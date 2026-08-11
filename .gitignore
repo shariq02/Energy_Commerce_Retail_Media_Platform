@@ -1,0 +1,105 @@
+# ====================================================================
+# Energy Commerce & Retail Media Analytics Platform - .gitignore
+# ====================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Project documentation - stays local/private until a sanitized
+# public version is prepared near project completion
+docs/
+
+# Data files - never commit raw or processed data
+data/raw/
+data/samples/
+data/staging/
+data/processed/
+*.csv
+*.parquet
+*.json.gz
+*.json
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Credentials - never commit
+.env
+config/credentials.json
+*service-account*.json
+*.pem
+*.key
+
+# GCP
+.config/gcloud/
+gcloud-service-key.json
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+terraform/modules/*/.terraform/
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Databricks
+.databricks/
+databricks/.databricks/
+
+# Redpanda
+redpanda/data/
+redpanda/logs/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+
+# Dagster
+.dagster/
+dagster_home/
+
+# ChromaDB / vector store
+ai/vector_store/data/
+chroma_db/
+*.chroma/
+
+# Grafana
+grafana/data/
+grafana/logs/
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Pytest
+.pytest_cache/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
