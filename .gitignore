@@ -18,6 +18,9 @@ venv/
 # public version is prepared near project completion
 docs/
 
+# Local-only acquisition notes - not tracked
+scripts/download/README.md
+
 # Data files - never commit raw or processed data
 data/raw/
 data/samples/
