@@ -22,7 +22,7 @@ This file manages:
 - dbt configuration
 - FastAPI configuration
 - Data generator configuration
-- Layer-specific settings (Landing, Standardized, Canonical/Curated)
+- Layer-specific settings (Bronze, Silver, Gold)
 - AI / RAG configuration
 - Logging configuration
 
@@ -250,13 +250,12 @@ DATABRICKS_CONFIG = {
     'token': os.getenv('DATABRICKS_TOKEN'),
     'token_dbt': os.getenv('DATABRICKS_TOKEN_DBT'),
     'catalog': 'ecrmap',
-    # Layer names per ADR-011 - Landing / Standardized / Canonical,
-    # not Bronze / Silver / Gold
+    # Layer names per ADR-011, reverted to Bronze / Silver / Gold per ADR-016
     'schemas': {
         'eda': 'eda',
-        'landing': 'landing',
-        'standardized': 'standardized',
-        'canonical': 'canonical',
+        'bronze': 'bronze',
+        'silver': 'silver',
+        'gold': 'gold',
         'quality': 'quality',
     },
 }
@@ -269,8 +268,8 @@ DAGSTER_CONFIG = {
     'home': os.getenv('DAGSTER_HOME'),
     'schedules': {
         'batch_ingestion': '0 1 * * *',
-        'standardized_transform': '0 2 * * *',
-        'canonical_build': '0 3 * * *',
+        'silver_transform': '0 2 * * *',
+        'gold_build': '0 3 * * *',
         'dbt_run': '0 4 * * *',
         'quality_report': '0 5 * * *',
     },
@@ -339,42 +338,42 @@ GENERATOR_CONFIG = {
 }
 
 # ====================================================================
-# LANDING LAYER CONFIGURATION
+# BRONZE LAYER CONFIGURATION
 # Preserves what arrived, unmodified, source-attributed - ARCHITECTURE
-# Section 7, ADR-011
+# Section 7, ADR-011, ADR-016
 # ====================================================================
 
-LANDING_CONFIG = {
-    'poll_timeout': int(os.getenv('LANDING_POLL_TIMEOUT', 1000)),
-    'max_poll_records': int(os.getenv('LANDING_MAX_POLL_RECORDS', 500)),
-    'auto_offset_reset': os.getenv('LANDING_AUTO_OFFSET_RESET', 'earliest'),
-    'write_interval': int(os.getenv('LANDING_WRITE_INTERVAL', 60)),
-    'compression': os.getenv('LANDING_PARQUET_COMPRESSION', 'snappy'),
-    'checkpoint_interval': int(os.getenv('LANDING_CHECKPOINT_INTERVAL', 300)),
+BRONZE_CONFIG = {
+    'poll_timeout': int(os.getenv('BRONZE_POLL_TIMEOUT', 1000)),
+    'max_poll_records': int(os.getenv('BRONZE_MAX_POLL_RECORDS', 500)),
+    'auto_offset_reset': os.getenv('BRONZE_AUTO_OFFSET_RESET', 'earliest'),
+    'write_interval': int(os.getenv('BRONZE_WRITE_INTERVAL', 60)),
+    'compression': os.getenv('BRONZE_PARQUET_COMPRESSION', 'snappy'),
+    'checkpoint_interval': int(os.getenv('BRONZE_CHECKPOINT_INTERVAL', 300)),
     'gcs_partition_keys': ['source_system', 'event_type', 'year', 'month', 'day', 'hour'],
 }
 
 # ====================================================================
-# STANDARDIZED LAYER CONFIGURATION
-# Cleaned, validated, normalized per source's data contract - ADR-011
+# SILVER LAYER CONFIGURATION
+# Cleaned, validated, normalized per source's data contract - ADR-011, ADR-016
 # ====================================================================
 
-STANDARDIZED_CONFIG = {
-    'completeness_threshold': float(os.getenv('STANDARDIZED_COMPLETENESS_THRESHOLD', 0.95)),
-    'uniqueness_threshold': float(os.getenv('STANDARDIZED_UNIQUENESS_THRESHOLD', 1.0)),
-    'batch_size': int(os.getenv('STANDARDIZED_BATCH_SIZE', 10000)),
+SILVER_CONFIG = {
+    'completeness_threshold': float(os.getenv('SILVER_COMPLETENESS_THRESHOLD', 0.95)),
+    'uniqueness_threshold': float(os.getenv('SILVER_UNIQUENESS_THRESHOLD', 1.0)),
+    'batch_size': int(os.getenv('SILVER_BATCH_SIZE', 10000)),
 }
 
 # ====================================================================
-# CANONICAL / CURATED LAYER CONFIGURATION
+# GOLD LAYER CONFIGURATION
 # Integrated across domains, canonically mapped, includes Germany
-# localisation mapping (UC-10) - ADR-011
+# localisation mapping (UC-10) - ADR-011, ADR-016
 # ====================================================================
 
-CANONICAL_CONFIG = {
-    'snapshot_interval_hours': int(os.getenv('CANONICAL_SNAPSHOT_INTERVAL_HOURS', 1)),
-    'retention_days': int(os.getenv('CANONICAL_RETENTION_DAYS', 90)),
-    'aggregation_batch_size': int(os.getenv('CANONICAL_AGGREGATION_BATCH_SIZE', 50000)),
+GOLD_CONFIG = {
+    'snapshot_interval_hours': int(os.getenv('GOLD_SNAPSHOT_INTERVAL_HOURS', 1)),
+    'retention_days': int(os.getenv('GOLD_RETENTION_DAYS', 90)),
+    'aggregation_batch_size': int(os.getenv('GOLD_AGGREGATION_BATCH_SIZE', 50000)),
     # Every canonical entity carries source_system + source_record_id +
     # canonical_id - DATA_MODEL Section 8
     'required_provenance_fields': ['source_system', 'source_record_id', 'canonical_id'],
