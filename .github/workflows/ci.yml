@@ -42,4 +42,7 @@ jobs:
       - name: Run unit tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: pytest tests/unit/ -v -m unit
+        # Exit code 5 = "no tests collected" -- tolerated until real unit
+        # tests exist under tests/unit/. Any other non-zero exit (actual
+        # test failures, errors) still fails the job.
+        run: pytest tests/unit/ -v -m unit || [ $? -eq 5 ]
