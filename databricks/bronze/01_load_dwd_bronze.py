@@ -53,6 +53,22 @@ DWD_METADATA_DATASETS = [
     "missing_value_periods",
 ]
 
+# Source column names containing characters Delta rejects in identifiers
+# (e.g. "[", "]", "(", ")", ".") for the affected DWD datasets only.
+# Renaming happens right before the Bronze write; values are untouched.
+COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {
+    "device_instrument": {
+        "Geo. Laenge [Grad]": "geo_longitude_deg",
+        "Geo. Breite [Grad]": "geo_latitude_deg",
+        "Stationshoehe [m]": "station_elevation_m",
+        "Geberhoehe ueber Grund [m]": "sensor_height_m",
+        "Geraetetyp Name": "device_type_name",
+    },
+    "parameter_unit": {
+        "Datenquelle (Strukturversion=SV)": "data_source",
+    },
+}
+
 # (dataset_name, source_volume) for all 12 Bronze upload units.
 DWD_DATASETS = [(d, DWD_ANALYTICAL_VOLUME) for d in DWD_ANALYTICAL_DATASETS] + \
                [(d, DWD_METADATA_VOLUME) for d in DWD_METADATA_DATASETS]
@@ -173,6 +189,13 @@ for dataset, volume in DWD_DATASETS:
             .option("inferSchema", "false")
             .csv(files)
         )
+        rename_map = COLUMN_RENAME_MAP.get(dataset, {})
+        applied_renames = {old: new for old, new in rename_map.items() if old in df.columns}
+        for old, new in applied_renames.items():
+            df = df.withColumnRenamed(old, new)
+        if applied_renames:
+            print(f"OK  {dataset}: normalized column name(s) -- {applied_renames}")
+
         row_count = df.count()
         df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(table)
         result["rows"] = row_count
