@@ -1,0 +1,41 @@
+pandas==2.1.4
+numpy==1.26.4
+pyarrow==14.0.2
+pydantic==2.13.4
+psycopg2-binary==2.9.12
+SQLAlchemy==2.0.52
+fastavro==1.12.2
+fastapi==0.136.3
+uvicorn==0.49.0
+requests==2.31.0
+httpx==0.28.1
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.2
+protobuf==4.25.9
+
+# dbt - pinned to the 1.8.x line to coexist with ACIP's dbt-databricks 1.8.0
+# under the same shared dbt-core install. Do not bump without checking
+# dbt-databricks compatibility first (see project notes).
+dbt-core==1.8.8
+dbt-bigquery~=1.8.0
+
+# Databricks - pinned to what ACIP's dbt-databricks 1.8.0 requires
+databricks-sdk==0.17.0
+databricks-sql-connector==3.1.2
+
+# Orchestration / AI / GCP - no known conflicts with ACIP/MarketMind as of
+# this install (verified via dry-run + runtime check, August 2026)
+dagster==1.13.17
+dagster-webserver==1.13.17
+dagster-gcp==0.29.17
+chromadb==1.5.9
+google-cloud-bigquery==3.43.0
+google-cloud-storage==2.19.0
+google-auth==2.56.3
+confluent-kafka>=2.3.0
+pyspark==4.2.0
+
+# opentelemetry-api pinned up from dagster's default to satisfy Prefect's
+# pydocket dependency (>=1.33.0) - installed after dagster to correct a
+# silent downgrade dagster's own dependency chain caused
+opentelemetry-api>=1.33.0
