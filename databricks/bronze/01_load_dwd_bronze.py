@@ -1,9 +1,13 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data into the
@@ -11,24 +15,13 @@
 
 # COMMAND ----------
 
-# 1. IMPORTS
-
+# DBTITLE 1,Imports
 from pyspark.sql.utils import AnalysisException
 import re
 
 # COMMAND ----------
 
-# 2. CONFIGURATION
-#
-# One catalog, one Bronze schema, two DWD Volume upload units
-# (dwd_analytical, dwd_metadata). Each of the 12 DWD_DATASETS below maps
-# to exactly one Bronze table -- physical chunks inside a Volume are a
-# file-count detail, never a table-count driver. The regex used later
-# to collect a dataset's files accepts either a single unchunked file
-# (<dataset>.csv, as produced by scripts/ingestion/stage_dwd.py) or a
-# chunked upload (dwd_<dataset>_chunk_00001.csv, ...) so both staging
-# outcomes are handled without changing this notebook.
-
+# DBTITLE 1,Configuration
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 
@@ -91,12 +84,6 @@ def dataset_file_pattern(dataset: str) -> re.Pattern:
 
 # COMMAND ----------
 
-# 3. VOLUME EXISTENCE CHECKS
-#
-# Both DWD Volumes must exist and be listable before any dataset file
-# is looked for. Missing/inaccessible Volumes fail the notebook
-# immediately -- there is nothing downstream that can safely proceed.
-
 # DBTITLE 1,Verify DWD Volumes exist and are accessible
 found_volumes = {
     row.volume_name
@@ -124,13 +111,6 @@ print(f"OK  both DWD Volumes present and accessible: {VOLUMES}")
 
 # COMMAND ----------
 
-# 4. DATASET-TO-FILE MAPPING
-#
-# For each of the 12 DWD datasets, collect every physical file
-# belonging to it out of its source Volume. Any dataset with zero
-# matching files fails the notebook immediately -- a missing dataset
-# file must not silently become a missing/empty Bronze table.
-
 # DBTITLE 1,Map each DWD dataset to its source files
 dataset_files: dict[str, list[str]] = {}
 missing_dataset_files: list[str] = []
@@ -155,17 +135,6 @@ if missing_dataset_files:
 print(f"OK  all {len(DWD_DATASETS)} DWD datasets have at least one source file")
 
 # COMMAND ----------
-
-# 5. BRONZE LOADING
-#
-# Each dataset's file(s) -- one physical file or many chunks -- are
-# read together as a single DataFrame and written to exactly one
-# Bronze table, preserving the staged column structure. Columns are
-# read as strings (no schema inference) so Bronze faithfully mirrors
-# the staged CSV content rather than reinterpreting types. A failure
-# loading one dataset does not stop the others -- every dataset is
-# attempted so the Final Summary and Volume cleanup step can report
-# and decide on the complete picture.
 
 # DBTITLE 1,Load each DWD dataset into its Bronze table
 load_results: list[dict] = []
@@ -209,14 +178,6 @@ for dataset, volume in DWD_DATASETS:
 
 # COMMAND ----------
 
-# 6. VALIDATION
-#
-# For every dataset that loaded successfully, confirm the Bronze table
-# exists, is describable, has a non-empty schema, and its row count
-# matches what was reported during loading. Datasets that failed to
-# load are recorded as failed validation too -- they never reach this
-# check with a usable table.
-
 # DBTITLE 1,Validate each Bronze table
 for result in load_results:
     if result["status"] != "LOADED":
@@ -248,8 +209,6 @@ overall_success = all_loaded and all_validated and all_files_ok
 
 # COMMAND ----------
 
-# 7. FINAL SUMMARY
-
 # DBTITLE 1,DWD Bronze load summary
 print("=" * 70)
 print("DWD BRONZE LOAD SUMMARY")
@@ -271,14 +230,6 @@ print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
 
 # COMMAND ----------
-
-# 8. VOLUME CLEANUP
-#
-# The two DWD Volumes are temporary landing storage, deleted only after
-# all 12 Bronze tables are confirmed loaded and validated with no
-# failed files/chunks. Any failure anywhere above -- missing Volume,
-# missing dataset file, failed load, failed validation -- preserves
-# both Volumes untouched.
 
 # DBTITLE 1,Delete DWD Volumes only if every dataset passed
 volume_cleanup: dict[str, str] = {}
