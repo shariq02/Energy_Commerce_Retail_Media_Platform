@@ -28,7 +28,7 @@
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -36,6 +36,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from _memory_guard import PeakRSSMonitor
+
 from config import DATA_RAW_DIR, DATA_STAGING_DIR, get_logger
 
 logger = get_logger(__name__)
@@ -57,7 +58,7 @@ def _rows_for_file(path: Path) -> tuple[pd.DataFrame, int]:
     resolution = payload["resolution"]
     series = payload["series"]
 
-    timestamps = [datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat() for ts_ms, _ in series]
+    timestamps = [datetime.fromtimestamp(ts_ms / 1000, tz=UTC).isoformat() for ts_ms, _ in series]
     values = [value for _, value in series]
 
     df = pd.DataFrame({

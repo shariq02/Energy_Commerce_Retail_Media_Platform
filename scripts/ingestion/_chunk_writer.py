@@ -10,7 +10,7 @@
 # never be read as dataset count.
 #
 # Each write() call is handed a DataFrame no larger than one processing
-# batch (<=100,000 rows, per the memory guard). That batch is written to
+# batch (<=300,000 rows, per the memory guard). That batch is written to
 # disk immediately -- if it would push the current physical chunk past
 # either limit, the batch itself is sliced by row so no output file
 # exceeds MAX_CHUNK_BYTES, and the current chunk is closed/rotated
@@ -23,8 +23,8 @@ from pathlib import Path
 
 import pandas as pd
 
-MAX_CHUNK_ROWS = 100_000
-MAX_CHUNK_BYTES = 50 * 1024 * 1024  # 50 MiB
+MAX_CHUNK_ROWS = 300_000
+MAX_CHUNK_BYTES = 80 * 1024 * 1024  # 80 MiB
 
 
 class ChunkedCSVWriter:

@@ -50,8 +50,13 @@ where = ["."]
 include = ["src*", "fastapi*", "ai*"]
 
 [tool.ruff]
-extend-ignore = ["E402"]
 exclude = ["data/", "docs/", ".terraform/"]
+
+[tool.ruff.lint]
+# I: import sorting. PLW1508: reject numeric os.getenv() defaults (must
+# be str/None). UP017: datetime.UTC alias. PLR1730: if/assign -> max().
+extend-select = ["I", "PLW1508", "UP017", "PLR1730"]
+extend-ignore = ["E402"]
 
 [tool.pytest.ini_options]
 markers = [

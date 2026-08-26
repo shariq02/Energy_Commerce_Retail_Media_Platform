@@ -30,10 +30,11 @@ Usage:
     from config import get_database_url, KAFKA_CONFIG, GCP_CONFIG
 """
 
-import os
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load environment variables first
@@ -165,9 +166,9 @@ KAFKA_CONFIG = {
     'client_id': os.getenv('KAFKA_CLIENT_ID', 'ecrmap-producer'),
     'compression_type': os.getenv('KAFKA_COMPRESSION_TYPE', 'gzip'),
     'acks': os.getenv('KAFKA_ACKS', 'all'),
-    'retries': int(os.getenv('KAFKA_RETRIES', 3)),
-    'batch_size': int(os.getenv('KAFKA_BATCH_SIZE', 16384)),
-    'linger_ms': int(os.getenv('KAFKA_LINGER_MS', 10)),
+    'retries': int(os.getenv('KAFKA_RETRIES', '3')),
+    'batch_size': int(os.getenv('KAFKA_BATCH_SIZE', '16384')),
+    'linger_ms': int(os.getenv('KAFKA_LINGER_MS', '10')),
 }
 
 # Topics carry replayed historical data (IoT, REES46, iPinYou) plus CDC
@@ -295,7 +296,7 @@ DBT_CONFIG = {
 
 FASTAPI_CONFIG = {
     'host': os.getenv('FASTAPI_HOST', '0.0.0.0'),
-    'port': int(os.getenv('FASTAPI_PORT', 8000)),
+    'port': int(os.getenv('FASTAPI_PORT', '8000')),
     'reload': os.getenv('FASTAPI_RELOAD', 'true').lower() == 'true',
     'title': 'Energy Commerce Intelligence Agent API',
     'version': '0.1.0',
@@ -330,10 +331,10 @@ AI_TOOLS = [
 # ====================================================================
 
 GENERATOR_CONFIG = {
-    'events_per_second': int(os.getenv('GENERATOR_EVENTS_PER_SECOND', 10)),
-    'replay_speed': int(os.getenv('GENERATOR_REPLAY_SPEED', 60)),
+    'events_per_second': int(os.getenv('GENERATOR_EVENTS_PER_SECOND', '10')),
+    'replay_speed': int(os.getenv('GENERATOR_REPLAY_SPEED', '60')),
     'anomaly_mode': os.getenv('GENERATOR_ANOMALY_MODE', 'false').lower() == 'true',
-    'anomaly_probability': float(os.getenv('GENERATOR_ANOMALY_PROBABILITY', 0.05)),
+    'anomaly_probability': float(os.getenv('GENERATOR_ANOMALY_PROBABILITY', '0.05')),
     'sources': ['iot', 'commerce', 'retail_media'],
 }
 
@@ -344,12 +345,12 @@ GENERATOR_CONFIG = {
 # ====================================================================
 
 BRONZE_CONFIG = {
-    'poll_timeout': int(os.getenv('BRONZE_POLL_TIMEOUT', 1000)),
-    'max_poll_records': int(os.getenv('BRONZE_MAX_POLL_RECORDS', 500)),
+    'poll_timeout': int(os.getenv('BRONZE_POLL_TIMEOUT', '1000')),
+    'max_poll_records': int(os.getenv('BRONZE_MAX_POLL_RECORDS', '500')),
     'auto_offset_reset': os.getenv('BRONZE_AUTO_OFFSET_RESET', 'earliest'),
-    'write_interval': int(os.getenv('BRONZE_WRITE_INTERVAL', 60)),
+    'write_interval': int(os.getenv('BRONZE_WRITE_INTERVAL', '60')),
     'compression': os.getenv('BRONZE_PARQUET_COMPRESSION', 'snappy'),
-    'checkpoint_interval': int(os.getenv('BRONZE_CHECKPOINT_INTERVAL', 300)),
+    'checkpoint_interval': int(os.getenv('BRONZE_CHECKPOINT_INTERVAL', '300')),
     'gcs_partition_keys': ['source_system', 'event_type', 'year', 'month', 'day', 'hour'],
 }
 
@@ -359,9 +360,9 @@ BRONZE_CONFIG = {
 # ====================================================================
 
 SILVER_CONFIG = {
-    'completeness_threshold': float(os.getenv('SILVER_COMPLETENESS_THRESHOLD', 0.95)),
-    'uniqueness_threshold': float(os.getenv('SILVER_UNIQUENESS_THRESHOLD', 1.0)),
-    'batch_size': int(os.getenv('SILVER_BATCH_SIZE', 10000)),
+    'completeness_threshold': float(os.getenv('SILVER_COMPLETENESS_THRESHOLD', '0.95')),
+    'uniqueness_threshold': float(os.getenv('SILVER_UNIQUENESS_THRESHOLD', '1.0')),
+    'batch_size': int(os.getenv('SILVER_BATCH_SIZE', '10000')),
 }
 
 # ====================================================================
@@ -371,9 +372,9 @@ SILVER_CONFIG = {
 # ====================================================================
 
 GOLD_CONFIG = {
-    'snapshot_interval_hours': int(os.getenv('GOLD_SNAPSHOT_INTERVAL_HOURS', 1)),
-    'retention_days': int(os.getenv('GOLD_RETENTION_DAYS', 90)),
-    'aggregation_batch_size': int(os.getenv('GOLD_AGGREGATION_BATCH_SIZE', 50000)),
+    'snapshot_interval_hours': int(os.getenv('GOLD_SNAPSHOT_INTERVAL_HOURS', '1')),
+    'retention_days': int(os.getenv('GOLD_RETENTION_DAYS', '90')),
+    'aggregation_batch_size': int(os.getenv('GOLD_AGGREGATION_BATCH_SIZE', '50000')),
     # Every canonical entity carries source_system + source_record_id +
     # canonical_id - DATA_MODEL Section 8
     'required_provenance_fields': ['source_system', 'source_record_id', 'canonical_id'],

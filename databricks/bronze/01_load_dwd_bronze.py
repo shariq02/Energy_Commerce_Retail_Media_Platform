@@ -16,8 +16,9 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-from pyspark.sql.utils import AnalysisException
 import re
+
+from pyspark.sql.utils import AnalysisException
 
 # COMMAND ----------
 

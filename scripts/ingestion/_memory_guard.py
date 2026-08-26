@@ -28,8 +28,7 @@ class PeakRSSMonitor:
 
     def check(self) -> int:
         rss = self._process.memory_info().rss
-        if rss > self.peak_rss_bytes:
-            self.peak_rss_bytes = rss
+        self.peak_rss_bytes = max(self.peak_rss_bytes, rss)
         if rss > self.safety_threshold_bytes:
             raise MemoryLimitExceeded(
                 f"RSS {rss / 1024 / 1024:.1f} MB exceeded safety threshold "

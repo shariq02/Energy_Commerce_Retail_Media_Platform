@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from _chunk_writer import ChunkedCSVWriter
 from _memory_guard import PeakRSSMonitor
+
 from config import DATA_RAW_DIR, DATA_STAGING_DIR, get_logger
 
 logger = get_logger(__name__)
@@ -43,7 +44,7 @@ REFERENCE_DIR = STAGING_IPINYOU_DIR / "reference"
 # decompresses far past what fits in memory on this machine at once.
 # Capped at 50,000 rows/chunk under the Phase 2b 1 GB memory-safety design
 # (scripts/ingestion/_memory_guard.py).
-CHUNK_SIZE = 100_000
+CHUNK_SIZE = 300_000
 
 # ---- Canonical field lists, in on-disk column order -----------------
 
