@@ -37,9 +37,9 @@ DATASETS: list[tuple[str, str, str]] = [
 VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
 # Read settings for this source's staged files.
-READ_FORMAT = "json"                                     # "csv" or "json"
+READ_FORMAT = "csv"
 CSV_OPTIONS = {"header": "true", "inferSchema": "false"}  # used only when READ_FORMAT == "csv"
-FILE_EXT_PATTERN = r"json"                                # regex alternation of accepted extensions
+FILE_EXT_PATTERN = r"csv"                                # regex alternation of accepted extensions
 
 # Optional semantic column renames applied before the generic sanitizer
 # below. Column VALUES are never touched. Empty unless a source needs it.
@@ -60,8 +60,7 @@ def dataset_file_pattern(dataset: str) -> re.Pattern:
     # "<source>_"-prefixed variant, or a physically chunked upload
     # "<dataset>_chunk_00001.<ext>". Chunk boundaries disappear at Bronze.
     return re.compile(
-        rf"^(?:{re.escape(SOURCE_PREFIX)}_)?{re.escape(dataset)}"
-        rf"(?:_chunk_\d{{5}})?\.(?:{FILE_EXT_PATTERN})$"
+        rf"^{re.escape(dataset)}\.(?:{FILE_EXT_PATTERN})$"
     )
 
 
@@ -120,6 +119,22 @@ if inaccessible_volumes:
     raise RuntimeError(f"FAIL  inaccessible Volume(s): {detail}")
 
 print(f"OK  all {len(VOLUMES)} required Volume(s) present and accessible: {VOLUMES}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect SMARD Volume File Details
+VOLUME_PATH = "/Volumes/energy_commerce_retail_media/bronze/smard_analytical"
+
+items = dbutils.fs.ls(VOLUME_PATH)
+
+print(f"Files found: {len(items)}")
+print()
+
+for item in items:
+    print(f"Name : {item.name}")
+    print(f"Path : {item.path}")
+    print(f"Size : {item.size / (1024 * 1024):.2f} MB")
+    print("-" * 70)
 
 # COMMAND ----------
 
