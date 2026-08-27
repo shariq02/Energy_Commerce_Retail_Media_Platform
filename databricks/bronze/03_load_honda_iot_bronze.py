@@ -6,28 +6,13 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- HONDA IOT (IOT / ENERGY CONSUMPTION)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the Honda
 # MAGIC Research Institute Smart Building dataset (iot domain) into the frozen
 # MAGIC Bronze table structure.
-# MAGIC
-# MAGIC Bronze design is frozen (`PIPELINE_DESIGN` Section 1c): **7 Bronze
-# MAGIC tables**, one per metric domain (`electricity_P/W`, `heating_P/W`,
-# MAGIC `cooling_P/W`, `weather`). The 1min/15min/1h variants are frequency
-# MAGIC partitions of the same 7 datasets, not 21 -- `frequency` is already an
-# MAGIC explicit column in the staged files (added in Phase 2b), so this
-# MAGIC notebook just reads and unions them.
-# MAGIC
-# MAGIC Staged files are read and unioned **by column name** (`unionByName`),
-# MAGIC never by position -- the `weather` dataset has a documented column-order
-# MAGIC inconsistency across frequency files and a positional read would
-# MAGIC silently swap two fields.
-# MAGIC
-# MAGIC Flat naming `energy_commerce_retail_media.bronze.honda_iot_*`, no
-# MAGIC domain-nested schema at this stage.
 
 # COMMAND ----------
 

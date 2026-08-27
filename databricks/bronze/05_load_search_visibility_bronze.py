@@ -6,27 +6,14 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- SEARCH VISIBILITY (COMMERCE)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the RAMP /
 # MAGIC Dryad Search Console-derived dataset (commerce domain) into the frozen
 # MAGIC Bronze table structure.
 # MAGIC
-# MAGIC Bronze design is frozen (`PIPELINE_DESIGN` Section 1c): **2 Bronze
-# MAGIC tables** -- `search_visibility_events` (one 11-column event log; the 12
-# MAGIC monthly archives are monthly partitions of it, joined to the reference
-# MAGIC table by `repository_id`) and `search_visibility_repository` (the
-# MAGIC `repository_info` reference/lookup dataset). The two live in separate
-# MAGIC Volumes.
-# MAGIC
-# MAGIC **Source condition, preserved not repaired:** February 2017 contains
-# MAGIC data only through Feb 7. Bronze does not fabricate or repair it.
-# MAGIC
-# MAGIC This is a static published research dataset, never a live Search Console
-# MAGIC property. Flat naming `energy_commerce_retail_media.bronze.search_visibility_*`,
-# MAGIC no domain-nested schema at this stage.
 
 # COMMAND ----------
 

@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- CRITEO ATTRIBUTION (RETAIL MEDIA / ADVERTISING)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the Criteo
@@ -15,13 +15,6 @@
 # MAGIC performance signal alongside iPinYou) into the frozen Bronze table
 # MAGIC structure.
 # MAGIC
-# MAGIC Bronze design is frozen (`PIPELINE_DESIGN` Section 1c): **1 Bronze
-# MAGIC table** -- one self-contained `attribution_events` dataset (16,468,028
-# MAGIC rows, 22 columns, tab-separated). Chunked only for upload practicality;
-# MAGIC chunk boundaries disappear here.
-# MAGIC
-# MAGIC Flat naming `energy_commerce_retail_media.bronze.criteo_attribution_*`,
-# MAGIC no domain-nested schema at this stage.
 
 # COMMAND ----------
 

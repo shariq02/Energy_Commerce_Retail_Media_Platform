@@ -6,22 +6,13 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- KDD CUP 2012 TRACK 2 (COMMERCE / SEARCH ADVERTISING)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the KDD Cup
 # MAGIC 2012 Track 2 (Click Prediction) dataset (commerce domain -- search
 # MAGIC advertising signal) into the frozen Bronze table structure.
-# MAGIC
-# MAGIC Bronze design is frozen (`PIPELINE_DESIGN` Section 1c): **1 Bronze
-# MAGIC table** -- one self-contained `click_prediction` dataset (399,483 rows,
-# MAGIC 12 columns, single consistent header). No splitting, no consolidation.
-# MAGIC
-# MAGIC This is Tencent/SOSO search-engine click-prediction competition data --
-# MAGIC never described as Google Ads or Criteo data. Flat naming
-# MAGIC `energy_commerce_retail_media.bronze.kddcup2012_*`, no domain-nested
-# MAGIC schema at this stage.
 
 # COMMAND ----------
 

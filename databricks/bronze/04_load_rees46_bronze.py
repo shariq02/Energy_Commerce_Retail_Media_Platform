@@ -6,26 +6,14 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- REES46 (COMMERCE / CUSTOMER BEHAVIOUR)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the REES46
 # MAGIC Ecommerce Behaviour dataset (commerce / customer_behaviour domain) into
 # MAGIC the frozen Bronze table structure.
 # MAGIC
-# MAGIC Bronze design is frozen (`PIPELINE_DESIGN` Section 1c): **1 Bronze
-# MAGIC table** -- one logical `events` dataset. The Oct/Nov 2019 files are
-# MAGIC monthly partitions of one 9-column event log (identical header);
-# MAGIC `view`/`cart`/`purchase` event types stay together. Chunked only for
-# MAGIC upload practicality -- chunk boundaries disappear here.
-# MAGIC
-# MAGIC This dataset is **not German** and must never be represented as German
-# MAGIC customer data (ADR-005, UC-10). Bronze preserves it as-is with its own
-# MAGIC source attribution; localisation happens downstream.
-# MAGIC
-# MAGIC Flat naming `energy_commerce_retail_media.bronze.rees46_*`, no
-# MAGIC domain-nested schema at this stage.
 
 # COMMAND ----------
 

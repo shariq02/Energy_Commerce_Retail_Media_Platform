@@ -6,19 +6,12 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- SMARD (ENERGY MARKET)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
-# MAGIC **Date:** August 2026
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Date:** August 2026  
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for SMARD (energy
 # MAGIC domain) into the frozen Bronze table structure.
-# MAGIC
-# MAGIC Bronze design is frozen (`PIPELINE_DESIGN` Section 1c): **1 Bronze table**
-# MAGIC for this source -- one logical `energy_timeseries` dataset (all 16 source
-# MAGIC JSON files share `filter_id, region, resolution, series`; `filter_id`
-# MAGIC becomes metric context within the one table, never 16 tables). Flat
-# MAGIC naming `energy_commerce_retail_media.bronze.smard_*`, no domain-nested
-# MAGIC schema at this stage.
 
 # COMMAND ----------
 
