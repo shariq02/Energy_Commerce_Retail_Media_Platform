@@ -47,7 +47,7 @@ VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
 # Read settings for this source's staged files.
 READ_FORMAT = "csv"                                       # "csv" or "json"
-CSV_OPTIONS = {"header": "true", "inferSchema": "false"}  # used only when READ_FORMAT == "csv"
+CSV_OPTIONS = {"header": "true", "inferSchema": "false", "enforceSchema": "false"}  # used only when READ_FORMAT == "csv"
 FILE_EXT_PATTERN = r"csv|csv\.gz"                         # gzip CSV is read natively by Spark
 
 # Optional semantic column renames applied before the generic sanitizer
@@ -96,14 +96,13 @@ def read_dataset(files: list[str]) -> DataFrame:
     reader = spark.read
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
-    # Read each staged file on its own and union by column NAME, so a file
-    # whose columns arrive in a different order (a documented Honda `weather`
-    # condition) still lines up correctly.
-    frame: DataFrame | None = None
-    for path in files:
-        part = reader.csv(path)
-        frame = part if frame is None else frame.unionByName(part, allowMissingColumns=True)
-    return frame
+    # All staged files for one dataset are lossless chunks of a single
+    # Phase 2b dataframe and share an identical header (Phase 2b already
+    # normalized Honda's raw cross-frequency `weather` column-order issue and
+    # folded frequency into a column), so read them in one pass.
+    # enforceSchema=false makes Spark validate every chunk's header and fail
+    # loudly on a mismatch rather than aligning columns by position.
+    return reader.csv(files)
 
 # COMMAND ----------
 
