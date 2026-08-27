@@ -122,19 +122,19 @@ print(f"OK  all {len(VOLUMES)} required Volume(s) present and accessible: {VOLUM
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect SMARD Volume File Details
-VOLUME_PATH = "/Volumes/energy_commerce_retail_media/bronze/smard_analytical"
-
-items = dbutils.fs.ls(VOLUME_PATH)
-
-print(f"Files found: {len(items)}")
-print()
-
-for item in items:
-    print(f"Name : {item.name}")
-    print(f"Path : {item.path}")
-    print(f"Size : {item.size / (1024 * 1024):.2f} MB")
-    print("-" * 70)
+# DBTITLE 1,Inspect source Volume file details
+for volume in VOLUMES:
+    vpath = volume_path(volume)
+    items = dbutils.fs.ls(vpath)
+    print(f"Volume: {vpath}")
+    print(f"Files found: {len(items)}")
+    print()
+    for item in items:
+        print(f"Name : {item.name}")
+        print(f"Path : {item.path}")
+        print(f"Size : {item.size / (1024 * 1024):.2f} MB")
+        print("-" * 70)
+    print()
 
 # COMMAND ----------
 
