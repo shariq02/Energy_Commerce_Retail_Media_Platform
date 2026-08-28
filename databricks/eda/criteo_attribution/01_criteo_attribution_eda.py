@@ -1,0 +1,268 @@
+# Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
+# MAGIC %md
+# MAGIC # EDA -- CRITEO ATTRIBUTION
+# MAGIC
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Date:** August 2026
+# MAGIC
+# MAGIC **Purpose:** Profile criteo_attribution_events (one Bronze table of
+# MAGIC click/impression records with conversion + attribution fields and 9
+# MAGIC anonymised categoricals) -- schema, missingness, constant columns,
+# MAGIC relative-time coverage & continuity, campaign/user/conversion_id
+# MAGIC cardinality & concentration, conversion & attribution rates,
+# MAGIC attribution-path consistency, anomalous attribution behaviour,
+# MAGIC conversion behaviour, cost/cpo distributions, duplicate-key (identical
+# MAGIC vs conflicting) -- as evidence for Silver design.
+
+# COMMAND ----------
+
+# DBTITLE 1,Imports
+import matplotlib.pyplot as plt
+
+from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
+CATALOG = "energy_commerce_retail_media"
+BRONZE_SCHEMA = "bronze"
+TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.criteo_attribution_events"
+
+CAT_COLS = [f"cat{i}" for i in range(1, 10)]
+# timestamp / conversion_timestamp / time_since_last_click are relative
+# seconds-from-dataset-start integers here, not wall-clock.
+TS_COLS = ["timestamp", "conversion_timestamp", "time_since_last_click"]
+NUM_COLS = ["cost", "cpo", "click_pos", "click_nb"]
+
+# COMMAND ----------
+
+# DBTITLE 1,Helpers
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, log=False):
+    plt.figure(figsize=(10, 4))
+    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs], log=log)
+    plt.title(title); plt.xlabel(xlabel); plt.ylabel(ylabel)
+    plt.xticks(rotation=rot, ha="right" if rot else "center")
+    plt.tight_layout(); plt.show()
+
+
+def histplot(values, title, xlabel, bins=50, log=False):
+    plt.figure(figsize=(10, 4))
+    plt.hist(values, bins=bins, log=log)
+    plt.title(title); plt.xlabel(xlabel); plt.ylabel("count")
+    plt.tight_layout(); plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Schema, row count, missingness, approx distinct, constant columns (one pass)
+df = spark.table(TABLE)
+COLS = df.columns
+exprs = [F.count(F.lit(1)).alias("__rows")]
+for c in COLS:
+    miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
+    exprs += [F.sum(miss.cast("long")).alias(c + "__m"), F.approx_count_distinct(c).alias(c + "__d")]
+r = df.agg(*exprs).first().asDict()
+total = r["__rows"]
+acd = {c: r[c + "__d"] for c in COLS}
+constant_cols = [c for c in COLS if acd[c] <= 1]
+print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
+for c in COLS:
+    print(f"  {c:<22} missing={r[c + '__m']:>12} rate={r[c + '__m'] / total:.4f} approx_distinct={acd[c]}")
+print("constant columns:", constant_cols)
+df.show(5, truncate=False)
+
+# COMMAND ----------
+
+# DBTITLE 1,Scalar summary -- rates, flag domains, relative-time ranges, consistency, anomalies (one agg)
+conv, attr, clk = (F.col(c).cast("int") for c in ("conversion", "attribution", "click"))
+cts, cpo = F.col("conversion_timestamp").cast("double"), F.col("cpo").cast("double")
+agg_exprs = [
+    F.avg(F.col("conversion").cast("double")).alias("conversion_rate"),
+    F.avg(F.col("attribution").cast("double")).alias("attribution_rate"),
+    F.avg(F.col("click").cast("double")).alias("click_rate"),
+    F.sum(conv).alias("conversions"), F.sum(attr).alias("attributions"), F.sum(clk).alias("clicks"),
+    # attribution-path consistency
+    F.sum(((attr == 1) & (conv == 0)).cast("long")).alias("attr_no_conv"),
+    F.sum(((conv == 1) & (attr == 0)).cast("long")).alias("conv_no_attr"),
+    F.sum(((conv == 0) & (cts > 0)).cast("long")).alias("conv_ts_without_conversion"),
+    F.min(F.col("click_pos").cast("int")).alias("click_pos_min"), F.max(F.col("click_pos").cast("int")).alias("click_pos_max"),
+    F.min(F.col("click_nb").cast("int")).alias("click_nb_min"), F.max(F.col("click_nb").cast("int")).alias("click_nb_max"),
+    F.sum((F.col("click_pos").cast("int") > F.col("click_nb").cast("int")).cast("long")).alias("click_pos_gt_nb"),
+    # anomalous attribution / cost
+    F.sum(((attr == 1) & (clk == 0)).cast("long")).alias("attributed_no_click"),
+    F.sum(((F.col("cost").cast("double") > 0) & (clk == 0)).cast("long")).alias("cost_no_click"),
+    F.sum(((conv == 1) & (cpo <= 0)).cast("long")).alias("conversion_no_cpo"),
+    F.sum(((conv == 0) & (cpo > 0)).cast("long")).alias("cpo_no_conversion"),
+    # conversion path timing
+    F.expr("percentile_approx(case when conversion=1 then cast(time_since_last_click as double) end, array(0.25,0.5,0.75,0.99))").alias("tslc_conv_p25_50_75_99"),
+]
+for c in TS_COLS:
+    v = F.col(c).cast("double")
+    agg_exprs += [F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max"),
+                  F.sum((v < 0).cast("long")).alias(c + "_negative"),
+                  F.sum((F.col(c).isNull() | (F.trim(F.col(c)) == "")).cast("long")).alias(c + "_missing")]
+for c in NUM_COLS:
+    v = F.col(c).cast("double")
+    agg_exprs += [F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max"), F.avg(v).alias(c + "_avg"),
+                  F.expr(f"percentile_approx(cast(`{c}` as double), array(0.5,0.95,0.99))").alias(c + "_p")]
+S = df.agg(*agg_exprs).first().asDict()
+rates = {k: S[k] for k in ("conversion_rate", "attribution_rate", "click_rate")}
+print("rates:", rates)
+print("attr_no_conv:", S["attr_no_conv"], " conv_no_attr:", S["conv_no_attr"],
+      " conv_ts_without_conversion:", S["conv_ts_without_conversion"])
+print("click_pos:", (S["click_pos_min"], S["click_pos_max"]), " click_nb:", (S["click_nb_min"], S["click_nb_max"]),
+      " click_pos>click_nb:", S["click_pos_gt_nb"])
+print("anomalies:", {k: S[k] for k in ("attributed_no_click", "cost_no_click", "conversion_no_cpo", "cpo_no_conversion")})
+for c in TS_COLS + NUM_COLS:
+    print(f"  {c:<22}", {k[len(c) + 1:]: v for k, v in S.items() if k.startswith(c + "_")})
+
+# COMMAND ----------
+
+# DBTITLE 1,campaign / uid / conversion_id -- top values + concentration (one groupBy each)
+entity_top = {}
+for c in ("campaign", "uid", "conversion_id"):
+    top = [(x[c], x["count"]) for x in df.groupBy(c).count().orderBy(F.desc("count")).limit(50).collect()]
+    entity_top[c] = top
+    share10 = sum(n for _, n in top[:10]) / total
+    print(f"{c:<14} approx_distinct={acd[c]}  top value {top[0]} -> {top[0][1]} rows  "
+          f"top10 share={share10:.3%}")
+top_campaigns = entity_top["campaign"][:20]
+
+# COMMAND ----------
+
+# DBTITLE 1,Anonymised categoricals cat1..cat9 -- top values (single exploded pass)
+stacked = df.select(F.explode(F.array(
+    *[F.struct(F.lit(c).alias("cat"), F.col(c).alias("val")) for c in CAT_COLS])).alias("s")) \
+    .select("s.cat", "s.val")
+cat_counts = stacked.groupBy("cat", "val").count().collect()
+cat_top = {}
+for c in CAT_COLS:
+    vals = sorted((x for x in cat_counts if x["cat"] == c), key=lambda x: -x["count"])[:10]
+    cat_top[c] = [(x["val"], x["count"]) for x in vals]
+    print(f"{c}  approx_distinct={acd[c]}  top: {cat_top[c][:3]}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Conversion path -- rows per conversion_id, multi-uid paths (conversion subset)
+conv_rows = df.where(F.col("conversion").cast("int") == 1)
+cid = conv_rows.groupBy("conversion_id").agg(
+    F.count(F.lit(1)).alias("rows_in_path"),
+    F.approx_count_distinct("uid").alias("distinct_uids"),
+    F.approx_count_distinct("campaign").alias("distinct_campaigns"),
+)
+cp = cid.agg(
+    F.expr("approx_percentile(rows_in_path, array(0.5, 0.9, 0.99))").alias("path_len_p50_90_99"),
+    F.max("rows_in_path").alias("max_path_len"),
+    F.sum((F.col("distinct_uids") > 1).cast("long")).alias("multi_uid_paths"),
+    F.count(F.lit(1)).alias("conversion_paths"),
+).first().asDict()
+print("conversion paths:", cp)
+print("time_since_last_click for conversions (p25/50/75/99):", S["tslc_conv_p25_50_75_99"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Relative-time activity -- hour buckets (one groupBy, derive day / hod / conv curve)
+hb = df.groupBy((F.col("timestamp").cast("long") / 3600).cast("int").alias("hour")) \
+       .agg(F.count(F.lit(1)).alias("events"), F.avg(F.col("conversion").cast("double")).alias("conv_rate")) \
+       .collect()
+hb = sorted((x for x in hb if x["hour"] is not None), key=lambda x: x["hour"])
+hours = [x["hour"] for x in hb]
+day_events = {}
+hod_events = {}
+hod_conv = {}
+for x in hb:
+    d = x["hour"] // 24
+    day_events[d] = day_events.get(d, 0) + x["events"]
+    h = x["hour"] % 24
+    hod_events[h] = hod_events.get(h, 0) + x["events"]
+    hod_conv.setdefault(h, []).append((x["events"], x["conv_rate"]))
+days = sorted(day_events)
+missing_days = sorted(set(range(days[0], days[-1] + 1)) - set(days)) if days else []
+print(f"relative-time span: hour {hours[0]}..{hours[-1]}  days {days[0]}..{days[-1]}  missing days: {missing_days}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Duplicate-key -- (uid, timestamp, campaign): identical vs conflicting (one pass)
+KEY = ["uid", "timestamp", "campaign"]
+dk = df.groupBy(*KEY).agg(
+    F.count(F.lit(1)).alias("n"),
+    F.countDistinct(F.hash(*[F.col(c) for c in COLS])).alias("row_variants"),
+    F.countDistinct("conversion", "attribution", "click").alias("outcome_variants"),
+)
+db = dk.agg(
+    F.count(F.lit(1)).alias("distinct_keys"),
+    F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
+    F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias("identical"),
+    F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias("conflicting"),
+    F.sum(((F.col("n") > 1) & (F.col("outcome_variants") > 1)).cast("long")).alias("conflicting_outcomes"),
+).first().asDict()
+print(f"{KEY}: distinct_keys={db['distinct_keys']} dup_groups={db['dup_groups']} "
+      f"identical={db['identical']} conflicting={db['conflicting']} conflicting_outcomes={db['conflicting_outcomes']}")
+
+# COMMAND ----------
+
+# DBTITLE 1,cost / cpo sample for histograms (one bounded sampled pass)
+p99 = {c: (S[c + "_p"][2] if S[c + "_p"] else None) for c in ("cost", "cpo")}
+cost_pdf = (
+    df.select(F.col("cost").cast("double").alias("cost"), F.col("cpo").cast("double").alias("cpo"))
+    .where(F.col("cost").isNotNull() | F.col("cpo").isNotNull())
+    .sample(0.05, seed=42).limit(200_000).toPandas()
+)
+print("cost/cpo sample rows:", len(cost_pdf), " p99:", p99)
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- rates, top campaigns, cat cardinality
+barplot([(k.replace("_rate", ""), rates[k]) for k in rates], "Criteo -- positive-flag rate", "flag", "rate")
+barplot(top_campaigns, "Criteo -- top 20 campaigns by row volume", "campaign", "rows", rot=90)
+plt.figure(figsize=(10, 4))
+plt.bar(CAT_COLS, [acd[c] for c in CAT_COLS], log=True)
+plt.title("Criteo -- distinct values per anonymised categorical"); plt.ylabel("distinct (log)")
+plt.tight_layout(); plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- cost / cpo distributions (sampled, clipped to p99)
+for c in ("cost", "cpo"):
+    s = cost_pdf[c].dropna()
+    if p99[c] and p99[c] > 0:
+        s = s[(s >= 0) & (s <= p99[c])]
+    if len(s):
+        histplot(s.tolist(), f"Criteo {c} -- distribution (sampled, clipped to p99={p99[c]})", c)
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- relative-time activity (events/day, events & conversion rate by hour bucket, by hour-of-day)
+barplot(sorted(day_events.items()), "Criteo -- events per relative day", "day", "events", rot=90)
+plt.figure(figsize=(12, 4))
+plt.plot(hours, [x["events"] for x in hb], linewidth=0.8)
+plt.title("Criteo -- event volume by relative-time hour bucket"); plt.xlabel("hour from start"); plt.ylabel("events")
+plt.tight_layout(); plt.show()
+plt.figure(figsize=(12, 4))
+plt.plot(hours, [x["conv_rate"] for x in hb], linewidth=0.8)
+plt.title("Criteo -- conversion rate by relative-time hour bucket"); plt.xlabel("hour from start"); plt.ylabel("conversion rate")
+plt.tight_layout(); plt.show()
+
+hods = sorted(hod_events)
+hod_cr = [sum(e * cr for e, cr in hod_conv[h]) / max(sum(e for e, _ in hod_conv[h]), 1) for h in hods]
+fig, ax1 = plt.subplots(figsize=(10, 4))
+ax1.bar(hods, [hod_events[h] for h in hods], alpha=0.6); ax1.set_xlabel("hour of day (relative)"); ax1.set_ylabel("events")
+ax2 = ax1.twinx(); ax2.plot(hods, hod_cr, color="red", marker="."); ax2.set_ylabel("conversion rate")
+plt.title("Criteo -- events and conversion rate by hour of day"); plt.tight_layout(); plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings
+print("constant columns:", constant_cols)
+print("rates:", rates, " conversions/attributions/clicks:", (S["conversions"], S["attributions"], S["clicks"]))
+print("relative-time span days:", (days[0], days[-1]), " missing days:", missing_days)
+print("attribution consistency: attr_no_conv =", S["attr_no_conv"], " conv_no_attr =", S["conv_no_attr"],
+      " conv_ts_without_conversion =", S["conv_ts_without_conversion"])
+print("anomalies:", {k: S[k] for k in ("attributed_no_click", "cost_no_click", "conversion_no_cpo", "cpo_no_conversion")})
+print("conversion paths:", cp)
+print("dup key:", db)
+print("concentration: campaign/uid/conversion_id top10 share -> see cell above")

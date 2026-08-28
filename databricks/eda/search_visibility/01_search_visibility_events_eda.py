@@ -1,0 +1,240 @@
+# Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
+# MAGIC %md
+# MAGIC # EDA -- SEARCH VISIBILITY EVENTS
+# MAGIC
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Date:** August 2026
+# MAGIC
+# MAGIC **Purpose:** Profile search_visibility_events (search-visibility
+# MAGIC metrics per url) -- schema, missingness, constant columns, the `date`
+# MAGIC field's true granularity + month structure, date/month coverage gaps,
+# MAGIC country/device breakdown, ranking (position / index) distributions,
+# MAGIC metric ranges & internal consistency (clicks <= impressions),
+# MAGIC duplicate-key (identical vs conflicting), entity coverage -- as
+# MAGIC evidence for Silver design.
+
+# COMMAND ----------
+
+# DBTITLE 1,Imports
+import datetime as dt
+
+import matplotlib.pyplot as plt
+
+from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
+CATALOG = "energy_commerce_retail_media"
+BRONZE_SCHEMA = "bronze"
+TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.search_visibility_events"
+KEY = ["repository_id", "url", "date", "country", "device"]
+
+# COMMAND ----------
+
+# DBTITLE 1,Helpers
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+    plt.figure(figsize=figsize)
+    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+    plt.title(title); plt.xlabel(xlabel); plt.ylabel(ylabel)
+    plt.xticks(rotation=rot, ha="right" if rot else "center")
+    plt.tight_layout(); plt.show()
+
+
+def histplot(values, title, xlabel, bins=50, log=False):
+    plt.figure(figsize=(10, 4))
+    plt.hist(values, bins=bins, log=log)
+    plt.title(title); plt.xlabel(xlabel); plt.ylabel("count")
+    plt.tight_layout(); plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Profile -- rows, missingness, approx distinct, constant columns (one agg)
+df = spark.table(TABLE)
+COLS = df.columns
+exprs = [F.count(F.lit(1)).alias("__rows")]
+for c in COLS:
+    miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
+    exprs += [F.sum(miss.cast("long")).alias(c + "__m"), F.approx_count_distinct(c).alias(c + "__d")]
+r = df.agg(*exprs).first().asDict()
+total = r["__rows"]
+acd = {c: r[c + "__d"] for c in COLS}
+constant_cols = [c for c in COLS if acd[c] <= 1]
+print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
+for c in COLS:
+    print(f"  {c:<18} missing={r[c + '__m']:>12} rate={r[c + '__m'] / total:.4f} approx_distinct={acd[c]}")
+print("constant columns:", constant_cols)
+print("url / repository_id approx distinct:", acd.get("url"), "/", acd.get("repository_id"))
+df.show(10, truncate=False)
+
+# COMMAND ----------
+
+# DBTITLE 1,`date` field -- rows, sums, granularity, month structure & gaps (one groupBy)
+dg = df.groupBy("date").agg(
+    F.count(F.lit(1)).alias("rows"),
+    F.sum(F.col("clicks").cast("double")).alias("clicks"),
+    F.sum(F.col("impressions").cast("double")).alias("impressions"),
+).orderBy("date").collect()
+date_rows = [(x["date"], x["rows"]) for x in dg]
+monthly = [(x["date"], x["clicks"], x["impressions"]) for x in dg]
+raw_dates = [x["date"] for x in dg if x["date"]]
+parsed = []
+for rd in raw_dates:
+    try:
+        parsed.append(dt.date.fromisoformat(str(rd)[:10]))
+    except ValueError:
+        pass
+yms = sorted({d.strftime("%Y-%m") for d in parsed})
+dom = sorted({d.day for d in parsed})
+print(f"distinct raw date values={len(raw_dates)}  distinct year-month={len(yms)}  distinct day-of-month={dom}")
+print("=> granularity is", "monthly" if len(dom) <= 1 else "daily/other")
+missing_months = []
+if yms:
+    cur = dt.date(int(yms[0][:4]), int(yms[0][5:7]), 1)
+    end = dt.date(int(yms[-1][:4]), int(yms[-1][5:7]), 1)
+    seen = set(yms)
+    while cur <= end:
+        if cur.strftime("%Y-%m") not in seen:
+            missing_months.append(cur.strftime("%Y-%m"))
+        cur = (cur.replace(day=28) + dt.timedelta(days=7)).replace(day=1)
+print("months present:", yms, " missing in span:", missing_months)
+
+# COMMAND ----------
+
+# DBTITLE 1,country / device / citableContent distributions (one groupBy)
+g = df.groupBy("country", "device", "citableContent").count().collect()
+dist = {}
+for c in ("country", "device", "citableContent"):
+    acc = {}
+    for x in g:
+        acc[x[c]] = acc.get(x[c], 0) + x["count"]
+    dist[c] = sorted(acc.items(), key=lambda p: -p[1])[:30]
+    print(f"{c}:", dist[c])
+
+# COMMAND ----------
+
+# DBTITLE 1,Metric ranges, internal consistency, ranking percentiles (one agg)
+num = {"clicks": F.col("clicks").cast("double"), "impressions": F.col("impressions").cast("double"),
+       "clickThrough": F.col("clickThrough").cast("double"), "position": F.col("position").cast("double"),
+       "index": F.col("index").cast("double")}
+exprs = []
+for c, v in num.items():
+    exprs += [F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max"), F.avg(v).alias(c + "_avg"),
+              F.sum((v < 0).cast("long")).alias(c + "_negative")]
+exprs += [
+    F.sum((num["clicks"] > num["impressions"]).cast("long")).alias("clicks_gt_impr"),
+    F.expr("percentile_approx(cast(position as double), array(0.1,0.25,0.5,0.75,0.9,0.99))").alias("position_pctiles"),
+    F.expr("percentile_approx(cast(clicks as double), array(0.5,0.9,0.99))").alias("clicks_pctiles"),
+    F.expr("percentile_approx(cast(impressions as double), array(0.5,0.9,0.99))").alias("impressions_pctiles"),
+    F.expr("percentile_approx(case when cast(impressions as double) > 0 then "
+           "cast(clickThrough as double) - cast(clicks as double)/cast(impressions as double) end, "
+           "array(0.05,0.5,0.95))").alias("ct_delta_pctiles"),
+]
+M = df.agg(*exprs).first().asDict()
+bad_ratio = M["clicks_gt_impr"]
+for c in num:
+    print(f"  {c:<14}", {k[len(c) + 1:]: M[k] for k in M if k.startswith(c + "_")})
+print("clicks > impressions rows:", bad_ratio)
+print("clickThrough - clicks/impressions delta (p5/50/95):", M["ct_delta_pctiles"])
+print("position percentiles:", M["position_pctiles"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Ranking -- rounded-position rows + CTR (one groupBy) and index distribution
+pr = df.groupBy(F.round(F.col("position").cast("double")).alias("pos")).agg(
+    F.count(F.lit(1)).alias("rows"),
+    F.sum(F.col("clicks").cast("double")).alias("clk"),
+    F.sum(F.col("impressions").cast("double")).alias("imp"),
+).orderBy("pos").collect()
+pos_dist = [(x["pos"], x["rows"]) for x in pr]
+pos_ctr = [(x["pos"], (x["clk"] / x["imp"]) if x["imp"] else None) for x in pr]
+idx = df.groupBy("index").count().orderBy(F.desc("count")).limit(20).collect()
+print("index top values:", [(x["index"], x["count"]) for x in idx])
+
+# COMMAND ----------
+
+# DBTITLE 1,Duplicate-key -- identical vs conflicting metrics on the candidate key (one groupBy)
+dk = df.groupBy(*KEY).agg(
+    F.count(F.lit(1)).alias("n"),
+    F.countDistinct(F.hash(*[F.col(c) for c in COLS])).alias("row_variants"),
+    F.countDistinct("clicks", "impressions", "position").alias("metric_variants"),
+)
+db = dk.agg(
+    F.count(F.lit(1)).alias("distinct_keys"),
+    F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
+    F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias("identical"),
+    F.sum(((F.col("n") > 1) & (F.col("metric_variants") > 1)).cast("long")).alias("conflicting_metrics"),
+).first().asDict()
+print(f"key={KEY}  distinct_keys={db['distinct_keys']} (rows={total}, unique={db['distinct_keys'] == total})  "
+      f"dup_groups={db['dup_groups']} identical={db['identical']} conflicting_metrics={db['conflicting_metrics']}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity coverage -- urls / dates / countries per repository; repositories per country
+repo_cov = df.groupBy("repository_id").agg(
+    F.approx_count_distinct("url").alias("urls"),
+    F.countDistinct("date").alias("dates"),
+    F.approx_count_distinct("country").alias("countries"),
+).orderBy("repository_id").collect()
+for x in repo_cov:
+    print(x.asDict())
+cpr = df.groupBy("country").agg(F.approx_count_distinct("repository_id").alias("repositories")).collect()
+print("repositories per country:", [(x["country"], x["repositories"]) for x in cpr])
+
+# COMMAND ----------
+
+# DBTITLE 1,Metric sample for figures (one bounded sampled pass)
+mp = (
+    df.select(F.col("clicks").cast("double").alias("clicks"),
+              F.col("impressions").cast("double").alias("impressions"),
+              F.col("position").cast("double").alias("position"))
+    .sample(0.1, seed=42).limit(150_000).toPandas()
+)
+print("metric sample rows:", len(mp))
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- monthly volume, category distributions
+barplot(date_rows, "Search Visibility -- rows per monthly archive", "date", "rows", rot=90, figsize=(12, 4))
+for c, pairs in dist.items():
+    barplot(pairs, f"Search Visibility -- rows per {c}", c, "rows", rot=45)
+xs = [d for d, _, _ in monthly]
+plt.figure(figsize=(12, 4))
+plt.plot(xs, [i for _, _, i in monthly], marker=".", label="impressions")
+plt.plot(xs, [c for _, c, _ in monthly], marker=".", label="clicks")
+plt.legend(); plt.title("Search Visibility -- total clicks & impressions per month")
+plt.xticks(rotation=90); plt.tight_layout(); plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- metric distributions, clicks vs impressions, position & CTR
+for c in ("clicks", "impressions", "position"):
+    s = mp[c].dropna()
+    if len(s):
+        histplot(s.tolist(), f"Search Visibility {c} -- distribution (n={len(s)} sample)", c, log=True)
+sc = mp[(mp["clicks"] > 0) & (mp["impressions"] > 0)]
+if len(sc):
+    plt.figure(figsize=(6, 6))
+    plt.loglog(sc["impressions"], sc["clicks"], marker=".", linestyle="none", alpha=0.3)
+    plt.title("Search Visibility -- clicks vs impressions (sampled)"); plt.xlabel("impressions"); plt.ylabel("clicks")
+    plt.tight_layout(); plt.show()
+barplot(pos_dist, "Search Visibility -- rows by rounded position", "position", "rows")
+plt.figure(figsize=(10, 4))
+plt.plot([p for p, _ in pos_ctr], [c for _, c in pos_ctr], marker="o")
+plt.title("Search Visibility -- CTR by search position"); plt.xlabel("position"); plt.ylabel("CTR")
+plt.tight_layout(); plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings
+print("constant columns:", constant_cols)
+print("date granularity: distinct day-of-month =", dom, " -> ", "monthly" if len(dom) <= 1 else "daily/other")
+print("months present:", yms, " missing:", missing_months)
+print("clicks > impressions rows:", bad_ratio)
+print("clickThrough vs clicks/impressions delta (p5/50/95):", M["ct_delta_pctiles"])
+print("duplicate key:", db)
