@@ -25,14 +25,6 @@ from pyspark.sql.utils import AnalysisException
 # COMMAND ----------
 
 # DBTITLE 1,Write-performance tuning
-# optimizeWrite bin-packs the write into ~128 MB files so a many-chunk CSV
-# read does not leave hundreds of tiny Delta files; autoCompact cleans up
-# any small files that remain. Bronze tables are wide and all-string, so
-# data-skipping statistics are collected on only the first 8 columns
-# instead of 32 -- min/max/null stats on dozens of string columns cost
-# write time and buy nothing at Bronze. (defaults.* applies to tables
-# created by this notebook; an ALTER TABLE is needed to change an
-# already-existing Bronze table.)
 spark.conf.set("spark.databricks.delta.optimizeWrite.enabled", "true")
 spark.conf.set("spark.databricks.delta.autoCompact.enabled", "true")
 spark.conf.set(
@@ -68,13 +60,9 @@ CSV_OPTIONS = {
     "header": "true",
     "inferSchema": "false",
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
-    "multiLine": "false",      # keep plain CSV splittable (no effect on .gz -- see note below)
+    "multiLine": "false",
 }  # used only when READ_FORMAT == "csv"
-FILE_EXT_PATTERN = r"csv|csv\.gz"                         # gzip CSV is read natively by Spark
-# NOTE: a single .csv.gz file is NOT splittable -- Spark reads each one on a
-# single core. If a Honda dataset's read is slow, the fix is upstream
-# (stage as plain .csv or as multiple smaller gz chunks), not in this
-# notebook. optimizeWrite still parallelises the write side.
+FILE_EXT_PATTERN = r"csv|csv\.gz"
 
 # Optional semantic column renames applied before the generic sanitizer
 # below. Column VALUES are never touched. Empty unless a source needs it.

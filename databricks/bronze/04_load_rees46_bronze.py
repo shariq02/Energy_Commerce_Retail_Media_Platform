@@ -26,14 +26,6 @@ from pyspark.sql.utils import AnalysisException
 # COMMAND ----------
 
 # DBTITLE 1,Write-performance tuning
-# optimizeWrite bin-packs the write into ~128 MB files so a many-chunk CSV
-# read does not leave hundreds of tiny Delta files; autoCompact cleans up
-# any small files that remain. Bronze tables are wide and all-string, so
-# data-skipping statistics are collected on only the first 8 columns
-# instead of 32 -- min/max/null stats on dozens of string columns cost
-# write time and buy nothing at Bronze. (defaults.* applies to tables
-# created by this notebook; an ALTER TABLE is needed to change an
-# already-existing Bronze table.)
 spark.conf.set("spark.databricks.delta.optimizeWrite.enabled", "true")
 spark.conf.set("spark.databricks.delta.autoCompact.enabled", "true")
 spark.conf.set(
