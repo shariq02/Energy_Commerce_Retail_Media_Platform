@@ -30,11 +30,13 @@ from pyspark.sql.utils import AnalysisException
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 
-SOURCE_PREFIX = "criteo_attribution"
+SOURCE_PREFIX = "criteo"
 
 # (staging dataset name, source Volume, fully-qualified Bronze table name)
+# Phase 2b staged the chunks as "criteo_attribution_chunk_NNNNN.tsv"
+# (ChunkedCSVWriter source="criteo", dataset="attribution").
 DATASETS: list[tuple[str, str, str]] = [
-    ("attribution_events", "criteo_attribution_events",
+    ("attribution", "criteo_attribution_events",
      f"{CATALOG}.{BRONZE_SCHEMA}.criteo_attribution_events"),
 ]
 
