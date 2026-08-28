@@ -178,9 +178,6 @@ for dataset, volume in DWD_DATASETS:
             print(f"OK  {dataset}: normalized column name(s) -- {applied_renames}")
 
         df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(table)
-        # Row count from the Delta transaction log (metadata only). Taking it
-        # after the write avoids the second full parse of every source file
-        # that a pre-write df.count() would force.
         row_count = spark.table(table).count()
         result["rows"] = row_count
         result["columns"] = len(df.columns)

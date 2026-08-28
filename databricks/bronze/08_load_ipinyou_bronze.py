@@ -6,23 +6,15 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- iPINYOU (RETAIL MEDIA / RTB)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the iPinYou
 # MAGIC RTB dataset (retail_media domain) into the frozen Bronze table
 # MAGIC structure -- `ipinyou_training`, `ipinyou_leaderboard`,
-# MAGIC `ipinyou_reference` (`PIPELINE_DESIGN.md` Section 1c).
+# MAGIC `ipinyou_reference`.
 # MAGIC
-# MAGIC `training` and `leaderboard` pass through 1:1 from their Phase 2b
-# MAGIC staging datasets -- each already carries `season` / `event_type`
-# MAGIC discriminator columns, and the Season 1 vs Season 2/3 schema split
-# MAGIC was reconciled onto one superset schema in Phase 2b. `reference` is
-# MAGIC the one merge visible at Bronze: the three staged lookup files (city,
-# MAGIC region, user_profile_tags) share an `id, name_en, name_cn` shape and
-# MAGIC combine into a single table with an explicit `lookup_type`
-# MAGIC discriminator (`PIPELINE_DESIGN.md` Section 1c rule 8).
 
 # COMMAND ----------
 
@@ -74,9 +66,6 @@ REFERENCE_LOOKUPS: list[tuple[str, str, str]] = [
 
 VOLUMES = sorted({ANALYTICAL_VOLUME, REFERENCE_VOLUME})
 
-# Read settings for this source's staged files. Phase 2b writes UTF-8 CSV
-# with a header on every chunk (ChunkedCSVWriter) and comma-separated
-# reference files.
 CSV_OPTIONS = {
     "header": "true",
     "inferSchema": "false",
@@ -130,12 +119,6 @@ def read_dataset(files: list[str]) -> DataFrame:
     reader = spark.read
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
-    # Read every staged file for the dataset in ONE scan. Spark parallelises
-    # across all files and their splits and builds a single FileScan -- far
-    # cheaper than a per-file unionByName chain, which builds an N-deep
-    # logical plan and serialises planning. enforceSchema=false (set in
-    # CSV_OPTIONS) makes Spark check each file's header and fail loudly on a
-    # real mismatch instead of aligning columns by position.
     return reader.csv(files)
 
 # COMMAND ----------
@@ -242,9 +225,6 @@ for dataset, volume, table in DATASETS:
             .option("overwriteSchema", "true")
             .saveAsTable(table)
         )
-        # Row count from the Delta transaction log (metadata only). Taking it
-        # after the write avoids the second full parse of every source file
-        # that a pre-write df.count() would force.
         row_count = spark.table(table).count()
         result["rows"] = row_count
         result["columns"] = len(df.columns)
@@ -280,9 +260,6 @@ try:
                 f"columns are {part.columns}"
             )
         part = part.withColumn("lookup_type", F.lit(lookup_type))
-        # Front the discriminator columns; union the rest by NAME so the
-        # three lookups line up even if name_en / name_cn arrive in a
-        # different order.
         ordered = ["lookup_type", "lookup_id"] + [
             c for c in part.columns if c not in ("lookup_type", "lookup_id")
         ]

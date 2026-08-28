@@ -57,8 +57,6 @@ CSV_OPTIONS = {
 }  # used only when READ_FORMAT == "csv"
 FILE_EXT_PATTERN = r"csv|txt"                             # regex alternation of accepted extensions
 
-# Optional semantic column renames applied before the generic sanitizer
-# below. Column VALUES are never touched. Empty unless a source needs it.
 COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {}
 
 # Characters Delta rejects in column identifiers. Any offending column is
@@ -102,12 +100,6 @@ def read_dataset(files: list[str]) -> DataFrame:
     reader = spark.read
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
-    # Read every staged file for the dataset in ONE scan. Spark parallelises
-    # across all files and their splits and builds a single FileScan -- far
-    # cheaper than a per-file unionByName chain, which builds an N-deep
-    # logical plan and serialises planning. enforceSchema=false (set in
-    # CSV_OPTIONS) makes Spark check each file's header and fail loudly on a
-    # real mismatch instead of aligning columns by position.
     return reader.csv(files)
 
 # COMMAND ----------
@@ -211,9 +203,6 @@ for dataset, volume, table in DATASETS:
             .option("overwriteSchema", "true")
             .saveAsTable(table)
         )
-        # Row count from the Delta transaction log (metadata only). Taking it
-        # after the write avoids the second full parse of every source file
-        # that a pre-write df.count() would force.
         row_count = spark.table(table).count()
         result["rows"] = row_count
         result["columns"] = len(df.columns)
