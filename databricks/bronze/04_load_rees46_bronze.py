@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- REES46 (COMMERCE / CUSTOMER BEHAVIOUR)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the REES46
@@ -39,14 +39,14 @@ DATASETS: list[tuple[str, str, str]] = [
 VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
 # Read settings for this source's staged files.
-READ_FORMAT = "csv"                                       # "csv" or "json"
+READ_FORMAT = "csv"  # "csv" or "json"
 CSV_OPTIONS = {
     "header": "true",
     "inferSchema": "false",
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
-    "multiLine": "false",      # keep CSV splittable so large files read in parallel
+    "multiLine": "false",  # keep CSV splittable so large files read in parallel
 }  # used only when READ_FORMAT == "csv"
-FILE_EXT_PATTERN = r"csv"                                 # regex alternation of accepted extensions
+FILE_EXT_PATTERN = r"csv"  # regex alternation of accepted extensions
 
 COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {}
 
@@ -92,6 +92,7 @@ def read_dataset(files: list[str]) -> DataFrame:
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
     return reader.csv(files)
+
 
 # COMMAND ----------
 
@@ -186,7 +187,9 @@ for dataset, volume, table in DATASETS:
 
         df, sanitized = sanitize_columns(df)
         if applied or sanitized:
-            print(f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}")
+            print(
+                f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}"
+            )
 
         (
             df.write.format("delta")
@@ -222,7 +225,9 @@ for result in load_results:
             raise RuntimeError("table has zero rows after load")
         result["validated"] = True
         result["validation_error"] = None
-        print(f"OK  {table}: schema has {len(schema.fields)} column(s), {actual_rows} rows verified")
+        print(
+            f"OK  {table}: schema has {len(schema.fields)} column(s), {actual_rows} rows verified"
+        )
     except (AnalysisException, RuntimeError) as exc:
         result["validated"] = False
         result["validation_error"] = str(exc)
@@ -242,7 +247,7 @@ print("=" * 70)
 for result in load_results:
     print(
         f"{result['dataset']:<28} files={result['files']:<3} "
-        f"rows={str(result['rows']):<12} status={result['status']:<7} "
+        f"rows={result['rows']!s:<12} status={result['status']:<7} "
         f"validated={result.get('validated')}"
     )
     if result["error"]:
@@ -250,8 +255,12 @@ for result in load_results:
     if result.get("validation_error"):
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
-print(f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DATASETS)}")
-print(f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DATASETS)}")
+print(
+    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DATASETS)}"
+)
+print(
+    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DATASETS)}"
+)
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
 
@@ -268,7 +277,9 @@ if overall_success:
 else:
     for volume in VOLUMES:
         volume_cleanup[volume] = "PRESERVED"
-        print(f"PRESERVED  volume kept (load/validation did not fully pass): {volume_path(volume)}")
+        print(
+            f"PRESERVED  volume kept (load/validation did not fully pass): {volume_path(volume)}"
+        )
 
 print("-" * 70)
 print("VOLUME CLEANUP RESULT")

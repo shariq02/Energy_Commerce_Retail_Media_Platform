@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data into the
@@ -64,8 +64,9 @@ COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {
 }
 
 # (dataset_name, source_volume) for all 12 Bronze upload units.
-DWD_DATASETS = [(d, DWD_ANALYTICAL_VOLUME) for d in DWD_ANALYTICAL_DATASETS] + \
-               [(d, DWD_METADATA_VOLUME) for d in DWD_METADATA_DATASETS]
+DWD_DATASETS = [(d, DWD_ANALYTICAL_VOLUME) for d in DWD_ANALYTICAL_DATASETS] + [
+    (d, DWD_METADATA_VOLUME) for d in DWD_METADATA_DATASETS
+]
 
 VOLUMES = [DWD_ANALYTICAL_VOLUME, DWD_METADATA_VOLUME]
 
@@ -81,7 +82,10 @@ def bronze_table(dataset: str) -> str:
 def dataset_file_pattern(dataset: str) -> re.Pattern:
     # Matches "<dataset>.csv" (single staged file) or
     # "dwd_<dataset>_chunk_00001.csv" (physically chunked upload).
-    return re.compile(rf"^(?:dwd_)?{re.escape(dataset)}(?:_chunk_\d{{5}})?\.(?:csv|txt)$")
+    return re.compile(
+        rf"^(?:dwd_)?{re.escape(dataset)}(?:_chunk_\d{{5}})?\.(?:csv|txt)$"
+    )
+
 
 # COMMAND ----------
 
@@ -157,18 +161,24 @@ for dataset, volume in DWD_DATASETS:
         df = (
             spark.read.option("header", "true")
             .option("inferSchema", "false")
-            .option("enforceSchema", "false")  # verify every chunk's header, fail loud on mismatch
-            .option("multiLine", "false")      # keep CSV splittable
+            .option(
+                "enforceSchema", "false"
+            )  # verify every chunk's header, fail loud on mismatch
+            .option("multiLine", "false")  # keep CSV splittable
             .csv(files)
         )
         rename_map = COLUMN_RENAME_MAP.get(dataset, {})
-        applied_renames = {old: new for old, new in rename_map.items() if old in df.columns}
+        applied_renames = {
+            old: new for old, new in rename_map.items() if old in df.columns
+        }
         for old, new in applied_renames.items():
             df = df.withColumnRenamed(old, new)
         if applied_renames:
             print(f"OK  {dataset}: normalized column name(s) -- {applied_renames}")
 
-        df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(table)
+        df.write.format("delta").mode("overwrite").option(
+            "overwriteSchema", "true"
+        ).saveAsTable(table)
         row_count = spark.table(table).count()
         result["rows"] = row_count
         result["columns"] = len(df.columns)
@@ -197,7 +207,9 @@ for result in load_results:
             raise RuntimeError("table has zero rows after load")
         result["validated"] = True
         result["validation_error"] = None
-        print(f"OK  {table}: schema has {len(schema.fields)} column(s), {actual_rows} rows verified")
+        print(
+            f"OK  {table}: schema has {len(schema.fields)} column(s), {actual_rows} rows verified"
+        )
     except (AnalysisException, RuntimeError) as exc:
         result["validated"] = False
         result["validation_error"] = str(exc)
@@ -217,7 +229,7 @@ print("=" * 70)
 for result in load_results:
     print(
         f"{result['dataset']:<24} files={result['files']:<3} "
-        f"rows={str(result['rows']):<10} status={result['status']:<7} "
+        f"rows={result['rows']!s:<10} status={result['status']:<7} "
         f"validated={result.get('validated')}"
     )
     if result["error"]:
@@ -225,8 +237,12 @@ for result in load_results:
     if result.get("validation_error"):
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
-print(f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DWD_DATASETS)}")
-print(f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DWD_DATASETS)}")
+print(
+    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DWD_DATASETS)}"
+)
+print(
+    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DWD_DATASETS)}"
+)
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
 
@@ -243,7 +259,9 @@ if overall_success:
 else:
     for volume in VOLUMES:
         volume_cleanup[volume] = "PRESERVED"
-        print(f"PRESERVED  volume kept (load/validation did not fully pass): {volume_path(volume)}")
+        print(
+            f"PRESERVED  volume kept (load/validation did not fully pass): {volume_path(volume)}"
+        )
 
 print("-" * 70)
 print("VOLUME CLEANUP RESULT")

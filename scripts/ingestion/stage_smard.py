@@ -45,7 +45,14 @@ RAW_SMARD_DIR = DATA_RAW_DIR / "smard"
 STAGING_SMARD_DIR = DATA_STAGING_DIR / "smard"
 ANALYTICAL_DIR = STAGING_SMARD_DIR / "analytical"
 
-OUTPUT_COLUMNS = ["metric", "filter_id", "region", "resolution", "timestamp_utc", "value"]
+OUTPUT_COLUMNS = [
+    "metric",
+    "filter_id",
+    "region",
+    "resolution",
+    "timestamp_utc",
+    "value",
+]
 
 
 def _rows_for_file(path: Path) -> tuple[pd.DataFrame, int]:
@@ -58,17 +65,21 @@ def _rows_for_file(path: Path) -> tuple[pd.DataFrame, int]:
     resolution = payload["resolution"]
     series = payload["series"]
 
-    timestamps = [datetime.fromtimestamp(ts_ms / 1000, tz=UTC).isoformat() for ts_ms, _ in series]
+    timestamps = [
+        datetime.fromtimestamp(ts_ms / 1000, tz=UTC).isoformat() for ts_ms, _ in series
+    ]
     values = [value for _, value in series]
 
-    df = pd.DataFrame({
-        "metric": metric,
-        "filter_id": filter_id,
-        "region": region,
-        "resolution": resolution,
-        "timestamp_utc": timestamps,
-        "value": values,
-    })
+    df = pd.DataFrame(
+        {
+            "metric": metric,
+            "filter_id": filter_id,
+            "region": region,
+            "resolution": resolution,
+            "timestamp_utc": timestamps,
+            "value": values,
+        }
+    )
     df = df.reindex(columns=OUTPUT_COLUMNS)
     return df, len(series)
 
@@ -84,17 +95,26 @@ def stage_energy_timeseries(monitor: PeakRSSMonitor) -> tuple[int, Path, int]:
     for src_file in sorted(RAW_SMARD_DIR.glob("*.json")):
         files_read += 1
         df, row_count = _rows_for_file(src_file)
-        df.to_csv(out_path, mode="w" if first_write else "a", header=first_write,
-                   index=False, encoding="utf-8")
+        df.to_csv(
+            out_path,
+            mode="w" if first_write else "a",
+            header=first_write,
+            index=False,
+            encoding="utf-8",
+        )
         first_write = False
         total_rows += row_count
         del df
         monitor.check()
 
     if first_write:
-        pd.DataFrame(columns=OUTPUT_COLUMNS).to_csv(out_path, index=False, encoding="utf-8")
+        pd.DataFrame(columns=OUTPUT_COLUMNS).to_csv(
+            out_path, index=False, encoding="utf-8"
+        )
 
-    logger.info(f"Staged analytical/energy_timeseries.csv -- {total_rows} rows, {files_read} source files")
+    logger.info(
+        f"Staged analytical/energy_timeseries.csv -- {total_rows} rows, {files_read} source files"
+    )
     return total_rows, out_path, files_read
 
 
@@ -105,10 +125,14 @@ def main() -> None:
     monitor.check()
 
     logger.info("SMARD Phase 2b staging complete.")
-    logger.info(f"  energy_timeseries: {total_rows} rows, {len(OUTPUT_COLUMNS)} columns, "
-                f"{files_read} source files -> {out_path}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+    logger.info(
+        f"  energy_timeseries: {total_rows} rows, {len(OUTPUT_COLUMNS)} columns, "
+        f"{files_read} source files -> {out_path}"
+    )
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":

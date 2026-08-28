@@ -81,7 +81,9 @@ def resolve_station_ids() -> dict[str, str]:
     (recent/) data file - physical station IDs are stable across categories."""
     active_ids = fetch_active_station_ids("air_temperature", "TU")
 
-    url = f"{BASE_URL}/air_temperature/recent/TU_Stundenwerte_Beschreibung_Stationen.txt"
+    url = (
+        f"{BASE_URL}/air_temperature/recent/TU_Stundenwerte_Beschreibung_Stationen.txt"
+    )
     response = requests.get(url, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     lines = response.content.decode("latin-1").splitlines()
@@ -96,7 +98,10 @@ def resolve_station_ids() -> dict[str, str]:
         station_name = line[61:].strip() if len(line) > 61 else ""
         normalized_station_name = _normalize(station_name).lower()
         for key, match_name in STATIONS.items():
-            if key not in resolved and _normalize(match_name).lower() in normalized_station_name:
+            if (
+                key not in resolved
+                and _normalize(match_name).lower() in normalized_station_name
+            ):
                 resolved[key] = station_id
 
     missing = set(STATIONS) - set(resolved)
@@ -105,16 +110,22 @@ def resolve_station_ids() -> dict[str, str]:
     return resolved
 
 
-def download_station_category(station_key: str, station_id: str, category: str, param: str) -> None:
+def download_station_category(
+    station_key: str, station_id: str, category: str, param: str
+) -> None:
     dest_dir = OUTPUT_DIR / station_key / category
     if dest_dir.exists() and any(dest_dir.iterdir()):
-        logger.info(f"DWD {station_key}/{category} already downloaded, skipping: {dest_dir}")
+        logger.info(
+            f"DWD {station_key}/{category} already downloaded, skipping: {dest_dir}"
+        )
         return
 
     url = f"{BASE_URL}/{category}/recent/stundenwerte_{param}_{station_id}_akt.zip"
     response = requests.get(url, timeout=REQUEST_TIMEOUT)
     if response.status_code == 404:
-        logger.warning(f"No {category} data available for station {station_key} ({station_id}): {url}")
+        logger.warning(
+            f"No {category} data available for station {station_key} ({station_id}): {url}"
+        )
         return
     response.raise_for_status()
 
@@ -122,7 +133,9 @@ def download_station_category(station_key: str, station_id: str, category: str, 
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         archive.extractall(dest_dir)
 
-    logger.info(f"Downloaded DWD {category} for {station_key} ({station_id}) -> {dest_dir}")
+    logger.info(
+        f"Downloaded DWD {category} for {station_key} ({station_id}) -> {dest_dir}"
+    )
 
 
 def main() -> None:

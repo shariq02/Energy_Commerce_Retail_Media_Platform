@@ -48,17 +48,20 @@ class ChunkedCSVWriter:
 
         self.out_dir.mkdir(parents=True, exist_ok=True)
 
-        self._chunk_index = 0        # last chunk number actually opened (1-based)
+        self._chunk_index = 0  # last chunk number actually opened (1-based)
         self._current_path: Path | None = None
         self._current_rows = 0
-        self._current_bytes = 0      # running count of bytes written to the open chunk
+        self._current_bytes = 0  # running count of bytes written to the open chunk
         self._current_has_header = False
 
         self.total_rows = 0
         self.chunk_paths: list[Path] = []
 
     def _chunk_path(self, index: int) -> Path:
-        return self.out_dir / f"{self.source}_{self.dataset}_chunk_{index:05d}.{self.extension}"
+        return (
+            self.out_dir
+            / f"{self.source}_{self.dataset}_chunk_{index:05d}.{self.extension}"
+        )
 
     def _open_new_chunk(self) -> None:
         self._chunk_index += 1
@@ -114,7 +117,10 @@ class ChunkedCSVWriter:
             # If `head` would push the open chunk past the byte cap and the
             # chunk already holds rows, rotate and re-encode (with header)
             # on the next iteration.
-            if self._current_rows > 0 and self._current_bytes + len(data) > self.max_bytes:
+            if (
+                self._current_rows > 0
+                and self._current_bytes + len(data) > self.max_bytes
+            ):
                 self._open_new_chunk()
                 continue
 
@@ -123,7 +129,9 @@ class ChunkedCSVWriter:
             # estimate ran over. Guarantees progress (fit >= 1).
             if self._current_bytes + len(data) > self.max_bytes:
                 avg = max(1, len(data) // max(1, len(head)))
-                fit = min(len(head), max(1, (self.max_bytes - self._current_bytes) // avg))
+                fit = min(
+                    len(head), max(1, (self.max_bytes - self._current_bytes) // avg)
+                )
                 data = self._encode(head.iloc[:fit], need_header)
                 while fit > 1 and len(data) > self.max_bytes:
                     fit = max(1, int(fit * 0.9))

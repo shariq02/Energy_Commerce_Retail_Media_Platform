@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # CREATE UNITY CATALOG SCHEMAS AND VOLUMES
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Create and verify the Unity Catalog structure required
@@ -165,7 +165,9 @@ print(f"OK  table ready: {CATALOG}.{QUALITY_SCHEMA}.quality_audit_log")
 # COMMAND ----------
 
 # DBTITLE 1,Verify schemas
-found_schemas = {row.databaseName for row in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()}
+found_schemas = {
+    row.databaseName for row in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
+}
 missing_schemas = [s for s in SCHEMAS if s not in found_schemas]
 
 print(f"Catalog: {CATALOG}")
@@ -236,7 +238,9 @@ for table in QUALITY_TABLES:
         spark.sql(f"DESCRIBE TABLE {CATALOG}.{QUALITY_SCHEMA}.{table}")
         print(f"OK  describable: {CATALOG}.{QUALITY_SCHEMA}.{table}")
     except AnalysisException as exc:
-        raise RuntimeError(f"FAIL  could not describe {CATALOG}.{QUALITY_SCHEMA}.{table}: {exc}")
+        raise RuntimeError(
+            f"FAIL  could not describe {CATALOG}.{QUALITY_SCHEMA}.{table}: {exc}"
+        )
 
 print(f"OK  all {len(QUALITY_TABLES)} required quality tables present")
 

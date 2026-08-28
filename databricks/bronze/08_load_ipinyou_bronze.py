@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # BRONZE DATA LOADING -- iPINYOU (RETAIL MEDIA / RTB)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the iPinYou
@@ -40,7 +40,11 @@ REFERENCE_VOLUME = "ipinyou_reference"
 # One staged dataset -> one Bronze table, no transformation.
 DATASETS: list[tuple[str, str, str]] = [
     ("training", ANALYTICAL_VOLUME, f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_training"),
-    ("leaderboard", ANALYTICAL_VOLUME, f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_leaderboard"),
+    (
+        "leaderboard",
+        ANALYTICAL_VOLUME,
+        f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_leaderboard",
+    ),
 ]
 
 # Merged reference table: the three staged lookup files each become one
@@ -61,7 +65,7 @@ CSV_OPTIONS = {
     "header": "true",
     "inferSchema": "false",
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
-    "multiLine": "false",      # keep CSV splittable so large files read in parallel
+    "multiLine": "false",  # keep CSV splittable so large files read in parallel
 }
 FILE_EXT_PATTERN = r"csv"
 
@@ -111,6 +115,7 @@ def read_dataset(files: list[str]) -> DataFrame:
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
     return reader.csv(files)
+
 
 # COMMAND ----------
 
@@ -174,17 +179,23 @@ for stem, _id_col, _lookup_type in REFERENCE_LOOKUPS:
     matches = find_files(REFERENCE_VOLUME, stem)
     reference_files[stem] = matches
     if not matches:
-        missing_dataset_files.append(f"reference/{stem} (expected in {volume_path(REFERENCE_VOLUME)})")
+        missing_dataset_files.append(
+            f"reference/{stem} (expected in {volume_path(REFERENCE_VOLUME)})"
+        )
     else:
-        print(f"OK  reference/{stem}: {len(matches)} file(s) found in {volume_path(REFERENCE_VOLUME)}")
+        print(
+            f"OK  reference/{stem}: {len(matches)} file(s) found in {volume_path(REFERENCE_VOLUME)}"
+        )
 
 if missing_dataset_files:
     raise RuntimeError(
         f"FAIL  no source file(s) found for dataset(s): {missing_dataset_files}"
     )
 
-print(f"OK  all {len(DATASETS)} pass-through dataset(s) and "
-      f"{len(REFERENCE_LOOKUPS)} reference lookup(s) have at least one source file")
+print(
+    f"OK  all {len(DATASETS)} pass-through dataset(s) and "
+    f"{len(REFERENCE_LOOKUPS)} reference lookup(s) have at least one source file"
+)
 
 # COMMAND ----------
 
@@ -255,9 +266,15 @@ try:
             c for c in part.columns if c not in ("lookup_type", "lookup_id")
         ]
         part = part.select(*ordered)
-        merged = part if merged is None else merged.unionByName(part, allowMissingColumns=True)
-        print(f"OK  reference/{stem}: {len(reference_files[stem])} file(s), "
-              f"columns={part.columns}")
+        merged = (
+            part
+            if merged is None
+            else merged.unionByName(part, allowMissingColumns=True)
+        )
+        print(
+            f"OK  reference/{stem}: {len(reference_files[stem])} file(s), "
+            f"columns={part.columns}"
+        )
 
     merged, sanitized = sanitize_columns(merged)
     if sanitized:
@@ -273,8 +290,10 @@ try:
     reference_result["rows"] = row_count
     reference_result["columns"] = len(merged.columns)
     reference_result["status"] = "LOADED"
-    print(f"OK  reference: {row_count} rows from {reference_result['files']} file(s) "
-          f"-> {REFERENCE_TABLE}")
+    print(
+        f"OK  reference: {row_count} rows from {reference_result['files']} file(s) "
+        f"-> {REFERENCE_TABLE}"
+    )
 except Exception as exc:
     reference_result["error"] = str(exc)
     print(f"FAIL  reference: could not load into {REFERENCE_TABLE} -- {exc}")
@@ -299,7 +318,9 @@ for result in load_results:
             raise RuntimeError("table has zero rows after load")
         result["validated"] = True
         result["validation_error"] = None
-        print(f"OK  {table}: schema has {len(schema.fields)} column(s), {actual_rows} rows verified")
+        print(
+            f"OK  {table}: schema has {len(schema.fields)} column(s), {actual_rows} rows verified"
+        )
     except (AnalysisException, RuntimeError) as exc:
         result["validated"] = False
         result["validation_error"] = str(exc)
@@ -319,7 +340,7 @@ print("=" * 70)
 for result in load_results:
     print(
         f"{result['dataset']:<28} files={result['files']:<3} "
-        f"rows={str(result['rows']):<12} status={result['status']:<7} "
+        f"rows={result['rows']!s:<12} status={result['status']:<7} "
         f"validated={result.get('validated')}"
     )
     if result["error"]:
@@ -327,8 +348,12 @@ for result in load_results:
     if result.get("validation_error"):
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
-print(f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(load_results)}")
-print(f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(load_results)}")
+print(
+    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(load_results)}"
+)
+print(
+    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(load_results)}"
+)
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
 
@@ -345,7 +370,9 @@ if overall_success:
 else:
     for volume in VOLUMES:
         volume_cleanup[volume] = "PRESERVED"
-        print(f"PRESERVED  volume kept (load/validation did not fully pass): {volume_path(volume)}")
+        print(
+            f"PRESERVED  volume kept (load/validation did not fully pass): {volume_path(volume)}"
+        )
 
 print("-" * 70)
 print("VOLUME CLEANUP RESULT")

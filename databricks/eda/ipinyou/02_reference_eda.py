@@ -22,7 +22,6 @@
 # DBTITLE 1,Imports
 import matplotlib.pyplot as plt
 import numpy as np
-
 from pyspark.sql import functions as F
 
 # COMMAND ----------
@@ -34,13 +33,18 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_reference"
 
 # COMMAND ----------
 
+
 # DBTITLE 1,Helper
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
     plt.figure(figsize=(9, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title); plt.xlabel(xlabel); plt.ylabel(ylabel)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout(); plt.show()
+    plt.tight_layout()
+    plt.show()
+
 
 # COMMAND ----------
 
@@ -50,13 +54,18 @@ COLS = df.columns
 exprs = [F.count(F.lit(1)).alias("__rows")]
 for c in COLS:
     miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
-    exprs += [F.sum(miss.cast("long")).alias(c + "__m"), F.approx_count_distinct(c).alias(c + "__d")]
+    exprs += [
+        F.sum(miss.cast("long")).alias(c + "__m"),
+        F.approx_count_distinct(c).alias(c + "__d"),
+    ]
 r = df.agg(*exprs).first().asDict()
 total = r["__rows"]
 constant_cols = [c for c in COLS if r[c + "__d"] <= 1]
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:
-    print(f"  {c:<14} missing={r[c + '__m']:>8} rate={r[c + '__m'] / total:.4f} approx_distinct={r[c + '__d']}")
+    print(
+        f"  {c:<14} missing={r[c + '__m']:>8} rate={r[c + '__m'] / total:.4f} approx_distinct={r[c + '__d']}"
+    )
 print("constant columns:", constant_cols)
 df.show(20, truncate=False)
 
@@ -82,8 +91,14 @@ for lt, v in by_type.items():
     ids = sorted(int(d["lookup_id"]) for d in v if d["lookup_id"] not in (None, ""))
     dup_ids = len(ids) - len(set(ids))
     gaps = sorted(set(range(ids[0], ids[-1] + 1)) - set(ids)) if ids else []
-    uniq[lt] = {"n": len(ids), "min": ids[0] if ids else None, "max": ids[-1] if ids else None,
-                "dup_ids": dup_ids, "gaps_in_range": len(gaps), "gap_examples": gaps[:20]}
+    uniq[lt] = {
+        "n": len(ids),
+        "min": ids[0] if ids else None,
+        "max": ids[-1] if ids else None,
+        "dup_ids": dup_ids,
+        "gaps_in_range": len(gaps),
+        "gap_examples": gaps[:20],
+    }
     print(f"{lt}: {uniq[lt]}")
 
 # COMMAND ----------
@@ -94,14 +109,24 @@ name_missing = []
 for lt, v in by_type.items():
     en_missing = sum(1 for d in v if not (d["name_en"] or "").strip())
     cn_missing = sum(1 for d in v if not (d["name_cn"] or "").strip())
-    both = sum(1 for d in v if (d["name_en"] or "").strip() and (d["name_cn"] or "").strip())
-    ph = sum(1 for d in v if (d["name_en"] or "").strip().lower() in PLACEHOLDERS
-             or (d["name_cn"] or "").strip() in PLACEHOLDERS)
+    both = sum(
+        1 for d in v if (d["name_en"] or "").strip() and (d["name_cn"] or "").strip()
+    )
+    ph = sum(
+        1
+        for d in v
+        if (d["name_en"] or "").strip().lower() in PLACEHOLDERS
+        or (d["name_cn"] or "").strip() in PLACEHOLDERS
+    )
     name_missing.append((lt, en_missing, cn_missing, len(v)))
-    print(f"{lt}: name_en_missing={en_missing} name_cn_missing={cn_missing} both_present={both} "
-          f"placeholder_like={ph} distinct_en={len({d['name_en'] for d in v})} "
-          f"distinct_cn={len({d['name_cn'] for d in v})}")
-both_present = sum(1 for d in recs if (d["name_en"] or "").strip() and (d["name_cn"] or "").strip())
+    print(
+        f"{lt}: name_en_missing={en_missing} name_cn_missing={cn_missing} both_present={both} "
+        f"placeholder_like={ph} distinct_en={len({d['name_en'] for d in v})} "
+        f"distinct_cn={len({d['name_cn'] for d in v})}"
+    )
+both_present = sum(
+    1 for d in recs if (d["name_en"] or "").strip() and (d["name_cn"] or "").strip()
+)
 
 # COMMAND ----------
 
@@ -122,11 +147,24 @@ barplot(type_rows, "iPinYou reference -- rows per lookup_type", "lookup_type", "
 types = [n[0] for n in name_missing]
 x = np.arange(len(types))
 plt.figure(figsize=(9, 4))
-plt.bar(x - 0.2, [n[1] / n[3] for n in name_missing], width=0.4, label="name_en missing rate")
-plt.bar(x + 0.2, [n[2] / n[3] for n in name_missing], width=0.4, label="name_cn missing rate")
-plt.xticks(x, types); plt.legend()
-plt.title("iPinYou reference -- name missingness by lookup_type"); plt.ylabel("rate")
-plt.tight_layout(); plt.show()
+plt.bar(
+    x - 0.2,
+    [n[1] / n[3] for n in name_missing],
+    width=0.4,
+    label="name_en missing rate",
+)
+plt.bar(
+    x + 0.2,
+    [n[2] / n[3] for n in name_missing],
+    width=0.4,
+    label="name_cn missing rate",
+)
+plt.xticks(x, types)
+plt.legend()
+plt.title("iPinYou reference -- name missingness by lookup_type")
+plt.ylabel("rate")
+plt.tight_layout()
+plt.show()
 
 # COMMAND ----------
 

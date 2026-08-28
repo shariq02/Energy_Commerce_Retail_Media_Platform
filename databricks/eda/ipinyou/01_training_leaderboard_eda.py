@@ -23,8 +23,7 @@
 
 # DBTITLE 1,Imports
 import matplotlib.pyplot as plt
-
-from pyspark.sql import DataFrame, functions as F
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -32,29 +31,42 @@ from pyspark.sql import DataFrame, functions as F
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 TABLES = {
-    "training":    f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_training",
+    "training": f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_training",
     "leaderboard": f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_leaderboard",
 }
 # timestamp is YYYYMMDDHHMMSSmmm.
-SLOT_LOWCARD = ["ad_slot_width", "ad_slot_height", "ad_slot_visibility", "ad_slot_format"]
+SLOT_LOWCARD = [
+    "ad_slot_width",
+    "ad_slot_height",
+    "ad_slot_visibility",
+    "ad_slot_format",
+]
 PRICE_COLS = ["bidding_price", "paying_price", "ad_slot_floor_price"]
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Helpers
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title); plt.xlabel(xlabel); plt.ylabel(ylabel)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout(); plt.show()
+    plt.tight_layout()
+    plt.show()
 
 
 def histplot(values, title, xlabel, bins=50, log=False):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins, log=log)
-    plt.title(title); plt.xlabel(xlabel); plt.ylabel("count")
-    plt.tight_layout(); plt.show()
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel("count")
+    plt.tight_layout()
+    plt.show()
+
 
 # COMMAND ----------
 
@@ -66,14 +78,23 @@ for name, df in frames.items():
     exprs = [F.count(F.lit(1)).alias("__rows")]
     for c in cols:
         miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
-        exprs += [F.sum(miss.cast("long")).alias(c + "__m"), F.approx_count_distinct(c).alias(c + "__d")]
+        exprs += [
+            F.sum(miss.cast("long")).alias(c + "__m"),
+            F.approx_count_distinct(c).alias(c + "__d"),
+        ]
     r = df.agg(*exprs).first().asDict()
-    prof[name] = {"cols": cols, "total": r["__rows"],
-                  "miss": {c: r[c + "__m"] for c in cols}, "acd": {c: r[c + "__d"] for c in cols}}
+    prof[name] = {
+        "cols": cols,
+        "total": r["__rows"],
+        "miss": {c: r[c + "__m"] for c in cols},
+        "acd": {c: r[c + "__d"] for c in cols},
+    }
     print("=" * 90, f"\n{name}  rows={prof[name]['total']}  ->  {cols}\n", "=" * 90)
     for c in cols:
         m = r[c + "__m"]
-        print(f"  {c:<22} missing={m:>12} rate={m / prof[name]['total']:.4f} approx_distinct={r[c + '__d']}")
+        print(
+            f"  {c:<22} missing={m:>12} rate={m / prof[name]['total']:.4f} approx_distinct={r[c + '__d']}"
+        )
     print("constant columns:", [c for c in cols if r[c + "__d"] <= 1])
     df.show(5, truncate=False)
 totals = {n: prof[n]["total"] for n in frames}
@@ -100,19 +121,41 @@ for name, df in frames.items():
 season_cmp = {}
 for name, df in frames.items():
     has_et = "event_type" in df.columns
-    agg = df.groupBy("season").agg(
-        F.count(F.lit(1)).alias("rows"),
-        F.approx_count_distinct("advertiser_id").alias("advertisers"),
-        F.approx_count_distinct("ipinyou_id").alias("users"),
-        F.approx_count_distinct("timestamp").alias("distinct_ts"),
-        F.min("timestamp").alias("min_ts"), F.max("timestamp").alias("max_ts"),
-        F.expr("percentile_approx(cast(paying_price as double), 0.5)").alias("median_paying"),
-        *([F.sum((F.col("event_type") == "impression").cast("long")).alias("impressions"),
-           F.sum((F.col("event_type") == "click").cast("long")).alias("clicks"),
-           F.sum((F.col("event_type") == "conversion").cast("long")).alias("conversions")]
-          if has_et else
-          [F.sum(F.col("has_conversion").cast("double")).alias("conversions_sum")]),
-    ).orderBy("season").collect()
+    agg = (
+        df.groupBy("season")
+        .agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.approx_count_distinct("advertiser_id").alias("advertisers"),
+            F.approx_count_distinct("ipinyou_id").alias("users"),
+            F.approx_count_distinct("timestamp").alias("distinct_ts"),
+            F.min("timestamp").alias("min_ts"),
+            F.max("timestamp").alias("max_ts"),
+            F.expr("percentile_approx(cast(paying_price as double), 0.5)").alias(
+                "median_paying"
+            ),
+            *(
+                [
+                    F.sum((F.col("event_type") == "impression").cast("long")).alias(
+                        "impressions"
+                    ),
+                    F.sum((F.col("event_type") == "click").cast("long")).alias(
+                        "clicks"
+                    ),
+                    F.sum((F.col("event_type") == "conversion").cast("long")).alias(
+                        "conversions"
+                    ),
+                ]
+                if has_et
+                else [
+                    F.sum(F.col("has_conversion").cast("double")).alias(
+                        "conversions_sum"
+                    )
+                ]
+            ),
+        )
+        .orderBy("season")
+        .collect()
+    )
     season_cmp[name] = [x.asDict() for x in agg]
     for x in season_cmp[name]:
         print(f"{name} season {x['season']}: {x}")
@@ -121,10 +164,17 @@ for name, df in frames.items():
 
 # DBTITLE 1,Impression -> click -> conversion funnel (training) + leaderboard labels
 et_counts = dict(partitions["training"].get("event_type", []))
-imp, clk, conv = et_counts.get("impression", 0), et_counts.get("click", 0), et_counts.get("conversion", 0)
+imp, clk, conv = (
+    et_counts.get("impression", 0),
+    et_counts.get("click", 0),
+    et_counts.get("conversion", 0),
+)
 print(f"training funnel: impression={imp}  click={clk}  conversion={conv}")
 if imp:
-    print(f"  CTR={clk / imp:.6f}  conversion rate={conv / imp:.8f}" + (f"  click->conv={conv / clk:.6f}" if clk else ""))
+    print(
+        f"  CTR={clk / imp:.6f}  conversion rate={conv / imp:.8f}"
+        + (f"  click->conv={conv / clk:.6f}" if clk else "")
+    )
 funnel = [("impression", imp), ("click", clk), ("conversion", conv)]
 
 lb = frames["leaderboard"]
@@ -135,7 +185,7 @@ if "has_conversion" in lb.columns:
         acc = {}
         for x in g:
             acc[x[k]] = acc.get(x[k], 0) + x["count"]
-        lb_labels[k] = sorted(acc.items(), key=lambda p: (str(p[0])))
+        lb_labels[k] = sorted(acc.items(), key=lambda p: str(p[0]))
         print(f"leaderboard.{k}:", lb_labels[k])
 
 # COMMAND ----------
@@ -161,8 +211,12 @@ for name, df in frames.items():
     for c in PRICE_COLS:
         v = F.col(c).cast("double")
         exprs += [
-            F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max"), F.avg(v).alias(c + "_avg"),
-            F.expr(f"percentile_approx(cast(`{c}` as double), array(0.5, 0.95, 0.99))").alias(c + "_p"),
+            F.min(v).alias(c + "_min"),
+            F.max(v).alias(c + "_max"),
+            F.avg(v).alias(c + "_avg"),
+            F.expr(
+                f"percentile_approx(cast(`{c}` as double), array(0.5, 0.95, 0.99))"
+            ).alias(c + "_p"),
             F.sum((v < 0).cast("long")).alias(c + "_negative"),
             F.sum((v == 0).cast("long")).alias(c + "_zero"),
         ]
@@ -177,21 +231,39 @@ for name, df in frames.items():
     price_stats[name] = df.agg(*exprs).first().asDict()
     print(f"--- {name} ---")
     for c in PRICE_COLS:
-        print(f"  {c}: min={price_stats[name][c + '_min']} max={price_stats[name][c + '_max']} "
-              f"avg={price_stats[name][c + '_avg']} p50/95/99={price_stats[name][c + '_p']} "
-              f"neg={price_stats[name][c + '_negative']} zero={price_stats[name][c + '_zero']}")
-    print(f"  paying>bidding={price_stats[name]['paying_gt_bidding']}  "
-          f"floor>paying={price_stats[name]['floor_gt_paying']}  "
-          f"floor>bidding={price_stats[name]['floor_gt_bidding']}")
+        print(
+            f"  {c}: min={price_stats[name][c + '_min']} max={price_stats[name][c + '_max']} "
+            f"avg={price_stats[name][c + '_avg']} p50/95/99={price_stats[name][c + '_p']} "
+            f"neg={price_stats[name][c + '_negative']} zero={price_stats[name][c + '_zero']}"
+        )
+    print(
+        f"  paying>bidding={price_stats[name]['paying_gt_bidding']}  "
+        f"floor>paying={price_stats[name]['floor_gt_paying']}  "
+        f"floor>bidding={price_stats[name]['floor_gt_bidding']}"
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Entity cardinality (approx, reused from profile)
 for name in frames:
     acd = prof[name]["acd"]
-    print(f"{name}:", {c: acd[c] for c in
-                       ("bid_id", "ipinyou_id", "advertiser_id", "creative_id",
-                        "region", "city", "ad_exchange", "domain") if c in acd})
+    print(
+        f"{name}:",
+        {
+            c: acd[c]
+            for c in (
+                "bid_id",
+                "ipinyou_id",
+                "advertiser_id",
+                "creative_id",
+                "region",
+                "city",
+                "ad_exchange",
+                "domain",
+            )
+            if c in acd
+        },
+    )
 
 # COMMAND ----------
 
@@ -199,11 +271,15 @@ for name in frames:
 day_hour = {}
 for name, df in frames.items():
     day_hour[name] = (
-        df.select("season",
-                  F.substring("timestamp", 1, 8).alias("day"),
-                  F.substring("timestamp", 1, 10).alias("hour"))
+        df.select(
+            "season",
+            F.substring("timestamp", 1, 8).alias("day"),
+            F.substring("timestamp", 1, 10).alias("hour"),
+        )
         .where(F.length("hour") == 10)
-        .groupBy("season", "day", "hour").count().collect()
+        .groupBy("season", "day", "hour")
+        .count()
+        .collect()
     )
     by_season_day = {}
     for x in day_hour[name]:
@@ -219,7 +295,10 @@ concentration = {}
 for name, df in frames.items():
     acd = prof[name]["acd"]
     for c in ("ipinyou_id", "advertiser_id"):
-        top = [x["count"] for x in df.groupBy(c).count().orderBy(F.desc("count")).limit(50).collect()]
+        top = [
+            x["count"]
+            for x in df.groupBy(c).count().orderBy(F.desc("count")).limit(50).collect()
+        ]
         concentration[(name, c)] = {
             "approx_distinct": acd[c],
             "top10_share": sum(top[:10]) / totals[name],
@@ -227,11 +306,24 @@ for name, df in frames.items():
             "max_rows_one_entity": top[0] if top else 0,
         }
         print(f"{name}.{c}: {concentration[(name, c)]}")
-    adv_roll = df.groupBy("advertiser_id").agg(
-        F.count(F.lit(1)).alias("rows"),
-        *([F.avg((F.col("event_type") == "click").cast("double")).alias("click_share")]
-          if "event_type" in df.columns else []),
-    ).orderBy(F.desc("rows")).limit(15).collect()
+    adv_roll = (
+        df.groupBy("advertiser_id")
+        .agg(
+            F.count(F.lit(1)).alias("rows"),
+            *(
+                [
+                    F.avg((F.col("event_type") == "click").cast("double")).alias(
+                        "click_share"
+                    )
+                ]
+                if "event_type" in df.columns
+                else []
+            ),
+        )
+        .orderBy(F.desc("rows"))
+        .limit(15)
+        .collect()
+    )
     for x in adv_roll:
         print(f"  {name} adv {x['advertiser_id']}: {x.asDict()}")
 
@@ -246,27 +338,44 @@ for name, df in frames.items():
         F.count(F.lit(1)).alias("n"),
         F.countDistinct(F.hash(*[F.col(c) for c in cols])).alias("row_variants"),
     )
-    b = dk.agg(
-        F.count(F.lit(1)).alias("distinct_keys"),
-        F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
-        F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias("identical"),
-        F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias("conflicting"),
-    ).first().asDict()
+    b = (
+        dk.agg(
+            F.count(F.lit(1)).alias("distinct_keys"),
+            F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
+            F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
+                "identical"
+            ),
+            F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias(
+                "conflicting"
+            ),
+        )
+        .first()
+        .asDict()
+    )
     dup_breakdown[name] = b
-    print(f"{name}: key={key}  distinct_keys={b['distinct_keys']} (rows={totals[name]}, "
-          f"unique={b['distinct_keys'] == totals[name]})  dup_groups={b['dup_groups']} "
-          f"identical={b['identical']} conflicting={b['conflicting']}")
+    print(
+        f"{name}: key={key}  distinct_keys={b['distinct_keys']} (rows={totals[name]}, "
+        f"unique={b['distinct_keys'] == totals[name]})  dup_groups={b['dup_groups']} "
+        f"identical={b['identical']} conflicting={b['conflicting']}"
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Price sample for histograms (one bounded sampled pass per table)
 price_pdf = {}
 for name, df in frames.items():
-    hi = max(price_stats[name][c + "_p"][2] for c in PRICE_COLS if price_stats[name][c + "_p"])
+    hi = max(
+        price_stats[name][c + "_p"][2]
+        for c in PRICE_COLS
+        if price_stats[name][c + "_p"]
+    )
     sel = [F.col(c).cast("double").alias(c) for c in PRICE_COLS]
     price_pdf[name] = (
-        df.select(*sel).where(F.greatest(*[F.col(c) for c in PRICE_COLS]).isNotNull())
-        .sample(0.05, seed=42).limit(200_000).toPandas()
+        df.select(*sel)
+        .where(F.greatest(*[F.col(c) for c in PRICE_COLS]).isNotNull())
+        .sample(0.05, seed=42)
+        .limit(200_000)
+        .toPandas()
     )
     print(f"{name} price sample rows: {len(price_pdf[name])}  clip p99={hi}")
 
@@ -275,8 +384,10 @@ for name, df in frames.items():
 # DBTITLE 1,Figure -- funnel + partitions
 plt.figure(figsize=(8, 4))
 plt.bar([f[0] for f in funnel], [f[1] for f in funnel], log=True)
-plt.title("iPinYou training -- impression -> click -> conversion funnel"); plt.ylabel("events (log)")
-plt.tight_layout(); plt.show()
+plt.title("iPinYou training -- impression -> click -> conversion funnel")
+plt.ylabel("events (log)")
+plt.tight_layout()
+plt.show()
 for name, parts in partitions.items():
     for c, pairs in parts.items():
         barplot(pairs, f"iPinYou {name} -- rows per {c}", c, "rows", rot=30)
@@ -297,14 +408,26 @@ for name, rows in day_hour.items():
     plt.figure(figsize=(13, 4))
     for s in seasons:
         xs = sorted(day_agg[s])
-        plt.plot(range(len(xs)), [day_agg[s][d] for d in xs], marker=".", label=f"season {s}", linewidth=0.8)
-    plt.legend(); plt.title(f"iPinYou {name} -- events per day by season"); plt.xlabel("day index")
-    plt.tight_layout(); plt.show()
+        plt.plot(
+            range(len(xs)),
+            [day_agg[s][d] for d in xs],
+            marker=".",
+            label=f"season {s}",
+            linewidth=0.8,
+        )
+    plt.legend()
+    plt.title(f"iPinYou {name} -- events per day by season")
+    plt.xlabel("day index")
+    plt.tight_layout()
+    plt.show()
     hrs = sorted(hour_agg)
     plt.figure(figsize=(13, 4))
     plt.plot(range(len(hrs)), [hour_agg[h] for h in hrs], linewidth=0.8)
-    plt.title(f"iPinYou {name} -- event volume per hour"); plt.xlabel("hour index"); plt.ylabel("events")
-    plt.tight_layout(); plt.show()
+    plt.title(f"iPinYou {name} -- event volume per hour")
+    plt.xlabel("hour index")
+    plt.ylabel("events")
+    plt.tight_layout()
+    plt.show()
 
 # COMMAND ----------
 
@@ -317,7 +440,11 @@ for name in frames:
         if hi and hi > 0:
             vals = vals[(vals >= 0) & (vals <= hi)]
         if len(vals):
-            histplot(vals.tolist(), f"iPinYou {name}.{c} -- distribution (sampled, <=p99={hi})", c)
+            histplot(
+                vals.tolist(),
+                f"iPinYou {name}.{c} -- distribution (sampled, <=p99={hi})",
+                c,
+            )
 
 # COMMAND ----------
 
@@ -326,6 +453,14 @@ print("constant columns:", const_cols)
 print("training funnel (impr, click, conv):", (imp, clk, conv))
 print("dup key:", {n: dup_breakdown[n] for n in frames})
 print("concentration:", concentration)
-print("suspicious prices:", {n: {k: price_stats[n][k] for k in
-      ("paying_gt_bidding", "floor_gt_paying", "floor_gt_bidding")} for n in frames})
+print(
+    "suspicious prices:",
+    {
+        n: {
+            k: price_stats[n][k]
+            for k in ("paying_gt_bidding", "floor_gt_paying", "floor_gt_bidding")
+        }
+        for n in frames
+    },
+)
 print("per-season comparison:", season_cmp)

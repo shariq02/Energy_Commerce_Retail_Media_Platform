@@ -26,8 +26,8 @@ import datetime as dt
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from pyspark.sql import DataFrame, functions as F
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -35,11 +35,20 @@ from pyspark.sql import DataFrame, functions as F
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 MISSING_TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.dwd_missing_value_periods"
-MEASUREMENTS = ["air_temperature", "cloudiness", "moisture", "precipitation", "pressure", "sun", "wind"]
+MEASUREMENTS = [
+    "air_temperature",
+    "cloudiness",
+    "moisture",
+    "precipitation",
+    "pressure",
+    "sun",
+    "wind",
+]
 MEASUREMENT_TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
 NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "QN_9", "QN_3", "QN_4", "QN_8", "EOR"}
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Helpers
 def find_col(df: DataFrame, *cands: str) -> str | None:
@@ -57,9 +66,13 @@ def value_cols(df):
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title); plt.xlabel(xlabel); plt.ylabel(ylabel)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout(); plt.show()
+    plt.tight_layout()
+    plt.show()
+
 
 # COMMAND ----------
 
@@ -91,15 +104,17 @@ print("periods per parameter:", mv_per_param)
 
 # COMMAND ----------
 
+
 # DBTITLE 1,Reported period spans (von/bis -> hours) per station
 def to_dt(v):
     s = str(v or "").strip()
     for fmt in ("%Y%m%d%H", "%Y%m%d"):
         try:
-            return dt.datetime.strptime(s, fmt)
+            return dt.datetime.strptime(s, fmt).replace(tzinfo=dt.UTC)
         except ValueError:
             continue
     return None
+
 
 reported_gaps = {}
 period_spans = []
@@ -115,7 +130,9 @@ for d in mv_recs:
         inverted += 1
         continue
     period_spans.append(span_h)
-    g = reported_gaps.setdefault(d[sid_c], {"reported_periods": 0, "longest": 0.0, "total": 0.0})
+    g = reported_gaps.setdefault(
+        d[sid_c], {"reported_periods": 0, "longest": 0.0, "total": 0.0}
+    )
     g["reported_periods"] += 1
     g["longest"] = max(g["longest"], span_h)
     g["total"] += span_h
@@ -132,13 +149,26 @@ for m, t in MEASUREMENT_TABLES.items():
     df = spark.table(t)
     s, dts = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     vc = value_cols(df)
-    exprs = [F.min(dts).alias("min_ts"), F.max(dts).alias("max_ts"),
-             F.countDistinct(dts).alias("distinct_hours"), F.count(F.lit(1)).alias("rows")]
+    exprs = [
+        F.min(dts).alias("min_ts"),
+        F.max(dts).alias("max_ts"),
+        F.countDistinct(dts).alias("distinct_hours"),
+        F.count(F.lit(1)).alias("rows"),
+    ]
     for c in vc:
         v = F.col(c).cast("double")
-        exprs += [F.sum((v == -999).cast("long")).alias(c + "__999"),
-                  F.sum((F.col(c).isNull() | (F.trim(F.col(c)) == "")).cast("long")).alias(c + "__blank")]
-    g = df.groupBy(F.col(s).cast("string").alias("station")).agg(*exprs).orderBy("station").collect()
+        exprs += [
+            F.sum((v == -999).cast("long")).alias(c + "__999"),
+            F.sum((F.col(c).isNull() | (F.trim(F.col(c)) == "")).cast("long")).alias(
+                c + "__blank"
+            ),
+        ]
+    g = (
+        df.groupBy(F.col(s).cast("string").alias("station"))
+        .agg(*exprs)
+        .orderBy("station")
+        .collect()
+    )
     station_roll[m] = [x.asDict() for x in g]
     total_m = sum(x["rows"] for x in g)
     missing_rates[m] = {}
@@ -157,19 +187,34 @@ for m, t in MEASUREMENT_TABLES.items():
     any_missing = F.lit(False)
     for c in value_cols(df):
         v = F.col(c).cast("double")
-        any_missing = any_missing | (v == -999) | F.col(c).isNull() | (F.trim(F.col(c)) == "")
-    missing_over_time[m] = df.select(
-        F.substring(F.col(dts).cast("string"), 1, 4).alias("year"), any_missing.alias("miss")
-    ).groupBy("year").agg(
-        F.avg(F.col("miss").cast("double")).alias("missing_rate"), F.count(F.lit(1)).alias("rows")
-    ).orderBy("year").collect()
-    print(f"{m}:", [(x["year"], round(x["missing_rate"], 4)) for x in missing_over_time[m]])
+        any_missing = (
+            any_missing | (v == -999) | F.col(c).isNull() | (F.trim(F.col(c)) == "")
+        )
+    missing_over_time[m] = (
+        df.select(
+            F.substring(F.col(dts).cast("string"), 1, 4).alias("year"),
+            any_missing.alias("miss"),
+        )
+        .groupBy("year")
+        .agg(
+            F.avg(F.col("miss").cast("double")).alias("missing_rate"),
+            F.count(F.lit(1)).alias("rows"),
+        )
+        .orderBy("year")
+        .collect()
+    )
+    print(
+        f"{m}:",
+        [(x["year"], round(x["missing_rate"], 4)) for x in missing_over_time[m]],
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Reconciliation -- reported periods vs observed -999/blank per station x parameter
 # The measurement value-column name IS the DWD parameter code (TT_TU, RF_TU, ...).
-reported_pairs = {(str(d[sid_c]), d[param_c]) for d in mv_recs} if (sid_c and param_c) else set()
+reported_pairs = (
+    {(str(d[sid_c]), d[param_c]) for d in mv_recs} if (sid_c and param_c) else set()
+)
 recon = []
 for m in MEASUREMENTS:
     df = spark.table(MEASUREMENT_TABLES[m])
@@ -177,13 +222,28 @@ for m in MEASUREMENTS:
     for x in station_roll[m]:
         for c in vc:
             n999, nblank = x[c + "__999"], x[c + "__blank"]
-            recon.append({"station": x["station"], "measurement": m, "parameter": c,
-                          "observed_999": n999, "observed_blank": nblank, "rows": x["rows"],
-                          "has_reported": (x["station"], c) in reported_pairs})
+            recon.append(
+                {
+                    "station": x["station"],
+                    "measurement": m,
+                    "parameter": c,
+                    "observed_999": n999,
+                    "observed_blank": nblank,
+                    "rows": x["rows"],
+                    "has_reported": (x["station"], c) in reported_pairs,
+                }
+            )
 obs_no_report = sum(1 for r in recon if r["observed_999"] > 0 and not r["has_reported"])
-report_no_obs = sum(1 for r in recon if r["has_reported"] and r["observed_999"] == 0 and r["observed_blank"] == 0)
+report_no_obs = sum(
+    1
+    for r in recon
+    if r["has_reported"] and r["observed_999"] == 0 and r["observed_blank"] == 0
+)
 print("station x parameter with -999 observed but NO reported period:", obs_no_report)
-print("station x parameter with a reported period but ZERO observed -999/blank:", report_no_obs)
+print(
+    "station x parameter with a reported period but ZERO observed -999/blank:",
+    report_no_obs,
+)
 
 # COMMAND ----------
 
@@ -192,8 +252,9 @@ stations = sorted({r["station"] for r in recon})
 params = sorted({r["parameter"] for r in recon})
 rate = {}
 for r in recon:
-    rate[(r["station"], r["parameter"])] = rate.get((r["station"], r["parameter"]), 0) + \
-        (r["observed_999"] + r["observed_blank"]) / max(r["rows"], 1)
+    rate[(r["station"], r["parameter"])] = rate.get(
+        (r["station"], r["parameter"]), 0
+    ) + (r["observed_999"] + r["observed_blank"]) / max(r["rows"], 1)
 grid = np.array([[rate.get((st, p), 0.0) for p in params] for st in stations])
 plt.figure(figsize=(max(6, 0.8 * len(params)), max(3, 0.5 * len(stations))))
 plt.imshow(grid, aspect="auto", cmap="magma")
@@ -201,45 +262,93 @@ plt.colorbar(label="missing (-999/blank) rate")
 plt.xticks(range(len(params)), params, rotation=45, ha="right")
 plt.yticks(range(len(stations)), stations)
 plt.title("DWD -- observed missingness rate by station x parameter")
-plt.tight_layout(); plt.show()
+plt.tight_layout()
+plt.show()
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- reported periods, span distribution, missingness over time
 if mv_per_station:
-    barplot(sorted(mv_per_station.items()), "DWD missing_value_periods -- periods per station", "station id", "periods", rot=45)
+    barplot(
+        sorted(mv_per_station.items()),
+        "DWD missing_value_periods -- periods per station",
+        "station id",
+        "periods",
+        rot=45,
+    )
 if mv_per_param:
-    barplot(sorted(mv_per_param.items()), "DWD missing_value_periods -- periods per parameter", "parameter", "periods", rot=45)
+    barplot(
+        sorted(mv_per_param.items()),
+        "DWD missing_value_periods -- periods per parameter",
+        "parameter",
+        "periods",
+        rot=45,
+    )
 if period_spans:
     plt.figure(figsize=(10, 4))
     plt.hist(period_spans, bins=50, log=True)
     plt.title("DWD missing_value_periods -- reported span (hours) distribution")
-    plt.xlabel("bis - von (hours)"); plt.ylabel("count (log)")
-    plt.tight_layout(); plt.show()
+    plt.xlabel("bis - von (hours)")
+    plt.ylabel("count (log)")
+    plt.tight_layout()
+    plt.show()
 if reported_gaps:
-    barplot([(sid, g["longest"]) for sid, g in reported_gaps.items()],
-            "DWD -- longest reported missing period per station (hours)", "station id", "hours", rot=45)
+    barplot(
+        [(sid, g["longest"]) for sid, g in reported_gaps.items()],
+        "DWD -- longest reported missing period per station (hours)",
+        "station id",
+        "hours",
+        rot=45,
+    )
 for m, rows in missing_over_time.items():
     plt.figure(figsize=(11, 3))
     plt.plot([x["year"] for x in rows], [x["missing_rate"] for x in rows], marker=".")
-    plt.title(f"DWD {m} -- observed -999/blank rate by year"); plt.xlabel("year"); plt.ylabel("rate")
-    plt.xticks(rotation=90); plt.tight_layout(); plt.show()
+    plt.title(f"DWD {m} -- observed -999/blank rate by year")
+    plt.xlabel("year")
+    plt.ylabel("rate")
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.show()
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- missing rate per value column + distinct hours per station
 for m, cols in missing_rates.items():
-    barplot([(c, miss / tm) for c, (miss, tm) in cols.items()],
-            f"DWD {m} -- missing / -999 rate by value column", "value column", "rate", rot=30)
+    barplot(
+        [(c, miss / tm) for c, (miss, tm) in cols.items()],
+        f"DWD {m} -- missing / -999 rate by value column",
+        "value column",
+        "rate",
+        rot=30,
+    )
 for m in MEASUREMENTS:
-    barplot([(x["station"], x["distinct_hours"]) for x in station_roll[m]],
-            f"DWD {m} -- distinct observed hours per station", "station id", "distinct hours", rot=45)
+    barplot(
+        [(x["station"], x["distinct_hours"]) for x in station_roll[m]],
+        f"DWD {m} -- distinct observed hours per station",
+        "station id",
+        "distinct hours",
+        rot=45,
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Findings
 print("reported periods total:", total, " inverted ranges:", inverted)
-print("reported longest gap per station:", {sid: g["longest"] for sid, g in reported_gaps.items()})
-print("observed -999/blank rate per (measurement.column):",
-      {f"{m}.{c}": round(miss / tm, 4) for m, cs in missing_rates.items() for c, (miss, tm) in cs.items()})
-print("reconciliation: -999-without-report =", obs_no_report, " report-without-observed =", report_no_obs)
+print(
+    "reported longest gap per station:",
+    {sid: g["longest"] for sid, g in reported_gaps.items()},
+)
+print(
+    "observed -999/blank rate per (measurement.column):",
+    {
+        f"{m}.{c}": round(miss / tm, 4)
+        for m, cs in missing_rates.items()
+        for c, (miss, tm) in cs.items()
+    },
+)
+print(
+    "reconciliation: -999-without-report =",
+    obs_no_report,
+    " report-without-observed =",
+    report_no_obs,
+)
