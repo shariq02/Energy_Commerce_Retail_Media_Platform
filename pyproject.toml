@@ -51,12 +51,15 @@ include = ["src*", "fastapi*", "ai*"]
 
 [tool.ruff]
 exclude = ["data/", "docs/", ".terraform/"]
+# spark/dbutils are Databricks-runtime-injected globals (databricks/*),
+# never imported -- declared here so Ruff doesn't flag them as undefined.
+builtins = ["spark", "dbutils"]
 
 [tool.ruff.lint]
 # I: import sorting. PLW1508: reject numeric os.getenv() defaults (must
 # be str/None). UP017: datetime.UTC alias. PLR1730: if/assign -> max().
 extend-select = ["I", "PLW1508", "UP017", "PLR1730"]
-extend-ignore = ["E402"]
+extend-ignore = ["E402", "BLE001"]
 
 [tool.pytest.ini_options]
 markers = [

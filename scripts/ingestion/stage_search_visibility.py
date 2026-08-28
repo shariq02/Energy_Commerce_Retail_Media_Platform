@@ -62,8 +62,17 @@ REPOSITORY_INFO_FILE = RAW_SEARCH_VISIBILITY_DIR / "RAMP_repository_info.csv"
 CHUNK_SIZE = 100_000
 
 EVENT_COLUMNS = [
-    "citableContent", "clickThrough", "clicks", "country", "date", "device",
-    "impressions", "index", "position", "url", "repository_id",
+    "citableContent",
+    "clickThrough",
+    "clicks",
+    "country",
+    "date",
+    "device",
+    "impressions",
+    "index",
+    "position",
+    "url",
+    "repository_id",
 ]
 
 
@@ -76,7 +85,9 @@ def stage_events(monitor: PeakRSSMonitor) -> tuple[int, Path, int, int]:
         with zipfile.ZipFile(zip_path) as zf:
             entries = zf.namelist()
             if len(entries) != 1:
-                raise ValueError(f"Expected exactly one entry in {zip_path}, found {len(entries)}: {entries}")
+                raise ValueError(
+                    f"Expected exactly one entry in {zip_path}, found {len(entries)}: {entries}"
+                )
             with zf.open(entries[0]) as f:
                 for chunk in pd.read_csv(f, chunksize=CHUNK_SIZE):
                     chunk = chunk.reindex(columns=EVENT_COLUMNS)
@@ -85,14 +96,18 @@ def stage_events(monitor: PeakRSSMonitor) -> tuple[int, Path, int, int]:
                     monitor.check()
 
     writer.close()
-    logger.info(f"Staged events/ -- {writer.total_rows} rows, {files_read} source files, "
-                f"{len(writer.chunk_paths)} chunks")
+    logger.info(
+        f"Staged events/ -- {writer.total_rows} rows, {files_read} source files, "
+        f"{len(writer.chunk_paths)} chunks"
+    )
     return writer.total_rows, EVENTS_DIR, files_read, len(writer.chunk_paths)
 
 
 def stage_repository_info() -> tuple[int, list[str], Path]:
     if not REPOSITORY_INFO_FILE.exists():
-        raise FileNotFoundError(f"Expected Search Visibility reference file missing: {REPOSITORY_INFO_FILE}")
+        raise FileNotFoundError(
+            f"Expected Search Visibility reference file missing: {REPOSITORY_INFO_FILE}"
+        )
 
     REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
     out_path = REFERENCE_DIR / "repository_info.csv"
@@ -114,11 +129,17 @@ def main() -> None:
     monitor.check()
 
     logger.info("Search Visibility Phase 2b staging complete.")
-    logger.info(f"  events: {event_rows} rows, {len(EVENT_COLUMNS)} columns, "
-                f"{event_files} source files, {chunk_count} chunks -> {events_dir}")
-    logger.info(f"  reference/repository_info: {ref_rows} rows, {len(ref_columns)} columns -> {ref_path}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+    logger.info(
+        f"  events: {event_rows} rows, {len(EVENT_COLUMNS)} columns, "
+        f"{event_files} source files, {chunk_count} chunks -> {events_dir}"
+    )
+    logger.info(
+        f"  reference/repository_info: {ref_rows} rows, {len(ref_columns)} columns -> {ref_path}"
+    )
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":

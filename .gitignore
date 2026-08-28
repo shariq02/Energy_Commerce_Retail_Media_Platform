@@ -98,6 +98,9 @@ htmlcov/
 # Pytest
 .pytest_cache/
 
+# Ruff
+.ruff_cache/
+
 # VS Code
 .vscode/
 *.code-workspace

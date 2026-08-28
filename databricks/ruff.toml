@@ -1,6 +1,0 @@
-# Databricks notebooks run with `spark` and `dbutils` injected into the
-# global namespace by the Databricks runtime -- they are never imported.
-# Declaring them as predefined globals (scoped to this directory only)
-# lets Ruff keep checking real undefined-name errors everywhere else.
-extend = "../pyproject.toml"
-builtins = ["spark", "dbutils"]

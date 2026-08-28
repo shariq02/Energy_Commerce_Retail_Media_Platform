@@ -45,12 +45,18 @@ SOURCE_FILE = RAW_CRITEO_DIR / "pcb_dataset_final.tsv"
 CHUNK_SIZE = 100_000
 
 
-def stage_attribution_events(monitor: PeakRSSMonitor) -> tuple[int, list[str], Path, int, int]:
+def stage_attribution_events(
+    monitor: PeakRSSMonitor,
+) -> tuple[int, list[str], Path, int, int]:
     if not SOURCE_FILE.exists():
-        raise FileNotFoundError(f"Expected Criteo Attribution source file missing: {SOURCE_FILE}")
+        raise FileNotFoundError(
+            f"Expected Criteo Attribution source file missing: {SOURCE_FILE}"
+        )
 
     out_dir = STAGING_CRITEO_DIR / "attribution_events"
-    writer = ChunkedCSVWriter(out_dir, source="criteo", dataset="attribution", extension="tsv", sep="\t")
+    writer = ChunkedCSVWriter(
+        out_dir, source="criteo", dataset="attribution", extension="tsv", sep="\t"
+    )
 
     columns: list[str] = []
     for chunk in pd.read_csv(SOURCE_FILE, sep="\t", chunksize=CHUNK_SIZE):
@@ -61,22 +67,30 @@ def stage_attribution_events(monitor: PeakRSSMonitor) -> tuple[int, list[str], P
         monitor.check()
 
     writer.close()
-    logger.info(f"Staged attribution_events/ -- {writer.total_rows} rows, 1 source file, "
-                f"{len(writer.chunk_paths)} chunks")
+    logger.info(
+        f"Staged attribution_events/ -- {writer.total_rows} rows, 1 source file, "
+        f"{len(writer.chunk_paths)} chunks"
+    )
     return writer.total_rows, columns, out_dir, 1, len(writer.chunk_paths)
 
 
 def main() -> None:
     monitor = PeakRSSMonitor()
 
-    total_rows, columns, out_dir, files_read, chunk_count = stage_attribution_events(monitor)
+    total_rows, columns, out_dir, files_read, chunk_count = stage_attribution_events(
+        monitor
+    )
     monitor.check()
 
     logger.info("Criteo Attribution Phase 2b staging complete.")
-    logger.info(f"  attribution_events: {total_rows} rows, {len(columns)} columns, "
-                f"{files_read} source files, {chunk_count} chunks -> {out_dir}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+    logger.info(
+        f"  attribution_events: {total_rows} rows, {len(columns)} columns, "
+        f"{files_read} source files, {chunk_count} chunks -> {out_dir}"
+    )
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":

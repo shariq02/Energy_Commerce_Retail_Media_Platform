@@ -50,8 +50,15 @@ CHUNK_SIZE = 300_000
 SOURCE_FILES = ["2019-Oct.csv", "2019-Nov.csv"]
 
 EVENT_COLUMNS = [
-    "event_time", "event_type", "product_id", "category_id",
-    "category_code", "brand", "price", "user_id", "user_session",
+    "event_time",
+    "event_type",
+    "product_id",
+    "category_id",
+    "category_code",
+    "brand",
+    "price",
+    "user_id",
+    "user_session",
 ]
 
 
@@ -73,8 +80,10 @@ def stage_events(monitor: PeakRSSMonitor) -> tuple[int, Path, int, int]:
             monitor.check()
 
     writer.close()
-    logger.info(f"Staged events/ -- {writer.total_rows} rows, {files_read} source files, "
-                f"{len(writer.chunk_paths)} chunks")
+    logger.info(
+        f"Staged events/ -- {writer.total_rows} rows, {files_read} source files, "
+        f"{len(writer.chunk_paths)} chunks"
+    )
     return writer.total_rows, out_dir, files_read, len(writer.chunk_paths)
 
 
@@ -85,10 +94,14 @@ def main() -> None:
     monitor.check()
 
     logger.info("REES46 Phase 2b staging complete.")
-    logger.info(f"  events: {total_rows} rows, {len(EVENT_COLUMNS)} columns, "
-                f"{files_read} source files, {chunk_count} chunks -> {out_dir}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+    logger.info(
+        f"  events: {total_rows} rows, {len(EVENT_COLUMNS)} columns, "
+        f"{files_read} source files, {chunk_count} chunks -> {out_dir}"
+    )
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":

@@ -68,7 +68,12 @@ DATASET_COLUMNS = {
     "heating_W": ["frequency", "datetime_utc", "total", "CHP_heat", "CHP_elec"],
     "cooling_P": ["frequency", "datetime_utc", "total", "cool_elec"],
     "cooling_W": ["frequency", "datetime_utc", "total", "cool_elec"],
-    "weather": ["frequency", "datetime_utc", "WeatherStation.Weather.Ta", "WeatherStation.Weather.Igm"],
+    "weather": [
+        "frequency",
+        "datetime_utc",
+        "WeatherStation.Weather.Ta",
+        "WeatherStation.Weather.Igm",
+    ],
 }
 
 DATASETS = list(DATASET_COLUMNS.keys())
@@ -83,7 +88,9 @@ def stage_dataset(dataset: str, monitor: PeakRSSMonitor) -> tuple[int, Path, int
     for frequency in FREQUENCIES:
         src_file = RAW_HONDA_DIR / frequency / f"{dataset}.csv.gz"
         if not src_file.exists():
-            raise FileNotFoundError(f"Expected Honda IoT source file missing: {src_file}")
+            raise FileNotFoundError(
+                f"Expected Honda IoT source file missing: {src_file}"
+            )
         files_read += 1
 
         for chunk in pd.read_csv(src_file, compression="gzip", chunksize=CHUNK_SIZE):
@@ -94,8 +101,10 @@ def stage_dataset(dataset: str, monitor: PeakRSSMonitor) -> tuple[int, Path, int
             monitor.check()
 
     writer.close()
-    logger.info(f"Staged analytical/{dataset}/ -- {writer.total_rows} rows, {files_read} source files, "
-                f"{len(writer.chunk_paths)} chunks")
+    logger.info(
+        f"Staged analytical/{dataset}/ -- {writer.total_rows} rows, {files_read} source files, "
+        f"{len(writer.chunk_paths)} chunks"
+    )
     return writer.total_rows, out_dir, files_read, len(writer.chunk_paths)
 
 
@@ -109,10 +118,14 @@ def main() -> None:
 
     logger.info("Honda IoT Phase 2b staging complete.")
     for dataset, (rows, out_dir, files_read, chunk_count) in results.items():
-        logger.info(f"  {dataset}: {rows} rows, {files_read} source files, "
-                    f"{chunk_count} chunks -> {out_dir}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+        logger.info(
+            f"  {dataset}: {rows} rows, {files_read} source files, "
+            f"{chunk_count} chunks -> {out_dir}"
+        )
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":

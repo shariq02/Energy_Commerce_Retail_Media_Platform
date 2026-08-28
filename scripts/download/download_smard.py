@@ -67,7 +67,9 @@ def fetch_series(filter_id: int, timestamp: int) -> dict:
 def download_filter(filter_id: int, name: str) -> None:
     dest = OUTPUT_DIR / f"{name}.json"
     if dest.exists():
-        logger.info(f"SMARD {name} (filter {filter_id}) already downloaded, skipping: {dest}")
+        logger.info(
+            f"SMARD {name} (filter {filter_id}) already downloaded, skipping: {dest}"
+        )
         return
 
     logger.info(f"Fetching SMARD index for {name} (filter {filter_id})")
@@ -83,7 +85,15 @@ def download_filter(filter_id: int, name: str) -> None:
     import json
 
     with open(dest, "w") as f:
-        json.dump({"filter_id": filter_id, "region": REGION, "resolution": RESOLUTION, "series": series}, f)
+        json.dump(
+            {
+                "filter_id": filter_id,
+                "region": REGION,
+                "resolution": RESOLUTION,
+                "series": series,
+            },
+            f,
+        )
 
     logger.info(f"Wrote {len(series)} records to {dest}")
 

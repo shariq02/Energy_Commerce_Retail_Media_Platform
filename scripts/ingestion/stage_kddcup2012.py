@@ -43,7 +43,9 @@ CHUNK_SIZE = 100_000
 
 def stage_click_prediction(monitor: PeakRSSMonitor) -> tuple[int, list[str], Path, int]:
     if not SOURCE_FILE.exists():
-        raise FileNotFoundError(f"Expected KDD Cup 2012 Track 2 source file missing: {SOURCE_FILE}")
+        raise FileNotFoundError(
+            f"Expected KDD Cup 2012 Track 2 source file missing: {SOURCE_FILE}"
+        )
 
     ANALYTICAL_DIR.mkdir(parents=True, exist_ok=True)
     out_path = ANALYTICAL_DIR / "click_prediction.csv"
@@ -55,14 +57,21 @@ def stage_click_prediction(monitor: PeakRSSMonitor) -> tuple[int, list[str], Pat
     for chunk in pd.read_csv(SOURCE_FILE, chunksize=CHUNK_SIZE):
         if not columns:
             columns = list(chunk.columns)
-        chunk.to_csv(out_path, mode="w" if first_write else "a",
-                     header=first_write, index=False, encoding="utf-8")
+        chunk.to_csv(
+            out_path,
+            mode="w" if first_write else "a",
+            header=first_write,
+            index=False,
+            encoding="utf-8",
+        )
         first_write = False
         total_rows += len(chunk)
         del chunk
         monitor.check()
 
-    logger.info(f"Staged analytical/click_prediction.csv -- {total_rows} rows, 1 source file")
+    logger.info(
+        f"Staged analytical/click_prediction.csv -- {total_rows} rows, 1 source file"
+    )
     return total_rows, columns, out_path, 1
 
 
@@ -73,10 +82,14 @@ def main() -> None:
     monitor.check()
 
     logger.info("KDD Cup 2012 Track 2 Phase 2b staging complete.")
-    logger.info(f"  click_prediction: {total_rows} rows, {len(columns)} columns, "
-                f"{files_read} source files -> {out_path}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+    logger.info(
+        f"  click_prediction: {total_rows} rows, {len(columns)} columns, "
+        f"{files_read} source files -> {out_path}"
+    )
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":

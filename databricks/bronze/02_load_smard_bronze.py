@@ -4,20 +4,21 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # BRONZE DATA LOADING
+# MAGIC # BRONZE DATA LOADING -- SMARD (ENERGY MARKET)
 # MAGIC
 # MAGIC **Energy Commerce and Retail Media Analytics Platform**
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
-# MAGIC **Purpose:** Load uploaded Unity Catalog Volume data into the
-# MAGIC frozen Bronze table structure.
+# MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for SMARD (energy
+# MAGIC domain) into the frozen Bronze table structure.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
 import re
 
+from pyspark.sql import DataFrame
 from pyspark.sql.utils import AnalysisException
 
 # COMMAND ----------
@@ -26,70 +27,75 @@ from pyspark.sql.utils import AnalysisException
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 
-DWD_ANALYTICAL_VOLUME = "dwd_analytical"
-DWD_METADATA_VOLUME = "dwd_metadata"
+SOURCE_PREFIX = "smard"
 
-DWD_ANALYTICAL_DATASETS = [
-    "air_temperature",
-    "cloudiness",
-    "moisture",
-    "precipitation",
-    "pressure",
-    "sun",
-    "wind",
+# (staging dataset name, source Volume, fully-qualified Bronze table name)
+DATASETS: list[tuple[str, str, str]] = [
+    (
+        "energy_timeseries",
+        "smard_analytical",
+        f"{CATALOG}.{BRONZE_SCHEMA}.smard_energy_timeseries",
+    ),
 ]
 
-DWD_METADATA_DATASETS = [
-    "station_geography",
-    "station_name_history",
-    "device_instrument",
-    "parameter_unit",
-    "missing_value_periods",
-]
+VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
-# Source column names containing characters Delta rejects in identifiers
-# (e.g. "[", "]", "(", ")", ".") for the affected DWD datasets only.
-# Renaming happens right before the Bronze write; values are untouched.
-COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {
-    "device_instrument": {
-        "Geo. Laenge [Grad]": "geo_longitude_deg",
-        "Geo. Breite [Grad]": "geo_latitude_deg",
-        "Stationshoehe [m]": "station_elevation_m",
-        "Geberhoehe ueber Grund [m]": "sensor_height_m",
-        "Geraetetyp Name": "device_type_name",
-    },
-    "parameter_unit": {
-        "Datenquelle (Strukturversion=SV)": "data_source",
-    },
-}
+# Read settings for this source's staged files.
+READ_FORMAT = "csv"
+CSV_OPTIONS = {
+    "header": "true",
+    "inferSchema": "false",
+    "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
+    "multiLine": "false",  # keep CSV splittable so large files read in parallel
+}  # used only when READ_FORMAT == "csv"
+FILE_EXT_PATTERN = r"csv"  # regex alternation of accepted extensions
 
-# (dataset_name, source_volume) for all 12 Bronze upload units.
-DWD_DATASETS = [(d, DWD_ANALYTICAL_VOLUME) for d in DWD_ANALYTICAL_DATASETS] + [
-    (d, DWD_METADATA_VOLUME) for d in DWD_METADATA_DATASETS
-]
+COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {}
 
-VOLUMES = [DWD_ANALYTICAL_VOLUME, DWD_METADATA_VOLUME]
+# Characters Delta rejects in column identifiers. Any offending column is
+# renamed (offending chars -> "_") right before the Bronze write; values
+# are never touched.
+_ILLEGAL_COL_CHARS = re.compile(r"[ ,;{}()\[\]\n\t=.]")
 
 
 def volume_path(volume: str) -> str:
     return f"/Volumes/{CATALOG}/{BRONZE_SCHEMA}/{volume}"
 
 
-def bronze_table(dataset: str) -> str:
-    return f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{dataset}"
-
-
 def dataset_file_pattern(dataset: str) -> re.Pattern:
-    # Matches "<dataset>.csv" (single staged file) or
-    # "dwd_<dataset>_chunk_00001.csv" (physically chunked upload).
-    return re.compile(
-        rf"^(?:dwd_)?{re.escape(dataset)}(?:_chunk_\d{{5}})?\.(?:csv|txt)$"
-    )
+    # Matches "<dataset>.<ext>" (single staged file), an optionally
+    # "<source>_"-prefixed variant, or a physically chunked upload
+    # "<dataset>_chunk_00001.<ext>". Chunk boundaries disappear at Bronze.
+    return re.compile(rf"^{re.escape(dataset)}\.(?:{FILE_EXT_PATTERN})$")
+
+
+def sanitize_columns(df: DataFrame) -> tuple[DataFrame, dict[str, str]]:
+    renames: dict[str, str] = {}
+    for col in df.columns:
+        clean = _ILLEGAL_COL_CHARS.sub("_", col)
+        clean = re.sub(r"_+", "_", clean).strip("_")
+        if clean != col:
+            renames[col] = clean
+    final_names = [renames.get(c, c) for c in df.columns]
+    if len(set(final_names)) != len(final_names):
+        raise RuntimeError(f"column sanitization would collide: {final_names}")
+    for old, new in renames.items():
+        df = df.withColumnRenamed(old, new)
+    return df, renames
+
+
+def read_dataset(files: list[str]) -> DataFrame:
+    if READ_FORMAT == "json":
+        return spark.read.option("multiLine", "true").json(files)
+    reader = spark.read
+    for key, value in CSV_OPTIONS.items():
+        reader = reader.option(key, value)
+    return reader.csv(files)
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Verify DWD Volumes exist and are accessible
+# DBTITLE 1,Verify source Volume(s) exist and are accessible
 found_volumes = {
     row.volume_name
     for row in spark.sql(f"SHOW VOLUMES IN {CATALOG}.{BRONZE_SCHEMA}").collect()
@@ -97,7 +103,7 @@ found_volumes = {
 missing_volumes = [v for v in VOLUMES if v not in found_volumes]
 if missing_volumes:
     raise RuntimeError(
-        f"FAIL  missing required DWD Volume(s) in {CATALOG}.{BRONZE_SCHEMA}: {missing_volumes}"
+        f"FAIL  missing required Volume(s) in {CATALOG}.{BRONZE_SCHEMA}: {missing_volumes}"
     )
 
 inaccessible_volumes = []
@@ -110,22 +116,36 @@ for volume in VOLUMES:
 
 if inaccessible_volumes:
     detail = "; ".join(f"{path} -> {err}" for path, err in inaccessible_volumes)
-    raise RuntimeError(f"FAIL  inaccessible DWD Volume(s): {detail}")
+    raise RuntimeError(f"FAIL  inaccessible Volume(s): {detail}")
 
-print(f"OK  both DWD Volumes present and accessible: {VOLUMES}")
+print(f"OK  all {len(VOLUMES)} required Volume(s) present and accessible: {VOLUMES}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Map each DWD dataset to its source files
+# DBTITLE 1,Inspect source Volume file details
+for volume in VOLUMES:
+    vpath = volume_path(volume)
+    items = dbutils.fs.ls(vpath)
+    print(f"Volume: {vpath}")
+    print(f"Files found: {len(items)}")
+    print()
+    for item in items:
+        print(f"Name : {item.name}")
+        print(f"Path : {item.path}")
+        print(f"Size : {item.size / (1024 * 1024):.2f} MB")
+        print("-" * 70)
+    print()
+
+# COMMAND ----------
+
+# DBTITLE 1,Map each staged dataset to its source files
 dataset_files: dict[str, list[str]] = {}
 missing_dataset_files: list[str] = []
 
-for dataset, volume in DWD_DATASETS:
+for dataset, volume, _table in DATASETS:
     all_files = [f.path for f in dbutils.fs.ls(volume_path(volume)) if not f.isDir()]
     pattern = dataset_file_pattern(dataset)
-    matches = sorted(
-        path for path in all_files if pattern.match(path.rsplit("/", 1)[-1])
-    )
+    matches = sorted(p for p in all_files if pattern.match(p.rsplit("/", 1)[-1]))
     dataset_files[dataset] = matches
     if not matches:
         missing_dataset_files.append(f"{dataset} (expected in {volume_path(volume)})")
@@ -137,16 +157,15 @@ if missing_dataset_files:
         f"FAIL  no source file(s) found for dataset(s): {missing_dataset_files}"
     )
 
-print(f"OK  all {len(DWD_DATASETS)} DWD datasets have at least one source file")
+print(f"OK  all {len(DATASETS)} dataset(s) have at least one source file")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load each DWD dataset into its Bronze table
+# DBTITLE 1,Load each dataset into its Bronze table
 load_results: list[dict] = []
 
-for dataset, volume in DWD_DATASETS:
+for dataset, volume, table in DATASETS:
     files = dataset_files[dataset]
-    table = bronze_table(dataset)
     result = {
         "dataset": dataset,
         "volume": volume,
@@ -158,27 +177,25 @@ for dataset, volume in DWD_DATASETS:
         "error": None,
     }
     try:
-        df = (
-            spark.read.option("header", "true")
-            .option("inferSchema", "false")
-            .option(
-                "enforceSchema", "false"
-            )  # verify every chunk's header, fail loud on mismatch
-            .option("multiLine", "false")  # keep CSV splittable
-            .csv(files)
-        )
-        rename_map = COLUMN_RENAME_MAP.get(dataset, {})
-        applied_renames = {
-            old: new for old, new in rename_map.items() if old in df.columns
-        }
-        for old, new in applied_renames.items():
-            df = df.withColumnRenamed(old, new)
-        if applied_renames:
-            print(f"OK  {dataset}: normalized column name(s) -- {applied_renames}")
+        df = read_dataset(files)
 
-        df.write.format("delta").mode("overwrite").option(
-            "overwriteSchema", "true"
-        ).saveAsTable(table)
+        explicit = COLUMN_RENAME_MAP.get(dataset, {})
+        applied = {old: new for old, new in explicit.items() if old in df.columns}
+        for old, new in applied.items():
+            df = df.withColumnRenamed(old, new)
+
+        df, sanitized = sanitize_columns(df)
+        if applied or sanitized:
+            print(
+                f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}"
+            )
+
+        (
+            df.write.format("delta")
+            .mode("overwrite")
+            .option("overwriteSchema", "true")
+            .saveAsTable(table)
+        )
         row_count = spark.table(table).count()
         result["rows"] = row_count
         result["columns"] = len(df.columns)
@@ -222,33 +239,33 @@ overall_success = all_loaded and all_validated and all_files_ok
 
 # COMMAND ----------
 
-# DBTITLE 1,DWD Bronze load summary
+# DBTITLE 1,SMARD Bronze load summary
 print("=" * 70)
-print("DWD BRONZE LOAD SUMMARY")
+print("SMARD BRONZE LOAD SUMMARY")
 print("=" * 70)
 for result in load_results:
     print(
-        f"{result['dataset']:<24} files={result['files']:<3} "
-        f"rows={result['rows']!s:<10} status={result['status']:<7} "
+        f"{result['dataset']:<28} files={result['files']:<3} "
+        f"rows={result['rows']!s:<12} status={result['status']:<7} "
         f"validated={result.get('validated')}"
     )
     if result["error"]:
-        print(f"    load error:       {result['error']}")
+        print(f"    load error:        {result['error']}")
     if result.get("validation_error"):
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
 print(
-    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DWD_DATASETS)}"
+    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DATASETS)}"
 )
 print(
-    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DWD_DATASETS)}"
+    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DATASETS)}"
 )
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
 
 # COMMAND ----------
 
-# DBTITLE 1,Delete DWD Volumes only if every dataset passed
+# DBTITLE 1,Delete source Volume(s) only if every dataset passed
 volume_cleanup: dict[str, str] = {}
 
 if overall_success:
@@ -271,6 +288,6 @@ print("=" * 70)
 
 if not overall_success:
     raise RuntimeError(
-        "FAIL  DWD Bronze load did not fully pass -- see summary above. "
-        "Both DWD Volumes were preserved."
+        "FAIL  SMARD Bronze load did not fully pass -- see summary above. "
+        "Source Volume(s) were preserved."
     )

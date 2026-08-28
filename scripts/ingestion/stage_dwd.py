@@ -61,18 +61,29 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def _iter_semicolon_chunks(path: Path, chunksize: int = CHUNK_SIZE):
     for chunk in pd.read_csv(
-        path, sep=";", encoding=SOURCE_ENCODING, skipinitialspace=True, chunksize=chunksize,
+        path,
+        sep=";",
+        encoding=SOURCE_ENCODING,
+        skipinitialspace=True,
+        chunksize=chunksize,
     ):
         yield _clean_columns(chunk)
 
 
 def _write_chunk(chunk: pd.DataFrame, out_path: Path, first_write: bool) -> int:
-    chunk.to_csv(out_path, mode="w" if first_write else "a",
-                 header=first_write, index=False, encoding="utf-8")
+    chunk.to_csv(
+        out_path,
+        mode="w" if first_write else "a",
+        header=first_write,
+        index=False,
+        encoding="utf-8",
+    )
     return len(chunk)
 
 
-def stage_analytical(measurement: str, monitor: PeakRSSMonitor) -> tuple[int, list[str], Path]:
+def stage_analytical(
+    measurement: str, monitor: PeakRSSMonitor
+) -> tuple[int, list[str], Path]:
     ANALYTICAL_DIR.mkdir(parents=True, exist_ok=True)
     out_path = ANALYTICAL_DIR / f"{measurement}.csv"
 
@@ -93,12 +104,16 @@ def stage_analytical(measurement: str, monitor: PeakRSSMonitor) -> tuple[int, li
             del chunk
             monitor.check()
 
-    logger.info(f"Staged analytical/{measurement}.csv -- {total_rows} rows, {files_read} source files")
+    logger.info(
+        f"Staged analytical/{measurement}.csv -- {total_rows} rows, {files_read} source files"
+    )
     return total_rows, columns, out_path
 
 
 def stage_station_level_metadata(
-    filename_prefix: str, dataset_name: str, monitor: PeakRSSMonitor,
+    filename_prefix: str,
+    dataset_name: str,
+    monitor: PeakRSSMonitor,
 ) -> tuple[int, list[str], Path]:
     """Station-level files (Geographie, Stationsname) are duplicated byte-for-byte
     across every measurement folder for a station -- dedupe by content, not by
@@ -147,7 +162,9 @@ def stage_station_level_metadata(
         # skipping output.
         pd.DataFrame(columns=columns).to_csv(out_path, index=False, encoding="utf-8")
 
-    logger.info(f"Staged metadata/{dataset_name}.csv -- {total_rows} rows after dedup, from {files_read} source files")
+    logger.info(
+        f"Staged metadata/{dataset_name}.csv -- {total_rows} rows after dedup, from {files_read} source files"
+    )
     return total_rows, columns, out_path
 
 
@@ -175,7 +192,9 @@ def stage_device_instrument(monitor: PeakRSSMonitor) -> tuple[int, list[str], Pa
             del chunk
             monitor.check()
 
-    logger.info(f"Staged metadata/device_instrument.csv -- {total_rows} rows, {files_read} source files")
+    logger.info(
+        f"Staged metadata/device_instrument.csv -- {total_rows} rows, {files_read} source files"
+    )
     return total_rows, columns, out_path
 
 
@@ -200,7 +219,9 @@ def stage_parameter_unit(monitor: PeakRSSMonitor) -> tuple[int, list[str], Path]
             del chunk
             monitor.check()
 
-    logger.info(f"Staged metadata/parameter_unit.csv -- {total_rows} rows, {files_read} source files")
+    logger.info(
+        f"Staged metadata/parameter_unit.csv -- {total_rows} rows, {files_read} source files"
+    )
     return total_rows, columns, out_path
 
 
@@ -213,7 +234,11 @@ def _iter_fehlwerte_chunks(path: Path, chunksize: int = CHUNK_SIZE):
     then handed to pd.read_csv in chunks like every other source, and
     discarded once its chunks are yielded."""
     text = path.read_text(encoding=SOURCE_ENCODING)
-    lines = [ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("generiert:")]
+    lines = [
+        ln
+        for ln in text.splitlines()
+        if ln.strip() and not ln.lstrip().startswith("generiert:")
+    ]
     del text
     buf = io.StringIO("\n".join(lines))
     del lines
@@ -248,7 +273,9 @@ def stage_missing_value_periods(monitor: PeakRSSMonitor) -> tuple[int, list[str]
             del chunk
             monitor.check()
 
-    logger.info(f"Staged metadata/missing_value_periods.csv -- {total_rows} rows, {files_read} source files")
+    logger.info(
+        f"Staged metadata/missing_value_periods.csv -- {total_rows} rows, {files_read} source files"
+    )
     return total_rows, columns, out_path
 
 
@@ -260,7 +287,9 @@ def main() -> None:
         rows, columns, path = stage_analytical(measurement, monitor)
         results[measurement] = (rows, columns, path)
 
-    rows, columns, path = stage_station_level_metadata("Metadaten_Geographie", "station_geography", monitor)
+    rows, columns, path = stage_station_level_metadata(
+        "Metadaten_Geographie", "station_geography", monitor
+    )
     results["station_geography"] = (rows, columns, path)
 
     rows, columns, path = stage_device_instrument(monitor)
@@ -270,7 +299,9 @@ def main() -> None:
     results["parameter_unit"] = (rows, columns, path)
 
     rows, columns, path = stage_station_level_metadata(
-        "Metadaten_Stationsname_Betreibername", "station_name_history", monitor,
+        "Metadaten_Stationsname_Betreibername",
+        "station_name_history",
+        monitor,
     )
     results["station_name_history"] = (rows, columns, path)
 
@@ -280,8 +311,10 @@ def main() -> None:
     logger.info("DWD Phase 2b staging complete.")
     for name, (rows, columns, path) in results.items():
         logger.info(f"  {name}: {rows} rows, {len(columns)} columns -> {path}")
-    logger.info(f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
-                f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)")
+    logger.info(
+        f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
+        f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
+    )
 
 
 if __name__ == "__main__":
