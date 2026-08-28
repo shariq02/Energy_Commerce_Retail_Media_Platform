@@ -24,15 +24,6 @@ from pyspark.sql.utils import AnalysisException
 
 # COMMAND ----------
 
-# DBTITLE 1,Write-performance tuning
-spark.conf.set("spark.databricks.delta.optimizeWrite.enabled", "true")
-spark.conf.set("spark.databricks.delta.autoCompact.enabled", "true")
-spark.conf.set(
-    "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols", "8"
-)
-
-# COMMAND ----------
-
 # DBTITLE 1,Configuration
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
