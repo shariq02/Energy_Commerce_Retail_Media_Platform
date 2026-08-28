@@ -4,14 +4,25 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # BRONZE DATA LOADING -- SMARD (ENERGY MARKET)
+# MAGIC # BRONZE DATA LOADING -- iPINYOU (RETAIL MEDIA / RTB)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
-# MAGIC **Date:** August 2026  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Date:** August 2026
 # MAGIC
-# MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for SMARD (energy
-# MAGIC domain) into the frozen Bronze table structure.
+# MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the iPinYou
+# MAGIC RTB dataset (retail_media domain) into the frozen Bronze table
+# MAGIC structure -- `ipinyou_training`, `ipinyou_leaderboard`,
+# MAGIC `ipinyou_reference` (`PIPELINE_DESIGN.md` Section 1c).
+# MAGIC
+# MAGIC `training` and `leaderboard` pass through 1:1 from their Phase 2b
+# MAGIC staging datasets -- each already carries `season` / `event_type`
+# MAGIC discriminator columns, and the Season 1 vs Season 2/3 schema split
+# MAGIC was reconciled onto one superset schema in Phase 2b. `reference` is
+# MAGIC the one merge visible at Bronze: the three staged lookup files (city,
+# MAGIC region, user_profile_tags) share an `id, name_en, name_cn` shape and
+# MAGIC combine into a single table with an explicit `lookup_type`
+# MAGIC discriminator (`PIPELINE_DESIGN.md` Section 1c rule 8).
 
 # COMMAND ----------
 
@@ -19,6 +30,7 @@
 import re
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 from pyspark.sql.utils import AnalysisException
 
 # COMMAND ----------
@@ -44,28 +56,42 @@ spark.conf.set(
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 
-SOURCE_PREFIX = "smard"
+SOURCE_PREFIX = "ipinyou"
 
-# (staging dataset name, source Volume, fully-qualified Bronze table name)
+ANALYTICAL_VOLUME = "ipinyou_analytical"
+REFERENCE_VOLUME = "ipinyou_reference"
+
+# Pass-through datasets: (staging dataset name, source Volume, Bronze table).
+# One staged dataset -> one Bronze table, no transformation.
 DATASETS: list[tuple[str, str, str]] = [
-    ("energy_timeseries", "smard_analytical", f"{CATALOG}.{BRONZE_SCHEMA}.smard_energy_timeseries"),
+    ("training", ANALYTICAL_VOLUME, f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_training"),
+    ("leaderboard", ANALYTICAL_VOLUME, f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_leaderboard"),
 ]
 
-VOLUMES = sorted({volume for _, volume, _ in DATASETS})
+# Merged reference table: the three staged lookup files each become one
+# lookup_type partition of a single Bronze table. Their id column is named
+# differently per file (city_id / region_id / tag_id) and is renamed to a
+# common `lookup_id`; `lookup_type` is added as an explicit discriminator.
+REFERENCE_TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_reference"
+# (staged file stem, id column in that file, lookup_type value)
+REFERENCE_LOOKUPS: list[tuple[str, str, str]] = [
+    ("city", "city_id", "city"),
+    ("region", "region_id", "region"),
+    ("user_profile_tags", "tag_id", "tag"),
+]
 
-# Read settings for this source's staged files.
-READ_FORMAT = "csv"
+VOLUMES = sorted({ANALYTICAL_VOLUME, REFERENCE_VOLUME})
+
+# Read settings for this source's staged files. Phase 2b writes UTF-8 CSV
+# with a header on every chunk (ChunkedCSVWriter) and comma-separated
+# reference files.
 CSV_OPTIONS = {
     "header": "true",
     "inferSchema": "false",
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
     "multiLine": "false",      # keep CSV splittable so large files read in parallel
-}  # used only when READ_FORMAT == "csv"
-FILE_EXT_PATTERN = r"csv"                                # regex alternation of accepted extensions
-
-# Optional semantic column renames applied before the generic sanitizer
-# below. Column VALUES are never touched. Empty unless a source needs it.
-COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {}
+}
+FILE_EXT_PATTERN = r"csv"
 
 # Characters Delta rejects in column identifiers. Any offending column is
 # renamed (offending chars -> "_") right before the Bronze write; values
@@ -77,13 +103,20 @@ def volume_path(volume: str) -> str:
     return f"/Volumes/{CATALOG}/{BRONZE_SCHEMA}/{volume}"
 
 
-def dataset_file_pattern(dataset: str) -> re.Pattern:
-    # Matches "<dataset>.<ext>" (single staged file), an optionally
-    # "<source>_"-prefixed variant, or a physically chunked upload
-    # "<dataset>_chunk_00001.<ext>". Chunk boundaries disappear at Bronze.
+def dataset_file_pattern(stem: str) -> re.Pattern:
+    # Matches "<stem>.csv", an optionally "ipinyou_"-prefixed variant, or a
+    # physically chunked upload "ipinyou_<stem>_chunk_00001.csv". Chunk
+    # boundaries disappear at Bronze.
     return re.compile(
-        rf"^{re.escape(dataset)}\.(?:{FILE_EXT_PATTERN})$"
+        rf"^(?:{re.escape(SOURCE_PREFIX)}_)?{re.escape(stem)}"
+        rf"(?:_chunk_\d{{5}})?\.(?:{FILE_EXT_PATTERN})$"
     )
+
+
+def find_files(volume: str, stem: str) -> list[str]:
+    all_files = [f.path for f in dbutils.fs.ls(volume_path(volume)) if not f.isDir()]
+    pattern = dataset_file_pattern(stem)
+    return sorted(p for p in all_files if pattern.match(p.rsplit("/", 1)[-1]))
 
 
 def sanitize_columns(df: DataFrame) -> tuple[DataFrame, dict[str, str]]:
@@ -102,8 +135,6 @@ def sanitize_columns(df: DataFrame) -> tuple[DataFrame, dict[str, str]]:
 
 
 def read_dataset(files: list[str]) -> DataFrame:
-    if READ_FORMAT == "json":
-        return spark.read.option("multiLine", "true").json(files)
     reader = spark.read
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
@@ -165,25 +196,33 @@ dataset_files: dict[str, list[str]] = {}
 missing_dataset_files: list[str] = []
 
 for dataset, volume, _table in DATASETS:
-    all_files = [f.path for f in dbutils.fs.ls(volume_path(volume)) if not f.isDir()]
-    pattern = dataset_file_pattern(dataset)
-    matches = sorted(p for p in all_files if pattern.match(p.rsplit("/", 1)[-1]))
+    matches = find_files(volume, dataset)
     dataset_files[dataset] = matches
     if not matches:
         missing_dataset_files.append(f"{dataset} (expected in {volume_path(volume)})")
     else:
         print(f"OK  {dataset}: {len(matches)} file(s) found in {volume_path(volume)}")
 
+reference_files: dict[str, list[str]] = {}
+for stem, _id_col, _lookup_type in REFERENCE_LOOKUPS:
+    matches = find_files(REFERENCE_VOLUME, stem)
+    reference_files[stem] = matches
+    if not matches:
+        missing_dataset_files.append(f"reference/{stem} (expected in {volume_path(REFERENCE_VOLUME)})")
+    else:
+        print(f"OK  reference/{stem}: {len(matches)} file(s) found in {volume_path(REFERENCE_VOLUME)}")
+
 if missing_dataset_files:
     raise RuntimeError(
         f"FAIL  no source file(s) found for dataset(s): {missing_dataset_files}"
     )
 
-print(f"OK  all {len(DATASETS)} dataset(s) have at least one source file")
+print(f"OK  all {len(DATASETS)} pass-through dataset(s) and "
+      f"{len(REFERENCE_LOOKUPS)} reference lookup(s) have at least one source file")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load each dataset into its Bronze table
+# DBTITLE 1,Load the pass-through datasets into their Bronze tables
 load_results: list[dict] = []
 
 for dataset, volume, table in DATASETS:
@@ -201,14 +240,9 @@ for dataset, volume, table in DATASETS:
     try:
         df = read_dataset(files)
 
-        explicit = COLUMN_RENAME_MAP.get(dataset, {})
-        applied = {old: new for old, new in explicit.items() if old in df.columns}
-        for old, new in applied.items():
-            df = df.withColumnRenamed(old, new)
-
         df, sanitized = sanitize_columns(df)
-        if applied or sanitized:
-            print(f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}")
+        if sanitized:
+            print(f"OK  {dataset}: sanitized column name(s) -- {sanitized}")
 
         (
             df.write.format("delta")
@@ -228,6 +262,64 @@ for dataset, volume, table in DATASETS:
         result["error"] = str(exc)
         print(f"FAIL  {dataset}: could not load into {table} -- {exc}")
     load_results.append(result)
+
+# COMMAND ----------
+
+# DBTITLE 1,Build and load the merged reference table
+reference_result = {
+    "dataset": "reference",
+    "volume": REFERENCE_VOLUME,
+    "table": REFERENCE_TABLE,
+    "files": sum(len(reference_files[stem]) for stem, _, _ in REFERENCE_LOOKUPS),
+    "rows": None,
+    "columns": None,
+    "status": "FAILED",
+    "error": None,
+}
+try:
+    merged: DataFrame | None = None
+    for stem, id_col, lookup_type in REFERENCE_LOOKUPS:
+        part = read_dataset(reference_files[stem])
+        if id_col in part.columns:
+            part = part.withColumnRenamed(id_col, "lookup_id")
+        elif "lookup_id" not in part.columns:
+            raise RuntimeError(
+                f"reference/{stem}: expected id column '{id_col}' not present -- "
+                f"columns are {part.columns}"
+            )
+        part = part.withColumn("lookup_type", F.lit(lookup_type))
+        # Front the discriminator columns; union the rest by NAME so the
+        # three lookups line up even if name_en / name_cn arrive in a
+        # different order.
+        ordered = ["lookup_type", "lookup_id"] + [
+            c for c in part.columns if c not in ("lookup_type", "lookup_id")
+        ]
+        part = part.select(*ordered)
+        merged = part if merged is None else merged.unionByName(part, allowMissingColumns=True)
+        print(f"OK  reference/{stem}: {len(reference_files[stem])} file(s), "
+              f"columns={part.columns}")
+
+    merged, sanitized = sanitize_columns(merged)
+    if sanitized:
+        print(f"OK  reference: sanitized column name(s) -- {sanitized}")
+
+    (
+        merged.write.format("delta")
+        .mode("overwrite")
+        .option("overwriteSchema", "true")
+        .saveAsTable(REFERENCE_TABLE)
+    )
+    row_count = spark.table(REFERENCE_TABLE).count()
+    reference_result["rows"] = row_count
+    reference_result["columns"] = len(merged.columns)
+    reference_result["status"] = "LOADED"
+    print(f"OK  reference: {row_count} rows from {reference_result['files']} file(s) "
+          f"-> {REFERENCE_TABLE}")
+except Exception as exc:
+    reference_result["error"] = str(exc)
+    print(f"FAIL  reference: could not load into {REFERENCE_TABLE} -- {exc}")
+
+load_results.append(reference_result)
 
 # COMMAND ----------
 
@@ -260,9 +352,9 @@ overall_success = all_loaded and all_validated and all_files_ok
 
 # COMMAND ----------
 
-# DBTITLE 1,SMARD Bronze load summary
+# DBTITLE 1,iPinYou Bronze load summary
 print("=" * 70)
-print("SMARD BRONZE LOAD SUMMARY")
+print("iPINYOU BRONZE LOAD SUMMARY")
 print("=" * 70)
 for result in load_results:
     print(
@@ -275,8 +367,8 @@ for result in load_results:
     if result.get("validation_error"):
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
-print(f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DATASETS)}")
-print(f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DATASETS)}")
+print(f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(load_results)}")
+print(f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(load_results)}")
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
 
@@ -303,6 +395,6 @@ print("=" * 70)
 
 if not overall_success:
     raise RuntimeError(
-        "FAIL  SMARD Bronze load did not fully pass -- see summary above. "
+        "FAIL  iPinYou Bronze load did not fully pass -- see summary above. "
         "Source Volume(s) were preserved."
     )
