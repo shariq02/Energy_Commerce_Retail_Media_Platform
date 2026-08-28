@@ -14,10 +14,18 @@
 # Season 2/3 -- they do not carry AdvertiserID or UserTags. This is
 # confirmed both by the README ("the second and third season data
 # contains the user tags column while the first season data does not")
-# and by direct column-count inspection (bid: 19 vs 21, imp/clk/conv:
-# 22 vs 24, leaderboard: 24 vs 26 -- each a 2-column gap). Rows are
-# reconciled onto one superset schema per logical dataset; Season 1
-# rows carry NULL in the columns that season never populated.
+# and by direct column-count inspection (imp/clk/conv: 22 vs 24,
+# leaderboard: 24 vs 26 -- a 2-column gap). Rows are reconciled onto one
+# superset schema per logical dataset; Season 1 rows carry NULL in the
+# columns that season never populated.
+#
+# The bid-request logs (training{1,2,3}/bid.*) are deliberately NOT
+# staged: they are ~2/3 of the raw volume and redundant for this
+# platform's analysis -- the impression log already carries every won
+# auction with its paying price, and no use case needs raw RTB
+# bid-landscape data. See PIPELINE_DESIGN.md Section 1a and CHANGELOG
+# Entry 013. training_data therefore consists of impression / click /
+# conversion events only.
 # ====================================================================
 
 import sys
@@ -40,21 +48,13 @@ ANALYTICAL_DIR = STAGING_IPINYOU_DIR / "analytical"
 REFERENCE_DIR = STAGING_IPINYOU_DIR / "reference"
 
 # Source logs are plain TSV with no header row, bzip2-compressed. Read
-# in chunks -- the largest single source file (training2nd bid logs)
-# decompresses far past what fits in memory on this machine at once.
+# in chunks -- the largest single source file (training2nd impression
+# logs) decompresses far past what fits in memory on this machine at once.
 # Capped at 50,000 rows/chunk under the Phase 2b 1 GB memory-safety design
 # (scripts/ingestion/_memory_guard.py).
 CHUNK_SIZE = 300_000
 
 # ---- Canonical field lists, in on-disk column order -----------------
-
-BID_FIELDS_S1 = [
-    "bid_id", "timestamp", "ipinyou_id", "user_agent", "ip", "region",
-    "city", "ad_exchange", "domain", "url", "anonymous_url_id",
-    "ad_slot_id", "ad_slot_width", "ad_slot_height", "ad_slot_visibility",
-    "ad_slot_format", "ad_slot_floor_price", "creative_id", "bidding_price",
-]
-BID_FIELDS_S23 = BID_FIELDS_S1 + ["advertiser_id", "user_tags"]
 
 EVENT_FIELDS_S1 = [
     "bid_id", "timestamp", "log_type", "ipinyou_id", "user_agent", "ip",
@@ -68,11 +68,9 @@ EVENT_FIELDS_S23 = EVENT_FIELDS_S1 + ["advertiser_id", "user_tags"]
 LEADERBOARD_FIELDS_S1 = EVENT_FIELDS_S1 + ["related_clicks_count", "has_conversion"]
 LEADERBOARD_FIELDS_S23 = EVENT_FIELDS_S23 + ["related_clicks_count", "has_conversion"]
 
-# Superset output schemas -- Season 1 rows get NULL in columns their
-# season's log format never carried (advertiser_id, user_tags), and bid
-# rows get NULL in columns only imp/clk/conv carry (log_type,
-# paying_price, keypage_url). This is schema reconciliation, not missing
-# data.
+# Superset output schemas -- Season 1 rows get NULL in the columns their
+# season's log format never carried (advertiser_id, user_tags). This is
+# schema reconciliation, not missing data.
 TRAINING_OUTPUT_COLUMNS = [
     "season", "event_type", "bid_id", "timestamp", "log_type",
     "ipinyou_id", "user_agent", "ip", "region", "city", "ad_exchange",
@@ -90,18 +88,16 @@ LEADERBOARD_OUTPUT_COLUMNS = [
     "advertiser_id", "user_tags", "related_clicks_count", "has_conversion",
 ]
 
-SEASON1_DIRS = {"training1st", "testing1st"}
-
+# Impression / click / conversion logs only -- bid-request logs are not
+# staged (see module docstring). Season 1 uses the shorter field list;
+# Season 2/3 add advertiser_id + user_tags.
 TRAINING_SOURCES = [
-    ("training1st", "bid", BID_FIELDS_S1),
     ("training1st", "clk", EVENT_FIELDS_S1),
     ("training1st", "conv", EVENT_FIELDS_S1),
     ("training1st", "imp", EVENT_FIELDS_S1),
-    ("training2nd", "bid", BID_FIELDS_S23),
     ("training2nd", "clk", EVENT_FIELDS_S23),
     ("training2nd", "conv", EVENT_FIELDS_S23),
     ("training2nd", "imp", EVENT_FIELDS_S23),
-    ("training3rd", "bid", BID_FIELDS_S23),
     ("training3rd", "clk", EVENT_FIELDS_S23),
     ("training3rd", "conv", EVENT_FIELDS_S23),
     ("training3rd", "imp", EVENT_FIELDS_S23),

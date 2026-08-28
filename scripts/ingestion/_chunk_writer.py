@@ -10,13 +10,13 @@
 # never be read as dataset count.
 #
 # Each write() call is handed a DataFrame no larger than one processing
-# batch (<=300,000 rows, per the memory guard). That batch is written to
-# disk immediately -- if it would push the current physical chunk past
-# either limit, the batch itself is sliced by row so no output file
-# exceeds MAX_CHUNK_BYTES, and the current chunk is closed/rotated
-# before the remainder is written. The full dataset is never held in
-# RAM: only the one incoming batch, plus a running byte count for the
-# currently-open chunk.
+# batch (<=300,000 rows, per the memory guard). The batch is serialised
+# to CSV bytes exactly ONCE per chunk-append and written straight to the
+# open chunk file; the byte budget is tracked with a running counter
+# (the encoded length actually written), never a filesystem stat() and
+# never a throwaway second serialisation just to measure size. The full
+# dataset is never held in RAM: only the one incoming batch plus its
+# single encoded copy.
 # ====================================================================
 
 from pathlib import Path
@@ -51,7 +51,7 @@ class ChunkedCSVWriter:
         self._chunk_index = 0        # last chunk number actually opened (1-based)
         self._current_path: Path | None = None
         self._current_rows = 0
-        self._current_bytes = 0
+        self._current_bytes = 0      # running count of bytes written to the open chunk
         self._current_has_header = False
 
         self.total_rows = 0
@@ -68,28 +68,36 @@ class ChunkedCSVWriter:
         self._current_has_header = False
         self.chunk_paths.append(self._current_path)
 
-    def _append(self, df: pd.DataFrame) -> None:
+    def _encode(self, df: pd.DataFrame, header: bool) -> bytes:
+        """Serialise one row-slice to CSV bytes. This is the ONLY place a
+        frame is turned into CSV -- callers reuse the returned bytes for
+        both the size check and the actual write."""
+        return df.to_csv(index=False, header=header, sep=self.sep).encode("utf-8")
+
+    def _append(self, data: bytes, rows: int) -> None:
         if self._current_path is None:
             self._open_new_chunk()
-        first_write = not self._current_has_header
-        df.to_csv(
-            self._current_path, mode="w" if first_write else "a",
-            header=first_write, index=False, encoding="utf-8", sep=self.sep,
-        )
+        # A fresh chunk (no header written yet) is created/truncated; an
+        # existing one is appended to. `data` was encoded with header iff
+        # this is the first write to the chunk.
+        mode = "ab" if self._current_has_header else "wb"
+        with open(self._current_path, mode) as f:
+            f.write(data)
         self._current_has_header = True
-        self._current_rows += len(df)
-        self._current_bytes = self._current_path.stat().st_size
-        self.total_rows += len(df)
+        self._current_rows += rows
+        self._current_bytes += len(data)
+        self.total_rows += rows
 
     def write(self, df: pd.DataFrame) -> None:
         """Write one processing batch (<=max_rows), splitting it across
-        chunk-file boundaries as needed. Never buffers more than the
-        batch handed in plus one row-slice of it."""
+        chunk-file boundaries as needed. Holds only the batch handed in
+        plus one encoded CSV copy of the slice being written."""
         if df.empty:
             return
 
-        remaining = df
-        while len(remaining) > 0:
+        n = len(df)
+        start = 0
+        while start < n:
             if self._current_path is None:
                 self._open_new_chunk()
 
@@ -98,41 +106,33 @@ class ChunkedCSVWriter:
                 self._open_new_chunk()
                 continue
 
-            head = remaining.iloc[:room_rows]
-            tail = remaining.iloc[room_rows:]
+            end = min(start + room_rows, n)
+            head = df.iloc[start:end]
+            need_header = not self._current_has_header
+            data = self._encode(head, need_header)
 
-            # Estimate whether `head` fits the remaining byte budget for
-            # the current chunk; if not, binary-search down to the
-            # largest row-prefix that does.
-            est_bytes = len(head.to_csv(index=False, header=not self._current_has_header, sep=self.sep).encode("utf-8"))
-            if self._current_bytes + est_bytes > self.max_bytes and self._current_rows > 0:
+            # If `head` would push the open chunk past the byte cap and the
+            # chunk already holds rows, rotate and re-encode (with header)
+            # on the next iteration.
+            if self._current_rows > 0 and self._current_bytes + len(data) > self.max_bytes:
                 self._open_new_chunk()
                 continue
 
-            if self._current_bytes + est_bytes > self.max_bytes:
-                # Even an empty chunk can't fit the full head -- shrink
-                # head by row count until it fits (guarantees progress
-                # since a single row always eventually fits under any
-                # sane per-row size, and this only runs on an empty
-                # freshly-opened chunk).
-                lo, hi = 1, len(head)
-                fit = 1
-                while lo <= hi:
-                    mid = (lo + hi) // 2
-                    trial = head.iloc[:mid]
-                    trial_bytes = len(trial.to_csv(index=False, header=not self._current_has_header, sep=self.sep).encode("utf-8"))
-                    if trial_bytes <= self.max_bytes:
-                        fit = mid
-                        lo = mid + 1
-                    else:
-                        hi = mid - 1
-                tail = pd.concat([head.iloc[fit:], tail]) if fit < len(head) else tail
+            # Fresh/empty chunk still can't hold the whole slice: size a
+            # prefix from the measured average row width, then trim if the
+            # estimate ran over. Guarantees progress (fit >= 1).
+            if self._current_bytes + len(data) > self.max_bytes:
+                avg = max(1, len(data) // max(1, len(head)))
+                fit = min(len(head), max(1, (self.max_bytes - self._current_bytes) // avg))
+                data = self._encode(head.iloc[:fit], need_header)
+                while fit > 1 and len(data) > self.max_bytes:
+                    fit = max(1, int(fit * 0.9))
+                    data = self._encode(head.iloc[:fit], need_header)
                 head = head.iloc[:fit]
+                end = start + fit
 
-            self._append(head)
-            del head
-            remaining = tail
-            del tail
+            self._append(data, len(head))
+            start = end
 
     def close(self) -> None:
         self._current_path = None
