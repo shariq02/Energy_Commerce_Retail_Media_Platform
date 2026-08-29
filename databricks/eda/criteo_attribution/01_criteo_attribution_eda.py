@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- CRITEO ATTRIBUTION
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile criteo_attribution_events (one Bronze table of
@@ -43,8 +43,8 @@ NUM_COLS = ["cost", "cpo", "click_pos", "click_nb"]
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
+
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, log=False):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs], log=log)
@@ -68,39 +68,19 @@ def histplot(values, title, xlabel, bins=50, log=False):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 import contextlib
 import os as _os
 import re as _re
 
 
 def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
+    current = _os.path.abspath(_os.getcwd())
+    repo_root = _os.path.abspath(
+        _os.path.join(current, "..", "..", "..")
     )
+    return repo_root
 
 
 def _profiling_dir():
@@ -149,6 +129,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
