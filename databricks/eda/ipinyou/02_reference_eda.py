@@ -38,7 +38,7 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_reference"
 
 
 # DBTITLE 1,Helper
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(9, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -46,6 +46,8 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -132,6 +134,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -230,7 +241,13 @@ for c in extra:
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- rows per lookup_type + name missingness
-barplot(type_rows, "iPinYou reference -- rows per lookup_type", "lookup_type", "rows")
+barplot(
+    type_rows,
+    "iPinYou reference -- rows per lookup_type",
+    "lookup_type",
+    "rows",
+    filename="ipinyou_reference_rows_per_lookup_type.png",
+)
 types = [n[0] for n in name_missing]
 x = np.arange(len(types))
 plt.figure(figsize=(9, 4))
@@ -251,6 +268,11 @@ plt.legend()
 plt.title("iPinYou reference -- name missingness by lookup_type")
 plt.ylabel("rate")
 plt.tight_layout()
+plt.savefig(
+    fig_path("ipinyou_reference_name_missingness_by_lookup_type.png"),
+    dpi=110,
+    bbox_inches="tight",
+)
 plt.show()
 
 # COMMAND ----------
@@ -355,5 +377,15 @@ write_profiling(
         ("Coverage", "\n".join(_coverage)),
         ("EDA Findings", _findings_md),
         ("Silver Implications", "\n".join(_silver)),
+    ],
+    figures=[
+        (
+            "iPinYou reference -- rows per lookup_type",
+            "ipinyou_reference_rows_per_lookup_type.png",
+        ),
+        (
+            "iPinYou reference -- name missingness by lookup_type",
+            "ipinyou_reference_name_missingness_by_lookup_type.png",
+        ),
     ],
 )

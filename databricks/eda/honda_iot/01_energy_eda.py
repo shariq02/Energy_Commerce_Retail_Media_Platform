@@ -51,7 +51,7 @@ FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 
 
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -59,16 +59,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -155,6 +159,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -443,7 +456,13 @@ for e in ENERGY:
 
 # DBTITLE 1,Figure -- rows per frequency, coverage %, duplicate groups
 for e in ENERGY:
-    barplot(freq_rows[e], f"Honda {e} -- rows per frequency", "frequency", "rows")
+    barplot(
+        freq_rows[e],
+        f"Honda {e} -- rows per frequency",
+        "frequency",
+        "rows",
+        filename=f"honda_{e}_rows_per_frequency.png",
+    )
 for e in ENERGY:
     if continuity[e]:
         barplot(
@@ -451,6 +470,7 @@ for e in ENERGY:
             f"Honda {e} -- coverage % by frequency",
             "frequency",
             "%",
+            filename=f"honda_{e}_coverage_pct_by_frequency.png",
         )
 barplot(
     [(e, dup[e]["dup_groups"]) for e in ENERGY],
@@ -458,6 +478,7 @@ barplot(
     "table",
     "dup groups",
     rot=30,
+    filename="honda_energy_duplicate_groups.png",
 )
 
 # COMMAND ----------
@@ -474,6 +495,9 @@ plt.legend()
 plt.title("Honda energy -- longest gap (missing steps) per table x frequency")
 plt.ylabel("steps")
 plt.tight_layout()
+plt.savefig(
+    fig_path("honda_energy_longest_gap_per_table.png"), dpi=110, bbox_inches="tight"
+)
 plt.show()
 
 # COMMAND ----------
@@ -485,7 +509,10 @@ for e in ENERGY:
         s = pdf[c].dropna()
         if len(s):
             histplot(
-                s.tolist(), f"Honda {e}.{c} -- distribution (n={len(s)} sample)", c
+                s.tolist(),
+                f"Honda {e}.{c} -- distribution (n={len(s)} sample)",
+                c,
+                filename=f"honda_{e}_{c}_distribution.png",
             )
     tp = ts_pdf[e]
     if not tp.empty:
@@ -496,6 +523,11 @@ for e in ENERGY:
         plt.title(f"Honda {e} -- first 2000 hourly points")
         plt.xlabel("time index")
         plt.tight_layout()
+        plt.savefig(
+            fig_path(f"honda_{e}_first_hourly_points.png"),
+            dpi=110,
+            bbox_inches="tight",
+        )
         plt.show()
 
 # COMMAND ----------
@@ -510,6 +542,9 @@ for metric, (col, pdf) in pw_scatter.items():
     plt.xlabel(f"P.{col}")
     plt.ylabel(f"W.{col}")
     plt.tight_layout()
+    plt.savefig(
+        fig_path(f"honda_{metric}_p_vs_w_scatter.png"), dpi=110, bbox_inches="tight"
+    )
     plt.show()
 
 # COMMAND ----------
@@ -624,5 +659,15 @@ write_profiling(
             ),
         ),
         ("Silver Implications", "\n".join(_silver)),
+    ],
+    figures=[
+        (
+            "Honda energy -- duplicate (frequency, datetime_utc) groups",
+            "honda_energy_duplicate_groups.png",
+        ),
+        (
+            "Honda energy -- longest gap (missing steps) per table x frequency",
+            "honda_energy_longest_gap_per_table.png",
+        ),
     ],
 )

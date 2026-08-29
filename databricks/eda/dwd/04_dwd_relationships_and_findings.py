@@ -64,7 +64,9 @@ def find_col(df: DataFrame, *cands: str) -> str | None:
     return None
 
 
-def barplot(pairs, title, xlabel, ylabel="count", rot=0, figsize=(10, 4)):
+def barplot(
+    pairs, title, xlabel, ylabel="count", rot=0, figsize=(10, 4), filename=None
+):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -72,6 +74,8 @@ def barplot(pairs, title, xlabel, ylabel="count", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -158,6 +162,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -330,6 +343,7 @@ barplot(
     "table",
     "stations",
     rot=40,
+    filename="dwd_stations_per_bronze_table.png",
 )
 barplot(
     list(measure_missing.items()),
@@ -337,6 +351,7 @@ barplot(
     "measurement",
     "missing",
     rot=30,
+    filename="dwd_stations_absent_per_measurement.png",
 )
 metas = list(ref_integrity)
 x = np.arange(len(metas))
@@ -358,9 +373,14 @@ plt.legend()
 plt.title("DWD -- referential integrity: measurements <-> metadata")
 plt.ylabel("stations")
 plt.tight_layout()
+plt.savefig(fig_path("dwd_referential_integrity.png"), dpi=110, bbox_inches="tight")
 plt.show()
 barplot(
-    sorted(city_counts.items()), "DWD -- distinct stations per city", "city", "stations"
+    sorted(city_counts.items()),
+    "DWD -- distinct stations per city",
+    "city",
+    "stations",
+    filename="dwd_stations_per_city.png",
 )
 
 # COMMAND ----------
@@ -452,6 +472,18 @@ write_profiling(
         (
             "DWD cross-measurement (station, timestamp) overlap per pair",
             "dwd_cross_measurement_overlap.png",
-        )
+        ),
+        (
+            "DWD distinct stations per Bronze table",
+            "dwd_stations_per_bronze_table.png",
+        ),
+        (
+            "DWD stations absent from each measurement",
+            "dwd_stations_absent_per_measurement.png",
+        ),
+        (
+            "DWD referential integrity: measurements <-> metadata",
+            "dwd_referential_integrity.png",
+        ),
     ],
 )

@@ -49,7 +49,7 @@ ZERO_SENTINEL = ["query_id", "keyword_id", "title_id", "description_id", "user_i
 
 
 # DBTITLE 1,Helper
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -57,6 +57,8 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -143,6 +145,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -317,7 +328,11 @@ for c in ("ad_id", "advertiser_id", "query_id", "user_id"):
 
 # DBTITLE 1,Figures
 barplot(
-    [("click=0", neg), ("click>0", pos)], "KDD -- click class balance", "class", "rows"
+    [("click=0", neg), ("click>0", pos)],
+    "KDD -- click class balance",
+    "class",
+    "rows",
+    filename="kddcup2012_click_class_balance.png",
 )
 barplot(
     [(c, n / total) for c, n in sentinel_zero.items()],
@@ -325,18 +340,50 @@ barplot(
     "column",
     "rate",
     rot=30,
+    filename="kddcup2012_unknown_id_rate.png",
 )
-barplot(clk_dist, "KDD -- click value distribution", "click", "rows")
-barplot(depth_dist, "KDD -- depth distribution", "depth", "rows")
-barplot(pos_dist, "KDD -- position distribution", "position", "rows")
-barplot(ctr_depth, "KDD -- CTR by depth", "depth", "CTR")
-barplot(ctr_pos, "KDD -- CTR by position", "position", "CTR")
+barplot(
+    clk_dist,
+    "KDD -- click value distribution",
+    "click",
+    "rows",
+    filename="kddcup2012_click_distribution.png",
+)
+barplot(
+    depth_dist,
+    "KDD -- depth distribution",
+    "depth",
+    "rows",
+    filename="kddcup2012_depth_distribution.png",
+)
+barplot(
+    pos_dist,
+    "KDD -- position distribution",
+    "position",
+    "rows",
+    filename="kddcup2012_position_distribution.png",
+)
+barplot(
+    ctr_depth,
+    "KDD -- CTR by depth",
+    "depth",
+    "CTR",
+    filename="kddcup2012_ctr_by_depth.png",
+)
+barplot(
+    ctr_pos,
+    "KDD -- CTR by position",
+    "position",
+    "CTR",
+    filename="kddcup2012_ctr_by_position.png",
+)
 plt.figure(figsize=(10, 4))
 plt.bar(list(id_card), list(id_card.values()), log=True)
 plt.title("KDD -- distinct value count per id column")
 plt.ylabel("distinct (log)")
 plt.xticks(rotation=30, ha="right")
 plt.tight_layout()
+plt.savefig(fig_path("kddcup2012_id_cardinality.png"), dpi=110, bbox_inches="tight")
 plt.show()
 for c in ("ad_id", "query_id", "user_id"):
     counts = top_counts[c]
@@ -346,6 +393,9 @@ for c in ("ad_id", "query_id", "user_id"):
     plt.xlabel("rank")
     plt.ylabel("rows")
     plt.tight_layout()
+    plt.savefig(
+        fig_path(f"kddcup2012_rows_per_{c}_loglog.png"), dpi=110, bbox_inches="tight"
+    )
     plt.show()
 
 # COMMAND ----------
@@ -498,5 +548,15 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("Silver Implications", "\n".join(_silver)),
+    ],
+    figures=[
+        ("KDD -- click class balance", "kddcup2012_click_class_balance.png"),
+        (
+            "KDD -- share of rows with id value 0 (unknown)",
+            "kddcup2012_unknown_id_rate.png",
+        ),
+        ("KDD -- CTR by depth", "kddcup2012_ctr_by_depth.png"),
+        ("KDD -- CTR by position", "kddcup2012_ctr_by_position.png"),
+        ("KDD -- distinct value count per id column", "kddcup2012_id_cardinality.png"),
     ],
 )

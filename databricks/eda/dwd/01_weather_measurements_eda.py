@@ -83,7 +83,7 @@ def value_columns(df: DataFrame) -> list:
     return [c for c in df.columns if c.upper() not in NON_VALUE]
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -91,16 +91,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -190,6 +194,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -447,6 +460,7 @@ barplot(
     "DWD -- rows per measurement",
     "measurement",
     rot=30,
+    filename="dwd_rows_per_measurement.png",
 )
 barplot(
     [(m, coverage[m]["stations"]) for m in MEASUREMENTS],
@@ -454,6 +468,7 @@ barplot(
     "measurement",
     "stations",
     rot=30,
+    filename="dwd_stations_per_measurement.png",
 )
 barplot(
     [(m, coverage[m]["cities"]) for m in MEASUREMENTS],
@@ -461,6 +476,7 @@ barplot(
     "measurement",
     "cities",
     rot=30,
+    filename="dwd_cities_per_measurement.png",
 )
 plt.figure(figsize=(10, 4))
 for i, m in enumerate(MEASUREMENTS):
@@ -474,13 +490,20 @@ plt.yticks(range(len(MEASUREMENTS)), MEASUREMENTS)
 plt.title("DWD -- observation year span per measurement")
 plt.xlabel("year")
 plt.tight_layout()
+plt.savefig(fig_path("dwd_observation_year_span.png"), dpi=110, bbox_inches="tight")
 plt.show()
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- QN distribution, dup composition, coverage %, longest gap
 for m, pairs in qn_dist.items():
-    barplot(pairs, f"DWD {m} -- QN quality-flag distribution", "QN value", "rows")
+    barplot(
+        pairs,
+        f"DWD {m} -- QN quality-flag distribution",
+        "QN value",
+        "rows",
+        filename=f"dwd_{m}_qn_distribution.png",
+    )
 x = np.arange(len(MEASUREMENTS))
 plt.figure(figsize=(11, 4))
 plt.bar(
@@ -500,6 +523,7 @@ plt.legend()
 plt.title("DWD -- duplicate key composition")
 plt.ylabel("key groups")
 plt.tight_layout()
+plt.savefig(fig_path("dwd_duplicate_key_composition.png"), dpi=110, bbox_inches="tight")
 plt.show()
 for m in MEASUREMENTS:
     barplot(
@@ -508,6 +532,7 @@ for m in MEASUREMENTS:
         "station id",
         "coverage %",
         rot=45,
+        filename=f"dwd_{m}_hourly_coverage_pct.png",
     )
     barplot(
         [(r["station"], r["longest_gap_hours"] or 0) for r in freq_cov[m]],
@@ -515,6 +540,7 @@ for m in MEASUREMENTS:
         "station id",
         "hours",
         rot=45,
+        filename=f"dwd_{m}_longest_gap_hours.png",
     )
 
 # COMMAND ----------
@@ -545,7 +571,10 @@ for m in MEASUREMENTS:
     cols = [c for c in pdf.columns if pdf[c].notna().any()]
     for c in cols:
         histplot(
-            pdf[c].dropna().tolist(), f"DWD {m}.{c} -- value distribution (sampled)", c
+            pdf[c].dropna().tolist(),
+            f"DWD {m}.{c} -- value distribution (sampled)",
+            c,
+            filename=f"dwd_{m}_{c}_value_distribution.png",
         )
     if cols:
         plt.figure(figsize=(max(6, 1.6 * len(cols)), 4))
@@ -555,6 +584,9 @@ for m in MEASUREMENTS:
         plt.title(f"DWD {m} -- value column spread (sampled)")
         plt.ylabel("value")
         plt.tight_layout()
+        plt.savefig(
+            fig_path(f"dwd_{m}_value_column_spread.png"), dpi=110, bbox_inches="tight"
+        )
         plt.show()
 
 # COMMAND ----------
@@ -693,6 +725,13 @@ write_profiling(
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[
-        ("DWD station x measurement coverage", "dwd_station_x_measurement_coverage.png")
+        ("DWD rows per measurement", "dwd_rows_per_measurement.png"),
+        ("DWD distinct stations per measurement", "dwd_stations_per_measurement.png"),
+        ("DWD observation year span per measurement", "dwd_observation_year_span.png"),
+        ("DWD duplicate key composition", "dwd_duplicate_key_composition.png"),
+        (
+            "DWD station x measurement coverage",
+            "dwd_station_x_measurement_coverage.png",
+        ),
     ],
 )

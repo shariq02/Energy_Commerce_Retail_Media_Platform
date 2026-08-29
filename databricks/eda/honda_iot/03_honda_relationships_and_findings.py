@@ -48,7 +48,7 @@ TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{d}" for d in DATASETS}
 
 
 # DBTITLE 1,Helper
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -56,6 +56,8 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -142,6 +144,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -263,6 +274,7 @@ barplot(
     "dataset",
     "missing keys",
     rot=30,
+    filename="honda_keys_missing_vs_union.png",
 )
 x = np.arange(len(ENERGY))
 plt.figure(figsize=(11, 4))
@@ -275,6 +287,9 @@ plt.legend()
 plt.title("Honda -- energy<->weather join yield on (frequency, datetime_utc)")
 plt.ylabel("keys")
 plt.tight_layout()
+plt.savefig(
+    fig_path("honda_energy_weather_join_yield.png"), dpi=110, bbox_inches="tight"
+)
 plt.show()
 
 # COMMAND ----------

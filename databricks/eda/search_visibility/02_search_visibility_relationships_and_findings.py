@@ -45,7 +45,7 @@ def find_col(df: DataFrame, *candidates: str) -> str | None:
     return None
 
 
-def barplot(pairs, title, xlabel, ylabel="count", rot=0):
+def barplot(pairs, title, xlabel, ylabel="count", rot=0, filename=None):
     plt.figure(figsize=(9, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -53,6 +53,8 @@ def barplot(pairs, title, xlabel, ylabel="count", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -142,6 +144,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
 
 # COMMAND ----------
 
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
+
+# COMMAND ----------
+
 # DBTITLE 1,Repository table -- collect once, profile in Python
 repo = spark.table(REPOSITORY)
 repo_key = find_col(repo, "repository_id", "id", "repositoryId") or repo.columns[0]
@@ -225,6 +236,7 @@ barplot(
     "repository_id",
     "dates",
     rot=90,
+    filename="sv_distinct_dates_per_repository.png",
 )
 barplot(
     [
@@ -237,6 +249,7 @@ barplot(
     "",
     "count",
     rot=30,
+    filename="sv_repository_coverage_integrity.png",
 )
 barplot(
     per_repo_pairs,
@@ -244,6 +257,7 @@ barplot(
     "repository_id",
     "events",
     rot=90,
+    filename="sv_events_per_repository.png",
 )
 
 # COMMAND ----------
@@ -339,5 +353,15 @@ write_profiling(
         ("Relationships", "\n".join(_rel)),
         ("EDA Findings", _findings_md),
         ("Silver Implications", "\n".join(_silver)),
+    ],
+    figures=[
+        (
+            "Search Visibility -- repository_id coverage & integrity",
+            "sv_repository_coverage_integrity.png",
+        ),
+        (
+            "Search Visibility -- events per repository_id (top 30)",
+            "sv_events_per_repository.png",
+        ),
     ],
 )

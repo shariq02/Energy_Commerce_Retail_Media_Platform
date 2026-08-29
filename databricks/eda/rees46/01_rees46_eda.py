@@ -40,7 +40,16 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.rees46_events"
 
 
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), log=False):
+def barplot(
+    pairs,
+    title,
+    xlabel,
+    ylabel="rows",
+    rot=0,
+    figsize=(10, 4),
+    log=False,
+    filename=None,
+):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs], log=log)
     plt.title(title)
@@ -48,16 +57,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), log=Fal
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=60, log=False):
+def histplot(values, title, xlabel, bins=60, log=False, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins, log=log)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -144,6 +157,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -517,14 +539,31 @@ plt.tight_layout()
 plt.savefig(fig_path("rees46_funnel.png"), dpi=110, bbox_inches="tight")
 plt.show()
 barplot(
-    session_funnel, "REES46 -- sessions reaching each funnel stage", "stage", "sessions"
+    session_funnel,
+    "REES46 -- sessions reaching each funnel stage",
+    "stage",
+    "sessions",
+    filename="rees46_session_funnel.png",
 )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- activity by hour of day and weekday
-barplot(sorted(hod.items()), "REES46 -- events by hour of day", "hour", "events")
-barplot(sorted(dow.items()), "REES46 -- events by weekday", "weekday", "events", rot=30)
+barplot(
+    sorted(hod.items()),
+    "REES46 -- events by hour of day",
+    "hour",
+    "events",
+    filename="rees46_events_by_hour_of_day.png",
+)
+barplot(
+    sorted(dow.items()),
+    "REES46 -- events by weekday",
+    "weekday",
+    "events",
+    rot=30,
+    filename="rees46_events_by_weekday.png",
+)
 
 # COMMAND ----------
 
@@ -535,6 +574,7 @@ barplot(
     "column",
     "rate",
     rot=30,
+    filename="rees46_missing_rate_per_column.png",
 )
 
 # COMMAND ----------
@@ -547,6 +587,7 @@ plt.xlabel("day")
 plt.ylabel("events")
 plt.xticks(rotation=90)
 plt.tight_layout()
+plt.savefig(fig_path("rees46_events_per_day.png"), dpi=110, bbox_inches="tight")
 plt.show()
 
 plt.figure(figsize=(13, 4))
@@ -559,6 +600,7 @@ plt.legend()
 plt.title("REES46 -- events per day by type")
 plt.xticks(rotation=90)
 plt.tight_layout()
+plt.savefig(fig_path("rees46_events_per_day_by_type.png"), dpi=110, bbox_inches="tight")
 plt.show()
 
 # COMMAND ----------
@@ -569,17 +611,28 @@ if len(price_pdf):
         price_pdf["price"].tolist(),
         f"REES46 price -- distribution (sampled, <=p99={price_p99})",
         "price",
+        filename="rees46_price_distribution.png",
     )
     for et in event_types:
         ev = price_pdf.loc[price_pdf["event_type"] == et, "price"].tolist()
         if ev:
-            histplot(ev, f"REES46 price -- {et} (sampled, <=p99)", "price")
+            histplot(
+                ev,
+                f"REES46 price -- {et} (sampled, <=p99)",
+                "price",
+                filename=f"rees46_price_distribution_{et}.png",
+            )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- top brands / categories, sessions, product stability
 barplot(
-    top_brands, "REES46 -- top 20 brands by event volume", "brand", "events", rot=90
+    top_brands,
+    "REES46 -- top 20 brands by event volume",
+    "brand",
+    "events",
+    rot=90,
+    filename="rees46_top_brands.png",
 )
 barplot(
     top_cats,
@@ -587,6 +640,7 @@ barplot(
     "category_code",
     "events",
     rot=90,
+    filename="rees46_top_categories.png",
 )
 if session_events_sample:
     histplot(
@@ -595,12 +649,14 @@ if session_events_sample:
         "events in session",
         bins=60,
         log=True,
+        filename="rees46_events_per_session.png",
     )
 barplot(
     [("multi-category products", n_multi_cat), ("multi-brand products", n_multi_brand)],
     "REES46 -- products with unstable category / brand",
     "",
     "products",
+    filename="rees46_unstable_product_attributes.png",
 )
 
 # COMMAND ----------
@@ -858,5 +914,20 @@ write_profiling(
         ("EDA Findings", _findings_md),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[("REES46 event_type funnel", "rees46_funnel.png")],
+    figures=[
+        ("REES46 event_type funnel", "rees46_funnel.png"),
+        ("REES46 sessions reaching each funnel stage", "rees46_session_funnel.png"),
+        ("REES46 events by hour of day", "rees46_events_by_hour_of_day.png"),
+        ("REES46 missing rate per column", "rees46_missing_rate_per_column.png"),
+        ("REES46 events per day by type", "rees46_events_per_day_by_type.png"),
+        (
+            "REES46 price distribution (sampled, clipped to p99)",
+            "rees46_price_distribution.png",
+        ),
+        ("REES46 top 20 category_code by event volume", "rees46_top_categories.png"),
+        (
+            "REES46 products with unstable category / brand",
+            "rees46_unstable_product_attributes.png",
+        ),
+    ],
 )

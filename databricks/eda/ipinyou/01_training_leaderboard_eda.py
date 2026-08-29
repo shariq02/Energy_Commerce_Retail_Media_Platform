@@ -50,7 +50,7 @@ PRICE_COLS = ["bidding_price", "paying_price", "ad_slot_floor_price"]
 
 
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -58,16 +58,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50, log=False):
+def histplot(values, title, xlabel, bins=50, log=False, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins, log=log)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -154,6 +158,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -478,9 +491,23 @@ plt.savefig(fig_path("ipinyou_funnel.png"), dpi=110, bbox_inches="tight")
 plt.show()
 for name, parts in partitions.items():
     for c, pairs in parts.items():
-        barplot(pairs, f"iPinYou {name} -- rows per {c}", c, "rows", rot=30)
+        barplot(
+            pairs,
+            f"iPinYou {name} -- rows per {c}",
+            c,
+            "rows",
+            rot=30,
+            filename=f"ipinyou_{name}_rows_per_{c}.png",
+        )
 for c, pairs in lb_labels.items():
-    barplot(pairs[:30], f"iPinYou leaderboard -- {c} distribution", c, "rows", rot=45)
+    barplot(
+        pairs[:30],
+        f"iPinYou leaderboard -- {c} distribution",
+        c,
+        "rows",
+        rot=45,
+        filename=f"ipinyou_leaderboard_{c}_distribution.png",
+    )
 
 # COMMAND ----------
 
@@ -507,6 +534,11 @@ for name, rows in day_hour.items():
     plt.title(f"iPinYou {name} -- events per day by season")
     plt.xlabel("day index")
     plt.tight_layout()
+    plt.savefig(
+        fig_path(f"ipinyou_{name}_events_per_day_by_season.png"),
+        dpi=110,
+        bbox_inches="tight",
+    )
     plt.show()
     hrs = sorted(hour_agg)
     plt.figure(figsize=(13, 4))
@@ -515,6 +547,11 @@ for name, rows in day_hour.items():
     plt.xlabel("hour index")
     plt.ylabel("events")
     plt.tight_layout()
+    plt.savefig(
+        fig_path(f"ipinyou_{name}_event_volume_per_hour.png"),
+        dpi=110,
+        bbox_inches="tight",
+    )
     plt.show()
 
 # COMMAND ----------
@@ -532,6 +569,7 @@ for name in frames:
                 vals.tolist(),
                 f"iPinYou {name}.{c} -- distribution (sampled, <=p99={hi})",
                 c,
+                filename=f"ipinyou_{name}_{c}_distribution.png",
             )
 
 # COMMAND ----------
@@ -729,6 +767,10 @@ write_profiling(
         (
             "iPinYou training impression -> click -> conversion funnel",
             "ipinyou_funnel.png",
-        )
+        ),
+        (
+            "iPinYou training -- events per day by season",
+            "ipinyou_training_events_per_day_by_season.png",
+        ),
     ],
 )

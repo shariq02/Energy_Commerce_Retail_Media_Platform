@@ -74,7 +74,7 @@ def find_key(cols, *cands):
     return None
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -82,6 +82,8 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -168,6 +170,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -349,6 +360,7 @@ barplot(
     "station id",
     "rows",
     rot=45,
+    filename="dwd_geography_location_rows_per_station.png",
 )
 if elev:
     barplot(
@@ -361,6 +373,7 @@ if elev:
         "station id",
         "metres",
         rot=45,
+        filename="dwd_geography_elevation_span_per_station.png",
     )
 barplot(
     [(sid, n["history_rows"]) for sid, n in name_changes.items()],
@@ -368,6 +381,7 @@ barplot(
     "station id",
     "rows",
     rot=45,
+    filename="dwd_name_history_rows_per_station.png",
 )
 if meta_gaps:
     barplot(
@@ -376,15 +390,24 @@ if meta_gaps:
         "metadata table",
         "stations",
         rot=20,
+        filename="dwd_metadata_missing_station_rows.png",
     )
 barplot(
     [(n, meta[n]["total"]) for n in TABLES],
     "DWD metadata -- rows per table",
     "table",
     rot=20,
+    filename="dwd_metadata_rows_per_table.png",
 )
 for name, pairs in station_counts.items():
-    barplot(pairs, f"DWD {name} -- rows per station", "station id", "rows", rot=45)
+    barplot(
+        pairs,
+        f"DWD {name} -- rows per station",
+        "station id",
+        "rows",
+        rot=45,
+        filename=f"dwd_{name}_rows_per_station.png",
+    )
 for name, (open_ended, inverted, total) in period_stats.items():
     barplot(
         [
@@ -395,6 +418,7 @@ for name, (open_ended, inverted, total) in period_stats.items():
         f"DWD {name} -- validity-period rows",
         "period type",
         "rows",
+        filename=f"dwd_{name}_validity_period_rows.png",
     )
 
 # COMMAND ----------
@@ -523,6 +547,19 @@ write_profiling(
         (
             "DWD station_geography -- station locations & relocations",
             "dwd_station_geography.png",
-        )
+        ),
+        (
+            "DWD station_geography -- location rows per station",
+            "dwd_geography_location_rows_per_station.png",
+        ),
+        (
+            "DWD station_name_history -- history rows per station",
+            "dwd_name_history_rows_per_station.png",
+        ),
+        (
+            "DWD -- measurement stations missing a metadata row",
+            "dwd_metadata_missing_station_rows.png",
+        ),
+        ("DWD metadata -- rows per table", "dwd_metadata_rows_per_table.png"),
     ],
 )

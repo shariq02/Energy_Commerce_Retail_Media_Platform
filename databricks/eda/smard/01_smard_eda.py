@@ -70,7 +70,7 @@ def step_col():
     return e
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -78,16 +78,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -174,6 +178,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -407,11 +420,31 @@ print("value sample rows:", len(value_pdf))
 
 # DBTITLE 1,Figure -- distributions, series volume, coverage, activity
 for c, pairs in dist.items():
-    barplot(pairs, f"SMARD -- rows per {c}", c, "rows", rot=45)
+    barplot(
+        pairs,
+        f"SMARD -- rows per {c}",
+        c,
+        "rows",
+        rot=45,
+        filename=f"smard_rows_per_{c}.png",
+    )
 barplot(
-    series_rows, "SMARD -- rows per series", "series", "rows", rot=90, figsize=(12, 5)
+    series_rows,
+    "SMARD -- rows per series",
+    "series",
+    "rows",
+    rot=90,
+    figsize=(12, 5),
+    filename="smard_rows_per_series.png",
 )
-barplot(sorted(by_year.items()), "SMARD -- rows per year", "year", "rows", rot=45)
+barplot(
+    sorted(by_year.items()),
+    "SMARD -- rows per year",
+    "year",
+    "rows",
+    rot=45,
+    filename="smard_rows_per_year.png",
+)
 if continuity:
     barplot(
         [
@@ -424,6 +457,7 @@ if continuity:
         "%",
         rot=90,
         figsize=(12, 5),
+        filename="smard_per_series_coverage_pct.png",
     )
     barplot(
         [(c["series"], c["longest_gap"]) for c in continuity if c["longest_gap"]],
@@ -432,6 +466,7 @@ if continuity:
         "steps",
         rot=90,
         figsize=(12, 5),
+        filename="smard_per_series_longest_gap.png",
     )
 
 # COMMAND ----------
@@ -441,7 +476,10 @@ for m in metrics:
     s = value_pdf.loc[value_pdf["metric"] == m, "value"]
     if len(s):
         histplot(
-            s.tolist(), f"SMARD {m} -- value distribution (n={len(s)} sample)", "value"
+            s.tolist(),
+            f"SMARD {m} -- value distribution (n={len(s)} sample)",
+            "value",
+            filename=f"smard_{m}_value_distribution.png",
         )
     pdf = ts_pdf[m]
     if not pdf.empty:
@@ -451,6 +489,9 @@ for m in metrics:
         plt.xlabel("time index")
         plt.ylabel("value")
         plt.tight_layout()
+        plt.savefig(
+            fig_path(f"smard_{m}_time_series.png"), dpi=110, bbox_inches="tight"
+        )
         plt.show()
 
 # COMMAND ----------
@@ -642,6 +683,13 @@ write_profiling(
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[
-        ("SMARD metric|region x resolution presence", "smard_coverage_matrix.png")
+        ("SMARD metric|region x resolution presence", "smard_coverage_matrix.png"),
+        ("SMARD rows per series", "smard_rows_per_series.png"),
+        ("SMARD rows per year", "smard_rows_per_year.png"),
+        ("SMARD per-series temporal coverage %", "smard_per_series_coverage_pct.png"),
+        (
+            "SMARD per-series longest gap (missing steps)",
+            "smard_per_series_longest_gap.png",
+        ),
     ],
 )

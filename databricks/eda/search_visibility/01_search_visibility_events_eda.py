@@ -41,7 +41,7 @@ KEY = ["repository_id", "url", "date", "country", "device"]
 
 
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -49,16 +49,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50, log=False):
+def histplot(values, title, xlabel, bins=50, log=False, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins, log=log)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -145,6 +149,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -362,9 +375,17 @@ barplot(
     "rows",
     rot=90,
     figsize=(12, 4),
+    filename="sv_rows_per_monthly_archive.png",
 )
 for c, pairs in dist.items():
-    barplot(pairs, f"Search Visibility -- rows per {c}", c, "rows", rot=45)
+    barplot(
+        pairs,
+        f"Search Visibility -- rows per {c}",
+        c,
+        "rows",
+        rot=45,
+        filename=f"sv_rows_per_{c}.png",
+    )
 xs = [d for d, _, _ in monthly]
 plt.figure(figsize=(12, 4))
 plt.plot(xs, [i for _, _, i in monthly], marker=".", label="impressions")
@@ -373,6 +394,9 @@ plt.legend()
 plt.title("Search Visibility -- total clicks & impressions per month")
 plt.xticks(rotation=90)
 plt.tight_layout()
+plt.savefig(
+    fig_path("sv_clicks_impressions_per_month.png"), dpi=110, bbox_inches="tight"
+)
 plt.show()
 
 # COMMAND ----------
@@ -386,6 +410,7 @@ for c in ("clicks", "impressions", "position"):
             f"Search Visibility {c} -- distribution (n={len(s)} sample)",
             c,
             log=True,
+            filename=f"sv_{c}_distribution.png",
         )
 sc = mp[(mp["clicks"] > 0) & (mp["impressions"] > 0)]
 if len(sc):
@@ -395,8 +420,15 @@ if len(sc):
     plt.xlabel("impressions")
     plt.ylabel("clicks")
     plt.tight_layout()
+    plt.savefig(fig_path("sv_clicks_vs_impressions.png"), dpi=110, bbox_inches="tight")
     plt.show()
-barplot(pos_dist, "Search Visibility -- rows by rounded position", "position", "rows")
+barplot(
+    pos_dist,
+    "Search Visibility -- rows by rounded position",
+    "position",
+    "rows",
+    filename="sv_rows_by_position.png",
+)
 plt.figure(figsize=(10, 4))
 plt.plot([p for p, _ in pos_ctr], [c for _, c in pos_ctr], marker="o")
 plt.title("Search Visibility -- CTR by search position")
@@ -545,5 +577,16 @@ write_profiling(
         ("EDA Findings", _findings_md),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[("Search Visibility CTR by search position", "sv_ctr_by_position.png")],
+    figures=[
+        ("Search Visibility CTR by search position", "sv_ctr_by_position.png"),
+        (
+            "Search Visibility total clicks & impressions per month",
+            "sv_clicks_impressions_per_month.png",
+        ),
+        (
+            "Search Visibility clicks vs impressions (sampled)",
+            "sv_clicks_vs_impressions.png",
+        ),
+        ("Search Visibility rows by rounded position", "sv_rows_by_position.png"),
+    ],
 )

@@ -39,7 +39,7 @@ FACTS = {"training": training, "leaderboard": leaderboard}
 
 
 # DBTITLE 1,Helper
-def barplot(pairs, title, xlabel, ylabel="count", rot=0):
+def barplot(pairs, title, xlabel, ylabel="count", rot=0, filename=None):
     plt.figure(figsize=(9, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -47,6 +47,8 @@ def barplot(pairs, title, xlabel, ylabel="count", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -133,6 +135,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -286,6 +297,7 @@ barplot(
     "",
     "keys",
     rot=20,
+    filename="ipinyou_season_bid_id_key_overlap.png",
 )
 dims = ["region", "city", "tag"]
 x = np.arange(len(dims))
@@ -302,6 +314,7 @@ plt.legend()
 plt.title("iPinYou -- share of id values not found in ipinyou_reference")
 plt.ylabel("unmatched rate")
 plt.tight_layout()
+plt.savefig(fig_path("ipinyou_fk_unmatched_rate.png"), dpi=110, bbox_inches="tight")
 plt.show()
 
 # COMMAND ----------
@@ -395,5 +408,15 @@ write_profiling(
         ("Relationships", "\n".join(_rel)),
         ("EDA Findings", _findings_md + "\n\n" + _verdict),
         ("Silver Implications", "\n".join(_silver)),
+    ],
+    figures=[
+        (
+            "iPinYou -- (season, bid_id) key overlap",
+            "ipinyou_season_bid_id_key_overlap.png",
+        ),
+        (
+            "iPinYou -- share of id values not found in ipinyou_reference",
+            "ipinyou_fk_unmatched_rate.png",
+        ),
     ],
 )

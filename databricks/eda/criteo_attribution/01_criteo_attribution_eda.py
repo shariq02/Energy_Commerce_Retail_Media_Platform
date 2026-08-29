@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- CRITEO ATTRIBUTION
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile criteo_attribution_events (one Bronze table of
@@ -45,7 +45,8 @@ NUM_COLS = ["cost", "cpo", "click_pos", "click_nb"]
 
 # DBTITLE 1,Helpers
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, log=False):
+
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, log=False, filename=None):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs], log=log)
     plt.title(title)
@@ -53,16 +54,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, log=False):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50, log=False):
+def histplot(values, title, xlabel, bins=50, log=False, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins, log=log)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -76,11 +81,32 @@ import re as _re
 
 
 def _repo_root():
-    current = _os.path.abspath(_os.getcwd())
-    repo_root = _os.path.abspath(
-        _os.path.join(current, "..", "..", "..")
+    # Notebook CWD in a Databricks Git folder is <repo>/databricks/eda/<source>.
+    p = _os.path.abspath(_os.getcwd())
+    for _ in range(12):
+        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
+            _os.path.join(p, "databricks", "eda")
+        ):
+            return p
+        if _os.path.dirname(p) == p:
+            break
+        p = _os.path.dirname(p)
+    with contextlib.suppress(Exception):
+        wp = (
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .notebookPath()
+            .get()
+        )
+        i = wp.rfind("/databricks/eda/")
+        if i > 0:
+            for cand in (wp[:i], "/Workspace" + wp[:i]):
+                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
+                    return cand
+    raise RuntimeError(
+        "repo root not found -- run from <repo>/databricks/eda/<source>/"
     )
-    return repo_root
 
 
 def _profiling_dir():
@@ -400,6 +426,7 @@ barplot(
     "Criteo -- positive-flag rate",
     "flag",
     "rate",
+    filename="criteo_positive_flag_rate.png",
 )
 barplot(
     top_campaigns,
@@ -407,12 +434,16 @@ barplot(
     "campaign",
     "rows",
     rot=90,
+    filename="criteo_top_campaigns.png",
 )
 plt.figure(figsize=(10, 4))
 plt.bar(CAT_COLS, [acd[c] for c in CAT_COLS], log=True)
 plt.title("Criteo -- distinct values per anonymised categorical")
 plt.ylabel("distinct (log)")
 plt.tight_layout()
+plt.savefig(
+    fig_path("criteo_categorical_cardinality.png"), dpi=110, bbox_inches="tight"
+)
 plt.show()
 
 # COMMAND ----------
@@ -427,6 +458,7 @@ for c in ("cost", "cpo"):
             s.tolist(),
             f"Criteo {c} -- distribution (sampled, clipped to p99={p99[c]})",
             c,
+            filename=f"criteo_{c}_distribution.png",
         )
 
 # COMMAND ----------
@@ -438,6 +470,7 @@ barplot(
     "day",
     "events",
     rot=90,
+    filename="criteo_events_per_day.png",
 )
 plt.figure(figsize=(12, 4))
 plt.plot(hours, [x["events"] for x in hb], linewidth=0.8)
@@ -445,6 +478,7 @@ plt.title("Criteo -- event volume by relative-time hour bucket")
 plt.xlabel("hour from start")
 plt.ylabel("events")
 plt.tight_layout()
+plt.savefig(fig_path("criteo_event_volume_by_hour.png"), dpi=110, bbox_inches="tight")
 plt.show()
 plt.figure(figsize=(12, 4))
 plt.plot(hours, [x["conv_rate"] for x in hb], linewidth=0.8)
@@ -469,6 +503,11 @@ ax2.plot(hods, hod_cr, color="red", marker=".")
 ax2.set_ylabel("conversion rate")
 plt.title("Criteo -- events and conversion rate by hour of day")
 plt.tight_layout()
+fig.savefig(
+    fig_path("criteo_events_conversion_by_hour_of_day.png"),
+    dpi=110,
+    bbox_inches="tight",
+)
 plt.show()
 
 # COMMAND ----------
@@ -665,6 +704,28 @@ write_profiling(
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[
-        ("Criteo conversion rate by relative-time hour bucket", "criteo_activity.png")
+        ("Criteo positive-flag rate", "criteo_positive_flag_rate.png"),
+        ("Criteo top campaigns by row volume", "criteo_top_campaigns.png"),
+        (
+            "Criteo distinct values per anonymised categorical",
+            "criteo_categorical_cardinality.png",
+        ),
+        (
+            "Criteo cost distribution (sampled, clipped to p99)",
+            "criteo_cost_distribution.png",
+        ),
+        (
+            "Criteo cpo distribution (sampled, clipped to p99)",
+            "criteo_cpo_distribution.png",
+        ),
+        ("Criteo events per relative day", "criteo_events_per_day.png"),
+        (
+            "Criteo conversion rate by relative-time hour bucket",
+            "criteo_activity.png",
+        ),
+        (
+            "Criteo events and conversion rate by hour of day",
+            "criteo_events_conversion_by_hour_of_day.png",
+        ),
     ],
 )

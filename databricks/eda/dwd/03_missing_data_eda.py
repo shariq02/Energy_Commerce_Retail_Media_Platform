@@ -66,7 +66,7 @@ def value_cols(df):
     return [c for c in df.columns if c.upper() not in NON_VALUE]
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -74,6 +74,8 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -160,6 +162,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -363,6 +374,7 @@ if mv_per_station:
         "station id",
         "periods",
         rot=45,
+        filename="dwd_missing_periods_per_station.png",
     )
 if mv_per_param:
     barplot(
@@ -371,6 +383,7 @@ if mv_per_param:
         "parameter",
         "periods",
         rot=45,
+        filename="dwd_missing_periods_per_parameter.png",
     )
 if period_spans:
     plt.figure(figsize=(10, 4))
@@ -379,6 +392,9 @@ if period_spans:
     plt.xlabel("bis - von (hours)")
     plt.ylabel("count (log)")
     plt.tight_layout()
+    plt.savefig(
+        fig_path("dwd_missing_period_span_hours.png"), dpi=110, bbox_inches="tight"
+    )
     plt.show()
 if reported_gaps:
     barplot(
@@ -387,6 +403,7 @@ if reported_gaps:
         "station id",
         "hours",
         rot=45,
+        filename="dwd_longest_reported_missing_period.png",
     )
 for m, rows in missing_over_time.items():
     plt.figure(figsize=(11, 3))
@@ -396,6 +413,9 @@ for m, rows in missing_over_time.items():
     plt.ylabel("rate")
     plt.xticks(rotation=90)
     plt.tight_layout()
+    plt.savefig(
+        fig_path(f"dwd_{m}_missing_rate_by_year.png"), dpi=110, bbox_inches="tight"
+    )
     plt.show()
 
 # COMMAND ----------
@@ -408,6 +428,7 @@ for m, cols in missing_rates.items():
         "value column",
         "rate",
         rot=30,
+        filename=f"dwd_{m}_missing_rate_by_column.png",
     )
 for m in MEASUREMENTS:
     barplot(
@@ -416,6 +437,7 @@ for m in MEASUREMENTS:
         "station id",
         "distinct hours",
         rot=45,
+        filename=f"dwd_{m}_distinct_hours_per_station.png",
     )
 
 # COMMAND ----------
@@ -531,6 +553,18 @@ write_profiling(
         (
             "DWD observed missingness rate by station x parameter",
             "dwd_missingness_heatmap.png",
-        )
+        ),
+        (
+            "DWD missing_value_periods -- periods per parameter",
+            "dwd_missing_periods_per_parameter.png",
+        ),
+        (
+            "DWD missing_value_periods -- reported span (hours) distribution",
+            "dwd_missing_period_span_hours.png",
+        ),
+        (
+            "DWD -- longest reported missing period per station",
+            "dwd_longest_reported_missing_period.png",
+        ),
     ],
 )

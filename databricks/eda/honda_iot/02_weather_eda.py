@@ -42,7 +42,7 @@ PLAUSIBLE = {"Ta": (-40.0, 50.0), "Igm": (0.0, 1500.0)}
 
 
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -50,16 +50,20 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
@@ -146,6 +150,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -324,19 +337,27 @@ print("value sample rows:", len(value_pdf))
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- frequency, coverage %, longest gap
-barplot(freq_rows, "Honda weather -- rows per frequency", "frequency", "rows")
+barplot(
+    freq_rows,
+    "Honda weather -- rows per frequency",
+    "frequency",
+    "rows",
+    filename="honda_weather_rows_per_frequency.png",
+)
 if continuity:
     barplot(
         [(r[0], r[2]) for r in continuity],
         "Honda weather -- coverage % by frequency",
         "frequency",
         "%",
+        filename="honda_weather_coverage_pct_by_frequency.png",
     )
     barplot(
         [(r[0], r[4]) for r in continuity],
         "Honda weather -- longest gap (steps) by frequency",
         "frequency",
         "steps",
+        filename="honda_weather_longest_gap_by_frequency.png",
     )
 
 # COMMAND ----------
@@ -346,7 +367,10 @@ for c in VCOLS:
     s = value_pdf[c].dropna()
     if len(s):
         histplot(
-            s.tolist(), f"Honda weather.{c} -- distribution (n={len(s)} sample)", c
+            s.tolist(),
+            f"Honda weather.{c} -- distribution (n={len(s)} sample)",
+            c,
+            filename=f"honda_weather_{c}_distribution.png",
         )
 if not ts_pdf.empty:
     fig, axes = plt.subplots(len(VCOLS), 1, figsize=(12, 3 * len(VCOLS)), squeeze=False)
@@ -354,6 +378,9 @@ if not ts_pdf.empty:
         axes[i][0].plot(range(len(ts_pdf)), ts_pdf[c], linewidth=0.8)
         axes[i][0].set_title(f"Honda weather -- {c} (first 3000 hourly points)")
     plt.tight_layout()
+    fig.savefig(
+        fig_path("honda_weather_hourly_window.png"), dpi=110, bbox_inches="tight"
+    )
     plt.show()
 for c in VCOLS:
     plt.figure(figsize=(9, 3))
@@ -362,6 +389,11 @@ for c in VCOLS:
     plt.xlabel("hour")
     plt.ylabel(c)
     plt.tight_layout()
+    plt.savefig(
+        fig_path(f"honda_weather_{c}_diurnal_profile.png"),
+        dpi=110,
+        bbox_inches="tight",
+    )
     plt.show()
 
 # COMMAND ----------
@@ -483,5 +515,15 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("Silver Implications", _silver_md),
+    ],
+    figures=[
+        (
+            "Honda weather -- coverage % by frequency",
+            "honda_weather_coverage_pct_by_frequency.png",
+        ),
+        (
+            "Honda weather -- longest gap (steps) by frequency",
+            "honda_weather_longest_gap_by_frequency.png",
+        ),
     ],
 )
