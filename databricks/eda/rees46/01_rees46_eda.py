@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- REES46 ECOMMERCE EVENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile rees46_events (~110M view / cart / purchase
@@ -26,6 +26,10 @@ import matplotlib.pyplot as plt
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
+import contextlib
+import os as _os
+import re as _re
+
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
@@ -37,7 +41,6 @@ SECTION_TITLE = "REES46 ecommerce events (rees46_events)"
 TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.rees46_events"
 
 # COMMAND ----------
-
 
 # DBTITLE 1,Helpers
 def barplot(
@@ -76,13 +79,7 @@ def histplot(values, title, xlabel, bins=60, log=False, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -348,14 +345,14 @@ sc = (
         F.sum("has_view").alias("with_view"),
         F.sum("has_cart").alias("with_cart"),
         F.sum("has_purchase").alias("with_purchase"),
-        F.sum((F.col("has_view") & F.col("has_cart")).cast("int")).alias(
+        F.sum((F.col("has_view").cast("boolean") & F.col("has_cart").cast("boolean")).cast("int")).alias(
             "view_and_cart"
         ),
-        F.sum((F.col("has_cart") & F.col("has_purchase")).cast("int")).alias(
+        F.sum((F.col("has_cart").cast("boolean") & F.col("has_purchase").cast("boolean")).cast("int")).alias(
             "cart_and_purchase"
         ),
         F.sum(
-            (F.col("has_view") & F.col("has_cart") & F.col("has_purchase")).cast("int")
+            (F.col("has_view").cast("boolean") & F.col("has_cart").cast("boolean") & F.col("has_purchase").cast("boolean")).cast("int")
         ).alias("full_path"),
     )
     .first()
@@ -430,8 +427,9 @@ for c in ("user_id", "product_id"):
 # COMMAND ----------
 
 # DBTITLE 1,In-session event-sequence consistency (one windowed pass)
-w = Window.partitionBy("user_session").orderBy(ts)
-seq = df.select("event_type", ts.alias("ts")).withColumn(
+seq = df.select("user_session", "event_type", F.to_timestamp(F.substring("event_time", 1, 19)).alias("ts"))
+w = Window.partitionBy("user_session").orderBy("ts")
+seq = seq.withColumn(
     "prior_types",
     F.collect_set("event_type").over(w.rowsBetween(Window.unboundedPreceding, -1)),
 )

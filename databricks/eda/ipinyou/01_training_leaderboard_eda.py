@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- IPINYOU TRAINING AND LEADERBOARD
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile ipinyou_training and ipinyou_leaderboard (RTB
@@ -24,6 +24,10 @@
 # DBTITLE 1,Imports
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
+
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -47,7 +51,6 @@ SLOT_LOWCARD = [
 PRICE_COLS = ["bidding_price", "paying_price", "ad_slot_floor_price"]
 
 # COMMAND ----------
-
 
 # DBTITLE 1,Helpers
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
@@ -77,13 +80,7 @@ def histplot(values, title, xlabel, bins=50, log=False, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -309,20 +306,20 @@ price_stats = {}
 for name, df in frames.items():
     exprs = []
     for c in PRICE_COLS:
-        v = F.col(c).cast("double")
+        v = F.when(F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")).otherwise(F.lit(None))
         exprs += [
             F.min(v).alias(c + "_min"),
             F.max(v).alias(c + "_max"),
             F.avg(v).alias(c + "_avg"),
             F.expr(
-                f"percentile_approx(cast(`{c}` as double), array(0.5, 0.95, 0.99))"
+                f"percentile_approx(case when `{c}` rlike '^-?[0-9]+(\\\\.[0-9]+)?$' then cast(`{c}` as double) else null end, array(0.5, 0.95, 0.99))"
             ).alias(c + "_p"),
             F.sum((v < 0).cast("long")).alias(c + "_negative"),
             F.sum((v == 0).cast("long")).alias(c + "_zero"),
         ]
-    pay = F.col("paying_price").cast("double")
-    bid = F.col("bidding_price").cast("double")
-    floor = F.col("ad_slot_floor_price").cast("double")
+    pay = F.when(F.col("paying_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col("paying_price").cast("double")).otherwise(F.lit(None))
+    bid = F.when(F.col("bidding_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col("bidding_price").cast("double")).otherwise(F.lit(None))
+    floor = F.when(F.col("ad_slot_floor_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col("ad_slot_floor_price").cast("double")).otherwise(F.lit(None))
     exprs += [
         F.sum((pay > bid).cast("long")).alias("paying_gt_bidding"),
         F.sum((floor > pay).cast("long")).alias("floor_gt_paying"),
@@ -469,7 +466,7 @@ for name, df in frames.items():
         for c in PRICE_COLS
         if price_stats[name][c + "_p"]
     )
-    sel = [F.col(c).cast("double").alias(c) for c in PRICE_COLS]
+    sel = [F.when(F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")).otherwise(F.lit(None)).alias(c) for c in PRICE_COLS]
     price_pdf[name] = (
         df.select(*sel)
         .where(F.greatest(*[F.col(c) for c in PRICE_COLS]).isNotNull())

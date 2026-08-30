@@ -94,8 +94,36 @@ Totals: conversions=806196, attributions=442424, clicks=5947563.
 - Add validation flags for the attribution/cost/cpo anomalies rather than dropping rows.
 - Silver grain: one row per click/impression event; conversion_id links events into attribution paths.
 
+### Figure -- Criteo positive-flag rate
+
+![Criteo positive-flag rate](figures/criteo_positive_flag_rate.png)
+
+### Figure -- Criteo top campaigns by row volume
+
+![Criteo top campaigns by row volume](figures/criteo_top_campaigns.png)
+
+### Figure -- Criteo distinct values per anonymised categorical
+
+![Criteo distinct values per anonymised categorical](figures/criteo_categorical_cardinality.png)
+
+### Figure -- Criteo cost distribution (sampled, clipped to p99)
+
+![Criteo cost distribution (sampled, clipped to p99)](figures/criteo_cost_distribution.png)
+
+### Figure -- Criteo cpo distribution (sampled, clipped to p99)
+
+![Criteo cpo distribution (sampled, clipped to p99)](figures/criteo_cpo_distribution.png)
+
+### Figure -- Criteo events per relative day
+
+![Criteo events per relative day](figures/criteo_events_per_day.png)
+
 ### Figure -- Criteo conversion rate by relative-time hour bucket
 
 ![Criteo conversion rate by relative-time hour bucket](figures/criteo_activity.png)
+
+### Figure -- Criteo events and conversion rate by hour of day
+
+![Criteo events and conversion rate by hour of day](figures/criteo_events_conversion_by_hour_of_day.png)
 
 <!-- END criteo_attribution:01_attribution_events -->

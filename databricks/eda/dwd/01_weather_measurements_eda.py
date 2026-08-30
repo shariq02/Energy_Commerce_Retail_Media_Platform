@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD WEATHER MEASUREMENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the seven DWD weather-measurement Bronze tables
@@ -25,6 +25,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -65,8 +68,8 @@ PLAUSIBLE = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
+
 def find_col(df: DataFrame, *cands: str) -> str | None:
     low = {c.lower(): c for c in df.columns}
     for x in cands:
@@ -110,12 +113,7 @@ def histplot(values, title, xlabel, bins=50, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
 
 def _repo_root():
     # Notebook CWD in a Databricks Git folder is <repo>/databricks/eda/<source>.
@@ -286,7 +284,10 @@ for m in MEASUREMENTS:
     any_sentinel = F.lit(False)
     any_oor = F.lit(False)
     for c in vcols:
-        v = F.col(c).cast("double")
+        v = F.when(
+            F.col(c).rlike(r'^-?\d+(\.\d+)?$'), 
+            F.col(c).cast("double")
+        )
         any_sentinel = any_sentinel | (v == -999)
         b = PLAUSIBLE.get(c.upper())
         if b:
@@ -341,7 +342,10 @@ for m in MEASUREMENTS:
     df = frames[m]
     exprs = []
     for c in value_columns(df):
-        v = F.col(c).cast("double")
+        v = F.when(
+            F.col(c).rlike(r'^-?\d+(\.\d+)?$'),
+            F.col(c).cast("double")
+        )
         b = PLAUSIBLE.get(c.upper())
         exprs += [
             F.min(v).alias(c + "_min"),
@@ -352,7 +356,7 @@ for m in MEASUREMENTS:
             F.avg(F.when(v != -999, v)).alias(c + "_mean"),
             F.stddev(F.when(v != -999, v)).alias(c + "_sd"),
             F.expr(
-                f"percentile_approx(case when cast(`{c}` as double) != -999 then cast(`{c}` as double) end, array(0.01,0.5,0.99))"
+                f"percentile_approx(case when `{c}` rlike '^-?\\d+(\\.\\d+)?$' and cast(`{c}` as double) != -999 then cast(`{c}` as double) end, array(0.01,0.5,0.99))"
             ).alias(c + "_p"),
             F.sum((v == 0).cast("long")).alias(c + "_zero"),
             *(
@@ -440,9 +444,10 @@ for m in MEASUREMENTS:
     value_pdf[m] = (
         df.select(
             *[
-                F.when(F.col(c).cast("double") != -999, F.col(c).cast("double")).alias(
-                    c
-                )
+                F.when(
+                    F.col(c).rlike(r'^-?\d+(\.\d+)?$') & (F.col(c).cast("double") != -999),
+                    F.col(c).cast("double")
+                ).alias(c)
                 for c in vcols
             ]
         )

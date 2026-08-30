@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- SMARD ENERGY TIME SERIES
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**   
+# MAGIC **Author:** Sharique Mohammad    
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile smard_energy_timeseries (one long-format Bronze
@@ -25,6 +25,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -51,7 +55,6 @@ RESOLUTION_SECONDS = {
 }
 
 # COMMAND ----------
-
 
 # DBTITLE 1,Helpers
 def as_ts(col: str):
@@ -97,13 +100,7 @@ def histplot(values, title, xlabel, bins=50, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):

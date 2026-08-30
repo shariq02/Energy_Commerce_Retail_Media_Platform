@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- SEARCH VISIBILITY EVENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile search_visibility_events (search-visibility
@@ -26,6 +26,10 @@ import datetime as dt
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
 
+import contextlib
+import os as _os
+import re as _re
+
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
@@ -38,7 +42,6 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.search_visibility_events"
 KEY = ["repository_id", "url", "date", "country", "device"]
 
 # COMMAND ----------
-
 
 # DBTITLE 1,Helpers
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
@@ -68,13 +71,7 @@ def histplot(values, title, xlabel, bins=50, log=False, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -244,11 +241,11 @@ for c in ("country", "device", "citableContent"):
 
 # DBTITLE 1,Metric ranges, internal consistency, ranking percentiles (one agg)
 num = {
-    "clicks": F.col("clicks").cast("double"),
-    "impressions": F.col("impressions").cast("double"),
-    "clickThrough": F.col("clickThrough").cast("double"),
-    "position": F.col("position").cast("double"),
-    "index": F.col("index").cast("double"),
+    "clicks": F.expr("try_cast(clicks as double)"),
+    "impressions": F.expr("try_cast(impressions as double)"),
+    "clickThrough": F.expr("try_cast(clickThrough as double)"),
+    "position": F.expr("try_cast(position as double)"),
+    "index": F.expr("try_cast(index as double)"),
 }
 exprs = []
 for c, v in num.items():

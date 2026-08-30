@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD STATION METADATA
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the four DWD metadata Bronze tables
@@ -23,9 +23,11 @@
 
 # DBTITLE 1,Imports
 from functools import reduce
-
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -64,7 +66,6 @@ META_NON_VALUE = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
 def find_key(cols, *cands):
     low = {c.lower(): c for c in cols}
@@ -89,13 +90,7 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filenam
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -512,7 +507,7 @@ if any(v > 0 for v in meta_gaps.values()):
     _silver.append(
         "- Some measurement stations have no metadata row -> a left join must not drop the fact row; flag the unmatched station."
     )
-if any(inv > 0 for _, inv in period_stats.values()):
+if any(inv > 0 for _, inv, _ in period_stats.values()):
     _silver.append(
         "- Inverted von>bis validity ranges exist -> a fix/exclusion rule is required (rule not yet established)."
     )

@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- CRITEO ATTRIBUTION
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile criteo_attribution_events (one Bronze table of
@@ -24,6 +24,9 @@
 # DBTITLE 1,Imports
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -44,8 +47,6 @@ NUM_COLS = ["cost", "cpo", "click_pos", "click_nb"]
 # COMMAND ----------
 
 # DBTITLE 1,Helpers
-
-
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, log=False, filename=None):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs], log=log)
@@ -74,12 +75,6 @@ def histplot(values, title, xlabel, bins=50, log=False, filename=None):
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     # Notebook CWD in a Databricks Git folder is <repo>/databricks/eda/<source>.
     p = _os.path.abspath(_os.getcwd())

@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD MISSING DATA
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile dwd_missing_value_periods (the DWD-reported
@@ -28,6 +28,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -51,7 +55,6 @@ MEASUREMENT_TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREME
 NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "QN_9", "QN_3", "QN_4", "QN_8", "EOR"}
 
 # COMMAND ----------
-
 
 # DBTITLE 1,Helpers
 def find_col(df: DataFrame, *cands: str) -> str | None:
@@ -81,13 +84,7 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filenam
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -202,8 +199,8 @@ print("periods per parameter:", mv_per_param)
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Reported period spans (von/bis -> hours) per station
+
 def to_dt(v):
     s = str(v or "").strip()
     for fmt in ("%Y%m%d%H", "%Y%m%d"):
@@ -254,7 +251,10 @@ for m, t in MEASUREMENT_TABLES.items():
         F.count(F.lit(1)).alias("rows"),
     ]
     for c in vc:
-        v = F.col(c).cast("double")
+        # Validate numeric before casting to avoid CAST_INVALID_INPUT errors (e.g., 'I', 'P' in cloudiness)
+        v = F.when(
+            F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
+        ).otherwise(F.lit(None))
         exprs += [
             F.sum((v == -999).cast("long")).alias(c + "__999"),
             F.sum((F.col(c).isNull() | (F.trim(F.col(c)) == "")).cast("long")).alias(
@@ -284,7 +284,10 @@ for m, t in MEASUREMENT_TABLES.items():
     dts = find_col(df, "MESS_DATUM")
     any_missing = F.lit(False)
     for c in value_cols(df):
-        v = F.col(c).cast("double")
+        # Validate numeric before casting to avoid CAST_INVALID_INPUT errors (e.g., 'I', 'P' in cloudiness)
+        v = F.when(
+            F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
+        ).otherwise(F.lit(None))
         any_missing = (
             any_missing | (v == -999) | F.col(c).isNull() | (F.trim(F.col(c)) == "")
         )

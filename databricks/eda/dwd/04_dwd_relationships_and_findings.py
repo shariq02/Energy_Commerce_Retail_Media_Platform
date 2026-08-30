@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD RELATIONSHIPS AND FINDINGS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Cross-table checks across the 12 DWD Bronze tables --
@@ -26,6 +26,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -54,7 +58,6 @@ META = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
 def find_col(df: DataFrame, *cands: str) -> str | None:
     low = {c.lower(): c for c in df.columns}
@@ -81,13 +84,7 @@ def barplot(
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):

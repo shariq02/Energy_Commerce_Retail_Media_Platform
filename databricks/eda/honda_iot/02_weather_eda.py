@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- HONDA IOT WEATHER
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile honda_iot_weather -- schema (the sanitized
@@ -25,6 +25,10 @@ import matplotlib.pyplot as plt
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
+import contextlib
+import os as _os
+import re as _re
+
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
@@ -39,7 +43,6 @@ FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 PLAUSIBLE = {"Ta": (-40.0, 50.0), "Igm": (0.0, 1500.0)}
 
 # COMMAND ----------
-
 
 # DBTITLE 1,Helpers
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
@@ -69,13 +72,7 @@ def histplot(values, title, xlabel, bins=50, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -294,19 +291,21 @@ print("top interval sizes (frequency, delta_s, count):", delta_dist)
 
 # DBTITLE 1,Stuck-run detection per value column (one windowed pass)
 w2 = Window.partitionBy("frequency").orderBy("datetime_utc")
-stuck_exprs = []
+df_1h = df.where(F.col("frequency") == "1h")
+# First pass: compute window columns
 for c in VCOLS:
     v = F.col(c).cast("double")
-    stuck_exprs.append(
-        F.sum(
-            (
-                v.isNotNull()
-                & (v == F.lag(v, 1).over(w2))
-                & (v == F.lag(v, 11).over(w2))
-            ).cast("long")
-        ).alias(c)
+    df_1h = df_1h.withColumn(
+        f"{c}_stuck",
+        (
+            v.isNotNull()
+            & (v == F.lag(v, 1).over(w2))
+            & (v == F.lag(v, 11).over(w2))
+        ).cast("long")
     )
-stuck = df.where(F.col("frequency") == "1h").agg(*stuck_exprs).first().asDict()
+# Second pass: aggregate the flags
+stuck_exprs = [F.sum(F.col(f"{c}_stuck")).alias(c) for c in VCOLS]
+stuck = df_1h.agg(*stuck_exprs).first().asDict()
 print("stuck>=12-run (1h):", stuck)
 
 # COMMAND ----------

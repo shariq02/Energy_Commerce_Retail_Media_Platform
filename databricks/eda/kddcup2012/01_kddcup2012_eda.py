@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- KDD CUP 2012 TRACK 2 (CLICK PREDICTION)
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile kddcup2012_click_prediction (one Bronze table:
@@ -23,6 +23,10 @@
 # DBTITLE 1,Imports
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
+
+import contextlib
+import os as _os
+import re as _re
 
 # COMMAND ----------
 
@@ -47,7 +51,6 @@ ZERO_SENTINEL = ["query_id", "keyword_id", "title_id", "description_id", "user_i
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helper
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(10, 4))
@@ -64,13 +67,7 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
-
-
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):
@@ -280,8 +277,8 @@ kg.where((F.col("n") > 1) & (F.col("distinct_click") > 1)).orderBy(F.desc("n")).
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Entity relationships -- ads per advertiser, keywords/ads per query, etc.
+
 def card(parent, *children):
     d = df.groupBy(parent).agg(*[F.approx_count_distinct(c).alias(c) for c in children])
     for c in children:
