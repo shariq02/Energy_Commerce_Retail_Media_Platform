@@ -118,6 +118,10 @@ Totals: conversions=806196, attributions=442424, clicks=5947563.
 
 ![Criteo events per relative day](figures/criteo_events_per_day.png)
 
+### Figure -- Criteo event volume by relative-time hour bucket
+
+![Criteo event volume by relative-time hour bucket](figures/criteo_event_volume_by_hour.png)
+
 ### Figure -- Criteo conversion rate by relative-time hour bucket
 
 ![Criteo conversion rate by relative-time hour bucket](figures/criteo_activity.png)

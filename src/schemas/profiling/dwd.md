@@ -31,7 +31,7 @@ Highest-missingness column per measurement (missing includes blank):
 | measurement | dup key groups | identical | conflicting | -999 sentinel (worst col) | out-of-range (worst col) |
 |---|---|---|---|---|---|
 | air_temperature | 0 | 0 | 0 | RF_TU=613 | TT_TU=0 |
-| cloudiness | 0 | 0 | 0 | V_N_I=177 | V_N=31 |
+| cloudiness | 0 | 0 | 0 | V_N=0 | V_N=31 |
 | moisture | 0 | 0 | 0 | ABSF_STD=0 | TF_STD=84 |
 | precipitation | 0 | 0 | 0 | WRTR=13413 | R1=0 |
 | pressure | 0 | 0 | 0 | P=399 | P=0 |
@@ -40,10 +40,11 @@ Highest-missingness column per measurement (missing includes blank):
 
 QN quality flag vs -999 sentinel / out-of-range rows:
 - air_temperature: {'QN_9': '3', 'rows': 90039, 'rows_with_-999': 596, 'rows_out_of_range': 0}; {'QN_9': '1', 'rows': 12264, 'rows_with_-999': 17, 'rows_out_of_range': 0}
-- cloudiness: {'QN_8': '3', 'rows': 68107, 'rows_with_-999': 164, 'rows_out_of_range': 31}; {'QN_8': '1', 'rows': 10461, 'rows_with_-999': 13, 'rows_out_of_range': 0}
+- cloudiness: {'QN_8': '3', 'rows': 68107, 'rows_with_-999': 0, 'rows_out_of_range': 31}; {'QN_8': '1', 'rows': 10461, 'rows_with_-999': 0, 'rows_out_of_range': 0}
 - moisture: {'QN_8': '3', 'rows': 99540, 'rows_with_-999': 0, 'rows_out_of_range': 84}
 - precipitation: {'QN_8': '3', 'rows': 80136, 'rows_with_-999': 11630, 'rows_out_of_range': 0}; {'QN_8': '1', 'rows': 12264, 'rows_with_-999': 1807, 'rows_out_of_range': 0}
 - pressure: {'QN_8': '3', 'rows': 78599, 'rows_with_-999': 331, 'rows_out_of_range': 0}; {'QN_8': '1', 'rows': 10512, 'rows_with_-999': 68, 'rows_out_of_range': 0}
+- sun: {'QN_7': '10', 'rows': 31051, 'rows_with_-999': 0, 'rows_out_of_range': 0}; {'QN_7': '3', 'rows': 11316, 'rows_with_-999': 0, 'rows_out_of_range': 0}; {'QN_7': '1', 'rows': 6360, 'rows_with_-999': 32, 'rows_out_of_range': 0}
 - wind: {'QN_3': '10', 'rows': 67426, 'rows_with_-999': 48, 'rows_out_of_range': 0}; {'QN_3': '1', 'rows': 10512, 'rows_with_-999': 26, 'rows_out_of_range': 0}; {'QN_3': '3', 'rows': 10277, 'rows_with_-999': 18, 'rows_out_of_range': 0}
 
 ### Temporal
@@ -72,26 +73,24 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 
 ### Distributions
 
-- air_temperature.`TT_TU`: min/max(no sentinel)=-16.6/40.8, p01/p50/p99=None, mean=11.396613875949987, sd=8.222668833554085, zero rows=307, -999=328, out-of-range=0
-- air_temperature.`RF_TU`: min/max(no sentinel)=11.0/100.0, p01/p50/p99=None, mean=73.98731438686202, sd=19.03041486315501, zero rows=0, -999=613, out-of-range=0
-- cloudiness.`V_N_I`: min/max(no sentinel)=None/None, p01/p50/p99=None, mean=None, sd=None, zero rows=0, -999=177
-- cloudiness.`V_N`: min/max(no sentinel)=-1.0/8.0, p01/p50/p99=None, mean=5.3224213420221975, sd=3.349913116214353, zero rows=17965, -999=0, out-of-range=31
-- moisture.`ABSF_STD`: min/max(no sentinel)=-99.9/19.6, p01/p50/p99=None, mean=7.664523809523808, sd=4.382101103782512, zero rows=0, -999=0
-- moisture.`VP_STD`: min/max(no sentinel)=-99.9/27.8, p01/p50/p99=None, mean=10.1897930480209, sd=5.342714092587421, zero rows=0, -999=0
-- moisture.`TF_STD`: min/max(no sentinel)=-99.9/26.5, p01/p50/p99=None, mean=8.52446051838457, sd=7.200728155932988, zero rows=317, -999=0, out-of-range=84
-- moisture.`P_STD`: min/max(no sentinel)=900.8/1039.2, p01/p50/p99=None, mean=991.6988446855619, sd=27.87556126707011, zero rows=0, -999=0
-- moisture.`TT_STD`: min/max(no sentinel)=-16.6/40.3, p01/p50/p99=None, mean=11.38867892304601, sd=8.269118270044746, zero rows=336, -999=0
-- moisture.`RF_STD`: min/max(no sentinel)=-99.9/100.0, p01/p50/p99=None, mean=73.62668073136422, sd=19.76049380748527, zero rows=0, -999=0
-- moisture.`TD_STD`: min/max(no sentinel)=-99.9/22.8, p01/p50/p99=None, mean=6.087108700020094, sd=7.106786315694734, zero rows=466, -999=0
-- precipitation.`R1`: min/max(no sentinel)=0.0/42.2, p01/p50/p99=None, mean=0.07251396648044695, sd=0.5011238334172204, zero rows=84289, -999=215, out-of-range=0
-- precipitation.`RS_IND`: min/max(no sentinel)=0.0/1.0, p01/p50/p99=None, mean=0.1741823507078158, sd=0.3792682689051104, zero rows=76128, -999=215, out-of-range=0
-- precipitation.`WRTR`: min/max(no sentinel)=0.0/8.0, p01/p50/p99=None, mean=1.1429475736513603, sd=2.3956747115161083, zero rows=64206, -999=13413
-- pressure.`P`: min/max(no sentinel)=974.4/1040.6, p01/p50/p99=None, mean=1016.4191811705288, sd=8.261065582324624, zero rows=0, -999=399, out-of-range=0
-- pressure.`P0`: min/max(no sentinel)=900.8/1039.2, p01/p50/p99=None, mean=989.9270277881031, sd=29.305005258871304, zero rows=0, -999=332, out-of-range=0
-- sun.`QN_7`: min/max(no sentinel)=1.0/10.0, p01/p50/p99=None, mean=7.199663430952039, sd=3.7563515269906183, zero rows=0, -999=0
-- sun.`SD_SO`: min/max(no sentinel)=0.0/60.0, p01/p50/p99=None, mean=18.562480747510012, sd=25.050756235702103, zero rows=26865, -999=32, out-of-range=0
-- wind.`F`: min/max(no sentinel)=0.1/23.6, p01/p50/p99=None, mean=3.4928454712570662, sd=2.786643155222601, zero rows=0, -999=89, out-of-range=0
-- wind.`D`: min/max(no sentinel)=0.0/360.0, p01/p50/p99=None, mean=183.63848753600834, sd=95.68872682938914, zero rows=52, -999=41, out-of-range=0
+- air_temperature.`TT_TU`: min/max(no sentinel)=-16.6/40.8, p01/p50/p99=[-6.2, 11.4, 31.0], mean=11.396613875949987, sd=8.222668833554085, zero rows=307, -999=328, out-of-range=0
+- air_temperature.`RF_TU`: min/max(no sentinel)=11.0/100.0, p01/p50/p99=[26.0, 79.0, 100.0], mean=73.98731438686202, sd=19.03041486315501, zero rows=0, -999=613, out-of-range=0
+- cloudiness.`V_N`: min/max(no sentinel)=-1.0/8.0, p01/p50/p99=[0.0, 7.0, 8.0], mean=5.3224213420221975, sd=3.349913116214353, zero rows=17965, -999=0, out-of-range=31
+- moisture.`ABSF_STD`: min/max(no sentinel)=-99.9/19.6, p01/p50/p99=[2.4, 7.4, 15.2], mean=7.664523809523808, sd=4.382101103782512, zero rows=0, -999=0
+- moisture.`VP_STD`: min/max(no sentinel)=-99.9/27.8, p01/p50/p99=[3.0, 9.7, 20.7], mean=10.1897930480209, sd=5.342714092587421, zero rows=0, -999=0
+- moisture.`TF_STD`: min/max(no sentinel)=-99.9/26.5, p01/p50/p99=[-6.9, 9.0, 20.7], mean=8.52446051838457, sd=7.200728155932988, zero rows=317, -999=0, out-of-range=84
+- moisture.`P_STD`: min/max(no sentinel)=900.8/1039.2, p01/p50/p99=[921.9, 1004.6, 1027.9], mean=991.6988446855619, sd=27.87556126707011, zero rows=0, -999=0
+- moisture.`TT_STD`: min/max(no sentinel)=-16.6/40.3, p01/p50/p99=[-6.3, 11.4, 31.1], mean=11.38867892304601, sd=8.269118270044746, zero rows=336, -999=0
+- moisture.`RF_STD`: min/max(no sentinel)=-99.9/100.0, p01/p50/p99=[25.8, 78.3, 100.0], mean=73.62668073136422, sd=19.76049380748527, zero rows=0, -999=0
+- moisture.`TD_STD`: min/max(no sentinel)=-99.9/22.8, p01/p50/p99=[-9.3, 6.5, 18.0], mean=6.087108700020094, sd=7.106786315694734, zero rows=466, -999=0
+- precipitation.`R1`: min/max(no sentinel)=0.0/42.2, p01/p50/p99=[0.0, 0.0, 1.8], mean=0.07251396648044695, sd=0.5011238334172204, zero rows=84289, -999=215, out-of-range=0
+- precipitation.`RS_IND`: min/max(no sentinel)=0.0/1.0, p01/p50/p99=[0.0, 0.0, 1.0], mean=0.1741823507078158, sd=0.3792682689051104, zero rows=76128, -999=215, out-of-range=0
+- precipitation.`WRTR`: min/max(no sentinel)=0.0/8.0, p01/p50/p99=[0.0, 0.0, 7.0], mean=1.1429475736513603, sd=2.3956747115161083, zero rows=64206, -999=13413
+- pressure.`P`: min/max(no sentinel)=974.4/1040.6, p01/p50/p99=[992.2, 1017.3, 1032.0], mean=1016.4191811705288, sd=8.261065582324624, zero rows=0, -999=399, out-of-range=0
+- pressure.`P0`: min/max(no sentinel)=900.8/1039.2, p01/p50/p99=[921.3, 1002.1, 1028.7], mean=989.9270277881031, sd=29.305005258871304, zero rows=0, -999=332, out-of-range=0
+- sun.`SD_SO`: min/max(no sentinel)=0.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=18.562480747510012, sd=25.050756235702103, zero rows=26865, -999=32, out-of-range=0
+- wind.`F`: min/max(no sentinel)=0.1/23.6, p01/p50/p99=[0.5, 2.8, 13.6], mean=3.4928454712570662, sd=2.786643155222601, zero rows=0, -999=89, out-of-range=0
+- wind.`D`: min/max(no sentinel)=0.0/360.0, p01/p50/p99=[10.0, 200.0, 360.0], mean=183.63848753600834, sd=95.68872682938914, zero rows=52, -999=41, out-of-range=0
 
 ### EDA Findings
 
@@ -111,25 +110,33 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 - Hourly series are not continuous (coverage % / gaps above) -> no dense-grid assumption.
 - Out-of-range non-sentinel values are flagged as suspicious, not proven wrong -> keep raw + a quality flag.
 
-### Figure -- DWD rows per measurement
+### Figure -- DWD measurement overview
 
-![DWD rows per measurement](figures/dwd_rows_per_measurement.png)
+![DWD measurement overview](figures/dwd_measurement_overview.png)
 
-### Figure -- DWD distinct stations per measurement
+### Figure -- DWD QN quality-flag distribution
 
-![DWD distinct stations per measurement](figures/dwd_stations_per_measurement.png)
-
-### Figure -- DWD observation year span per measurement
-
-![DWD observation year span per measurement](figures/dwd_observation_year_span.png)
+![DWD QN quality-flag distribution](figures/dwd_qn_distribution.png)
 
 ### Figure -- DWD duplicate key composition
 
 ![DWD duplicate key composition](figures/dwd_duplicate_key_composition.png)
 
+### Figure -- DWD hourly coverage % per station
+
+![DWD hourly coverage % per station](figures/dwd_hourly_coverage_pct.png)
+
+### Figure -- DWD longest missing-hours gap per station
+
+![DWD longest missing-hours gap per station](figures/dwd_longest_gap_hours.png)
+
 ### Figure -- DWD station x measurement coverage
 
 ![DWD station x measurement coverage](figures/dwd_station_x_measurement_coverage.png)
+
+### Figure -- DWD value column spread per measurement
+
+![DWD value column spread per measurement](figures/dwd_value_column_spread.png)
 
 <!-- END dwd:01_weather_measurements -->
 
@@ -175,14 +182,14 @@ Measurement stations with NO row in each metadata table:
 ### Domain Findings
 
 station_geography carries multiple location rows per station where coordinates/elevation changed over time:
-- station 400: 11 location row(s), lat span=None, lon span=None, elevation span=16.0 m
-- station 2667: 6 location row(s), lat span=None, lon span=None, elevation span=40.91 m
-- station 1420: 10 location row(s), lat span=None, lon span=None, elevation span=12.3 m
-- station 1550: 8 location row(s), lat span=None, lon span=None, elevation span=19.25 m
-- station 954: 4 location row(s), lat span=None, lon span=None, elevation span=0.0 m
-- station 2928: 15 location row(s), lat span=None, lon span=None, elevation span=41.0 m
-- station 1262: 4 location row(s), lat span=None, lon span=None, elevation span=1.9 m
-- station 4271: 6 location row(s), lat span=None, lon span=None, elevation span=3.78 m
+- station 400: 11 location row(s), lat span=0.0834, lon span=0.1427, elevation span=16.0 m
+- station 2667: 6 location row(s), lat span=0.0194, lon span=0.0748, elevation span=40.91 m
+- station 1420: 10 location row(s), lat span=0.0237, lon span=0.0766, elevation span=12.3 m
+- station 1550: 8 location row(s), lat span=0.0168, lon span=0.0509, elevation span=19.25 m
+- station 954: 4 location row(s), lat span=0.1812, lon span=0.42, elevation span=0.0 m
+- station 2928: 15 location row(s), lat span=0.0582, lon span=0.0737, elevation span=41.0 m
+- station 1262: 4 location row(s), lat span=0.01, lon span=0.0104, elevation span=1.9 m
+- station 4271: 6 location row(s), lat span=0.0055, lon span=0.0349, elevation span=3.78 m
 
 station_name_history name/operator changes:
 - station 400: 9 history row(s), 8 distinct name(s)
@@ -198,9 +205,9 @@ station_name_history name/operator changes:
 - station 4271: 4 history row(s), 4 distinct name(s)
 
 parameter_unit declared codes: ['ABSF_STD', 'D', 'F', 'None', 'P', 'P0', 'P_STD', 'R1', 'RF_STD', 'RF_TU', 'RS_IND', 'SD_SO', 'TD_STD', 'TF_STD', 'TT_STD', 'TT_TU', 'VP_STD', 'V_N', 'WRTR']
-value-column codes present in measurements but NOT in parameter_unit: ['QN_7', 'V_N_I']
+value-column codes present in measurements but NOT in parameter_unit: []
 parameter_unit codes never used as a measurement value column: ['None']
-value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudiness': ['V_N_I', 'V_N'], 'moisture': ['ABSF_STD', 'VP_STD', 'TF_STD', 'P_STD', 'TT_STD', 'RF_STD', 'TD_STD'], 'precipitation': ['R1', 'RS_IND', 'WRTR'], 'pressure': ['P', 'P0'], 'sun': ['QN_7', 'SD_SO'], 'wind': ['F', 'D']}
+value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudiness': ['V_N'], 'moisture': ['ABSF_STD', 'VP_STD', 'TF_STD', 'P_STD', 'TT_STD', 'RF_STD', 'TD_STD'], 'precipitation': ['R1', 'RS_IND', 'WRTR'], 'pressure': ['P', 'P0'], 'sun': ['SD_SO'], 'wind': ['F', 'D']}
 
 ### EDA Findings
 
@@ -219,21 +226,17 @@ value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudine
 
 ![DWD station_geography -- station locations & relocations](figures/dwd_station_geography.png)
 
-### Figure -- DWD station_geography -- location rows per station
+### Figure -- DWD metadata -- overview
 
-![DWD station_geography -- location rows per station](figures/dwd_geography_location_rows_per_station.png)
+![DWD metadata -- overview](figures/dwd_metadata_overview.png)
 
-### Figure -- DWD station_name_history -- history rows per station
+### Figure -- DWD metadata -- rows per station, by table
 
-![DWD station_name_history -- history rows per station](figures/dwd_name_history_rows_per_station.png)
+![DWD metadata -- rows per station, by table](figures/dwd_metadata_rows_per_station.png)
 
-### Figure -- DWD -- measurement stations missing a metadata row
+### Figure -- DWD metadata -- validity-period row composition, by table
 
-![DWD -- measurement stations missing a metadata row](figures/dwd_metadata_missing_station_rows.png)
-
-### Figure -- DWD metadata -- rows per table
-
-![DWD metadata -- rows per table](figures/dwd_metadata_rows_per_table.png)
+![DWD metadata -- validity-period row composition, by table](figures/dwd_metadata_validity_periods.png)
 
 <!-- END dwd:02_station_metadata -->
 
@@ -251,16 +254,17 @@ value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudine
 
 - REPORTED = a row in dwd_missing_value_periods; OBSERVED = a measurement value that is `-999` or blank. They are not guaranteed to line up.
 - inverted von>bis ranges in the reported table: 0
-- reconciliation: station x parameter with -999 observed but NO reported period: 7
+- reconciliation: station x parameter with -999 observed but NO reported period: 1
 - reconciliation: station x parameter with a reported period but ZERO observed -999/blank: 14
 
 ### Temporal
 
-reported-period span (hours): count=0
+reported-period span (hours): parsed 0 of 457 rows
+  unparsed von/bis samples: [('31.05.2025-10:00', '31.05.2025-13:00'), ('11.06.2025-11:00', '11.06.2025-20:00'), ('12.06.2025-09:00', '12.06.2025-11:00'), ('18.06.2026-14:00', '19.06.2026-06:00'), ('31.05.2025-10:00', '31.05.2025-13:00'), ('11.06.2025-11:00', '11.06.2025-20:00'), ('12.06.2025-09:00', '12.06.2025-11:00'), ('18.06.2026-14:00', '19.06.2026-06:00'), ('31.05.2025-10:00', '31.05.2025-13:00'), ('11.06.2025-11:00', '11.06.2025-20:00')]
 longest reported missing period per station (hours): {}
 observed -999/blank rate by year, per measurement:
 - air_temperature: [('2025', 0.0097), ('2026', 0.0005)]
-- cloudiness: [('2025', 1.0), ('2026', 1.0)]
+- cloudiness: [('2025', 0.0), ('2026', 0.0)]
 - moisture: [('2025', 0.0), ('2026', 0.0)]
 - precipitation: [('2025', 0.1461), ('2026', 0.1445)]
 - pressure: [('2025', 0.0061), ('2026', 0.0021)]
@@ -272,7 +276,6 @@ observed -999/blank rate by year, per measurement:
 Observed -999/blank rate per (measurement.value-column):
 - air_temperature.TT_TU: 0.0032
 - air_temperature.RF_TU: 0.0060
-- cloudiness.V_N_I: 0.0023
 - cloudiness.V_N: 0.0000
 - moisture.ABSF_STD: 0.0000
 - moisture.VP_STD: 0.0000
@@ -286,7 +289,6 @@ Observed -999/blank rate per (measurement.value-column):
 - precipitation.WRTR: 0.1452
 - pressure.P: 0.0045
 - pressure.P0: 0.0037
-- sun.QN_7: 0.0000
 - sun.SD_SO: 0.0007
 - wind.F: 0.0010
 - wind.D: 0.0005
@@ -306,8 +308,8 @@ Per-station observed distinct hours (measurement completeness proxy):
 
 - reported periods total: 457, inverted ranges: 0
 - reported longest gap per station (h): {}
-- observed -999/blank rate per (measurement.column): {'air_temperature.TT_TU': 0.0032, 'air_temperature.RF_TU': 0.006, 'cloudiness.V_N_I': 0.0023, 'cloudiness.V_N': 0.0, 'moisture.ABSF_STD': 0.0, 'moisture.VP_STD': 0.0, 'moisture.TF_STD': 0.0, 'moisture.P_STD': 0.0, 'moisture.TT_STD': 0.0, 'moisture.RF_STD': 0.0, 'moisture.TD_STD': 0.0, 'precipitation.R1': 0.0023, 'precipitation.RS_IND': 0.0023, 'precipitation.WRTR': 0.1452, 'pressure.P': 0.0045, 'pressure.P0': 0.0037, 'sun.QN_7': 0.0, 'sun.SD_SO': 0.0007, 'wind.F': 0.001, 'wind.D': 0.0005}
-- reconciliation: -999-without-report=7, report-without-observed=14
+- observed -999/blank rate per (measurement.column): {'air_temperature.TT_TU': 0.0032, 'air_temperature.RF_TU': 0.006, 'cloudiness.V_N': 0.0, 'moisture.ABSF_STD': 0.0, 'moisture.VP_STD': 0.0, 'moisture.TF_STD': 0.0, 'moisture.P_STD': 0.0, 'moisture.TT_STD': 0.0, 'moisture.RF_STD': 0.0, 'moisture.TD_STD': 0.0, 'precipitation.R1': 0.0023, 'precipitation.RS_IND': 0.0023, 'precipitation.WRTR': 0.1452, 'pressure.P': 0.0045, 'pressure.P0': 0.0037, 'sun.SD_SO': 0.0007, 'wind.F': 0.001, 'wind.D': 0.0005}
+- reconciliation: -999-without-report=1, report-without-observed=14
 
 ### Silver Implications
 
@@ -320,17 +322,21 @@ Per-station observed distinct hours (measurement completeness proxy):
 
 ![DWD observed missingness rate by station x parameter](figures/dwd_missingness_heatmap.png)
 
-### Figure -- DWD missing_value_periods -- periods per parameter
+### Figure -- DWD missing_value_periods -- reported windows
 
-![DWD missing_value_periods -- periods per parameter](figures/dwd_missing_periods_per_parameter.png)
+![DWD missing_value_periods -- reported windows](figures/dwd_reported_missing_periods.png)
 
-### Figure -- DWD missing_value_periods -- reported span (hours) distribution
+### Figure -- DWD observed -999/blank rate by year, per measurement
 
-![DWD missing_value_periods -- reported span (hours) distribution](figures/dwd_missing_period_span_hours.png)
+![DWD observed -999/blank rate by year, per measurement](figures/dwd_missing_rate_by_year.png)
 
-### Figure -- DWD -- longest reported missing period per station
+### Figure -- DWD missing / -999 rate by value column, per measurement
 
-![DWD -- longest reported missing period per station](figures/dwd_longest_reported_missing_period.png)
+![DWD missing / -999 rate by value column, per measurement](figures/dwd_missing_rate_by_column.png)
+
+### Figure -- DWD distinct observed hours per station, per measurement
+
+![DWD distinct observed hours per station, per measurement](figures/dwd_distinct_hours_per_station.png)
 
 <!-- END dwd:03_missing_data -->
 
@@ -413,5 +419,9 @@ union of (station, ts) across all 7 measurements = 102329
 ### Figure -- DWD referential integrity: measurements <-> metadata
 
 ![DWD referential integrity: measurements <-> metadata](figures/dwd_referential_integrity.png)
+
+### Figure -- DWD distinct stations per city
+
+![DWD distinct stations per city](figures/dwd_stations_per_city.png)
 
 <!-- END dwd:04_relationships_and_findings -->

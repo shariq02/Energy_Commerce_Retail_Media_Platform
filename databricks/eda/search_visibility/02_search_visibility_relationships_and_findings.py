@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- SEARCH VISIBILITY RELATIONSHIPS AND FINDINGS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** search_visibility_events <-> search_visibility_repository
@@ -39,8 +39,8 @@ REPOSITORY = f"{CATALOG}.{BRONZE_SCHEMA}.search_visibility_repository"
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helper
+
 def find_col(df: DataFrame, *candidates: str) -> str | None:
     lower = {c.lower(): c for c in df.columns}
     for cand in candidates:
@@ -64,8 +64,8 @@ def barplot(pairs, title, xlabel, ylabel="count", rot=0, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):

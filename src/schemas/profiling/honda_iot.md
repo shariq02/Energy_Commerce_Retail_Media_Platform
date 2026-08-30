@@ -97,6 +97,14 @@ P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 - Stuck-sensor runs and 5-sigma spikes -> data-quality flag, keep raw.
 - P and W tables of a metric are schema-identical, join 1:1 on (frequency, datetime_utc), and are highly correlated (corr above) -> may be modelled as one fact per metric (a Silver modelling choice).
 
+### Figure -- Honda energy -- rows per frequency, by table
+
+![Honda energy -- rows per frequency, by table](figures/honda_energy_rows_per_frequency.png)
+
+### Figure -- Honda energy -- coverage % by frequency
+
+![Honda energy -- coverage % by frequency](figures/honda_energy_coverage_pct.png)
+
 ### Figure -- Honda energy -- duplicate (frequency, datetime_utc) groups
 
 ![Honda energy -- duplicate (frequency, datetime_utc) groups](figures/honda_energy_duplicate_groups.png)
@@ -104,6 +112,18 @@ P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 ### Figure -- Honda energy -- longest gap (missing steps) per table x frequency
 
 ![Honda energy -- longest gap (missing steps) per table x frequency](figures/honda_energy_longest_gap_per_table.png)
+
+### Figure -- Honda energy -- value distribution per table.column
+
+![Honda energy -- value distribution per table.column](figures/honda_energy_value_distributions.png)
+
+### Figure -- Honda energy -- first 2000 hourly points, by table
+
+![Honda energy -- first 2000 hourly points, by table](figures/honda_energy_first_hourly_points.png)
+
+### Figure -- Honda energy -- P vs W per metric
+
+![Honda energy -- P vs W per metric](figures/honda_energy_p_vs_w_scatter.png)
 
 <!-- END honda_iot:01_energy -->
 
@@ -151,13 +171,21 @@ Stuck runs (>=12 identical consecutive values, 1h partition): {'WeatherStation_W
 
 - Sensor stuck-runs detected (1h): {'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}.
 
-### Figure -- Honda weather -- coverage % by frequency
+### Figure -- Honda weather -- frequency overview
 
-![Honda weather -- coverage % by frequency](figures/honda_weather_coverage_pct_by_frequency.png)
+![Honda weather -- frequency overview](figures/honda_weather_frequency.png)
 
-### Figure -- Honda weather -- longest gap (steps) by frequency
+### Figure -- Honda weather -- value distribution per column
 
-![Honda weather -- longest gap (steps) by frequency](figures/honda_weather_longest_gap_by_frequency.png)
+![Honda weather -- value distribution per column](figures/honda_weather_value_distributions.png)
+
+### Figure -- Honda weather -- first 3000 hourly points per column
+
+![Honda weather -- first 3000 hourly points per column](figures/honda_weather_hourly_window.png)
+
+### Figure -- Honda weather -- mean value by hour of day
+
+![Honda weather -- mean value by hour of day](figures/honda_weather_diurnal_profiles.png)
 
 <!-- END honda_iot:02_weather -->
 
@@ -233,5 +261,13 @@ A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)'
 ### Figure -- Honda pairwise (frequency, datetime_utc) overlap
 
 ![Honda pairwise (frequency, datetime_utc) overlap](figures/honda_overlap_matrix.png)
+
+### Figure -- Honda -- keys missing from each table vs the union
+
+![Honda -- keys missing from each table vs the union](figures/honda_keys_missing_vs_union.png)
+
+### Figure -- Honda -- energy <-> weather join yield
+
+![Honda -- energy <-> weather join yield](figures/honda_energy_weather_join_yield.png)
 
 <!-- END honda_iot:03_relationships_and_findings -->

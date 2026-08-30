@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- IPINYOU REFERENCE
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile ipinyou_reference (the merged city / region /
@@ -40,8 +40,8 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.ipinyou_reference"
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helper
+
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(9, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
@@ -57,8 +57,8 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
     for _ in range(12):

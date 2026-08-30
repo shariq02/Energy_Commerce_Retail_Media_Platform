@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD WEATHER MEASUREMENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the seven DWD weather-measurement Bronze tables
@@ -629,8 +629,8 @@ plt.show()
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Figure -- value column spread per measurement (sampled, sentinel excluded)
+
 def _box_draw(pdf, cols):
     def draw(ax):
         ax.boxplot(

@@ -55,7 +55,8 @@ Per-table price stats (min / max / avg / p50-95-99):
 
 ### Relationships
 
-Training funnel: impression=0, click=0, conversion=0.
+Training funnel: impression=24658121, click=20176, conversion=1104 (event_type raw values: {'imp': 24658121, 'clk': 20176, 'conv': 1104}).
+CTR = 0.000818; click->conversion = 0.054718; conversion/impression = 0.00004477.
 Leaderboard labels: {'has_conversion': [('0', 6694772), ('1', 330)], 'related_clicks_count': [('0', 6690160), ('1', 4690), ('12', 1), ('2', 189), ('3', 35), ('4', 9), ('5', 7), ('6', 5), ('7', 3), ('8', 1), (None, 2)]}.
 Per-season comparison (rows / advertisers / users / funnel): see season_cmp cell.
 - training season training1st: rows=9270416, advertisers=1, users=6819956
@@ -72,6 +73,7 @@ Per-season comparison (rows / advertisers / users / funnel): see season_cmp cell
 - training: price ordering violations (paying>bidding=191091, floor>paying=116370).
 - leaderboard: 8006 candidate-key groups have conflicting rows.
 - leaderboard: price ordering violations (paying>bidding=71451, floor>paying=30445).
+- Training funnel is extremely top-heavy (CTR 0.00082, conversion rate 0.0000448) -> severe class imbalance for modelling.
 
 ### Silver Implications
 
@@ -86,9 +88,25 @@ Per-season comparison (rows / advertisers / users / funnel): see season_cmp cell
 
 ![iPinYou training impression -> click -> conversion funnel](figures/ipinyou_funnel.png)
 
-### Figure -- iPinYou training -- events per day by season
+### Figure -- iPinYou -- rows per partition column, by table
 
-![iPinYou training -- events per day by season](figures/ipinyou_training_events_per_day_by_season.png)
+![iPinYou -- rows per partition column, by table](figures/ipinyou_partitions.png)
+
+### Figure -- iPinYou leaderboard -- label distributions
+
+![iPinYou leaderboard -- label distributions](figures/ipinyou_leaderboard_labels.png)
+
+### Figure -- iPinYou -- events per day by season, by table
+
+![iPinYou -- events per day by season, by table](figures/ipinyou_events_per_day_by_season.png)
+
+### Figure -- iPinYou -- event volume per hour, by table
+
+![iPinYou -- event volume per hour, by table](figures/ipinyou_event_volume_per_hour.png)
+
+### Figure -- iPinYou -- price distributions (sampled, clipped to p99)
+
+![iPinYou -- price distributions (sampled, clipped to p99)](figures/ipinyou_price_distributions.png)
 
 <!-- END ipinyou:01_training_leaderboard -->
 

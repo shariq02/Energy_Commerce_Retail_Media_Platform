@@ -29,22 +29,22 @@ Per-series continuity (fixed-step resolutions only):
 
 | series | resolution | observed | expected | coverage % | longest gap | missing steps |
 |---|---|---|---|---|---|---|
-| day_ahead_prices|4169|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| generation_biomass|4066|DE-LU|day | day | 4018 | 4018 | 100.0 | 0.04166666666666674 | 0.45833333333333415 |
-| generation_hard_coal|4069|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| generation_hydro|1226|DE-LU|day | day | 4018 | 4018 | 100.0 | 0.04166666666666674 | 0.45833333333333415 |
-| generation_lignite|1223|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| generation_natural_gas|4071|DE-LU|day | day | 4018 | 4018 | 100.0 | 0.04166666666666674 | 0.45833333333333415 |
-| generation_nuclear|1224|DE-LU|day | day | 2557 | 2557 | 100.0 | 0.04166666666666674 | 0.2916666666666672 |
-| generation_offshore_wind|1225|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| generation_onshore_wind|4067|DE-LU|day | day | 4018 | 4018 | 100.0 | 0.04166666666666674 | 0.45833333333333415 |
-| generation_other_conventional|1227|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| generation_other_renewable|1228|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| generation_photovoltaic|4068|DE-LU|day | day | 4018 | 4018 | 100.0 | 0.04166666666666674 | 0.45833333333333415 |
-| generation_pumped_storage|4070|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| pumped_storage_consumption|4387|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| residual_load|4359|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
-| total_power_consumption|410|DE-LU|day | day | 3287 | 3287 | 100.0 | 0.04166666666666674 | 0.37500000000000067 |
+| day_ahead_prices|4169|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| generation_biomass|4066|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
+| generation_hard_coal|4069|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| generation_hydro|1226|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
+| generation_lignite|1223|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| generation_natural_gas|4071|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
+| generation_nuclear|1224|DE-LU|day | day | 2557 | 2557 | 100.0 | None | 0 |
+| generation_offshore_wind|1225|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| generation_onshore_wind|4067|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
+| generation_other_conventional|1227|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| generation_other_renewable|1228|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| generation_photovoltaic|4068|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
+| generation_pumped_storage|4070|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| pumped_storage_consumption|4387|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| residual_load|4359|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
+| total_power_consumption|410|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
 
 Rows per year: [(2015, 5), (2016, 1830), (2017, 1836), (2018, 5840), (2019, 5840), (2020, 5856), (2021, 5840), (2022, 5840), (2023, 5840), (2024, 5855), (2025, 5475), (2026, 5460)].
 
@@ -101,20 +101,16 @@ Absent combos (first 30): []
 
 ![SMARD metric|region x resolution presence](figures/smard_coverage_matrix.png)
 
-### Figure -- SMARD rows per series
+### Figure -- SMARD series overview
 
-![SMARD rows per series](figures/smard_rows_per_series.png)
+![SMARD series overview](figures/smard_series_overview.png)
 
-### Figure -- SMARD rows per year
+### Figure -- SMARD value distribution per metric (sampled)
 
-![SMARD rows per year](figures/smard_rows_per_year.png)
+![SMARD value distribution per metric (sampled)](figures/smard_value_distributions.png)
 
-### Figure -- SMARD per-series temporal coverage %
+### Figure -- SMARD first 3000 points per metric
 
-![SMARD per-series temporal coverage %](figures/smard_per_series_coverage_pct.png)
-
-### Figure -- SMARD per-series longest gap (missing steps)
-
-![SMARD per-series longest gap (missing steps)](figures/smard_per_series_longest_gap.png)
+![SMARD first 3000 points per metric](figures/smard_time_series.png)
 
 <!-- END smard:01_smard -->

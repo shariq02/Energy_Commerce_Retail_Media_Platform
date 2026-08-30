@@ -57,9 +57,9 @@ Multi-user sessions: 937.
 
 | event_type | price min | max | avg | p50/95/99 |
 |---|---|---|---|---|
-| purchase | 0.77 | 2574.07 | 304.34753882424565 | [174.02, 1007.97, 1628.07] |
-| cart | 0.0 | 2574.07 | 300.24630626480734 | [174.73, 1003.37, 1616.49] |
-| view | 0.0 | 2574.07 | 291.1060965566807 | [163.97, 1003.85, 1706.0] |
+| purchase | 0.77 | 2574.07 | 304.3475388242502 | [174.02, 1007.97, 1628.07] |
+| cart | 0.0 | 2574.07 | 300.24630626479006 | [174.73, 1003.37, 1616.36] |
+| view | 0.0 | 2574.07 | 291.1060965565274 | [163.97, 1003.85, 1706.0] |
 
 Overall p99 price: 1706.0.
 Top brands: [(None, 15341158), ('samsung', 13172020), ('apple', 10381933), ('xiaomi', 7721825), ('huawei', 2521331), ('lucente', 1840936), ('lg', 1659394), ('bosch', 1532149), ('oppo', 1294585), ('sony', 1255101)].
@@ -74,14 +74,14 @@ Sessions: 23016651; with view=23005603, with cart=2316433, with purchase=1402758
 view->cart session rate = 0.1004.
 cart->purchase session rate = 0.4059.
 Buyers: 697470; repeat buyers: 295325; multi-session users: 3057138; (user, product) rebought: 202354.
-In-session sequence violations: purchase with no prior cart = 539567 of 1659788; cart with no prior view = 29849 of 3955446.
+In-session sequence violations: purchase with no prior cart = 539567 of 1659788; cart with no prior view = 29848 of 3955446.
 Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event sessions: 8.
 
 ### EDA Findings
 
 - 12 duplicate ['user_session', 'product_id', 'event_type', 'event_time'] groups have conflicting non-key values.
 - Columns with >10% missing: {'category_code': 0.322, 'brand': 0.14}.
-- Funnel not strictly ordered in-session: 539567 purchases without a prior cart, 29849 carts without a prior view.
+- Funnel not strictly ordered in-session: 539567 purchases without a prior cart, 29848 carts without a prior view.
 - Product attributes drift: 22 products with >1 category_id, 277 with >1 brand.
 - category_id <-> category_code is not a clean 1:1 mapping (0 / 58 conflicts).
 - 937 sessions span more than one user_id.
@@ -107,9 +107,17 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 
 ![REES46 events by hour of day](figures/rees46_events_by_hour_of_day.png)
 
+### Figure -- REES46 events by weekday
+
+![REES46 events by weekday](figures/rees46_events_by_weekday.png)
+
 ### Figure -- REES46 missing rate per column
 
 ![REES46 missing rate per column](figures/rees46_missing_rate_per_column.png)
+
+### Figure -- REES46 events per day
+
+![REES46 events per day](figures/rees46_events_per_day.png)
 
 ### Figure -- REES46 events per day by type
 
@@ -119,9 +127,29 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 
 ![REES46 price distribution (sampled, clipped to p99)](figures/rees46_price_distribution.png)
 
+### Figure -- REES46 price distribution -- view (sampled)
+
+![REES46 price distribution -- view (sampled)](figures/rees46_price_distribution_view.png)
+
+### Figure -- REES46 price distribution -- cart (sampled)
+
+![REES46 price distribution -- cart (sampled)](figures/rees46_price_distribution_cart.png)
+
+### Figure -- REES46 price distribution -- purchase (sampled)
+
+![REES46 price distribution -- purchase (sampled)](figures/rees46_price_distribution_purchase.png)
+
+### Figure -- REES46 top brands by event volume
+
+![REES46 top brands by event volume](figures/rees46_top_brands.png)
+
 ### Figure -- REES46 top 20 category_code by event volume
 
 ![REES46 top 20 category_code by event volume](figures/rees46_top_categories.png)
+
+### Figure -- REES46 events per session distribution
+
+![REES46 events per session distribution](figures/rees46_events_per_session.png)
 
 ### Figure -- REES46 products with unstable category / brand
 
