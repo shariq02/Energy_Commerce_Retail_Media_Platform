@@ -1,0 +1,175 @@
+# Data contract -- Honda IoT (smart-building energy + weather)
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the Honda Research Institute smart-building
+# dataset -- 6 energy tables (electricity / heating / cooling, each a P and a W
+# variant) + 1 weather table. Every *_observed value is traceable to
+# src/schemas/profiling/honda_iot.md. Authored; generated/honda_iot_*.schema.json
+# is produced by src/schemas/_generate_jsonschema.py -- do not edit those by hand.
+
+source: honda_iot
+source_system: honda_iot
+domain: IoT / Consumption
+description: >
+  Single building site (Honda Research Institute Europe, Germany), sub-metered
+  electricity / heating / cooling plus on-site weather, each series recorded at
+  1min / 15min / 1h resolution. Static one-time acquisition (reduced dataset).
+profiling_evidence: src/schemas/profiling/honda_iot.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+conventions:
+  key: [frequency, datetime_utc]
+  key_unique: true                       # unique in every Honda table (profiling)
+  frequency_values: ["1min", "15min", "1h"]
+  frequency_note: >
+    Same underlying series at 3 physical resolutions -- a real resolution, kept
+    in the grain; frequencies are never blended.
+  p_vs_w_note: >
+    '_p' tables and '_w' tables of a metric are schema-identical and join 1:1 on
+    (frequency, datetime_utc). Their meaning (instantaneous power vs cumulative
+    energy) is not documented in the EDA -- see open_questions.
+  value_missing_note: >
+    weather columns are ~2.4% null; energy value columns have no nulls but carry
+    large negative values (PV / CHP export) and 5-sigma spikes.
+
+tables:
+
+  - name: honda_iot_electricity_p
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3417959
+    columns:
+      - { name: frequency,    type: string, required: true, nullable: false }
+      - { name: datetime_utc, type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: total,        type: double, required: true, nullable: true, notes: "range -663729..788591; 251753 negative rows; 159 5-sigma" }
+      - { name: PV,           type: double, required: true, nullable: true, notes: "mostly negative (export); range -719598..228" }
+      - { name: CHP,          type: double, required: true, nullable: true, notes: "mostly negative; range -282562..27705" }
+
+  - name: honda_iot_electricity_w
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3417957
+    columns:
+      - { name: frequency,    type: string, required: true, nullable: false }
+      - { name: datetime_utc, type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: total,        type: double, required: true, nullable: true, notes: "range -104..8918861; cumulative-looking" }
+      - { name: PV,           type: double, required: true, nullable: true, notes: "range -2464379..0" }
+      - { name: CHP,          type: double, required: true, nullable: true, notes: "range -3390184..0" }
+
+  - name: honda_iot_heating_p
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3417959
+    columns:
+      - { name: frequency,    type: string, required: true, nullable: false }
+      - { name: datetime_utc, type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: total,        type: double, required: true, nullable: true, notes: "range ~0..2193300; 680 5-sigma" }
+      - { name: CHP_heat,     type: double, required: true, nullable: true }
+      - { name: CHP_elec,     type: double, required: true, nullable: true, notes: "mostly negative; identical stats to electricity CHP" }
+
+  - name: honda_iot_heating_w
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3417947
+    columns:
+      - { name: frequency,    type: string, required: true, nullable: false }
+      - { name: datetime_utc, type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: total,        type: double, required: true, nullable: true, notes: "range 0..12975100" }
+      - { name: CHP_heat,     type: double, required: true, nullable: true, notes: "range 0..5583000" }
+      - { name: CHP_elec,     type: double, required: true, nullable: true, notes: "range -3390184..0" }
+
+  - name: honda_iot_cooling_p
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3417960
+    columns:
+      - { name: frequency,    type: string, required: true, nullable: false }
+      - { name: datetime_utc, type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: total,        type: double, required: true, nullable: true, notes: "range ~0..3717000; 7384 5-sigma" }
+      - { name: cool_elec,    type: double, required: true, nullable: true, notes: "range 0..332025; 8430 5-sigma" }
+
+  - name: honda_iot_cooling_w
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3417895
+    columns:
+      - { name: frequency,    type: string, required: true, nullable: false }
+      - { name: datetime_utc, type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: total,        type: double, required: true, nullable: true, notes: "range 0..2270133" }
+      - { name: cool_elec,    type: double, required: true, nullable: true, notes: "range 0..1024964" }
+
+  - name: honda_iot_weather
+    grain: { key: [frequency, datetime_utc], unique: true }
+    row_count_observed: 3419507
+    columns:
+      - { name: frequency,                  type: string, required: true, nullable: false }
+      - { name: datetime_utc,               type: timestamp, required: true, nullable: false, timezone: UTC }
+      - { name: WeatherStation_Weather_Ta,  type: double, required: true, nullable: true, notes: "air temp degC; ~2.4% null; range -11.6..39.9; 70 stuck-runs (1h)" }
+      - { name: WeatherStation_Weather_Igm, type: double, required: true, nullable: true, notes: "global irradiance W/m2; ~2.4% null; range 0..1141; 1455479 zeros (night); 1710 stuck-runs (1h)" }
+
+quality_rules:
+  - id: key_unique
+    expr: "(frequency, datetime_utc) unique in every table"
+    severity: block
+    evidence: "profiling: 0 conflicting duplicate groups"
+  - id: frequency_domain
+    expr: "frequency in {1min, 15min, 1h}"
+    severity: block
+  - id: weather_plausible_range
+    expr: "Ta in [-40, 50] degC; Igm in [0, 1500] W/m2"
+    severity: warn
+    evidence: "profiling: 0 out-of-range"
+  - id: energy_5sigma_spikes
+    expr: "5-sigma value spikes present on several _p.total columns -- flag, keep raw"
+    severity: warn
+  - id: p_w_1to1
+    expr: "each metric's _p and _w tables join 1:1 on (frequency, datetime_utc)"
+    severity: warn
+    evidence: "profiling: matched ~3.4M rows per metric"
+
+localisation:
+  required: false
+  note: >
+    Site is in Germany (Honda Research Institute Europe). No language / currency
+    localisation needed; geography is a single fixed site.
+
+open_questions:
+  - id: honda-p-vs-w-semantics
+    question: >
+      What do the '_p' and '_w' variants mean? Working hypothesis: _p =
+      instantaneous power (kW), _w = cumulative energy (kWh) -- consistent with
+      _w being large and monotone-looking and _p swinging +/-. Confirm, and
+      confirm units, before Silver. This decides whether both map to
+      fact_energy_consumption or one is derived from the other.
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: honda-signed-consumption
+    question: >
+      Energy value columns carry large negatives (PV / CHP generation and
+      export). fact_energy_consumption grain is (device/meter, date, interval).
+      Decide: (a) signed value (import positive, export negative) on one fact;
+      (b) split into consumption vs generation measures. Recommend (a) with an
+      explicit sign convention. Needs a canonical-model note.
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: honda-resolution-choice
+    question: >
+      1min / 15min / 1h are the same series at 3 resolutions. Carry all three
+      into Silver (partitioned by frequency), or downselect to one canonical
+      resolution (1h) for fact_energy_consumption? Recommend keep all in Silver,
+      1h into Gold.
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: honda-weather-canonical-home
+    question: >
+      honda_iot_weather is single-site on-site sensor data. Map to fact_weather
+      with a synthetic weather_location = 'honda_site', or carry only as
+      consumption context (joined to the energy facts on (frequency,
+      datetime_utc)) with no canonical weather fact? Recommend the synthetic
+      weather_location so DWD and Honda weather share fact_weather.
+    raised: 2026-08-30
+    blocks_stage: silver
+    see: src/schemas/mappings/honda_iot.yml

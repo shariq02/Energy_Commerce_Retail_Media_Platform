@@ -1,0 +1,107 @@
+# Data contract -- KDD Cup 2012 Track 2 (search-ad click prediction)
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the KDD Cup 2012 Track 2 source (1 Bronze table).
+# Every *_observed value is traceable to src/schemas/profiling/kddcup2012.md.
+# Authored; generated/kddcup2012_click_prediction.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit it by hand.
+
+source: kddcup2012
+source_system: kddcup2012_track2
+domain: Commerce / Search Advertising
+description: >
+  Search-advertising impression records with a click flag/count and an
+  impression count, plus hashed query / ad / keyword / title / description / user
+  ids and ranking position/depth. No timestamp. Static one-time acquisition
+  (single CSV, sample release). Not a German source; provides click / click-
+  prediction evidence only -- no conversion or sale field.
+profiling_evidence: src/schemas/profiling/kddcup2012.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+tables:
+
+  - name: kddcup2012_click_prediction
+    grain:
+      key: [url_hash, ad_id, advertiser_id, depth, position, query_id, keyword_id, title_id, description_id, user_id]
+      unique: false          # 2062 context keys repeat; 0 have conflicting click labels
+      row_count_observed: 399482
+      description: "one row per aggregated (context) search-ad impression group"
+    columns:
+      - { name: click,          type: integer, required: true, nullable: false, notes: "click count for the group; class balance 16.8% positive" }
+      - { name: impression,     type: integer, required: true, nullable: false, notes: "impression count for the group; range 1..316" }
+      - { name: url_hash,       type: string,  required: true, nullable: false, distinct_observed: 15870 }
+      - { name: ad_id,          type: string,  required: true, nullable: false, distinct_observed: 82684 }
+      - { name: advertiser_id,  type: string,  required: true, nullable: false, distinct_observed: 11225, notes: "ad_id -> advertiser_id is effectively 1:1" }
+      - { name: depth,          type: integer, required: true, nullable: false, allowed_values: [1, 2, 3] }
+      - { name: position,       type: integer, required: true, nullable: false, allowed_values: [1, 2, 3], notes: "position <= depth always holds" }
+      - { name: query_id,       type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.39% of rows" }
+      - { name: keyword_id,     type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.39%" }
+      - { name: title_id,       type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.00%" }
+      - { name: description_id, type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.00%" }
+      - { name: user_id,        type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 24.27%; source-attributed, never joined to any other source" }
+
+quality_rules:
+  - id: exact_duplicates
+    expr: "2075 exact full-row duplicates -- apply distinct on load"
+    severity: block
+  - id: id_zero_is_unknown
+    expr: "id value 0 in query_id / keyword_id / title_id / description_id / user_id means 'unknown', treat as NULL"
+    severity: block
+  - id: click_le_impression
+    expr: "click <= impression for every row"
+    severity: block
+    evidence: "profiling: 0 violations"
+  - id: position_le_depth
+    expr: "position <= depth for every row"
+    severity: block
+    evidence: "profiling: 0 violations"
+  - id: context_key_no_conflict
+    expr: "repeated context keys never carry conflicting click labels"
+    severity: warn
+    evidence: "profiling: 2062 repeated, 0 conflicting"
+  - id: class_imbalance
+    expr: "negative:positive ~ 5:1 -- a modelling constraint, recorded not enforced"
+    severity: info
+
+localisation:
+  required: false
+  note: >
+    No geography field. Source is not German. Retained with
+    source_system='kddcup2012_track2'; never presented as German advertising.
+
+open_questions:
+  - id: kdd-no-timestamp
+    question: >
+      The dataset has no timestamp column. fact_search_ad_click grain includes an
+      event timestamp / dim_date link. Decide: (a) fact_search_ad_click rows from
+      this source carry a NULL / 'undated' date key and are excluded from any
+      time-series metric; (b) this source is used only for position/depth CTR
+      curves and click-prediction features, not loaded as dated fact rows.
+      Recommend (b).
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: kdd-aggregated-grain
+    question: >
+      Rows are (context) groups with click + impression counts, not individual
+      impressions. Confirm fact_search_ad_click is modelled at this aggregated
+      grain (one row per context group, with click_count / impression_count
+      measures), not expanded to per-impression rows.
+    raised: 2026-08-30
+    blocks_stage: silver
+    see: src/schemas/mappings/kddcup2012.yml
+  - id: kdd-user-id-scope
+    question: >
+      user_id is the source's own hashed id. Confirm it is carried only as
+      source_record context and never joined to REES46 / GA4 / synthetic customer
+      identities (provenance principle).
+    raised: 2026-08-30
+    blocks_stage: silver

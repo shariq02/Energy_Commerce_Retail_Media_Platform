@@ -1,0 +1,66 @@
+# Source-to-canonical mapping -- Honda IoT
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired Honda IoT schema (see contracts/honda_iot.yml) to
+# the canonical model. Design only -- no transform code here.
+
+source: honda_iot
+source_system: honda_iot
+profiling_evidence: src/schemas/profiling/honda_iot.md
+contract: src/schemas/contracts/honda_iot.yml
+
+targets:
+
+  - canonical_fact: fact_energy_consumption
+    status: resolved_shape_open
+    from_tables: [honda_iot_electricity_p, honda_iot_electricity_w,
+                  honda_iot_heating_p, honda_iot_heating_w,
+                  honda_iot_cooling_p, honda_iot_cooling_w]
+    canonical_grain: [device_meter, date, interval]
+    proposed_silver_grain: [site, subsystem, channel, frequency, datetime_utc, measure, value]
+    field_map:
+      - source: "table name -> subsystem"
+        canonical: "dim_device.subsystem (electricity / heating / cooling)"
+      - source: "value column name -> channel"
+        canonical: "dim_device.channel (total / PV / CHP / CHP_heat / CHP_elec / cool_elec)"
+      - source: "_p vs _w table -> measure"
+        canonical: "fact_energy_consumption.measure (power vs energy -- see open_question honda-p-vs-w-semantics)"
+      - source: "frequency"
+        canonical: "interval attribute (1min / 15min / 1h)"
+      - source: "datetime_utc"
+        canonical: "dim_date + interval timestamp"
+        transform: "cast to timestamp (UTC)"
+      - source: "<value columns>"
+        canonical: "fact_energy_consumption.value"
+        transform: "cast to double; keep sign (negative = generation/export -- see honda-signed-consumption)"
+    provenance:
+      source_system: honda_iot
+      source_record_id: "concat_ws('|', <table>, frequency, datetime_utc)"
+    synthetic_dimension_note: >
+      There is one physical site. dim_device entries are synthesised as
+      site='honda_site' x subsystem x channel; no real per-device serial exists.
+
+  - canonical_fact: fact_weather
+    status: open
+    open_question: honda-weather-canonical-home
+    from_tables: [honda_iot_weather]
+    canonical_grain: [weather_location, date, hour]
+    proposed: >
+      weather_location = synthetic 'honda_site'; Ta -> air temperature parameter,
+      Igm -> global irradiance parameter (a parameter DWD does not carry).
+      Alternative: no canonical weather fact, join weather to the energy facts as
+      context only.
+
+dropped_columns: []          # every source column carries information
+
+localisation:
+  required: false
+  reason: "single fixed German site; no language / currency mapping"
+
+unresolved_before_silver:
+  - honda-p-vs-w-semantics
+  - honda-signed-consumption
+  - honda-resolution-choice
+  - honda-weather-canonical-home

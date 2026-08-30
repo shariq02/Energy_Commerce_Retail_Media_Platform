@@ -1,0 +1,80 @@
+# Source-to-canonical mapping -- REES46
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired REES46 schema (see contracts/rees46.yml) to the
+# canonical model. Design only -- no transform code here.
+
+source: rees46
+source_system: rees46
+profiling_evidence: src/schemas/profiling/rees46.md
+contract: src/schemas/contracts/rees46.yml
+
+targets:
+
+  - canonical_fact: fact_customer_activity
+    status: resolved
+    from_tables: [rees46_events]
+    canonical_grain: [customer_session, event]
+    field_map:
+      - source: "user_id + user_session"
+        canonical: "customer_session key"
+        transform: "session identity = (user_id, user_session)"
+      - source: "user_id"
+        canonical: "dim_customer (source-attributed -- REES46 user, never resolved to any other source's customer)"
+      - source: "event_type"
+        canonical: "fact_customer_activity.activity_type (view / cart / purchase)"
+      - source: "event_time"
+        canonical: "dim_date + event timestamp"
+        transform: "cast to timestamp (UTC)"
+      - source: "product_id / category_id / category_code / brand"
+        canonical: "dim_product attributes (SCD / last-seen -- attributes drift)"
+      - source: "price"
+        canonical: "fact_customer_activity.item_price (currency-unknown -- see open_question)"
+    provenance:
+      source_system: rees46
+      source_record_id: "concat_ws('|', user_session, product_id, event_type, event_time)"
+
+  - canonical_fact: fact_product_demand
+    status: open
+    open_question: rees46-no-geography
+    from_tables: [rees46_events]
+    canonical_grain: [product_category, geography, date]
+    note: >
+      REES46 has no geography. Recommendation: do NOT populate fact_product_demand
+      directly; feed REES46 view/cart/purchase counts per (category, date) into
+      the cross-domain int_product_demand model as an ungeo'd demand signal.
+
+  - canonical_fact: fact_orders
+    status: open
+    open_question: rees46-purchase-to-orders
+    note: >
+      No order_id / basket grouping in the source. Recommendation: do NOT
+      populate fact_orders from REES46; purchases stay as purchase events in
+      fact_customer_activity.
+
+  - canonical_dimension: dim_product
+    from_tables: [rees46_events]
+    open_question: rees46-category-hierarchy
+    note: >
+      Build the category hierarchy from the category_code dotted path; keep
+      category_id as a source id. Product attributes are SCD / last-seen (drift
+      observed). category_code / brand kept nullable with an 'unknown' member.
+
+dropped_columns: []
+
+localisation:
+  required: true
+  approach: honest_provenance
+  detail:
+    geography: "no country field -- REES46 rows carry no geography; never labelled German"
+    currency: "undocumented -- see open_question rees46-currency"
+    language: "product / brand strings are English-ish; category_code is English tokens"
+  never: "REES46 data is never presented as German commerce or merged into a German customer identity"
+
+unresolved_before_silver:
+  - rees46-no-geography
+  - rees46-currency
+  - rees46-purchase-to-orders
+  - rees46-category-hierarchy

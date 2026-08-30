@@ -1,0 +1,187 @@
+# Data contract -- iPinYou (RTB display advertising)
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the iPinYou source (3 Bronze tables -- training
+# events, leaderboard events, a merged reference lookup). Every *_observed value
+# is traceable to src/schemas/profiling/ipinyou.md. Authored;
+# generated/ipinyou_*.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit those by hand.
+
+source: ipinyou
+source_system: ipinyou
+domain: Retail Media / Advertising
+description: >
+  Real-time-bidding display-ad logs from a Chinese DSP, 3 seasons of 2013
+  (impression / click / conversion events for training; a held-out leaderboard
+  set with conversion labels), plus a merged city / region / user-tag lookup.
+  Bid-request logs are excluded upstream. Static one-time acquisition. NOT a
+  German source.
+profiling_evidence: src/schemas/profiling/ipinyou.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+conventions:
+  timestamp_format: "yyyyMMddHHmmssSSS"
+  season_values: [training1st, training2nd, training3rd, testing1st, testing2nd, testing3rd]
+  season_schema_split: >
+    Season 1 rows lack advertiser_id and user_tags (fewer source columns);
+    reconciled onto the superset schema with NULLs, not concatenated blindly.
+  no_campaign_id: >
+    iPinYou carries advertiser_id (12 distinct) + creative_id + ad_slot, but no
+    campaign id -- see open_questions.
+
+tables:
+
+  - name: ipinyou_training
+    grain:
+      key: [season, bid_id]
+      unique: false          # profiling: 59483 dup groups, 59304 conflicting
+      row_count_observed: 24679401
+      description: "one row per RTB event (impression / click / conversion)"
+    columns:
+      - { name: season,               type: string,  required: true,  nullable: false }
+      - { name: event_type,           type: string,  required: true,  nullable: false, allowed_values: [imp, clk, conv] }
+      - { name: bid_id,               type: string,  required: true,  nullable: false }
+      - { name: timestamp,            type: string,  required: true,  nullable: false, notes: "yyyyMMddHHmmssSSS" }
+      - { name: log_type,             type: string,  required: true,  nullable: false }
+      - { name: ipinyou_id,           type: string,  required: true,  nullable: false, notes: "user id; source-attributed" }
+      - { name: user_agent,           type: string,  required: true,  nullable: true }
+      - { name: ip,                   type: string,  required: true,  nullable: true }
+      - { name: region,               type: string,  required: true,  nullable: true, notes: "FK to ipinyou_reference lookup_type=region; ~100% row match" }
+      - { name: city,                 type: string,  required: true,  nullable: true, notes: "FK to lookup_type=city; ~80% row match" }
+      - { name: ad_exchange,          type: string,  required: true,  nullable: true }
+      - { name: domain,               type: string,  required: true,  nullable: true, null_rate_observed: 0.0685 }
+      - { name: url,                  type: string,  required: true,  nullable: true }
+      - { name: anonymous_url_id,     type: string,  required: false, nullable: true, null_rate_observed: 1.0, notes: "100% null -- drop" }
+      - { name: ad_slot_id,           type: string,  required: true,  nullable: true }
+      - { name: ad_slot_width,        type: integer, required: true,  nullable: true }
+      - { name: ad_slot_height,       type: integer, required: true,  nullable: true }
+      - { name: ad_slot_visibility,   type: string,  required: true,  nullable: true }
+      - { name: ad_slot_format,       type: string,  required: true,  nullable: true }
+      - { name: ad_slot_floor_price,  type: double,  required: true,  nullable: true, notes: "range 0..300" }
+      - { name: creative_id,          type: string,  required: true,  nullable: true, distinct_observed: 176 }
+      - { name: bidding_price,        type: double,  required: true,  nullable: true, notes: "range 227..11908" }
+      - { name: paying_price,         type: double,  required: true,  nullable: true, notes: "range 0..300; paying>bidding in 191091 rows" }
+      - { name: keypage_url,          type: string,  required: true,  nullable: true, null_rate_observed: 0.1281 }
+      - { name: advertiser_id,        type: string,  required: false, nullable: true, null_rate_observed: 0.3756, distinct_observed: 12, notes: "absent in season 1" }
+      - { name: user_tags,            type: string,  required: false, nullable: true, null_rate_observed: 0.504, notes: "absent in season 1; ';'-delimited tag ids" }
+
+  - name: ipinyou_leaderboard
+    grain:
+      key: [season, bid_id]
+      unique: false          # profiling: 8314 dup groups, 8006 conflicting
+      row_count_observed: 6695102
+      description: "held-out RTB events with a conversion label; NO event_type"
+    columns:
+      - { name: season,               type: string,  required: true,  nullable: false }
+      - { name: bid_id,               type: string,  required: true,  nullable: false }
+      - { name: timestamp,            type: string,  required: true,  nullable: false }
+      - { name: log_type,             type: string,  required: true,  nullable: false, constant_observed: true }
+      - { name: ipinyou_id,           type: string,  required: true,  nullable: false }
+      - { name: user_agent,           type: string,  required: true,  nullable: true }
+      - { name: ip,                   type: string,  required: true,  nullable: true }
+      - { name: region,               type: string,  required: true,  nullable: true }
+      - { name: city,                 type: string,  required: true,  nullable: true }
+      - { name: ad_exchange,          type: string,  required: true,  nullable: true }
+      - { name: domain,               type: string,  required: true,  nullable: true }
+      - { name: url,                  type: string,  required: true,  nullable: true }
+      - { name: anonymous_url_id,     type: string,  required: false, nullable: true, constant_observed: true, notes: "100% null -- drop" }
+      - { name: ad_slot_id,           type: string,  required: true,  nullable: true }
+      - { name: ad_slot_width,        type: integer, required: true,  nullable: true }
+      - { name: ad_slot_height,       type: integer, required: true,  nullable: true }
+      - { name: ad_slot_visibility,   type: string,  required: true,  nullable: true }
+      - { name: ad_slot_format,       type: string,  required: true,  nullable: true }
+      - { name: ad_slot_floor_price,  type: double,  required: true,  nullable: true }
+      - { name: creative_id,          type: string,  required: true,  nullable: true }
+      - { name: bidding_price,        type: double,  required: true,  nullable: true }
+      - { name: paying_price,         type: double,  required: true,  nullable: true }
+      - { name: keypage_url,          type: string,  required: true,  nullable: true }
+      - { name: advertiser_id,        type: string,  required: false, nullable: true }
+      - { name: user_tags,            type: string,  required: false, nullable: true }
+      - { name: related_clicks_count, type: integer, required: true,  nullable: true }
+      - { name: has_conversion,       type: integer, required: true,  nullable: false, allowed_values: [0, 1], notes: "330 positives of 6.7M" }
+
+  - name: ipinyou_reference
+    grain:
+      key: [lookup_type, lookup_id]
+      unique: true           # profiling: 0 duplicate ids within each lookup_type
+      row_count_observed: 441
+      description: "merged city / region / user-tag lookup, discriminated by lookup_type"
+    columns:
+      - { name: lookup_type, type: string, required: true, nullable: false, allowed_values: [city, region, tag] }
+      - { name: lookup_id,   type: string, required: true, nullable: false, notes: "id ranges are non-contiguous (gaps) -- expected" }
+      - { name: name_en,     type: string, required: true, nullable: false }
+      - { name: name_cn,     type: string, required: true, nullable: false }
+
+quality_rules:
+  - id: conflicting_dup_keys
+    expr: "(season, bid_id) is not unique -- training 59304 / leaderboard 8006 conflicting groups; deterministic resolution needed"
+    severity: block
+  - id: training_leaderboard_disjoint
+    expr: "training and leaderboard (season, bid_id) sets do not overlap at all -> model as two separate facts, never a union"
+    severity: block
+    evidence: "profiling: inner overlap = 0"
+  - id: price_ordering
+    expr: "expected floor <= paying <= bidding; violated (paying>bidding 191091 training / 71451 leaderboard) -> validity flag, keep raw"
+    severity: warn
+  - id: drop_dead_columns
+    expr: "anonymous_url_id is 100% null; leaderboard log_type constant -> drop"
+    severity: warn
+  - id: reference_fk_partial
+    expr: "region FK ~100% row match; city FK ~80%; tag ids partly absent from reference -> route unmatched to 'unknown', do not drop rows"
+    severity: warn
+  - id: funnel_imbalance
+    expr: "training CTR 0.00082, conversion/impression 0.0000448 -> severe class imbalance (modelling constraint)"
+    severity: info
+
+localisation:
+  required: true
+  approach: honest_provenance
+  note: >
+    iPinYou is a Chinese DSP. region / city are opaque Chinese geo codes resolved
+    only to name_en / name_cn via ipinyou_reference -- no coordinates, no German
+    geography. Retained with source_system='ipinyou'; never presented as German
+    RTB. See the Germany localisation design doc.
+
+open_questions:
+  - id: ipinyou-no-campaign-id
+    question: >
+      fact_ad_impression / fact_ad_click / fact_conversion grain is "campaign,
+      placement, event_timestamp". iPinYou has advertiser_id + creative_id +
+      ad_slot but NO campaign id. Decide: (a) treat advertiser_id as the campaign
+      grain surrogate; (b) synthesise a campaign key from (advertiser_id,
+      creative_id); (c) leave campaign NULL for iPinYou-sourced rows. Recommend
+      (b). Needs a canonical-model note.
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: ipinyou-event-fact-split
+    question: >
+      training carries event_type (imp / clk / conv). Split into three facts
+      (fact_ad_impression / fact_ad_click / fact_conversion) or one long RTB
+      event fact partitioned by event_type? EDA leans one fact per event grain.
+      leaderboard is a separate fact (conversion-label test set). Confirm.
+    raised: 2026-08-30
+    blocks_stage: silver
+    see: src/schemas/mappings/ipinyou.yml
+  - id: ipinyou-geo-dimension
+    question: >
+      Build region / city dimensions from ipinyou_reference (name_en / name_cn).
+      Confirm these are source-attributed geo dimensions, never mapped to German
+      regions or to dim_geography's German members.
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: ipinyou-price-currency
+    question: >
+      bidding_price / paying_price / floor_price are in CNY fen (or the dataset's
+      own micro-unit). Confirm the unit and whether prices are used as currency
+      or only as relative measures.
+    raised: 2026-08-30
+    blocks_stage: silver

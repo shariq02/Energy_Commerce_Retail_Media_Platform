@@ -1,0 +1,56 @@
+# Source-to-canonical mapping -- KDD Cup 2012 Track 2
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired KDD Cup 2012 Track 2 schema (see
+# contracts/kddcup2012.yml) to the canonical model. Design only.
+
+source: kddcup2012
+source_system: kddcup2012_track2
+profiling_evidence: src/schemas/profiling/kddcup2012.md
+contract: src/schemas/contracts/kddcup2012.yml
+
+targets:
+
+  - canonical_fact: fact_search_ad_click
+    status: open
+    open_question: kdd-no-timestamp
+    from_tables: [kddcup2012_click_prediction]
+    canonical_grain: [impression/click_event, ad, query, source-attributed user]
+    proposed_grain: [ad_id, query_id, keyword_id, title_id, description_id, user_id, url_hash, depth, position]
+    field_map:
+      - source: "ad_id"
+        canonical: "dim_advertisement / fact_search_ad_click.ad_id"
+      - source: "advertiser_id"
+        canonical: "dim_advertiser (source-attributed)"
+      - source: "query_id / keyword_id / title_id / description_id"
+        canonical: "search-context attributes"
+        transform: "value 0 -> NULL (unknown)"
+      - source: "user_id"
+        canonical: "source-attributed user id -- NOT dim_customer, never resolved across sources"
+        transform: "value 0 -> NULL"
+      - source: "depth / position"
+        canonical: "ranking attributes"
+      - source: "click / impression"
+        canonical: "fact_search_ad_click.click_count / impression_count (aggregated measures)"
+      - source: "(no timestamp)"
+        canonical: "date key = NULL / 'undated'"
+    provenance:
+      source_system: kddcup2012_track2
+      source_record_id: "row hash of the full context key"
+    recommendation: >
+      Because there is no timestamp and rows are pre-aggregated, use this source
+      for position/depth CTR curves and click-prediction features feeding the
+      cross-domain models -- do NOT load it as dated fact_search_ad_click rows.
+
+dropped_columns: []
+
+localisation:
+  required: false
+  reason: "no geography; not a German source"
+
+unresolved_before_silver:
+  - kdd-no-timestamp
+  - kdd-aggregated-grain
+  - kdd-user-id-scope

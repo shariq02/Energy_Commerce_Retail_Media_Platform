@@ -1,0 +1,75 @@
+# Source-to-canonical mapping -- iPinYou
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired iPinYou schema (see contracts/ipinyou.yml) to the
+# canonical model. Design only -- no transform code here.
+
+source: ipinyou
+source_system: ipinyou
+profiling_evidence: src/schemas/profiling/ipinyou.md
+contract: src/schemas/contracts/ipinyou.yml
+
+targets:
+
+  - canonical_fact: [fact_ad_impression, fact_ad_click, fact_conversion]
+    status: resolved_campaign_open
+    from_tables: [ipinyou_training]
+    split_by: "event_type (imp -> fact_ad_impression, clk -> fact_ad_click, conv -> fact_conversion)"
+    canonical_grain: [campaign, placement, event_timestamp]
+    field_map:
+      - source: "advertiser_id (+ creative_id)"
+        canonical: "dim_campaign surrogate -- see open_question ipinyou-no-campaign-id"
+      - source: "ad_slot_id / ad_slot_width / ad_slot_height / ad_slot_visibility / ad_slot_format / domain / url"
+        canonical: "placement attributes"
+      - source: "timestamp"
+        canonical: "dim_date + event_timestamp"
+        transform: "parse yyyyMMddHHmmssSSS -> timestamp"
+      - source: "ipinyou_id"
+        canonical: "source-attributed user id -- NOT dim_customer"
+      - source: "region / city"
+        canonical: "source-attributed geo dimensions (from ipinyou_reference); never German geography"
+      - source: "bidding_price / paying_price / ad_slot_floor_price"
+        canonical: "bid economics measures (unit unconfirmed -- see open_question)"
+      - source: "user_tags"
+        canonical: "';'-split user-segment attributes (season 1 NULL)"
+      - source: "anonymous_url_id"
+        canonical: dropped
+        transform: "100% null"
+    provenance:
+      source_system: ipinyou
+      source_record_id: "concat_ws('|', season, bid_id)"
+
+  - canonical_fact: fact_conversion       # leaderboard is a distinct labelled set
+    status: resolved
+    from_tables: [ipinyou_leaderboard]
+    note: >
+      Held-out test set with has_conversion / related_clicks_count labels and NO
+      event_type. Load as a separate fact sharing conformed dimensions -- NOT
+      unioned with training (0 key overlap).
+
+  - canonical_dimension: [dim_geography_ipinyou_region, dim_geography_ipinyou_city, dim_user_tag]
+    from_tables: [ipinyou_reference]
+    transform: "split by lookup_type into one dimension each, keyed on lookup_id; keep an 'unknown' member"
+    open_question: ipinyou-geo-dimension
+
+dropped_columns:
+  - { column: anonymous_url_id, reason: "100% null in both event tables" }
+  - { column: "log_type (leaderboard)", reason: "constant" }
+  - { column: name_cn, reason: "Chinese name kept for reference only; name_en is the canonical label" }
+
+localisation:
+  required: true
+  approach: honest_provenance
+  detail:
+    geography: "opaque Chinese region/city codes; resolved to name_en only; never mapped to German regions"
+    currency: "prices in the dataset's own unit -- see open_question ipinyou-price-currency"
+    language: "name_cn dropped from canonical; name_en used"
+  never: "iPinYou data is never presented as German RTB or merged into a German advertiser/customer identity"
+
+unresolved_before_silver:
+  - ipinyou-no-campaign-id
+  - ipinyou-event-fact-split
+  - ipinyou-geo-dimension
+  - ipinyou-price-currency

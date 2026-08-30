@@ -1,0 +1,56 @@
+# Source-to-canonical mapping -- Criteo Attribution
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired Criteo Attribution schema (see
+# contracts/criteo_attribution.yml) to the canonical model. Design only.
+
+source: criteo_attribution
+source_system: criteo_attribution
+profiling_evidence: src/schemas/profiling/criteo_attribution.md
+contract: src/schemas/contracts/criteo_attribution.yml
+
+targets:
+
+  - canonical_fact: fact_attribution
+    status: resolved_date_open
+    from_tables: [criteo_attribution_events]
+    canonical_grain: [campaign, impression/click chain, conversion, date]
+    proposed_silver_grain: [uid, timestamp, campaign]      # one row per touchpoint, as Bronze
+    field_map:
+      - source: "campaign"
+        canonical: "dim_campaign (source_system='criteo_attribution' discriminator)"
+      - source: "uid"
+        canonical: "source-attributed user id -- NOT dim_customer"
+      - source: "conversion_id"
+        canonical: "attribution-path key (links touchpoints); -1 -> NULL"
+      - source: "timestamp / conversion_timestamp / time_since_last_click"
+        canonical: "relative-seconds attributes; relative-day (0..30) derived; calendar date NULL"
+        transform: "keep integer; -1 -> NULL"
+      - source: "click / attribution / conversion"
+        canonical: "fact_attribution.click_flag / attributed_flag / conversion_flag"
+      - source: "click_pos / click_nb"
+        canonical: "click-sequence attributes; -1 -> NULL"
+      - source: "cost / cpo"
+        canonical: "fact_attribution.cost / cost_per_order (relative measures, not currency)"
+      - source: "cat1..cat9"
+        canonical: "anonymised context attributes, carried through as-is"
+    provenance:
+      source_system: criteo_attribution
+      source_record_id: "concat_ws('|', uid, timestamp, campaign)"
+    relationship_note: >
+      Sits alongside iPinYou-sourced fact_ad_impression / fact_ad_click /
+      fact_conversion as a distinct source, not a replacement (ADR-005).
+
+dropped_columns: []
+
+localisation:
+  required: false
+  reason: "no geography; not a German source"
+
+unresolved_before_silver:
+  - criteo-relative-time-date-key
+  - criteo-cost-cpo-units
+  - criteo-campaign-dimension
+  - criteo-fact-grain

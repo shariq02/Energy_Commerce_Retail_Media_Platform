@@ -1,0 +1,77 @@
+# Source-to-canonical mapping -- DWD
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired DWD schema (see contracts/dwd.yml) to the canonical
+# model. Design only -- no transform code here.
+
+source: dwd
+source_system: dwd
+profiling_evidence: src/schemas/profiling/dwd.md
+contract: src/schemas/contracts/dwd.yml
+
+targets:
+
+  - canonical_fact: fact_weather
+    status: resolved_shape_open       # target fact clear; long-vs-wide shape is an open question
+    from_tables: [dwd_air_temperature, dwd_cloudiness, dwd_moisture, dwd_precipitation,
+                  dwd_pressure, dwd_sun, dwd_wind]
+    canonical_grain: [weather_location, date, hour]
+    proposed_silver_grain: [weather_location, hour_ts, parameter, value, quality_flag]
+    field_map:
+      - source: "STATIONS_ID"
+        canonical: "dim_weather_location.station_id  (+ city as a station attribute)"
+        transform: "map STATIONS_ID -> weather_location; city column carries the German city name"
+      - source: "MESS_DATUM"
+        canonical: "dim_date.date_key + hour"
+        transform: "parse yyyyMMddHH as UTC hour timestamp"
+      - source: "<value columns> (TT_TU, RF_TU, V_N, ABSF_STD, ... F, D)"
+        canonical: "fact_weather.value  (long form: one row per parameter)"
+        transform: >
+          replace -999 / -999.0 / -99.9 / '' with NULL FIRST; then cast to double.
+          parameter name = the source column code (reconciled against dwd_parameter_unit).
+      - source: "QN_9 / QN_8 / QN_7 / QN_3"
+        canonical: "fact_weather.quality_flag"
+        transform: "carry the DWD quality level as-is (1 / 3 / 10)"
+      - source: "eor"
+        canonical: dropped
+        transform: "constant end-of-row marker -- no information"
+    provenance:
+      source_system: dwd
+      source_record_id: "concat_ws('|', <measurement>, STATIONS_ID, MESS_DATUM)"
+
+  - canonical_dimension: dim_weather_location
+    status: open
+    open_question: dwd-station-time-varying-location
+    from_tables: [dwd_station_geography, dwd_station_name_history]
+    note: >
+      Both are 1:N per station over time (relocations, renames). Options: SCD-2
+      weather-location dimension joined on the von/bis validity window, or a
+      latest-value collapse. Recommend SCD-2. Decision needed before Silver.
+
+  - reference_only: true
+    from_tables: [dwd_device_instrument, dwd_parameter_unit, dwd_missing_value_periods]
+    note: >
+      Small static lookups. dwd_parameter_unit -> parameter/unit reference for
+      fact_weather. dwd_missing_value_periods -> a data-quality reference keyed
+      by (station, parameter, from_ts, to_ts); NOT reconciled against observed
+      sentinels by row deletion. dwd_device_instrument -> instrument-history
+      reference, not required for any canonical fact. All three need footer/legend
+      rows filtered first.
+
+dropped_columns:
+  - column: eor
+    reason: "constant end-of-row marker in every measurement + missing_value_periods table"
+  - column: "Literaturhinweis (dwd_parameter_unit)"
+    reason: "constant / empty"
+
+localisation:
+  required: false
+  reason: "natively German (DWD, 8 German city stations)"
+
+unresolved_before_silver:
+  - dwd-station-time-varying-location
+  - dwd-measurement-fact-shape
+  - dwd-moisture-qn8-constant
+  - dwd-metadata-column-names

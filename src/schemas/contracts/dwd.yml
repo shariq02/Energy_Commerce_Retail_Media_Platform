@@ -1,0 +1,284 @@
+# Data contract -- DWD (weather, Germany)
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the DWD source -- 12 Bronze tables (7 hourly
+# measurement tables + 5 metadata tables). Every *_observed value and every
+# quality-rule bound is traceable to src/schemas/profiling/dwd.md. Authored;
+# src/schemas/contracts/generated/dwd_*.schema.json is generated per table by
+# src/schemas/_generate_jsonschema.py -- do not edit those by hand.
+
+source: dwd
+source_system: dwd
+domain: Weather
+description: >
+  Deutscher Wetterdienst open hourly climate observations for 8 curated German
+  city stations, plus station/device metadata and a reported-missing-periods
+  table. Static one-time acquisition, public open-data server, no auth.
+profiling_evidence: src/schemas/profiling/dwd.md
+bronze_physical_types: string
+
+acquisition:
+  method: scripted_api
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+conventions:
+  missing_sentinels: ["-999", "-999.0", "-99.9", ""]   # all mean missing in value columns
+  measurement_key: [STATIONS_ID, MESS_DATUM]
+  mess_datum_format: "yyyyMMddHH"                        # hourly grid
+  qn_note: >
+    DWD quality-level flag column (QN_9 / QN_8 / QN_7 / QN_3 depending on the
+    measurement). Observed values {1, 3, 10}; not correlated 1:1 with sentinel
+    presence.
+  station_set:
+    ids: ["1262", "1420", "1550", "2667", "2928", "400", "4271", "954"]
+    cities: [leipzig, garmisch_partenkirchen, rostock_warnemuende, cologne,
+             frankfurt_am_main, hamburg, berlin, munich]
+    mapping_note: "one station per city; station<->city is 1:1 in the acquired data"
+
+tables:
+
+  - name: dwd_air_temperature
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 102303
+    stations_observed: 8
+    hourly_coverage_pct_observed: [96.96, 100.0]
+    longest_gap_hours_observed: 220
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false, notes: "hour stamp yyyyMMddHH" }
+      - { name: QN_9,        type: string, required: true, nullable: false, notes: "quality level; observed {1,3}" }
+      - { name: TT_TU,       type: double, required: true, nullable: true, notes: "air temp degC; range -16.6..40.8; sentinel rate 0.0032" }
+      - { name: RF_TU,       type: double, required: true, nullable: true, notes: "rel humidity %; range 11..100; sentinel rate 0.0060" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false, notes: "added by Bronze load from source folder" }
+
+  - name: dwd_cloudiness
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 78568
+    stations_observed: 6
+    hourly_coverage_pct_observed: [97.92, 99.86]
+    longest_gap_hours_observed: 171
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false }
+      - { name: QN_8,        type: string, required: true, nullable: false }
+      - { name: V_N_I,       type: string, required: false, nullable: true, notes: "observation-method indicator (P/I)" }
+      - { name: V_N,         type: double, required: true, nullable: true, notes: "total cloud cover, eighths 0-8; -1 = not recognisable; 31 out-of-range rows" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false }
+
+  - name: dwd_moisture
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 99540
+    stations_observed: 8
+    hourly_coverage_pct_observed: [85.11, 99.98]
+    longest_gap_hours_observed: 264
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false }
+      - { name: QN_8,        type: string, required: true, nullable: false, constant_observed: "3", notes: "constant in acquired data -- see open_questions" }
+      - { name: ABSF_STD,    type: double, required: true, nullable: true, notes: "absolute humidity g/m3" }
+      - { name: VP_STD,      type: double, required: true, nullable: true, notes: "vapour pressure hPa" }
+      - { name: TF_STD,      type: double, required: true, nullable: true, notes: "wet-bulb temp degC; 84 out-of-range" }
+      - { name: P_STD,       type: double, required: true, nullable: true, notes: "station pressure hPa" }
+      - { name: TT_STD,      type: double, required: true, nullable: true, notes: "air temp degC" }
+      - { name: RF_STD,      type: double, required: true, nullable: true, notes: "rel humidity %" }
+      - { name: TD_STD,      type: double, required: true, nullable: true, notes: "dew point degC" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false }
+
+  - name: dwd_precipitation
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 92400
+    stations_observed: 7
+    hourly_coverage_pct_observed: [100.0, 100.0]
+    longest_gap_hours_observed: 0
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false }
+      - { name: QN_8,        type: string, required: true, nullable: false }
+      - { name: R1,          type: double, required: true, nullable: true, notes: "precip mm; range 0..42.2" }
+      - { name: RS_IND,      type: double, required: true, nullable: true, notes: "precip indicator 0/1" }
+      - { name: WRTR,        type: double, required: true, nullable: true, notes: "precip form code 0-9; sentinel rate 0.145 (often uncoded, expected)" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false }
+
+  - name: dwd_pressure
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 89111
+    stations_observed: 7
+    hourly_coverage_pct_observed: [97.03, 100.0]
+    longest_gap_hours_observed: 220
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false }
+      - { name: QN_8,        type: string, required: true, nullable: false }
+      - { name: P,           type: double, required: true, nullable: true, notes: "sea-level pressure hPa; range 974.4..1040.6" }
+      - { name: P0,          type: double, required: true, nullable: true, notes: "station-level pressure hPa" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false }
+
+  - name: dwd_sun
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 48727
+    stations_observed: 6
+    hourly_coverage_pct_observed: [74.23, 100.0]
+    longest_gap_hours_observed: 302
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false }
+      - { name: QN_7,        type: string, required: true, nullable: false, notes: "observed {1,3,10}" }
+      - { name: SD_SO,       type: double, required: true, nullable: true, notes: "sunshine minutes/hour 0-60" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false }
+    notes: "stations 2928 / 400 have no sun rows; station 954 has 18 -- coverage gap, not a defect"
+
+  - name: dwd_wind
+    grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
+    row_count_observed: 88215
+    stations_observed: 7
+    hourly_coverage_pct_observed: [96.83, 100.0]
+    longest_gap_hours_observed: 220
+    columns:
+      - { name: STATIONS_ID, type: string, required: true, nullable: false }
+      - { name: MESS_DATUM,  type: string, required: true, nullable: false }
+      - { name: QN_3,        type: string, required: true, nullable: false, notes: "observed {1,3,10}" }
+      - { name: F,           type: double, required: true, nullable: true, notes: "wind speed m/s; range 0.1..23.6" }
+      - { name: D,           type: double, required: true, nullable: true, notes: "wind direction degrees 0-360" }
+      - { name: eor,         type: string, required: true, nullable: false, constant_observed: "eor" }
+      - { name: city,        type: string, required: true, nullable: false }
+
+  # ---- Metadata tables (column lists are best-effort from the EDA profile) --
+
+  - name: dwd_station_geography
+    kind: metadata
+    grain: { key: [Stations_ID, von_datum, bis_datum], unique: false, notes: "time-varying -- 4-15 location rows per station (relocations)" }
+    row_count_observed: 64
+    full_row_duplicates_observed: 0
+    columns:
+      - { name: Stations_ID,         type: string, required: true, nullable: false }
+      - { name: von_datum,           type: string, required: true, nullable: false }
+      - { name: bis_datum,           type: string, required: false, nullable: true, notes: "8 open-ended (blank)" }
+      - { name: station_elevation_m, type: double, required: true, nullable: true }
+      - { name: latitude,            type: double, required: true, nullable: true }
+      - { name: longitude,           type: double, required: true, nullable: true }
+      - { name: station_name,        type: string, required: true, nullable: true }
+
+  - name: dwd_station_name_history
+    kind: metadata
+    grain: { key: [Stations_ID, von_datum, bis_datum], unique: false }
+    row_count_observed: 36
+    full_row_duplicates_observed: 0
+    columns:
+      - { name: Stations_ID,  type: string, required: true, nullable: false, notes: "contains 3 non-id footer rows -- must be filtered" }
+      - { name: von_datum,    type: string, required: true, nullable: true }
+      - { name: bis_datum,    type: string, required: false, nullable: true, notes: "18 open-ended" }
+      - { name: station_name, type: string, required: true, nullable: true }
+
+  - name: dwd_device_instrument
+    kind: metadata
+    grain: { key: [Stations_ID, device_category, von_datum, bis_datum], unique: false }
+    row_count_observed: 593
+    full_row_duplicates_observed: 120
+    columns:
+      - { name: Stations_ID,         type: string, required: true, nullable: false, notes: "contains non-id footer rows -- must be filtered" }
+      - { name: device_category,     type: string, required: true, nullable: true }
+      - { name: von_datum,           type: string, required: true, nullable: true }
+      - { name: bis_datum,           type: string, required: false, nullable: true, notes: "90 open-ended" }
+      - { name: station_elevation_m, type: double, required: false, nullable: true }
+      - { name: device_type_name,    type: string, required: false, nullable: true }
+
+  - name: dwd_parameter_unit
+    kind: metadata
+    grain: { key: [Stations_ID, parameter, von_datum, bis_datum], unique: false }
+    row_count_observed: 519
+    full_row_duplicates_observed: 95
+    constant_columns_observed: [Literaturhinweis]
+    columns:
+      - { name: Stations_ID,     type: string, required: true, nullable: false, notes: "contains non-id footer/legend rows -- must be filtered" }
+      - { name: parameter,       type: string, required: true, nullable: true, notes: "code reconciles with measurement value-column names; 'None' declared but unused" }
+      - { name: von_datum,       type: string, required: true, nullable: true }
+      - { name: bis_datum,       type: string, required: false, nullable: true, notes: "98 open-ended" }
+      - { name: Literaturhinweis, type: string, required: false, nullable: true, constant_observed: true }
+
+  - name: dwd_missing_value_periods
+    kind: metadata
+    grain: { key: [Stations_ID, Parameter, Von_Datum, Bis_Datum], unique: false }
+    row_count_observed: 457
+    columns:
+      - { name: Stations_ID,      type: string, required: true, nullable: false }
+      - { name: Stations_Name,    type: string, required: true, nullable: true }
+      - { name: Parameter,        type: string, required: true, nullable: false }
+      - { name: Von_Datum,        type: string, required: true, nullable: false, notes: "format 'dd.mm.yyyy-HH:MM' -- NOT ISO" }
+      - { name: Bis_Datum,        type: string, required: true, nullable: false, notes: "format 'dd.mm.yyyy-HH:MM' -- NOT ISO" }
+      - { name: Anzahl_Fehlwerte, type: integer, required: true, nullable: true }
+      - { name: Beschreibung,     type: string, required: false, nullable: true }
+      - { name: eor,              type: string, required: true, nullable: false, constant_observed: "eor" }
+
+quality_rules:
+  - id: measurement_key_unique
+    expr: "(STATIONS_ID, MESS_DATUM) unique in every measurement table"
+    severity: block
+    evidence: "profiling: 0 conflicting duplicate groups in all 7"
+  - id: sentinels_to_null
+    expr: "-999 / -999.0 / -99.9 / '' in value columns are missing markers, never real values"
+    severity: block
+  - id: hourly_grid_not_dense
+    expr: "per-station hourly coverage 74-100% -- gaps are real"
+    severity: warn
+  - id: station_set
+    expr: "STATIONS_ID in the 8 curated ids"
+    severity: block
+  - id: metadata_footer_rows
+    expr: "id columns in name_history / device_instrument / parameter_unit contain non-id footer/legend rows"
+    severity: block
+    evidence: 'filter to the 8 numeric station ids only'
+  - id: missing_periods_reconciliation
+    expr: >
+      reported missing periods vs observed -999/blank disagree (1 unreported, 14
+      reported-but-not-observed) -- flag, do not delete
+    severity: warn
+
+localisation:
+  required: false
+  note: "natively German. No localisation mapping needed."
+
+open_questions:
+  - id: dwd-moisture-qn8-constant
+    question: >
+      dwd_moisture QN_8 is constant (=3) in the acquired data. Confirm this is a
+      genuine source characteristic for the covered window, not a load defect.
+    raised: 2026-08-30
+    blocks_stage: silver
+  - id: dwd-station-time-varying-location
+    question: >
+      station_geography and station_name_history are 1:N per station over time.
+      dim_weather_location needs a decision: (a) SCD-2 dimension joined on the
+      von/bis window; (b) collapse to the latest location per station. Recommend
+      (a). Needs a canonical-model / ADR decision.
+    raised: 2026-08-30
+    blocks_stage: silver
+    see: src/schemas/mappings/dwd.yml
+  - id: dwd-measurement-fact-shape
+    question: >
+      7 measurement tables have disjoint value columns and only partly
+      overlapping (station, hour) coverage. fact_weather grain is
+      (weather_location, date, hour). Model as (a) one long fact_weather
+      (location, hour, parameter, value, quality_flag) unioning all 7, or (b) 7
+      wide per-measurement facts aligned only at Gold. EDA verdict leans (a) for
+      Silver with a Gold wide table. Confirm before Silver.
+    raised: 2026-08-30
+    blocks_stage: silver
+    see: src/schemas/mappings/dwd.yml
+  - id: dwd-metadata-column-names
+    question: >
+      Metadata-table column lists in this contract are best-effort from the EDA
+      profile (which reports row/dup/validity stats, not full headers). Confirm
+      exact Bronze column names for the 5 metadata tables before Silver.
+    raised: 2026-08-30
+    blocks_stage: silver

@@ -1,0 +1,66 @@
+# Source-to-canonical mapping -- Search Visibility
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired Search Visibility schema (see
+# contracts/search_visibility.yml) to the canonical model. Design only.
+
+source: search_visibility
+source_system: search_visibility_ramp_dryad
+profiling_evidence: src/schemas/profiling/search_visibility.md
+contract: src/schemas/contracts/search_visibility.yml
+
+targets:
+
+  - canonical_fact: fact_search_visibility
+    status: resolved_date_open
+    from_tables: [search_visibility_events]
+    canonical_grain: [page_url, country, device, date]
+    grain_note: "date = monthly period (see open_question sv-date-monthly-period)"
+    field_map:
+      - source: "url"
+        canonical: "page_url (grain)"
+      - source: "repository_id"
+        canonical: "dim property attribute; FK to the repository dimension"
+      - source: "country"
+        canonical: "dim_geography.country_iso3 (search-console geography, source-attributed)"
+      - source: "device"
+        canonical: "device attribute (DESKTOP / MOBILE / TABLET)"
+      - source: "date"
+        canonical: "dim_date monthly period"
+        transform: "parse %m/%d/%Y or %Y-%m-%d -> YYYY-MM"
+      - source: "impressions / clicks / clickThrough / position"
+        canonical: "fact_search_visibility measures"
+        transform: "aggregate conflicting key groups per the resolution rule"
+      - source: "citableContent"
+        canonical: "content-type attribute (Yes / No)"
+      - source: "index"
+        canonical: "UNRESOLVED -- see open_question sv-index-column"
+    provenance:
+      source_system: search_visibility_ramp_dryad
+      source_record_id: "concat_ws('|', repository_id, url, date, country, device)"
+
+  - canonical_dimension: dim_repository        # a source-specific reference dimension
+    from_tables: [search_visibility_repository]
+    field_map:
+      - { source: repository_id, canonical: "dim key" }
+      - { source: country,       canonical: "repository home country" }
+      - { source: ir_platform,   canonical: "repository platform attribute" }
+      - { source: name,          canonical: "repository display name" }
+    note: "36 unreferenced rows are acceptable; keep an 'unknown' member for safety"
+
+dropped_columns: []
+
+localisation:
+  required: true
+  approach: honest_provenance
+  detail:
+    geography: "country is search-console traffic geography, not a market; carried as source-attributed dim_geography"
+    never: "not presented as German ecommerce / German market visibility even where country='deu'"
+
+unresolved_before_silver:
+  - sv-date-monthly-period
+  - sv-conflicting-metric-resolution
+  - sv-index-column
+  - sv-canonical-role

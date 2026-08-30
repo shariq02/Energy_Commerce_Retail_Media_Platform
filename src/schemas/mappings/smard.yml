@@ -1,0 +1,74 @@
+# Source-to-canonical mapping -- SMARD
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired SMARD schema (see contracts/smard.yml) to the
+# canonical model. Design only -- no transform code here.
+
+source: smard
+source_system: smard
+profiling_evidence: src/schemas/profiling/smard.md
+contract: src/schemas/contracts/smard.yml
+
+# SMARD is long-format: the canonical target depends on the `metric` value.
+targets:
+
+  - canonical_fact: fact_market_price
+    status: resolved
+    applies_when: "metric = 'day_ahead_prices'"
+    canonical_grain: [market_zone, date]
+    grain_note: >
+      Source resolution is 'day', so the hour/interval part of the canonical
+      grain is not populated from this source.
+    field_map:
+      - source: "metric + filter_id + region + resolution + timestamp_utc"
+        canonical: source_record_id
+        transform: "concat_ws('|', metric, filter_id, region, resolution, timestamp_utc)"
+      - source: region                     # 'DE-LU'
+        canonical: "dim_market.market_zone"
+        transform: "'DE-LU' -> market zone 'DE-LU' (German-Luxembourg bidding zone)"
+      - source: timestamp_utc
+        canonical: "dim_date.date_key"
+        transform: "cast to timestamp (UTC), truncate to date"
+      - source: value
+        canonical: "fact_market_price.price"
+        transform: "cast to double"
+        unit: EUR/MWh
+    provenance:
+      source_system: smard
+      source_record_id: "the concat_ws key above"
+
+  - canonical_fact: UNRESOLVED
+    status: open
+    open_question: smard-generation-canonical-fact   # see contracts/smard.yml
+    applies_when: >
+      metric like 'generation_%'
+      or metric in ('residual_load', 'total_power_consumption', 'pumped_storage_consumption')
+    metrics_affected: 15
+    canonical_grain_proposed: [market_zone, date, metric]
+    unit: MWh/day
+    recommendation: >
+      Add fact_market_timeseries(metric, market_zone, date, value, unit) to the
+      canonical model and map all 15 metrics there in long format, mirroring the
+      source shape. Until that decision is made these metrics have no canonical
+      home and must not be silently folded into fact_market_price.
+    interim_use: >
+      They may still be consumed as feature inputs by the cross-domain
+      fact_market_impact / fact_energy_demand intermediate models without a
+      canonical fact of their own.
+
+# Columns dropped on the way to canonical (recorded so the decision is explicit)
+dropped_columns:
+  - column: resolution
+    reason: "constant 'day'; not part of any canonical grain at this resolution"
+  - column: filter_id
+    reason: "SMARD-internal series id; retained inside source_record_id, not a canonical field"
+
+localisation:
+  required: false
+  reason: "natively German (DE-LU zone, Bundesnetzagentur)"
+
+unresolved_before_silver:
+  - smard-resolution-daily-only
+  - smard-generation-canonical-fact
