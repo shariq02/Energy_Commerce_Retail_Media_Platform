@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD STATION METADATA
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the four DWD metadata Bronze tables
@@ -69,6 +69,7 @@ def measurement_value_cols(cols):
 
 # DBTITLE 1,Helpers
 
+
 def find_key(cols, *cands):
     low = {c.lower(): c for c in cols}
     for x in cands:
@@ -112,6 +113,7 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filenam
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())

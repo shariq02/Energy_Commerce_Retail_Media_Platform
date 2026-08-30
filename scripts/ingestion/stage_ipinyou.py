@@ -1,20 +1,19 @@
-# ====================================================================
-# iPinYou Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# iPinYou staging
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Consolidate iPinYou raw files in data/raw/ipinyou/ into the
-# 3 logical staging datasets defined in PIPELINE_DESIGN.md Section 1a
-# (training_data, leaderboard_data, reference_data), written to
-# data/staging/ipinyou/. Local file operations only -- does not upload
-# anywhere. data/raw/ is read-only throughout.
+#
+# Purpose: consolidate iPinYou raw files in data/raw/ipinyou/ into the
+# 3 logical staging datasets (training_data, leaderboard_data,
+# reference_data), written to data/staging/ipinyou/. Local file
+# operations only -- does not upload anywhere. data/raw/ is read-only
+# throughout.
 #
 # Season 1 (training1st/testing1st) log rows carry fewer fields than
 # Season 2/3 -- they do not carry AdvertiserID or UserTags. This is
-# confirmed both by the README ("the second and third season data
-# contains the user tags column while the first season data does not")
-# and by direct column-count inspection (imp/clk/conv: 22 vs 24,
+# confirmed both by the source's own documentation ("the second and
+# third season data contains the user tags column while the first season
+# data does not") and by direct column-count inspection (imp/clk/conv: 22 vs 24,
 # leaderboard: 24 vs 26 -- a 2-column gap). Rows are reconciled onto one
 # superset schema per logical dataset; Season 1 rows carry NULL in the
 # columns that season never populated.
@@ -23,10 +22,8 @@
 # staged: they are ~2/3 of the raw volume and redundant for this
 # platform's analysis -- the impression log already carries every won
 # auction with its paying price, and no use case needs raw RTB
-# bid-landscape data. See PIPELINE_DESIGN.md Section 1a and CHANGELOG
-# Entry 013. training_data therefore consists of impression / click /
-# conversion events only.
-# ====================================================================
+# bid-landscape data. training_data therefore consists of impression /
+# click / conversion events only.
 
 import sys
 from pathlib import Path
@@ -50,7 +47,7 @@ REFERENCE_DIR = STAGING_IPINYOU_DIR / "reference"
 # Source logs are plain TSV with no header row, bzip2-compressed. Read
 # in chunks -- the largest single source file (training2nd impression
 # logs) decompresses far past what fits in memory on this machine at once.
-# Capped at 50,000 rows/chunk under the Phase 2b 1 GB memory-safety design
+# Capped under the 1 GB memory-safety design
 # (scripts/ingestion/_memory_guard.py).
 CHUNK_SIZE = 300_000
 
@@ -317,7 +314,7 @@ def main() -> None:
     reference_results = stage_reference_data()
     monitor.check()
 
-    logger.info("iPinYou Phase 2b staging complete.")
+    logger.info("iPinYou staging complete.")
     logger.info(
         f"  training_data: {training_rows} rows, {len(training_columns)} columns, "
         f"{training_files} source files -> {training_path}"

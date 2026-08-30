@@ -15,7 +15,7 @@
 # MAGIC
 # MAGIC This notebook creates structure only:
 # MAGIC - the 5 project schemas (`bronze`, `silver`, `gold`, `quality`, `eda`)
-# MAGIC - the 11 frozen Bronze upload-unit Volumes (Phase 2b staging -> Volume -> Bronze architecture)
+# MAGIC - the 11 frozen Bronze upload-unit Volumes (staging -> Volume -> Bronze)
 # MAGIC - the 2 quality/control Delta tables (`pipeline_watermarks`, `quality_audit_log`)
 # MAGIC
 # MAGIC It does **not** create any Bronze business/data table. Bronze tables are
@@ -23,8 +23,8 @@
 # MAGIC these Volumes.
 # MAGIC
 # MAGIC Three counts are never the same number and none derives from another:
-# MAGIC Phase 2b staging dataset count, Volume upload-unit count (11, fixed
-# MAGIC below), and Bronze table count.
+# MAGIC the staging dataset count, the Volume upload-unit count (11, fixed
+# MAGIC below), and the Bronze table count.
 # MAGIC
 # MAGIC This notebook is safe to run repeatedly -- every statement uses
 # MAGIC `IF NOT EXISTS`. It never drops a schema/volume/table and never deletes
@@ -56,7 +56,7 @@ CATALOG = "energy_commerce_retail_media"
 
 SCHEMAS = ["bronze", "silver", "gold", "quality", "eda"]
 
-# 11 Volume upload units, fixed by the frozen Phase 2b -> Volume -> Bronze
+# 11 Volume upload units, fixed by the frozen staging -> Volume -> Bronze
 # architecture. Grouped here by source for readability only -- the schema
 # each Volume lives under is `bronze` in every case.
 VOLUME_UNITS = [

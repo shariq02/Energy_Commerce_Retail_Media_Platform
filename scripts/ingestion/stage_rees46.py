@@ -1,32 +1,27 @@
-# ====================================================================
-# REES46 Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# REES46 staging
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Consolidate the REES46 raw CSVs in data/raw/rees46/ into the
-# single logical staging dataset defined in PIPELINE_DESIGN.md Section
-# 1a (events), written to data/staging/rees46/events/. Local file
-# operations only -- does not upload anywhere. data/raw/ is read-only
-# throughout.
+#
+# Purpose: consolidate the REES46 raw CSVs in data/raw/rees46/ into the
+# single logical staging dataset (events), written to
+# data/staging/rees46/events/. Local file operations only -- does not
+# upload anywhere. data/raw/ is read-only throughout.
 #
 # 2019-Oct.csv (42,448,764 rows) and 2019-Nov.csv (67,501,979 rows)
-# share an identical 9-column header -- confirmed via
-# logs/inspections/rees46_phase2b_inspection.txt -- and are monthly
+# share an identical 9-column header, and are monthly
 # partitions of one events dataset; view/cart/purchase event types
 # remain together, not split into separate datasets. The existing
 # in-row event_time field already carries month provenance, so no
 # synthetic column is added.
 #
 # At ~14 GB combined, this requires lossless physical chunking for
-# upload practicality (PIPELINE_DESIGN.md Section 1b); chunking never
-# creates a second logical dataset -- all chunks stay one Volume
-# upload unit.
+# upload practicality; chunking never creates a second logical dataset
+# -- all chunks stay one Volume upload unit.
 #
 # Memory-safety design: each source file is read in 50,000-row chunks
 # and handed straight to a ChunkedCSVWriter, which writes and closes
 # each physical chunk immediately; no frames list + pd.concat().
-# ====================================================================
 
 import sys
 from pathlib import Path
@@ -93,7 +88,7 @@ def main() -> None:
     total_rows, out_dir, files_read, chunk_count = stage_events(monitor)
     monitor.check()
 
-    logger.info("REES46 Phase 2b staging complete.")
+    logger.info("REES46 staging complete.")
     logger.info(
         f"  events: {total_rows} rows, {len(EVENT_COLUMNS)} columns, "
         f"{files_read} source files, {chunk_count} chunks -> {out_dir}"

@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- IPINYOU TRAINING AND LEADERBOARD
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile ipinyou_training and ipinyou_leaderboard (RTB
@@ -63,6 +63,7 @@ ET_ALIASES = {
 
 # DBTITLE 1,Helpers
 
+
 def _et_stage_expr(stage):
     return F.lower(F.trim(F.col("event_type").cast("string"))).isin(
         sorted(ET_ALIASES[stage])
@@ -97,6 +98,7 @@ def histplot(values, title, xlabel, bins=50, log=False, filename=None):
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())

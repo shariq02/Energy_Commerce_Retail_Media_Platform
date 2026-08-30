@@ -1,12 +1,10 @@
-# ====================================================================
-# SMARD Energy Market Data Download
-# Energy Commerce & Retail Media Analytics Platform
+# SMARD energy market data download
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Download German energy market data (day-ahead prices,
+#
+# Purpose: download German energy market data (day-ahead prices,
 # generation, consumption) from the SMARD public API.
-# ====================================================================
 
 import sys
 import time

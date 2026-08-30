@@ -55,7 +55,7 @@ CSV_OPTIONS = {
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
     "multiLine": "false",  # keep CSV splittable so large files read in parallel
 }  # used only when READ_FORMAT == "csv"
-FILE_EXT_PATTERN = r"csv"  # zip archives are extracted in Phase 2b
+FILE_EXT_PATTERN = r"csv"  # zip archives are extracted during staging
 
 COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {}
 

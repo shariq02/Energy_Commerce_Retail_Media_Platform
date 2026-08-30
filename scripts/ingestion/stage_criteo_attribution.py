@@ -1,12 +1,11 @@
-# ====================================================================
-# Criteo Attribution Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# Criteo Attribution staging
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Stage the single Criteo Attribution raw TSV in
-# data/raw/criteo_attribution/ into the logical staging dataset defined
-# in PIPELINE_DESIGN.md Section 1a (attribution_events), written to
+#
+# Purpose: stage the single Criteo Attribution raw TSV in
+# data/raw/criteo_attribution/ into the logical staging dataset
+# (attribution_events), written to
 # data/staging/criteo_attribution/attribution_events/. Local file
 # operations only -- does not upload anywhere. data/raw/ is read-only
 # throughout.
@@ -14,14 +13,13 @@
 # Already one self-contained TSV (16,468,028 rows, 22 columns) -- no
 # splitting, no consolidation, all columns passed through unchanged.
 # At ~2.47 GB it requires lossless physical chunking for upload
-# practicality (PIPELINE_DESIGN.md Section 1b); chunking never creates
-# a second logical dataset -- all chunks stay one Volume upload unit.
+# practicality; chunking never creates a second logical dataset -- all
+# chunks stay one Volume upload unit.
 #
 # Memory-safety design: read in 50,000-row chunks directly from the
 # source TSV and handed straight to a ChunkedCSVWriter, which writes
 # and closes each physical chunk immediately; no frames list +
 # pd.concat().
-# ====================================================================
 
 import sys
 from pathlib import Path
@@ -82,7 +80,7 @@ def main() -> None:
     )
     monitor.check()
 
-    logger.info("Criteo Attribution Phase 2b staging complete.")
+    logger.info("Criteo Attribution staging complete.")
     logger.info(
         f"  attribution_events: {total_rows} rows, {len(columns)} columns, "
         f"{files_read} source files, {chunk_count} chunks -> {out_dir}"

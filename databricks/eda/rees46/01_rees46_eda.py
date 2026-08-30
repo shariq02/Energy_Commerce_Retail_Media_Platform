@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- REES46 ECOMMERCE EVENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile rees46_events (~110M view / cart / purchase
@@ -43,6 +43,7 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.rees46_events"
 # COMMAND ----------
 
 # DBTITLE 1,Helpers
+
 
 def barplot(
     pairs,
@@ -81,6 +82,7 @@ def histplot(values, title, xlabel, bins=60, log=False, filename=None):
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())

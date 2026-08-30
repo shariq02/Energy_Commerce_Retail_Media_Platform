@@ -1,13 +1,13 @@
-# ====================================================================
-# Shared Phase 2b memory guard
-# Energy Commerce & Retail Media Analytics Platform
-# ====================================================================
+# Shared memory guard
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
 # Purpose: lightweight peak-RSS tracking + a hard safety-threshold check
-# for Phase 2b staging scripts. Call check() after writing each chunk;
+# for the staging scripts. Call check() after writing each chunk;
 # it samples current RSS, updates the observed peak, and raises if RSS
 # has crossed the safety threshold -- fail clearly rather than let a
 # script silently balloon past the 1 GB hard limit.
-# ====================================================================
 
 import os
 

@@ -33,7 +33,7 @@ BRONZE_SCHEMA = "bronze"
 SOURCE_PREFIX = "criteo"
 
 # (staging dataset name, source Volume, fully-qualified Bronze table name)
-# Phase 2b staged the chunks as "criteo_attribution_chunk_NNNNN.tsv"
+# Staging wrote the chunks as "criteo_attribution_chunk_NNNNN.tsv"
 # (ChunkedCSVWriter source="criteo", dataset="attribution").
 DATASETS: list[tuple[str, str, str]] = [
     (

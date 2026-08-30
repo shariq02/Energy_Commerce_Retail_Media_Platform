@@ -1,12 +1,10 @@
-# ====================================================================
-# DWD Weather Data Download
-# Energy Commerce & Retail Media Analytics Platform
+# DWD weather data download
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Download German weather station data (temperature,
+#
+# Purpose: download German weather station data (temperature,
 # precipitation, wind, and related categories) from the DWD open-data server.
-# ====================================================================
 
 import io
 import re
@@ -26,8 +24,8 @@ logger = get_logger(__name__)
 BASE_URL = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly"
 REQUEST_TIMEOUT = 60
 
-# Category -> DWD parameter abbreviation, matching docs/DATA_SOURCES_20260813_v3.md
-# Section 3 fields (temperature, precipitation, humidity, pressure, wind, sunshine,
+# Category -> DWD parameter abbreviation for the curated fields
+# (temperature, precipitation, humidity, pressure, wind, sunshine,
 # cloud conditions). Solar radiation is DWD's "solar" category, which uses a
 # different directory layout (no recent/historical split, "_row" suffix instead
 # of "_akt") and is out of scope for this initial script.
@@ -41,8 +39,8 @@ CATEGORIES = {
     "cloudiness": "N",
 }
 
-# Curated 8-station list, per docs/PROJECT_PLAN_20260813_v3.md Section 15.
-# Matched against DWD's station name field (substring, case-insensitive,
+# Curated 8-station list. Matched against DWD's station name field
+# (substring, case-insensitive,
 # diacritics stripped via _normalize() since DWD's own file uses German
 # umlauts that this codebase keeps out of source text).
 STATIONS = {

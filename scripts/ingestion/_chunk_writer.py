@@ -1,8 +1,9 @@
-# ====================================================================
-# Shared Phase 2b physical chunk writer
-# Energy Commerce & Retail Media Analytics Platform
-# ====================================================================
-# Purpose: write one logical Phase 2b dataset out as a sequence of
+# Shared physical chunk writer
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: write one logical staging dataset out as a sequence of
 # physical chunk files, each capped at MAX_CHUNK_ROWS rows and
 # MAX_CHUNK_BYTES bytes. A chunk is purely a physical-file/upload
 # concern -- all chunks written by one ChunkedCSVWriter instance remain
@@ -17,7 +18,6 @@
 # never a throwaway second serialisation just to measure size. The full
 # dataset is never held in RAM: only the one incoming batch plus its
 # single encoded copy.
-# ====================================================================
 
 from pathlib import Path
 

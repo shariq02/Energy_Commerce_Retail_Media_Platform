@@ -1,14 +1,11 @@
-# ====================================================================
-# Configuration Settings for Energy Commerce & Retail Media Analytics
-# Platform
+# Configuration
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# FILE: config.py (Project Root)
-# Purpose: Centralize all configuration settings
-# ====================================================================
+#
+# Purpose: centralize all configuration settings.
 """
-Configuration settings for the Energy Commerce & Retail Media Analytics
+Configuration settings for the Energy Commerce and Retail Media Analytics
 Platform.
 ALL SENSITIVE DATA IN .env FILE - NEVER COMMIT .env TO GITHUB
 
@@ -172,7 +169,7 @@ KAFKA_CONFIG = {
 }
 
 # Topics carry replayed historical data (IoT, REES46, iPinYou) plus CDC
-# change events - see PIPELINE_DESIGN Section 2-3
+# change events
 KAFKA_TOPICS = {
     "market": os.getenv("TOPIC_MARKET", "market.events"),
     "weather": os.getenv("TOPIC_WEATHER", "weather.events"),
@@ -205,9 +202,8 @@ GCS_CONFIG = {
 }
 
 # BigQuery
-# See docs/TECHNOLOGY_BASELINE for the Sandbox vs bounded-cost operating
-# mode decision (ADR-011 consequences) - CDC upserts and streaming loads
-# require a billing-enabled configuration, not the free Sandbox.
+# Sandbox vs bounded-cost operating mode - CDC upserts and streaming
+# loads require a billing-enabled configuration, not the free Sandbox.
 BIGQUERY_CONFIG = {
     "project_id": os.getenv("BIGQUERY_PROJECT_ID"),
     "datasets": {
@@ -227,8 +223,7 @@ DEBEZIUM_CONFIG = {
     "connector_name": os.getenv("DEBEZIUM_CONNECTOR_NAME", "ecrmap-postgres-connector"),
     "slot_name": os.getenv("DEBEZIUM_SLOT_NAME", "ecrmap_slot"),
     "topic_prefix": os.getenv("DEBEZIUM_TOPIC_PREFIX", "cdc"),
-    # Entities captured from the operational PostgreSQL system -
-    # DATA_SOURCES Section 9
+    # Entities captured from the operational PostgreSQL system
     "tables": [
         "customers",
         "customer_contracts",
@@ -251,7 +246,7 @@ DATABRICKS_CONFIG = {
     "token": os.getenv("DATABRICKS_TOKEN"),
     "token_dbt": os.getenv("DATABRICKS_TOKEN_DBT"),
     "catalog": "ecrmap",
-    # Layer names per ADR-011, reverted to Bronze / Silver / Gold per ADR-016
+    # Layer names: Bronze / Silver / Gold
     "schemas": {
         "eda": "eda",
         "bronze": "bronze",
@@ -284,14 +279,14 @@ DBT_CONFIG = {
     "profiles_dir": os.getenv("DBT_PROFILES_DIR"),
     "project_dir": str(DBT_DIR),
     # dbt targets BigQuery (dbt-bigquery adapter), not Databricks -
-    # see ADR-011: BigQuery is the analytical platform, dbt owns the
-    # analytical modelling on top of it
+    # BigQuery is the analytical platform, dbt owns the analytical
+    # modelling on top of it
     "target": ENVIRONMENT,
 }
 
 # ====================================================================
 # FASTAPI CONFIGURATION
-# Scoped narrowly to the AI agent's service layer - see ADR-007
+# Scoped narrowly to the AI agent's service layer
 # ====================================================================
 
 FASTAPI_CONFIG = {
@@ -312,9 +307,8 @@ AI_CONFIG = {
     "chroma_db_path": str(CHROMA_DB_PATH),
 }
 
-# Controlled tool-calling functions the LLM may use - TECHNOLOGY_BASELINE
-# Section 20, AI_DESIGN Section 3. The LLM never receives unrestricted
-# database access.
+# Controlled tool-calling functions the LLM may use. The LLM never
+# receives unrestricted database access.
 AI_TOOLS = [
     "get_metric",
     "compare_periods",
@@ -327,7 +321,7 @@ AI_TOOLS = [
 # ====================================================================
 # DATA GENERATOR CONFIGURATION
 # Replay of historical public data (IoT, REES46, iPinYou) as simulated
-# real-time events - PIPELINE_DESIGN Section 2
+# real-time events
 # ====================================================================
 
 GENERATOR_CONFIG = {
@@ -340,8 +334,7 @@ GENERATOR_CONFIG = {
 
 # ====================================================================
 # BRONZE LAYER CONFIGURATION
-# Preserves what arrived, unmodified, source-attributed - ARCHITECTURE
-# Section 7, ADR-011, ADR-016
+# Preserves what arrived, unmodified, source-attributed
 # ====================================================================
 
 BRONZE_CONFIG = {
@@ -363,7 +356,7 @@ BRONZE_CONFIG = {
 
 # ====================================================================
 # SILVER LAYER CONFIGURATION
-# Cleaned, validated, normalized per source's data contract - ADR-011, ADR-016
+# Cleaned, validated, normalized per source's data contract
 # ====================================================================
 
 SILVER_CONFIG = {
@@ -375,7 +368,7 @@ SILVER_CONFIG = {
 # ====================================================================
 # GOLD LAYER CONFIGURATION
 # Integrated across domains, canonically mapped, includes Germany
-# localisation mapping (UC-10) - ADR-011, ADR-016
+# localisation mapping
 # ====================================================================
 
 GOLD_CONFIG = {
@@ -383,7 +376,7 @@ GOLD_CONFIG = {
     "retention_days": int(os.getenv("GOLD_RETENTION_DAYS", "90")),
     "aggregation_batch_size": int(os.getenv("GOLD_AGGREGATION_BATCH_SIZE", "50000")),
     # Every canonical entity carries source_system + source_record_id +
-    # canonical_id - DATA_MODEL Section 8
+    # canonical_id
     "required_provenance_fields": ["source_system", "source_record_id", "canonical_id"],
     "scd2_tables": ["dim_customer", "dim_advertiser"],
     "scd1_tables": ["dim_product", "dim_campaign"],
@@ -398,7 +391,7 @@ GOLD_CONFIG = {
 
 # ====================================================================
 # ANOMALY DETECTION CONFIGURATION
-# UC-04 - ML signal built Phase 14, GenAI explanation added Phase 16
+# ML signal plus GenAI explanation
 # ====================================================================
 
 ANOMALY_CONFIG = {

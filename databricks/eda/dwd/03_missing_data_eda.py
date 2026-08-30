@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD MISSING DATA
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile dwd_missing_value_periods (the DWD-reported
@@ -61,6 +61,7 @@ INDICATOR_COLS = {"V_N_I"}
 
 # DBTITLE 1,Helpers
 
+
 def find_col(df: DataFrame, *cands: str) -> str | None:
     low = {c.lower(): c for c in df.columns}
     for x in cands:
@@ -95,6 +96,7 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filenam
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
@@ -483,6 +485,7 @@ facet_bars(
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- observed -999/blank rate by year, per measurement (faceted)
+
 
 def _line_draw(rows):
     def draw(ax):

@@ -1,14 +1,13 @@
-# ====================================================================
-# KDD Cup 2012 Track 2 Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# KDD Cup 2012 Track 2 staging
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Stage the single KDD Cup 2012 Track 2 raw CSV in
-# data/raw/kddcup2012_track2/ into the logical staging dataset defined
-# in PIPELINE_DESIGN.md Section 1a (click_prediction), written to
-# data/staging/kddcup2012_track2/. Local file operations only -- does
-# not upload anywhere. data/raw/ is read-only throughout.
+#
+# Purpose: stage the single KDD Cup 2012 Track 2 raw CSV in
+# data/raw/kddcup2012_track2/ into the logical staging dataset
+# (click_prediction), written to data/staging/kddcup2012_track2/. Local
+# file operations only -- does not upload anywhere. data/raw/ is
+# read-only throughout.
 #
 # Already one self-contained CSV (399,483 rows, 12 columns, single
 # consistent header) -- no splitting, no consolidation.
@@ -17,7 +16,6 @@
 # to disk; no frames list + pd.concat(). Output stays well under the
 # 50 MiB chunking threshold (source is 27.5 MB), so it is written as
 # one flat file -- chunking would be artificial here.
-# ====================================================================
 
 import sys
 from pathlib import Path
@@ -81,7 +79,7 @@ def main() -> None:
     total_rows, columns, out_path, files_read = stage_click_prediction(monitor)
     monitor.check()
 
-    logger.info("KDD Cup 2012 Track 2 Phase 2b staging complete.")
+    logger.info("KDD Cup 2012 Track 2 staging complete.")
     logger.info(
         f"  click_prediction: {total_rows} rows, {len(columns)} columns, "
         f"{files_read} source files -> {out_path}"

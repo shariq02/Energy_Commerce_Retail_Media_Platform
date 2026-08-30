@@ -1,13 +1,12 @@
-# ====================================================================
-# DWD Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# DWD staging
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Consolidate DWD raw files in data/raw/dwd/ into the 12
-# logical staging datasets defined in PIPELINE_DESIGN.md Section 1a,
-# written to data/staging/dwd/. Local file operations only -- does not
-# upload anywhere. data/raw/ is read-only throughout.
+#
+# Purpose: consolidate DWD raw files in data/raw/dwd/ into the 12
+# logical staging datasets, written to data/staging/dwd/. Local file
+# operations only -- does not upload anywhere. data/raw/ is read-only
+# throughout.
 #
 # Memory-safety design: every dataset is written incrementally, chunk
 # by chunk (<=CHUNK_SIZE rows), directly to its output CSV. No frames
@@ -15,7 +14,6 @@
 # next one is read. The two deduped station-level datasets keep only a
 # small in-memory set of already-seen row-tuples (not full DataFrames)
 # to dedupe while streaming.
-# ====================================================================
 
 import io
 import sys
@@ -308,7 +306,7 @@ def main() -> None:
     rows, columns, path = stage_missing_value_periods(monitor)
     results["missing_value_periods"] = (rows, columns, path)
 
-    logger.info("DWD Phase 2b staging complete.")
+    logger.info("DWD staging complete.")
     for name, (rows, columns, path) in results.items():
         logger.info(f"  {name}: {rows} rows, {len(columns)} columns -> {path}")
     logger.info(

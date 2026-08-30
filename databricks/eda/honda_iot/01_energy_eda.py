@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- HONDA IOT ENERGY
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the six Honda IoT energy Bronze tables
@@ -55,6 +55,7 @@ FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 
 # DBTITLE 1,Helpers
 
+
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
@@ -83,6 +84,7 @@ def histplot(values, title, xlabel, bins=50, filename=None):
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
@@ -592,6 +594,7 @@ _facet_grid(
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- P vs W scatter per metric (faceted)
+
 
 def _scatter_draw(col, pdf):
     def draw(ax):

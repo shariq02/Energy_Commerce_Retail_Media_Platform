@@ -1,24 +1,21 @@
-# ====================================================================
-# Search Visibility Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# Search Visibility staging
+# Energy Commerce and Retail Media Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Consolidate Search Visibility raw files in
+#
+# Purpose: consolidate Search Visibility raw files in
 # data/raw/search_visibility/ into the 2 logical staging datasets
-# defined in PIPELINE_DESIGN.md Section 1a (search_visibility_events,
-# repository_info), written to data/staging/search_visibility/. Local
-# file operations only -- does not upload anywhere. data/raw/ is
-# read-only throughout.
+# (search_visibility_events, repository_info), written to
+# data/staging/search_visibility/. Local file operations only -- does
+# not upload anywhere. data/raw/ is read-only throughout.
 #
 # The 12 monthly .zip archives are monthly partitions of one event
 # dataset, not 12 tables -- confirmed identical 11-column header across
-# all 12 (logs/inspections/search_visibility_final_mapping_check.txt),
-# including repository_id as an in-row join key to the separate
-# repository_info reference dataset. README.txt remains documentation,
-# not data, and is not staged.
+# all 12, including repository_id as an in-row join key to the separate
+# repository_info reference dataset. The bundled readme file remains
+# documentation, not data, and is not staged.
 #
-# Month column decision (FINAL, per PIPELINE_DESIGN.md): no separate
+# Month column decision (FINAL): no separate
 # `month` column is added here -- the existing in-row `date` field
 # already carries this information, and monthly archive provenance is
 # preserved through `date` rather than a synthetic column. February
@@ -35,7 +32,6 @@
 # closes each physical chunk immediately; no frames list +
 # pd.concat(). The reference file is small (<1 MB) and is read/written
 # in one pass.
-# ====================================================================
 
 import sys
 import zipfile
@@ -128,7 +124,7 @@ def main() -> None:
     ref_rows, ref_columns, ref_path = stage_repository_info()
     monitor.check()
 
-    logger.info("Search Visibility Phase 2b staging complete.")
+    logger.info("Search Visibility staging complete.")
     logger.info(
         f"  events: {event_rows} rows, {len(EVENT_COLUMNS)} columns, "
         f"{event_files} source files, {chunk_count} chunks -> {events_dir}"

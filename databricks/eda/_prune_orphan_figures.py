@@ -21,7 +21,7 @@
 import os
 import re
 
-DRY_RUN = False #True 
+DRY_RUN = False  # True
 
 # COMMAND ----------
 

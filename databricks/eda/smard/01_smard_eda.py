@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- SMARD ENERGY TIME SERIES
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile smard_energy_timeseries (one long-format Bronze
@@ -58,6 +58,7 @@ RESOLUTION_SECONDS = {
 
 # DBTITLE 1,Helpers
 
+
 def as_ts(col: str):
     c = F.col(col).cast("string")
     return F.coalesce(
@@ -102,6 +103,7 @@ def histplot(values, title, xlabel, bins=50, filename=None):
 # COMMAND ----------
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
+
 
 def _repo_root():
     p = _os.path.abspath(_os.getcwd())
