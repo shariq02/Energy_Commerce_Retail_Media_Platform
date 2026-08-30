@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- IPINYOU RELATIONSHIPS AND FINDINGS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Cross-table checks across the 3 iPinYou Bronze tables --
@@ -18,13 +18,13 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import matplotlib.pyplot as plt
-import numpy as np
-from pyspark.sql import functions as F
-
 import contextlib
 import os as _os
 import re as _re
+
+import matplotlib.pyplot as plt
+import numpy as np
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -41,6 +41,7 @@ FACTS = {"training": training, "leaderboard": leaderboard}
 
 # COMMAND ----------
 
+
 # DBTITLE 1,Helper
 def barplot(pairs, title, xlabel, ylabel="count", rot=0, filename=None):
     plt.figure(figsize=(9, 4))
@@ -56,6 +57,7 @@ def barplot(pairs, title, xlabel, ylabel="count", rot=0, filename=None):
 
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
 def _repo_root():
@@ -96,6 +98,16 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -105,6 +117,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)

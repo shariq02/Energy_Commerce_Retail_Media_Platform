@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD RELATIONSHIPS AND FINDINGS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Cross-table checks across the 12 DWD Bronze tables --
@@ -22,14 +22,14 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib
+import os as _os
+import re as _re
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-
-import contextlib
-import os as _os
-import re as _re
 
 # COMMAND ----------
 
@@ -58,6 +58,7 @@ META = {
 
 # COMMAND ----------
 
+
 # DBTITLE 1,Helpers
 def find_col(df: DataFrame, *cands: str) -> str | None:
     low = {c.lower(): c for c in df.columns}
@@ -83,6 +84,7 @@ def barplot(
 
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
 def _repo_root():
@@ -123,6 +125,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -132,6 +200,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -482,5 +553,6 @@ write_profiling(
             "DWD referential integrity: measurements <-> metadata",
             "dwd_referential_integrity.png",
         ),
+        ("DWD distinct stations per city", "dwd_stations_per_city.png"),
     ],
 )

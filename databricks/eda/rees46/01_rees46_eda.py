@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- REES46 ECOMMERCE EVENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile rees46_events (~110M view / cart / purchase
@@ -22,13 +22,13 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import matplotlib.pyplot as plt
-from pyspark.sql import Window
-from pyspark.sql import functions as F
-
 import contextlib
 import os as _os
 import re as _re
+
+import matplotlib.pyplot as plt
+from pyspark.sql import Window
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -41,6 +41,7 @@ SECTION_TITLE = "REES46 ecommerce events (rees46_events)"
 TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.rees46_events"
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Helpers
 def barplot(
@@ -78,6 +79,7 @@ def histplot(values, title, xlabel, bins=60, log=False, filename=None):
 
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
 def _repo_root():
@@ -118,6 +120,16 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -127,6 +139,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -345,14 +360,23 @@ sc = (
         F.sum("has_view").alias("with_view"),
         F.sum("has_cart").alias("with_cart"),
         F.sum("has_purchase").alias("with_purchase"),
-        F.sum((F.col("has_view").cast("boolean") & F.col("has_cart").cast("boolean")).cast("int")).alias(
-            "view_and_cart"
-        ),
-        F.sum((F.col("has_cart").cast("boolean") & F.col("has_purchase").cast("boolean")).cast("int")).alias(
-            "cart_and_purchase"
-        ),
         F.sum(
-            (F.col("has_view").cast("boolean") & F.col("has_cart").cast("boolean") & F.col("has_purchase").cast("boolean")).cast("int")
+            (
+                F.col("has_view").cast("boolean") & F.col("has_cart").cast("boolean")
+            ).cast("int")
+        ).alias("view_and_cart"),
+        F.sum(
+            (
+                F.col("has_cart").cast("boolean")
+                & F.col("has_purchase").cast("boolean")
+            ).cast("int")
+        ).alias("cart_and_purchase"),
+        F.sum(
+            (
+                F.col("has_view").cast("boolean")
+                & F.col("has_cart").cast("boolean")
+                & F.col("has_purchase").cast("boolean")
+            ).cast("int")
         ).alias("full_path"),
     )
     .first()
@@ -427,7 +451,11 @@ for c in ("user_id", "product_id"):
 # COMMAND ----------
 
 # DBTITLE 1,In-session event-sequence consistency (one windowed pass)
-seq = df.select("user_session", "event_type", F.to_timestamp(F.substring("event_time", 1, 19)).alias("ts"))
+seq = df.select(
+    "user_session",
+    "event_type",
+    F.to_timestamp(F.substring("event_time", 1, 19)).alias("ts"),
+)
 w = Window.partitionBy("user_session").orderBy("ts")
 seq = seq.withColumn(
     "prior_types",
@@ -916,13 +944,29 @@ write_profiling(
         ("REES46 event_type funnel", "rees46_funnel.png"),
         ("REES46 sessions reaching each funnel stage", "rees46_session_funnel.png"),
         ("REES46 events by hour of day", "rees46_events_by_hour_of_day.png"),
+        ("REES46 events by weekday", "rees46_events_by_weekday.png"),
         ("REES46 missing rate per column", "rees46_missing_rate_per_column.png"),
+        ("REES46 events per day", "rees46_events_per_day.png"),
         ("REES46 events per day by type", "rees46_events_per_day_by_type.png"),
         (
             "REES46 price distribution (sampled, clipped to p99)",
             "rees46_price_distribution.png",
         ),
+        (
+            "REES46 price distribution -- view (sampled)",
+            "rees46_price_distribution_view.png",
+        ),
+        (
+            "REES46 price distribution -- cart (sampled)",
+            "rees46_price_distribution_cart.png",
+        ),
+        (
+            "REES46 price distribution -- purchase (sampled)",
+            "rees46_price_distribution_purchase.png",
+        ),
+        ("REES46 top brands by event volume", "rees46_top_brands.png"),
         ("REES46 top 20 category_code by event volume", "rees46_top_categories.png"),
+        ("REES46 events per session distribution", "rees46_events_per_session.png"),
         (
             "REES46 products with unstable category / brand",
             "rees46_unstable_product_attributes.png",

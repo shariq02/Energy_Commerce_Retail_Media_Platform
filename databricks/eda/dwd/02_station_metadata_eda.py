@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD STATION METADATA
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the four DWD metadata Bronze tables
@@ -22,12 +22,13 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-from functools import reduce
-import matplotlib.pyplot as plt
-from pyspark.sql import functions as F
 import contextlib
 import os as _os
 import re as _re
+from functools import reduce
+
+import matplotlib.pyplot as plt
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -53,18 +54,19 @@ MEASUREMENTS = [
     "wind",
 ]
 MEASUREMENT_TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
-META_NON_VALUE = {
-    "STATIONS_ID",
-    "CITY",
-    "MESS_DATUM",
-    "QN_9",
-    "QN_3",
-    "QN_4",
-    "QN_8",
-    "EOR",
-}
+META_NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR", "V_N_I"}
+
+
+def measurement_value_cols(cols):
+    return [
+        c
+        for c in cols
+        if c.upper() not in META_NON_VALUE and not c.upper().startswith("QN")
+    ]
+
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Helpers
 def find_key(cols, *cands):
@@ -73,6 +75,25 @@ def find_key(cols, *cands):
         if x.lower() in low:
             return low[x.lower()]
     return None
+
+
+def find_key_like(cols, *substrings):
+    for c in cols:
+        cl = c.lower()
+        if any(s in cl for s in substrings):
+            return c
+    return None
+
+
+def to_float(x):
+    # DWD metadata stores coordinates as strings and sometimes with a German
+    # decimal comma; a bare float() silently dropped every lat/lon value.
+    if x is None:
+        return None
+    try:
+        return float(str(x).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
 
 
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
@@ -89,6 +110,7 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filenam
 
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
 def _repo_root():
@@ -129,6 +151,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -138,6 +226,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -232,9 +323,16 @@ for name, x in meta.items():
 # DBTITLE 1,station_geography relocation + station_name_history changes (Python)
 geo = meta["station_geography"]
 gsid = find_key(geo["cols"], "Stations_id", "STATIONS_ID", "stations_id")
-lat = find_key(geo["cols"], "Geogr_Breite", "geo_latitude_deg", "Geographische_Breite")
-lon = find_key(geo["cols"], "Geogr_Laenge", "geo_longitude_deg", "Geographische_Laenge")
-elev = find_key(geo["cols"], "Stationshoehe", "station_elevation_m", "Stationshoehe_m")
+lat = find_key(
+    geo["cols"], "Geogr_Breite", "geo_latitude_deg", "Geographische_Breite"
+) or find_key_like(geo["cols"], "breit", "latitud")
+lon = find_key(
+    geo["cols"], "Geogr_Laenge", "geo_longitude_deg", "Geographische_Laenge"
+) or find_key_like(geo["cols"], "laeng", "longitud")
+elev = find_key(
+    geo["cols"], "Stationshoehe", "station_elevation_m", "Stationshoehe_m"
+) or find_key_like(geo["cols"], "hoehe", "elevation", "height")
+print(f"geography columns -> {geo['cols']}")
 print(f"geography columns -> id={gsid} lat={lat} lon={lon} elev={elev}")
 geo_moves = {}
 for d in geo["recs"]:
@@ -244,10 +342,9 @@ for d in geo["recs"]:
     g["location_rows"] += 1
     for k, col in (("lat", lat), ("lon", lon), ("elev", elev)):
         if col:
-            try:
-                g[k].append(float(d[col]))
-            except (TypeError, ValueError):
-                pass
+            fv = to_float(d[col])
+            if fv is not None:
+                g[k].append(fv)
 for sid, g in geo_moves.items():
     g["lat_span"] = round(max(g["lat"]) - min(g["lat"]), 5) if g["lat"] else None
     g["lon_span"] = round(max(g["lon"]) - min(g["lon"]), 5) if g["lon"] else None
@@ -287,7 +384,7 @@ if punit:
     print("code -> unit:", pairs)
 observed = {}
 for m, t in MEASUREMENT_TABLES.items():
-    observed[m] = [c for c in spark.table(t).columns if c.upper() not in META_NON_VALUE]
+    observed[m] = measurement_value_cols(spark.table(t).columns)
 observed_flat = {c for cs in observed.values() for c in cs}
 print("value columns per measurement:", observed)
 print(
@@ -348,73 +445,53 @@ if gsid and lat and lon:
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- relocations, name history, coverage gaps, table sizes, validity periods
-barplot(
-    [(sid, g["location_rows"]) for sid, g in geo_moves.items()],
-    "DWD station_geography -- location rows per station",
-    "station id",
-    "rows",
-    rot=45,
-    filename="dwd_geography_location_rows_per_station.png",
-)
-if elev:
-    barplot(
-        [
+# DBTITLE 1,Figure -- metadata overview (one faceted figure)
+facet_bars(
+    {
+        "geography: location rows per station": [
+            (sid, g["location_rows"]) for sid, g in geo_moves.items()
+        ],
+        "geography: elevation span (m) per station": [
             (sid, g["elev_span_m"])
             for sid, g in geo_moves.items()
             if g["elev_span_m"] is not None
         ],
-        "DWD station_geography -- elevation span per station (m)",
-        "station id",
-        "metres",
-        rot=45,
-        filename="dwd_geography_elevation_span_per_station.png",
-    )
-barplot(
-    [(sid, n["history_rows"]) for sid, n in name_changes.items()],
-    "DWD station_name_history -- history rows per station",
-    "station id",
-    "rows",
+        "name_history: rows per station": [
+            (sid, n["history_rows"]) for sid, n in name_changes.items()
+        ],
+        "measurement stations missing a metadata row": list(meta_gaps.items()),
+        "metadata rows per table": [(n, meta[n]["total"]) for n in TABLES],
+    },
+    "DWD metadata -- overview",
+    "dwd_metadata_overview.png",
     rot=45,
-    filename="dwd_name_history_rows_per_station.png",
+    ncols=2,
 )
-if meta_gaps:
-    barplot(
-        list(meta_gaps.items()),
-        "DWD -- measurement stations missing a metadata row",
-        "metadata table",
-        "stations",
-        rot=20,
-        filename="dwd_metadata_missing_station_rows.png",
-    )
-barplot(
-    [(n, meta[n]["total"]) for n in TABLES],
-    "DWD metadata -- rows per table",
-    "table",
-    rot=20,
-    filename="dwd_metadata_rows_per_table.png",
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- per-table rows per station + validity-period composition (faceted)
+facet_bars(
+    dict(station_counts),
+    "DWD metadata -- rows per station, by table",
+    "dwd_metadata_rows_per_station.png",
+    rot=45,
+    ncols=2,
 )
-for name, pairs in station_counts.items():
-    barplot(
-        pairs,
-        f"DWD {name} -- rows per station",
-        "station id",
-        "rows",
-        rot=45,
-        filename=f"dwd_{name}_rows_per_station.png",
-    )
-for name, (open_ended, inverted, total) in period_stats.items():
-    barplot(
-        [
+facet_bars(
+    {
+        name: [
             ("open-ended", open_ended),
             ("closed", total - open_ended),
             ("inverted", inverted),
-        ],
-        f"DWD {name} -- validity-period rows",
-        "period type",
-        "rows",
-        filename=f"dwd_{name}_validity_period_rows.png",
-    )
+        ]
+        for name, (open_ended, inverted, total) in period_stats.items()
+    },
+    "DWD metadata -- validity-period row composition, by table",
+    "dwd_metadata_validity_periods.png",
+    rot=20,
+    ncols=2,
+)
 
 # COMMAND ----------
 
@@ -543,18 +620,14 @@ write_profiling(
             "DWD station_geography -- station locations & relocations",
             "dwd_station_geography.png",
         ),
+        ("DWD metadata -- overview", "dwd_metadata_overview.png"),
         (
-            "DWD station_geography -- location rows per station",
-            "dwd_geography_location_rows_per_station.png",
+            "DWD metadata -- rows per station, by table",
+            "dwd_metadata_rows_per_station.png",
         ),
         (
-            "DWD station_name_history -- history rows per station",
-            "dwd_name_history_rows_per_station.png",
+            "DWD metadata -- validity-period row composition, by table",
+            "dwd_metadata_validity_periods.png",
         ),
-        (
-            "DWD -- measurement stations missing a metadata row",
-            "dwd_metadata_missing_station_rows.png",
-        ),
-        ("DWD metadata -- rows per table", "dwd_metadata_rows_per_table.png"),
     ],
 )

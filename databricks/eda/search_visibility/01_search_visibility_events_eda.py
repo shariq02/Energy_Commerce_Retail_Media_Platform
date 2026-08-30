@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- SEARCH VISIBILITY EVENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile search_visibility_events (search-visibility
@@ -21,14 +21,13 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib
 import datetime as dt
+import os as _os
+import re as _re
 
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
-
-import contextlib
-import os as _os
-import re as _re
 
 # COMMAND ----------
 
@@ -42,6 +41,7 @@ TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.search_visibility_events"
 KEY = ["repository_id", "url", "date", "country", "device"]
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Helpers
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
@@ -70,6 +70,7 @@ def histplot(values, title, xlabel, bins=50, log=False, filename=None):
 
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
 def _repo_root():
@@ -110,6 +111,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -119,6 +186,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -202,16 +272,37 @@ dg = (
 date_rows = [(x["date"], x["rows"]) for x in dg]
 monthly = [(x["date"], x["clicks"], x["impressions"]) for x in dg]
 raw_dates = [x["date"] for x in dg if x["date"]]
+
+
+def parse_sv_date(rd):
+    # The `date` column mixes formats: ISO `YYYY-MM-DD` plus a `M/D/YYYY` style
+    # used for some archives (e.g. the February files `2/1/2017`..`2/7/2017`).
+    # Parsing ISO only made February look absent from the span.
+    s = str(rd).strip()
+    for raw, fmt in ((s[:10], "%Y-%m-%d"), (s, "%m/%d/%Y"), (s, "%d.%m.%Y")):
+        try:
+            return (
+                dt.datetime.strptime(raw, fmt).replace(tzinfo=dt.UTC).date(),
+                fmt,
+            )
+        except ValueError:
+            continue
+    return None, "<unparsed>"
+
+
 parsed = []
+date_fmt_counts = {}
 for rd in raw_dates:
-    try:
-        parsed.append(dt.date.fromisoformat(str(rd)[:10]))
-    except ValueError:
-        pass
+    d, fmt = parse_sv_date(rd)
+    date_fmt_counts[fmt] = date_fmt_counts.get(fmt, 0) + 1
+    if d:
+        parsed.append(d)
 yms = sorted({d.strftime("%Y-%m") for d in parsed})
 dom = sorted({d.day for d in parsed})
+multi_format_date = len([k for k in date_fmt_counts if k != "<unparsed>"]) > 1
 print(
-    f"distinct raw date values={len(raw_dates)}  distinct year-month={len(yms)}  distinct day-of-month={dom}"
+    f"distinct raw date values={len(raw_dates)}  distinct year-month={len(yms)}  "
+    f"distinct day-of-month={dom}  date-format breakdown={date_fmt_counts}"
 )
 print("=> granularity is", "monthly" if len(dom) <= 1 else "daily/other")
 missing_months = []
@@ -365,24 +456,26 @@ print("metric sample rows:", len(mp))
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- monthly volume, category distributions
+_rows_by_ym = {}
+for rd, n_ in date_rows:
+    d, _ = parse_sv_date(rd)
+    ym = d.strftime("%Y-%m") if d else str(rd)
+    _rows_by_ym[ym] = _rows_by_ym.get(ym, 0) + n_
 barplot(
-    date_rows,
-    "Search Visibility -- rows per monthly archive",
-    "date",
+    sorted(_rows_by_ym.items()),
+    "Search Visibility -- rows per month (archives aggregated)",
+    "month",
     "rows",
     rot=90,
     figsize=(12, 4),
     filename="sv_rows_per_monthly_archive.png",
 )
-for c, pairs in dist.items():
-    barplot(
-        pairs,
-        f"Search Visibility -- rows per {c}",
-        c,
-        "rows",
-        rot=45,
-        filename=f"sv_rows_per_{c}.png",
-    )
+facet_bars(
+    dict(dist),
+    "Search Visibility -- rows by category",
+    "sv_category_breakdown.png",
+    rot=45,
+)
 xs = [d for d, _, _ in monthly]
 plt.figure(figsize=(12, 4))
 plt.plot(xs, [i for _, _, i in monthly], marker=".", label="impressions")
@@ -399,16 +492,11 @@ plt.show()
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- metric distributions, clicks vs impressions, position & CTR
-for c in ("clicks", "impressions", "position"):
-    s = mp[c].dropna()
-    if len(s):
-        histplot(
-            s.tolist(),
-            f"Search Visibility {c} -- distribution (n={len(s)} sample)",
-            c,
-            log=True,
-            filename=f"sv_{c}_distribution.png",
-        )
+facet_hists(
+    {c: mp[c].dropna().tolist() for c in ("clicks", "impressions", "position")},
+    "Search Visibility -- metric distributions (sampled)",
+    "sv_metric_distributions.png",
+)
 sc = mp[(mp["clicks"] > 0) & (mp["impressions"] > 0)]
 if len(sc):
     plt.figure(figsize=(6, 6))
@@ -482,7 +570,8 @@ _dq = [
 _temporal = [
     f"Months present ({len(yms)}): {yms}.",
     f"Missing months within span: {missing_months or 'none'}.",
-    f"Rows per monthly archive: {date_rows}.",
+    f"`date` raw-format breakdown: {date_fmt_counts}.",
+    f"Rows per monthly archive: {fmt_pairs(date_rows)}.",
 ]
 
 _entities = [
@@ -504,21 +593,42 @@ _coverage = []
 for c in ("country", "device", "citableContent"):
     _coverage.append(f"- {c}: {dist[c]}")
 
+_index_numeric = M["index_min"] is not None or M["index_max"] is not None
 _dist = ["| metric | min | max | avg |", "|---|---|---|---|"]
 for c in num:
+    if c == "index" and not _index_numeric:
+        continue
     _dist.append(f"| {c} | {M[c + '_min']} | {M[c + '_max']} | {M[c + '_avg']} |")
+if not _index_numeric:
+    _dist += [
+        "",
+        f"`index` is non-numeric (approx_distinct {acd.get('index')}); top values: "
+        + str([(x["index"], x["count"]) for x in idx]),
+    ]
+_ctr_pairs = [(p_, round(v, 4) if v is not None else None) for p_, v in pos_ctr]
 _dist += [
     "",
     f"position percentiles (10/25/50/75/90/99): {M['position_pctiles']}.",
     f"clicks percentiles (50/90/99): {M['clicks_pctiles']}.",
     f"impressions percentiles (50/90/99): {M['impressions_pctiles']}.",
-    f"CTR by rounded position: {[(p_, round(v, 4) if v is not None else None) for p_, v in pos_ctr]}.",
+    "CTR by rounded position:",
+    fmt_pairs(_ctr_pairs, n=30),
 ]
 
 _findings = []
 if constant_cols:
     _findings.append(f"- Constant columns: {constant_cols}.")
 _findings.append(f"- `date` is a {_gran} archive marker, not a daily timestamp.")
+if multi_format_date:
+    _findings.append(
+        f"- `date` mixes ≥2 raw formats ({date_fmt_counts}); parsing only ISO "
+        "previously made some months look absent from the span."
+    )
+if date_fmt_counts.get("<unparsed>"):
+    _findings.append(
+        f"- {date_fmt_counts['<unparsed>']} distinct `date` values did not parse "
+        "under any known format."
+    )
 if missing_months:
     _findings.append(
         f"- {len(missing_months)} months missing within the covered span: {missing_months}."
@@ -585,5 +695,11 @@ write_profiling(
             "sv_clicks_vs_impressions.png",
         ),
         ("Search Visibility rows by rounded position", "sv_rows_by_position.png"),
+        (
+            "Search Visibility rows per month (archives aggregated)",
+            "sv_rows_per_monthly_archive.png",
+        ),
+        ("Search Visibility rows by category", "sv_category_breakdown.png"),
+        ("Search Visibility metric distributions", "sv_metric_distributions.png"),
     ],
 )

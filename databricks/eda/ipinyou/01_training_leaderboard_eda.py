@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # EDA -- IPINYOU TRAINING AND LEADERBOARD
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile ipinyou_training and ipinyou_leaderboard (RTB
@@ -22,12 +22,12 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import matplotlib.pyplot as plt
-from pyspark.sql import functions as F
-
 import contextlib
 import os as _os
 import re as _re
+
+import matplotlib.pyplot as plt
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -50,9 +50,25 @@ SLOT_LOWCARD = [
 ]
 PRICE_COLS = ["bidding_price", "paying_price", "ad_slot_floor_price"]
 
+# iPinYou's merged training log does not always spell the funnel stages out;
+# accept the common aliases (and numeric codes) rather than matching the literal
+# strings "impression"/"click"/"conversion", which produced a 0/0/0 funnel.
+ET_ALIASES = {
+    "impression": {"impression", "impressions", "imp", "i", "1"},
+    "click": {"click", "clicks", "clk", "c", "2"},
+    "conversion": {"conversion", "conversions", "conv", "cv", "3"},
+}
+
 # COMMAND ----------
 
+
 # DBTITLE 1,Helpers
+def _et_stage_expr(stage):
+    return F.lower(F.trim(F.col("event_type").cast("string"))).isin(
+        sorted(ET_ALIASES[stage])
+    )
+
+
 def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
@@ -79,6 +95,7 @@ def histplot(values, title, xlabel, bins=50, log=False, filename=None):
 
 
 # COMMAND ----------
+
 
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
 def _repo_root():
@@ -119,6 +136,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -128,6 +211,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -232,13 +318,11 @@ for name, df in frames.items():
             ),
             *(
                 [
-                    F.sum((F.col("event_type") == "impression").cast("long")).alias(
+                    F.sum(_et_stage_expr("impression").cast("long")).alias(
                         "impressions"
                     ),
-                    F.sum((F.col("event_type") == "click").cast("long")).alias(
-                        "clicks"
-                    ),
-                    F.sum((F.col("event_type") == "conversion").cast("long")).alias(
+                    F.sum(_et_stage_expr("click").cast("long")).alias("clicks"),
+                    F.sum(_et_stage_expr("conversion").cast("long")).alias(
                         "conversions"
                     ),
                 ]
@@ -261,11 +345,24 @@ for name, df in frames.items():
 
 # DBTITLE 1,Impression -> click -> conversion funnel (training) + leaderboard labels
 et_counts = dict(partitions["training"].get("event_type", []))
-imp, clk, conv = (
-    et_counts.get("impression", 0),
-    et_counts.get("click", 0),
-    et_counts.get("conversion", 0),
-)
+print(f"training event_type distinct values (raw): {et_counts}")
+
+
+def _et_bucket(counts, stage):
+    al = ET_ALIASES[stage]
+    return sum(int(v) for k, v in counts.items() if str(k).strip().lower() in al)
+
+
+imp = _et_bucket(et_counts, "impression")
+clk = _et_bucket(et_counts, "click")
+conv = _et_bucket(et_counts, "conversion")
+et_unmapped = {
+    k: v
+    for k, v in et_counts.items()
+    if not any(str(k).strip().lower() in a for a in ET_ALIASES.values())
+}
+if et_unmapped:
+    print(f"WARNING  unmapped event_type values (not in funnel): {et_unmapped}")
 print(f"training funnel: impression={imp}  click={clk}  conversion={conv}")
 if imp:
     print(
@@ -306,7 +403,9 @@ price_stats = {}
 for name, df in frames.items():
     exprs = []
     for c in PRICE_COLS:
-        v = F.when(F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")).otherwise(F.lit(None))
+        v = F.when(
+            F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
+        ).otherwise(F.lit(None))
         exprs += [
             F.min(v).alias(c + "_min"),
             F.max(v).alias(c + "_max"),
@@ -317,9 +416,18 @@ for name, df in frames.items():
             F.sum((v < 0).cast("long")).alias(c + "_negative"),
             F.sum((v == 0).cast("long")).alias(c + "_zero"),
         ]
-    pay = F.when(F.col("paying_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col("paying_price").cast("double")).otherwise(F.lit(None))
-    bid = F.when(F.col("bidding_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col("bidding_price").cast("double")).otherwise(F.lit(None))
-    floor = F.when(F.col("ad_slot_floor_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col("ad_slot_floor_price").cast("double")).otherwise(F.lit(None))
+    pay = F.when(
+        F.col("paying_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"),
+        F.col("paying_price").cast("double"),
+    ).otherwise(F.lit(None))
+    bid = F.when(
+        F.col("bidding_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"),
+        F.col("bidding_price").cast("double"),
+    ).otherwise(F.lit(None))
+    floor = F.when(
+        F.col("ad_slot_floor_price").rlike("^-?[0-9]+(\\.[0-9]+)?$"),
+        F.col("ad_slot_floor_price").cast("double"),
+    ).otherwise(F.lit(None))
     exprs += [
         F.sum((pay > bid).cast("long")).alias("paying_gt_bidding"),
         F.sum((floor > pay).cast("long")).alias("floor_gt_paying"),
@@ -466,7 +574,12 @@ for name, df in frames.items():
         for c in PRICE_COLS
         if price_stats[name][c + "_p"]
     )
-    sel = [F.when(F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")).otherwise(F.lit(None)).alias(c) for c in PRICE_COLS]
+    sel = [
+        F.when(F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double"))
+        .otherwise(F.lit(None))
+        .alias(c)
+        for c in PRICE_COLS
+    ]
     price_pdf[name] = (
         df.select(*sel)
         .where(F.greatest(*[F.col(c) for c in PRICE_COLS]).isNotNull())
@@ -486,74 +599,78 @@ plt.ylabel("events (log)")
 plt.tight_layout()
 plt.savefig(fig_path("ipinyou_funnel.png"), dpi=110, bbox_inches="tight")
 plt.show()
-for name, parts in partitions.items():
-    for c, pairs in parts.items():
-        barplot(
-            pairs,
-            f"iPinYou {name} -- rows per {c}",
-            c,
-            "rows",
-            rot=30,
-            filename=f"ipinyou_{name}_rows_per_{c}.png",
-        )
-for c, pairs in lb_labels.items():
-    barplot(
-        pairs[:30],
-        f"iPinYou leaderboard -- {c} distribution",
-        c,
-        "rows",
-        rot=45,
-        filename=f"ipinyou_leaderboard_{c}_distribution.png",
-    )
+facet_bars(
+    {
+        f"{name}.{c}": pairs
+        for name, parts in partitions.items()
+        for c, pairs in parts.items()
+    },
+    "iPinYou -- rows per partition column, by table",
+    "ipinyou_partitions.png",
+    rot=30,
+    ncols=3,
+)
+facet_bars(
+    {c: pairs[:30] for c, pairs in lb_labels.items()},
+    "iPinYou leaderboard -- label distributions",
+    "ipinyou_leaderboard_labels.png",
+    rot=45,
+    ncols=2,
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- events per day per season, and per hour
+_day_items, _hour_items = [], []
 for name, rows in day_hour.items():
     seasons = sorted({x["season"] for x in rows})
-    day_agg = {}
-    hour_agg = {}
+    day_agg, hour_agg = {}, {}
     for x in rows:
         sd = day_agg.setdefault(x["season"], {})
         sd[x["day"]] = sd.get(x["day"], 0) + x["count"]
         hour_agg[x["hour"]] = hour_agg.get(x["hour"], 0) + x["count"]
-    plt.figure(figsize=(13, 4))
-    for s in seasons:
-        xs = sorted(day_agg[s])
-        plt.plot(
-            range(len(xs)),
-            [day_agg[s][d] for d in xs],
-            marker=".",
-            label=f"season {s}",
-            linewidth=0.8,
-        )
-    plt.legend()
-    plt.title(f"iPinYou {name} -- events per day by season")
-    plt.xlabel("day index")
-    plt.tight_layout()
-    plt.savefig(
-        fig_path(f"ipinyou_{name}_events_per_day_by_season.png"),
-        dpi=110,
-        bbox_inches="tight",
-    )
-    plt.show()
-    hrs = sorted(hour_agg)
-    plt.figure(figsize=(13, 4))
-    plt.plot(range(len(hrs)), [hour_agg[h] for h in hrs], linewidth=0.8)
-    plt.title(f"iPinYou {name} -- event volume per hour")
-    plt.xlabel("hour index")
-    plt.ylabel("events")
-    plt.tight_layout()
-    plt.savefig(
-        fig_path(f"ipinyou_{name}_event_volume_per_hour.png"),
-        dpi=110,
-        bbox_inches="tight",
-    )
-    plt.show()
+
+    def _day_draw(day_agg=day_agg, seasons=seasons):
+        def draw(ax):
+            for s in seasons:
+                xs = sorted(day_agg[s])
+                ax.plot(
+                    range(len(xs)),
+                    [day_agg[s][d] for d in xs],
+                    marker=".",
+                    label=f"season {s}",
+                    linewidth=0.8,
+                )
+            ax.legend(fontsize=6)
+
+        return draw
+
+    def _hour_draw(hour_agg=hour_agg):
+        def draw(ax):
+            hrs = sorted(hour_agg)
+            ax.plot(range(len(hrs)), [hour_agg[h] for h in hrs], linewidth=0.8)
+
+        return draw
+
+    _day_items.append((name, _day_draw()))
+    _hour_items.append((name, _hour_draw()))
+_facet_grid(
+    _day_items,
+    "iPinYou -- events per day by season, by table",
+    "ipinyou_events_per_day_by_season.png",
+    ncols=2,
+)
+_facet_grid(
+    _hour_items,
+    "iPinYou -- event volume per hour, by table",
+    "ipinyou_event_volume_per_hour.png",
+    ncols=2,
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- price distributions (sampled, clipped to p99)
+# DBTITLE 1,Figure -- price distributions (sampled, clipped to p99, faceted)
+_price_groups = {}
 for name in frames:
     pdf = price_pdf[name]
     for c in PRICE_COLS:
@@ -561,13 +678,13 @@ for name in frames:
         vals = pdf[c].dropna()
         if hi and hi > 0:
             vals = vals[(vals >= 0) & (vals <= hi)]
-        if len(vals):
-            histplot(
-                vals.tolist(),
-                f"iPinYou {name}.{c} -- distribution (sampled, <=p99={hi})",
-                c,
-                filename=f"ipinyou_{name}_{c}_distribution.png",
-            )
+        _price_groups[f"{name}.{c}"] = vals.tolist()
+facet_hists(
+    _price_groups,
+    "iPinYou -- price distributions (sampled, clipped to p99)",
+    "ipinyou_price_distributions.png",
+    ncols=3,
+)
 
 # COMMAND ----------
 
@@ -673,7 +790,14 @@ for name in frames:
             f"- {name}.{c}: {ps[c + '_min']} / {ps[c + '_max']} / {ps[c + '_avg']} / {ps[c + '_p']}"
         )
 
-_rel = [f"Training funnel: impression={imp}, click={clk}, conversion={conv}."]
+_rel = [
+    (
+        f"Training funnel: impression={imp}, click={clk}, conversion={conv} "
+        f"(event_type raw values: {et_counts})."
+    )
+]
+if et_unmapped:
+    _rel.append(f"event_type values not mapped to a funnel stage: {et_unmapped}.")
 if imp:
     _rel.append(
         f"CTR = {clk / imp:.6f}"
@@ -766,8 +890,24 @@ write_profiling(
             "ipinyou_funnel.png",
         ),
         (
-            "iPinYou training -- events per day by season",
-            "ipinyou_training_events_per_day_by_season.png",
+            "iPinYou -- rows per partition column, by table",
+            "ipinyou_partitions.png",
+        ),
+        (
+            "iPinYou leaderboard -- label distributions",
+            "ipinyou_leaderboard_labels.png",
+        ),
+        (
+            "iPinYou -- events per day by season, by table",
+            "ipinyou_events_per_day_by_season.png",
+        ),
+        (
+            "iPinYou -- event volume per hour, by table",
+            "ipinyou_event_volume_per_hour.png",
+        ),
+        (
+            "iPinYou -- price distributions (sampled, clipped to p99)",
+            "ipinyou_price_distributions.png",
         ),
     ],
 )
