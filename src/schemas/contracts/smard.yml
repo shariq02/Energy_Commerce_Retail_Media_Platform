@@ -86,7 +86,7 @@ columns:
     nullable: false
     constant_observed: "day"
     allowed_values: ["day"]
-    notes: see open_questions -- SMARD offers finer resolutions that are absent here
+    notes: "only 'day' present; SMARD also publishes hourly / quarter-hourly -- not acquired"
 
   - name: timestamp_utc
     type: timestamp
@@ -155,25 +155,3 @@ localisation:
   note: >
     Natively German -- DE-LU bidding zone, Bundesnetzagentur source. No Germany
     localisation mapping needed (contrast REES46 / iPinYou).
-
-open_questions:
-  - id: smard-resolution-daily-only
-    question: >
-      SMARD publishes hourly and quarter-hourly market resolutions. The acquired
-      data is 'day' only. Was daily-only acquisition intentional, or should the
-      scripted pull be re-run for finer resolutions before cleaning?
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: smard-generation-canonical-fact
-    question: >
-      The canonical model has no fact for grid-level generation / load /
-      residual-load volumes. Only day_ahead_prices maps cleanly (fact_market_price).
-      The other 15 metrics are market supply/demand series at (zone, date).
-      Options: (a) add fact_market_timeseries(metric, zone, date, value, unit);
-      (b) carry them only as feature inputs to the cross-domain
-      fact_market_impact / fact_energy_demand, with no dedicated canonical fact;
-      (c) something else. Recommend (a). Needs a canonical-model decision before
-      Silver/Gold modelling.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/smard.yml

@@ -14,11 +14,10 @@ contract: src/schemas/contracts/dwd.yml
 targets:
 
   - canonical_fact: fact_weather
-    status: resolved_shape_open       # target fact clear; long-vs-wide shape is an open question
     from_tables: [dwd_air_temperature, dwd_cloudiness, dwd_moisture, dwd_precipitation,
                   dwd_pressure, dwd_sun, dwd_wind]
-    canonical_grain: [weather_location, date, hour]
-    proposed_silver_grain: [weather_location, hour_ts, parameter, value, quality_flag]
+    canonical_grain: [weather_location, hour_ts, parameter]
+    silver_grain: [weather_location, hour_ts, parameter, value, quality_flag]
     field_map:
       - source: "STATIONS_ID"
         canonical: "dim_weather_location.station_id  (+ city as a station attribute)"
@@ -42,13 +41,17 @@ targets:
       source_record_id: "concat_ws('|', <measurement>, STATIONS_ID, MESS_DATUM)"
 
   - canonical_dimension: dim_weather_location
-    status: open
-    open_question: dwd-station-time-varying-location
+    scd2: false
     from_tables: [dwd_station_geography, dwd_station_name_history]
+    shape: "one row per station -- representative city / latitude / longitude / elevation"
+    field_map:
+      - { source: "STATIONS_ID", canonical: "dim_weather_location.station_id" }
+      - { source: "city",        canonical: "dim_weather_location.city" }
+      - { source: "latitude / longitude / station_elevation_m (representative row)", canonical: "dim_weather_location coordinates" }
+    history_kept_as_reference: [dwd_station_geography, dwd_station_name_history]
     note: >
-      Both are 1:N per station over time (relocations, renames). Options: SCD-2
-      weather-location dimension joined on the von/bis validity window, or a
-      latest-value collapse. Recommend SCD-2. Decision needed before Silver.
+      Full location / name history stays as Silver reference tables for anyone
+      who needs point-in-time detail; the fact joins to the one-row dimension.
 
   - reference_only: true
     from_tables: [dwd_device_instrument, dwd_parameter_unit, dwd_missing_value_periods]
@@ -69,9 +72,3 @@ dropped_columns:
 localisation:
   required: false
   reason: "natively German (DWD, 8 German city stations)"
-
-unresolved_before_silver:
-  - dwd-station-time-varying-location
-  - dwd-measurement-fact-shape
-  - dwd-moisture-qn8-constant
-  - dwd-metadata-column-names

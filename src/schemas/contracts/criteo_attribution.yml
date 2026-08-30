@@ -85,36 +85,5 @@ localisation:
   required: false
   note: >
     No geography field. Not a German source. Retained with
-    source_system='criteo_attribution'; distinct from iPinYou (ADR-005 keeps
-    iPinYou as the primary RTB source). Never presented as German advertising.
-
-open_questions:
-  - id: criteo-relative-time-date-key
-    question: >
-      Timestamps are relative seconds from an undisclosed start. fact_attribution
-      grain includes a date. Decide: (a) carry a relative-day integer (0..30) and
-      a NULL calendar date; (b) anchor day 0 to a synthetic reference date purely
-      for a dim_date join, clearly flagged as synthetic. Recommend (a).
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: criteo-cost-cpo-units
-    question: >
-      cost and cpo are normalised (Criteo does not disclose the scale). Confirm
-      they are used only as relative / ratio measures, not as currency amounts.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: criteo-campaign-dimension
-    question: >
-      Criteo campaign ids are this source's own. Confirm dim_campaign carries a
-      source_system discriminator so Criteo campaigns are never merged with
-      iPinYou or synthetic campaign ids.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/criteo_attribution.yml
-  - id: criteo-fact-grain
-    question: >
-      fact_attribution grain is "campaign, impression/click chain, conversion,
-      date". Confirm the Silver grain is one row per touchpoint (as in Bronze),
-      with conversion_id as the path key, rather than one row per conversion path.
-    raised: 2026-08-30
-    blocks_stage: silver
+    source_system='criteo_attribution'; a distinct source from iPinYou, not a
+    replacement. Never presented as German advertising.

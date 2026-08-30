@@ -14,7 +14,6 @@ contract: src/schemas/contracts/honda_iot.yml
 targets:
 
   - canonical_fact: fact_energy_consumption
-    status: resolved_shape_open
     from_tables: [honda_iot_electricity_p, honda_iot_electricity_w,
                   honda_iot_heating_p, honda_iot_heating_w,
                   honda_iot_cooling_p, honda_iot_cooling_w]
@@ -26,7 +25,7 @@ targets:
       - source: "value column name -> channel"
         canonical: "dim_device.channel (total / PV / CHP / CHP_heat / CHP_elec / cool_elec)"
       - source: "_p vs _w table -> measure"
-        canonical: "fact_energy_consumption.measure (power vs energy -- see open_question honda-p-vs-w-semantics)"
+        canonical: "fact_energy_consumption.measure ('power' for _p, 'energy' for _w)"
       - source: "frequency"
         canonical: "interval attribute (1min / 15min / 1h)"
       - source: "datetime_utc"
@@ -34,7 +33,7 @@ targets:
         transform: "cast to timestamp (UTC)"
       - source: "<value columns>"
         canonical: "fact_energy_consumption.value"
-        transform: "cast to double; keep sign (negative = generation/export -- see honda-signed-consumption)"
+        transform: "cast to double; keep sign -- negative = on-site generation / export"
     provenance:
       source_system: honda_iot
       source_record_id: "concat_ws('|', <table>, frequency, datetime_utc)"
@@ -43,24 +42,19 @@ targets:
       site='honda_site' x subsystem x channel; no real per-device serial exists.
 
   - canonical_fact: fact_weather
-    status: open
-    open_question: honda-weather-canonical-home
     from_tables: [honda_iot_weather]
-    canonical_grain: [weather_location, date, hour]
-    proposed: >
-      weather_location = synthetic 'honda_site'; Ta -> air temperature parameter,
-      Igm -> global irradiance parameter (a parameter DWD does not carry).
-      Alternative: no canonical weather fact, join weather to the energy facts as
-      context only.
+    canonical_grain: [weather_location, hour_ts, parameter]
+    field_map:
+      - { source: "(synthetic)",                canonical: "weather_location = 'honda_site'  [synthetic field]" }
+      - { source: "datetime_utc",               canonical: "hour_ts", transform: "cast to timestamp (UTC)" }
+      - { source: "WeatherStation_Weather_Ta",  canonical: "parameter='air_temperature', value" }
+      - { source: "WeatherStation_Weather_Igm", canonical: "parameter='global_irradiance', value  (not carried by DWD)" }
+    provenance:
+      source_system: honda_iot
+      source_record_id: "concat_ws('|', 'honda_iot_weather', frequency, datetime_utc)"
 
 dropped_columns: []          # every source column carries information
 
 localisation:
   required: false
   reason: "single fixed German site; no language / currency mapping"
-
-unresolved_before_silver:
-  - honda-p-vs-w-semantics
-  - honda-signed-consumption
-  - honda-resolution-choice
-  - honda-weather-canonical-home

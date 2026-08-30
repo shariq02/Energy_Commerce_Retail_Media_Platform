@@ -13,44 +13,36 @@ contract: src/schemas/contracts/kddcup2012.yml
 
 targets:
 
-  - canonical_fact: fact_search_ad_click
-    status: open
-    open_question: kdd-no-timestamp
+  - canonical_use: cross_domain_signal_only
     from_tables: [kddcup2012_click_prediction]
-    canonical_grain: [impression/click_event, ad, query, source-attributed user]
-    proposed_grain: [ad_id, query_id, keyword_id, title_id, description_id, user_id, url_hash, depth, position]
+    decision: >
+      NOT loaded as dated fact_search_ad_click rows (no timestamp, none
+      derivable). Used for position/depth CTR curves and click-prediction
+      features feeding the cross-domain models. Grain of the analysis =
+      (ad_id, advertiser_id, query_id, keyword_id, title_id, description_id,
+      user_id, url_hash, depth, position), aggregated (click_count /
+      impression_count), not per-impression.
     field_map:
-      - source: "ad_id"
-        canonical: "dim_advertisement / fact_search_ad_click.ad_id"
-      - source: "advertiser_id"
-        canonical: "dim_advertiser (source-attributed)"
-      - source: "query_id / keyword_id / title_id / description_id"
-        canonical: "search-context attributes"
-        transform: "value 0 -> NULL (unknown)"
-      - source: "user_id"
-        canonical: "source-attributed user id -- NOT dim_customer, never resolved across sources"
-        transform: "value 0 -> NULL"
-      - source: "depth / position"
-        canonical: "ranking attributes"
-      - source: "click / impression"
-        canonical: "fact_search_ad_click.click_count / impression_count (aggregated measures)"
-      - source: "(no timestamp)"
-        canonical: "date key = NULL / 'undated'"
+      - { source: "query_id / keyword_id / title_id / description_id", canonical: "search-context attributes; value 0 -> NULL" }
+      - { source: "user_id", canonical: "source-attributed user id; value 0 -> NULL; joined only to kddcup2012_userid_profile" }
+      - { source: "depth / position", canonical: "ranking attributes" }
+      - { source: "click / impression", canonical: "click_count / impression_count (aggregated)" }
     provenance:
       source_system: kddcup2012_track2
       source_record_id: "row hash of the full context key"
-    recommendation: >
-      Because there is no timestamp and rows are pre-aggregated, use this source
-      for position/depth CTR curves and click-prediction features feeding the
-      cross-domain models -- do NOT load it as dated fact_search_ad_click rows.
+
+  - reference_enrichment: true                   # pending acquisition
+    from_tables: [kddcup2012_userid_profile, kddcup2012_queryid_tokensid,
+                  kddcup2012_purchasedkeywordid_tokensid, kddcup2012_titleid_tokensid,
+                  kddcup2012_descriptionid_tokensid]
+    note: >
+      userid_profile -> gender / age-bucket attributes on the source-attributed
+      user (same-dataset enrichment, still never cross-joined). The *_tokensid
+      files -> token-content lookups for query / keyword / title / description.
+      All five reference-only; not facts.
 
 dropped_columns: []
 
 localisation:
   required: false
   reason: "no geography; not a German source"
-
-unresolved_before_silver:
-  - kdd-no-timestamp
-  - kdd-aggregated-grain
-  - kdd-user-id-scope

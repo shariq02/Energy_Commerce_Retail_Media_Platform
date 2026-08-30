@@ -44,7 +44,7 @@ tables:
       - { name: date,           type: string, required: true, nullable: false, notes: "archive marker, NOT a daily timestamp; mixed formats %m/%d/%Y (7) and %Y-%m-%d (335); model as monthly period" }
       - { name: device,         type: string, required: true, nullable: false, allowed_values: [DESKTOP, MOBILE, TABLET] }
       - { name: impressions,    type: double, required: true, nullable: false, notes: "range 1..260271; p99 = 11" }
-      - { name: index,          type: string, required: true, nullable: false, distinct_observed: 28, notes: "non-numeric repo-ish token (um, texas_am, ...); relationship to repository_id unclear -- see open_questions" }
+      - { name: index,          type: string, required: true, nullable: false, distinct_observed: 28, notes: "non-numeric repo-ish token (um, texas_am, ...); relationship to repository_id unclear -- verify before Silver" }
       - { name: position,       type: double, required: true, nullable: false, notes: "mean search rank; range 1..115321; p50 = 16" }
       - { name: url,            type: string, required: true, nullable: false, distinct_observed: 1475244 }
       - { name: repository_id,  type: string, required: true, nullable: false, distinct_observed: 29, notes: "FK to search_visibility_repository (100% row match)" }
@@ -92,36 +92,3 @@ localisation:
     German retail-market data. `deu` rows exist but the source is never presented
     as German ecommerce or a German market signal. Retained with
     source_system='search_visibility_ramp_dryad'.
-
-open_questions:
-  - id: sv-date-monthly-period
-    question: >
-      Confirm `date` is modelled as a monthly period (YYYY-MM) for the canonical
-      grain, and confirm the parse handles both raw formats. fact_search_visibility
-      grain is (page/URL, country, device, date) -- date here is monthly.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: sv-conflicting-metric-resolution
-    question: >
-      Pick the deterministic rule for the 469515 conflicting candidate-key groups
-      (sum metrics? last archive wins? max?). Recommend: sum clicks/impressions,
-      recompute clickThrough, take impression-weighted mean position.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: sv-index-column
-    question: >
-      What is the `index` column (28 non-numeric tokens like 'um', 'texas_am')?
-      It looks like a coarser repository grouping. Confirm whether it is redundant
-      with repository_id or a genuine separate attribute before Silver.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/search_visibility.yml
-  - id: sv-canonical-role
-    question: >
-      This is institutional-repository search traffic, not the platform's own
-      product-page search visibility. Confirm it feeds fact_search_visibility as
-      a standalone source-attributed fact and is used only as a demand / search-
-      behaviour signal in the cross-domain models, never joined to product or
-      customer identities.
-    raised: 2026-08-30
-    blocks_stage: silver

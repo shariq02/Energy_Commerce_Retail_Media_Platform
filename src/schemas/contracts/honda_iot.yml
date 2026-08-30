@@ -36,7 +36,7 @@ conventions:
   p_vs_w_note: >
     '_p' tables and '_w' tables of a metric are schema-identical and join 1:1 on
     (frequency, datetime_utc). Their meaning (instantaneous power vs cumulative
-    energy) is not documented in the EDA -- see open_questions.
+    energy) is not documented in the EDA; treated as power vs energy respectively.
   value_missing_note: >
     weather columns are ~2.4% null; energy value columns have no nulls but carry
     large negative values (PV / CHP export) and 5-sigma spikes.
@@ -135,41 +135,3 @@ localisation:
   note: >
     Site is in Germany (Honda Research Institute Europe). No language / currency
     localisation needed; geography is a single fixed site.
-
-open_questions:
-  - id: honda-p-vs-w-semantics
-    question: >
-      What do the '_p' and '_w' variants mean? Working hypothesis: _p =
-      instantaneous power (kW), _w = cumulative energy (kWh) -- consistent with
-      _w being large and monotone-looking and _p swinging +/-. Confirm, and
-      confirm units, before Silver. This decides whether both map to
-      fact_energy_consumption or one is derived from the other.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: honda-signed-consumption
-    question: >
-      Energy value columns carry large negatives (PV / CHP generation and
-      export). fact_energy_consumption grain is (device/meter, date, interval).
-      Decide: (a) signed value (import positive, export negative) on one fact;
-      (b) split into consumption vs generation measures. Recommend (a) with an
-      explicit sign convention. Needs a canonical-model note.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: honda-resolution-choice
-    question: >
-      1min / 15min / 1h are the same series at 3 resolutions. Carry all three
-      into Silver (partitioned by frequency), or downselect to one canonical
-      resolution (1h) for fact_energy_consumption? Recommend keep all in Silver,
-      1h into Gold.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: honda-weather-canonical-home
-    question: >
-      honda_iot_weather is single-site on-site sensor data. Map to fact_weather
-      with a synthetic weather_location = 'honda_site', or carry only as
-      consumption context (joined to the energy facts on (frequency,
-      datetime_utc)) with no canonical weather fact? Recommend the synthetic
-      weather_location so DWD and Honda weather share fact_weather.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/honda_iot.yml

@@ -81,7 +81,7 @@ tables:
     columns:
       - { name: STATIONS_ID, type: string, required: true, nullable: false }
       - { name: MESS_DATUM,  type: string, required: true, nullable: false }
-      - { name: QN_8,        type: string, required: true, nullable: false, constant_observed: "3", notes: "constant in acquired data -- see open_questions" }
+      - { name: QN_8,        type: string, required: true, nullable: false, constant_observed: "3", notes: "constant (=3) in the acquired data" }
       - { name: ABSF_STD,    type: double, required: true, nullable: true, notes: "absolute humidity g/m3" }
       - { name: VP_STD,      type: double, required: true, nullable: true, notes: "vapour pressure hPa" }
       - { name: TF_STD,      type: double, required: true, nullable: true, notes: "wet-bulb temp degC; 84 out-of-range" }
@@ -247,38 +247,3 @@ quality_rules:
 localisation:
   required: false
   note: "natively German. No localisation mapping needed."
-
-open_questions:
-  - id: dwd-moisture-qn8-constant
-    question: >
-      dwd_moisture QN_8 is constant (=3) in the acquired data. Confirm this is a
-      genuine source characteristic for the covered window, not a load defect.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: dwd-station-time-varying-location
-    question: >
-      station_geography and station_name_history are 1:N per station over time.
-      dim_weather_location needs a decision: (a) SCD-2 dimension joined on the
-      von/bis window; (b) collapse to the latest location per station. Recommend
-      (a). Needs a canonical-model / ADR decision.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/dwd.yml
-  - id: dwd-measurement-fact-shape
-    question: >
-      7 measurement tables have disjoint value columns and only partly
-      overlapping (station, hour) coverage. fact_weather grain is
-      (weather_location, date, hour). Model as (a) one long fact_weather
-      (location, hour, parameter, value, quality_flag) unioning all 7, or (b) 7
-      wide per-measurement facts aligned only at Gold. EDA verdict leans (a) for
-      Silver with a Gold wide table. Confirm before Silver.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/dwd.yml
-  - id: dwd-metadata-column-names
-    question: >
-      Metadata-table column lists in this contract are best-effort from the EDA
-      profile (which reports row/dup/validity stats, not full headers). Confirm
-      exact Bronze column names for the 5 metadata tables before Silver.
-    raised: 2026-08-30
-    blocks_stage: silver

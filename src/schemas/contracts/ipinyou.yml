@@ -36,7 +36,8 @@ conventions:
     reconciled onto the superset schema with NULLs, not concatenated blindly.
   no_campaign_id: >
     iPinYou carries advertiser_id (12 distinct) + creative_id + ad_slot, but no
-    campaign id -- see open_questions.
+    campaign id; a derived surrogate (advertiser_id, creative_id) is used --
+    see src/schemas/mappings/ipinyou.yml.
 
 tables:
 
@@ -150,38 +151,3 @@ localisation:
     only to name_en / name_cn via ipinyou_reference -- no coordinates, no German
     geography. Retained with source_system='ipinyou'; never presented as German
     RTB. See the Germany localisation design doc.
-
-open_questions:
-  - id: ipinyou-no-campaign-id
-    question: >
-      fact_ad_impression / fact_ad_click / fact_conversion grain is "campaign,
-      placement, event_timestamp". iPinYou has advertiser_id + creative_id +
-      ad_slot but NO campaign id. Decide: (a) treat advertiser_id as the campaign
-      grain surrogate; (b) synthesise a campaign key from (advertiser_id,
-      creative_id); (c) leave campaign NULL for iPinYou-sourced rows. Recommend
-      (b). Needs a canonical-model note.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: ipinyou-event-fact-split
-    question: >
-      training carries event_type (imp / clk / conv). Split into three facts
-      (fact_ad_impression / fact_ad_click / fact_conversion) or one long RTB
-      event fact partitioned by event_type? EDA leans one fact per event grain.
-      leaderboard is a separate fact (conversion-label test set). Confirm.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/ipinyou.yml
-  - id: ipinyou-geo-dimension
-    question: >
-      Build region / city dimensions from ipinyou_reference (name_en / name_cn).
-      Confirm these are source-attributed geo dimensions, never mapped to German
-      regions or to dim_geography's German members.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: ipinyou-price-currency
-    question: >
-      bidding_price / paying_price / floor_price are in CNY fen (or the dataset's
-      own micro-unit). Confirm the unit and whether prices are used as currency
-      or only as relative measures.
-    raised: 2026-08-30
-    blocks_stage: silver

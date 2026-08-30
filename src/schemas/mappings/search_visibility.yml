@@ -14,10 +14,10 @@ contract: src/schemas/contracts/search_visibility.yml
 targets:
 
   - canonical_fact: fact_search_visibility
-    status: resolved_date_open
     from_tables: [search_visibility_events]
     canonical_grain: [page_url, country, device, date]
-    grain_note: "date = monthly period (see open_question sv-date-monthly-period)"
+    grain_note: "date = monthly period (YYYY-MM); parse both %m/%d/%Y and %Y-%m-%d"
+    never: "not joined to product or customer identities -- cross-domain signal only"
     field_map:
       - source: "url"
         canonical: "page_url (grain)"
@@ -36,7 +36,7 @@ targets:
       - source: "citableContent"
         canonical: "content-type attribute (Yes / No)"
       - source: "index"
-        canonical: "UNRESOLVED -- see open_question sv-index-column"
+        canonical: "carried as an attribute; role unverified"
     provenance:
       source_system: search_visibility_ramp_dryad
       source_record_id: "concat_ws('|', repository_id, url, date, country, device)"
@@ -58,9 +58,3 @@ localisation:
   detail:
     geography: "country is search-console traffic geography, not a market; carried as source-attributed dim_geography"
     never: "not presented as German ecommerce / German market visibility even where country='deu'"
-
-unresolved_before_silver:
-  - sv-date-monthly-period
-  - sv-conflicting-metric-resolution
-  - sv-index-column
-  - sv-canonical-role

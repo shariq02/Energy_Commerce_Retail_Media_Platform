@@ -79,44 +79,16 @@ localisation:
   required: true
   approach: honest_provenance
   note: >
-    REES46 is not a German retailer and carries no country / geography column and
-    no documented currency. It is retained with source_system='rees46' and is
-    never presented as German commerce. See src/schemas/mappings/rees46.yml and
-    the Germany localisation design doc.
-
-open_questions:
-  - id: rees46-no-geography
-    question: >
-      REES46 has no country / region / geography field. fact_product_demand grain
-      is (product_category, geography, date). Decide: (a) REES46 contributes to
-      fact_product_demand with geography = 'unknown' / a single synthetic bucket;
-      (b) REES46 feeds only fact_customer_activity (session, event) and product
-      demand is derived without a geography split for this source. Recommend (b)
-      for the canonical fact, with REES46 demand signal used in the cross-domain
-      intermediate models only.
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: rees46-currency
-    question: >
-      price currency is undocumented. Confirm a currency assumption (or mark
-      price as currency-unknown and use only relative / ratio measures).
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: rees46-purchase-to-orders
-    question: >
-      Purchase events have no order_id and no basket grouping. fact_orders grain
-      is (order, order_item). Decide: synthesise an order key from
-      (user_session, min-purchase-timestamp window), or do NOT populate
-      fact_orders from REES46 and treat purchases as purchase-events only.
-      Recommend the latter.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/rees46.yml
-  - id: rees46-category-hierarchy
-    question: >
-      Parse category_code dotted paths into a category hierarchy dimension, and
-      pick the resolution rule for the category_id <-> category_code mismatch
-      (58 conflicts). Recommend: category_code path is authoritative for the
-      hierarchy; category_id kept as a source id only.
-    raised: 2026-08-30
-    blocks_stage: silver
+    REES46 is not a German retailer, carries no country / geography column and no
+    documented currency, and no geography can be derived from any field. Retained
+    with source_system='rees46', never presented as German commerce. A SYNTHETIC
+    country is attached at user level (one stable country per user_id,
+    deterministically generated, clearly flagged synthetic) -- a platform-
+    generated attribute, never a claim about where the events occurred. See
+    src/schemas/mappings/rees46.yml.
+  synthetic_fields:
+    - name: country_synthetic
+      class: synthetic
+      grain: user_id                # NOT on the event rows
+      rule: "deterministic hash of user_id -> a country; stable per user_id"
+      note: "generated in Silver, not present in Bronze; flagged synthetic on every downstream use"

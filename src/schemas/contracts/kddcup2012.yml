@@ -14,9 +14,10 @@ domain: Commerce / Search Advertising
 description: >
   Search-advertising impression records with a click flag/count and an
   impression count, plus hashed query / ad / keyword / title / description / user
-  ids and ranking position/depth. No timestamp. Static one-time acquisition
-  (single CSV, sample release). Not a German source; provides click / click-
-  prediction evidence only -- no conversion or sale field.
+  ids and ranking position/depth. No timestamp -- used undated. The
+  main click-prediction CSV is acquired (sample release); five supplementary
+  lookup files are pending acquisition. Not a German
+  source; provides click / click-prediction evidence only -- no conversion field.
 profiling_evidence: src/schemas/profiling/kddcup2012.md
 bronze_physical_types: string
 
@@ -26,6 +27,9 @@ acquisition:
   cadence: static_snapshot
   update_frequency: none
   sla: none
+  status: >
+    kddcup2012_click_prediction acquired + profiled; the 5 supplementary lookup
+    tables are NOT yet acquired -- a Phase 2 / 2b follow-up.
 
 tables:
 
@@ -47,7 +51,47 @@ tables:
       - { name: keyword_id,     type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.39%" }
       - { name: title_id,       type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.00%" }
       - { name: description_id, type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.00%" }
-      - { name: user_id,        type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 24.27%; source-attributed, never joined to any other source" }
+      - { name: user_id,        type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 24.27%; source-attributed; joined only to kddcup2012_userid_profile" }
+
+  # ---- Supplementary lookup files (pending acquisition) ------------------
+  # Official files from the same KDD Cup 2012 Track 2 release, not yet acquired.
+  # Columns are the dataset's published TSV format; no profiling evidence yet.
+
+  - name: kddcup2012_userid_profile
+    acquisition_status: pending
+    grain: { key: [userid], unique: true }
+    columns:
+      - { name: userid, type: string,  required: true, nullable: false }
+      - { name: gender, type: integer, required: true, nullable: false, notes: "0 = unknown, 1, 2" }
+      - { name: age,    type: integer, required: true, nullable: false, notes: "age bucket 0-6 (0 = unknown)" }
+
+  - name: kddcup2012_queryid_tokensid
+    acquisition_status: pending
+    grain: { key: [queryid], unique: true }
+    columns:
+      - { name: queryid, type: string, required: true, nullable: false }
+      - { name: tokens,  type: string, required: true, nullable: false, notes: "pipe-delimited token ids, e.g. '12|3|45'" }
+
+  - name: kddcup2012_purchasedkeywordid_tokensid
+    acquisition_status: pending
+    grain: { key: [keywordid], unique: true }
+    columns:
+      - { name: keywordid, type: string, required: true, nullable: false }
+      - { name: tokens,    type: string, required: true, nullable: false, notes: "pipe-delimited token ids" }
+
+  - name: kddcup2012_titleid_tokensid
+    acquisition_status: pending
+    grain: { key: [titleid], unique: true }
+    columns:
+      - { name: titleid, type: string, required: true, nullable: false }
+      - { name: tokens,  type: string, required: true, nullable: false, notes: "pipe-delimited token ids" }
+
+  - name: kddcup2012_descriptionid_tokensid
+    acquisition_status: pending
+    grain: { key: [descriptionid], unique: true }
+    columns:
+      - { name: descriptionid, type: string, required: true, nullable: false }
+      - { name: tokens,        type: string, required: true, nullable: false, notes: "pipe-delimited token ids" }
 
 quality_rules:
   - id: exact_duplicates
@@ -77,31 +121,3 @@ localisation:
   note: >
     No geography field. Source is not German. Retained with
     source_system='kddcup2012_track2'; never presented as German advertising.
-
-open_questions:
-  - id: kdd-no-timestamp
-    question: >
-      The dataset has no timestamp column. fact_search_ad_click grain includes an
-      event timestamp / dim_date link. Decide: (a) fact_search_ad_click rows from
-      this source carry a NULL / 'undated' date key and are excluded from any
-      time-series metric; (b) this source is used only for position/depth CTR
-      curves and click-prediction features, not loaded as dated fact rows.
-      Recommend (b).
-    raised: 2026-08-30
-    blocks_stage: silver
-  - id: kdd-aggregated-grain
-    question: >
-      Rows are (context) groups with click + impression counts, not individual
-      impressions. Confirm fact_search_ad_click is modelled at this aggregated
-      grain (one row per context group, with click_count / impression_count
-      measures), not expanded to per-impression rows.
-    raised: 2026-08-30
-    blocks_stage: silver
-    see: src/schemas/mappings/kddcup2012.yml
-  - id: kdd-user-id-scope
-    question: >
-      user_id is the source's own hashed id. Confirm it is carried only as
-      source_record context and never joined to REES46 / GA4 / synthetic customer
-      identities (provenance principle).
-    raised: 2026-08-30
-    blocks_stage: silver
