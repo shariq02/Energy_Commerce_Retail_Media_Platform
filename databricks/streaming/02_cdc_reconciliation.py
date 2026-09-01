@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # CDC RECONCILIATION
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Compare the CDC current-state Bronze tables against the row
@@ -115,5 +115,5 @@ print(f"Overall      : {'PASS' if not failed else 'FAIL'}")
 print("=" * 70)
 if failed:
     raise RuntimeError(
-        f"FAIL  CDC reconciliation mismatch on: {[r[4] for r in failed]}"
+        f"FAIL  CDC reconciliation mismatch on: {', '.join(r[4] for r in failed)}"
     )

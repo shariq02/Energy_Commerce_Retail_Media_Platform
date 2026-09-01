@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # CREATE CDC UNITY CATALOG OBJECTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Create the landing Volume the local CDC consumer uploads to,
@@ -202,7 +202,7 @@ for table, columns in TABLE_COLUMNS.items():
     spark.sql(
         f"CREATE TABLE IF NOT EXISTS {current} ("
         + ", ".join([*value_cols, *meta_cols])
-        + f") USING DELTA TBLPROPERTIES (delta.constraints.pk = '{PRIMARY_KEY[table]}')"
+        + ") USING DELTA"
     )
     created.extend([history, current])
     print(f"OK  {table}: history + current")
