@@ -1,7 +1,10 @@
 # Energy Commerce & Retail Media Analytics Platform - Makefile
 # Common commands for development workflow
 
-.PHONY: help setup setup-dev test test-unit test-integration test-regression test-performance lint lint-fix terraform-init terraform-plan terraform-apply terraform-destroy redpanda-start redpanda-stop dagster-start dbt-run dbt-test grafana-start generator-start api-start gcp-auth clean
+# Keep __pycache__ out of the tree for every recipe below.
+export PYTHONDONTWRITEBYTECODE := 1
+
+.PHONY: help setup setup-dev test test-unit test-integration test-regression test-performance lint lint-fix terraform-init terraform-plan terraform-apply terraform-destroy redpanda-start redpanda-stop cdc-install cdc-topics cdc-connect-start cdc-connect-stop cdc-schemas cdc-driver cdc-consume cdc-sync cdc-cycle dagster-start dbt-run dbt-test grafana-start generator-start api-start gcp-auth clean
 
 help:
 	@echo "Energy Commerce & Retail Media Analytics Platform - Available Commands"
@@ -32,11 +35,22 @@ help:
 	@echo "SERVICES"
 	@echo "  redpanda-start     - Start Redpanda broker"
 	@echo "  redpanda-stop      - Stop Redpanda broker"
+	@echo ""
+	@echo "CDC"
+	@echo "  cdc-install        - Download Kafka Connect + Debezium PostgreSQL plugin"
+	@echo "  cdc-topics         - Create the 10 per-table CDC topics on Redpanda"
+	@echo "  cdc-connect-start  - Start the standalone Debezium connector"
+	@echo "  cdc-connect-stop   - Stop the standalone Debezium connector"
+	@echo "  cdc-schemas        - Register the CDC event schemas in Schema Registry"
+	@echo "  cdc-driver         - Apply operational changes (CYCLES=N)"
+	@echo "  cdc-consume        - Run the local consumer, land events to data/cdc/"
+	@echo "  cdc-sync           - Upload landed files to the Databricks Volume"
+	@echo "  cdc-cycle          - Topics -> schemas -> baseline -> changes -> consume -> sync"
 	@echo "  dagster-start      - Start Dagster dev UI and orchestration"
 	@echo "  dbt-run            - Run all dbt models"
 	@echo "  dbt-test           - Run all dbt tests"
 	@echo "  grafana-start      - Start Grafana"
-	@echo "  generator-start    - Start data generator (replay all sources)"
+	@echo "  generator-start    - Build the operational seed dataset (CSV)"
 	@echo "  api-start          - Start FastAPI server (AI agent service layer)"
 	@echo ""
 	@echo "UTILITIES"
@@ -114,6 +128,37 @@ redpanda-start:
 
 redpanda-stop:
 	rpk redpanda stop
+
+# ====================================================================
+# CDC (operational PostgreSQL -> Debezium -> Redpanda -> local consumer)
+# ====================================================================
+
+cdc-install:
+	bash scripts/setup/install_kafka_connect.sh
+
+cdc-topics:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.topics create
+
+cdc-connect-start:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.connect start
+
+cdc-connect-stop:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.connect stop
+
+cdc-schemas:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.register_schemas
+
+cdc-driver:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.change_driver --cycles $(or $(CYCLES),40)
+
+cdc-consume:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.consumer
+
+cdc-sync:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.sync_to_databricks
+
+cdc-cycle:
+	PYTHONPATH=$(PWD) python3 -m src.ingestion.cdc.run_cdc_cycle --cycles $(or $(CYCLES),40)
 
 dagster-start:
 	PYTHONPATH=$(PWD) dagster dev -m dagster

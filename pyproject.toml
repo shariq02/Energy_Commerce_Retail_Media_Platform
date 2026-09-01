@@ -51,6 +51,8 @@ include = ["src*", "fastapi*", "ai*"]
 
 [tool.ruff]
 exclude = ["data/", "docs/", ".terraform/"]
+# Keep the ruff cache out of the repo tree.
+cache-dir = "~/.cache/ruff/ecrmap"
 # spark/dbutils are Databricks-runtime-injected globals (databricks/*),
 # never imported -- declared here so Ruff doesn't flag them as undefined.
 builtins = ["spark", "dbutils"]

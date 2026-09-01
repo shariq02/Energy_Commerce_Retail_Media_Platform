@@ -168,20 +168,33 @@ KAFKA_CONFIG = {
     "linger_ms": int(os.getenv("KAFKA_LINGER_MS", "10")),
 }
 
-# Topics carry replayed historical data (IoT, REES46, iPinYou) plus CDC
-# change events
+# Redpanda carries exactly one kind of event data: CDC change events from the
+# operational PostgreSQL system. One topic per physical operational table,
+# "<prefix>.<schema>.<table>" -- created by src/ingestion/cdc/topics.py. No
+# historical source is replayed as a simulated stream.
+CDC_TOPIC_PREFIX = os.getenv("DEBEZIUM_TOPIC_PREFIX", "ecrmap")
+CDC_SOURCE_SCHEMA = "operational"
+
+OPERATIONAL_TABLES = (
+    "tariffs",
+    "products",
+    "customers",
+    "customer_contracts",
+    "meters",
+    "advertisers",
+    "campaigns",
+    "campaign_budgets",
+    "orders",
+    "order_items",
+)
+
 KAFKA_TOPICS = {
-    "market": os.getenv("TOPIC_MARKET", "market.events"),
-    "weather": os.getenv("TOPIC_WEATHER", "weather.events"),
-    "iot": os.getenv("TOPIC_IOT", "iot.consumption"),
-    "commerce": os.getenv("TOPIC_COMMERCE", "commerce.events"),
-    "retail_media": os.getenv("TOPIC_RETAIL_MEDIA", "retailmedia.events"),
-    "cdc_operational": os.getenv("TOPIC_CDC_OPERATIONAL", "cdc.operational"),
+    table: f"{CDC_TOPIC_PREFIX}.{CDC_SOURCE_SCHEMA}.{table}"
+    for table in OPERATIONAL_TABLES
 }
 
 KAFKA_CONSUMER_GROUPS = {
-    "databricks_streaming": "databricks-streaming-group",
-    "cdc_consumer": "cdc-consumer-group",
+    "cdc_consumer": os.getenv("CDC_CONSUMER_GROUP", "ecrmap-cdc-consumer"),
 }
 
 # ====================================================================
@@ -221,20 +234,14 @@ BIGQUERY_CONFIG = {
 
 DEBEZIUM_CONFIG = {
     "connector_name": os.getenv("DEBEZIUM_CONNECTOR_NAME", "ecrmap-postgres-connector"),
-    "slot_name": os.getenv("DEBEZIUM_SLOT_NAME", "ecrmap_slot"),
-    "topic_prefix": os.getenv("DEBEZIUM_TOPIC_PREFIX", "cdc"),
-    # Entities captured from the operational PostgreSQL system
-    "tables": [
-        "customers",
-        "customer_contracts",
-        "tariffs",
-        "meters",
-        "products",
-        "orders",
-        "advertisers",
-        "campaigns",
-        "campaign_budgets",
-    ],
+    "slot_name": os.getenv("DEBEZIUM_SLOT_NAME", "ecrmap_cdc_slot"),
+    "publication_name": os.getenv("DEBEZIUM_PUBLICATION_NAME", "ecrmap_cdc_pub"),
+    "topic_prefix": CDC_TOPIC_PREFIX,
+    "plugin_name": "pgoutput",
+    "snapshot_mode": os.getenv("DEBEZIUM_SNAPSHOT_MODE", "initial"),
+    "schema_registry_url": os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081"),
+    # All 10 physical operational tables are captured as independent streams.
+    "tables": list(OPERATIONAL_TABLES),
 }
 
 # ====================================================================
@@ -245,7 +252,7 @@ DATABRICKS_CONFIG = {
     "host": os.getenv("DATABRICKS_HOST"),
     "token": os.getenv("DATABRICKS_TOKEN"),
     "token_dbt": os.getenv("DATABRICKS_TOKEN_DBT"),
-    "catalog": "ecrmap",
+    "catalog": os.getenv("DATABRICKS_CATALOG", "energy_commerce_retail_media"),
     # Layer names: Bronze / Silver / Gold
     "schemas": {
         "eda": "eda",
@@ -319,17 +326,15 @@ AI_TOOLS = [
 ]
 
 # ====================================================================
-# DATA GENERATOR CONFIGURATION
-# Replay of historical public data (IoT, REES46, iPinYou) as simulated
-# real-time events
+# OPERATIONAL DATA GENERATOR / CDC CHANGE DRIVER CONFIGURATION
+# The seed generator builds the Phase 5 operational dataset; the change
+# driver applies ongoing INSERT/UPDATE/DELETE activity for CDC to capture.
+# No historical public dataset is replayed as a simulated stream.
 # ====================================================================
 
 GENERATOR_CONFIG = {
-    "events_per_second": int(os.getenv("GENERATOR_EVENTS_PER_SECOND", "10")),
-    "replay_speed": int(os.getenv("GENERATOR_REPLAY_SPEED", "60")),
-    "anomaly_mode": os.getenv("GENERATOR_ANOMALY_MODE", "false").lower() == "true",
-    "anomaly_probability": float(os.getenv("GENERATOR_ANOMALY_PROBABILITY", "0.05")),
-    "sources": ["iot", "commerce", "retail_media"],
+    "seed": int(os.getenv("GENERATOR_SEED", "20260830")),
+    "change_driver_cycles": int(os.getenv("CDC_CHANGE_CYCLES", "40")),
 }
 
 # ====================================================================
@@ -415,18 +420,15 @@ DOMAINS = {
     },
     "iot_consumption": {
         "name": "IoT / Consumption",
-        "topic": KAFKA_TOPICS["iot"],
         "source": "Honda Research Institute Europe Smart Building Dataset",
     },
     "commerce": {
         "name": "Commerce",
-        "topic": KAFKA_TOPICS["commerce"],
         "source": "REES46",
         "is_german_source": False,
     },
     "retail_media": {
         "name": "Retail Media",
-        "topic": KAFKA_TOPICS["retail_media"],
         "source": "iPinYou",
         "is_german_source": False,
     },
