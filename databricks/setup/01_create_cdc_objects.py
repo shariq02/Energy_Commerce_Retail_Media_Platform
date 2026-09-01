@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # CREATE CDC UNITY CATALOG OBJECTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Create the landing Volume the local CDC consumer uploads to,

@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # CDC BRONZE LOAD
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Batch-load the CDC event files the local consumer uploaded to
@@ -181,6 +181,7 @@ META_COLS = [
 
 # DBTITLE 1,Locate landing files per table
 
+
 def list_files(table):
     path = f"{VOLUME_ROOT}/{table}"
     try:
@@ -199,6 +200,7 @@ if total_files == 0:
 # COMMAND ----------
 
 # DBTITLE 1,Load one table: append history, merge current
+
 
 def _nested_fields(df, parent):
     if parent not in df.columns:

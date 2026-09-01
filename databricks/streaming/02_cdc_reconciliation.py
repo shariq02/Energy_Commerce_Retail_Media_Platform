@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # CDC RECONCILIATION
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Compare the CDC current-state Bronze tables against the row
