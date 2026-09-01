@@ -19,9 +19,15 @@ import json
 import time
 from datetime import UTC, datetime
 
-from confluent_kafka import Consumer, KafkaError, KafkaException, TopicPartition
+from confluent_kafka import (
+    OFFSET_BEGINNING,
+    Consumer,
+    KafkaError,
+    KafkaException,
+    TopicPartition,
+)
 
-from src.ingestion.cdc import config
+from src.ingestion.cdc import config, source_identity
 from src.ingestion.cdc.debezium import ChangeEvent, MalformedEvent, parse_value
 from src.ingestion.cdc.landing import LandingWriter
 from src.ingestion.cdc.state import ConsumerState
@@ -61,7 +67,13 @@ def _end_offsets(messages: list) -> list[TopicPartition]:
 
 
 class CdcConsumer:
-    def __init__(self, *, idle_timeout: float = 15.0, from_beginning: bool = False):
+    def __init__(
+        self,
+        *,
+        idle_timeout: float = 15.0,
+        from_beginning: bool = False,
+        epoch_resolver=source_identity.current_epoch,
+    ):
         config.ensure_dirs()
         self._idle_timeout = idle_timeout
         self._run_id = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -71,6 +83,8 @@ class CdcConsumer:
         self._applied = 0
         self._stale = 0
         self._late = 0
+        self._rewind_on_assign = from_beginning
+        self._reconcile_source_lifetime(epoch_resolver)
         self._consumer = Consumer(
             {
                 "bootstrap.servers": config.BOOTSTRAP_SERVERS,
@@ -81,11 +95,41 @@ class CdcConsumer:
             }
         )
 
+    def _reconcile_source_lifetime(self, epoch_resolver) -> None:
+        """Drop resume state that belongs to a previous source lifetime.
+
+        Recorded log positions only mean something within the source database
+        lifetime that produced them. A rebuilt/restored source restarts its log
+        lower, so keeping the old positions would make its events look
+        already-applied and silently skip them. Fails closed if the source
+        identity cannot be confirmed.
+        """
+        epoch = epoch_resolver()
+        stored = self._state.source_epoch()
+        if stored is None:
+            self._state.bind_source_epoch(epoch)
+        elif stored != epoch:
+            print(
+                f"WARN  source lifetime changed ({stored} -> {epoch}); "
+                "resetting CDC resume state and re-reading from the start"
+            )
+            self._state.reset_for_new_source(epoch)
+            self._rewind_on_assign = True
+
     # -- lifecycle ---------------------------------------------------------
+
+    def _on_assign(self, consumer, partitions) -> None:
+        if self._rewind_on_assign:
+            for tp in partitions:
+                tp.offset = OFFSET_BEGINNING
+            # only on the first assignment -- a later rebalance must resume,
+            # not restart from the beginning again
+            self._rewind_on_assign = False
+        consumer.assign(partitions)
 
     def run(self) -> dict:
         topics = config.all_topics()
-        self._consumer.subscribe(topics)
+        self._consumer.subscribe(topics, on_assign=self._on_assign)
         last_message_at = time.monotonic()
         try:
             while True:

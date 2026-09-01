@@ -51,8 +51,12 @@ class FakeConsumer:
         self.subscribed = None
         self.closed = False
 
-    def subscribe(self, topics):
+    def subscribe(self, topics, on_assign=None):
         self.subscribed = list(topics)
+        self.on_assign = on_assign
+
+    def assign(self, partitions):
+        self.assigned = list(partitions)
 
     def commit(self, *, offsets=None, asynchronous=True):
         self.commits.append(offsets)
@@ -88,7 +92,7 @@ def cdc_consumer(tmp_path, monkeypatch):
         tmp_path / "connect" / "offsets" / "connect.offsets",
     )
     monkeypatch.setattr(mod, "Consumer", lambda _cfg: FakeConsumer())
-    return CdcConsumer(idle_timeout=0.0)
+    return CdcConsumer(idle_timeout=0.0, epoch_resolver=lambda: "test-epoch")
 
 
 def _drive(consumer, monkeypatch, batches):

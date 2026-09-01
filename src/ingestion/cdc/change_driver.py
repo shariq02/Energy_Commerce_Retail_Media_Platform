@@ -28,6 +28,7 @@ from psycopg2.extras import RealDictCursor
 from src.generators import config as gen
 from src.generators import reference_data as ref
 from src.ingestion.cdc import config as cdc
+from src.ingestion.cdc import connect
 
 load_dotenv()
 
@@ -609,7 +610,20 @@ def main() -> int:
     parser.add_argument(
         "--snapshot", action="store_true", help="only export the baseline"
     )
+    parser.add_argument(
+        "--skip-connector-check",
+        action="store_true",
+        help="do not verify the Debezium connector before mutating the source",
+    )
     args = parser.parse_args()
+
+    if not args.snapshot and not args.skip_connector_check and not connect.is_healthy():
+        print(
+            "FAIL  Debezium connector is not RUNNING -- changes would not be "
+            "captured. Start it (make cdc-connect-start) or pass "
+            "--skip-connector-check for an intentionally uncaptured run."
+        )
+        return 2
 
     conn = psycopg2.connect(connect_timeout=10, **_DB)
     conn.autocommit = False

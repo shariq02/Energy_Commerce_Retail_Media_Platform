@@ -69,7 +69,17 @@ def test_parse_delete_uses_before_for_key():
     assert ev.state_row is None
 
 
-def test_snapshot_read_without_lsn():
+def test_snapshot_read_with_lsn():
+    ev = parse_value(
+        _envelope("r", None, {"order_id": "o-2"}, 7_832_191_512_176),
+        table="orders",
+        pk_column="order_id",
+    )
+    assert ev.op == "r"
+    assert ev.lsn == 7_832_191_512_176
+
+
+def test_event_without_lsn_is_rejected():
     payload = {
         "before": None,
         "after": {"order_id": "o-2"},
@@ -77,11 +87,10 @@ def test_snapshot_read_without_lsn():
         "op": "r",
         "ts_ms": 1,
     }
-    ev = parse_value(
-        {"payload": payload, "schema": {}}, table="orders", pk_column="order_id"
-    )
-    assert ev.op == "r"
-    assert ev.lsn == 0
+    with pytest.raises(MalformedEvent):
+        parse_value(
+            {"payload": payload, "schema": {}}, table="orders", pk_column="order_id"
+        )
 
 
 def test_unwrapped_payload_also_parses():

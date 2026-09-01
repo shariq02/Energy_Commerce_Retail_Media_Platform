@@ -99,8 +99,12 @@ def parse_value(
 
     lsn = source.get("lsn")
     if lsn is None:
-        # Snapshot reads can omit lsn -- order them before any streamed change.
-        lsn = 0 if op == "r" else source.get("txId", 0)
+        # Every event -- snapshot reads included -- must carry a real log
+        # position. Inventing one (a zero sentinel) silently breaks ordering and
+        # dedup, so fail closed instead.
+        raise MalformedEvent(
+            f"{table}: {op!r} event has no source.lsn -- cannot order or dedup it"
+        )
     event_ms = source.get("ts_ms") or payload.get("ts_ms") or 0
 
     return ChangeEvent(

@@ -17,7 +17,7 @@ import argparse
 import subprocess
 import sys
 
-from src.ingestion.cdc import config
+from src.ingestion.cdc import config, connect
 
 _STEPS = ("topics", "schemas", "baseline", "changes", "consume", "sync")
 
@@ -27,6 +27,29 @@ def _run(module: str, *args: str) -> int:
     return subprocess.run(
         [sys.executable, "-m", module, *args], cwd=config.REPO_ROOT, check=False
     ).returncode
+
+
+def _connector_running() -> bool:
+    """True only if the Debezium connector and all its tasks report RUNNING.
+
+    The change driver must never mutate the source while capture is down --
+    those changes would never reach the topics and reconciliation would later
+    flag the gap. Fail closed on anything short of a healthy connector.
+    """
+    if connect.is_healthy():
+        print("OK  Debezium connector RUNNING")
+        return True
+    state = connect.status()
+    if state is None:
+        print(f"FAIL  Debezium connector unreachable at {config.CONNECT_REST_URL}")
+    else:
+        connector_state = (state.get("connector") or {}).get("state")
+        task_states = [t.get("state") for t in (state.get("tasks") or [])]
+        print(
+            f"FAIL  Debezium connector not healthy "
+            f"(connector={connector_state}, tasks={task_states or 'none'})"
+        )
+    return False
 
 
 def main() -> int:
@@ -56,6 +79,9 @@ def main() -> int:
         if step_name in args.skip:
             print(f"\n--- {step_name}: skipped ---")
             continue
+        if step_name == "changes" and not _connector_running():
+            print("\nFAIL  refusing to run the change driver without CDC capture")
+            return 2
         rc = _run(module, *mod_args)
         if rc != 0:
             print(f"\nFAIL  step '{step_name}' returned {rc}; stopping cycle")

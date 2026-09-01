@@ -78,6 +78,17 @@ BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 SCHEMA_COMPATIBILITY = os.getenv("SCHEMA_REGISTRY_COMPATIBILITY", "BACKWARD")
 CONSUMER_GROUP = os.getenv("CDC_CONSUMER_GROUP", "ecrmap-cdc-consumer")
+CONNECT_REST_URL = os.getenv("KAFKA_CONNECT_REST_URL", "http://localhost:8083")
+
+# Source PostgreSQL -- the consumer reads the cluster identity once at startup to
+# detect a rebuilt/restored source lifetime (see source_identity.py).
+POSTGRES = {
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": int(os.getenv("POSTGRES_PORT", "5432")),
+    "dbname": os.getenv("POSTGRES_DB", "ecrmap"),
+    "user": os.getenv("POSTGRES_USER", "postgres"),
+    "password": os.getenv("POSTGRES_PASSWORD", ""),
+}
 
 # --- local landing / state -------------------------------------------------
 

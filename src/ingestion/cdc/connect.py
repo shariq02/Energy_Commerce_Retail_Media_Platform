@@ -66,6 +66,20 @@ def status() -> dict | None:
     return resp.json()
 
 
+def is_healthy() -> bool:
+    """True only if the connector and every task report RUNNING."""
+    state = status()
+    if state is None:
+        return False
+    connector_state = (state.get("connector") or {}).get("state")
+    task_states = [t.get("state") for t in (state.get("tasks") or [])]
+    return (
+        connector_state == "RUNNING"
+        and bool(task_states)
+        and all(s == "RUNNING" for s in task_states)
+    )
+
+
 def start(wait: float = 90.0) -> int:
     for path in (WORKER_PROPERTIES, CONNECTOR_PROPERTIES):
         if not path.exists():
