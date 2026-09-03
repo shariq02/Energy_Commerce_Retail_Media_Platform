@@ -1,6 +1,6 @@
 """CDC -- the consumer commits explicit Kafka offsets for every processed batch.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 """

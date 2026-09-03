@@ -1,6 +1,6 @@
 """CDC -- the registered event schemas are well-formed and cover every table.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 """

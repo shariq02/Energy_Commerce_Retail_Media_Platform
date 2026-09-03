@@ -6,7 +6,7 @@
 # MAGIC %md
 # MAGIC # CREATE CDC UNITY CATALOG OBJECTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC

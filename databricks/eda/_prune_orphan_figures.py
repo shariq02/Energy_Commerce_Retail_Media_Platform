@@ -6,7 +6,7 @@
 # MAGIC %md
 # MAGIC # Prune orphaned profiling figures
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
 # MAGIC The EDA notebooks write PNGs into `src/schemas/profiling/figures/` but
 # MAGIC never delete old ones. After the figure-consolidation rework, and after

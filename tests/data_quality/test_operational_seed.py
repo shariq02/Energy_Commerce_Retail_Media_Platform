@@ -1,6 +1,6 @@
 """Synthetic operational seed data -- determinism and integrity.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 

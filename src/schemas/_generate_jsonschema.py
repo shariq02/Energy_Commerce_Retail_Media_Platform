@@ -1,6 +1,6 @@
 """Generate JSON Schema files from the authored YAML data contracts.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 
@@ -85,7 +85,7 @@ def build_table_schema(source: str, table: dict, contract_name: str) -> dict:
     return {
         "$schema": SCHEMA_DIALECT,
         "$id": f"https://ecrmap/schemas/contracts/{table['name']}.schema.json",
-        "$comment": "Energy Commerce and Retail Media Analytics Platform. "
+        "$comment": "ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform. "
         "Author: Sharique Mohammad. Generated file -- do not edit by hand.",
         "title": f"{source}: {table['name']} record",
         "description": description,
