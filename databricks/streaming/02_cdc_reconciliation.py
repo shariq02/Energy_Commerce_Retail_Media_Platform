@@ -36,9 +36,6 @@ TABLES = [
     "customers",
     "customer_contracts",
     "meters",
-    "advertisers",
-    "campaigns",
-    "campaign_budgets",
     "orders",
     "order_items",
 ]

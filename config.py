@@ -181,9 +181,6 @@ OPERATIONAL_TABLES = (
     "customers",
     "customer_contracts",
     "meters",
-    "advertisers",
-    "campaigns",
-    "campaign_budgets",
     "orders",
     "order_items",
 )
@@ -240,7 +237,7 @@ DEBEZIUM_CONFIG = {
     "plugin_name": "pgoutput",
     "snapshot_mode": os.getenv("DEBEZIUM_SNAPSHOT_MODE", "initial"),
     "schema_registry_url": os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081"),
-    # All 10 physical operational tables are captured as independent streams.
+    # All 7 physical operational tables are captured as independent streams.
     "tables": list(OPERATIONAL_TABLES),
 }
 
@@ -322,7 +319,6 @@ AI_TOOLS = [
     "analyse_market_conditions",
     "analyse_weather_conditions",
     "analyse_customer_demand",
-    "analyse_campaign_performance",
 ]
 
 # ====================================================================
@@ -383,8 +379,8 @@ GOLD_CONFIG = {
     # Every canonical entity carries source_system + source_record_id +
     # canonical_id
     "required_provenance_fields": ["source_system", "source_record_id", "canonical_id"],
-    "scd2_tables": ["dim_customer", "dim_advertiser"],
-    "scd1_tables": ["dim_product", "dim_campaign"],
+    "scd2_tables": ["dim_customer"],
+    "scd1_tables": ["dim_product"],
     "static_tables": [
         "dim_date",
         "dim_time",
@@ -425,11 +421,6 @@ DOMAINS = {
     "commerce": {
         "name": "Commerce",
         "source": "REES46",
-        "is_german_source": False,
-    },
-    "retail_media": {
-        "name": "Retail Media",
-        "source": "iPinYou",
         "is_german_source": False,
     },
     "energy_retail": {

@@ -5,8 +5,8 @@ Author: Sharique Mohammad
 Date: August 2026
 
 Purpose: fixed, hand-curated lists (German cities with a plausible postcode
-prefix, names, street stems, the tariff book, product catalogue, advertiser
-book). No external dependency -- deterministic inputs only.
+prefix, names, street stems, the tariff book, product catalogue). No external
+dependency -- deterministic inputs only.
 """
 
 from __future__ import annotations
@@ -162,41 +162,4 @@ PRODUCTS = [
     ("SUB-CARE-1", "Care Plan 12 Months", "service", 59.00),
     ("SUB-CARE-2", "Care Plan 24 Months", "service", 99.00),
     ("INSTALL-1", "Professional Installation Visit", "service", 129.00),
-]
-
-# Retail-media advertiser book -- (name, industry).
-ADVERTISERS = [
-    ("Nordlicht Haushaltsgeraete", "home_appliances"),
-    ("SolarTech Deutschland", "solar"),
-    ("Waermepumpe24", "heating"),
-    ("EcoDrive Mobility", "automotive"),
-    ("GruenStrom Partner", "energy"),
-    ("SmartHaus Systeme", "smart_home"),
-    ("Isolier-Profis", "construction"),
-    ("Bank fuer Energie", "financial_services"),
-    ("Versicherung Direkt", "insurance"),
-    ("Rheinland Baumarkt", "retail"),
-    ("Klima Komfort GmbH", "heating"),
-    ("LadeNetz Mobil", "ev_charging"),
-    ("Haus and Garten Plus", "retail"),
-    ("Energieberatung Nord", "consulting"),
-    ("PV-Speicher Experten", "storage"),
-]
-
-CAMPAIGN_THEMES = [
-    "Winteraktion",
-    "Fruehjahrsangebot",
-    "Sommerkampagne",
-    "Herbstaktion",
-    "Neukunden",
-    "Bestandskunden",
-    "Waermepumpe",
-    "Solar-Bundle",
-    "Smart-Home",
-    "E-Mobilitaet",
-    "Energiespar-Wochen",
-    "Black Friday",
-    "Jahresend-Aktion",
-    "Tarifwechsel",
-    "Empfehlungsprogramm",
 ]

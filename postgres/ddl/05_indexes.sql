@@ -15,7 +15,4 @@ CREATE INDEX ix_orders_customer              ON operational.orders (customer_id)
 CREATE INDEX ix_orders_ordered_at            ON operational.orders (ordered_at);
 CREATE INDEX ix_order_items_order            ON operational.order_items (order_id);
 CREATE INDEX ix_order_items_product          ON operational.order_items (product_id);
-CREATE INDEX ix_campaigns_advertiser         ON operational.campaigns (advertiser_id);
-CREATE INDEX ix_campaign_budgets_campaign    ON operational.campaign_budgets (campaign_id);
 CREATE INDEX ix_customers_status             ON operational.customers (status);
-CREATE INDEX ix_campaigns_status             ON operational.campaigns (status);

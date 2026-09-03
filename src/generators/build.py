@@ -4,7 +4,7 @@ Energy Commerce and Retail Media Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 
-Purpose: build all 10 operational tables as lists of row dicts, deterministically
+Purpose: build all 7 operational tables as lists of row dicts, deterministically
 from a fixed seed, with referential integrity and the internal-consistency
 invariants (orders header total = sum of its order_items line totals).
 """
@@ -56,9 +56,6 @@ def _streams() -> dict[str, np.random.Generator]:
         "meters",
         "orders",
         "order_items",
-        "advertisers",
-        "campaigns",
-        "budgets",
     ]
     children = np.random.SeedSequence(config.SEED).spawn(len(names))
     return {n: np.random.default_rng(s) for n, s in zip(names, children, strict=True)}
@@ -80,12 +77,6 @@ def build_all() -> dict[str, list[dict]]:
     tables["customer_contracts"] = contracts
 
     tables["meters"] = _build_meters(rng["meters"], contracts)
-
-    advertisers = _build_advertisers(rng["advertisers"])
-    campaigns = _build_campaigns(rng["campaigns"], advertisers)
-    tables["advertisers"] = advertisers
-    tables["campaigns"] = campaigns
-    tables["campaign_budgets"] = _build_budgets(rng["budgets"], campaigns)
 
     orders, order_items = _build_orders(
         rng["orders"], rng["order_items"], customers, products
@@ -268,115 +259,6 @@ def _build_meters(rng, contracts) -> list[dict]:
             installed = min(
                 (removed or installed) + timedelta(days=1), config.HISTORY_END
             )
-    return rows
-
-
-def _build_advertisers(rng) -> list[dict]:
-    rows = []
-    for i, (name, industry) in enumerate(ref.ADVERTISERS, start=1):
-        onboard_day = _rand_date(rng, config.HISTORY_START, date(2025, 6, 30))
-        onboarded = _rand_ts(rng, onboard_day)
-        status = (
-            "active"
-            if rng.random() < 0.8
-            else ("paused" if rng.random() < 0.6 else "offboarded")
-        )
-        slug = name.lower().replace(" ", "").replace(".", "")
-        rows.append(
-            {
-                "advertiser_id": config.entity_uuid("advertisers", str(i)),
-                "advertiser_name": name,
-                "industry": industry,
-                "contact_email": f"media@{slug}.de",
-                "onboarded_at": _ts(onboarded),
-                "status": status,
-                "created_at": _ts(onboarded),
-                "updated_at": _ts(onboarded),
-                "_onboarded": onboarded,
-            }
-        )
-    return rows
-
-
-def _build_campaigns(rng, advertisers) -> list[dict]:
-    rows = []
-    seq = 0
-    for adv in advertisers:
-        onboarded = adv.pop("_onboarded")
-        n = int(rng.integers(2, 7))
-        used_names: set[str] = set()
-        for _ in range(n):
-            seq += 1
-            theme = ref.CAMPAIGN_THEMES[int(rng.integers(0, len(ref.CAMPAIGN_THEMES)))]
-            year = int(rng.integers(onboarded.year, config.HISTORY_END.year + 1))
-            name = f"{theme} {year}"
-            if name in used_names:
-                name = f"{theme} {year} #{seq}"
-            used_names.add(name)
-            start = _rand_date(
-                rng, max(onboarded.date(), config.HISTORY_START), config.HISTORY_END
-            )
-            end = start + timedelta(days=int(rng.integers(14, 120)))
-            end = min(end, config.HISTORY_END)
-            if end < config.HISTORY_END - timedelta(days=7):
-                status = "completed"
-            elif start <= config.HISTORY_END <= end:
-                status = "running" if rng.random() < 0.8 else "paused"
-            else:
-                status = "draft"
-            created = _rand_ts(rng, start - timedelta(days=int(rng.integers(3, 20))))
-            rows.append(
-                {
-                    "campaign_id": config.entity_uuid("campaigns", str(seq)),
-                    "campaign_name": name,
-                    "advertiser_id": adv["advertiser_id"],
-                    "objective": ("awareness", "consideration", "conversion")[
-                        int(rng.integers(0, 3))
-                    ],
-                    "start_date": _d(start),
-                    "end_date": _d(end),
-                    "status": status,
-                    "created_at": _ts(created),
-                    "updated_at": _ts(created),
-                    "_start": start,
-                    "_end": end,
-                }
-            )
-    return rows
-
-
-def _build_budgets(rng, campaigns) -> list[dict]:
-    rows = []
-    seq = 0
-    for campaign in campaigns:
-        start = campaign.pop("_start")
-        end = campaign.pop("_end")
-        period_start = start.replace(day=1)
-        while period_start <= end:
-            seq += 1
-            if period_start.month == 12:
-                nxt = period_start.replace(year=period_start.year + 1, month=1)
-            else:
-                nxt = period_start.replace(month=period_start.month + 1)
-            period_end = min(nxt - timedelta(days=1), end)
-            budget = float(rng.integers(500, 20001))
-            spent = round(budget * float(rng.uniform(0.3, 1.05)), 2)
-            created = _rand_ts(rng, period_start)
-            rows.append(
-                {
-                    "campaign_budget_id": config.entity_uuid(
-                        "campaign_budgets", str(seq)
-                    ),
-                    "campaign_id": campaign["campaign_id"],
-                    "period_start": _d(period_start),
-                    "period_end": _d(period_end),
-                    "budget_eur": _money(budget),
-                    "spent_eur": _money(spent),
-                    "created_at": _ts(created),
-                    "updated_at": _ts(created),
-                }
-            )
-            period_start = nxt
     return rows
 
 

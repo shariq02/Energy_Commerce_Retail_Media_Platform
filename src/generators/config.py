@@ -32,7 +32,6 @@ NOW = datetime(2026, 8, 30, 12, 0, 0, tzinfo=UTC)
 # the relationship rules in build.py; the numbers below are the direct targets.
 VOLUMES = {
     "customers": 2000,
-    "advertisers": 15,
     "ordering_customer_fraction": 0.40,
 }
 
@@ -43,9 +42,6 @@ TABLE_LOAD_ORDER = [
     "customers",
     "customer_contracts",
     "meters",
-    "advertisers",
-    "campaigns",
-    "campaign_budgets",
     "orders",
     "order_items",
 ]
@@ -115,37 +111,6 @@ TABLE_COLUMNS = {
         "installed_on",
         "removed_on",
         "status",
-        "created_at",
-        "updated_at",
-    ],
-    "advertisers": [
-        "advertiser_id",
-        "advertiser_name",
-        "industry",
-        "contact_email",
-        "onboarded_at",
-        "status",
-        "created_at",
-        "updated_at",
-    ],
-    "campaigns": [
-        "campaign_id",
-        "campaign_name",
-        "advertiser_id",
-        "objective",
-        "start_date",
-        "end_date",
-        "status",
-        "created_at",
-        "updated_at",
-    ],
-    "campaign_budgets": [
-        "campaign_budget_id",
-        "campaign_id",
-        "period_start",
-        "period_end",
-        "budget_eur",
-        "spent_eur",
         "created_at",
         "updated_at",
     ],

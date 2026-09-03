@@ -7,9 +7,9 @@ Date: August 2026
 Purpose: apply a deterministic stream of genuine INSERT / UPDATE / DELETE
 activity to ecrmap.operational so Debezium has real changes to capture -- new
 sign-ups and orders, order-status progression, meter faults and replacements,
-campaign lifecycle and budget spend, and a few hard deletes. Every order or
-order_items change recomputes the order header in the same transaction, so the
-items_subtotal / total invariants always hold after a commit.
+and a few hard deletes. Every order or order_items change recomputes the
+order header in the same transaction, so the items_subtotal / total
+invariants always hold after a commit.
 """
 
 from __future__ import annotations
@@ -53,9 +53,6 @@ class Catalog:
     tariff_ids: list[str] = field(default_factory=list)
     product_prices: dict[str, float] = field(default_factory=dict)
     open_order_ids: list[str] = field(default_factory=list)
-    running_campaign_ids: list[str] = field(default_factory=list)
-    draft_campaign_ids: list[str] = field(default_factory=list)
-    advertiser_ids: list[str] = field(default_factory=list)
     max_customer_seq: int = 0
     max_contract_seq: int = 0
     max_meter_seq: int = 0
@@ -211,49 +208,6 @@ def build_plan(catalog: Catalog, *, cycles: int, seed: int) -> list[Operation]:
                 )
             )
 
-        # Campaign lifecycle + budget spend.
-        if catalog.draft_campaign_ids and rng.random() < 0.4:
-            ops.append(
-                Operation(
-                    "update",
-                    "campaigns",
-                    {
-                        "campaign_id": catalog.draft_campaign_ids[
-                            int(rng.integers(0, len(catalog.draft_campaign_ids)))
-                        ],
-                        "status": "running",
-                    },
-                )
-            )
-        if catalog.running_campaign_ids and rng.random() < 0.6:
-            ops.append(
-                Operation(
-                    "update",
-                    "campaign_budgets",
-                    {
-                        "campaign_id": catalog.running_campaign_ids[
-                            int(rng.integers(0, len(catalog.running_campaign_ids)))
-                        ],
-                        "spend_delta": round(float(rng.uniform(20, 400)), 2),
-                    },
-                )
-            )
-
-        # Rare hard delete of a future budget row.
-        if catalog.running_campaign_ids and rng.random() < 0.08:
-            ops.append(
-                Operation(
-                    "delete",
-                    "campaign_budgets",
-                    {
-                        "campaign_id": catalog.running_campaign_ids[
-                            int(rng.integers(0, len(catalog.running_campaign_ids)))
-                        ],
-                        "which": "future",
-                    },
-                )
-            )
-
         # Occasional catalogue price change.
         if skus and rng.random() < 0.15:
             sku = skus[int(rng.integers(0, len(skus)))]
@@ -310,16 +264,6 @@ def load_catalog(conn) -> Catalog:
             "WHERE order_status IN ('placed', 'paid')"
         )
         cat.open_order_ids = [r["order_id"] for r in cur.fetchall()]
-        cur.execute(
-            f"SELECT campaign_id FROM {SCHEMA}.campaigns WHERE status = 'running'"
-        )
-        cat.running_campaign_ids = [r["campaign_id"] for r in cur.fetchall()]
-        cur.execute(
-            f"SELECT campaign_id FROM {SCHEMA}.campaigns WHERE status = 'draft'"
-        )
-        cat.draft_campaign_ids = [r["campaign_id"] for r in cur.fetchall()]
-        cur.execute(f"SELECT advertiser_id FROM {SCHEMA}.advertisers")
-        cat.advertiser_ids = [r["advertiser_id"] for r in cur.fetchall()]
         for table, col, attr in (
             ("customers", "customer_number", "max_customer_seq"),
             ("customer_contracts", "contract_number", "max_contract_seq"),
@@ -532,24 +476,6 @@ class ChangeExecutor:
                 ),
             )
 
-    def _update_campaigns(self, d: dict) -> None:
-        with self._conn.cursor() as cur:
-            cur.execute(
-                f"UPDATE {SCHEMA}.campaigns SET status = %s, updated_at = now() "
-                "WHERE campaign_id = %s",
-                (d["status"], d["campaign_id"]),
-            )
-
-    def _update_campaign_budgets(self, d: dict) -> None:
-        with self._conn.cursor() as cur:
-            cur.execute(
-                f"UPDATE {SCHEMA}.campaign_budgets SET spent_eur = spent_eur + %s, "
-                "updated_at = now() WHERE campaign_budget_id = ("
-                f"  SELECT campaign_budget_id FROM {SCHEMA}.campaign_budgets "
-                "  WHERE campaign_id = %s ORDER BY period_start DESC LIMIT 1)",
-                (d["spend_delta"], d["campaign_id"]),
-            )
-
     def _update_products(self, d: dict) -> None:
         with self._conn.cursor() as cur:
             cur.execute(
@@ -575,16 +501,6 @@ class ChangeExecutor:
                 (rows[0][0],),
             )
             cur.execute(_RECOMPUTE_HEADER, (d["order_id"], d["order_id"]))
-
-    def _delete_campaign_budgets(self, d: dict) -> None:
-        with self._conn.cursor() as cur:
-            cur.execute(
-                f"DELETE FROM {SCHEMA}.campaign_budgets WHERE campaign_budget_id = ("
-                f"  SELECT campaign_budget_id FROM {SCHEMA}.campaign_budgets "
-                "  WHERE campaign_id = %s AND period_start > CURRENT_DATE "
-                "  ORDER BY period_start DESC LIMIT 1)",
-                (d["campaign_id"],),
-            )
 
 
 def export_snapshot(conn, path) -> dict:

@@ -46,7 +46,7 @@ def _cast(value: str, col: dict):
     return value
 
 
-def test_contract_covers_exactly_the_ten_tables(contract_tables):
+def test_contract_covers_exactly_the_seven_tables(contract_tables):
     assert set(contract_tables) == set(config.TABLE_LOAD_ORDER)
 
 

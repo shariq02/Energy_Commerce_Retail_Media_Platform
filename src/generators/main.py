@@ -4,7 +4,7 @@ Energy Commerce and Retail Media Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 
-Purpose: build all 10 operational tables deterministically and write them as CSV
+Purpose: build all 7 operational tables deterministically and write them as CSV
 to postgres/seed/. Database loading is a separate step (load_seed.py).
 
 Usage:

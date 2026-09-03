@@ -4,23 +4,28 @@
 # Date: August 2026
 #
 # Operational PostgreSQL source: database `ecrmap`, schema `operational`.
-# 9 business entities across 10 tables (orders header + order_items child).
+# 6 business entities across 7 tables (orders header + order_items child).
 # Types are the contract's abstract vocabulary; PostgreSQL precision
 # (numeric(12,2), varchar(160), ...) lives in postgres/ddl/ and
 # postgres/migrations/. Versioned in lockstep with postgres/migrations/.
 # generated/*.schema.json is produced by _generate_jsonschema.py -- do not
 # edit those by hand.
+#
+# Historical note: this operational system originally also included a
+# Retail Media book (advertisers, campaigns, campaign_budgets) -- 3 further
+# tables. Those tables have been dropped from the live database and removed
+# from this contract; the historical schema/generator/EDA record for them is
+# preserved under archive/historical/.
 
 source: synthetic_operational
 source_system: synthetic_operational
-domain: Operations / Energy Retail / Commerce / Retail Media
+domain: Operations / Energy Retail / Commerce
 description: >
   Fully synthetic, deterministically generated operational records for the
   fictional German energy retailer -- customers, energy contracts and tariffs,
-  meters, a small product catalogue with orders, and a retail-media book of
-  advertisers, campaigns and budgets. The CDC source for Phase 6. Every field
-  is synthetic (ADR-020 field class); never identity-linked to REES46, iPinYou,
-  KDD Cup 2012, GA4, or any other dataset.
+  meters, and a small product catalogue with orders. The CDC source for
+  Phase 6. Every field is synthetic (ADR-020 field class); never
+  identity-linked to REES46, GA4, or any other dataset.
 database: ecrmap
 db_schema: operational
 generation: deterministic (fixed seed); seed CSVs in postgres/seed/ are a
@@ -176,58 +181,6 @@ tables:
       - { name: line_total_eur, type: decimal, required: true, nullable: false }
       - { name: created_at,     type: timestamp, required: true, nullable: false }
 
-  - name: advertisers
-    grain: { primary_key: [advertiser_id] }
-    unique: [[advertiser_name]]
-    checks: ["status in ('active','paused','offboarded')"]
-    columns:
-      - { name: advertiser_id,   type: string, required: true,  nullable: false, notes: "uuid PK" }
-      - { name: advertiser_name, type: string, required: true,  nullable: false }
-      - { name: industry,        type: string, required: false, nullable: true }
-      - { name: contact_email,   type: string, required: false, nullable: true }
-      - { name: onboarded_at,    type: timestamp, required: true, nullable: false }
-      - { name: status,          type: string, required: true,  nullable: false, allowed_values: [active, paused, offboarded] }
-      - { name: created_at,      type: timestamp, required: true, nullable: false }
-      - { name: updated_at,      type: timestamp, required: true, nullable: false }
-
-  - name: campaigns
-    grain: { primary_key: [campaign_id] }
-    unique: [[advertiser_id, campaign_name]]
-    foreign_keys:
-      - { columns: [advertiser_id], references: "advertisers(advertiser_id)" }
-    checks:
-      - "objective in ('awareness','consideration','conversion')"
-      - "status in ('draft','running','paused','completed','cancelled')"
-      - "end_date >= start_date"
-    columns:
-      - { name: campaign_id,   type: string, required: true, nullable: false, notes: "uuid PK" }
-      - { name: campaign_name, type: string, required: true, nullable: false }
-      - { name: advertiser_id, type: string, required: true, nullable: false, notes: "FK advertisers" }
-      - { name: objective,     type: string, required: true, nullable: false, allowed_values: [awareness, consideration, conversion] }
-      - { name: start_date,    type: date,   required: true, nullable: false }
-      - { name: end_date,      type: date,   required: true, nullable: false }
-      - { name: status,        type: string, required: true, nullable: false, allowed_values: [draft, running, paused, completed, cancelled] }
-      - { name: created_at,    type: timestamp, required: true, nullable: false }
-      - { name: updated_at,    type: timestamp, required: true, nullable: false }
-
-  - name: campaign_budgets
-    grain: { primary_key: [campaign_budget_id] }
-    unique: [[campaign_id, period_start]]
-    foreign_keys:
-      - { columns: [campaign_id], references: "campaigns(campaign_id)", on_delete: cascade }
-    checks:
-      - "budget_eur > 0 and spent_eur >= 0"
-      - "period_end >= period_start"
-    columns:
-      - { name: campaign_budget_id, type: string,  required: true, nullable: false, notes: "uuid PK" }
-      - { name: campaign_id,        type: string,  required: true, nullable: false, notes: "FK campaigns (cascade delete)" }
-      - { name: period_start,       type: date,    required: true, nullable: false }
-      - { name: period_end,         type: date,    required: true, nullable: false }
-      - { name: budget_eur,         type: decimal, required: true, nullable: false }
-      - { name: spent_eur,          type: decimal, required: true, nullable: false }
-      - { name: created_at,         type: timestamp, required: true, nullable: false }
-      - { name: updated_at,         type: timestamp, required: true, nullable: false }
-
 quality_rules:
   - id: order_header_matches_lines
     expr: "orders.items_subtotal_eur = sum(order_items.line_total_eur) per order_id"
@@ -238,9 +191,6 @@ quality_rules:
     severity: warn
   - id: customer_has_contract
     expr: "every customers row has >= 1 customer_contracts row"
-    severity: warn
-  - id: campaign_within_advertiser_life
-    expr: "campaigns.start_date >= advertisers.onboarded_at::date"
     severity: warn
 
 localisation:

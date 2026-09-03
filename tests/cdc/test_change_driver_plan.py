@@ -25,9 +25,6 @@ def _full_catalog() -> Catalog:
         tariff_ids=[f"t-{i}" for i in range(4)],
         product_prices={f"SKU-{i}": 10.0 + i for i in range(8)},
         open_order_ids=[f"o-{i}" for i in range(15)],
-        running_campaign_ids=[f"rc-{i}" for i in range(6)],
-        draft_campaign_ids=[f"dc-{i}" for i in range(4)],
-        advertiser_ids=[f"a-{i}" for i in range(5)],
         max_customer_seq=2000,
         max_contract_seq=2300,
         max_meter_seq=2500,
@@ -53,7 +50,6 @@ def test_plan_exercises_every_op_kind_and_table():
     assert ("update", "orders") in kinds
     assert ("update", "meters") in kinds
     assert ("delete", "order_items") in kinds
-    assert ("delete", "campaign_budgets") in kinds
 
 
 def test_order_item_delete_targets_last_line_only():

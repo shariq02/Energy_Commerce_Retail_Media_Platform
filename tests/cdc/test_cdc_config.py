@@ -19,24 +19,21 @@ _EXPECTED_TABLES = {
     "customers",
     "customer_contracts",
     "meters",
-    "advertisers",
-    "campaigns",
-    "campaign_budgets",
     "orders",
     "order_items",
 }
 
 
-def test_all_ten_physical_tables_present():
+def test_all_seven_physical_tables_present():
     assert set(config.TABLES) == _EXPECTED_TABLES
-    assert len(config.TABLES) == 10
+    assert len(config.TABLES) == 7
     assert "order_items" in config.TABLES
 
 
 def test_one_topic_per_table_unique():
     topics = config.all_topics()
-    assert len(topics) == 10
-    assert len(set(topics)) == 10
+    assert len(topics) == 7
+    assert len(set(topics)) == 7
     for table in config.TABLES:
         assert config.topic_for(table) == f"ecrmap.operational.{table}"
 

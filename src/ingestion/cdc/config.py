@@ -4,7 +4,7 @@ Energy Commerce and Retail Media Analytics Platform
 Author: Sharique Mohammad
 Date: August 2026
 
-Purpose: the fixed names and paths the CDC pieces share -- the 10 operational
+Purpose: the fixed names and paths the CDC pieces share -- the 7 operational
 tables, their Debezium topic names, the local landing/state locations, and the
 broker / schema-registry / Databricks endpoints (from the environment).
 """
@@ -20,7 +20,7 @@ load_dotenv()
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-# The 10 physical operational tables, parents first. Every table is captured as
+# The 7 physical operational tables, parents first. Every table is captured as
 # an independent stream; order_items is not folded into orders.
 TABLES: tuple[str, ...] = (
     "tariffs",
@@ -28,9 +28,6 @@ TABLES: tuple[str, ...] = (
     "customers",
     "customer_contracts",
     "meters",
-    "advertisers",
-    "campaigns",
-    "campaign_budgets",
     "orders",
     "order_items",
 )
@@ -42,9 +39,6 @@ PRIMARY_KEY: dict[str, str] = {
     "customers": "customer_id",
     "customer_contracts": "contract_id",
     "meters": "meter_id",
-    "advertisers": "advertiser_id",
-    "campaigns": "campaign_id",
-    "campaign_budgets": "campaign_budget_id",
     "orders": "order_id",
     "order_items": "order_item_id",
 }

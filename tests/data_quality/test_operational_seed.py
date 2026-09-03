@@ -38,15 +38,6 @@ _ENUMS = {
         "refunded",
     },
     ("orders", "currency"): {"EUR"},
-    ("advertisers", "status"): {"active", "paused", "offboarded"},
-    ("campaigns", "objective"): {"awareness", "consideration", "conversion"},
-    ("campaigns", "status"): {
-        "draft",
-        "running",
-        "paused",
-        "completed",
-        "cancelled",
-    },
 }
 
 _PK = {
@@ -55,9 +46,6 @@ _PK = {
     "customers": "customer_id",
     "customer_contracts": "contract_id",
     "meters": "meter_id",
-    "advertisers": "advertiser_id",
-    "campaigns": "campaign_id",
-    "campaign_budgets": "campaign_budget_id",
     "orders": "order_id",
     "order_items": "order_item_id",
 }
@@ -66,8 +54,6 @@ _DATE_ORDER = [
     ("tariffs", "valid_from", "valid_to"),
     ("customer_contracts", "start_date", "end_date"),
     ("meters", "installed_on", "removed_on"),
-    ("campaigns", "start_date", "end_date"),
-    ("campaign_budgets", "period_start", "period_end"),
 ]
 
 
@@ -107,8 +93,6 @@ def test_primary_keys_unique(built_tables):
         ("orders", "customer_id", "customers", "customer_id"),
         ("order_items", "order_id", "orders", "order_id"),
         ("order_items", "product_id", "products", "product_id"),
-        ("campaigns", "advertiser_id", "advertisers", "advertiser_id"),
-        ("campaign_budgets", "campaign_id", "campaigns", "campaign_id"),
     ],
 )
 def test_foreign_keys_resolve(built_tables, child, fk, parent, ppk):
@@ -163,7 +147,7 @@ def test_referential_completeness(built_tables):
 
 
 def test_timestamps_are_utc_and_ordered(built_tables):
-    for table in ("customers", "orders", "campaigns"):
+    for table in ("customers", "orders"):
         for row in built_tables[table]:
             for col in ("created_at", "updated_at"):
                 assert row[col].endswith("+00")
