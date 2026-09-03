@@ -6,8 +6,8 @@
 # MAGIC %md
 # MAGIC # HISTORICAL UNITY CATALOG CLEANUP -- iPinYou / Criteo Attribution / KDD Cup 2012
 # MAGIC
-# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
-# MAGIC **Author:** Sharique Mohammad
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**  
+# MAGIC **Author:** Sharique Mohammad  
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** inspect, then optionally delete, the Unity Catalog Bronze objects
@@ -367,3 +367,40 @@ print(
     f"Historical-source tables remaining live:                 {still_present_historical}"
 )
 print("=" * 78)
+
+# COMMAND ----------
+
+from pyspark.sql import functions as F
+
+catalog = "energy_commerce_retail_media"
+schema = "bronze"
+
+tables = [r.tableName for r in spark.sql(f"SHOW TABLES IN {catalog}.{schema}").collect()]
+
+results = []
+
+for table in tables:
+    detail = spark.sql(f"DESCRIBE DETAIL {catalog}.{schema}.{table}").first()
+    results.append((
+        table,
+        detail["numFiles"],
+        detail["sizeInBytes"],
+        detail["sizeInBytes"] / (1024 * 1024)
+    ))
+
+df = spark.createDataFrame(
+    results,
+    ["table_name", "num_files", "size_bytes", "size_mb"]
+)
+
+display(
+    df.orderBy(F.desc("size_mb"))
+)
+
+display(
+    df.agg(
+        F.count("*").alias("table_count"),
+        F.sum("size_bytes").alias("total_size_bytes"),
+        F.round(F.sum("size_mb"), 2).alias("total_size_mb")
+    )
+)
