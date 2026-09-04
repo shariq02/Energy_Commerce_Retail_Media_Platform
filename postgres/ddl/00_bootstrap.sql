@@ -5,8 +5,8 @@
 --
 -- Run once by a superuser on the local PostgreSQL instance, before any
 -- migration. Creates the ecrmap database, the app role, and the schema, and
--- sets logical-replication readiness (Phase 6 / ADR-004 creates the Debezium
--- publication and slot; not here).
+-- sets logical-replication readiness (the CDC connector creates the Debezium
+-- publication and slot later; not here).
 
 -- 1. Database (run from the `postgres` maintenance DB; cannot be in a txn block).
 --    createdb ecrmap    -- or:
@@ -19,7 +19,7 @@
 
 -- 3. App role. Password is set from the environment, not committed.
 -- CREATE ROLE ecrmap_app WITH LOGIN PASSWORD :'app_password';
--- The role that Debezium connects as (Phase 6) needs REPLICATION:
+-- The role that Debezium connects as needs REPLICATION:
 -- ALTER ROLE ecrmap_app WITH REPLICATION;
 
 -- 4. Schema (inside ecrmap). Also created by migration 0001 if absent.

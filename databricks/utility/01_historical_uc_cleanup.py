@@ -6,13 +6,13 @@
 # MAGIC %md
 # MAGIC # HISTORICAL UNITY CATALOG CLEANUP -- iPinYou / Criteo Attribution / KDD Cup 2012
 # MAGIC
-# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**  
-# MAGIC **Author:** Sharique Mohammad  
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** inspect, then optionally delete, the Unity Catalog Bronze objects
 # MAGIC belonging to the three historical, out-of-target-scope sources -- iPinYou,
-# MAGIC Criteo Attribution, and KDD Cup 2012 Track 2 (ADR-026, ADR-027). The
+# MAGIC Criteo Attribution, and KDD Cup 2012 Track 2. The
 # MAGIC repo-side code/config/contract cleanup for these sources is already done
 # MAGIC (moved to `archive/historical/`); this notebook is the corresponding
 # MAGIC Databricks-side cleanup, run manually and deliberately.
@@ -26,9 +26,9 @@
 # MAGIC Search Visibility object matching a historical-source filter, stop and do
 # MAGIC not delete it -- report it instead.
 # MAGIC
-# MAGIC **Known historical Bronze objects (from `PIPELINE_DESIGN_20260903_v4.md` and
-# MAGIC the repo's own storage/deletion inventory), to be confirmed live by the
-# MAGIC inspection cells below, not assumed:**
+# MAGIC **Known historical Bronze objects (from the repo's own storage/deletion
+# MAGIC records), to be confirmed live by the inspection cells below, not
+# MAGIC assumed:**
 # MAGIC - `bronze.kddcup2012_click_prediction`
 # MAGIC - `bronze.criteo_attribution_events`
 # MAGIC - `bronze.ipinyou_training`
@@ -36,8 +36,7 @@
 # MAGIC - `bronze.ipinyou_reference`
 # MAGIC
 # MAGIC No CDC, Silver, Gold, or streaming objects exist for these three sources --
-# MAGIC they were batch-only, Bronze-stage sources with no further build (confirmed
-# MAGIC in `docs/architecture/ECRMAP_STORAGE_AND_DELETION_INVENTORY.md`).
+# MAGIC they were batch-only, Bronze-stage sources with no further build.
 
 # COMMAND ----------
 
@@ -57,9 +56,9 @@ BRONZE_SCHEMA = "bronze"
 HISTORICAL_SOURCE_PREFIXES = ["ipinyou_", "criteo_attribution_", "kddcup2012_"]
 
 # The specific tables this notebook was written against, per the repo's own
-# storage/deletion inventory and PIPELINE_DESIGN.md Section 1c. The inspection
-# cells below confirm (or contradict) this list against the live catalog --
-# they do not assume it is correct.
+# storage/deletion records. The inspection cells below confirm (or
+# contradict) this list against the live catalog -- they do not assume it is
+# correct.
 EXPECTED_HISTORICAL_TABLES = [
     "kddcup2012_click_prediction",
     "criteo_attribution_events",
@@ -193,9 +192,9 @@ for t in historical_table_names:
 # COMMAND ----------
 
 # DBTITLE 1,2.10 -- Any surviving Unity Catalog Volumes for these sources (should already be dropped)
-# Per PIPELINE_DESIGN_20260903_v4.md Section 1c, each Bronze load notebook drops
-# its source Volume(s) on a full successful pass -- so this cell is expected to
-# show nothing. It exists to confirm that, not to assume it.
+# Each Bronze load notebook drops its source Volume(s) on a full successful
+# pass -- so this cell is expected to show nothing. It exists to confirm
+# that, not to assume it.
 try:
     all_volumes_df = spark.sql(f"SHOW VOLUMES IN {CATALOG}.{BRONZE_SCHEMA}")
     display(all_volumes_df)
@@ -244,9 +243,8 @@ print("=" * 78)
 # MAGIC cell is `DROP TABLE IF EXISTS`, so re-running a cell (or running it after
 # MAGIC another cell already removed the object) is a safe no-op, not an error.
 # MAGIC
-# MAGIC These five tables are historical Bronze build record only (Phase 2-3,
-# MAGIC completed and preserved per baseline Section 17) -- they are not read by
-# MAGIC any current-scope pipeline, use case, or Silver/Gold notebook (none exist
+# MAGIC These five tables are historical Bronze build record only -- they are not
+# MAGIC read by any current-scope pipeline, use case, or Silver/Gold notebook (none exist
 # MAGIC for these sources). Deleting them does not affect Search Visibility, SMARD,
 # MAGIC DWD, Honda IoT, REES46, or the operational/CDC tables.
 
@@ -375,32 +373,33 @@ from pyspark.sql import functions as F
 catalog = "energy_commerce_retail_media"
 schema = "bronze"
 
-tables = [r.tableName for r in spark.sql(f"SHOW TABLES IN {catalog}.{schema}").collect()]
+tables = [
+    r.tableName for r in spark.sql(f"SHOW TABLES IN {catalog}.{schema}").collect()
+]
 
 results = []
 
 for table in tables:
     detail = spark.sql(f"DESCRIBE DETAIL {catalog}.{schema}.{table}").first()
-    results.append((
-        table,
-        detail["numFiles"],
-        detail["sizeInBytes"],
-        detail["sizeInBytes"] / (1024 * 1024)
-    ))
+    results.append(
+        (
+            table,
+            detail["numFiles"],
+            detail["sizeInBytes"],
+            detail["sizeInBytes"] / (1024 * 1024),
+        )
+    )
 
 df = spark.createDataFrame(
-    results,
-    ["table_name", "num_files", "size_bytes", "size_mb"]
+    results, ["table_name", "num_files", "size_bytes", "size_mb"]
 )
 
-display(
-    df.orderBy(F.desc("size_mb"))
-)
+display(df.orderBy(F.desc("size_mb")))
 
 display(
     df.agg(
         F.count("*").alias("table_count"),
         F.sum("size_bytes").alias("total_size_bytes"),
-        F.round(F.sum("size_mb"), 2).alias("total_size_mb")
+        F.round(F.sum("size_mb"), 2).alias("total_size_mb"),
     )
 )

@@ -23,9 +23,9 @@ domain: Operations / Energy Retail / Commerce
 description: >
   Fully synthetic, deterministically generated operational records for the
   fictional German energy retailer -- customers, energy contracts and tariffs,
-  meters, and a small product catalogue with orders. The CDC source for
-  Phase 6. Every field is synthetic (ADR-020 field class); never
-  identity-linked to REES46, GA4, or any other dataset.
+  meters, and a small product catalogue with orders. The CDC source for the
+  streaming pipeline. Every field is synthetic; never identity-linked to
+  REES46, GA4, or any other dataset.
 database: ecrmap
 db_schema: operational
 generation: deterministic (fixed seed); seed CSVs in postgres/seed/ are a

@@ -5,7 +5,7 @@ Author: Sharique Mohammad
 Date: August 2026
 
 Purpose: fixed seed, deterministic UUID namespace, the history window, output
-location, and per-table target volumes for the Phase 5 operational dataset.
+location, and per-table target volumes for the operational dataset.
 """
 
 from __future__ import annotations

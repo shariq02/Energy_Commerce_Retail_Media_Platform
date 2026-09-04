@@ -4,7 +4,7 @@ A multi-ecosystem data and analytics platform built on GCP, Databricks, and BigQ
 
 ## Ecosystems
 
-Energy, Commerce / Digital Behaviour, Mobility, Healthcare, and Agriculture — parallel peers, not a fixed or ranked list. Each ecosystem defines its own sources, domains, models, and use cases; none is "future" relative to another. Energy and Commerce / Digital Behaviour currently have acquired, profiled data; Mobility, Healthcare, and Agriculture are validated future directions (`docs/ECOSYSTEM_EXPANSION_SCOPE_20260903_v1.md`).
+Energy, Commerce / Digital Behaviour, Mobility, Healthcare, and Agriculture — parallel peers, not a fixed or ranked list. Each ecosystem defines its own sources, domains, models, and use cases; none is "future" relative to another. Energy and Commerce / Digital Behaviour currently have acquired, profiled data; Mobility, Healthcare, and Agriculture are validated future directions.
 
 ## Tech Stack
 
@@ -14,11 +14,11 @@ The analytical-modelling layer above BigQuery (staging → intermediate → mart
 
 ## Status
 
-Phases 0–6 complete (environment, infrastructure, first-wave source acquisition/profiling/contracts, operational PostgreSQL, CDC/streaming). Phase 7a (multi-ecosystem platform architecture) complete. See `docs/MASTER_BUILD_FLOW_20260903_v2.md` for live build status and `docs/PROJECT_PLAN_20260903_v4.md` for the full phase plan.
+Environment, infrastructure, first-wave source acquisition/profiling/contracts, the operational PostgreSQL database, CDC/streaming, and the multi-ecosystem platform architecture are complete. Live build status and the full plan are tracked in the design documentation.
 
 ## Documentation
 
-Full design documentation lives in `docs/` (gitignored). Start with `docs/README.md`.
+Full design documentation lives in the `docs/` tree (gitignored). Start with its top-level index.
 
 ---
 

@@ -1,0 +1,42 @@
+-- PostgreSQL serving database bootstrap
+-- ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+-- Author: Sharique Mohammad
+-- Date: September 2026
+--
+-- NOT YET RUN. This file is DDL-as-code: the structural definition of a new
+-- serving database (provisionally `ecrmap_serving`) carrying one schema per
+-- ecosystem plus the two platform-level namespaces. It is ready to apply
+-- when the serving layer is actually built. It has deliberately NOT been
+-- executed against the live PostgreSQL server -- creating a new database on
+-- a live, shared server is a deployment action requiring explicit
+-- confirmation, not a structural-decision action.
+--
+-- This database is DISTINCT from the operational `ecrmap` database -- the
+-- operational system stays energy-only and is never touched by this file.
+-- Do not run this against the operational `ecrmap` database.
+
+-- 1. Database (run from the `postgres` maintenance DB; cannot be in a txn block).
+--    createdb ecrmap_serving    -- or:
+-- CREATE DATABASE ecrmap_serving;
+
+-- 2. Schema per ecosystem, plus the two platform-level namespaces.
+--    Created eagerly for `energy` (the only ecosystem with any forward
+--    build plan today); the other three are created only when that
+--    ecosystem's serving layer is actually built -- no ecosystem content or
+--    infrastructure is created speculatively.
+-- CREATE SCHEMA IF NOT EXISTS energy;
+-- CREATE SCHEMA IF NOT EXISTS shared_conformed;
+-- CREATE SCHEMA IF NOT EXISTS cross_ecosystem;
+-- -- CREATE SCHEMA IF NOT EXISTS mobility;    -- when the Mobility serving layer is built
+-- -- CREATE SCHEMA IF NOT EXISTS healthcare;  -- when the Healthcare serving layer is built
+-- -- CREATE SCHEMA IF NOT EXISTS agriculture; -- when the Agriculture serving layer is built
+
+-- 3. Grafana observability keeps its own schema here too.
+-- CREATE SCHEMA IF NOT EXISTS observability;
+
+-- 4. Migration tracking (same plain numbered-migration convention as the
+--    operational database; no Alembic).
+-- CREATE TABLE IF NOT EXISTS public.schema_migrations (
+--     version     text        PRIMARY KEY,
+--     applied_at  timestamptz NOT NULL DEFAULT now()
+-- );

@@ -323,7 +323,7 @@ AI_TOOLS = [
 
 # ====================================================================
 # OPERATIONAL DATA GENERATOR / CDC CHANGE DRIVER CONFIGURATION
-# The seed generator builds the Phase 5 operational dataset; the change
+# The seed generator builds the operational dataset; the change
 # driver applies ongoing INSERT/UPDATE/DELETE activity for CDC to capture.
 # No historical public dataset is replayed as a simulated stream.
 # ====================================================================
