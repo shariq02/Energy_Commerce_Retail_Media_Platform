@@ -1,4 +1,4 @@
-# BNetzA Kraftwerksliste data download
+# BNetzA power plant list (Kraftwerksliste) data download
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
 # Date: September 2026

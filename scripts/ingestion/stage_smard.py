@@ -3,24 +3,27 @@
 # Author: Sharique Mohammad
 # Date: August 2026
 #
-# Purpose: consolidate the 16 SMARD raw JSON files in data/raw/smard/
+# Purpose: consolidate the SMARD raw JSON files in data/raw/smard/ --
+# the original 16 daily DE-LU series plus the deepening additions
+# (forecast generation, control-area breakdown, quarter-hour window) --
 # into the single logical staging dataset (energy_timeseries), written
 # to data/staging/smard/. Local file operations only -- does not upload
 # anywhere. data/raw/ is read-only throughout.
 #
-# All 16 files share an identical structure (filter_id, region,
-# resolution, series) and the same region/resolution. The 16 files
-# become metric identity within one dataset, not 16 tables. Metric
-# identity is currently encoded only in the filename, so it is added
-# as an explicit `metric` column.
+# Every file shares an identical structure (filter_id, region,
+# resolution, series). Metric/region/resolution together become row
+# identity within one dataset, not one table per file/region/resolution
+# combination. Metric identity is encoded only in the filename, so it
+# is added as an explicit `metric` column; region/resolution are read
+# from each file's own payload (already correct per file).
 #
-# Memory-safety design: each file's `series` array is small (source
-# directory totals ~1.5 MB) so a single file is loaded and converted to
-# rows in one pass, then released before the next file is read. No
-# frames list + pd.concat() across files -- each file's rows are
-# written straight to disk and the in-memory DataFrame is discarded.
-# The combined output stays well under the 50 MiB chunking threshold,
-# so it is written as one flat file (chunking would be artificial here).
+# Memory-safety design: each file's `series` array is loaded and
+# converted to rows in one pass, then released before the next file is
+# read. No frames list + pd.concat() across files -- each file's rows
+# are written straight to disk and the in-memory DataFrame is
+# discarded. The combined output stays well under the 50 MiB chunking
+# threshold, so it is written as one flat file (chunking would be
+# artificial here).
 
 import json
 import sys
@@ -88,7 +91,7 @@ def stage_energy_timeseries(monitor: PeakRSSMonitor) -> tuple[int, Path, int]:
     files_read = 0
     first_write = True
 
-    for src_file in sorted(RAW_SMARD_DIR.glob("*.json")):
+    for src_file in sorted(RAW_SMARD_DIR.rglob("*.json")):
         files_read += 1
         df, row_count = _rows_for_file(src_file)
         df.to_csv(

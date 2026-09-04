@@ -3,17 +3,24 @@
 # Author: Sharique Mohammad
 # Date: August 2026
 #
-# Purpose: consolidate DWD raw files in data/raw/dwd/ into the 12
-# logical staging datasets, written to data/staging/dwd/. Local file
-# operations only -- does not upload anywhere. data/raw/ is read-only
-# throughout.
+# Purpose: consolidate DWD raw files in data/raw/dwd/ into the logical
+# staging datasets (14 analytical measurements + solar + 5 metadata),
+# written to data/staging/dwd/ as physical chunk files via
+# ChunkedCSVWriter (<=MAX_CHUNK_BYTES each; chunk count is not dataset
+# count). Local file operations only -- does not upload anywhere.
+# data/raw/ is read-only throughout.
+#
+# Each analytical measurement's recent/ and historical/ splits are one
+# logical dataset, not two -- DWD's own historical cutoff and recent
+# start are designed to be contiguous, not overlapping, so no dedup is
+# applied across the two.
 #
 # Memory-safety design: every dataset is written incrementally, chunk
-# by chunk (<=CHUNK_SIZE rows), directly to its output CSV. No frames
-# list + pd.concat() -- a chunk is written and released before the
-# next one is read. The two deduped station-level datasets keep only a
-# small in-memory set of already-seen row-tuples (not full DataFrames)
-# to dedupe while streaming.
+# by chunk (<=CHUNK_SIZE rows), straight to the open ChunkedCSVWriter.
+# No frames list + pd.concat() -- a chunk is written and released
+# before the next one is read. The two deduped station-level datasets
+# keep only a small in-memory set of already-seen row-tuples (not full
+# DataFrames) to dedupe while streaming.
 
 import io
 import sys
@@ -23,6 +30,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from _chunk_writer import ChunkedCSVWriter
 from _memory_guard import PeakRSSMonitor
 
 from config import DATA_RAW_DIR, DATA_STAGING_DIR, get_logger
@@ -39,6 +47,7 @@ METADATA_DIR = STAGING_DWD_DIR / "metadata"
 SOURCE_ENCODING = "latin-1"
 
 CHUNK_SIZE = 100_000
+MAX_CHUNK_BYTES = 150 * 1024 * 1024
 
 ANALYTICAL_MEASUREMENTS = [
     "air_temperature",
@@ -48,6 +57,13 @@ ANALYTICAL_MEASUREMENTS = [
     "pressure",
     "sun",
     "wind",
+    "dew_point",
+    "soil_temperature",
+    "visibility",
+    "cloud_type",
+    "wind_synop",
+    "extreme_wind",
+    "weather_phenomena",
 ]
 
 
@@ -68,66 +84,81 @@ def _iter_semicolon_chunks(path: Path, chunksize: int = CHUNK_SIZE):
         yield _clean_columns(chunk)
 
 
-def _write_chunk(chunk: pd.DataFrame, out_path: Path, first_write: bool) -> int:
-    chunk.to_csv(
-        out_path,
-        mode="w" if first_write else "a",
-        header=first_write,
-        index=False,
-        encoding="utf-8",
-    )
-    return len(chunk)
-
-
 def stage_analytical(
     measurement: str, monitor: PeakRSSMonitor
-) -> tuple[int, list[str], Path]:
-    ANALYTICAL_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = ANALYTICAL_DIR / f"{measurement}.csv"
-
-    total_rows = 0
+) -> tuple[int, list[str], list[Path]]:
+    writer = ChunkedCSVWriter(
+        ANALYTICAL_DIR, source="dwd", dataset=measurement, max_bytes=MAX_CHUNK_BYTES
+    )
     files_read = 0
-    first_write = True
     columns: list[str] = []
 
-    for produkt_file in sorted(RAW_DWD_DIR.glob(f"*/{measurement}/produkt_*.txt")):
+    for produkt_file in sorted(RAW_DWD_DIR.glob(f"*/{measurement}/*/produkt_*.txt")):
+        city = produkt_file.parent.parent.parent.name
+        files_read += 1
+        for chunk in _iter_semicolon_chunks(produkt_file):
+            chunk.insert(1, "city", city)
+            if not columns:
+                columns = list(chunk.columns)
+            writer.write(chunk)
+            del chunk
+            monitor.check()
+
+    writer.close()
+    logger.info(
+        f"Staged analytical/{measurement} -- {writer.total_rows} rows, "
+        f"{len(writer.chunk_paths)} chunk file(s), {files_read} source files"
+    )
+    return writer.total_rows, columns, writer.chunk_paths
+
+
+def stage_solar(monitor: PeakRSSMonitor) -> tuple[int, list[str], list[Path]]:
+    """Solar has its own flat layout (station/solar/produkt_*.txt, no
+    recent/historical split) and column set -- its own dataset, not folded
+    into ANALYTICAL_MEASUREMENTS. Not every station has solar data."""
+    writer = ChunkedCSVWriter(
+        ANALYTICAL_DIR, source="dwd", dataset="solar", max_bytes=MAX_CHUNK_BYTES
+    )
+    files_read = 0
+    columns: list[str] = []
+
+    for produkt_file in sorted(RAW_DWD_DIR.glob("*/solar/produkt_*.txt")):
         city = produkt_file.parent.parent.name
         files_read += 1
         for chunk in _iter_semicolon_chunks(produkt_file):
             chunk.insert(1, "city", city)
             if not columns:
                 columns = list(chunk.columns)
-            total_rows += _write_chunk(chunk, out_path, first_write)
-            first_write = False
+            writer.write(chunk)
             del chunk
             monitor.check()
 
+    writer.close()
     logger.info(
-        f"Staged analytical/{measurement}.csv -- {total_rows} rows, {files_read} source files"
+        f"Staged analytical/solar -- {writer.total_rows} rows, "
+        f"{len(writer.chunk_paths)} chunk file(s), {files_read} source files"
     )
-    return total_rows, columns, out_path
+    return writer.total_rows, columns, writer.chunk_paths
 
 
 def stage_station_level_metadata(
     filename_prefix: str,
     dataset_name: str,
     monitor: PeakRSSMonitor,
-) -> tuple[int, list[str], Path]:
+) -> tuple[int, list[str], list[Path]]:
     """Station-level files (Geographie, Stationsname) are duplicated byte-for-byte
     across every measurement folder for a station -- dedupe by content, not by
     dropping any distinct record. Dedup is done against a small set of
     already-written row-tuples (final datasets are tens of rows), never by
     holding the full multi-file DataFrame in memory."""
-    METADATA_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METADATA_DIR / f"{dataset_name}.csv"
-
+    writer = ChunkedCSVWriter(
+        METADATA_DIR, source="dwd", dataset=dataset_name, max_bytes=MAX_CHUNK_BYTES
+    )
     seen: set[tuple] = set()
-    total_rows = 0
     files_read = 0
-    first_write = True
     columns: list[str] = []
 
-    for meta_file in sorted(RAW_DWD_DIR.glob(f"*/*/{filename_prefix}_*.txt")):
+    for meta_file in sorted(RAW_DWD_DIR.glob(f"*/*/*/{filename_prefix}_*.txt")):
         files_read += 1
         for chunk in _iter_semicolon_chunks(meta_file):
             if not columns:
@@ -149,35 +180,43 @@ def stage_station_level_metadata(
                 new_mask.append(is_new)
             new_rows = chunk.loc[new_mask]
             if len(new_rows):
-                total_rows += _write_chunk(new_rows, out_path, first_write)
-                first_write = False
+                writer.write(new_rows)
             del chunk, new_rows, new_mask
             monitor.check()
 
-    if first_write:
-        # No rows at all is not expected for this source, but guard the
-        # "no file written" edge case explicitly rather than silently
-        # skipping output.
-        pd.DataFrame(columns=columns).to_csv(out_path, index=False, encoding="utf-8")
+    writer.close()
+    if writer.total_rows == 0:
+        # No rows at all is not expected for this source -- ChunkedCSVWriter
+        # writes nothing for an all-empty dataset (by design), so flag this
+        # loudly rather than let a missing dataset pass silently.
+        logger.warning(
+            f"DWD {dataset_name}: zero rows after dedup, no chunk file written"
+        )
 
     logger.info(
-        f"Staged metadata/{dataset_name}.csv -- {total_rows} rows after dedup, from {files_read} source files"
+        f"Staged metadata/{dataset_name} -- {writer.total_rows} rows after dedup, "
+        f"{len(writer.chunk_paths)} chunk file(s), from {files_read} source files"
     )
-    return total_rows, columns, out_path
+    return writer.total_rows, columns, writer.chunk_paths
 
 
-def stage_device_instrument(monitor: PeakRSSMonitor) -> tuple[int, list[str], Path]:
-    """Each Metadaten_Geraete_<category>_<station>.txt is unique per station per
-    device category -- no cross-folder duplication, unlike the station-level files."""
-    METADATA_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METADATA_DIR / "device_instrument.csv"
-
-    total_rows = 0
+def stage_device_instrument(
+    monitor: PeakRSSMonitor,
+) -> tuple[int, list[str], list[Path]]:
+    """Unique per station per device category, but now duplicated between the
+    recent/ and historical/ copies -- deduped by content like the station-level
+    files, via a small seen-set (not full DataFrames)."""
+    writer = ChunkedCSVWriter(
+        METADATA_DIR,
+        source="dwd",
+        dataset="device_instrument",
+        max_bytes=MAX_CHUNK_BYTES,
+    )
+    seen: set[tuple] = set()
     files_read = 0
-    first_write = True
     columns: list[str] = []
 
-    for meta_file in sorted(RAW_DWD_DIR.glob("*/*/Metadaten_Geraete_*.txt")):
+    for meta_file in sorted(RAW_DWD_DIR.glob("*/*/*/Metadaten_Geraete_*.txt")):
         device_category = meta_file.stem.replace("Metadaten_Geraete_", "")
         device_category = device_category.rsplit("_", 1)[0]  # drop trailing station id
         files_read += 1
@@ -185,42 +224,61 @@ def stage_device_instrument(monitor: PeakRSSMonitor) -> tuple[int, list[str], Pa
             chunk.insert(1, "device_category", device_category)
             if not columns:
                 columns = list(chunk.columns)
-            total_rows += _write_chunk(chunk, out_path, first_write)
-            first_write = False
-            del chunk
+            new_mask = []
+            for row in chunk.itertuples(index=False, name=None):
+                key = tuple(None if pd.isna(v) else v for v in row)
+                is_new = key not in seen
+                if is_new:
+                    seen.add(key)
+                new_mask.append(is_new)
+            new_rows = chunk.loc[new_mask]
+            if len(new_rows):
+                writer.write(new_rows)
+            del chunk, new_rows, new_mask
             monitor.check()
 
+    writer.close()
     logger.info(
-        f"Staged metadata/device_instrument.csv -- {total_rows} rows, {files_read} source files"
+        f"Staged metadata/device_instrument -- {writer.total_rows} rows after dedup, "
+        f"{len(writer.chunk_paths)} chunk file(s), {files_read} source files"
     )
-    return total_rows, columns, out_path
+    return writer.total_rows, columns, writer.chunk_paths
 
 
-def stage_parameter_unit(monitor: PeakRSSMonitor) -> tuple[int, list[str], Path]:
-    """Each Metadaten_Parameter_<code>_stunde_<station>.txt is unique per station
-    per measurement type -- no cross-folder duplication."""
-    METADATA_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METADATA_DIR / "parameter_unit.csv"
-
-    total_rows = 0
+def stage_parameter_unit(monitor: PeakRSSMonitor) -> tuple[int, list[str], list[Path]]:
+    """Unique per station per measurement type, but now duplicated between the
+    recent/ and historical/ copies -- deduped by content, same as above."""
+    writer = ChunkedCSVWriter(
+        METADATA_DIR, source="dwd", dataset="parameter_unit", max_bytes=MAX_CHUNK_BYTES
+    )
+    seen: set[tuple] = set()
     files_read = 0
-    first_write = True
     columns: list[str] = []
 
-    for meta_file in sorted(RAW_DWD_DIR.glob("*/*/Metadaten_Parameter_*.txt")):
+    for meta_file in sorted(RAW_DWD_DIR.glob("*/*/*/Metadaten_Parameter_*.txt")):
         files_read += 1
         for chunk in _iter_semicolon_chunks(meta_file):
             if not columns:
                 columns = list(chunk.columns)
-            total_rows += _write_chunk(chunk, out_path, first_write)
-            first_write = False
-            del chunk
+            new_mask = []
+            for row in chunk.itertuples(index=False, name=None):
+                key = tuple(None if pd.isna(v) else v for v in row)
+                is_new = key not in seen
+                if is_new:
+                    seen.add(key)
+                new_mask.append(is_new)
+            new_rows = chunk.loc[new_mask]
+            if len(new_rows):
+                writer.write(new_rows)
+            del chunk, new_rows, new_mask
             monitor.check()
 
+    writer.close()
     logger.info(
-        f"Staged metadata/parameter_unit.csv -- {total_rows} rows, {files_read} source files"
+        f"Staged metadata/parameter_unit -- {writer.total_rows} rows after dedup, "
+        f"{len(writer.chunk_paths)} chunk file(s), {files_read} source files"
     )
-    return total_rows, columns, out_path
+    return writer.total_rows, columns, writer.chunk_paths
 
 
 def _iter_fehlwerte_chunks(path: Path, chunksize: int = CHUNK_SIZE):
@@ -245,7 +303,9 @@ def _iter_fehlwerte_chunks(path: Path, chunksize: int = CHUNK_SIZE):
     buf.close()
 
 
-def stage_missing_value_periods(monitor: PeakRSSMonitor) -> tuple[int, list[str], Path]:
+def stage_missing_value_periods(
+    monitor: PeakRSSMonitor,
+) -> tuple[int, list[str], list[Path]]:
     """Metadaten_Fehlwerte_<station>_<daterange>.txt holds only the detailed
     missing-value-period rows. Metadaten_Fehldaten_* is a combined report --
     Gesamt_Fehlwerte summary rows followed by the same detailed rows found in
@@ -253,28 +313,30 @@ def stage_missing_value_periods(monitor: PeakRSSMonitor) -> tuple[int, list[str]
     Fehldaten is intentionally not read here, to avoid duplicating the detail
     rows or introducing the summary rows as if they were detail records.
     HTML variants are not used."""
-    METADATA_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METADATA_DIR / "missing_value_periods.csv"
-
-    total_rows = 0
+    writer = ChunkedCSVWriter(
+        METADATA_DIR,
+        source="dwd",
+        dataset="missing_value_periods",
+        max_bytes=MAX_CHUNK_BYTES,
+    )
     files_read = 0
-    first_write = True
     columns: list[str] = []
 
-    for meta_file in sorted(RAW_DWD_DIR.glob("*/*/Metadaten_Fehlwerte_*.txt")):
+    for meta_file in sorted(RAW_DWD_DIR.glob("*/*/*/Metadaten_Fehlwerte_*.txt")):
         files_read += 1
         for chunk in _iter_fehlwerte_chunks(meta_file):
             if not columns:
                 columns = list(chunk.columns)
-            total_rows += _write_chunk(chunk, out_path, first_write)
-            first_write = False
+            writer.write(chunk)
             del chunk
             monitor.check()
 
+    writer.close()
     logger.info(
-        f"Staged metadata/missing_value_periods.csv -- {total_rows} rows, {files_read} source files"
+        f"Staged metadata/missing_value_periods -- {writer.total_rows} rows, "
+        f"{len(writer.chunk_paths)} chunk file(s), {files_read} source files"
     )
-    return total_rows, columns, out_path
+    return writer.total_rows, columns, writer.chunk_paths
 
 
 def main() -> None:
@@ -282,33 +344,38 @@ def main() -> None:
     results = {}
 
     for measurement in ANALYTICAL_MEASUREMENTS:
-        rows, columns, path = stage_analytical(measurement, monitor)
-        results[measurement] = (rows, columns, path)
+        rows, columns, paths = stage_analytical(measurement, monitor)
+        results[measurement] = (rows, columns, paths)
 
-    rows, columns, path = stage_station_level_metadata(
+    rows, columns, paths = stage_solar(monitor)
+    results["solar"] = (rows, columns, paths)
+
+    rows, columns, paths = stage_station_level_metadata(
         "Metadaten_Geographie", "station_geography", monitor
     )
-    results["station_geography"] = (rows, columns, path)
+    results["station_geography"] = (rows, columns, paths)
 
-    rows, columns, path = stage_device_instrument(monitor)
-    results["device_instrument"] = (rows, columns, path)
+    rows, columns, paths = stage_device_instrument(monitor)
+    results["device_instrument"] = (rows, columns, paths)
 
-    rows, columns, path = stage_parameter_unit(monitor)
-    results["parameter_unit"] = (rows, columns, path)
+    rows, columns, paths = stage_parameter_unit(monitor)
+    results["parameter_unit"] = (rows, columns, paths)
 
-    rows, columns, path = stage_station_level_metadata(
+    rows, columns, paths = stage_station_level_metadata(
         "Metadaten_Stationsname_Betreibername",
         "station_name_history",
         monitor,
     )
-    results["station_name_history"] = (rows, columns, path)
+    results["station_name_history"] = (rows, columns, paths)
 
-    rows, columns, path = stage_missing_value_periods(monitor)
-    results["missing_value_periods"] = (rows, columns, path)
+    rows, columns, paths = stage_missing_value_periods(monitor)
+    results["missing_value_periods"] = (rows, columns, paths)
 
     logger.info("DWD staging complete.")
-    for name, (rows, columns, path) in results.items():
-        logger.info(f"  {name}: {rows} rows, {len(columns)} columns -> {path}")
+    for name, (rows, columns, paths) in results.items():
+        logger.info(
+            f"  {name}: {rows} rows, {len(columns)} columns, {len(paths)} chunk file(s)"
+        )
     logger.info(
         f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
         f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"
