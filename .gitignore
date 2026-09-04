@@ -68,18 +68,10 @@ override.tf.json
 .databricks/
 databricks/.databricks/
 
-# Redpanda
-redpanda/data/
-redpanda/logs/
+# CDC runtime (Debezium / Kafka Connect)
 cdc/connect/offsets/
 cdc/connect/connect.pid
 cdc/plugins/
-
-# dbt
-dbt/target/
-dbt/dbt_packages/
-dbt/logs/
-dbt/.user.yml
 
 # Dagster
 .dagster/

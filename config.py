@@ -16,7 +16,6 @@ This file manages:
 - CDC / Debezium configuration
 - Databricks configuration
 - Dagster configuration
-- dbt configuration
 - FastAPI configuration
 - Data generator configuration
 - Layer-specific settings (Bronze, Silver, Gold)
@@ -58,14 +57,12 @@ QUALITY_DIR = SRC_DIR / "quality"
 
 # Application directories
 FASTAPI_DIR = PROJECT_ROOT / "fastapi"
-DBT_DIR = PROJECT_ROOT / "dbt"
 DATABRICKS_DIR = PROJECT_ROOT / "databricks"
 DAGSTER_DIR = PROJECT_ROOT / "dagster"
 TERRAFORM_DIR = PROJECT_ROOT / "terraform"
 GRAFANA_DIR = PROJECT_ROOT / "grafana"
 AI_DIR = PROJECT_ROOT / "ai"
 POSTGRES_DIR = PROJECT_ROOT / "postgres"
-REDPANDA_DIR = PROJECT_ROOT / "redpanda"
 CDC_DIR = PROJECT_ROOT / "cdc"
 
 # SQL directories
@@ -100,7 +97,6 @@ DOCS_DIR = PROJECT_ROOT / "docs"
 LOGS_DIR = PROJECT_ROOT / "logs"
 LOGS_INGESTION_DIR = LOGS_DIR / "ingestion"
 LOGS_DATABRICKS_DIR = LOGS_DIR / "databricks"
-LOGS_DBT_DIR = LOGS_DIR / "dbt"
 LOGS_DAGSTER_DIR = LOGS_DIR / "dagster"
 LOGS_API_DIR = LOGS_DIR / "api"
 LOGS_AI_DIR = LOGS_DIR / "ai"
@@ -124,7 +120,6 @@ for directory in [
     SCRIPTS_UTILITIES_DIR,
     LOGS_INGESTION_DIR,
     LOGS_DATABRICKS_DIR,
-    LOGS_DBT_DIR,
     LOGS_DAGSTER_DIR,
     LOGS_API_DIR,
     LOGS_AI_DIR,
@@ -270,22 +265,8 @@ DAGSTER_CONFIG = {
         "batch_ingestion": "0 1 * * *",
         "silver_transform": "0 2 * * *",
         "gold_build": "0 3 * * *",
-        "dbt_run": "0 4 * * *",
         "quality_report": "0 5 * * *",
     },
-}
-
-# ====================================================================
-# DBT CONFIGURATION
-# ====================================================================
-
-DBT_CONFIG = {
-    "profiles_dir": os.getenv("DBT_PROFILES_DIR"),
-    "project_dir": str(DBT_DIR),
-    # dbt targets BigQuery (dbt-bigquery adapter), not Databricks -
-    # BigQuery is the analytical platform, dbt owns the analytical
-    # modelling on top of it
-    "target": ENVIRONMENT,
 }
 
 # ====================================================================
@@ -441,7 +422,6 @@ LOGGING_CONFIG = {
     "error_log": str(LOGS_DIR / "error.log"),
     "ingestion_log": str(LOGS_INGESTION_DIR / "ingestion.log"),
     "databricks_log": str(LOGS_DATABRICKS_DIR / "databricks.log"),
-    "dbt_log": str(LOGS_DBT_DIR / "dbt.log"),
     "dagster_log": str(LOGS_DAGSTER_DIR / "dagster.log"),
     "api_log": str(LOGS_API_DIR / "api.log"),
     "ai_log": str(LOGS_AI_DIR / "ai.log"),
@@ -494,8 +474,6 @@ def get_logger(name: str) -> logging.Logger:
         layer_log_file = LOGGING_CONFIG["ingestion_log"]
     elif "databricks" in name:
         layer_log_file = LOGGING_CONFIG["databricks_log"]
-    elif "dbt" in name:
-        layer_log_file = LOGGING_CONFIG["dbt_log"]
     elif "dagster" in name:
         layer_log_file = LOGGING_CONFIG["dagster_log"]
     elif "api" in name or "fastapi" in name or "router" in name:
