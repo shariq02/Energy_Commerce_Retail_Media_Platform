@@ -1,0 +1,201 @@
+# Data contract -- synthetic operational system (German energy retailer)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Operational PostgreSQL source: database `ecrmap`, schema `operational`.
+# 6 business entities across 7 tables (orders header + order_items child).
+# Types are the contract's abstract vocabulary; PostgreSQL precision
+# (numeric(12,2), varchar(160), ...) lives in postgres/ddl/ and
+# postgres/migrations/. Versioned in lockstep with postgres/migrations/.
+# generated/*.schema.json is produced by _generate_jsonschema.py -- do not
+# edit those by hand.
+#
+# Historical note: this operational system originally also included a
+# Retail Media book (advertisers, campaigns, campaign_budgets) -- 3 further
+# tables. Those tables have been dropped from the live database and removed
+# from this contract; the historical schema/generator/EDA record for them is
+# preserved under archive/historical/.
+
+source: synthetic_operational
+source_system: synthetic_operational
+domain: Operations / Energy Retail / Commerce
+description: >
+  Fully synthetic, deterministically generated operational records for the
+  fictional German energy retailer -- customers, energy contracts and tariffs,
+  meters, and a small product catalogue with orders. The CDC source for the
+  streaming pipeline. Every field is synthetic; never identity-linked to
+  REES46, GA4, or any other dataset.
+database: ecrmap
+db_schema: operational
+generation: deterministic (fixed seed); seed CSVs in postgres/seed/ are a
+  regenerable build artifact, loaded via COPY (truncate-and-reload)
+timestamps: timestamptz, UTC
+keys: UUID primary keys (deterministically generated, present in the seed CSVs)
+
+tables:
+
+  - name: tariffs
+    grain: { primary_key: [tariff_id] }
+    unique: [[tariff_code]]
+    checks:
+      - "energy_type in ('electricity','gas')"
+      - "unit_price_eur_per_kwh > 0"
+      - "standing_charge_eur_per_month >= 0"
+      - "contract_term_months > 0"
+      - "valid_to is null or valid_to >= valid_from"
+    columns:
+      - { name: tariff_id,                     type: string,  required: true,  nullable: false, notes: "uuid PK" }
+      - { name: tariff_code,                   type: string,  required: true,  nullable: false }
+      - { name: name,                          type: string,  required: true,  nullable: false }
+      - { name: energy_type,                   type: string,  required: true,  nullable: false, allowed_values: [electricity, gas] }
+      - { name: unit_price_eur_per_kwh,        type: decimal, required: true,  nullable: false }
+      - { name: standing_charge_eur_per_month, type: decimal, required: true,  nullable: false }
+      - { name: contract_term_months,          type: integer, required: true,  nullable: false }
+      - { name: active,                        type: boolean, required: true,  nullable: false }
+      - { name: valid_from,                    type: date,    required: true,  nullable: false }
+      - { name: valid_to,                      type: date,    required: false, nullable: true }
+      - { name: created_at,                    type: timestamp, required: true, nullable: false }
+      - { name: updated_at,                    type: timestamp, required: true, nullable: false }
+
+  - name: products
+    grain: { primary_key: [product_id] }
+    unique: [[sku]]
+    checks: ["unit_price_eur > 0"]
+    columns:
+      - { name: product_id,     type: string,  required: true, nullable: false, notes: "uuid PK" }
+      - { name: sku,            type: string,  required: true, nullable: false }
+      - { name: name,           type: string,  required: true, nullable: false }
+      - { name: category,       type: string,  required: true, nullable: false }
+      - { name: unit_price_eur, type: decimal, required: true, nullable: false }
+      - { name: active,         type: boolean, required: true, nullable: false }
+      - { name: created_at,     type: timestamp, required: true, nullable: false }
+      - { name: updated_at,     type: timestamp, required: true, nullable: false }
+
+  - name: customers
+    grain: { primary_key: [customer_id] }
+    unique: [[customer_number], [email]]
+    checks:
+      - "postal_code matches ^[0-9]{5}$"
+      - "country_code = 'DE'"
+      - "status in ('active','inactive','churned')"
+    columns:
+      - { name: customer_id,     type: string, required: true,  nullable: false, notes: "uuid PK" }
+      - { name: customer_number, type: string, required: true,  nullable: false }
+      - { name: first_name,      type: string, required: true,  nullable: false }
+      - { name: last_name,       type: string, required: true,  nullable: false }
+      - { name: email,           type: string, required: true,  nullable: false }
+      - { name: phone,           type: string, required: false, nullable: true }
+      - { name: street,          type: string, required: true,  nullable: false }
+      - { name: house_number,    type: string, required: true,  nullable: false }
+      - { name: postal_code,     type: string, required: true,  nullable: false, notes: "German PLZ, 5 digits" }
+      - { name: city,            type: string, required: true,  nullable: false }
+      - { name: country_code,    type: string, required: true,  nullable: false, allowed_values: [DE] }
+      - { name: date_of_birth,   type: date,   required: false, nullable: true }
+      - { name: signed_up_at,    type: timestamp, required: true, nullable: false }
+      - { name: status,          type: string, required: true,  nullable: false, allowed_values: [active, inactive, churned] }
+      - { name: created_at,      type: timestamp, required: true, nullable: false }
+      - { name: updated_at,      type: timestamp, required: true, nullable: false }
+
+  - name: customer_contracts
+    grain: { primary_key: [contract_id] }
+    unique: [[contract_number]]
+    foreign_keys:
+      - { columns: [customer_id], references: "customers(customer_id)" }
+      - { columns: [tariff_id],   references: "tariffs(tariff_id)" }
+    checks:
+      - "status in ('active','pending','ended','cancelled')"
+      - "billing_day between 1 and 28"
+      - "end_date is null or end_date >= start_date"
+    columns:
+      - { name: contract_id,     type: string, required: true,  nullable: false, notes: "uuid PK" }
+      - { name: contract_number, type: string, required: true,  nullable: false }
+      - { name: customer_id,     type: string, required: true,  nullable: false, notes: "FK customers" }
+      - { name: tariff_id,       type: string, required: true,  nullable: false, notes: "FK tariffs" }
+      - { name: start_date,      type: date,   required: true,  nullable: false }
+      - { name: end_date,        type: date,   required: false, nullable: true }
+      - { name: status,          type: string, required: true,  nullable: false, allowed_values: [active, pending, ended, cancelled] }
+      - { name: billing_day,     type: integer, required: true, nullable: false }
+      - { name: created_at,      type: timestamp, required: true, nullable: false }
+      - { name: updated_at,      type: timestamp, required: true, nullable: false }
+
+  - name: meters
+    grain: { primary_key: [meter_id] }
+    unique: [[meter_serial]]
+    foreign_keys:
+      - { columns: [contract_id], references: "customer_contracts(contract_id)" }
+    checks:
+      - "meter_type in ('electricity','gas')"
+      - "status in ('active','removed','faulty')"
+      - "removed_on is null or removed_on >= installed_on"
+    columns:
+      - { name: meter_id,     type: string, required: true,  nullable: false, notes: "uuid PK" }
+      - { name: meter_serial, type: string, required: true,  nullable: false }
+      - { name: contract_id,  type: string, required: true,  nullable: false, notes: "FK customer_contracts" }
+      - { name: meter_type,   type: string, required: true,  nullable: false, allowed_values: [electricity, gas] }
+      - { name: melo_id,      type: string, required: false, nullable: true, notes: "German Marktlokation id" }
+      - { name: installed_on, type: date,   required: true,  nullable: false }
+      - { name: removed_on,   type: date,   required: false, nullable: true }
+      - { name: status,       type: string, required: true,  nullable: false, allowed_values: [active, removed, faulty] }
+      - { name: created_at,   type: timestamp, required: true, nullable: false }
+      - { name: updated_at,   type: timestamp, required: true, nullable: false }
+
+  - name: orders
+    grain: { primary_key: [order_id] }
+    unique: [[order_number]]
+    foreign_keys:
+      - { columns: [customer_id], references: "customers(customer_id)" }
+    checks:
+      - "order_status in ('placed','paid','shipped','delivered','cancelled','refunded')"
+      - "currency = 'EUR'"
+      - "items_subtotal_eur >= 0 and shipping_fee_eur >= 0 and total_eur >= 0"
+      - "total_eur = items_subtotal_eur + shipping_fee_eur"
+    columns:
+      - { name: order_id,           type: string,  required: true, nullable: false, notes: "uuid PK" }
+      - { name: order_number,       type: string,  required: true, nullable: false }
+      - { name: customer_id,        type: string,  required: true, nullable: false, notes: "FK customers" }
+      - { name: order_status,       type: string,  required: true, nullable: false, allowed_values: [placed, paid, shipped, delivered, cancelled, refunded] }
+      - { name: ordered_at,         type: timestamp, required: true, nullable: false }
+      - { name: currency,           type: string,  required: true, nullable: false, allowed_values: [EUR] }
+      - { name: items_subtotal_eur, type: decimal, required: true, nullable: false, notes: "derived: sum of order_items.line_total_eur" }
+      - { name: shipping_fee_eur,   type: decimal, required: true, nullable: false }
+      - { name: total_eur,          type: decimal, required: true, nullable: false }
+      - { name: created_at,         type: timestamp, required: true, nullable: false }
+      - { name: updated_at,         type: timestamp, required: true, nullable: false }
+
+  - name: order_items
+    grain: { primary_key: [order_item_id] }
+    unique: [[order_id, product_id]]
+    foreign_keys:
+      - { columns: [order_id],   references: "orders(order_id)", on_delete: cascade }
+      - { columns: [product_id], references: "products(product_id)" }
+    checks:
+      - "quantity > 0 and unit_price_eur > 0 and line_total_eur >= 0"
+      - "line_total_eur = round(unit_price_eur * quantity, 2)"
+    columns:
+      - { name: order_item_id,  type: string,  required: true, nullable: false, notes: "uuid PK" }
+      - { name: order_id,       type: string,  required: true, nullable: false, notes: "FK orders (cascade delete)" }
+      - { name: product_id,     type: string,  required: true, nullable: false, notes: "FK products" }
+      - { name: quantity,       type: integer, required: true, nullable: false }
+      - { name: unit_price_eur, type: decimal, required: true, nullable: false, notes: "price snapshot at order time" }
+      - { name: line_total_eur, type: decimal, required: true, nullable: false }
+      - { name: created_at,     type: timestamp, required: true, nullable: false }
+
+quality_rules:
+  - id: order_header_matches_lines
+    expr: "orders.items_subtotal_eur = sum(order_items.line_total_eur) per order_id"
+    severity: block
+    evidence: "cross-row invariant -- guaranteed by the generator, not a DB CHECK"
+  - id: contract_has_meter
+    expr: "every customer_contracts row has >= 1 meters row"
+    severity: warn
+  - id: customer_has_contract
+    expr: "every customers row has >= 1 customer_contracts row"
+    severity: warn
+
+localisation:
+  required: false
+  note: >
+    Natively and deliberately German -- this is the platform's German operational
+    reference (real German cities / postcodes / names, EUR, German tariff and
+    metering semantics). Every field is synthetic and clearly so.

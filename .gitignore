@@ -26,6 +26,7 @@ data/raw/
 data/samples/
 data/staging/
 data/processed/
+data/cdc/
 *.csv
 *.parquet
 *.json.gz
@@ -70,6 +71,9 @@ databricks/.databricks/
 # Redpanda
 redpanda/data/
 redpanda/logs/
+cdc/connect/offsets/
+cdc/connect/connect.pid
+cdc/plugins/
 
 # dbt
 dbt/target/
@@ -100,6 +104,10 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
+
+# Local developer utilities (not part of the pipeline)
+scripts/utilities/lint.py
+scripts/utilities/clean_cache.py
 
 # VS Code
 .vscode/

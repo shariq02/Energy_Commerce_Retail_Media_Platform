@@ -1,0 +1,77 @@
+# Source-to-canonical mapping -- REES46
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired REES46 schema (see contracts/rees46.yml) to the
+# canonical model. Design only -- no transform code here.
+
+source: rees46
+source_system: rees46
+profiling_evidence: src/schemas/profiling/rees46.md
+contract: src/schemas/contracts/rees46.yml
+
+targets:
+
+  - canonical_fact: fact_customer_activity
+    from_tables: [rees46_events]
+    canonical_grain: [customer_session, event]
+    field_map:
+      - source: "user_id + user_session"
+        canonical: "customer_session key"
+        transform: "session identity = (user_id, user_session)"
+      - source: "user_id"
+        canonical: "dim_customer (source-attributed -- REES46 user, never resolved to any other source's customer)"
+      - source: "event_type"
+        canonical: "fact_customer_activity.activity_type (view / cart / purchase)"
+      - source: "event_time"
+        canonical: "dim_date + event timestamp"
+        transform: "cast to timestamp (UTC)"
+      - source: "product_id / category_id / category_code / brand"
+        canonical: "dim_product attributes (SCD / last-seen -- attributes drift)"
+      - source: "price"
+        canonical: "fact_customer_activity.item_price (currency-unknown; relative measures only)"
+    provenance:
+      source_system: rees46
+      source_record_id: "concat_ws('|', user_session, product_id, event_type, event_time)"
+
+  - canonical_fact: fact_product_demand
+    populated: false
+    from_tables: [rees46_events]
+    decision: >
+      REES46 does NOT populate fact_product_demand (needs real geography). It
+      feeds int_product_demand as an ungeo'd (category, date) demand signal.
+
+  - synthetic_attribute: country_synthetic
+    class: synthetic
+    grain: user_id
+    rule: "deterministic hash of user_id -> country; stable per user_id"
+    note: "built in Silver; flagged synthetic on every use; not a claim about event location"
+
+  - canonical_fact: fact_orders
+    populated: false
+    decision: "NOT populated from REES46 -- no order_id / basket grouping; purchases stay as events in fact_customer_activity"
+
+  - canonical_dimension: dim_product
+    from_tables: [rees46_events]
+    note: >
+      Build the category hierarchy from the category_code dotted path; keep
+      category_id as a source id. Product attributes are SCD / last-seen (drift
+      observed). category_code / brand kept nullable with an 'unknown' member.
+
+dropped_columns: []
+
+localisation:
+  required: true
+  approach: honest_provenance
+  detail:
+    geography: >
+      no country field, none derivable -- event rows carry no geography. A
+      synthetic user-level country (country_synthetic), deterministic and
+      stable per user_id, always flagged synthetic.
+    currency: "undocumented -- price marked currency-unknown; relative measures only"
+    language: "product / brand strings are English-ish; category_code is English tokens"
+  never: >
+    REES46 event data is never presented as German commerce or merged into a
+    German customer identity; the synthetic country is never presented as
+    source-provided.

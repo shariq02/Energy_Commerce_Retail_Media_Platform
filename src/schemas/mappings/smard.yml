@@ -1,0 +1,68 @@
+# Source-to-canonical mapping -- SMARD
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: map the acquired SMARD schema (see contracts/smard.yml) to the
+# canonical model. Design only -- no transform code here.
+
+source: smard
+source_system: smard
+profiling_evidence: src/schemas/profiling/smard.md
+contract: src/schemas/contracts/smard.yml
+
+# SMARD is long-format: the canonical target depends on the `metric` value.
+targets:
+
+  - canonical_fact: fact_market_price
+    applies_when: "metric = 'day_ahead_prices'"
+    canonical_grain: [market_zone, date]
+    grain_note: >
+      Source resolution is 'day', so the hour/interval part of the canonical
+      grain is not populated from this source.
+    field_map:
+      - source: "metric + filter_id + region + resolution + timestamp_utc"
+        canonical: source_record_id
+        transform: "concat_ws('|', metric, filter_id, region, resolution, timestamp_utc)"
+      - source: region                     # 'DE-LU'
+        canonical: "dim_market.market_zone"
+        transform: "'DE-LU' -> market zone 'DE-LU' (German-Luxembourg bidding zone)"
+      - source: timestamp_utc
+        canonical: "dim_date.date_key"
+        transform: "cast to timestamp (UTC), truncate to date"
+      - source: value
+        canonical: "fact_market_price.price"
+        transform: "cast to double"
+        unit: EUR/MWh
+    provenance:
+      source_system: smard
+      source_record_id: "the concat_ws key above"
+
+  - canonical_fact: fact_market_timeseries
+    applies_when: >
+      metric like 'generation_%'
+      or metric in ('residual_load', 'total_power_consumption', 'pumped_storage_consumption')
+    metrics_affected: 15
+    canonical_grain: [metric, market_zone, date]
+    field_map:
+      - { source: metric,        canonical: "fact_market_timeseries.metric" }
+      - { source: region,        canonical: "dim_market.market_zone", transform: "'DE-LU'" }
+      - { source: timestamp_utc, canonical: "dim_date.date_key", transform: "cast UTC, truncate to date" }
+      - { source: value,         canonical: "fact_market_timeseries.value", transform: "cast to double" }
+      - { source: "(constant)",  canonical: "fact_market_timeseries.unit", transform: "'MWh/day'" }
+    provenance:
+      source_system: smard
+      source_record_id: "concat_ws('|', metric, filter_id, region, resolution, timestamp_utc)"
+    also_feeds: >
+      cross-domain fact_market_impact / fact_energy_demand intermediate models.
+
+# Columns dropped on the way to canonical (recorded so the decision is explicit)
+dropped_columns:
+  - column: resolution
+    reason: "constant 'day'; not part of any canonical grain at this resolution"
+  - column: filter_id
+    reason: "SMARD-internal series id; retained inside source_record_id, not a canonical field"
+
+localisation:
+  required: false
+  reason: "natively German (DE-LU zone, Bundesnetzagentur)"

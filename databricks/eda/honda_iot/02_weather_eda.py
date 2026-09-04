@@ -6,7 +6,7 @@
 # MAGIC %md
 # MAGIC # EDA -- HONDA IOT WEATHER
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
@@ -21,6 +21,10 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib
+import os as _os
+import re as _re
+
 import matplotlib.pyplot as plt
 from pyspark.sql import Window
 from pyspark.sql import functions as F
@@ -40,9 +44,10 @@ PLAUSIBLE = {"Ta": (-40.0, 50.0), "Igm": (0.0, 1500.0)}
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
+
+
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
     plt.figure(figsize=(10, 4))
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -50,26 +55,26 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
 
 
 def _repo_root():
@@ -110,6 +115,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -119,6 +190,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -136,7 +210,7 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     )
     kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
     kept[notebook_key] = block
-    intro = f"_Auto-generated by the Phase 3 EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
+    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
     header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
     body = "\n\n".join(kept[k] for k in sorted(kept))
     out = header + body + "\n"
@@ -146,6 +220,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -281,19 +364,19 @@ print("top interval sizes (frequency, delta_s, count):", delta_dist)
 
 # DBTITLE 1,Stuck-run detection per value column (one windowed pass)
 w2 = Window.partitionBy("frequency").orderBy("datetime_utc")
-stuck_exprs = []
+df_1h = df.where(F.col("frequency") == "1h")
+# First pass: compute window columns
 for c in VCOLS:
     v = F.col(c).cast("double")
-    stuck_exprs.append(
-        F.sum(
-            (
-                v.isNotNull()
-                & (v == F.lag(v, 1).over(w2))
-                & (v == F.lag(v, 11).over(w2))
-            ).cast("long")
-        ).alias(c)
+    df_1h = df_1h.withColumn(
+        f"{c}_stuck",
+        (
+            v.isNotNull() & (v == F.lag(v, 1).over(w2)) & (v == F.lag(v, 11).over(w2))
+        ).cast("long"),
     )
-stuck = df.where(F.col("frequency") == "1h").agg(*stuck_exprs).first().asDict()
+# Second pass: aggregate the flags
+stuck_exprs = [F.sum(F.col(f"{c}_stuck")).alias(c) for c in VCOLS]
+stuck = df_1h.agg(*stuck_exprs).first().asDict()
 print("stuck>=12-run (1h):", stuck)
 
 # COMMAND ----------
@@ -323,46 +406,52 @@ print("value sample rows:", len(value_pdf))
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- frequency, coverage %, longest gap
-barplot(freq_rows, "Honda weather -- rows per frequency", "frequency", "rows")
-if continuity:
-    barplot(
-        [(r[0], r[2]) for r in continuity],
-        "Honda weather -- coverage % by frequency",
-        "frequency",
-        "%",
-    )
-    barplot(
-        [(r[0], r[4]) for r in continuity],
-        "Honda weather -- longest gap (steps) by frequency",
-        "frequency",
-        "steps",
-    )
+# DBTITLE 1,Figure -- frequency overview (rows / coverage % / longest gap)
+facet_bars(
+    {
+        "rows per frequency": freq_rows,
+        "coverage % by frequency": [(r[0], r[2]) for r in continuity],
+        "longest gap (steps) by frequency": [(r[0], r[4]) for r in continuity],
+    },
+    "Honda weather -- frequency overview",
+    "honda_weather_frequency.png",
+    rot=0,
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- value distributions, hourly window, diurnal profile
-for c in VCOLS:
-    s = value_pdf[c].dropna()
-    if len(s):
-        histplot(
-            s.tolist(), f"Honda weather.{c} -- distribution (n={len(s)} sample)", c
-        )
+facet_hists(
+    {c: value_pdf[c].dropna().tolist() for c in VCOLS},
+    "Honda weather -- value distribution per column (sampled)",
+    "honda_weather_value_distributions.png",
+)
 if not ts_pdf.empty:
     fig, axes = plt.subplots(len(VCOLS), 1, figsize=(12, 3 * len(VCOLS)), squeeze=False)
     for i, c in enumerate(VCOLS):
         axes[i][0].plot(range(len(ts_pdf)), ts_pdf[c], linewidth=0.8)
         axes[i][0].set_title(f"Honda weather -- {c} (first 3000 hourly points)")
     plt.tight_layout()
+    fig.savefig(
+        fig_path("honda_weather_hourly_window.png"), dpi=110, bbox_inches="tight"
+    )
     plt.show()
-for c in VCOLS:
-    plt.figure(figsize=(9, 3))
-    plt.plot([h["hod"] for h in hourly], [h[c] for h in hourly], marker="o")
-    plt.title(f"Honda weather -- mean {c} by hour of day")
-    plt.xlabel("hour")
-    plt.ylabel(c)
-    plt.tight_layout()
-    plt.show()
+
+
+def _diurnal_draw(c):
+    def draw(ax):
+        ax.plot([h["hod"] for h in hourly], [h[c] for h in hourly], marker="o")
+        ax.set_xlabel("hour", fontsize=7)
+
+    return draw
+
+
+_facet_grid(
+    [(c, _diurnal_draw(c)) for c in VCOLS],
+    "Honda weather -- mean value by hour of day",
+    "honda_weather_diurnal_profiles.png",
+    ncols=2,
+)
 
 # COMMAND ----------
 
@@ -483,5 +572,20 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("Silver Implications", _silver_md),
+    ],
+    figures=[
+        ("Honda weather -- frequency overview", "honda_weather_frequency.png"),
+        (
+            "Honda weather -- value distribution per column",
+            "honda_weather_value_distributions.png",
+        ),
+        (
+            "Honda weather -- first 3000 hourly points per column",
+            "honda_weather_hourly_window.png",
+        ),
+        (
+            "Honda weather -- mean value by hour of day",
+            "honda_weather_diurnal_profiles.png",
+        ),
     ],
 )

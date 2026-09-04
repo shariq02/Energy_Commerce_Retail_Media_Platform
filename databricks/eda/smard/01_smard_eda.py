@@ -6,7 +6,7 @@
 # MAGIC %md
 # MAGIC # EDA -- SMARD ENERGY TIME SERIES
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
@@ -21,6 +21,10 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib
+import os as _os
+import re as _re
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import Window
@@ -52,8 +56,9 @@ RESOLUTION_SECONDS = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
+
+
 def as_ts(col: str):
     c = F.col(col).cast("string")
     return F.coalesce(
@@ -70,7 +75,7 @@ def step_col():
     return e
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -78,26 +83,26 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
 
 
 def _repo_root():
@@ -138,6 +143,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -147,6 +218,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -164,7 +238,7 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     )
     kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
     kept[notebook_key] = block
-    intro = f"_Auto-generated by the Phase 3 EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
+    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
     header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
     body = "\n\n".join(kept[k] for k in sorted(kept))
     out = header + body + "\n"
@@ -174,6 +248,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -333,8 +416,14 @@ sd = (
     .where(F.col("ts").isNotNull() & F.col("step").isNotNull())
     .distinct()
     .withColumn(
+        # Round before subtracting 1: SMARD day/hour timestamps carry DST jumps
+        # (25h / 23h steps), which otherwise produced fractional "missing steps"
+        # like 0.0417 instead of 0.
         "gap_steps",
-        (F.col("ts").cast("long") - F.lag("ts").over(w).cast("long")) / F.col("step")
+        F.round(
+            (F.col("ts").cast("long") - F.lag("ts").over(w).cast("long"))
+            / F.col("step")
+        )
         - 1,
     )
     .groupBy(*SERIES_KEY, "step")
@@ -342,15 +431,17 @@ sd = (
         F.min("ts").alias("min_ts"),
         F.max("ts").alias("max_ts"),
         F.count(F.lit(1)).alias("observed"),
-        F.max(F.when(F.col("gap_steps") > 0, F.col("gap_steps"))).alias("longest_gap"),
-        F.sum(F.when(F.col("gap_steps") > 0, F.col("gap_steps")).otherwise(0)).alias(
-            "missing_steps"
-        ),
+        F.max(F.when(F.col("gap_steps") > 0, F.col("gap_steps")))
+        .cast("long")
+        .alias("longest_gap"),
+        F.sum(F.when(F.col("gap_steps") > 0, F.col("gap_steps")).otherwise(0))
+        .cast("long")
+        .alias("missing_steps"),
     )
 ).collect()
 continuity = []
 for x in sd:
-    exp = int((x["max_ts"].timestamp() - x["min_ts"].timestamp()) / x["step"]) + 1
+    exp = round((x["max_ts"].timestamp() - x["min_ts"].timestamp()) / x["step"]) + 1
     continuity.append(
         {
             "series": "|".join(str(x[k]) for k in SERIES_KEY),
@@ -405,53 +496,51 @@ print("value sample rows:", len(value_pdf))
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- distributions, series volume, coverage, activity
-for c, pairs in dist.items():
-    barplot(pairs, f"SMARD -- rows per {c}", c, "rows", rot=45)
-barplot(
-    series_rows, "SMARD -- rows per series", "series", "rows", rot=90, figsize=(12, 5)
-)
-barplot(sorted(by_year.items()), "SMARD -- rows per year", "year", "rows", rot=45)
-if continuity:
-    barplot(
-        [
+# DBTITLE 1,Figure -- series overview (rows per metric / year, coverage, longest gap)
+facet_bars(
+    {
+        "rows per metric": dist.get("metric", []),
+        "rows per year": sorted(by_year.items()),
+        "rows per series": series_rows,
+        "per-series coverage %": [
             (c["series"], c["coverage_pct"])
             for c in continuity
             if c["coverage_pct"] is not None
         ],
-        "SMARD -- per-series temporal coverage %",
-        "series",
-        "%",
-        rot=90,
-        figsize=(12, 5),
-    )
-    barplot(
-        [(c["series"], c["longest_gap"]) for c in continuity if c["longest_gap"]],
-        "SMARD -- per-series longest gap (missing steps)",
-        "series",
-        "steps",
-        rot=90,
-        figsize=(12, 5),
-    )
+        "per-series longest gap (steps)": [
+            (c["series"], c["longest_gap"]) for c in continuity if c["longest_gap"]
+        ],
+    },
+    "SMARD -- series overview",
+    "smard_series_overview.png",
+    rot=90,
+    ncols=2,
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- value distribution and time series per metric
-for m in metrics:
-    s = value_pdf.loc[value_pdf["metric"] == m, "value"]
-    if len(s):
-        histplot(
-            s.tolist(), f"SMARD {m} -- value distribution (n={len(s)} sample)", "value"
-        )
-    pdf = ts_pdf[m]
-    if not pdf.empty:
-        plt.figure(figsize=(12, 3))
-        plt.plot(range(len(pdf)), pdf["value"], linewidth=0.7)
-        plt.title(f"SMARD {m} -- first 3000 points")
-        plt.xlabel("time index")
-        plt.ylabel("value")
-        plt.tight_layout()
-        plt.show()
+# DBTITLE 1,Figure -- value distribution + time series per metric (faceted)
+facet_hists(
+    {m: value_pdf.loc[value_pdf["metric"] == m, "value"].tolist() for m in metrics},
+    "SMARD -- value distribution per metric (sampled)",
+    "smard_value_distributions.png",
+    ncols=4,
+)
+
+
+def _ts_draw(pdf):
+    def draw(ax):
+        ax.plot(range(len(pdf)), pdf["value"], linewidth=0.7)
+
+    return draw
+
+
+_facet_grid(
+    [(m, _ts_draw(ts_pdf[m])) for m in metrics if not ts_pdf[m].empty],
+    "SMARD -- first 3000 points per metric",
+    "smard_time_series.png",
+    ncols=4,
+)
 
 # COMMAND ----------
 
@@ -642,6 +731,12 @@ write_profiling(
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[
-        ("SMARD metric|region x resolution presence", "smard_coverage_matrix.png")
+        ("SMARD metric|region x resolution presence", "smard_coverage_matrix.png"),
+        ("SMARD series overview", "smard_series_overview.png"),
+        (
+            "SMARD value distribution per metric (sampled)",
+            "smard_value_distributions.png",
+        ),
+        ("SMARD first 3000 points per metric", "smard_time_series.png"),
     ],
 )

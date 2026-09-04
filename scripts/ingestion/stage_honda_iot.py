@@ -1,14 +1,12 @@
-# ====================================================================
-# Honda IoT Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# Honda IoT staging
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Consolidate Honda IoT raw files in data/raw/honda_iot/ into
-# the 7 logical staging datasets defined in PIPELINE_DESIGN.md Section
-# 1a, written to data/staging/honda_iot/analytical/. Local file
-# operations only -- does not upload anywhere. data/raw/ is read-only
-# throughout.
+#
+# Purpose: consolidate Honda IoT raw files in data/raw/honda_iot/ into
+# the 7 logical staging datasets, written to
+# data/staging/honda_iot/analytical/. Local file operations only --
+# does not upload anywhere. data/raw/ is read-only throughout.
 #
 # The 1min/15min/1h folders are frequency partitions of the same 7
 # datasets, not 21 separate ones -- confirmed schema-identical per
@@ -35,7 +33,6 @@
 # across all 3 frequencies) exceeds the 50 MiB physical chunk limit, so
 # every dataset uses the chunked writer for consistency, even where a
 # smaller dataset happens to end up as a single chunk.
-# ====================================================================
 
 import sys
 from pathlib import Path
@@ -116,7 +113,7 @@ def main() -> None:
         rows, out_dir, files_read, chunk_count = stage_dataset(dataset, monitor)
         results[dataset] = (rows, out_dir, files_read, chunk_count)
 
-    logger.info("Honda IoT Phase 2b staging complete.")
+    logger.info("Honda IoT staging complete.")
     for dataset, (rows, out_dir, files_read, chunk_count) in results.items():
         logger.info(
             f"  {dataset}: {rows} rows, {files_read} source files, "

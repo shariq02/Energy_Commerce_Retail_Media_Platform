@@ -1,0 +1,123 @@
+# Data contract -- KDD Cup 2012 Track 2 (search-ad click prediction)
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the KDD Cup 2012 Track 2 source (1 Bronze table).
+# Every *_observed value is traceable to src/schemas/profiling/kddcup2012.md.
+# Authored; generated/kddcup2012_click_prediction.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit it by hand.
+
+source: kddcup2012
+source_system: kddcup2012_track2
+domain: Commerce / Search Advertising
+description: >
+  Search-advertising impression records with a click flag/count and an
+  impression count, plus hashed query / ad / keyword / title / description / user
+  ids and ranking position/depth. No timestamp -- used undated. The
+  main click-prediction CSV is acquired (sample release); five supplementary
+  lookup files are pending acquisition. Not a German
+  source; provides click / click-prediction evidence only -- no conversion field.
+profiling_evidence: src/schemas/profiling/kddcup2012.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+  status: >
+    kddcup2012_click_prediction acquired + profiled; the 5 supplementary lookup
+    tables are NOT yet acquired -- a Phase 2 / 2b follow-up.
+
+tables:
+
+  - name: kddcup2012_click_prediction
+    grain:
+      key: [url_hash, ad_id, advertiser_id, depth, position, query_id, keyword_id, title_id, description_id, user_id]
+      unique: false          # 2062 context keys repeat; 0 have conflicting click labels
+      row_count_observed: 399482
+      description: "one row per aggregated (context) search-ad impression group"
+    columns:
+      - { name: click,          type: integer, required: true, nullable: false, notes: "click count for the group; class balance 16.8% positive" }
+      - { name: impression,     type: integer, required: true, nullable: false, notes: "impression count for the group; range 1..316" }
+      - { name: url_hash,       type: string,  required: true, nullable: false, distinct_observed: 15870 }
+      - { name: ad_id,          type: string,  required: true, nullable: false, distinct_observed: 82684 }
+      - { name: advertiser_id,  type: string,  required: true, nullable: false, distinct_observed: 11225, notes: "ad_id -> advertiser_id is effectively 1:1" }
+      - { name: depth,          type: integer, required: true, nullable: false, allowed_values: [1, 2, 3] }
+      - { name: position,       type: integer, required: true, nullable: false, allowed_values: [1, 2, 3], notes: "position <= depth always holds" }
+      - { name: query_id,       type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.39% of rows" }
+      - { name: keyword_id,     type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.39%" }
+      - { name: title_id,       type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.00%" }
+      - { name: description_id, type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 1.00%" }
+      - { name: user_id,        type: string,  required: true, nullable: false, notes: "0 = unknown sentinel, 24.27%; source-attributed; joined only to kddcup2012_userid_profile" }
+
+  # ---- Supplementary lookup files (pending acquisition) ------------------
+  # Official files from the same KDD Cup 2012 Track 2 release, not yet acquired.
+  # Columns are the dataset's published TSV format; no profiling evidence yet.
+
+  - name: kddcup2012_userid_profile
+    acquisition_status: pending
+    grain: { key: [userid], unique: true }
+    columns:
+      - { name: userid, type: string,  required: true, nullable: false }
+      - { name: gender, type: integer, required: true, nullable: false, notes: "0 = unknown, 1, 2" }
+      - { name: age,    type: integer, required: true, nullable: false, notes: "age bucket 0-6 (0 = unknown)" }
+
+  - name: kddcup2012_queryid_tokensid
+    acquisition_status: pending
+    grain: { key: [queryid], unique: true }
+    columns:
+      - { name: queryid, type: string, required: true, nullable: false }
+      - { name: tokens,  type: string, required: true, nullable: false, notes: "pipe-delimited token ids, e.g. '12|3|45'" }
+
+  - name: kddcup2012_purchasedkeywordid_tokensid
+    acquisition_status: pending
+    grain: { key: [keywordid], unique: true }
+    columns:
+      - { name: keywordid, type: string, required: true, nullable: false }
+      - { name: tokens,    type: string, required: true, nullable: false, notes: "pipe-delimited token ids" }
+
+  - name: kddcup2012_titleid_tokensid
+    acquisition_status: pending
+    grain: { key: [titleid], unique: true }
+    columns:
+      - { name: titleid, type: string, required: true, nullable: false }
+      - { name: tokens,  type: string, required: true, nullable: false, notes: "pipe-delimited token ids" }
+
+  - name: kddcup2012_descriptionid_tokensid
+    acquisition_status: pending
+    grain: { key: [descriptionid], unique: true }
+    columns:
+      - { name: descriptionid, type: string, required: true, nullable: false }
+      - { name: tokens,        type: string, required: true, nullable: false, notes: "pipe-delimited token ids" }
+
+quality_rules:
+  - id: exact_duplicates
+    expr: "2075 exact full-row duplicates -- apply distinct on load"
+    severity: block
+  - id: id_zero_is_unknown
+    expr: "id value 0 in query_id / keyword_id / title_id / description_id / user_id means 'unknown', treat as NULL"
+    severity: block
+  - id: click_le_impression
+    expr: "click <= impression for every row"
+    severity: block
+    evidence: "profiling: 0 violations"
+  - id: position_le_depth
+    expr: "position <= depth for every row"
+    severity: block
+    evidence: "profiling: 0 violations"
+  - id: context_key_no_conflict
+    expr: "repeated context keys never carry conflicting click labels"
+    severity: warn
+    evidence: "profiling: 2062 repeated, 0 conflicting"
+  - id: class_imbalance
+    expr: "negative:positive ~ 5:1 -- a modelling constraint, recorded not enforced"
+    severity: info
+
+localisation:
+  required: false
+  note: >
+    No geography field. Source is not German. Retained with
+    source_system='kddcup2012_track2'; never presented as German advertising.

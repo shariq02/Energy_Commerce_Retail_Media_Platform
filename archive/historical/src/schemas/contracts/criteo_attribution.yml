@@ -1,0 +1,89 @@
+# Data contract -- Criteo Attribution
+# Energy Commerce and Retail Media Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the Criteo Attribution source (1 Bronze table).
+# Every *_observed value is traceable to src/schemas/profiling/criteo_attribution.md.
+# Authored; generated/criteo_attribution_events.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit it by hand.
+
+source: criteo_attribution
+source_system: criteo_attribution
+domain: Retail Media / Attribution
+description: >
+  30 days of display-ad touchpoints (clicks / impressions) with campaign,
+  anonymised user id, cost / cost-per-order, conversion flags and an attribution
+  flag, plus 9 hashed context categoricals. Timestamps are relative seconds from
+  dataset start, not wall-clock. Static one-time acquisition (single TSV). Not a
+  German source.
+profiling_evidence: src/schemas/profiling/criteo_attribution.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+tables:
+
+  - name: criteo_attribution_events
+    grain:
+      key: [uid, timestamp, campaign]
+      unique: true               # profiling: distinct == row count, 0 dup groups
+      row_count_observed: 16468027
+      description: "one row per ad touchpoint (click or impression) for a user on a campaign"
+    columns:
+      - { name: timestamp,             type: integer, required: true, nullable: false, notes: "relative seconds from dataset start (0..2671199); NOT wall-clock" }
+      - { name: uid,                   type: string,  required: true, nullable: false, distinct_observed: 6374242, notes: "anonymised user; source-attributed" }
+      - { name: campaign,              type: string,  required: true, nullable: false, distinct_observed: 694 }
+      - { name: conversion,            type: integer, required: true, nullable: false, allowed_values: [0, 1], notes: "conversion rate 0.049" }
+      - { name: conversion_timestamp,  type: integer, required: true, nullable: false, notes: "relative seconds; -1 when no conversion (15661831 rows)" }
+      - { name: conversion_id,         type: string,  required: true, nullable: false, notes: "-1 when no conversion; links touchpoints into a path otherwise (435810 paths)" }
+      - { name: attribution,           type: integer, required: true, nullable: false, allowed_values: [0, 1], notes: "attribution rate 0.027; NOT perfectly nested inside conversion" }
+      - { name: click,                 type: integer, required: true, nullable: false, allowed_values: [0, 1], notes: "click rate 0.361 (rest are impressions)" }
+      - { name: click_pos,             type: integer, required: true, nullable: false, notes: "position in click sequence; -1 sentinel common" }
+      - { name: click_nb,              type: integer, required: true, nullable: false, notes: "number of clicks; -1 sentinel common; click_pos <= click_nb always" }
+      - { name: cost,                  type: double,  required: true, nullable: false, notes: "normalised; range 1e-05..0.058" }
+      - { name: cpo,                   type: double,  required: true, nullable: false, notes: "cost per order; range 0.004..1.016" }
+      - { name: time_since_last_click, type: integer, required: true, nullable: false, notes: "relative seconds; -1 sentinel (8770820 rows)" }
+      - { name: cat1, type: string, required: true, nullable: false, distinct_observed: 9 }
+      - { name: cat2, type: string, required: true, nullable: false, distinct_observed: 71 }
+      - { name: cat3, type: string, required: true, nullable: false, distinct_observed: 2002 }
+      - { name: cat4, type: string, required: true, nullable: false, distinct_observed: 21 }
+      - { name: cat5, type: string, required: true, nullable: false, distinct_observed: 50 }
+      - { name: cat6, type: string, required: true, nullable: false, distinct_observed: 30 }
+      - { name: cat7, type: string, required: true, nullable: false, distinct_observed: 57782 }
+      - { name: cat8, type: string, required: true, nullable: false, distinct_observed: 11 }
+      - { name: cat9, type: string, required: true, nullable: false, distinct_observed: 29 }
+
+quality_rules:
+  - id: key_unique
+    expr: "(uid, timestamp, campaign) unique"
+    severity: block
+    evidence: "profiling: distinct == row count"
+  - id: relative_time_only
+    expr: "timestamp / conversion_timestamp / time_since_last_click stay integer relative-seconds -- never coerced to wall-clock"
+    severity: block
+  - id: minus_one_sentinel
+    expr: "-1 in conversion_timestamp / conversion_id / click_pos / click_nb / time_since_last_click is a 'not applicable' sentinel"
+    severity: block
+  - id: attribution_not_nested_in_conversion
+    expr: "attribution=1 implies conversion=1 (0 violations) but conversion=1 does NOT imply attribution=1 (363772 rows)"
+    severity: warn
+  - id: click_pos_le_click_nb
+    expr: "click_pos <= click_nb for every row"
+    severity: block
+    evidence: "profiling: 0 violations"
+  - id: logical_anomalies_flag_not_drop
+    expr: "cost_no_click (10.5M) and cpo_no_conversion (15.7M, = conversion_id -1 rows) are flagged, not dropped"
+    severity: warn
+
+localisation:
+  required: false
+  note: >
+    No geography field. Not a German source. Retained with
+    source_system='criteo_attribution'; a distinct source from iPinYou, not a
+    replacement. Never presented as German advertising.

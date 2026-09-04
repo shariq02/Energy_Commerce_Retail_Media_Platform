@@ -1,0 +1,74 @@
+# Governed reference artifact -- source_system -> ecosystem map
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: the governed source_system -> ecosystem map. This is the single
+# source of truth the Silver boundary reads to assign the derived
+# `ecosystem` provenance attribute to every canonical record. It is never
+# written back into Bronze.
+#
+# Rules (do not violate when editing):
+# - Allowed `ecosystem` values are a closed, governed vocabulary -- currently
+#   only `energy` is populated (the completed first wave). `mobility` /
+#   `healthcare` / `agriculture` are added here only once that ecosystem's
+#   sources are actually acquired -- adding a new ecosystem value to this
+#   file is a governed change requiring an architecture decision and review.
+# - Every acquired, current-scope source_system maps to exactly one
+#   ecosystem, for the life of the platform (immutable per canonical_id).
+# - This file lists only sources with live Bronze data today. iPinYou,
+#   Criteo Attribution, and KDD Cup 2012 Track 2 historically also mapped to
+#   `energy`, but their Bronze tables have since been deleted and their scope
+#   removed -- they are not re-listed here. Their historical mapping/contract
+#   files are preserved under archive/historical/.
+
+version: 1
+governance: "change requires an architecture decision and review"
+schema:
+  source_system: "the source_system provenance value, as it appears on every canonical row"
+  ecosystem: "one of the closed vocabulary values below"
+  first_mapped: "when this source was first classified"
+
+allowed_ecosystems:
+  - energy
+  # - mobility      # add only when Mobility & Electrification sources are acquired, as a governed change
+  # - healthcare    # add only when Healthcare sources are acquired, as a governed change
+  # - agriculture   # add only when Agriculture sources are acquired, as a governed change
+
+mappings:
+  - source_system: smard
+    ecosystem: energy
+    first_mapped: "first wave"
+  - source_system: dwd
+    ecosystem: energy
+    first_mapped: "first wave"
+  - source_system: honda_iot
+    ecosystem: energy
+    first_mapped: "first wave"
+  - source_system: rees46
+    ecosystem: energy
+    first_mapped: "first wave"
+  - source_system: search_visibility_ramp_dryad
+    ecosystem: energy
+    first_mapped: "first wave"
+  - source_system: synthetic_operational
+    ecosystem: energy
+    first_mapped: "operational CDC source"
+  - source_system: ga4
+    ecosystem: energy
+    first_mapped: "secondary/harmonisation source"
+
+# Historical, out-of-scope entries -- listed here ONLY as a documented
+# negative record, so this file itself is traceable evidence that they were
+# deliberately omitted, not forgotten. Not part of `mappings:` above; must
+# never be read by any current-scope pipeline.
+historical_out_of_scope:
+  - source_system: ipinyou
+    formerly: energy
+    note: "Bronze table (bronze.ipinyou_*) deleted via databricks/utility/01_historical_uc_cleanup.py; historical contract/mapping under archive/historical/"
+  - source_system: criteo_attribution
+    formerly: energy
+    note: "Bronze table (bronze.criteo_attribution_events) deleted via databricks/utility/01_historical_uc_cleanup.py; historical contract/mapping under archive/historical/"
+  - source_system: kddcup2012_track2
+    formerly: energy
+    note: "Bronze table (bronze.kddcup2012_click_prediction) deleted via databricks/utility/01_historical_uc_cleanup.py; historical contract/mapping under archive/historical/"

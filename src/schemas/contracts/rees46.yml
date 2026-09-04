@@ -1,0 +1,94 @@
+# Data contract -- REES46 (ecommerce behaviour)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the REES46 ecommerce-events source (1 Bronze
+# table). Every *_observed value and every quality-rule bound is traceable to
+# src/schemas/profiling/rees46.md. Authored; generated/rees46_events.schema.json
+# is produced by src/schemas/_generate_jsonschema.py -- do not edit it by hand.
+
+source: rees46
+source_system: rees46
+domain: Commerce / Customer Behaviour
+description: >
+  Multi-category online store clickstream (view / cart / purchase events),
+  October and November 2019. Static one-time acquisition (2 monthly CSVs
+  consolidated to one events dataset). Not a German source.
+profiling_evidence: src/schemas/profiling/rees46.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+tables:
+
+  - name: rees46_events
+    grain:
+      key: [user_session, product_id, event_type, event_time]
+      unique: false             # profiling: 75658 dup groups (75646 identical, 12 conflicting)
+      row_count_observed: 109950743
+      description: >
+        one row per (view|cart|purchase) event. The natural event grain has no
+        clean natural key -- the candidate key above collides.
+    columns:
+      - { name: event_time,    type: timestamp, required: true, nullable: false, timezone: UTC, notes: "range 2019-10-01 .. 2019-11-30" }
+      - { name: event_type,    type: string,    required: true, nullable: false, allowed_values: [view, cart, purchase] }
+      - { name: product_id,    type: string,    required: true, nullable: false, distinct_observed: 208495 }
+      - { name: category_id,   type: string,    required: true, nullable: false, distinct_observed: 671 }
+      - { name: category_code, type: string,    required: true, nullable: true, null_rate_observed: 0.3221, notes: "dotted taxonomy path e.g. electronics.smartphone" }
+      - { name: brand,         type: string,    required: true, nullable: true, null_rate_observed: 0.1395 }
+      - { name: price,         type: double,    required: true, nullable: false, notes: "currency undocumented; range 0..2574.07; some cart rows price<=0" }
+      - { name: user_id,       type: string,    required: true, nullable: false, distinct_observed: 5291243 }
+      - { name: user_session,  type: string,    required: true, nullable: false, distinct_observed: 22303598, notes: "NOT unique per user -- 937 sessions span >1 user_id" }
+
+quality_rules:
+  - id: event_type_domain
+    expr: "event_type in {view, cart, purchase}"
+    severity: block
+  - id: conflicting_dup_keys
+    expr: "12 candidate-key groups have conflicting non-key values -- deterministic resolution needed"
+    severity: block
+  - id: session_grain
+    expr: "session identity is (user_id, user_session), never user_session alone"
+    severity: block
+    evidence: "profiling: 937 multi-user sessions"
+  - id: category_taxonomy_not_1to1
+    expr: "category_id <-> category_code is not 1:1 (58 category_code values map to >1 category_id)"
+    severity: warn
+  - id: product_attribute_drift
+    expr: "22 products have >1 category_id; 277 have >1 brand -- product attributes are not stable"
+    severity: warn
+  - id: negative_price_carts
+    expr: "4558 cart rows and 252203 view rows have price <= 0; 0 purchases do"
+    severity: warn
+  - id: funnel_not_ordered
+    expr: >
+      in-session sequence is not strictly view->cart->purchase (539567 purchases
+      with no prior cart; 29848 carts with no prior view) -- do not assume order
+    severity: warn
+  - id: bot_bursts
+    expr: "102 sessions show >20 events on a single event_time (likely bot / instrumentation)"
+    severity: warn
+
+localisation:
+  required: true
+  approach: honest_provenance
+  note: >
+    REES46 is not a German retailer, carries no country / geography column and no
+    documented currency, and no geography can be derived from any field. Retained
+    with source_system='rees46', never presented as German commerce. A SYNTHETIC
+    country is attached at user level (one stable country per user_id,
+    deterministically generated, clearly flagged synthetic) -- a platform-
+    generated attribute, never a claim about where the events occurred. See
+    src/schemas/mappings/rees46.yml.
+  synthetic_fields:
+    - name: country_synthetic
+      class: synthetic
+      grain: user_id                # NOT on the event rows
+      rule: "deterministic hash of user_id -> a country; stable per user_id"
+      note: "generated in Silver, not present in Bronze; flagged synthetic on every downstream use"

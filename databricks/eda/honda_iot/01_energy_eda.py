@@ -6,7 +6,7 @@
 # MAGIC %md
 # MAGIC # EDA -- HONDA IOT ENERGY
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
@@ -21,6 +21,10 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib
+import os as _os
+import re as _re
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import Window
@@ -49,9 +53,10 @@ FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+
+
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -59,26 +64,26 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
 
 
 def _repo_root():
@@ -119,6 +124,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
@@ -128,6 +199,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -145,7 +219,7 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     )
     kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
     kept[notebook_key] = block
-    intro = f"_Auto-generated by the Phase 3 EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
+    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
     header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
     body = "\n\n".join(kept[k] for k in sorted(kept))
     out = header + body + "\n"
@@ -155,6 +229,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -290,19 +373,19 @@ for e in ENERGY:
     outliers[e] = df.agg(*oor_exprs).first().asDict()
     # stuck sensor: a value equal to the value 1 and 9 rows earlier within the 1h series
     w = Window.partitionBy("frequency").orderBy("datetime_utc")
-    stuck_exprs = []
+    df_1h = df.where(F.col("frequency") == "1h")
+    # First pass: compute window columns
     for c in VCOLS[e]:
         v = F.col(c).cast("double")
-        stuck_exprs.append(
-            F.sum(
-                (
-                    v.isNotNull()
-                    & (v == F.lag(v, 1).over(w))
-                    & (v == F.lag(v, 9).over(w))
-                ).cast("long")
-            ).alias(c)
+        df_1h = df_1h.withColumn(
+            f"{c}_stuck",
+            (
+                v.isNotNull() & (v == F.lag(v, 1).over(w)) & (v == F.lag(v, 9).over(w))
+            ).cast("long"),
         )
-    stuck = df.where(F.col("frequency") == "1h").agg(*stuck_exprs).first().asDict()
+    # Second pass: aggregate the flags
+    stuck_exprs = [F.sum(F.col(f"{c}_stuck")).alias(c) for c in VCOLS[e]]
+    stuck = df_1h.agg(*stuck_exprs).first().asDict()
     print(f"{e}: 5sigma_outliers={outliers[e]}  stuck>=10run(1h)={stuck}")
 
 # COMMAND ----------
@@ -442,22 +525,25 @@ for e in ENERGY:
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- rows per frequency, coverage %, duplicate groups
-for e in ENERGY:
-    barplot(freq_rows[e], f"Honda {e} -- rows per frequency", "frequency", "rows")
-for e in ENERGY:
-    if continuity[e]:
-        barplot(
-            [(x[0], x[2]) for x in continuity[e]],
-            f"Honda {e} -- coverage % by frequency",
-            "frequency",
-            "%",
-        )
+facet_bars(
+    {e: freq_rows[e] for e in ENERGY},
+    "Honda energy -- rows per frequency, by table",
+    "honda_energy_rows_per_frequency.png",
+    rot=0,
+)
+facet_bars(
+    {e: [(x[0], x[2]) for x in continuity[e]] for e in ENERGY},
+    "Honda energy -- coverage % by frequency, by table",
+    "honda_energy_coverage_pct.png",
+    rot=0,
+)
 barplot(
     [(e, dup[e]["dup_groups"]) for e in ENERGY],
     "Honda energy -- duplicate (frequency, datetime_utc) groups",
     "table",
     "dup groups",
     rot=30,
+    filename="honda_energy_duplicate_groups.png",
 )
 
 # COMMAND ----------
@@ -474,43 +560,60 @@ plt.legend()
 plt.title("Honda energy -- longest gap (missing steps) per table x frequency")
 plt.ylabel("steps")
 plt.tight_layout()
+plt.savefig(
+    fig_path("honda_energy_longest_gap_per_table.png"), dpi=110, bbox_inches="tight"
+)
 plt.show()
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- value distributions and hourly windows
-for e in ENERGY:
-    pdf = value_pdf[e]
-    for c in VCOLS[e]:
-        s = pdf[c].dropna()
-        if len(s):
-            histplot(
-                s.tolist(), f"Honda {e}.{c} -- distribution (n={len(s)} sample)", c
-            )
-    tp = ts_pdf[e]
-    if not tp.empty:
-        plt.figure(figsize=(12, 4))
-        for c in VCOLS[e]:
-            plt.plot(range(len(tp)), tp[c], label=c, linewidth=0.8)
-        plt.legend()
-        plt.title(f"Honda {e} -- first 2000 hourly points")
-        plt.xlabel("time index")
-        plt.tight_layout()
-        plt.show()
+# DBTITLE 1,Figure -- value distributions and hourly windows (faceted)
+facet_hists(
+    {f"{e}.{c}": value_pdf[e][c].dropna().tolist() for e in ENERGY for c in VCOLS[e]},
+    "Honda energy -- value distribution per table.column (sampled)",
+    "honda_energy_value_distributions.png",
+    ncols=4,
+)
+
+
+def _hourly_draw(tp, cols):
+    def draw(ax):
+        for c in cols:
+            ax.plot(range(len(tp)), tp[c], label=c, linewidth=0.8)
+        ax.legend(fontsize=6)
+
+    return draw
+
+
+_facet_grid(
+    [(e, _hourly_draw(ts_pdf[e], VCOLS[e])) for e in ENERGY if not ts_pdf[e].empty],
+    "Honda energy -- first 2000 hourly points, by table",
+    "honda_energy_first_hourly_points.png",
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- P vs W scatter per metric
-for metric, (col, pdf) in pw_scatter.items():
-    if pdf.empty:
-        continue
-    plt.figure(figsize=(6, 6))
-    plt.scatter(pdf[f"p_{col}"], pdf[f"w_{col}"], s=6, alpha=0.3)
-    plt.title(f"Honda {metric} -- P.{col} vs W.{col} (sampled)")
-    plt.xlabel(f"P.{col}")
-    plt.ylabel(f"W.{col}")
-    plt.tight_layout()
-    plt.show()
+# DBTITLE 1,Figure -- P vs W scatter per metric (faceted)
+
+
+def _scatter_draw(col, pdf):
+    def draw(ax):
+        ax.scatter(pdf[f"p_{col}"], pdf[f"w_{col}"], s=6, alpha=0.3)
+        ax.set_xlabel(f"P.{col}", fontsize=7)
+        ax.set_ylabel(f"W.{col}", fontsize=7)
+
+    return draw
+
+
+_facet_grid(
+    [
+        (metric, _scatter_draw(col, pdf))
+        for metric, (col, pdf) in pw_scatter.items()
+        if not pdf.empty
+    ],
+    "Honda energy -- P vs W per metric (sampled)",
+    "honda_energy_p_vs_w_scatter.png",
+)
 
 # COMMAND ----------
 
@@ -624,5 +727,32 @@ write_profiling(
             ),
         ),
         ("Silver Implications", "\n".join(_silver)),
+    ],
+    figures=[
+        (
+            "Honda energy -- rows per frequency, by table",
+            "honda_energy_rows_per_frequency.png",
+        ),
+        ("Honda energy -- coverage % by frequency", "honda_energy_coverage_pct.png"),
+        (
+            "Honda energy -- duplicate (frequency, datetime_utc) groups",
+            "honda_energy_duplicate_groups.png",
+        ),
+        (
+            "Honda energy -- longest gap (missing steps) per table x frequency",
+            "honda_energy_longest_gap_per_table.png",
+        ),
+        (
+            "Honda energy -- value distribution per table.column",
+            "honda_energy_value_distributions.png",
+        ),
+        (
+            "Honda energy -- first 2000 hourly points, by table",
+            "honda_energy_first_hourly_points.png",
+        ),
+        (
+            "Honda energy -- P vs W per metric",
+            "honda_energy_p_vs_w_scatter.png",
+        ),
     ],
 )

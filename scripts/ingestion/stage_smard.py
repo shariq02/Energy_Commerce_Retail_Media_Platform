@@ -1,18 +1,15 @@
-# ====================================================================
-# SMARD Phase 2b Staging
-# Energy Commerce & Retail Media Analytics Platform
+# SMARD staging
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
 # Date: August 2026
-# ====================================================================
-# Purpose: Consolidate the 16 SMARD raw JSON files in data/raw/smard/
-# into the single logical staging dataset defined in PIPELINE_DESIGN.md
-# Section 1a (energy_timeseries), written to data/staging/smard/. Local
-# file operations only -- does not upload anywhere. data/raw/ is
-# read-only throughout.
+#
+# Purpose: consolidate the 16 SMARD raw JSON files in data/raw/smard/
+# into the single logical staging dataset (energy_timeseries), written
+# to data/staging/smard/. Local file operations only -- does not upload
+# anywhere. data/raw/ is read-only throughout.
 #
 # All 16 files share an identical structure (filter_id, region,
-# resolution, series) and the same region/resolution -- confirmed via
-# logs/inspections/smard_final_mapping_inspection.txt. The 16 files
+# resolution, series) and the same region/resolution. The 16 files
 # become metric identity within one dataset, not 16 tables. Metric
 # identity is currently encoded only in the filename, so it is added
 # as an explicit `metric` column.
@@ -24,7 +21,6 @@
 # written straight to disk and the in-memory DataFrame is discarded.
 # The combined output stays well under the 50 MiB chunking threshold,
 # so it is written as one flat file (chunking would be artificial here).
-# ====================================================================
 
 import json
 import sys
@@ -124,7 +120,7 @@ def main() -> None:
     total_rows, out_path, files_read = stage_energy_timeseries(monitor)
     monitor.check()
 
-    logger.info("SMARD Phase 2b staging complete.")
+    logger.info("SMARD staging complete.")
     logger.info(
         f"  energy_timeseries: {total_rows} rows, {len(OUTPUT_COLUMNS)} columns, "
         f"{files_read} source files -> {out_path}"

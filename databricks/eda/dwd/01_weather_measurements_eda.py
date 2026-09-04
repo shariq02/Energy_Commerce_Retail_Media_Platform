@@ -6,7 +6,7 @@
 # MAGIC %md
 # MAGIC # EDA -- DWD WEATHER MEASUREMENTS
 # MAGIC
-# MAGIC **Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC **Date:** August 2026
 # MAGIC
@@ -21,6 +21,10 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib
+import os as _os
+import re as _re
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import DataFrame, Window
@@ -44,7 +48,12 @@ MEASUREMENTS = [
     "wind",
 ]
 TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
-NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "QN_9", "QN_3", "QN_4", "QN_8", "EOR"}
+NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR"}
+# Any `QN_*` column is a DWD quality byte, never a measured value.
+QN_CANDIDATES = ("QN_9", "QN_8", "QN_7", "QN_4", "QN_3", "QN")
+# DWD companion "Messverfahren-Index" columns -- string indicators, not measured
+# values; treating them as numeric produced all-None distribution rows.
+INDICATOR_COLS = {"V_N_I"}
 
 # Physical plausibility windows for the common DWD hourly parameters (values
 # outside, and not the -999 sentinel, are "suspicious" not necessarily wrong).
@@ -65,8 +74,9 @@ PLAUSIBLE = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
+
+
 def find_col(df: DataFrame, *cands: str) -> str | None:
     low = {c.lower(): c for c in df.columns}
     for x in cands:
@@ -80,10 +90,16 @@ def as_ts(col: str):
 
 
 def value_columns(df: DataFrame) -> list:
-    return [c for c in df.columns if c.upper() not in NON_VALUE]
+    return [
+        c
+        for c in df.columns
+        if c.upper() not in NON_VALUE
+        and c.upper() not in INDICATOR_COLS
+        and not c.upper().startswith("QN")
+    ]
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
+def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
     plt.figure(figsize=figsize)
     plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
     plt.title(title)
@@ -91,26 +107,26 @@ def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4)):
     plt.ylabel(ylabel)
     plt.xticks(rotation=rot, ha="right" if rot else "center")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
-def histplot(values, title, xlabel, bins=50):
+def histplot(values, title, xlabel, bins=50, filename=None):
     plt.figure(figsize=(10, 4))
     plt.hist(values, bins=bins)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("count")
     plt.tight_layout()
+    if filename:
+        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
     plt.show()
 
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-import contextlib
-import os as _os
-import re as _re
 
 
 def _repo_root():
@@ -152,6 +168,72 @@ def fig_path(name):
     return _os.path.join(_profiling_dir(), "figures", name)
 
 
+def fmt_pairs(pairs, n=25):
+    # Render (label, value) pairs as markdown list lines, capped at n with a
+    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
+    items = list(pairs)
+    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
+    if len(items) > n:
+        out.append(f"- ... ({len(items) - n} more)")
+    return "\n".join(out)
+
+
+def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
+    items = [(str(k), draw) for k, draw in items if draw is not None]
+    if not items:
+        print(f"  _facet_grid: no data -> {filename}")
+        return False
+    ncols = min(ncols, len(items))
+    nrows = -(-len(items) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
+    )
+    flat = list(axes.flatten())
+    for ax, (title, draw) in zip(flat, items):
+        draw(ax)
+        ax.set_title(title, fontsize=9)
+        ax.tick_params(labelsize=7)
+    for ax in flat[len(items) :]:
+        ax.set_visible(False)
+    fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+    return True
+
+
+def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
+    def _mk(pairs):
+        if not pairs:
+            return None
+
+        def draw(ax):
+            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
+            if logy:
+                ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rot)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    def _mk(vals):
+        if vals is None or not len(vals):
+            return None
+
+        def draw(ax):
+            ax.hist(list(vals), bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
+
+
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     # One <source>.md per source; each notebook owns one marker-delimited
     # `## ` section, re-run replaces its own, others preserved, order by key.
@@ -163,6 +245,9 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
     for cap, name in figures or []:
+        if not _os.path.exists(_os.path.join(d, "figures", name)):
+            print(f"  profiling export: skipping absent figure {name}")
+            continue
         lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
@@ -180,7 +265,7 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     )
     kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
     kept[notebook_key] = block
-    intro = f"_Auto-generated by the Phase 3 EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
+    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
     header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
     body = "\n\n".join(kept[k] for k in sorted(kept))
     out = header + body + "\n"
@@ -190,6 +275,15 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     _os.replace(tmp, md)
     print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Validate profiling export path
+REPO_ROOT = _repo_root()
+PROFILING_DIR = _profiling_dir()
+
+print(f"OK  repo root: {REPO_ROOT}")
+print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
@@ -266,14 +360,14 @@ qn_dist = {}
 qn_quality = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    qn = find_col(df, "QN_9", "QN_3", "QN_4", "QN_8", "QN")
+    qn = find_col(df, *QN_CANDIDATES)
     vcols = value_columns(df)
     if qn is None:
         continue
     any_sentinel = F.lit(False)
     any_oor = F.lit(False)
     for c in vcols:
-        v = F.col(c).cast("double")
+        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
         any_sentinel = any_sentinel | (v == -999)
         b = PLAUSIBLE.get(c.upper())
         if b:
@@ -328,7 +422,7 @@ for m in MEASUREMENTS:
     df = frames[m]
     exprs = []
     for c in value_columns(df):
-        v = F.col(c).cast("double")
+        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
         b = PLAUSIBLE.get(c.upper())
         exprs += [
             F.min(v).alias(c + "_min"),
@@ -338,9 +432,13 @@ for m in MEASUREMENTS:
             F.sum((v == -999).cast("long")).alias(c + "_sentinel"),
             F.avg(F.when(v != -999, v)).alias(c + "_mean"),
             F.stddev(F.when(v != -999, v)).alias(c + "_sd"),
-            F.expr(
-                f"percentile_approx(case when cast(`{c}` as double) != -999 then cast(`{c}` as double) end, array(0.01,0.5,0.99))"
-            ).alias(c + "_p"),
+            # Reuse the parsed, sentinel-excluded column expression `v` directly.
+            # (An inline SQL regex string here is mangled by the Spark-SQL string
+            # parser -- `\d` -> `d` -- so the CASE matched nothing and every
+            # percentile came back NULL.)
+            F.percentile_approx(F.when(v != -999, v), [0.01, 0.5, 0.99]).alias(
+                c + "_p"
+            ),
             F.sum((v == 0).cast("long")).alias(c + "_zero"),
             *(
                 [
@@ -427,9 +525,11 @@ for m in MEASUREMENTS:
     value_pdf[m] = (
         df.select(
             *[
-                F.when(F.col(c).cast("double") != -999, F.col(c).cast("double")).alias(
-                    c
-                )
+                F.when(
+                    F.col(c).rlike(r"^-?\d+(\.\d+)?$")
+                    & (F.col(c).cast("double") != -999),
+                    F.col(c).cast("double"),
+                ).alias(c)
                 for c in vcols
             ]
         )
@@ -441,46 +541,37 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- rows / stations / cities / temporal span per measurement
-barplot(
-    [(m, totals[m]) for m in MEASUREMENTS],
-    "DWD -- rows per measurement",
-    "measurement",
+# DBTITLE 1,Figure -- measurement overview (rows / stations / cities / year span)
+facet_bars(
+    {
+        "rows per measurement": [(m, totals[m]) for m in MEASUREMENTS],
+        "distinct stations": [(m, coverage[m]["stations"]) for m in MEASUREMENTS],
+        "distinct cities": [(m, coverage[m]["cities"]) for m in MEASUREMENTS],
+        "observation years spanned": [
+            (
+                m,
+                int(str(coverage[m]["max_ts"])[:4])
+                - int(str(coverage[m]["min_ts"])[:4])
+                + 1,
+            )
+            for m in MEASUREMENTS
+        ],
+    },
+    "DWD -- measurement overview",
+    "dwd_measurement_overview.png",
     rot=30,
+    ncols=2,
 )
-barplot(
-    [(m, coverage[m]["stations"]) for m in MEASUREMENTS],
-    "DWD -- distinct stations per measurement",
-    "measurement",
-    "stations",
-    rot=30,
-)
-barplot(
-    [(m, coverage[m]["cities"]) for m in MEASUREMENTS],
-    "DWD -- distinct cities per measurement",
-    "measurement",
-    "cities",
-    rot=30,
-)
-plt.figure(figsize=(10, 4))
-for i, m in enumerate(MEASUREMENTS):
-    plt.plot(
-        [int(str(coverage[m]["min_ts"])[:4]), int(str(coverage[m]["max_ts"])[:4])],
-        [i, i],
-        marker="|",
-        markersize=12,
-    )
-plt.yticks(range(len(MEASUREMENTS)), MEASUREMENTS)
-plt.title("DWD -- observation year span per measurement")
-plt.xlabel("year")
-plt.tight_layout()
-plt.show()
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- QN distribution, dup composition, coverage %, longest gap
-for m, pairs in qn_dist.items():
-    barplot(pairs, f"DWD {m} -- QN quality-flag distribution", "QN value", "rows")
+facet_bars(
+    qn_dist,
+    "DWD -- QN quality-flag distribution per measurement",
+    "dwd_qn_distribution.png",
+    rot=0,
+)
 x = np.arange(len(MEASUREMENTS))
 plt.figure(figsize=(11, 4))
 plt.bar(
@@ -500,22 +591,21 @@ plt.legend()
 plt.title("DWD -- duplicate key composition")
 plt.ylabel("key groups")
 plt.tight_layout()
+plt.savefig(fig_path("dwd_duplicate_key_composition.png"), dpi=110, bbox_inches="tight")
 plt.show()
-for m in MEASUREMENTS:
-    barplot(
-        [(r["station"], r["coverage_pct"]) for r in freq_cov[m]],
-        f"DWD {m} -- hourly coverage % per station",
-        "station id",
-        "coverage %",
-        rot=45,
-    )
-    barplot(
-        [(r["station"], r["longest_gap_hours"] or 0) for r in freq_cov[m]],
-        f"DWD {m} -- longest missing-hours gap per station",
-        "station id",
-        "hours",
-        rot=45,
-    )
+facet_bars(
+    {m: [(r["station"], r["coverage_pct"]) for r in freq_cov[m]] for m in MEASUREMENTS},
+    "DWD -- hourly coverage % per station, by measurement",
+    "dwd_hourly_coverage_pct.png",
+)
+facet_bars(
+    {
+        m: [(r["station"], r["longest_gap_hours"] or 0) for r in freq_cov[m]]
+        for m in MEASUREMENTS
+    },
+    "DWD -- longest missing-hours gap per station, by measurement",
+    "dwd_longest_gap_hours.png",
+)
 
 # COMMAND ----------
 
@@ -539,23 +629,30 @@ plt.show()
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- value distributions and box plots (sampled, sentinel excluded)
+# DBTITLE 1,Figure -- value column spread per measurement (sampled, sentinel excluded)
+
+
+def _box_draw(pdf, cols):
+    def draw(ax):
+        ax.boxplot(
+            [pdf[c].dropna().tolist() for c in cols], labels=cols, showfliers=True
+        )
+        ax.tick_params(axis="x", labelrotation=30)
+
+    return draw
+
+
+_box_items = []
 for m in MEASUREMENTS:
     pdf = value_pdf[m]
     cols = [c for c in pdf.columns if pdf[c].notna().any()]
-    for c in cols:
-        histplot(
-            pdf[c].dropna().tolist(), f"DWD {m}.{c} -- value distribution (sampled)", c
-        )
     if cols:
-        plt.figure(figsize=(max(6, 1.6 * len(cols)), 4))
-        plt.boxplot(
-            [pdf[c].dropna().tolist() for c in cols], labels=cols, showfliers=True
-        )
-        plt.title(f"DWD {m} -- value column spread (sampled)")
-        plt.ylabel("value")
-        plt.tight_layout()
-        plt.show()
+        _box_items.append((m, _box_draw(pdf, cols)))
+_facet_grid(
+    _box_items,
+    "DWD -- value column spread per measurement (sampled)",
+    "dwd_value_column_spread.png",
+)
 
 # COMMAND ----------
 
@@ -693,6 +790,15 @@ write_profiling(
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[
-        ("DWD station x measurement coverage", "dwd_station_x_measurement_coverage.png")
+        ("DWD measurement overview", "dwd_measurement_overview.png"),
+        ("DWD QN quality-flag distribution", "dwd_qn_distribution.png"),
+        ("DWD duplicate key composition", "dwd_duplicate_key_composition.png"),
+        ("DWD hourly coverage % per station", "dwd_hourly_coverage_pct.png"),
+        ("DWD longest missing-hours gap per station", "dwd_longest_gap_hours.png"),
+        (
+            "DWD station x measurement coverage",
+            "dwd_station_x_measurement_coverage.png",
+        ),
+        ("DWD value column spread per measurement", "dwd_value_column_spread.png"),
     ],
 )

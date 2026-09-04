@@ -1,0 +1,94 @@
+# Data contract -- Search Visibility (RAMP / Dryad search-console-derived)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the Search Visibility source (2 Bronze tables --
+# an events table and a repository reference table). Every *_observed value is
+# traceable to src/schemas/profiling/search_visibility.md. Authored;
+# generated/search_visibility_*.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit those by hand.
+
+source: search_visibility
+source_system: search_visibility_ramp_dryad
+domain: Customer / Search Visibility
+description: >
+  Search-console-style visibility metrics (impressions, clicks, click-through,
+  ranking position) per URL x country x device x archive-date, for 29
+  institutional-repository properties, 12 monthly archives of 2017. Plus a
+  repository reference table. Static one-time acquisition. NOT a live Search
+  Console connection to any property this project owns.
+profiling_evidence: src/schemas/profiling/search_visibility.md
+bronze_physical_types: string
+
+acquisition:
+  method: manual_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+
+tables:
+
+  - name: search_visibility_events
+    grain:
+      key: [repository_id, url, date, country, device]
+      unique: false          # profiling: 9635135 dup groups; 469515 with conflicting metrics
+      row_count_observed: 111863691
+      description: "one row per URL x country x device x archive-date visibility record"
+    columns:
+      - { name: citableContent, type: string, required: true, nullable: false, allowed_values: ["Yes", "No"] }
+      - { name: clickThrough,   type: double, required: true, nullable: false, notes: "CTR; range 0..1; = clicks/impressions (delta ~0)" }
+      - { name: clicks,         type: double, required: true, nullable: false, notes: "range 0..165; p99 = 1" }
+      - { name: country,        type: string, required: true, nullable: false, distinct_observed: 236, notes: "lowercase ISO-3 (usa, ind, gbr, deu, ...); search-console geography, not a market" }
+      - { name: date,           type: string, required: true, nullable: false, notes: "archive marker, NOT a daily timestamp; mixed formats %m/%d/%Y (7) and %Y-%m-%d (335); model as monthly period" }
+      - { name: device,         type: string, required: true, nullable: false, allowed_values: [DESKTOP, MOBILE, TABLET] }
+      - { name: impressions,    type: double, required: true, nullable: false, notes: "range 1..260271; p99 = 11" }
+      - { name: index,          type: string, required: true, nullable: false, distinct_observed: 28, notes: "non-numeric repo-ish token (um, texas_am, ...); relationship to repository_id unclear -- verify before Silver" }
+      - { name: position,       type: double, required: true, nullable: false, notes: "mean search rank; range 1..115321; p50 = 16" }
+      - { name: url,            type: string, required: true, nullable: false, distinct_observed: 1475244 }
+      - { name: repository_id,  type: string, required: true, nullable: false, distinct_observed: 29, notes: "FK to search_visibility_repository (100% row match)" }
+
+  - name: search_visibility_repository
+    grain:
+      key: [repository_id]
+      unique: true           # profiling: key_unique True, 64 distinct ids
+      row_count_observed: 64
+      description: "repository reference; 36 of 64 rows are never referenced by any event (acceptable)"
+    columns:
+      - { name: repository_id, type: string, required: true, nullable: false }
+      - { name: country,       type: string, required: true, nullable: true, notes: "repository's home country" }
+      - { name: ir_platform,   type: string, required: true, nullable: true, notes: "repository software platform" }
+      - { name: name,          type: string, required: true, nullable: true }
+
+quality_rules:
+  - id: date_is_monthly_marker
+    expr: "`date` is an archive marker with mixed raw formats -- parse both, model as a monthly period"
+    severity: block
+    evidence: "profiling: {'%m/%d/%Y': 7, '%Y-%m-%d': 335}; distinct day-of-month values 1..31 but only 12 months"
+  - id: conflicting_metric_keys
+    expr: "469515 candidate-key groups carry conflicting metric values -- deterministic resolution rule needed"
+    severity: block
+  - id: clicks_le_impressions
+    expr: "clicks <= impressions for every row"
+    severity: block
+    evidence: "profiling: 0 violations"
+  - id: device_domain
+    expr: "device in {DESKTOP, MOBILE, TABLET}"
+    severity: block
+  - id: repository_fk
+    expr: "every event repository_id exists in search_visibility_repository"
+    severity: block
+    evidence: "profiling: 100% row-level match, 0 orphans"
+  - id: months_complete
+    expr: "12 monthly archives present (2017-01 .. 2017-12); February 2017 covers only through Feb 7 (source condition)"
+    severity: info
+
+localisation:
+  required: true
+  approach: honest_provenance
+  note: >
+    country is search-console geography for academic-repository traffic, not
+    German retail-market data. `deu` rows exist but the source is never presented
+    as German ecommerce or a German market signal. Retained with
+    source_system='search_visibility_ramp_dryad'.

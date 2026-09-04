@@ -1,0 +1,157 @@
+# Data contract -- SMARD (energy market, Germany)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: August 2026
+#
+# Purpose: formal contract for the SMARD source. Every *_observed value and every
+# quality-rule bound is traceable to src/schemas/profiling/smard.md. This file is
+# authored; src/schemas/contracts/generated/smard.schema.json is generated from it
+# by src/schemas/_generate_jsonschema.py -- do not edit that by hand.
+
+source: smard
+source_system: smard            # provenance value carried on every canonical row
+domain: Energy / Market
+description: >
+  Bundesnetzagentur SMARD open electricity-market data for the DE-LU bidding
+  zone -- day-ahead prices plus generation / load / residual-load series in
+  long format, one metric per row. Static one-time acquisition, public API,
+  no authentication.
+bronze_table: energy_commerce_retail_media.bronze.smard_energy_timeseries
+profiling_evidence: src/schemas/profiling/smard.md
+bronze_physical_types: string   # Bronze load reads every column as string (inferSchema=false)
+
+acquisition:
+  method: scripted_api
+  auth: none
+  cadence: static_snapshot      # not replayed as a stream
+  update_frequency: none        # not re-acquired on a schedule
+  sla: none
+  reacquisition_note: >
+    If re-acquired at a newer vintage, treat as a batch schema change --
+    re-profile, version this contract, record the change.
+
+grain:
+  key: [metric, filter_id, region, resolution, timestamp_utc]
+  unique: true                  # profiling: 0 full-row duplicates, 0 conflicting (series, timestamp) groups
+  row_count_observed: 55517
+  description: one row per (metric, filter_id, region, resolution, timestamp_utc)
+
+columns:
+  - name: metric
+    type: string
+    required: true
+    nullable: false             # missing rate 0.0000
+    distinct_observed: 16
+    allowed_values:
+      - day_ahead_prices
+      - generation_biomass
+      - generation_hard_coal
+      - generation_hydro
+      - generation_lignite
+      - generation_natural_gas
+      - generation_nuclear
+      - generation_offshore_wind
+      - generation_onshore_wind
+      - generation_other_conventional
+      - generation_other_renewable
+      - generation_photovoltaic
+      - generation_pumped_storage
+      - pumped_storage_consumption
+      - residual_load
+      - total_power_consumption
+    notes: series discriminator for the long format
+
+  - name: filter_id
+    type: string                # SMARD numeric filter id; kept as string, not arithmetic
+    required: true
+    nullable: false
+    distinct_observed: 16
+    allowed_values: ["4169", "4066", "4069", "1226", "1223", "4071", "1224", "1225",
+                     "4067", "1227", "1228", "4068", "4070", "4387", "4359", "410"]
+    notes: 1:1 with metric (see mappings/smard.yml for the pairing)
+
+  - name: region
+    type: string
+    required: true
+    nullable: false
+    constant_observed: "DE-LU"
+    allowed_values: ["DE-LU"]
+    notes: >
+      constant in the acquired data -- German-Luxembourg bidding zone. Flagged
+      for a Silver drop only after Silver confirms no second zone is ever added.
+
+  - name: resolution
+    type: string
+    required: true
+    nullable: false
+    constant_observed: "day"
+    allowed_values: ["day"]
+    notes: "only 'day' present; SMARD also publishes hourly / quarter-hourly -- not acquired"
+
+  - name: timestamp_utc
+    type: timestamp
+    required: true
+    nullable: false
+    timezone: UTC
+    observed_year_range: [2015, 2026]
+    notes: series start dates vary by metric (nuclear from 2019, biomass from 2015)
+
+  - name: value
+    type: double
+    required: true              # column always present
+    nullable: true              # 13.01% null overall -- expected, not a defect
+    null_rate_observed: 0.1301
+    null_rate_max: 0.15         # tolerance = observed + margin
+    unit_note: >
+      MWh per day for generation / load / consumption metrics;
+      EUR/MWh for day_ahead_prices. Unit is metric-dependent -- see mappings/smard.yml.
+    value_ranges_observed:      # profiling distributions, min / max per metric
+      day_ahead_prices:               {min: -53.87, max: 699.44, negatives: 20}
+      generation_biomass:             {min: 155.5, max: 119197.0}
+      generation_hard_coal:           {min: 5127.0, max: 393590.65}
+      generation_hydro:               {min: 7.5, max: 65880.75}
+      generation_lignite:             {min: 49067.0, max: 413439.75}
+      generation_natural_gas:         {min: 217.75, max: 420468.5}
+      generation_nuclear:             {min: 0.0, max: 228116.75, zeros: 289}
+      generation_offshore_wind:       {min: 179.0, max: 190655.5}
+      generation_onshore_wind:        {min: 17.5, max: 1064138.0}
+      generation_other_conventional:  {min: 19712.0, max: 56661.25}
+      generation_other_renewable:     {min: 1625.5, max: 5636.5}
+      generation_photovoltaic:        {min: 3.25, max: 528207.22}
+      generation_pumped_storage:      {min: 4308.61, max: 61197.75}
+      pumped_storage_consumption:     {min: 2950.91, max: 70895.25}
+      residual_load:                  {min: 26994.41, max: 1585773.0}
+      total_power_consumption:        {min: 875102.5, max: 1698425.5}
+
+quality_rules:
+  - id: key_unique
+    expr: "grain key (metric, filter_id, region, resolution, timestamp_utc) is unique"
+    severity: block
+    evidence: "profiling: 0 conflicting duplicate groups"
+  - id: value_null_rate
+    expr: "null(value) / count(*) <= 0.15"
+    severity: warn
+    evidence: "profiling: 0.1301 overall"
+  - id: generation_non_negative
+    expr: >
+      value >= 0 where metric like 'generation_%'
+      or metric in ('residual_load', 'total_power_consumption', 'pumped_storage_consumption')
+    severity: block
+    evidence: "profiling: 0 negatives on every non-price metric"
+  - id: price_plausible_range
+    expr: "value between -100 and 1000 where metric = 'day_ahead_prices'"
+    severity: warn
+    evidence: >
+      profiling: observed -53.87 .. 699.44; negative day-ahead prices are a real
+      market phenomenon, so this is a warn, not a block. 13 five-sigma outliers
+      on this metric are within plausible crisis-period bounds.
+  - id: metric_filter_id_consistent
+    expr: "each metric maps to exactly one filter_id and vice versa"
+    severity: block
+    evidence: "profiling: 16 distinct metrics, 16 distinct filter_ids, 16 distinct series"
+
+localisation:
+  required: false
+  note: >
+    Natively German -- DE-LU bidding zone, Bundesnetzagentur source. No Germany
+    localisation mapping needed (contrast REES46 / iPinYou).
