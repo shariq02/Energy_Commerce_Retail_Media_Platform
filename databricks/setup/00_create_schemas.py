@@ -7,7 +7,9 @@
 # MAGIC # CREATE UNITY CATALOG SCHEMAS AND VOLUMES
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Create and verify the Unity Catalog structure required

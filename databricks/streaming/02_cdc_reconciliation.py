@@ -7,7 +7,9 @@
 # MAGIC # CDC RECONCILIATION
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Compare the CDC current-state Bronze tables against the row

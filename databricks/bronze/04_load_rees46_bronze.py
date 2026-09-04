@@ -7,7 +7,9 @@
 # MAGIC # BRONZE DATA LOADING -- REES46 (COMMERCE / CUSTOMER BEHAVIOUR)
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the REES46

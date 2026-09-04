@@ -7,7 +7,9 @@
 # MAGIC # EDA -- SMARD ENERGY TIME SERIES
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile smard_energy_timeseries (one long-format Bronze

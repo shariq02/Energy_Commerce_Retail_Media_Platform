@@ -7,7 +7,9 @@
 # MAGIC # EDA -- SEARCH VISIBILITY EVENTS
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile search_visibility_events (search-visibility

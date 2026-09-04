@@ -7,7 +7,9 @@
 # MAGIC # BRONZE DATA LOADING -- SEARCH VISIBILITY (COMMERCE)
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data for the RAMP /

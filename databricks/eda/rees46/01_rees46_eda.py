@@ -7,7 +7,9 @@
 # MAGIC # EDA -- REES46 ECOMMERCE EVENTS
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile rees46_events (~110M view / cart / purchase

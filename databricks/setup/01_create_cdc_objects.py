@@ -7,7 +7,9 @@
 # MAGIC # CREATE CDC UNITY CATALOG OBJECTS
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Create the landing Volume the local CDC consumer uploads to,

@@ -7,7 +7,9 @@
 # MAGIC # EDA -- DWD WEATHER MEASUREMENTS
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the seven DWD weather-measurement Bronze tables
