@@ -154,7 +154,11 @@ sem = {}
 for name, df in frames.items():
     cols = df.columns
     amt = next((c for c in cols if any(h in c.lower() for h in AMOUNT_HINTS)), None)
-    dcols = [c for c in cols if any(h in c.lower() for h in DATE_HINTS)]
+    dcols = [
+        c
+        for c in cols
+        if any(h in c.lower() for h in DATE_HINTS) and not c.lower().endswith("_nv")
+    ]
     entry = {}
     if amt:
         npar = numeric_parseability(df, amt)
@@ -165,8 +169,11 @@ for name, df in frames.items():
             f"negative={pl['negative']} zero={pl['zero']}"
         )
     entry["dates"] = {}
-    for c in dcols[:3]:
-        ts = timestamp_semantics(df, c, valid_from="2000-01-01", tz="Europe/Berlin")
+    for c in dcols[:4]:
+        # Commissioning dates predate MaStR by decades (hydro from ~1900);
+        # registration / last-update dates cannot predate the register (2019).
+        vf = "1900-01-01" if "inbetriebnahme" in c.lower() else "2018-01-01"
+        ts = timestamp_semantics(df, c, valid_from=vf, tz="Europe/Berlin")
         entry["dates"][c] = ts
         for ln in ts["lines"]:
             print(f"  {name}.{c}: {ln}")
@@ -291,8 +298,9 @@ for d in DATASETS:
         )
     for c, ts in e.get("dates", {}).items():
         _unit.append(
-            f"- {d}.`{c}` (date): parse yield {ts['yield']:.1%}, range {ts['min_ts']}..{ts['max_ts']}, "
-            f"before 2000={ts['before_valid']}, future-dated={ts['future']}, formats={ts['per_format']}."
+            f"- {d}.`{c}` (date): parse yield {ts['yield']:.1%}, "
+            f"range {ts['min_ts']}..{ts['max_ts']}, implausibly-early={ts['before_valid']}, "
+            f"future-dated={ts['future']}, formats={ts['per_format']}."
         )
 if not _unit:
     _unit.append("- No amount or date column located by name in these tables.")

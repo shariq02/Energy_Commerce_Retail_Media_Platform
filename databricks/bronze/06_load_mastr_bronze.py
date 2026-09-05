@@ -80,27 +80,26 @@ DATASETS: list[tuple[str, str, str]] = [
 
 VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
+# MaStR free-text fields (turbine descriptions, company names, addresses)
+# routinely contain embedded newlines -- the staging writer quotes them
+# correctly, but Spark with multiLine=false treats the newline as a record
+# terminator, splitting one logical record into several physical rows and
+# shifting every field after the break (observed on einheiten_wind: 2,128
+# newline-containing records became ~2,170 extra misaligned rows, with plant
+# names in the status column and a bogus year-3220 commissioning date).
+# multiLine=true costs file-split parallelism; MaStR chunk files are <=150 MB
+# and the large tables have 19-23 of them, so they still read in parallel.
 CSV_OPTIONS = {
     "header": "true",
     "inferSchema": "false",
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
-    "multiLine": "false",  # keep CSV splittable so large files read in parallel
+    "multiLine": "true",
     "quote": '"',
     "escape": '"',  # RFC-4180 doubled-quote escaping used by the staging writer
 }
 
-# The wide actor / location exports carry free-text fields (company names,
-# addresses) that contain embedded newlines and delimiters. Reading them with
-# multiLine=false splits one logical record across physical lines, shifting
-# every field after the embedded newline -- observed as numeric ids landing in
-# the surname column and free text in the salutation column. These datasets
-# are read with multiLine=true (they lose split parallelism, which is
-# acceptable at their size) and are structurally checked after load.
-CSV_OPTIONS_OVERRIDE: dict[str, dict[str, str]] = {
-    "marktakteure": {"multiLine": "true"},
-    "lokationen": {"multiLine": "true"},
-    "marktakteure_und_rollen": {"multiLine": "true"},
-}
+# Per-dataset read-option overrides, if a specific table ever needs one.
+CSV_OPTIONS_OVERRIDE: dict[str, dict[str, str]] = {}
 
 # After load, a name column must not read as numeric and a short-code column
 # must not carry long free text -- either means the field alignment is wrong.
@@ -164,6 +163,39 @@ def read_dataset(files: list[str], dataset: str) -> DataFrame:
     for other in frames[1:]:
         df = df.unionByName(other, allowMissingColumns=True)
     return df
+
+
+# Every MaStR record's first column is a MastrNummer: 2-4 uppercase letters
+# then a long digit run. A row split by an embedded newline leaves a free-text
+# fragment (or empty) in column 0, so a non-trivial share of column-0 values
+# not matching this pattern means the CSV field alignment is broken.
+_MASTR_ID_RE = r"^[A-Z]{2,4}[0-9]{6,}$"
+
+
+def id_column_error(dataset: str, df: DataFrame) -> str | None:
+    if not df.columns:
+        return None
+    first = df.columns[0]
+    # Only the analytical tables lead with a MastrNummer; the reference/catalog
+    # tables lead with a plain integer Id, which this pattern must not flag.
+    if not first.lower().endswith(("mastrnummer", "mastrnr")):
+        return None
+    s = F.trim(F.col(first).cast("string"))
+    present = s.isNotNull() & (s != "")
+    ok = present & s.rlike(_MASTR_ID_RE)
+    r = df.agg(
+        F.sum(present.cast("long")).alias("p"),
+        F.sum(ok.cast("long")).alias("ok"),
+    ).first()
+    if not r["p"]:
+        return None
+    bad_rate = 1 - (r["ok"] / r["p"])
+    if bad_rate > 0.005:
+        return (
+            f"{bad_rate:.1%} of column {first!r} values are not a MastrNummer "
+            f"({r['p'] - r['ok']} of {r['p']}) -- records split on an embedded newline"
+        )
+    return None
 
 
 def structural_alignment_error(dataset: str, df: DataFrame) -> str | None:
@@ -271,7 +303,9 @@ for dataset, volume, table in DATASETS:
     try:
         df = read_dataset(files, dataset)
 
-        alignment_error = structural_alignment_error(dataset, df)
+        alignment_error = id_column_error(dataset, df) or structural_alignment_error(
+            dataset, df
+        )
         if alignment_error:
             raise RuntimeError(
                 f"structural check failed -- CSV field alignment is wrong: {alignment_error}. "

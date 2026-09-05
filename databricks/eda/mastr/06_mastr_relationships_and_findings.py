@@ -150,6 +150,24 @@ JOIN_SPEC = [
     ("einheiten_verbrennung", "LokationMaStRNummer", "lokationen", "MastrNummer"),
 ]
 
+# How each child table is expected to relate to the LIVE generation-unit /
+# market-actor population, so a high orphan rate is read correctly:
+#   subset        - child keys should almost all resolve to a live parent row;
+#                   a non-trivial orphan rate is a real data-quality signal.
+#   disjoint      - child keys should NOT be in the live tables by design; a
+#                   deregistered unit/actor is removed from the live export, so
+#                   ~100% "orphan" is the expected, correct result.
+#   partial-scope - the live parent set is incomplete here because the solar and
+#                   storage object types are deferred from staging, so a log
+#                   spanning every technology shows "orphans" that are really
+#                   just out-of-scope units, not broken keys.
+RELATIONSHIP_EXPECTATION = {
+    "geloeschte_deaktivierte_einheiten": "disjoint",
+    "geloeschte_deaktivierte_marktakteure": "disjoint",
+    "einheiten_aenderung_netzbetreiberzuordnungen": "partial-scope",
+    "ertuechtigungen": "partial-scope",
+}
+
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
@@ -257,10 +275,15 @@ for child, child_suffix, role, _parent_suffix in JOIN_SPEC:
     )
     ri["child_max_rows_per_key"] = int(fan["mx"]) if fan and fan["mx"] else None
     ri["child_avg_rows_per_key"] = round(fan["av"], 3) if fan and fan["av"] else None
+    ri["expectation"] = RELATIONSHIP_EXPECTATION.get(child, "subset")
+    # A real integrity problem = orphans where the child was expected to be a
+    # subset of the parent. "disjoint" / "partial-scope" orphans are expected.
+    ri["orphan_problem"] = ri["expectation"] == "subset" and ri["orphans"] > 0
     ri_results.append(ri)
     print(
-        f"{child}.{ccol} -> {role}: match_rate={ri['match_rate']} orphans={ri['orphans']} "
-        f"unused_parent={ri['unused_parent']} child_rows_per_key(max/avg)="
+        f"{child}.{ccol} -> {role} [{ri['expectation']}]: match_rate={ri['match_rate']} "
+        f"orphans={ri['orphans']} unused_parent={ri['unused_parent']} "
+        f"child_rows_per_key(max/avg)="
         f"{ri['child_max_rows_per_key']}/{ri['child_avg_rows_per_key']}"
     )
 
@@ -299,17 +322,19 @@ if barplot(
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- orphan rate per explicit relationship
+# Only the "subset" relationships belong on an orphan-rate chart -- for
+# "disjoint" / "partial-scope" a high rate is expected, not a defect.
 orphan_pairs = [
     (
         f"{r['child'].split('.')[0]}->{r['parent']}",
-        round((1 - (r["match_rate"] or 1)) * 100, 2),
+        round((1 - r["match_rate"]) * 100, 2),  # match_rate can be 0.0 -- do not `or`
     )
     for r in ri_results
-    if "match_rate" in r and r["match_rate"] is not None
+    if r.get("expectation") == "subset" and r.get("match_rate") is not None
 ]
 if barplot(
     orphan_pairs,
-    "MaStR -- orphan-key rate per relationship (% of child keys with no parent)",
+    "MaStR -- orphan-key rate, subset relationships only (% of child keys with no live parent)",
     "relationship",
     "orphan %",
     rot=60,
@@ -353,23 +378,53 @@ _ent.append(
 )
 
 _rel = [
-    "Referential integrity per EXPLICIT relationship (child column -> parent role):"
+    para(
+        "Referential integrity per EXPLICIT relationship (child column -> parent role).",
+        "`expectation`: subset = child should resolve to a live parent;",
+        "disjoint = child should NOT be in the live tables by design (deregistered",
+        "entities); partial-scope = the live parent set is incomplete because",
+        "solar/storage object types are deferred from staging.",
+    ),
+    "",
 ]
 for r in ri_results:
     if "match_rate" not in r:
         _rel.append(f"- {r['child']} -> {r['role']}: SKIPPED ({r.get('skipped')})")
         continue
     _rel.append(
-        f"- `{r['child']}` -> {r['parent']}: match_rate={r['match_rate']}, "
-        f"orphans={r['orphans']}/{r['child_distinct']}, unused_parent={r['unused_parent']}, "
+        f"- `{r['child']}` -> {r['parent']} [{r['expectation']}]: "
+        f"match_rate={r['match_rate']}, orphans={r['orphans']}/{r['child_distinct']}, "
+        f"unused_parent={r['unused_parent']}, "
         f"child rows/key max={r['child_max_rows_per_key']} avg={r['child_avg_rows_per_key']}"
     )
 _rel.append("")
-_rel.append("Interpretation of the relationships with a non-zero orphan rate:")
-for r in ri_results:
-    if r.get("orphans"):
-        for ln in ri_interpretation(r):
-            _rel.append(f"- {r['child']}: {ln}")
+_rel.append(
+    "Interpretation of the SUBSET relationships with a real (unexpected) orphan rate:"
+)
+_real_problems = [r for r in ri_results if r.get("orphan_problem")]
+if not _real_problems:
+    _rel.append("- none -- every subset relationship resolves cleanly.")
+for r in _real_problems:
+    for ln in ri_interpretation(r):
+        _rel.append(f"- {r['child']}: {ln}")
+_expected_orphans = [
+    r for r in ri_results if r.get("orphans") and not r.get("orphan_problem")
+]
+if _expected_orphans:
+    _rel.append("")
+    _rel.append("Expected high-orphan relationships (not a defect):")
+    for r in _expected_orphans:
+        _rel.append(
+            f"- `{r['child']}` [{r['expectation']}]: {1 - (r['match_rate'] or 0):.1%} of "
+            f"child keys have no live parent -- "
+            + (
+                "deregistered entities are removed from the live export; join to the live "
+                "tables only to confirm the entity is gone."
+                if r["expectation"] == "disjoint"
+                else "the log spans solar/storage units that are deferred from staging; the "
+                "orphan rate here reflects staging scope, not a key mismatch."
+            )
+        )
 if kat_ri:
     _rel.append("")
     _rel.append(
@@ -387,9 +442,15 @@ _coverage = [
 ]
 
 _verdict = []
-_any_orphans = any(r.get("orphans") for r in ri_results)
 _fanout = [r for r in ri_results if (r.get("child_max_rows_per_key") or 0) > 1]
-_verdict.append(f"- Any explicit relationship with orphan keys: {_any_orphans}.")
+_verdict.append(
+    f"- Subset relationships with a real orphan problem: "
+    f"{[r['child'] for r in _real_problems] or 'none'}."
+)
+_verdict.append(
+    f"- Expected-disjoint / partial-scope relationships (high orphan rate is correct): "
+    f"{[r['child'] for r in _expected_orphans] or 'none'}."
+)
 if _fanout:
     _verdict.append(
         "- Child-side fan-out (one child key on multiple rows) in: "
@@ -410,9 +471,17 @@ _silver = [
         "(NOT inferred from column-name similarity, and NOT case-sensitive)."
     ),
 ]
-if _any_orphans:
+if _real_problems:
     _silver.append(
-        "- Orphaned foreign keys exist -> LEFT join with an explicit unmatched flag; never inner."
+        "- Subset relationships with real orphans "
+        f"({[r['child'] for r in _real_problems]}) -> LEFT join with an explicit "
+        "unmatched flag; never inner."
+    )
+if _expected_orphans:
+    _silver.append(
+        "- Deregistered-entity and deferred-scope logs are disjoint from the live tables "
+        "by design -- do not 'fix' their orphan rate by dropping rows; carry them as "
+        "separate history facts."
     )
 if _fanout:
     _silver.append(

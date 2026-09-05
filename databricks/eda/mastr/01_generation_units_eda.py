@@ -168,9 +168,9 @@ for name, df in frames.items():
         # Filter to rows where capacity can be safely cast (some rows have text like turbine types)
         # Use regexp to identify numeric-like values (digits, commas, dots, minus)
         df_numeric = df.filter(
-            F.col(cap_col).isNull() | 
-            (F.trim(F.col(cap_col).cast("string")) == "") |
-            F.col(cap_col).cast("string").rlike(r"^[0-9.,\-]+$")
+            F.col(cap_col).isNull()
+            | (F.trim(F.col(cap_col).cast("string")) == "")
+            | F.col(cap_col).cast("string").rlike(r"^[0-9.,\-]+$")
         )
         pl = plausibility(df_numeric, cap_col, lo=0.0, hi=2_000_000.0, sentinels=())
         entry["capacity"] = {"column": cap_col, "parse": npar, "plausibility": pl}

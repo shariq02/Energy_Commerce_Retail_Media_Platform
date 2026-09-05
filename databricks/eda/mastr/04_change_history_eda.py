@@ -50,7 +50,12 @@ DATASETS = [
 ]
 TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}" for d in DATASETS}
 
-DATE_COL_HINTS = ("datum", "date", "zeitpunkt", "aenderung")
+# A date column's name contains one of these. "aenderung" alone is NOT here --
+# it also matches ArtDerAenderung ("type of change"), a catalog code column
+# whose values (3085, 3086, ...) would be mis-read as calendar years.
+DATE_COL_HINTS = ("datum", "date", "zeitpunkt")
+# `*_nv` ("nicht vorhanden") columns are boolean availability flags, never dates.
+NON_DATE_SUFFIXES = ("_nv",)
 OWN_KEY_PREFERENCE = ("EinheitMastrNummer", "MarktakteurMastrNummer", "MastrNummer")
 # A change registered against a unit cannot predate MaStR's precursor register;
 # anything before this or after "now" is a parse artefact, not a real event.
@@ -139,7 +144,10 @@ for name, df in frames.items():
 temporal = {}
 for name, df in frames.items():
     dcols = [
-        c for c in prof[name]["cols"] if any(h in c.lower() for h in DATE_COL_HINTS)
+        c
+        for c in prof[name]["cols"]
+        if any(h in c.lower() for h in DATE_COL_HINTS)
+        and not c.lower().endswith(NON_DATE_SUFFIXES)
     ]
     per_col = {}
     for c in dcols:
