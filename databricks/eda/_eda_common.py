@@ -192,13 +192,19 @@ def _apply_xlabels(ax, labels, rot):
 def _save_and_show(fig, filename):
     # Save the PNG under src/schemas/profiling/figures/, print where it landed
     # (so a run makes it obvious whether files are being written), then render
-    # it inline and close it.
+    # it inline and close it. Prefer Databricks' display() -- it serialises the
+    # figure to PNG itself, so it renders regardless of the matplotlib backend
+    # (plt.show() is a silent no-op if the session's backend is non-interactive,
+    # e.g. left on "Agg" by an earlier run in the same Python session).
     if filename:
         path = fig_path(filename)
         fig.savefig(path, dpi=110, bbox_inches="tight")
         size = _os.path.getsize(path) if _os.path.exists(path) else -1
         print(f"  figure saved -> {path}  ({size} bytes)")
-    plt.show()
+    try:
+        display(fig)
+    except NameError:
+        plt.show()
     plt.close(fig)
 
 
