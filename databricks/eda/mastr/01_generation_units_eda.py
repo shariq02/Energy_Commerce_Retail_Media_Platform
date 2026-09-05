@@ -165,7 +165,14 @@ for name, df in frames.items():
         npar = numeric_parseability(df, cap_col)
         # MaStR capacity is kW; 0 is implausible for a registered unit, and a
         # single unit above ~2 GW would be a national-scale outlier.
-        pl = plausibility(df, cap_col, lo=0.0, hi=2_000_000.0, sentinels=())
+        # Filter to rows where capacity can be safely cast (some rows have text like turbine types)
+        # Use regexp to identify numeric-like values (digits, commas, dots, minus)
+        df_numeric = df.filter(
+            F.col(cap_col).isNull() | 
+            (F.trim(F.col(cap_col).cast("string")) == "") |
+            F.col(cap_col).cast("string").rlike(r"^[0-9.,\-]+$")
+        )
+        pl = plausibility(df_numeric, cap_col, lo=0.0, hi=2_000_000.0, sentinels=())
         entry["capacity"] = {"column": cap_col, "parse": npar, "plausibility": pl}
         print(
             f"{name}.{cap_col}: parse_yield={npar['yield']} range=({pl['min']}, {pl['max']}) "
@@ -288,7 +295,7 @@ findings_lines = []
 for d in DATASETS:
     findings_lines.append(
         f"{d}: rows={prof[d]['total']}, cols={len(prof[d]['cols'])}, "
-        f"constant={prof[d]['constant']}, duplicates={dup_counts[d]}, "
+        f"constant={prof[d].get('constant', [])}, duplicates={dup_counts[d]}, "
         f"own_key={own_key[d]} (ratio {best_ratio[d]})"
     )
 print("\n".join(findings_lines))
