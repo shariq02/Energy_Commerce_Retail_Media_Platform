@@ -26,11 +26,12 @@ import datetime as _dt
 import os as _os
 import re as _re
 
-import matplotlib
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
 
-matplotlib.use("Agg")  # headless render on serverless; plt.show() is a no-op
+# Do NOT force a backend here -- Databricks installs its own inline backend and
+# forcing "Agg" makes plt.show() a no-op, so figures stop rendering in the
+# notebook (the PNGs still save, but the cell shows nothing).
 
 # A figure axis stays readable to about this many categorical bars; beyond it
 # the label band is unreadable, so the helpers cap and say how many were hidden.
@@ -188,6 +189,19 @@ def _apply_xlabels(ax, labels, rot):
     )
 
 
+def _save_and_show(fig, filename):
+    # Save the PNG under src/schemas/profiling/figures/, print where it landed
+    # (so a run makes it obvious whether files are being written), then render
+    # it inline and close it.
+    if filename:
+        path = fig_path(filename)
+        fig.savefig(path, dpi=110, bbox_inches="tight")
+        size = _os.path.getsize(path) if _os.path.exists(path) else -1
+        print(f"  figure saved -> {path}  ({size} bytes)")
+    plt.show()
+    plt.close(fig)
+
+
 def barplot(
     pairs, title, xlabel, ylabel="count", rot=0, figsize=(10, 4), filename=None
 ):
@@ -209,9 +223,7 @@ def barplot(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     fig.tight_layout()
-    if filename:
-        fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.close(fig)
+    _save_and_show(fig, filename)
     return True
 
 
@@ -234,8 +246,7 @@ def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
         ax.set_visible(False)
     fig.suptitle(suptitle)
     fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.close(fig)
+    _save_and_show(fig, filename)
     return True
 
 

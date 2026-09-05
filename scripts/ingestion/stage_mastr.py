@@ -128,13 +128,27 @@ def _iter_records(zf: zipfile.ZipFile, shard_name: str):
                     root.clear()
 
 
+def _column_union(zf: zipfile.ZipFile, shards: list[str]) -> list[str]:
+    """First pass over every shard collecting only the set of field tags, in
+    first-seen order. MaStR omits an absent optional field from a record
+    entirely, so a per-batch `pd.DataFrame(records)` carries only the fields
+    that batch happened to contain -- batches must be reindexed to this full
+    union before writing or headerless appends misalign. Tag-name only: no
+    text is read and the tree is cleared per record, so this is far cheaper
+    than the staging pass itself."""
+    seen: dict[str, None] = {}
+    for shard_name in shards:
+        for row in _iter_records(zf, shard_name):
+            for tag in row:
+                if tag not in seen:
+                    seen[tag] = None
+    return list(seen)
+
+
 def stage_object_type(
     prefix: str, dataset_name: str, subfolder: str, monitor: PeakRSSMonitor
 ) -> tuple[int, list[Path]]:
     out_dir = STAGING_MASTR_DIR / subfolder
-    writer = ChunkedCSVWriter(
-        out_dir, source="mastr", dataset=dataset_name, max_bytes=MAX_CHUNK_BYTES
-    )
 
     zip_files = list(RAW_MASTR_DIR.glob("Gesamtdatenexport_*.zip"))
     if not zip_files:
@@ -150,16 +164,29 @@ def stage_object_type(
             )
             return 0, []
 
+        columns = _column_union(zf, shards)
+        logger.info(
+            f"MaStR {prefix}: {len(columns)} field(s) across {len(shards)} shard(s) "
+            "-- every batch reindexed to this schema before write"
+        )
+        writer = ChunkedCSVWriter(
+            out_dir,
+            source="mastr",
+            dataset=dataset_name,
+            max_bytes=MAX_CHUNK_BYTES,
+            columns=columns,
+        )
+
         for shard_name in shards:
             for row in _iter_records(zf, shard_name):
                 batch.append(row)
                 if len(batch) >= BATCH_SIZE:
-                    writer.write(pd.DataFrame(batch))
+                    writer.write(pd.DataFrame(batch, columns=columns))
                     batch = []
                     monitor.check()
 
     if batch:
-        writer.write(pd.DataFrame(batch))
+        writer.write(pd.DataFrame(batch, columns=columns))
 
     writer.close()
     logger.info(

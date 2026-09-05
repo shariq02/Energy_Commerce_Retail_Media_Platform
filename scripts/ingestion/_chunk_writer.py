@@ -37,6 +37,7 @@ class ChunkedCSVWriter:
         max_bytes: int = MAX_CHUNK_BYTES,
         extension: str = "csv",
         sep: str = ",",
+        columns: list[str] | None = None,
     ):
         self.out_dir = out_dir
         self.source = source
@@ -45,6 +46,15 @@ class ChunkedCSVWriter:
         self.max_bytes = max_bytes
         self.extension = extension
         self.sep = sep
+
+        # The chunk header is written once (first batch) and every later
+        # batch is appended headerless, so every batch MUST serialise the
+        # same columns in the same order or the appended rows land under the
+        # wrong headers. `columns`, when given, is the authoritative order:
+        # each batch is reindexed to it (missing -> empty, unknown -> error).
+        # When not given, the first batch's column order is locked and any
+        # later batch that differs raises rather than corrupting the file.
+        self._columns: list[str] | None = list(columns) if columns else None
 
         self.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -91,6 +101,29 @@ class ChunkedCSVWriter:
         self._current_bytes += len(data)
         self.total_rows += rows
 
+    def _align_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Force every batch onto one stable column order. With an explicit
+        `columns` list, reindex to it and reject any column not in it. Without
+        one, lock on the first batch and reject any later batch that drifts --
+        a drifting batch appended headerless would silently misalign values
+        (observed with MaStR, whose XML omits absent optional fields, so a
+        `pd.DataFrame(records)` batch carries only the fields that batch's
+        records happened to have)."""
+        cols = list(df.columns)
+        if self._columns is None:
+            self._columns = cols
+            return df
+        unknown = [c for c in cols if c not in self._columns]
+        if unknown:
+            raise RuntimeError(
+                f"{self.source}/{self.dataset}: batch has column(s) absent from the "
+                f"locked schema: {unknown}. Pass the full column union via `columns=` "
+                "so every batch serialises the same fields in the same order."
+            )
+        if cols != self._columns:
+            return df.reindex(columns=self._columns)
+        return df
+
     def write(self, df: pd.DataFrame) -> None:
         """Write one processing batch (<=max_rows), splitting it across
         chunk-file boundaries as needed. Holds only the batch handed in
@@ -98,6 +131,7 @@ class ChunkedCSVWriter:
         if df.empty:
             return
 
+        df = self._align_columns(df)
         n = len(df)
         start = 0
         while start < n:
