@@ -61,6 +61,14 @@ builtins = ["spark", "dbutils", "display"]
 extend-select = ["I", "PLW1508", "UP017", "PLR1730"]
 extend-ignore = ["E402", "BLE001"]
 
+[tool.ruff.lint.per-file-ignores]
+# The source EDA notebooks pull shared helpers in with `%run ../_eda_common`
+# (a Databricks runtime magic Ruff cannot resolve statically). The helper
+# module itself (databricks/eda/_eda_common.py) is NOT exempted and stays
+# fully lint-clean.
+"databricks/eda/*/*_eda.py" = ["F821"]
+"databricks/eda/*/*_relationships_and_findings.py" = ["F821"]
+
 [tool.pytest.ini_options]
 markers = [
     "unit: Unit tests",

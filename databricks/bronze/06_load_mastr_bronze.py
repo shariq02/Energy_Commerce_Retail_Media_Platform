@@ -21,6 +21,7 @@
 import re
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 from pyspark.sql.utils import AnalysisException
 
 # COMMAND ----------
@@ -84,6 +85,30 @@ CSV_OPTIONS = {
     "inferSchema": "false",
     "enforceSchema": "false",  # validate each file's header, fail loud on a real mismatch
     "multiLine": "false",  # keep CSV splittable so large files read in parallel
+    "quote": '"',
+    "escape": '"',  # RFC-4180 doubled-quote escaping used by the staging writer
+}
+
+# The wide actor / location exports carry free-text fields (company names,
+# addresses) that contain embedded newlines and delimiters. Reading them with
+# multiLine=false splits one logical record across physical lines, shifting
+# every field after the embedded newline -- observed as numeric ids landing in
+# the surname column and free text in the salutation column. These datasets
+# are read with multiLine=true (they lose split parallelism, which is
+# acceptable at their size) and are structurally checked after load.
+CSV_OPTIONS_OVERRIDE: dict[str, dict[str, str]] = {
+    "marktakteure": {"multiLine": "true"},
+    "lokationen": {"multiLine": "true"},
+    "marktakteure_und_rollen": {"multiLine": "true"},
+}
+
+# After load, a name column must not read as numeric and a short-code column
+# must not carry long free text -- either means the field alignment is wrong.
+STRUCTURAL_CHECKS: dict[str, dict[str, list[str]]] = {
+    "marktakteure": {
+        "name_cols": ["MarktakteurNachname", "Firmenname"],
+        "code_cols": ["Personenart", "MarktakteurAnrede", "Marktfunktion"],
+    },
 }
 
 COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {}
@@ -122,7 +147,7 @@ def sanitize_columns(df: DataFrame) -> tuple[DataFrame, dict[str, str]]:
     return df, renames
 
 
-def read_dataset(files: list[str]) -> DataFrame:
+def read_dataset(files: list[str], dataset: str) -> DataFrame:
     # Read each chunk file separately and combine by column name rather than
     # passing all files to one reader.csv(files) call. Staged MaStR chunks
     # can have differently ordered headers -- optional XML fields are
@@ -130,14 +155,50 @@ def read_dataset(files: list[str]) -> DataFrame:
     # and Spark's multi-file CSV reader requires every file's header to
     # match the first file's column order exactly, failing the whole
     # dataset on any such drift (observed on marktakteure and lokationen).
+    opts = {**CSV_OPTIONS, **CSV_OPTIONS_OVERRIDE.get(dataset, {})}
     reader = spark.read
-    for key, value in CSV_OPTIONS.items():
+    for key, value in opts.items():
         reader = reader.option(key, value)
     frames = [reader.csv(f) for f in files]
     df = frames[0]
     for other in frames[1:]:
         df = df.unionByName(other, allowMissingColumns=True)
     return df
+
+
+def structural_alignment_error(dataset: str, df: DataFrame) -> str | None:
+    # Returns a message if a name column reads as numeric or a code column
+    # carries long free text -- both mean the CSV field alignment is wrong.
+    spec = STRUCTURAL_CHECKS.get(dataset)
+    if not spec:
+        return None
+    lower = {c.lower(): c for c in df.columns}
+    problems: list[str] = []
+    for want in spec.get("name_cols", []):
+        col = lower.get(want.lower())
+        if not col:
+            continue
+        s = F.col(col).cast("string")
+        present = s.isNotNull() & (F.trim(s) != "")
+        numeric = present & F.regexp_replace(F.trim(s), r"[\d.,\-]", "").eqNullSafe("")
+        r = df.agg(
+            F.sum(present.cast("long")).alias("p"),
+            F.sum(numeric.cast("long")).alias("n"),
+        ).first()
+        if r["p"] and r["n"] / r["p"] > 0.3:
+            problems.append(
+                f"name column {col!r} is {r['n'] / r['p']:.0%} numeric (expected ~0%)"
+            )
+    for want in spec.get("code_cols", []):
+        col = lower.get(want.lower())
+        if not col:
+            continue
+        r = df.agg(F.max(F.length(F.col(col).cast("string"))).alias("mx")).first()
+        if r["mx"] and r["mx"] > 40:
+            problems.append(
+                f"code column {col!r} has a {r['mx']}-char value (expected a short code)"
+            )
+    return "; ".join(problems) or None
 
 
 # COMMAND ----------
@@ -208,7 +269,14 @@ for dataset, volume, table in DATASETS:
         "error": None,
     }
     try:
-        df = read_dataset(files)
+        df = read_dataset(files, dataset)
+
+        alignment_error = structural_alignment_error(dataset, df)
+        if alignment_error:
+            raise RuntimeError(
+                f"structural check failed -- CSV field alignment is wrong: {alignment_error}. "
+                "Adjust the read options for this dataset and re-stage the raw export."
+            )
 
         explicit = COLUMN_RENAME_MAP.get(dataset, {})
         applied = {old: new for old, new in explicit.items() if old in df.columns}

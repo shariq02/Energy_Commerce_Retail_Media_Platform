@@ -16,20 +16,19 @@
 # MAGIC authorisation-adjacent Bronze tables (anlagen_eeg_wind,
 # MAGIC anlagen_eeg_biomasse, anlagen_eeg_wasser,
 # MAGIC anlagen_eeg_geothermie_gsgk, anlagen_kwk, einheiten_genehmigung,
-# MAGIC ertuechtigungen) -- schema, missingness, constant columns, MastrNummer
-# MAGIC key cardinality, full-row duplicates, low-cardinality categorical
-# MAGIC distributions -- as evidence for Silver design.
+# MAGIC ertuechtigungen) -- schema, missingness, constant columns, exact key
+# MAGIC cardinality (own key + the foreign key back to a generation unit),
+# MAGIC full-row duplicates, tariff/date validation, categorical distributions,
+# MAGIC and the layered modelling-risk checklist -- as evidence for Silver design.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
-from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -53,181 +52,35 @@ DATASETS = [
 ]
 TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}" for d in DATASETS}
 
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
-
-
-def find_col(df: DataFrame, *cands: str) -> str | None:
-    low = {c.lower(): c for c in df.columns}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
-
-
-def key_like_cols(cols, suffix="mastrnummer"):
-    return [c for c in cols if c.lower().endswith(suffix)]
-
-
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
+OWN_KEY_PREFERENCE = {
+    "anlagen_eeg_wind": ("EegMaStRNummer",),
+    "anlagen_eeg_biomasse": ("EegMaStRNummer",),
+    "anlagen_eeg_wasser": ("EegMaStRNummer",),
+    "anlagen_eeg_geothermie_gsgk": ("EegMaStRNummer",),
+    "anlagen_kwk": ("KwkMastrNummer", "KwkMaStRNummer"),
+    "einheiten_genehmigung": ("GenMastrNummer",),
+    "ertuechtigungen": ("ErtuechtigungMastrNummer", "EegMastrNummer"),
+}
+AMOUNT_HINTS = (
+    "anzulegenderwert",
+    "zuschlag",
+    "installierteleistung",
+    "leistung",
+    "wert",
+)
+DATE_HINTS = ("datum", "date")
 
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Profile each table -- rows, missingness, approx distinct, constant columns (one agg per table)
+# DBTITLE 1,Profile each table -- rows, missingness, approx distinct (one agg per table)
 frames = {d: spark.table(t) for d, t in TABLES.items()}
 prof = {}
 for name, df in frames.items():
@@ -243,48 +96,85 @@ for name, df in frames.items():
     total = r["__rows"]
     acd = {c: r[c + "__d"] for c in cols}
     miss = {c: r[c + "__m"] for c in cols}
-    constant = [c for c in cols if acd[c] <= 1]
-    prof[name] = {
-        "cols": cols,
-        "total": total,
-        "acd": acd,
-        "miss": miss,
-        "constant": constant,
-    }
-    print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}  -> {cols}")
+    prof[name] = {"cols": cols, "total": total, "acd": acd, "miss": miss}
+    print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}")
     for c in cols:
         rate = miss[c] / total if total else 0
         print(
             f"  {c:<40} missing={miss[c]:>10} rate={rate:.4f} approx_distinct={acd[c]}"
         )
-    print("constant columns:", constant)
 
 # COMMAND ----------
 
-# DBTITLE 1,Key columns (*MastrNummer) -- cardinality + likely primary/foreign key (reuses profile)
+# DBTITLE 1,Confirm constant columns exactly
+for name, df in frames.items():
+    cands = [c for c in prof[name]["cols"] if prof[name]["acd"][c] <= 1]
+    if cands:
+        r = (
+            df.agg(*[F.countDistinct(F.col(c)).alias(c) for c in cands])
+            .first()
+            .asDict()
+        )
+        prof[name]["constant"] = sorted(c for c in cands if (r[c] or 0) <= 1)
+    else:
+        prof[name]["constant"] = []
+    print(f"{name}: constant columns (exact) = {prof[name]['constant']}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Keys -- EXACT distinct; own key + foreign key back to a generation unit
 key_report = {}
-for name in DATASETS:
-    total = prof[name]["total"]
-    picks = []
-    for k in key_like_cols(prof[name]["cols"]):
-        ratio = prof[name]["acd"][k] / total if total else 0
-        picks.append((k, prof[name]["acd"][k], round(ratio, 4)))
-    key_report[name] = picks
-    print(f"{name}: {picks}")
+own_key = {}
+fk_cols = {}
+for name, df in frames.items():
+    cands = key_like_cols(df.columns)
+    uniq = exact_uniqueness(df, cands)
+    k, _ = pick_entity_key(uniq, cands, prefer=OWN_KEY_PREFERENCE.get(name, ()))
+    own_key[name] = k
+    key_report[name] = uniq
+    fk_cols[name] = [c for c in cands if c != k]
+    print(f"{name}: own_key={k}  foreign_keys={fk_cols[name]}")
+    for c, u in uniq.items():
+        print(
+            f"    {c:<32} distinct={u['distinct']:>10} ratio={u['ratio']} unique={u['unique']}"
+        )
 
 # COMMAND ----------
 
 # DBTITLE 1,Full-row duplicates per table
 dup_counts = {}
 for name, df in frames.items():
-    total = prof[name]["total"]
-    distinct_rows = df.distinct().count()
-    dup_counts[name] = total - distinct_rows
+    dup_counts[name] = prof[name]["total"] - df.distinct().count()
     print(f"{name}: exact full-row duplicates = {dup_counts[name]}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Low-cardinality (categorical) column value counts (one groupBy per flagged column)
+# DBTITLE 1,Unit & semantic validation -- tariff/amount columns + scheme dates
+sem = {}
+for name, df in frames.items():
+    cols = df.columns
+    amt = next((c for c in cols if any(h in c.lower() for h in AMOUNT_HINTS)), None)
+    dcols = [c for c in cols if any(h in c.lower() for h in DATE_HINTS)]
+    entry = {}
+    if amt:
+        npar = numeric_parseability(df, amt)
+        pl = plausibility(df, amt, lo=0.0, sentinels=())
+        entry["amount"] = {"column": amt, "parse": npar, "plausibility": pl}
+        print(
+            f"{name}.{amt}: parse_yield={npar['yield']} range=({pl['min']},{pl['max']}) "
+            f"negative={pl['negative']} zero={pl['zero']}"
+        )
+    entry["dates"] = {}
+    for c in dcols[:3]:
+        ts = timestamp_semantics(df, c, valid_from="2000-01-01", tz="Europe/Berlin")
+        entry["dates"][c] = ts
+        for ln in ts["lines"]:
+            print(f"  {name}.{c}: {ln}")
+    sem[name] = entry
+
+# COMMAND ----------
+
+# DBTITLE 1,Low-cardinality (categorical) column value counts
 categorical_dist = {}
 for name, df in frames.items():
     cat_cols = [c for c in prof[name]["cols"] if 1 < prof[name]["acd"][c] <= 50]
@@ -297,26 +187,42 @@ for name, df in frames.items():
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- rows per table, key cardinality ratio, duplicates
-facet_bars(
+# DBTITLE 1,Coverage bias -- rows per table
+row_counts = {d: prof[d]["total"] for d in DATASETS}
+cov = coverage_bias(row_counts)
+print("rows per table:", row_counts, "coverage bias:", cov)
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- rows / columns / duplicates / exact own-key ratio
+best_ratio = {
+    d: (key_report[d][own_key[d]]["ratio"] if own_key[d] in key_report[d] else 0.0)
+    for d in DATASETS
+}
+figs = []
+if facet_bars(
     {
         "rows per table": [(d, prof[d]["total"]) for d in DATASETS],
         "columns per table": [(d, len(prof[d]["cols"])) for d in DATASETS],
         "full-row duplicates": [(d, dup_counts[d]) for d in DATASETS],
-        "primary-key uniqueness ratio (best MastrNummer col)": [
-            (d, max((p[2] for p in key_report[d]), default=0)) for d in DATASETS
-        ],
+        "exact own-key uniqueness ratio": [(d, best_ratio[d]) for d in DATASETS],
     },
     "MaStR EEG support & authorisation -- overview",
     "mastr_eeg_support_overview.png",
     rot=30,
     ncols=2,
-)
+):
+    figs.append(
+        (
+            "MaStR EEG support & authorisation -- overview",
+            "mastr_eeg_support_overview.png",
+        )
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- top categorical distributions (faceted, one panel per table's first flagged column)
-facet_bars(
+# DBTITLE 1,Figure -- first categorical column per table
+if facet_bars(
     {
         d: (next(iter(categorical_dist[d].values())) if categorical_dist[d] else [])
         for d in DATASETS
@@ -325,7 +231,13 @@ facet_bars(
     "mastr_eeg_support_categorical.png",
     rot=45,
     ncols=3,
-)
+):
+    figs.append(
+        (
+            "MaStR EEG support & authorisation -- first categorical column per table",
+            "mastr_eeg_support_categorical.png",
+        )
+    )
 
 # COMMAND ----------
 
@@ -335,7 +247,7 @@ for d in DATASETS:
     findings_lines.append(
         f"{d}: rows={prof[d]['total']}, cols={len(prof[d]['cols'])}, "
         f"constant={prof[d]['constant']}, duplicates={dup_counts[d]}, "
-        f"key candidates={key_report[d]}"
+        f"own_key={own_key[d]} (ratio {best_ratio[d]}), fk_cols={fk_cols[d]}"
     )
 print("\n".join(findings_lines))
 
@@ -355,13 +267,71 @@ for d in DATASETS:
 
 _entities = [
     (
-        "MastrNummer-suffixed key column cardinality (column, approx_distinct, ratio-to-rows) -- "
-        "these tables carry both an own MastrNummer and a foreign-key MastrNummer back to the "
-        "generation-unit table (see 01_generation_units_eda.py):"
+        "Exact key cardinality (column: distinct / ratio-to-rows / unique). Own key is near-unique; "
+        "a lower-cardinality `*MastrNummer` is the foreign key back to the generation unit:"
     )
 ]
 for d in DATASETS:
-    _entities.append(f"- {d}: {key_report[d]}")
+    _entities.append(f"- {d}: own_key=`{own_key[d]}`, foreign_key(s)={fk_cols[d]}")
+    for c, u in key_report[d].items():
+        _entities.append(
+            f"  - `{c}`: {u['distinct']} / {u['ratio']} / unique={u['unique']}"
+        )
+
+_unit = []
+for d in DATASETS:
+    e = sem[d]
+    if "amount" in e:
+        a = e["amount"]
+        _unit.append(
+            f"- {d}.`{a['column']}`: parse yield {a['parse']['yield']:.1%}, "
+            f"observed {a['plausibility']['min']}..{a['plausibility']['max']}, "
+            f"negative={a['plausibility']['negative']}, zero={a['plausibility']['zero']} "
+            "-- confirm the unit (ct/kWh vs EUR/MWh vs kW) against the source layout."
+        )
+    for c, ts in e.get("dates", {}).items():
+        _unit.append(
+            f"- {d}.`{c}` (date): parse yield {ts['yield']:.1%}, range {ts['min_ts']}..{ts['max_ts']}, "
+            f"before 2000={ts['before_valid']}, future-dated={ts['future']}, formats={ts['per_format']}."
+        )
+if not _unit:
+    _unit.append("- No amount or date column located by name in these tables.")
+
+_temporal = [
+    (
+        "Scheme / authorisation dates are Europe/Berlin wall-clock. `Registrierungsdatum` is when "
+        "the record entered MaStR; the tariff/authorisation effective date is a separate column -- "
+        "the effective date is the event, the registration date is when it became knowable."
+    )
+]
+for d in DATASETS:
+    for c, ts in sem[d].get("dates", {}).items():
+        _temporal.append(
+            f"- {d}.`{c}`: {ts['min_ts']} .. {ts['max_ts']} (future-dated: {ts['future']})."
+        )
+
+_ri = [
+    (
+        "- The 1:1 vs 1:N cardinality of each `anlagen_eeg_* / anlagen_kwk / einheiten_genehmigung / "
+        "ertuechtigungen` record against its generation unit is confirmed in "
+        "`06_mastr_relationships_and_findings.py` with a row-level fan-out probe; here only the own "
+        "key and the FK column name are established."
+    ),
+    (
+        "- `ertuechtigungen` (repowering/upgrade) is expected 1:N against a unit -- a unit can be "
+        "upgraded more than once."
+    ),
+]
+
+_coverage = [
+    f"Rows per table: {row_counts}.",
+    (
+        f"Concentration: Gini {cov['gini']}, top-10% share {cov['top10pct_share']}. anlagen_kwk and "
+        "anlagen_eeg_wind dominate; anlagen_eeg_geothermie_gsgk / ertuechtigungen are 10^2 rows. A "
+        "support record exists only for units that entered a scheme -- units outside EEG/KWK have "
+        "no row here, so an EEG-tariff feature is structurally missing for a non-random subset."
+    ),
+]
 
 _dist = []
 for d in DATASETS:
@@ -372,62 +342,138 @@ _findings_md = "\n".join(f"- {ln}" for ln in findings_lines)
 
 _silver = [
     (
-        "- Each table's near-unique `*MastrNummer` column is the natural Bronze->Silver grain key; a "
-        "lower-cardinality `*MastrNummer` foreign-key column is the join back to its generation unit."
+        "- Own `*MastrNummer` is the Bronze->Silver grain key per table; the lower-cardinality "
+        "`*MastrNummer` is the join back to the generation unit (verified in 06)."
     ),
-    "- Constant columns above carry no information and can be dropped at Silver.",
+    "- Constant columns carry no information and can be dropped at Silver.",
+    (
+        "- Cast amount columns with an explicit unit; quarantine values that fail numeric parsing "
+        "or are negative."
+    ),
 ]
 if any(dup_counts.values()):
-    _silver.append(
-        "- Exact duplicate rows exist in at least one table -> de-duplicate on load."
-    )
+    _silver.append("- Exact duplicate rows exist -> de-duplicate on load.")
 _silver.append(
-    "- EEG-support and KWK-bonus records are 1:1 or 1:N against a generation unit depending on "
-    "scheme changes over time -> verify cardinality against 01 before assuming a simple join."
+    "- EEG-support / KWK-bonus / authorisation records are 1:1 or 1:N against a unit depending "
+    "on scheme changes -> use the cardinality confirmed in 06, not an assumed 1:1 join."
 )
 
-_ml_readiness = [
-    (
-        "Candidate target signals: `einheiten_genehmigung` (authorisation outcome) and "
-        "`ertuechtigungen` (repowering/upgrade events) are plausible classification/event targets "
-        "keyed by their own MastrNummer; EEG tariff-level columns in `anlagen_eeg_*` are candidate "
-        "regression targets for a support-scheme use case."
-    ),
-    (
-        "Leakage: EEG tariff/support-level attributes may be assigned AS A CONSEQUENCE of an "
-        "authorisation or scheme decision -- using them as a feature to predict the approval "
-        "outcome itself (or vice versa) risks circularity; verify which attribute is upstream of "
-        "which before pairing them as feature/target."
-    ),
-    (
-        "Grain and entity-grouped split: each table's own near-unique `*MastrNummer` is the entity id, "
-        "with a separate lower-cardinality `*MastrNummer` foreign key back to the generation unit (see "
-        "Entities / Keys) -- split by the generation-unit MastrNummer when a unit could contribute >1 "
-        "row across these tables, not by row."
-    ),
-    (
-        "Join cardinality: whether EEG-support/authorisation records are 1:1 or 1:N against a "
-        "generation unit is NOT confirmed in this notebook (noted as a Silver-implication caveat "
-        "above) -- see 06_mastr_relationships_and_findings.py's foreign-key coverage numbers before "
-        "assuming a simple 1:1 join; a 1:N case joined as 1:1 is a cartesian-explosion risk for any "
-        "unit-level feature table."
-    ),
-    (
-        "Imbalance: the low-cardinality categorical columns profiled above (Distributions) may be "
-        "skewed toward one dominant category per table -- check before using as a stratification or "
-        "target variable, especially for an approval/rejection outcome target."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable -- every statistic here is computed from a full "
-        "Spark aggregation or `.distinct().count()`, no `.sample()`/`.limit()` subset feeds any "
-        "reported number."
-    ),
-]
-if any(dup_counts.values()):
-    _ml_readiness.append(
-        "Exact full-row duplicates exist in at least one table (see Data Quality) -- de-duplicate "
-        "before treating MastrNummer as a unique entity key for a split."
-    )
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                "One row per support/authorisation record. Own key near-unique; the FK to the generation "
+                "unit is lower-cardinality, so unit -> support is potentially 1:N (confirmed in 06). "
+                "Joining to the unit table without checking drifts the grain."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                f"Foreign keys per table: {fk_cols}. A unit with multiple EEG/KWK/ertuechtigung records "
+                "joined as 1:1 multiplies its attributes -- 06 measures the fan-out."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                "`einheiten_genehmigung` (authorisation outcome) and `ertuechtigungen` (upgrade events) "
+                "are plausible targets; the EEG tariff/support level may be a CONSEQUENCE of the "
+                "authorisation, so it must not be a feature for predicting the authorisation."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "A tariff/authorisation attribute is only known from its effective date; the registration "
+                "date is later still. Use only records dated strictly before the prediction cutoff."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "The EEG scheme number itself, and the amount column, can uniquely identify a unit's "
+                "support decision -- a proxy for the very outcome being modelled."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Split by the generation-unit MastrNummer (root of the join chain), not by row in these "
+                "tables, so a unit's support and authorisation records stay together."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "Tariff levels change with scheme vintage; a record superseded by a later one must not be "
+                "used as the unit's tariff at an earlier date."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                "A support record exists only for scheme participants -- see Coverage & Sampling Bias; "
+                "absence of a row is informative, not random."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                "Whether an amount/date field is populated correlates with scheme, vintage and carrier -- "
+                "check before adding an 'is-missing' feature."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            f"Full-row duplicates: {dict(dup_counts)} -- de-duplicate before counting support records.",
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "Effective date, registration date and (for authorisation) decision date are distinct -- "
+                "align target and features to one as-of date."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            (
+                "Amount-column unit unconfirmed; `InstallierteLeistung` here overlaps the capacity column "
+                "in the unit table -- using both is double-counting."
+            ),
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "`Registrierungsdatum` and any MaStR status columns describe record handling, not the "
+                "physical scheme -- they can leak the timing of the label."
+            ),
+        ),
+        (
+            "Class / label instability",
+            "Support-scheme category codes change with each EEG amendment; pin the catalog release (05).",
+        ),
+        (
+            "Label availability lag",
+            (
+                "Authorisation and tariff decisions are registered after they are made -- the "
+                "effective-to-registration gap is the label lag."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "EEG 2000/2004/2009/2012/2014/2017/2021/2023 each changed the support mechanism (fixed "
+                "feed-in -> auction) -- a scheme-vintage indicator is essential before pooling records."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            "Every statistic is a full Spark aggregation or `.distinct().count()` -- no sampling.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -437,19 +483,14 @@ write_profiling(
         ("Profile", "\n".join(_profile)),
         ("Data Quality", "\n".join(_dq)),
         ("Entities / Keys", "\n".join(_entities)),
+        ("Unit & Semantic Validation", "\n".join(_unit)),
+        ("Temporal Semantics", "\n".join(_temporal)),
+        ("Referential Integrity", "\n".join(_ri)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        (
-            "MaStR EEG support & authorisation -- overview",
-            "mastr_eeg_support_overview.png",
-        ),
-        (
-            "MaStR EEG support & authorisation -- first categorical column per table",
-            "mastr_eeg_support_categorical.png",
-        ),
-    ],
+    figures=figs,
 )

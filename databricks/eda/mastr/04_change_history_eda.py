@@ -16,20 +16,21 @@
 # MAGIC tables (geloeschte_deaktivierte_einheiten,
 # MAGIC geloeschte_deaktivierte_marktakteure,
 # MAGIC einheiten_aenderung_netzbetreiberzuordnungen) -- schema, missingness,
-# MAGIC constant columns, MastrNummer key cardinality, full-row duplicates,
-# MAGIC temporal activity of the change events -- as evidence for Silver
-# MAGIC design.
+# MAGIC constant columns, exact key cardinality, full-row duplicates, and a
+# MAGIC proper multi-format parse of every change-event date (each format's
+# MAGIC contribution, unparsed samples, and implausible / future-dated rows
+# MAGIC reported explicitly). These tables are the only record of units and
+# MAGIC actors that left the register -- evidence for Silver design and for the
+# MAGIC survivorship-bias read of the current-state tables.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
-from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -48,184 +49,18 @@ DATASETS = [
     "einheiten_aenderung_netzbetreiberzuordnungen",
 ]
 TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}" for d in DATASETS}
-# Any column containing one of these substrings is treated as a change-event
-# date/timestamp for the temporal-activity check (dynamic, not hardcoded per
-# table since the exact German field name varies by table).
-DATE_COL_HINTS = ("datum", "date", "zeitpunkt")
 
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
-
-
-def find_col(df: DataFrame, *cands: str) -> str | None:
-    low = {c.lower(): c for c in df.columns}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
-
-
-def key_like_cols(cols, suffix="mastrnummer"):
-    return [c for c in cols if c.lower().endswith(suffix)]
-
-
-def date_like_cols(cols):
-    return [c for c in cols if any(h in c.lower() for h in DATE_COL_HINTS)]
-
-
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
+DATE_COL_HINTS = ("datum", "date", "zeitpunkt", "aenderung")
+OWN_KEY_PREFERENCE = ("EinheitMastrNummer", "MarktakteurMastrNummer", "MastrNummer")
+# A change registered against a unit cannot predate MaStR's precursor register;
+# anything before this or after "now" is a parse artefact, not a real event.
+VALID_FROM = "2000-01-01"
 
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -247,73 +82,112 @@ for name, df in frames.items():
     total = r["__rows"]
     acd = {c: r[c + "__d"] for c in cols}
     miss = {c: r[c + "__m"] for c in cols}
-    constant = [c for c in cols if acd[c] <= 1]
-    prof[name] = {
-        "cols": cols,
-        "total": total,
-        "acd": acd,
-        "miss": miss,
-        "constant": constant,
-    }
-    print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}  -> {cols}")
+    prof[name] = {"cols": cols, "total": total, "acd": acd, "miss": miss}
+    print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}")
     for c in cols:
         rate = miss[c] / total if total else 0
         print(
-            f"  {c:<40} missing={miss[c]:>10} rate={rate:.4f} approx_distinct={acd[c]}"
+            f"  {c:<44} missing={miss[c]:>10} rate={rate:.4f} approx_distinct={acd[c]}"
         )
-    print("constant columns:", constant)
 
 # COMMAND ----------
 
-# DBTITLE 1,Key columns (*MastrNummer) -- cardinality (reuses profile)
+# DBTITLE 1,Confirm constant columns exactly
+constant_cols = {}
+for name, df in frames.items():
+    cands = [c for c in prof[name]["cols"] if prof[name]["acd"][c] <= 1]
+    if cands:
+        r = (
+            df.agg(*[F.countDistinct(F.col(c)).alias(c) for c in cands])
+            .first()
+            .asDict()
+        )
+        constant_cols[name] = sorted(c for c in cands if (r[c] or 0) <= 1)
+    else:
+        constant_cols[name] = []
+    prof[name]["constant"] = constant_cols[name]
+    print(f"{name}: constant columns (exact) = {constant_cols[name]}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Key columns -- EXACT distinct count (a unit/actor recurs across change rows)
 key_report = {}
-for name in DATASETS:
-    total = prof[name]["total"]
-    picks = []
-    for k in key_like_cols(prof[name]["cols"]):
-        ratio = prof[name]["acd"][k] / total if total else 0
-        picks.append((k, prof[name]["acd"][k], round(ratio, 4)))
-    key_report[name] = picks
-    print(f"{name}: {picks}")
+own_key = {}
+for name, df in frames.items():
+    cands = key_like_cols(df.columns)
+    uniq = exact_uniqueness(df, cands)
+    k, _info = pick_entity_key(uniq, cands, prefer=OWN_KEY_PREFERENCE)
+    own_key[name] = k
+    key_report[name] = uniq
+    print(f"{name}: referenced-entity key = {k}")
+    for c, u in uniq.items():
+        print(
+            f"    {c:<34} distinct={u['distinct']:>10} ratio={u['ratio']} unique={u['unique']}"
+        )
 
 # COMMAND ----------
 
 # DBTITLE 1,Full-row duplicates per table
 dup_counts = {}
 for name, df in frames.items():
-    total = prof[name]["total"]
-    distinct_rows = df.distinct().count()
-    dup_counts[name] = total - distinct_rows
+    dup_counts[name] = prof[name]["total"] - df.distinct().count()
     print(f"{name}: exact full-row duplicates = {dup_counts[name]}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Temporal activity of change events -- rows per year (one groupBy per detected date column)
+# DBTITLE 1,Temporal semantics -- multi-format parse of every date-like column
 temporal = {}
 for name, df in frames.items():
-    dcols = date_like_cols(prof[name]["cols"])
+    dcols = [
+        c for c in prof[name]["cols"] if any(h in c.lower() for h in DATE_COL_HINTS)
+    ]
     per_col = {}
     for c in dcols:
-        parsed = F.coalesce(
-            F.try_to_timestamp(F.col(c).cast("string"), F.lit("yyyyMMdd")),
-            F.try_to_timestamp(F.col(c).cast("string")),
-        )
+        ts = timestamp_semantics(df, c, valid_from=VALID_FROM, tz="Europe/Berlin")
+        per_col[c] = ts
+        for ln in ts["lines"]:
+            print(f"  {name}.{c}: {ln}")
+    temporal[name] = per_col
+
+# COMMAND ----------
+
+# DBTITLE 1,Rows per year -- ONLY plausible years; unparsed / implausible counted separately
+rows_per_year = {}
+for name, df in frames.items():
+    dcols = list(temporal[name].keys())
+    per_col = {}
+    for c in dcols:
+        parsed = parse_ts_multi(c)
+        yr = F.year(parsed)
+        plausible = yr.between(2000, F.year(F.current_timestamp()) + 1)
         g = (
-            df.select(F.year(parsed).alias("yr"))
-            .where(F.col("yr").isNotNull())
+            df.select(yr.alias("yr"), plausible.alias("ok"))
+            .where(F.col("ok"))
             .groupBy("yr")
             .count()
             .orderBy("yr")
             .collect()
         )
-        per_col[c] = [(x["yr"], x["count"]) for x in g]
-    temporal[name] = per_col
-    print(f"{name} date-like columns -> rows per year:", per_col)
+        bad = (
+            df.select(parsed.alias("p"))
+            .where(
+                F.col("p").isNull()
+                | ~F.year("p").between(2000, F.year(F.current_timestamp()) + 1)
+            )
+            .count()
+        )
+        per_col[c] = {
+            "by_year": [(x["yr"], x["count"]) for x in g],
+            "unparsed_or_implausible": bad,
+        }
+        print(f"{name}.{c}: {per_col[c]}")
+    rows_per_year[name] = per_col
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- rows per table, duplicates, and rows-per-year for the first detected date column
-facet_bars(
+# DBTITLE 1,Figure -- rows per table + duplicates
+figs = []
+if facet_bars(
     {
         "rows per table": [(d, prof[d]["total"]) for d in DATASETS],
         "full-row duplicates": [(d, dup_counts[d]) for d in DATASETS],
@@ -322,24 +196,43 @@ facet_bars(
     "mastr_change_history_overview.png",
     rot=30,
     ncols=2,
-)
-facet_bars(
-    {d: (next(iter(temporal[d].values())) if temporal[d] else []) for d in DATASETS},
-    "MaStR change history -- rows per year (first date-like column per table)",
+):
+    figs.append(
+        ("MaStR change history -- overview", "mastr_change_history_overview.png")
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- rows per plausible year (first date column per table)
+if facet_bars(
+    {
+        d: (
+            next(iter(rows_per_year[d].values()))["by_year"] if rows_per_year[d] else []
+        )
+        for d in DATASETS
+    },
+    "MaStR change history -- rows per year (plausible years only; parse artefacts excluded)",
     "mastr_change_history_temporal.png",
     rot=45,
     ncols=3,
-)
+):
+    figs.append(
+        (
+            "MaStR change history -- rows per year (plausible years only)",
+            "mastr_change_history_temporal.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Findings
 findings_lines = []
 for d in DATASETS:
+    tcols = list(temporal[d].keys())
     findings_lines.append(
         f"{d}: rows={prof[d]['total']}, cols={len(prof[d]['cols'])}, "
         f"constant={prof[d]['constant']}, duplicates={dup_counts[d]}, "
-        f"key candidates={key_report[d]}, date-like columns={list(temporal[d].keys())}"
+        f"entity_key={own_key[d]}, date columns={tcols}"
     )
 print("\n".join(findings_lines))
 
@@ -358,77 +251,189 @@ for d in DATASETS:
     _dq.append(f"- {d}: {dup_counts[d]}")
 
 _entities = [
-    "MastrNummer-suffixed key column cardinality (column, approx_distinct, ratio-to-rows):"
+    "Referenced-entity key cardinality (column: distinct / ratio-to-rows / unique):"
 ]
 for d in DATASETS:
-    _entities.append(f"- {d}: {key_report[d]}")
+    _entities.append(
+        f"- {d}: entity key = `{own_key[d]}` (a unit/actor recurs across change rows)"
+    )
+    for c, u in key_report[d].items():
+        _entities.append(
+            f"  - `{c}`: {u['distinct']} / {u['ratio']} / unique={u['unique']}"
+        )
 
-_temporal = ["Rows per year, by detected date-like column:"]
+_temporal_md = ["Every date-like column parsed under multiple ISO + German formats:"]
 for d in DATASETS:
-    for c, pairs in temporal[d].items():
-        _temporal.append(f"- {d}.`{c}`: {pairs}")
+    for c, ts in temporal[d].items():
+        _temporal_md.append(
+            f"- `{d}.{c}`: parse yield {ts['yield']:.1%} of {ts['present']}; "
+            f"formats {ts['per_format']}; range {ts['min_ts']}..{ts['max_ts']}; "
+            f"before {VALID_FROM}={ts['before_valid']}; future-dated={ts['future']}."
+        )
+        if ts["unparsed_sample"]:
+            _temporal_md.append(f"  - unparsed samples: {ts['unparsed_sample']}")
+        rpy = rows_per_year[d][c]
+        _temporal_md.append(
+            f"  - rows per plausible year: {rpy['by_year']}; "
+            f"unparsed or implausible-year rows (excluded from the figure): "
+            f"{rpy['unparsed_or_implausible']}."
+        )
+_temporal_md.append(
+    "Source timezone is Europe/Berlin wall-clock; the registration and effective dates are "
+    "distinct columns where present -- do not treat them as interchangeable."
+)
+
+_coverage = [
+    f"Row counts: { {d: prof[d]['total'] for d in DATASETS} }.",
+    (
+        "These tables ARE the survivorship record: a unit in geloeschte_deaktivierte_einheiten "
+        "(or an actor in geloeschte_deaktivierte_marktakteure) has left the current-state register. "
+        "Any population built only from the current-state tables (01/03) is missing exactly this "
+        "set. The rows-per-year trend is dominated by the most recent export year -- MaStR back-"
+        "loads deregistration records, so the apparent surge is a registration-lag artefact, not a "
+        "real spike in decommissioning."
+    ),
+]
 
 _findings_md = "\n".join(f"- {ln}" for ln in findings_lines)
 
 _silver = [
     (
-        "- These are append-only change-event logs, not current-state entities -> model as a Silver "
-        "change/event fact, never overwritten by the current-state generation-unit/market-actor tables."
+        "- Append-only change-event logs -> model as a Silver change/event fact, never overwrite "
+        "the current-state generation-unit / market-actor tables with them."
+    ),
+    (
+        "- Parse each date column with the explicit format list; quarantine values that fail to "
+        "parse or fall outside 2000..now (the figure already excludes them)."
     ),
 ]
 if any(dup_counts.values()):
-    _silver.append(
-        "- Exact duplicate rows exist in at least one table -> de-duplicate on load."
-    )
+    _silver.append("- Exact duplicate rows exist -> de-duplicate on load.")
 _silver.append(
-    "- einheiten_aenderung_netzbetreiberzuordnungen records network-operator reassignment events; "
-    "join to the generation-unit MastrNummer to build a time-varying operator-assignment history, "
-    "not a static attribute."
+    "- einheiten_aenderung_netzbetreiberzuordnungen carries BOTH a registration date and an "
+    "effective date -> keep both; the effective date is the event time, the registration date "
+    "is when it became knowable."
 )
 
-_ml_readiness = [
-    (
-        "Candidate target signals: `geloeschte_deaktivierte_einheiten`/`geloeschte_deaktivierte_"
-        "marktakteure` are literal decommission/deactivation-event labels for a unit- or actor-"
-        "level survival/churn use case; `einheiten_aenderung_netzbetreiberzuordnungen` is an "
-        "operator-reassignment event label."
-    ),
-    (
-        "Leakage: these are append-only change-event logs -- a decommission-prediction model may "
-        "only use change events with a date/timestamp strictly before the prediction cutoff; using "
-        "any row from AFTER the cutoff (including the deactivation event itself) to build a feature "
-        "for predicting that same event is definitional leakage."
-    ),
-    (
-        "Grain and entity-grouped split: grain is one change EVENT per row, keyed by the referenced "
-        "unit/actor's MastrNummer, not one row per entity -- split by that MastrNummer so an "
-        "entity's full change history stays on one side of a split; a unit can have multiple change "
-        "rows over time (see key_report ratios below 1.0 where present)."
-    ),
-    (
-        "Join cardinality: joining these change-event tables to the current-state generation-unit "
-        "tables (01_generation_units_eda.py) is 1:N per unit if a unit has multiple historical "
-        "change events -- confirm the exact foreign-key coverage in "
-        "06_mastr_relationships_and_findings.py before joining as if 1:1; treating a 1:N join as "
-        "1:1 either loses history or silently duplicates the unit's static attributes per event."
-    ),
-    (
-        "Imbalance: deletion/deactivation/reassignment events are almost certainly rare relative to "
-        "the full generation-unit or market-actor population -- a decommission or reassignment "
-        "classifier built against the full current-state population as the negative class will "
-        "face severe class imbalance."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable -- every statistic here (profile, key cardinality, "
-        "duplicate counts, rows-per-year) is computed from a full Spark aggregation, no "
-        "`.sample()`/`.limit()` subset feeds any reported number."
-    ),
-]
-if any(dup_counts.values()):
-    _ml_readiness.append(
-        "Exact full-row duplicates exist in at least one table (see Data Quality) -- de-duplicate "
-        "before counting change events as independent observations."
-    )
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                "One row per change EVENT, keyed by the referenced unit/actor MastrNummer -- NOT one row "
+                "per entity. A unit can have several change rows; any per-entity feature must aggregate "
+                "them, and a naive join to a current-state table drifts the grain to (unit, event)."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                "Joining these logs to the current-state unit/actor tables is 1:N per entity -> aggregate "
+                "to the entity or keep as a separate fact; joining as 1:1 duplicates static attributes."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                "These tables ARE the natural label source for a decommission / deactivation / operator-"
+                "reassignment target. The event row (and everything dated on/after it) must be excluded "
+                "from the feature set for predicting that same event."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "A change is only knowable from its registration date onward -- a forecasting feature may "
+                "use only change rows whose registration date is strictly before the prediction cutoff."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "`DatumLetzteAktualisierung` and any 'reason' text describe the deregistration itself; "
+                "using them to predict deregistration is circular."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Split by the referenced MastrNummer so an entity's full change history sits on one side; "
+                "a row-level split leaks a unit's later events into training."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "To build a correct as-of snapshot, replay these events forward from a base date -- do "
+                "not use the current-state table joined to a past date."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                "See Coverage & Sampling Bias -- these rows are the churned population that the current-"
+                "state tables omit; a negative class drawn only from current-state units is biased."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                "A missing effective date vs a present one may itself signal the change type; check "
+                "before adding an 'is-missing' feature."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            (
+                f"Full-row duplicates: {dict(dup_counts)} -- a duplicated deregistration row double-counts "
+                "an event and can split across train/test."
+            ),
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "Effective date != registration date. A target defined on the effective date paired with "
+                "features cut at the registration date (or vice versa) misaligns label and features."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            "Not applicable -- no numeric measures in these tables.",
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "The back-loaded rows-per-year pattern is a property of MaStR's export process, not of "
+                "the physical decommissioning rate -- a year feature would encode the export cadence."
+            ),
+        ),
+        (
+            "Class / label instability",
+            (
+                "The change-type / reason codes are MaStR enumerations that evolve between releases -- "
+                "pin the catalog version (05)."
+            ),
+        ),
+        (
+            "Label availability lag",
+            (
+                "The gap between effective date and registration date is the label lag -- quantify it per "
+                "table before choosing a prediction horizon; a same-day label is not available same-day."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "Post-2019 MaStR deregistration workflow differs from the migrated legacy records; a "
+                "pre/post-migration indicator is warranted."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            "Every statistic is a full Spark aggregation -- no `.sample()` / `.limit()`.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -438,16 +443,11 @@ write_profiling(
         ("Profile", "\n".join(_profile)),
         ("Data Quality", "\n".join(_dq)),
         ("Entities / Keys", "\n".join(_entities)),
-        ("Temporal", "\n".join(_temporal)),
+        ("Temporal Semantics", "\n".join(_temporal_md)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("EDA Findings", _findings_md),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        ("MaStR change history -- overview", "mastr_change_history_overview.png"),
-        (
-            "MaStR change history -- rows per year (first date-like column per table)",
-            "mastr_change_history_temporal.png",
-        ),
-    ],
+    figures=figs,
 )

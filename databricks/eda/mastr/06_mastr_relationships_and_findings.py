@@ -12,24 +12,23 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** Cross-table checks across all 28 MaStR Bronze tables --
-# MAGIC MastrNummer key set overlap between generation units, EEG-support,
-# MAGIC market actors and network tables, referential integrity of the
-# MAGIC foreign-key MastrNummer columns, and an evidence-based verdict on
-# MAGIC joinability. Key sets are collected (they are far smaller than the
-# MAGIC row counts) and reconciled with Python set math instead of repeated
-# MAGIC pairwise Spark joins.
+# MAGIC **Purpose:** Cross-table checks across all 28 MaStR Bronze tables. The
+# MAGIC own-entity key of each table is taken from an exact distinct-count (not
+# MAGIC the HLL estimate), and every join is checked against an EXPLICIT
+# MAGIC relationship spec -- child key column, parent key column, both resolved
+# MAGIC case-insensitively because MaStR's field names drift in case
+# MAGIC (EegMaStRNummer vs EegMastrNummer). For each relationship: orphan rate,
+# MAGIC unused-parent count, and a row-level fan-out probe. Key sets are
+# MAGIC collected and reconciled with Python set math.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
-from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -82,250 +81,211 @@ ANALYTICAL = GENERATION_UNITS + EEG_SUPPORT + MARKET_NETWORK + CHANGE_HISTORY
 ALL_DATASETS = ANALYTICAL + REFERENCE
 TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}" for d in ALL_DATASETS}
 
-# COMMAND ----------
+# Own-entity key tie-break preference per table family. pick_entity_key still
+# ranks primarily by the exact distinct/row ratio; this only breaks ties and
+# names the semantically correct key when several columns are near-unique.
+OWN_KEY_PREFERENCE = {
+    **{d: ("EinheitMastrNummer",) for d in GENERATION_UNITS},
+    "anlagen_eeg_wind": ("EegMaStRNummer",),
+    "anlagen_eeg_biomasse": ("EegMaStRNummer",),
+    "anlagen_eeg_wasser": ("EegMaStRNummer",),
+    "anlagen_eeg_geothermie_gsgk": ("EegMaStRNummer",),
+    "anlagen_kwk": ("KwkMastrNummer", "KwkMaStRNummer"),
+    "einheiten_genehmigung": ("GenMastrNummer",),
+    "ertuechtigungen": ("ErtuechtigungMastrNummer", "EegMastrNummer"),
+    "marktakteure": ("MastrNummer",),
+    "marktakteure_und_rollen": ("MastrNummer",),
+    "netzanschlusspunkte": ("NetzanschlusspunktMastrNummer",),
+    "netze": ("MastrNummer",),
+    "lokationen": ("MastrNummer",),
+    "geloeschte_deaktivierte_einheiten": ("EinheitMastrNummer",),
+    "geloeschte_deaktivierte_marktakteure": ("MarktakteurMastrNummer",),
+    "einheiten_aenderung_netzbetreiberzuordnungen": ("EinheitMastrNummer",),
+}
 
-# DBTITLE 1,Helpers
-
-
-def find_col(df: DataFrame, *cands: str) -> str | None:
-    low = {c.lower(): c for c in df.columns}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
-
-
-def key_like_cols(cols, suffix="mastrnummer"):
-    return [c for c in cols if c.lower().endswith(suffix)]
-
-
-def own_key_col(df: DataFrame) -> str | None:
-    # The own-entity key is the *MastrNummer column with the shortest name
-    # among those on the table (foreign keys carry an extra role prefix,
-    # e.g. "NetzbetreiberMastrNummer" vs. the shorter own "MastrNummer").
-    cands = key_like_cols(df.columns)
-    return min(cands, key=len) if cands else None
-
-
-def barplot(
-    pairs, title, xlabel, ylabel="count", rot=0, figsize=(10, 4), filename=None
-):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
+# Explicit relationship spec: (child_table, child_key_suffix, parent_role,
+# parent_key_suffix). parent_role "generation_units" / "marktakteure" /
+# "lokationen" / "netze" resolves to the union of that key across its tables.
+# Suffixes are matched case-insensitively against column names.
+JOIN_SPEC = [
+    # EEG / KWK / authorisation -> generation unit (shared scheme number)
+    ("anlagen_eeg_wind", "EegMaStRNummer", "gen_eeg", "EegMaStRNummer"),
+    ("anlagen_eeg_biomasse", "EegMaStRNummer", "gen_eeg", "EegMaStRNummer"),
+    ("anlagen_eeg_wasser", "EegMaStRNummer", "gen_eeg", "EegMaStRNummer"),
+    ("anlagen_eeg_geothermie_gsgk", "EegMaStRNummer", "gen_eeg", "EegMaStRNummer"),
+    ("anlagen_kwk", "KwkMastrNummer", "gen_kwk", "KwkMaStRNummer"),
+    ("einheiten_genehmigung", "GenMastrNummer", "gen_gen", "GenMastrNummer"),
+    ("ertuechtigungen", "EegMastrNummer", "gen_eeg", "EegMaStRNummer"),
+    # change history -> generation unit / market actor (shared entity number)
+    (
+        "geloeschte_deaktivierte_einheiten",
+        "EinheitMastrNummer",
+        "gen_einheit",
+        "EinheitMastrNummer",
+    ),
+    (
+        "einheiten_aenderung_netzbetreiberzuordnungen",
+        "EinheitMastrNummer",
+        "gen_einheit",
+        "EinheitMastrNummer",
+    ),
+    (
+        "geloeschte_deaktivierte_marktakteure",
+        "MarktakteurMastrNummer",
+        "marktakteure",
+        "MastrNummer",
+    ),
+    # market actor / network wiring
+    (
+        "marktakteure_und_rollen",
+        "MarktakteurMastrNummer",
+        "marktakteure",
+        "MastrNummer",
+    ),
+    ("netzanschlusspunkte", "LokationMaStRNummer", "lokationen", "MastrNummer"),
+    ("netzanschlusspunkte", "NetzMaStRNummer", "netze", "MastrNummer"),
+    ("netzanschlusspunkte", "NetzbetreiberMaStRNummer", "marktakteure", "MastrNummer"),
+    # generation unit -> operator / location
+    ("einheiten_wind", "AnlagenbetreiberMastrNummer", "marktakteure", "MastrNummer"),
+    ("einheiten_verbrennung", "LokationMaStRNummer", "lokationen", "MastrNummer"),
+]
 
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Own-key set per table (collected -- key sets are small relative to row counts)
+# DBTITLE 1,Helpers -- resolve a *MastrNummer column by suffix, case-insensitive
 frames = {d: spark.table(t) for d, t in TABLES.items()}
+row_count = {d: frames[d].count() for d in ALL_DATASETS}
+
+
+def resolve_key(table, suffix):
+    low = suffix.lower()
+    for c in frames[table].columns:
+        if c.lower() == low or c.lower().endswith(low):
+            return c
+    return None
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Own-entity key per table -- EXACT distinct count
 own_key = {}
+own_uniq = {}
+for d in ALL_DATASETS:
+    df = frames[d]
+    cands = key_like_cols(df.columns) or [
+        c for c in df.columns if c.lower().endswith("id")
+    ]
+    uniq = exact_uniqueness(df, cands)
+    k, info = pick_entity_key(uniq, cands, prefer=OWN_KEY_PREFERENCE.get(d, ()))
+    own_key[d] = k
+    own_uniq[d] = uniq
+    print(f"{d:<48} own_key={k}  rows={row_count[d]:>10}  {info}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Own-key value set per table (collected -- key sets are far smaller than row counts)
 key_set = {}
-row_count = {}
-for name, df in frames.items():
-    k = own_key_col(df)
-    own_key[name] = k
-    row_count[name] = df.count()
-    if k:
-        key_set[name] = {
-            x[0] for x in df.select(F.col(k).cast("string")).distinct().collect()
-        }
-    else:
-        key_set[name] = set()
+for d in ALL_DATASETS:
+    key_set[d] = collect_key_set(frames[d], own_key[d]) if own_key[d] else set()
+    print(f"{d:<48} distinct own keys = {len(key_set[d])}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Parent-role key unions (by the join column, not the own key)
+PARENT_ROLES = {
+    "gen_eeg": (GENERATION_UNITS, "EegMaStRNummer"),
+    "gen_kwk": (GENERATION_UNITS, "KwkMaStRNummer"),
+    "gen_gen": (GENERATION_UNITS, "GenMastrNummer"),
+    "gen_einheit": (GENERATION_UNITS, "EinheitMastrNummer"),
+    "marktakteure": (["marktakteure"], "MastrNummer"),
+    "lokationen": (["lokationen"], "MastrNummer"),
+    "netze": (["netze"], "MastrNummer"),
+}
+parent_union = {}
+for role, (tables, suffix) in PARENT_ROLES.items():
+    vals = set()
+    for t in tables:
+        col = resolve_key(t, suffix)
+        if col:
+            vals |= collect_key_set(frames[t], col)
+    parent_union[role] = vals
     print(
-        f"{name:<48} own_key={k}  rows={row_count[name]:>10}  distinct_keys={len(key_set[name])}"
+        f"parent role {role:<14} ({suffix}) -> {len(vals)} distinct keys from {tables}"
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Generation-unit key union + EEG-support / genehmigung foreign-key coverage
-gen_union = set().union(*(key_set[d] for d in GENERATION_UNITS))
-print(f"union of generation-unit MastrNummer keys = {len(gen_union)}")
-eeg_fk_coverage = {}
-for d in EEG_SUPPORT:
-    df = frames[d]
-    fk = next(
-        (
-            c
-            for c in key_like_cols(df.columns)
-            if c != own_key[d] and "einheit" in c.lower()
-        ),
-        None,
-    )
-    if fk is None:
-        eeg_fk_coverage[d] = {"fk_col": None}
-        continue
-    fk_vals = {x[0] for x in df.select(F.col(fk).cast("string")).distinct().collect()}
-    orphans = len(fk_vals - gen_union)
-    eeg_fk_coverage[d] = {
-        "fk_col": fk,
-        "distinct_fk_values": len(fk_vals),
-        "orphans_vs_generation_units": orphans,
-    }
-print("EEG-support / genehmigung foreign-key coverage vs generation units:")
-for d, v in eeg_fk_coverage.items():
-    print(f"  {d}: {v}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Market-actor role coverage -- marktakteure_und_rollen vs marktakteure
-ma_key = key_set["marktakteure"]
-mur_fk = next(
-    (
-        c
-        for c in key_like_cols(frames["marktakteure_und_rollen"].columns)
-        if c != own_key["marktakteure_und_rollen"]
-    ),
-    own_key["marktakteure_und_rollen"],
+gen_einheit_union = parent_union["gen_einheit"]
+print(
+    f"generation-unit population (EinheitMastrNummer union) = {len(gen_einheit_union)}"
 )
-mur_vals = (
-    {
-        x[0]
-        for x in frames["marktakteure_und_rollen"]
-        .select(F.col(mur_fk).cast("string"))
-        .distinct()
-        .collect()
-    }
-    if mur_fk
-    else set()
-)
-print(f"marktakteure_und_rollen join column: {mur_fk}")
-print(f"marktakteure keys with no role row: {len(ma_key - mur_vals)}")
-print(f"role rows referencing an unknown marktakteure key: {len(mur_vals - ma_key)}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Change-history referential integrity vs current-state tables
-change_orphans = {}
-for d in CHANGE_HISTORY:
-    df = frames[d]
-    fk = next(
-        (c for c in key_like_cols(df.columns) if "einheit" in c.lower()),
-        own_key[d],
-    )
-    if fk is None:
+# DBTITLE 1,Referential integrity per explicit relationship (+ row-level fan-out probe)
+ri_results = []
+for child, child_suffix, role, _parent_suffix in JOIN_SPEC:
+    ccol = resolve_key(child, child_suffix)
+    if ccol is None:
+        ri_results.append(
+            {
+                "child": child,
+                "child_col": None,
+                "role": role,
+                "skipped": "child key column not found",
+            }
+        )
+        print(f"SKIP  {child}.{child_suffix} -> {role}: child column not found")
         continue
-    fk_vals = {x[0] for x in df.select(F.col(fk).cast("string")).distinct().collect()}
-    change_orphans[d] = {
-        "fk_col": fk,
-        "distinct_fk_values": len(fk_vals),
-        "not_in_generation_units": len(fk_vals - gen_union),
-    }
-print("Change-history foreign keys vs generation-unit key union:")
-for d, v in change_orphans.items():
-    print(f"  {d}: {v}")
+    child_vals = collect_key_set(frames[child], ccol)
+    ri = referential_integrity(
+        child_vals, parent_union[role], child=f"{child}.{ccol}", parent=role
+    )
+    # row-level fan-out on the child side: does one child key repeat across rows?
+    fan = (
+        frames[child]
+        .groupBy(F.col(ccol))
+        .count()
+        .agg(F.max("count").alias("mx"), F.avg("count").alias("av"))
+        .first()
+    )
+    ri["child_max_rows_per_key"] = int(fan["mx"]) if fan and fan["mx"] else None
+    ri["child_avg_rows_per_key"] = round(fan["av"], 3) if fan and fan["av"] else None
+    ri_results.append(ri)
+    print(
+        f"{child}.{ccol} -> {role}: match_rate={ri['match_rate']} orphans={ri['orphans']} "
+        f"unused_parent={ri['unused_parent']} child_rows_per_key(max/avg)="
+        f"{ri['child_max_rows_per_key']}/{ri['child_avg_rows_per_key']}"
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- key coverage summary
-barplot(
+# DBTITLE 1,katalogkategorien <-> katalogwerte (reference lookup consistency)
+kk = frames["katalogkategorien"]
+kw = frames["katalogwerte"]
+kk_id = find_col(kk, "Id", "KatalogKategorieId", "kategorie_id")
+kw_fk = next((c for c in kw.columns if "kategorie" in c.lower()), None)
+kat_ri = None
+if kk_id and kw_fk:
+    kat_ri = referential_integrity(
+        collect_key_set(kw, kw_fk),
+        collect_key_set(kk, kk_id),
+        child=f"katalogwerte.{kw_fk}",
+        parent=f"katalogkategorien.{kk_id}",
+    )
+    print("catalog lookup:", kat_ri)
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- rows per Bronze table
+figs = []
+if barplot(
     [(d, row_count[d]) for d in ALL_DATASETS],
     "MaStR -- rows per Bronze table (all 28)",
     "table",
@@ -333,149 +293,250 @@ barplot(
     rot=90,
     figsize=(16, 5),
     filename="mastr_rows_per_table.png",
-)
-barplot(
-    [
-        (d, v.get("orphans_vs_generation_units", 0))
-        for d, v in eeg_fk_coverage.items()
-        if v.get("fk_col")
-    ],
-    "MaStR -- EEG-support/genehmigung foreign keys not found in generation units",
-    "table",
-    "orphan keys",
-    rot=30,
-    filename="mastr_eeg_fk_orphans.png",
-)
+):
+    figs.append(("MaStR rows per Bronze table (all 28)", "mastr_rows_per_table.png"))
 
 # COMMAND ----------
 
-# DBTITLE 1,Verdict -- can the 28 tables be joined on MastrNummer as designed?
-_any_orphans = any(
-    v.get("orphans_vs_generation_units", 0) > 0 for v in eeg_fk_coverage.values()
-) or any(v.get("not_in_generation_units", 0) > 0 for v in change_orphans.values())
-print(
-    f"any EEG-support/change-history foreign key with no matching generation unit: {_any_orphans}"
-)
-print(f"marktakteure keys with no role row: {len(ma_key - mur_vals)}")
-print(
-    "=> MaStR's own-entity MastrNummer is the reliable Silver grain key per table; "
-    "cross-table joins are foreign-key MastrNummer -> another table's own MastrNummer, "
-    "confirmed above rather than assumed from column naming alone."
-)
+# DBTITLE 1,Figure -- orphan rate per explicit relationship
+orphan_pairs = [
+    (
+        f"{r['child'].split('.')[0]}->{r['parent']}",
+        round((1 - (r["match_rate"] or 1)) * 100, 2),
+    )
+    for r in ri_results
+    if "match_rate" in r and r["match_rate"] is not None
+]
+if barplot(
+    orphan_pairs,
+    "MaStR -- orphan-key rate per relationship (% of child keys with no parent)",
+    "relationship",
+    "orphan %",
+    rot=60,
+    figsize=(14, 5),
+    filename="mastr_eeg_fk_orphans.png",
+):
+    figs.append(
+        (
+            "MaStR -- orphan-key rate per explicit relationship",
+            "mastr_eeg_fk_orphans.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Findings
 print("own key per table:", own_key)
-print("distinct key counts:", {d: len(key_set[d]) for d in ALL_DATASETS})
-print("EEG-support foreign-key coverage:", eeg_fk_coverage)
-print("change-history foreign-key coverage:", change_orphans)
+print("relationships checked:", len([r for r in ri_results if "match_rate" in r]))
+_bad = [r for r in ri_results if r.get("orphans")]
+print("relationships with orphan keys:", [(r["child"], r["orphans"]) for r in _bad])
 
 # COMMAND ----------
 
 # DBTITLE 1,Export profiling findings -> src/schemas/profiling/mastr.md
 _ent = [
-    f"Own-entity key column per table: {own_key}",
-    f"Distinct own-key count per table: { {d: len(key_set[d]) for d in ALL_DATASETS} }",
-    f"Union of generation-unit MastrNummer keys: {len(gen_union)}",
+    "Own-entity key column per table (exact distinct / ratio-to-rows / unique):",
 ]
+for d in ALL_DATASETS:
+    k = own_key[d]
+    u = own_uniq[d].get(k) if k else None
+    _ent.append(
+        f"- {d}: `{k}`"
+        + (
+            f" -- {u['distinct']} / {u['ratio']} / unique={u['unique']}"
+            if u
+            else " -- none"
+        )
+    )
+_ent.append(
+    f"Generation-unit population (union of EinheitMastrNummer): {len(gen_einheit_union)}"
+)
 
 _rel = [
-    (
-        "EEG-support / genehmigung foreign-key coverage vs the generation-unit key union "
-        "(fk_col, distinct_fk_values, orphans_vs_generation_units):"
-    ),
+    "Referential integrity per EXPLICIT relationship (child column -> parent role):"
 ]
-for d, v in eeg_fk_coverage.items():
-    _rel.append(f"- {d}: {v}")
-_rel += [
-    "",
-    f"marktakteure_und_rollen join column: `{mur_fk}`",
-    f"- marktakteure keys with no role row: {len(ma_key - mur_vals)}",
-    f"- role rows referencing an unknown marktakteure key: {len(mur_vals - ma_key)}",
-    "",
-    (
-        "Change-history foreign keys vs generation-unit key union "
-        "(fk_col, distinct_fk_values, not_in_generation_units):"
-    ),
-]
-for d, v in change_orphans.items():
-    _rel.append(f"- {d}: {v}")
+for r in ri_results:
+    if "match_rate" not in r:
+        _rel.append(f"- {r['child']} -> {r['role']}: SKIPPED ({r.get('skipped')})")
+        continue
+    _rel.append(
+        f"- `{r['child']}` -> {r['parent']}: match_rate={r['match_rate']}, "
+        f"orphans={r['orphans']}/{r['child_distinct']}, unused_parent={r['unused_parent']}, "
+        f"child rows/key max={r['child_max_rows_per_key']} avg={r['child_avg_rows_per_key']}"
+    )
+_rel.append("")
+_rel.append("Interpretation of the relationships with a non-zero orphan rate:")
+for r in ri_results:
+    if r.get("orphans"):
+        for ln in ri_interpretation(r):
+            _rel.append(f"- {r['child']}: {ln}")
+if kat_ri:
+    _rel.append("")
+    _rel.append(
+        f"katalogwerte -> katalogkategorien: {kat_ri['orphans']} orphan FK values, "
+        f"{kat_ri['unused_parent']} unreferenced categories."
+    )
 
-_verdict = [
-    f"- Any EEG-support/change-history foreign key orphaned against generation units: {_any_orphans}.",
+_coverage = [
+    f"Rows per Bronze table: { {d: row_count[d] for d in ALL_DATASETS} }.",
     (
-        f"- marktakteure keys missing a role row: {len(ma_key - mur_vals)}; role rows with an unknown "
-        f"marktakteure key: {len(mur_vals - ma_key)}."
-    ),
-    (
-        "- Verdict: each table's own-entity MastrNummer is a safe Silver grain key; cross-table joins "
-        "must be validated against the live foreign-key coverage above per release, since MaStR's "
-        "German field names do not guarantee a byte-identical key match without this check."
+        "marktakteure / netzanschlusspunkte / lokationen are ~5-7M rows each; the generation-unit "
+        "and support tables are 10^2-10^5. A model rooted at a generation unit touches a tiny "
+        "slice of the market-actor and location tables -- most of those rows are never referenced."
     ),
 ]
+
+_verdict = []
+_any_orphans = any(r.get("orphans") for r in ri_results)
+_fanout = [r for r in ri_results if (r.get("child_max_rows_per_key") or 0) > 1]
+_verdict.append(f"- Any explicit relationship with orphan keys: {_any_orphans}.")
+if _fanout:
+    _verdict.append(
+        "- Child-side fan-out (one child key on multiple rows) in: "
+        + ", ".join(
+            f"{r['child']} (max {r['child_max_rows_per_key']})" for r in _fanout
+        )
+        + " -- these are 1:N and must not be joined as 1:1."
+    )
+_verdict.append(
+    "- Verdict: each table's own-entity `*MastrNummer` (exact ratio above) is the Silver grain "
+    "key; cross-table joins use the explicit column pairs above, resolved case-insensitively, "
+    "and must be re-validated per MaStR release."
+)
 
 _silver = [
     (
-        "- Silver join key: own-entity `*MastrNummer` per table, joined to another table's own key via "
-        "the matching foreign-key `*MastrNummer` column (verified above, not assumed from naming)."
+        "- Silver join key: the explicit child `*MastrNummer` -> parent `*MastrNummer` pairs above "
+        "(NOT inferred from column-name similarity, and NOT case-sensitive)."
     ),
 ]
 if _any_orphans:
     _silver.append(
-        "- Orphaned foreign keys exist -> a left join must not silently drop the fact row; flag "
-        "the orphan instead."
+        "- Orphaned foreign keys exist -> LEFT join with an explicit unmatched flag; never inner."
     )
-if ma_key - mur_vals or mur_vals - ma_key:
+if _fanout:
     _silver.append(
-        "- marktakteure <-> marktakteure_und_rollen is not a clean 1:1/1:N without gaps -> "
-        "reconcile before treating roles as a simple child table."
+        "- 1:N relationships identified above -> aggregate the child to the parent grain, or "
+        "keep it as a separate fact; never fold it into the parent's attribute row."
     )
 
-_ml_readiness = [
-    (
-        "No candidate ML target lives across these 28 tables directly -- this notebook is a "
-        "joinability audit; see 01-04 for per-table target candidates (decommission events, "
-        "authorisation outcomes, repowering events)."
-    ),
-    (
-        f"Join cardinality / cartesian-explosion risk: EEG-support and change-history foreign keys "
-        f"are checked against the generation-unit key union ({len(gen_union)} distinct keys) -- "
-        f"any orphan found ({_any_orphans}) means a left join must be used (not inner) or fact rows "
-        "silently disappear; a foreign key with MULTIPLE matching rows in a target table (not "
-        "checked by set-membership alone) would additionally risk fan-out -- verify row-level join "
-        "cardinality, not just key-set overlap, before joining at scale."
-    ),
-    (
-        f"marktakteure <-> marktakteure_und_rollen is not a clean gap-free 1:1/1:N: "
-        f"{len(ma_key - mur_vals)} marktakteure keys have no role row and "
-        f"{len(mur_vals - ma_key)} role rows reference an unknown marktakteure key -- treating this "
-        "as a simple child table without handling both gaps risks silently dropping actors from a "
-        "role-based feature."
-    ),
-    (
-        "Grain and entity-grouped split: each table's own-entity `*MastrNummer` (own_key above) is the "
-        "correct split unit for any cross-table model -- always split by the GENERATION-UNIT or "
-        "MARKET-ACTOR MastrNummer at the root of a join chain, not by row in any individual table, so "
-        "that one entity's rows across multiple joined tables stay together."
-    ),
-    (
-        "Leakage: change-history foreign-key coverage (checked here against the generation-unit key "
-        "union) confirms WHICH units have historical change events, but not WHEN -- combining this "
-        "notebook's cross-table joins with a temporal target (e.g. decommission prediction) still "
-        "requires the date-based leakage guard described in 04_change_history_eda.py; a clean key "
-        "match here does not imply a temporally safe feature."
-    ),
-    (
-        "Imbalance: not applicable at this join-audit level -- see 01-04 for per-table imbalance notes "
-        "on rare categorical/event columns."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable -- every statistic here (key sets, foreign-key "
-        "coverage, row counts) is computed from a full Spark distinct/count or a fully collected key "
-        "set, no `.sample()`/`.limit()` subset feeds any reported number."
-    ),
-]
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                "Root any cross-table model at one entity grain (generation unit = `EinheitMastrNummer`, "
+                "or market actor = `MastrNummer`); every join in JOIN_SPEC either holds that grain (1:1) "
+                "or drifts it (1:N, flagged above)."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                f"Row-level fan-out probe run per relationship: 1:N in "
+                f"{[r['child'] for r in _fanout] or 'none'}. lokationen link arrays (03) are M:N and "
+                "explode further -- verify exploded row counts against pre-explosion counts."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                "No target across these tables; a decommission/authorisation target drawn from 04/02 must "
+                "not be enriched with attributes recorded as a consequence of that same event."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "This notebook checks key-set membership only -- it confirms WHICH units have a change/"
+                "support record, not WHEN. A temporally safe feature still needs the date guards in 02/04."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "Operator identity (`AnlagenbetreiberMastrNummer`), grid connection point, and location "
+                "MastrNummer are high-cardinality near-keys that can memorise a specific unit's outcome."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Split at the ROOT entity of the join chain (unit or actor MastrNummer) so a unit's rows "
+                "across all joined tables stay on one side; a per-table row split leaks across joins."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "The current-state tables carry no validity windows; joining them to a dated event as if "
+                "their attributes were true at the event date is point-in-time leakage."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                "The generation-unit population here is what survived to the export; the change-history "
+                "tables are the only record of units that left. A joined training set that starts from "
+                "current-state units silently excludes the churned population."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                "Orphan rate per relationship (above) is itself informative -- whether a unit has an EEG "
+                "or KWK record correlates with carrier type and support era; an 'is-linked' flag can leak."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            (
+                "Child-side fan-out counts above show which tables repeat a key across rows; de-duplicate "
+                "or aggregate before joining so one entity is not counted multiple times across a split."
+            ),
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "Not resolvable from key sets alone; requires the per-table date columns (02/04) aligned "
+                "to a single as-of date."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            "Not applicable at the key-graph level (no numeric measures joined here).",
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "MaStR's own processing columns (Systemstatus, Netzbetreiberpruefung, migration flags) "
+                "propagate through every join and encode record-handling, not physical reality."
+            ),
+        ),
+        (
+            "Class / label instability",
+            "Catalog codes referenced across tables are version-dependent (05) -- pin the release.",
+        ),
+        (
+            "Label availability lag",
+            (
+                "Change events are registered after the fact; a clean key match here does not tell you "
+                "the event was known at its physical date."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "The 2019 MaStR migration means pre-2019 units carry migrated keys with different "
+                "completeness; a registration-era flag should ride along any cross-table feature."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            "Every number here is a full distinct/count or a fully collected key set -- no sampling.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -483,16 +544,11 @@ write_profiling(
     SECTION_TITLE,
     blocks=[
         ("Entities / Keys", "\n".join(_ent)),
-        ("Relationships", "\n".join(_rel)),
+        ("Referential Integrity", "\n".join(_rel)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("EDA Findings", "\n".join(_verdict)),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        ("MaStR rows per Bronze table (all 28)", "mastr_rows_per_table.png"),
-        (
-            "MaStR EEG-support/genehmigung foreign keys not found in generation units",
-            "mastr_eeg_fk_orphans.png",
-        ),
-    ],
+    figures=figs,
 )

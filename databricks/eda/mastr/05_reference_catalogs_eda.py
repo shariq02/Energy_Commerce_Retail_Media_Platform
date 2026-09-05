@@ -12,21 +12,16 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** Profile the six small MaStR reference-catalog Bronze
-# MAGIC tables (einheitentypen, katalogkategorien, katalogwerte,
-# MAGIC lokationstypen, marktfunktionen, marktrollen) -- schema, missingness,
-# MAGIC constant columns, duplicates, code reconciliation against the
-# MAGIC analytical tables' categorical columns. These tables are small, so
-# MAGIC each is collected once and analysed in Python.
+# MAGIC **Purpose:** Profile the six MaStR static reference / code-lookup Bronze
+# MAGIC tables (einheitentypen, katalogkategorien, katalogwerte, lokationstypen,
+# MAGIC marktfunktionen, marktrollen) -- schema, full-row duplicates, the
+# MAGIC katalogkategorien <-> katalogwerte lookup consistency, and how these
+# MAGIC code sets constrain the categorical columns profiled in 01-04. Small
+# MAGIC tables, collected and reconciled in Python.
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -51,177 +46,9 @@ TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}" for d in DATASETS}
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers
-
-
-def find_key(cols, *cands):
-    low = {c.lower(): c for c in cols}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
-
-
-def find_key_like(cols, *substrings):
-    for c in cols:
-        cl = c.lower()
-        if any(s in cl for s in substrings):
-            return c
-    return None
-
-
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
-
-# COMMAND ----------
-
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -236,10 +63,15 @@ for name, t in TABLES.items():
     total = len(recs)
     dups = total - len({tuple(sorted(d.items())) for d in recs})
     consts = [c for c in cols if len({d[c] for d in recs}) <= 1]
-    meta[name] = {"cols": cols, "recs": recs, "total": total}
+    meta[name] = {
+        "cols": cols,
+        "recs": recs,
+        "total": total,
+        "dups": dups,
+        "consts": consts,
+    }
     print(
-        "=" * 90,
-        f"\n{name}  rows={total}  cols={cols}  full_row_duplicates={dups}  constant_columns={consts}",
+        "=" * 90, f"\n{name}  rows={total}  cols={cols}  dups={dups}  constant={consts}"
     )
     for c in cols:
         missing = sum(1 for d in recs if d[c] is None or str(d[c]).strip() == "")
@@ -249,36 +81,40 @@ for name, t in TABLES.items():
 
 # COMMAND ----------
 
-# DBTITLE 1,katalogkategorien <-> katalogwerte reconciliation (Python)
-kk = meta["katalogkategorien"]
-kw = meta["katalogwerte"]
-kk_id = find_key(kk["cols"], "KatalogKategorieId", "Id", "kategorie_id")
-kw_fk = find_key_like(kw["cols"], "kategorie")
+# DBTITLE 1,katalogkategorien <-> katalogwerte lookup consistency
+kk, kw = meta["katalogkategorien"], meta["katalogwerte"]
+kk_id = find_col(
+    spark.table(TABLES["katalogkategorien"]), "Id", "KatalogKategorieId", "kategorie_id"
+)
+kw_fk = next((c for c in kw["cols"] if "kategorie" in c.lower()), None)
 kk_ids = {d[kk_id] for d in kk["recs"]} if kk_id else set()
 kw_fks = {d[kw_fk] for d in kw["recs"]} if kw_fk else set()
-print(f"katalogkategorien key column: {kk_id}   katalogwerte FK-like column: {kw_fk}")
-print("katalogkategorien ids not referenced by any katalogwerte row:", kk_ids - kw_fks)
-print("katalogwerte FK values with no matching katalogkategorien row:", kw_fks - kk_ids)
-
-# COMMAND ----------
-
-# DBTITLE 1,Findings
-_dup_report = {}
-for name, x in meta.items():
-    _dup_report[name] = x["total"] - len({tuple(sorted(d.items())) for d in x["recs"]})
-print("full-row duplicates per table:", _dup_report)
+kat_ri = referential_integrity(
+    kw_fks, kk_ids, child=f"katalogwerte.{kw_fk}", parent=f"katalogkategorien.{kk_id}"
+)
+print(f"catalog lookup key: {kk_id} <-> {kw_fk}")
+print("referential integrity:", kat_ri)
+for ln in ri_interpretation(kat_ri):
+    print("  ", ln)
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- rows per catalog table
-barplot(
+figs = []
+if barplot(
     [(n, meta[n]["total"]) for n in DATASETS],
     "MaStR reference catalogs -- rows per table",
     "table",
     "rows",
     rot=30,
     filename="mastr_reference_catalogs_overview.png",
-)
+):
+    figs.append(
+        (
+            "MaStR reference catalogs -- rows per table",
+            "mastr_reference_catalogs_overview.png",
+        )
+    )
 
 # COMMAND ----------
 
@@ -287,71 +123,149 @@ _profile = [
     "| table | rows | cols | full-row dups | constant columns |",
     "|---|---|---|---|---|",
 ]
-for name, x in meta.items():
-    consts = [c for c in x["cols"] if len({d[c] for d in x["recs"]}) <= 1]
+for name in DATASETS:
+    x = meta[name]
     _profile.append(
-        f"| {name} | {x['total']} | {len(x['cols'])} | {_dup_report[name]} | "
-        f"{', '.join(consts) or '-'} |"
+        f"| {name} | {x['total']} | {len(x['cols'])} | {x['dups']} | "
+        f"{', '.join(x['consts']) or '-'} |"
     )
 
-_dq = [f"Full-row exact duplicates per table: {_dup_report}"]
+_dq = [
+    f"Full-row exact duplicates per table: { {n: meta[n]['dups'] for n in DATASETS} }"
+]
 
 _recon = [
-    f"katalogkategorien key column: `{kk_id}`, katalogwerte FK-like column: `{kw_fk}`",
-    f"katalogkategorien ids with no referencing katalogwerte row: {sorted(kk_ids - kw_fks)}",
-    f"katalogwerte FK values with no matching katalogkategorien row: {sorted(kw_fks - kk_ids)}",
+    f"katalogkategorien key `{kk_id}` <-> katalogwerte FK `{kw_fk}`:",
+    (
+        f"- {kat_ri['orphans']} katalogwerte FK values with no matching category "
+        f"(match rate {kat_ri['match_rate']})."
+    ),
+    (
+        f"- {kat_ri['unused_parent']} categories never referenced by a katalogwerte row: "
+        f"{sorted(str(x) for x in (kk_ids - kw_fks))[:15]}."
+    ),
+]
+for ln in ri_interpretation(kat_ri):
+    _recon.append(f"- {ln}")
+
+_domain = [
+    (
+        "These six tables are the authoritative code sets for the categorical columns profiled in "
+        "01-04. Before Silver, each low-cardinality code column found there (status, technology, "
+        "energy carrier, market role, ...) must be reconciled against the matching catalog here -- "
+        "an unknown code is a quarantine class, not a silent NULL. That reconciliation is a Silver "
+        "task; this notebook only confirms the catalogs are internally consistent."
+    ),
 ]
 
 _findings_md = "\n".join(
-    f"- {name}: {v} full-row duplicate(s)" for name, v in _dup_report.items()
+    f"- {name}: {meta[name]['dups']} full-row duplicate(s), "
+    f"{len(meta[name]['cols'])} column(s)"
+    for name in DATASETS
 )
 
 _silver = [
     (
-        "- All six tables are static lookups -> model as Silver reference dimensions, SCD type 1 "
-        "(overwrite on reload) unless a future MaStR release adds a validity-period column."
+        "- All six tables are static lookups -> Silver reference dimensions, SCD type 1 (overwrite "
+        "on reload) unless a future MaStR release adds a validity-period column."
+    ),
+    (
+        "- Pin the MaStR catalog release used -- code meanings change between register versions, so "
+        "a code decoded against the wrong catalog vintage is a silent label error downstream."
     ),
 ]
-if any(_dup_report.values()):
+if any(meta[n]["dups"] for n in DATASETS):
+    _silver.append("- Exact duplicate rows exist -> de-duplicate on load.")
+if kat_ri["orphans"]:
     _silver.append(
-        "- Exact duplicate rows exist in at least one table -> de-duplicate on load."
+        "- katalogwerte has FK values with no category row -> confirm the FK column semantics "
+        "against the live schema before enforcing the foreign key."
     )
-if kw_fks - kk_ids:
-    _silver.append(
-        "- katalogwerte has FK values with no matching katalogkategorien row -> either the FK "
-        "column identified above is wrong or the catalog tables are not fully self-consistent; "
-        "verify column semantics against the live schema before enforcing a foreign key."
-    )
-_silver.append(
-    "- einheitentypen / lokationstypen / marktfunktionen / marktrollen are the candidate code "
-    "lookups for the categorical columns profiled in 01-04; reconcile the categorical value sets "
-    "found there against these tables' codes before finalising Silver contracts."
-)
 
-_ml_readiness = [
-    (
-        "No candidate ML target lives in these six static reference/catalog tables -- they are pure "
-        "code lookups, not observations of an outcome."
-    ),
-    (
-        f"Join cardinality: katalogkategorien <-> katalogwerte is confirmed as a code-lookup join "
-        f"on `{kk_id}` <-> `{kw_fk}`; {len(kk_ids - kw_fks)} category codes have no referencing "
-        f"katalogwerte row and {len(kw_fks - kk_ids)} katalogwerte FK values reference an unknown "
-        "category -- either gap means an inner join to enrich a categorical feature with its "
-        "catalog label will silently drop rows on one side."
-    ),
-    (
-        "Grain and entity-grouped split: not applicable -- these are code dimensions with no "
-        "observation-level grain to split; any model using them joins in a static label, it does not "
-        "train directly on these tables."
-    ),
-    "Leakage: not applicable -- static reference data carries no temporal ordering to leak across.",
-    "Imbalance: not applicable -- these are code enumerations, not a class-balance concern.",
-    (
-        "Sample-vs-full divergence: not applicable -- all six tables are fully collected (no "
-        "sampling) since they are small."
-    ),
-]
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                "Code dimensions with no observation grain -- a model joins a label in, it does not train "
+                "on these rows."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                f"katalogkategorien <-> katalogwerte is a clean code lookup ({kat_ri['match_rate']} match). "
+                "A decode join fans out only if a code appears in more than one category -- not observed."
+            ),
+        ),
+        (
+            "Target contamination",
+            "Not applicable -- static reference data, no outcome.",
+        ),
+        ("Temporal / post-event leakage", "Not applicable -- no temporal ordering."),
+        (
+            "Proxy leakage",
+            (
+                "A decoded label is a deterministic function of the code -- using both the raw code and "
+                "its decoded label as separate features is redundant, not leakage, but wastes capacity."
+            ),
+        ),
+        ("Split / entity leakage", "Not applicable -- no entities to split."),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "Real risk: decoding a historical record with today's catalog assigns a meaning the code "
+                "did not have then. Keep the catalog version alongside the decoded value."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                f"{kat_ri['unused_parent']} categories are never used by any katalogwerte row -- harmless "
+                "for a dimension, but a one-hot over the full catalog carries always-zero columns."
+            ),
+        ),
+        ("Missingness leakage", "Not applicable -- fully populated small tables."),
+        (
+            "Duplicate-event leakage",
+            (
+                f"Full-row duplicates: { {n: meta[n]['dups'] for n in DATASETS} } -- de-duplicate so a "
+                "decode join stays 1:1."
+            ),
+        ),
+        ("Target / feature temporal misalignment", "Not applicable -- no dates."),
+        (
+            "Unit / sign / circular-feature leakage",
+            "Not applicable -- no numeric measures.",
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "The catalogs describe MaStR's own classification scheme -- a code encodes how MaStR "
+                "categorises a thing, not an independent physical property."
+            ),
+        ),
+        (
+            "Class / label instability",
+            (
+                "PRIMARY concern here: MaStR revises these code sets between releases (adds/retires/"
+                "renames). A class defined by a raw code is only stable within one catalog vintage."
+            ),
+        ),
+        ("Label availability lag", "Not applicable -- reference data."),
+        (
+            "Source / version / regime change",
+            (
+                "Each MaStR release ships an updated catalog -- pin and diff it across releases before "
+                "pooling records decoded under different vintages."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            "All six tables are fully collected (small) -- no sampling.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -360,15 +274,11 @@ write_profiling(
     blocks=[
         ("Profile", "\n".join(_profile)),
         ("Data Quality", "\n".join(_dq)),
-        ("Domain Findings", "\n".join(_recon)),
+        ("Referential Integrity", "\n".join(_recon)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
         ("EDA Findings", _findings_md),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        (
-            "MaStR reference catalogs -- rows per table",
-            "mastr_reference_catalogs_overview.png",
-        ),
-    ],
+    figures=figs,
 )
