@@ -704,6 +704,47 @@ _silver.append(
     "- P and W tables of a metric are schema-identical, join 1:1 on (frequency, datetime_utc), and are highly correlated (corr above) -> may be modelled as one fact per metric (a Silver modelling choice)."
 )
 
+_ml_readiness = [
+    (
+        "Candidate target signals: the stuck-sensor flags and 5-sigma outlier counts computed "
+        f"above ({outliers}) are natural labels for a sensor-anomaly-detection use case; the value "
+        "columns themselves (electricity/heating/cooling P and W) are candidate forecasting "
+        "targets keyed by (frequency, datetime_utc)."
+    ),
+    (
+        "Leakage: P and W tables per metric are schema-identical and highly correlated (Pearson "
+        f"corr in `pw_rel` = {pw_rel}) -- verify whether P and W are independent physical "
+        "measurements or one is a unit-derived transform of the other before using both as separate "
+        "features; if derived, using one to predict the other is circular, not genuine signal."
+    ),
+    (
+        f"Grain and entity-grouped split: key = {KEY_COLS} per table, no separate device/sensor id -- "
+        "split by contiguous date range, not by row, and never mix `frequency` values within one split "
+        "since 1min/15min/1h are different physical resolutions of the same underlying signal."
+    ),
+    (
+        "Join cardinality: P<->W join per metric is 1:1 on (frequency, datetime_utc) confirmed by "
+        "matched-row counts and schema parity above -- safe to join without fan-out risk."
+    ),
+    (
+        f"Imbalance: stuck-run and 5-sigma-outlier flags are rare-event labels by construction "
+        f"({outliers}) -- an anomaly-detection model trained on these will face severe class "
+        "imbalance; do not evaluate with plain accuracy."
+    ),
+    (
+        "Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample "
+        "capped at 150k rows), the hourly time-series figure uses only the first 2000 chronological "
+        "points per table, and the P-vs-W scatter uses a 10% sample capped at 20k rows -- none of "
+        "these are representative of the full series; use the full-table `value_stats`/`outliers`/"
+        "`continuity` aggregates for any feature-quality or threshold decision."
+    ),
+]
+if any(dup[e]["conflicting"] > 0 for e in ENERGY):
+    _ml_readiness.append(
+        "Conflicting (frequency, datetime_utc) duplicates exist in at least one table (see Data "
+        "Quality) and must be resolved deterministically before use as a training feature or label."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -714,6 +755,7 @@ write_profiling(
         ("Temporal", "\n".join(_temporal)),
         ("Distributions", "\n".join(_dist)),
         ("Relationships", "\n".join(_rel)),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         (
             "EDA Findings",
             "\n".join(

@@ -563,6 +563,48 @@ if _oor and any(_oor.values()):
     _silver.append("- Apply plausibility bounds / flag out-of-range weather readings.")
 _silver_md = "\n".join(_silver) if _silver else ""
 
+_ml_readiness = [
+    (
+        "Candidate target signals: Ta (air temperature) and Igm (global irradiance) are candidate "
+        f"forecasting targets keyed by (frequency, datetime_utc); the stuck-run flags ({stuck}) are "
+        "a candidate anomaly-detection label."
+    ),
+    (
+        "Leakage: this table is the weather side of the energy<->weather join analysed in "
+        "03_honda_relationships_and_findings.py -- using same-timestamp weather to predict "
+        "same-timestamp energy is legitimate, but using a later weather reading (or a diurnal "
+        "profile averaged over the FULL history) to predict an earlier energy reading would leak "
+        "future information; any diurnal/seasonal feature must be computed only from data available "
+        "before the prediction point."
+    ),
+    (
+        "Grain and entity-grouped split: key = (frequency, datetime_utc), single weather source (no "
+        "station id) -- split by contiguous date range, not by row, and never mix `frequency` values "
+        "within one split."
+    ),
+    (
+        "Join cardinality: this notebook does not assess the energy<->weather join cardinality -- "
+        "see 03_honda_relationships_and_findings.py for the confirmed match rate; do not assume a "
+        "1:1 join without checking that notebook's yield numbers first."
+    ),
+    (
+        f"Imbalance: stuck-run flags ({stuck}) are a rare-event label by construction -- a sensor-"
+        "anomaly model trained on them will face severe class imbalance."
+    ),
+    (
+        "Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample "
+        "capped at 150k rows) and the hourly-window figure uses only the first 3000 chronological "
+        "points -- the diurnal-profile figure (`hourly`) IS a full-table groupBy average, not "
+        "sampled, so it is safe to use as-is; use the full-table `S` aggregate stats, not "
+        "`value_pdf`, for any threshold decision."
+    ),
+]
+if b.get("conflicting", 0) > 0:
+    _ml_readiness.append(
+        "Conflicting (frequency, datetime_utc) duplicates exist (see Data Quality) and must be "
+        "resolved deterministically before use as a training feature."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -573,6 +615,7 @@ write_profiling(
         ("Temporal", "\n".join(_temporal)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", _silver_md),
     ],
     figures=[

@@ -778,6 +778,47 @@ _silver.append(
     "- Out-of-range non-sentinel values are flagged as suspicious, not proven wrong -> keep raw + a quality flag."
 )
 
+_ml_readiness = [
+    (
+        "No candidate ML target lives in these tables -- they are raw per-station weather "
+        "measurements feeding the shared `dim_weather_context` conformed dimension, not a "
+        "labelled table."
+    ),
+    (
+        f"Grain: one row per (STATIONS_ID, MESS_DATUM) per measurement table ({', '.join(MEASUREMENTS)}) "
+        "-- a naive random row split leaks a station's neighbouring hourly rows across train/test; "
+        "any model consuming these features must split by STATIONS_ID or by contiguous date range, "
+        "never by row."
+    ),
+    (
+        "Leakage: QN_* quality flags are assigned by DWD's own QC process alongside the value and "
+        "must not be assumed available before the value itself; any forecasting/anomaly use case may "
+        "only use rows with MESS_DATUM strictly before the prediction timestamp as features."
+    ),
+    (
+        f"Join cardinality: cross-measurement joins on (STATIONS_ID, MESS_DATUM) are 1:1 where both "
+        f"measurements are present (confirmed in 04_dwd_relationships_and_findings.py), but station "
+        f"presence is uneven across the {len(all_stations)} stations (coverage matrix above) -- an "
+        "inner join across all 7 silently drops rows rather than exploding them."
+    ),
+    (
+        "Imbalance: not applicable -- no categorical target or grouping column in these tables; the "
+        "QN_* distribution shown under Data Quality is a quality flag, not a modelling target."
+    ),
+    (
+        "Sample-vs-full divergence: the value-column spread figure is drawn from `value_pdf`, a 5% "
+        "sample capped at 150k rows per measurement -- use the full-table `value_stats` "
+        "(min/max/mean/sd/percentiles/sentinel counts) above for any feature-quality decision, not the "
+        "sampled figure."
+    ),
+]
+if _any_conflict:
+    _ml_readiness.append(
+        "Conflicting (STATIONS_ID, MESS_DATUM) duplicates (see Data Quality) must be resolved "
+        "deterministically before use as a feature source -- an unresolved conflict silently "
+        "injects row-order-dependent noise."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -789,6 +830,7 @@ write_profiling(
         ("Coverage", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", "\n".join(f"- {ln}" for ln in findings_lines)),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[

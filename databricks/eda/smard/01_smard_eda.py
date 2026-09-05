@@ -718,6 +718,48 @@ if _low_cov:
         "- Expect and preserve gaps in series; do not forward-fill without a stated rule."
     )
 
+_ml_readiness = [
+    (
+        f"Candidate target signals: any `metric` representing an actual outcome (e.g. realised "
+        f"generation/consumption/price) is a plausible forecasting target keyed by "
+        f"(metric, region, resolution, timestamp_utc); metrics present are {metrics}."
+    ),
+    (
+        "Leakage: if any metric pair represents a forecast vs. an actual for the same underlying "
+        "quantity, the forecast series must not be used as a feature to predict the actual at a "
+        "timestamp on or after its own publication time, and vice versa -- verify metric semantics "
+        "before pairing them as feature/target."
+    ),
+    (
+        f"Grain and entity-grouped split: series key = {SERIES_KEY} -- split by series (metric, "
+        "filter_id, region, resolution), not by row or by shuffled timestamp, since a series' own "
+        "points are temporally correlated and a row-level split would leak adjacent timestamps across "
+        "train/test."
+    ),
+    (
+        "Join cardinality: this notebook does not join SMARD data to another Bronze table -- "
+        "cross-source join cardinality (e.g. to weather or grid-operator data) is unassessed here "
+        "and must be verified before using SMARD as a joined feature source."
+    ),
+    (
+        "Imbalance: not applicable -- `value` is continuous, not a categorical target; metric/region/"
+        "resolution cardinality is reported under Coverage, not as a class-balance concern."
+    ),
+    (
+        "Sample-vs-full divergence: the value-distribution figure draws from `value_pdf`, a 10% "
+        "sample capped at 200k rows, and the time-series figure (`ts_pdf`) shows only each metric's "
+        "first 3000 chronological points -- neither is representative of the full series' later "
+        "history; use the full-table `by_metric` aggregates (min/max/mean/sd/percentiles) for any "
+        "feature-quality decision."
+    ),
+]
+if db["conflicting"]:
+    _ml_readiness.append(
+        f"{db['conflicting']} (series, timestamp_utc) keys have conflicting values (see Data "
+        "Quality) -- these must be resolved deterministically before use as a training label; an "
+        "unresolved conflict would otherwise let the label-selection rule vary silently."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -730,6 +772,7 @@ write_profiling(
         ("Coverage", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[

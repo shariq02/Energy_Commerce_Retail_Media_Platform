@@ -616,6 +616,42 @@ _silver.append(
     "- Missingness is time-varying (year plots) -> no uniform-completeness assumption; any imputation is an explicit, evidenced choice."
 )
 
+_ml_readiness = [
+    (
+        "Candidate target signal: `dwd_missing_value_periods` is itself a natural label source for "
+        "a missingness/outage-prediction use case (predict whether a station x parameter will enter "
+        "a reported gap); the observed -999/blank rate per (measurement.column) is an alternative, "
+        "denser target for the same question."
+    ),
+    (
+        "Leakage: a reported period's von/bis window is only known once DWD has closed the gap -- "
+        "using `dwd_missing_value_periods` rows as a feature to predict the very same gap they "
+        "describe is circular; a forecasting model may only use periods with bis_datum strictly "
+        "before the prediction point."
+    ),
+    (
+        "Grain and entity-grouped split: reported periods and per-station rollups are keyed by "
+        "(station, parameter); split any model of this data by station id, not by row, so a station's "
+        "reported periods don't leak across train/test."
+    ),
+    (
+        f"Join cardinality: the station x parameter reconciliation join ({obs_no_report} observed-"
+        f"without-report, {report_no_obs} reported-without-observed cases) is 1:1 per (station, "
+        "parameter) pair by construction, but the two sides disagree for a nontrivial share of "
+        "pairs -- treat REPORTED and OBSERVED as two different signals, not one validated join."
+    ),
+    (
+        f"Imbalance: reported periods are concentrated per station/parameter ({mv_per_station}, "
+        f"{mv_per_param}) -- a station/parameter-level classifier for 'has a reported gap' would "
+        "see a skewed positive rate; check this before choosing a class-imbalance strategy."
+    ),
+    (
+        "Sample-vs-full divergence: not applicable -- every stat in this notebook (reported-period "
+        "table, per-station rollups, yearly rates) is computed from a full Spark scan or a full "
+        "collected small table, no `.sample()`/`.limit()` subset is used for any reported statistic."
+    ),
+]
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -626,6 +662,7 @@ write_profiling(
         ("Temporal", "\n".join(_temporal)),
         ("Distributions", "\n".join(_dist)),
         ("Domain Findings", "\n".join(_dom)),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         (
             "EDA Findings",
             "\n".join(

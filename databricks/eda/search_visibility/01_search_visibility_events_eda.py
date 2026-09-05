@@ -674,6 +674,51 @@ if bad_ratio or _neg:
         "- Add validity flags for clicks<=impressions and non-negative metrics."
     )
 
+_ml_readiness = [
+    (
+        "Candidate target signals: `clicks`, `clickThrough` (CTR), and `position` per url are "
+        "plausible forecasting/ranking-optimisation targets, keyed by the candidate key "
+        f"{KEY}."
+    ),
+    (
+        "Leakage: search `position`/`index` are themselves influenced by prior clicks/CTR in most "
+        "search-ranking systems -- using a concurrent-period position as a feature to predict CTR "
+        "(or vice versa) risks a feedback-loop leak; any predictive use case must use position/CTR "
+        "from a period strictly before the target period, not the same monthly archive."
+    ),
+    (
+        f"Grain and entity-grouped split: candidate key = {KEY}, with `date` being a "
+        f"{'monthly' if len(dom) <= 1 else 'daily/other'} archive marker, not a daily timestamp -- "
+        "split by repository_id or url (not by row), so a url's monthly history stays on one side of "
+        "a split."
+    ),
+    (
+        "Join cardinality: this notebook does not assess the events <-> repository join -- see "
+        "02_search_visibility_relationships_and_findings.py for the confirmed cardinality and "
+        "referential-integrity numbers before joining on repository_id."
+    ),
+    (
+        "Imbalance: not applicable -- clicks/impressions/position are continuous; country/device/"
+        "citableContent distributions (Coverage) are categorical breakdowns, not a modelling target."
+    ),
+    (
+        "Sample-vs-full divergence: the metric-distribution and clicks-vs-impressions figures draw "
+        "from `mp`, a 10% sample capped at 150k rows -- use the full-table `M` aggregate "
+        "(min/max/avg/percentiles per metric) above for any feature-quality or threshold decision, "
+        "not these sampled figures."
+    ),
+]
+if db["conflicting_metrics"]:
+    _ml_readiness.append(
+        f"{db['conflicting_metrics']} candidate-key groups have conflicting metric values (see "
+        "Data Quality) -- resolve deterministically before using this table as a training source."
+    )
+if bad_ratio:
+    _ml_readiness.append(
+        f"{bad_ratio} rows have clicks > impressions -- exclude or flag these before computing a "
+        "CTR-based target, since CTR > 1 is not a physically valid label."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -686,6 +731,7 @@ write_profiling(
         ("Coverage", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[

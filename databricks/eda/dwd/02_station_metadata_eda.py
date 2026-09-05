@@ -596,6 +596,48 @@ _silver.append(
     "- device_instrument / parameter_unit are small static lookups -> reference dimensions; reconcile parameter codes with the measurement value-column names (list above)."
 )
 
+_ml_readiness = [
+    (
+        f"Candidate target signal: station relocation events ({len(_relocations)} station(s) with "
+        ">1 location row) and name/operator change events "
+        f"({len(_renames)} station(s) with >1 distinct name) could support a change-detection use "
+        "case; treat as event indicators, not attributes of a static station dimension."
+    ),
+    (
+        "Leakage: station_geography and station_name_history are time-varying (von/bis validity "
+        "windows) -- joining a measurement row to a station's metadata must use the validity window "
+        "covering that row's MESS_DATUM, not the latest/current metadata row, or a future station "
+        "attribute (e.g. a later relocation's coordinates) would leak into a historical feature."
+    ),
+    (
+        "Grain and entity-grouped split: station_geography/station_name_history grain is one row "
+        "per (station, validity period), not one row per station -- any split for a model using "
+        "these attributes must group by station id, not by row, since multiple validity-period "
+        "rows for the same station must stay on the same side of a split."
+    ),
+    (
+        "Join cardinality: measurement -> metadata is 1:N fan-out for stations with relocations or "
+        "name changes (see Domain Findings) unless the join is scoped to the correct von/bis "
+        "window -- an un-windowed join is a cartesian-explosion risk for any station with >1 "
+        "metadata row."
+    ),
+    (
+        "Imbalance: not applicable -- no categorical target column; parameter_unit/device_instrument "
+        "are static reference lookups, not a modelling signal."
+    ),
+    (
+        "Sample-vs-full divergence: not applicable -- all four metadata tables are fully collected "
+        "(no sampling) since they are small; only the measurement-station union scan is a full Spark "
+        "pass, also unsampled."
+    ),
+]
+if any(v > 0 for v in meta_gaps.values()):
+    _ml_readiness.append(
+        f"Coverage gap: {meta_gaps} measurement stations have no metadata row in at least one "
+        "table -- a feature pipeline joining on station id must handle the resulting nulls "
+        "explicitly rather than silently dropping the station's fact rows."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -606,6 +648,7 @@ write_profiling(
         ("Entities / Keys", "\n".join(_entities)),
         ("Coverage", "\n".join(_gaps)),
         ("Domain Findings", "\n".join(_relo) + "\n\n" + "\n".join(_recon)),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         (
             "EDA Findings",
             "\n".join(

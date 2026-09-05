@@ -930,6 +930,57 @@ if sc["multi_user_sessions"]:
         "- Session grain must be (user_id, user_session), not user_session alone."
     )
 
+_ml_readiness = [
+    (
+        f"Candidate target signals: `event_type == 'purchase'` (session/user-level conversion "
+        f"prediction), repeat-purchase behaviour ({ur['repeat_buyers']} of {ur['buyers']} buyers "
+        "rebuy) for a churn/LTV use case, and session funnel completion "
+        f"(full_path={sc['full_path']} of {sc['sessions']} sessions) are all plausible targets."
+    ),
+    (
+        "Leakage: `has_view`/`has_cart`/`has_purchase` session flags are computed over the WHOLE "
+        "session regardless of event order -- a feature built this way for a mid-session purchase-"
+        "prediction task would include events that happen AFTER the purchase, which is leakage; any "
+        "such feature must be recomputed using only events with event_time strictly before the "
+        "prediction point in the session."
+    ),
+    (
+        f"Grain and entity-grouped split: grain is one row per event, but user_id "
+        f"(approx_distinct={approx_card.get('user_id')}) and user_session "
+        f"(approx_distinct={approx_card.get('user_session')}) are the real entities -- split by "
+        f"user_id (not by row or by session alone, since {ur['multi_session_users']} "
+        "users span multiple sessions), or a user's behaviour leaks across train/test."
+    ),
+    (
+        f"Imbalance: the event_type funnel is heavily skewed ({funnel}) -- purchases are a small "
+        "minority of events, so a purchase-prediction target will face severe class imbalance; do "
+        "not evaluate with plain accuracy."
+    ),
+    (
+        f"Product/category drift: {n_multi_cat} products have >1 category_id and {n_multi_brand} "
+        "have >1 brand over the observed period -- a static product-attribute join (rather than a "
+        "point-in-time/SCD join) risks using a category or brand value that did not exist yet at "
+        "the event's timestamp, a form of feature leakage for any category-based feature."
+    ),
+    (
+        "Sample-vs-full divergence: `price_pdf` is a 2% sample capped at 250k rows (clipped to "
+        "p99) and `session_events_sample` is a 2% sample capped at 200k rows -- use the full-table "
+        "`by_type_map`/session (`sc`)/user (`ur`) aggregates above for any feature-quality or "
+        "threshold decision, not these sampled figures."
+    ),
+]
+if dup_conflicting:
+    _ml_readiness.append(
+        f"{dup_conflicting} duplicate key groups have conflicting non-key values (see Data "
+        "Quality) -- resolve deterministically before using this table as a training source."
+    )
+if purch_no_cart or cart_no_view:
+    _ml_readiness.append(
+        f"In-session event order is not strictly funnel-ordered ({purch_no_cart} purchases with no "
+        f"prior cart, {cart_no_view} carts with no prior view) -- a sequence-based model must not "
+        "assume the canonical view->cart->purchase order holds for every session."
+    )
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -942,6 +993,7 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("Relationships", "\n".join(_rel)),
         ("EDA Findings", _findings_md),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[

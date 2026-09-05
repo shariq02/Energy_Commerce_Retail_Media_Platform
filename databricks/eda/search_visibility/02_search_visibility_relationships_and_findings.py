@@ -360,6 +360,42 @@ if unused_repo:
         "- Unused repository rows are acceptable as a dimension; no action required."
     )
 
+_ml_readiness = [
+    (
+        "No candidate ML target lives in the repository table itself -- it is a dimension; see "
+        "01_search_visibility_events_eda.py for target candidates (clicks/CTR/position)."
+    ),
+    (
+        f"Join cardinality: events <-> repository on repository_id is {kind}; "
+        f"{matched}/{ev_total} event rows ({matched / ev_total * 100:.2f}%) match a repository row -- "
+        f"the remaining {ev_total - matched} unmatched rows ({orphan_events} orphan repository_id "
+        "values) mean an inner join silently drops those events from any repository-attribute "
+        "feature; use a left join with an explicit unmatched flag instead."
+    ),
+    (
+        "Grain and entity-grouped split: repository is the entity that owns many url/date rows in "
+        "events -- split any repository-attribute-enriched model by repository_id, not by row, so "
+        "a repository's events stay together across train/test."
+    ),
+    (
+        f"Leakage: {'repository key is unique' if repo_key_unique else 'repository key is NOT unique'} "
+        f"in the repository table -- if not unique, a naive join fans out event rows across "
+        "duplicate repository rows, which can inflate a repository-level feature's effective "
+        "sample weight without that being a real signal."
+    ),
+    (
+        f"Coverage: {partial} of {len(event_repo_ids)} repositories have partial date/month coverage -- "
+        "a time-series feature per repository must not assume every repository has the same observed "
+        "span; missing months are a real absence, not a zero."
+    ),
+    "Imbalance: not applicable at this join-audit level -- see 01 for metric-level imbalance notes.",
+    (
+        "Sample-vs-full divergence: not applicable -- every statistic here (match rate, orphan counts, "
+        "per-repository coverage) is computed from a full Spark aggregation or a fully collected small "
+        "repository table, no `.sample()`/`.limit()` subset feeds any reported number."
+    ),
+]
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -368,6 +404,7 @@ write_profiling(
         ("Entities / Keys", "\n".join(_entities)),
         ("Relationships", "\n".join(_rel)),
         ("EDA Findings", _findings_md),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[

@@ -530,6 +530,48 @@ _silver.append(
     "- A cross-measurement wide 'all weather at station S, hour H' table drops rows (overlap numbers above) -> that is a Gold consolidation, not Silver."
 )
 
+_ml_readiness = [
+    (
+        "No candidate ML target lives across these 7 measurement + metadata tables -- this notebook "
+        "is a joinability audit, not a labelled-outcome source."
+    ),
+    (
+        f"Grain and entity-grouped split: (STATIONS_ID, MESS_DATUM) is unique within every "
+        f"measurement ({all(key_unique.values())}) -- a station-level (not row-level) split is "
+        "still required for any downstream model combining these tables, since a station's rows "
+        "are correlated across measurements and across time."
+    ),
+    (
+        "Join cardinality: measurement -> metadata is 1:1 only where "
+        f"{[k for k, v in meta_card.items() if v['max'] == 1]}; "
+        f"{[k for k, v in meta_card.items() if v['max'] > 1]} fan out (>1 row per station id) and "
+        "MUST be joined on the von/bis validity window, not station_id alone, or the join "
+        "cartesian-multiplies fact rows across every metadata version for that station."
+    ),
+    (
+        f"Cross-measurement join risk: the largest non-shared (station, MESS_DATUM) count in any "
+        f"measurement pair is {max_pair_only} -- an inner join to build a wide 'all weather at "
+        "station S, hour H' table silently drops that tail; this is a sample-vs-full divergence "
+        "risk for any feature built from the wide join rather than the per-measurement full table."
+    ),
+    (
+        f"Leakage: all 7 measurements have disjoint value-column sets ({schema_disjoint}) so there "
+        "is no direct column-overlap leakage risk between them, but referential-integrity orphans "
+        f"({ {k: v[0] for k, v in ref_integrity.items()} }) mean a left join can introduce nulls "
+        "that a naive imputation could turn into leaked population statistics if computed after "
+        "the train/test split rather than before it."
+    ),
+    (
+        "Imbalance: not applicable -- no categorical target; `city` is checked for a 1:1 station "
+        "mapping (see Findings) as a structural consistency check, not a class-balance concern."
+    ),
+    (
+        "Sample-vs-full divergence: not applicable -- every statistic here (station sets, overlap "
+        "counts, cardinality) is computed from a full Spark aggregation or a fully collected small "
+        "set, no `.sample()`/`.limit()` subset feeds any reported number."
+    ),
+]
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -538,6 +580,7 @@ write_profiling(
         ("Entities / Keys", "\n".join(_ent)),
         ("Relationships", "\n".join(_rel)),
         ("EDA Findings", "\n".join(_verdict)),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[

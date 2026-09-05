@@ -460,6 +460,44 @@ if any(v < 100 for v in _ewr.values()):
         "- Use outer joins (not inner) when combining energy and weather to retain unmatched rows."
     )
 
+_ml_readiness = [
+    (
+        "No candidate ML target lives across these 7 tables directly -- this notebook is a joinability "
+        "audit; see 01_energy_eda.py and 02_weather_eda.py for per-table target candidates."
+    ),
+    (
+        f"Join cardinality: (frequency, datetime_utc) is unique in every table "
+        f"({all(key_unique.values())}), so all pairwise and 7-way joins are 1:1 on the shared key -- "
+        "no cartesian-explosion risk from fan-out, but the join is NOT complete: only "
+        f"{seven_ct} of {union_ct} keys ({seven_ct / union_ct * 100:.1f}%) are present in all 7 "
+        "tables, so an inner 7-way join drops the rest."
+    ),
+    (
+        f"Energy<->weather join yield (the join a combined energy+weather model would use): "
+        f"{_ewr} -- any energy table with <100% match will silently lose rows on an inner join; use "
+        "an outer join and an explicit missing-weather flag instead."
+    ),
+    (
+        "Grain and entity-grouped split: shared key = (frequency, datetime_utc) across all 7 tables -- "
+        "any model combining them must split by contiguous date range, not by row, so a timestamp's "
+        "energy and weather readings stay together on the same side of a split."
+    ),
+    (
+        "Leakage: because energy and weather share the same timestamp grid, a same-timestamp weather "
+        "feature is legitimate for predicting same-timestamp energy, but a model must not be fed a "
+        "later timestamp's energy or weather value when predicting an earlier one."
+    ),
+    (
+        "Imbalance: not applicable at this cross-table level -- see per-table stuck-run/outlier "
+        "imbalance notes in 01_energy_eda.py and 02_weather_eda.py."
+    ),
+    (
+        "Sample-vs-full divergence: not applicable -- every statistic here (key presence, pairwise "
+        "overlap, join yield) is computed from a full Spark aggregation over the tagged-union presence "
+        "matrix, no `.sample()`/`.limit()` subset feeds any reported number."
+    ),
+]
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -468,6 +506,7 @@ write_profiling(
         ("Entities / Keys", "\n".join(_ek)),
         ("Relationships", "\n".join(_rel)),
         ("EDA Findings", _findings_md + "\n\n" + "\n".join(_verdict)),
+        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=[
