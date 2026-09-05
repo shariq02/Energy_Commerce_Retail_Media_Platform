@@ -123,10 +123,21 @@ def sanitize_columns(df: DataFrame) -> tuple[DataFrame, dict[str, str]]:
 
 
 def read_dataset(files: list[str]) -> DataFrame:
+    # Read each chunk file separately and combine by column name rather than
+    # passing all files to one reader.csv(files) call. Staged MaStR chunks
+    # can have differently ordered headers -- optional XML fields are
+    # sometimes absent from a record, shifting the remaining tags' order --
+    # and Spark's multi-file CSV reader requires every file's header to
+    # match the first file's column order exactly, failing the whole
+    # dataset on any such drift (observed on marktakteure and lokationen).
     reader = spark.read
     for key, value in CSV_OPTIONS.items():
         reader = reader.option(key, value)
-    return reader.csv(files)
+    frames = [reader.csv(f) for f in files]
+    df = frames[0]
+    for other in frames[1:]:
+        df = df.unionByName(other, allowMissingColumns=True)
+    return df
 
 
 # COMMAND ----------
