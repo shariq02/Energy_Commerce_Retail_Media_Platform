@@ -384,7 +384,10 @@ for m in MEASUREMENTS:
         continue
     w = Window.partitionBy("station").orderBy("ts")
     per_station = (
-        df.select(F.col(sid).alias("station"), as_ts(dts).alias("ts"))
+        df.select(
+            F.col(sid).alias("station"),
+            F.to_timestamp(F.substring(F.col(dts), 1, 10), "yyyyMMddHH").alias("ts")
+        )
         .where(F.col("ts").isNotNull())
         .distinct()
         .withColumn(

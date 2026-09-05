@@ -295,8 +295,8 @@ for name, df in frames.items():
     per_col = {}
     for c in dcols:
         parsed = F.coalesce(
-            F.to_date(F.col(c).cast("string"), "yyyyMMdd"),
-            F.to_date(F.col(c).cast("string")),
+            F.try_to_timestamp(F.col(c).cast("string"), F.lit("yyyyMMdd")),
+            F.try_to_timestamp(F.col(c).cast("string")),
         )
         g = (
             df.select(F.year(parsed).alias("yr"))

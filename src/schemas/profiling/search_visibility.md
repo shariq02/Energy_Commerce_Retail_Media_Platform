@@ -160,6 +160,16 @@ CTR by rounded position:
 - 469515 candidate-key groups have conflicting metric values.
 - CTR decreases monotonically with search position (expected ranking behaviour).
 
+### ML-Readiness Evidence
+
+- Candidate target signals: `clicks`, `clickThrough` (CTR), and `position` per url are plausible forecasting/ranking-optimisation targets, keyed by the candidate key ['repository_id', 'url', 'date', 'country', 'device'].
+- Leakage: search `position`/`index` are themselves influenced by prior clicks/CTR in most search-ranking systems -- using a concurrent-period position as a feature to predict CTR (or vice versa) risks a feedback-loop leak; any predictive use case must use position/CTR from a period strictly before the target period, not the same monthly archive.
+- Grain and entity-grouped split: candidate key = ['repository_id', 'url', 'date', 'country', 'device'], with `date` being a daily/other archive marker, not a daily timestamp -- split by repository_id or url (not by row), so a url's monthly history stays on one side of a split.
+- Join cardinality: this notebook does not assess the events <-> repository join -- see 02_search_visibility_relationships_and_findings.py for the confirmed cardinality and referential-integrity numbers before joining on repository_id.
+- Imbalance: not applicable -- clicks/impressions/position are continuous; country/device/citableContent distributions (Coverage) are categorical breakdowns, not a modelling target.
+- Sample-vs-full divergence: the metric-distribution and clicks-vs-impressions figures draw from `mp`, a 10% sample capped at 150k rows -- use the full-table `M` aggregate (min/max/avg/percentiles per metric) above for any feature-quality or threshold decision, not these sampled figures.
+- 469515 candidate-key groups have conflicting metric values (see Data Quality) -- resolve deterministically before using this table as a training source.
+
 ### Silver Implications
 
 - Model `date` as a monthly period; Silver grain = one row per ['repository_id', 'url', 'date', 'country', 'device'].
@@ -215,6 +225,16 @@ Repositories not present in every date/month: 27 of 28.
 
 - 36 repository rows are never referenced by any event.
 - 27 repositories have partial date/month coverage.
+
+### ML-Readiness Evidence
+
+- No candidate ML target lives in the repository table itself -- it is a dimension; see 01_search_visibility_events_eda.py for target candidates (clicks/CTR/position).
+- Join cardinality: events <-> repository on repository_id is 1:N (one repository -> many events); 111863691/111863691 event rows (100.00%) match a repository row -- the remaining 0 unmatched rows (0 orphan repository_id values) mean an inner join silently drops those events from any repository-attribute feature; use a left join with an explicit unmatched flag instead.
+- Grain and entity-grouped split: repository is the entity that owns many url/date rows in events -- split any repository-attribute-enriched model by repository_id, not by row, so a repository's events stay together across train/test.
+- Leakage: repository key is unique in the repository table -- if not unique, a naive join fans out event rows across duplicate repository rows, which can inflate a repository-level feature's effective sample weight without that being a real signal.
+- Coverage: 27 of 28 repositories have partial date/month coverage -- a time-series feature per repository must not assume every repository has the same observed span; missing months are a real absence, not a zero.
+- Imbalance: not applicable at this join-audit level -- see 01 for metric-level imbalance notes.
+- Sample-vs-full divergence: not applicable -- every statistic here (match rate, orphan counts, per-repository coverage) is computed from a full Spark aggregation or a fully collected small repository table, no `.sample()`/`.limit()` subset feeds any reported number.
 
 ### Silver Implications
 

@@ -79,3 +79,6 @@ markers = [
     "data_quality: Data quality tests",
     "data_flow: Data flow tests",
 ]
+
+[tool.databricks.environment]
+environment_version = '5'

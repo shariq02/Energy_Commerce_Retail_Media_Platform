@@ -87,6 +87,18 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 - 937 sessions span more than one user_id.
 - 102 sessions show same-timestamp event bursts (likely bot/instrumentation).
 
+### ML-Readiness Evidence
+
+- Candidate target signals: `event_type == 'purchase'` (session/user-level conversion prediction), repeat-purchase behaviour (295325 of 697470 buyers rebuy) for a churn/LTV use case, and session funnel completion (full_path=937336 of 23016651 sessions) are all plausible targets.
+- Leakage: `has_view`/`has_cart`/`has_purchase` session flags are computed over the WHOLE session regardless of event order -- a feature built this way for a mid-session purchase-prediction task would include events that happen AFTER the purchase, which is leakage; any such feature must be recomputed using only events with event_time strictly before the prediction point in the session.
+- Grain and entity-grouped split: grain is one row per event, but user_id (approx_distinct=5291243) and user_session (approx_distinct=22303598) are the real entities -- split by user_id (not by row or by session alone, since 3057138 users span multiple sessions), or a user's behaviour leaks across train/test.
+- Join cardinality: this notebook profiles a single Bronze table with no join to another table performed here -- product_id/category_id/brand are event-level attributes, not a separate dimension table in this source, so no fan-out risk exists at this stage; if a future Silver/Gold model joins these events to an external product catalog, that join's cardinality is unassessed and must be verified before use.
+- Imbalance: the event_type funnel is heavily skewed ([('view', 104335509), ('cart', 3955446), ('purchase', 1659788)]) -- purchases are a small minority of events, so a purchase-prediction target will face severe class imbalance; do not evaluate with plain accuracy.
+- Product/category drift: 22 products have >1 category_id and 277 have >1 brand over the observed period -- a static product-attribute join (rather than a point-in-time/SCD join) risks using a category or brand value that did not exist yet at the event's timestamp, a form of feature leakage for any category-based feature.
+- Sample-vs-full divergence: `price_pdf` is a 2% sample capped at 250k rows (clipped to p99) and `session_events_sample` is a 2% sample capped at 200k rows -- use the full-table `by_type_map`/session (`sc`)/user (`ur`) aggregates above for any feature-quality or threshold decision, not these sampled figures.
+- 12 duplicate key groups have conflicting non-key values (see Data Quality) -- resolve deterministically before using this table as a training source.
+- In-session event order is not strictly funnel-ordered (539567 purchases with no prior cart, 29848 carts with no prior view) -- a sequence-based model must not assume the canonical view->cart->purchase order holds for every session.
+
 ### Silver Implications
 
 - De-duplicate ['user_session', 'product_id', 'event_type', 'event_time'] with a deterministic rule; conflicting rows need explicit handling.

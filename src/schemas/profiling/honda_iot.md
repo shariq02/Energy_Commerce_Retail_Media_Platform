@@ -81,6 +81,15 @@ P<->W value relationship per metric (matched rows on (frequency, datetime_utc) +
 
 P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 
+### ML-Readiness Evidence
+
+- Candidate target signals: the stuck-sensor flags and 5-sigma outlier counts computed above ({'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}) are natural labels for a sensor-anomaly-detection use case; the value columns themselves (electricity/heating/cooling P and W) are candidate forecasting targets keyed by (frequency, datetime_utc).
+- Leakage: P and W tables per metric are schema-identical and highly correlated (Pearson corr in `pw_rel` = {'electricity': {'matched': 3417956, 'corr_total': -0.3205019774045346, 'corr_PV': 0.12364898401544824, 'corr_CHP': -0.0010890810054510877}, 'heating': {'matched': 3417946, 'corr_total': -0.0609501173806899, 'corr_CHP_heat': 0.012587110363189692, 'corr_CHP_elec': -0.0011254584876038121}, 'cooling': {'matched': 3417895, 'corr_total': -0.0272440113236412, 'corr_cool_elec': -0.014216150000299979}}) -- verify whether P and W are independent physical measurements or one is a unit-derived transform of the other before using both as separate features; if derived, using one to predict the other is circular, not genuine signal.
+- Grain and entity-grouped split: key = ['frequency', 'datetime_utc'] per table, no separate device/sensor id -- split by contiguous date range, not by row, and never mix `frequency` values within one split since 1min/15min/1h are different physical resolutions of the same underlying signal.
+- Join cardinality: P<->W join per metric is 1:1 on (frequency, datetime_utc) confirmed by matched-row counts and schema parity above -- safe to join without fan-out risk.
+- Imbalance: stuck-run and 5-sigma-outlier flags are rare-event labels by construction ({'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}) -- an anomaly-detection model trained on these will face severe class imbalance; do not evaluate with plain accuracy.
+- Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample capped at 150k rows), the hourly time-series figure uses only the first 2000 chronological points per table, and the P-vs-W scatter uses a 10% sample capped at 20k rows -- none of these are representative of the full series; use the full-table `value_stats`/`outliers`/`continuity` aggregates for any feature-quality or threshold decision.
+
 ### EDA Findings
 
 - dup composition: {'electricity_p': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'electricity_w': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_p': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_w': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_p': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_w': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}}
@@ -171,6 +180,15 @@ Stuck runs (>=12 identical consecutive values, 1h partition): {'WeatherStation_W
 
 - Sensor stuck-runs detected (1h): {'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}.
 
+### ML-Readiness Evidence
+
+- Candidate target signals: Ta (air temperature) and Igm (global irradiance) are candidate forecasting targets keyed by (frequency, datetime_utc); the stuck-run flags ({'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}) are a candidate anomaly-detection label.
+- Leakage: this table is the weather side of the energy<->weather join analysed in 03_honda_relationships_and_findings.py -- using same-timestamp weather to predict same-timestamp energy is legitimate, but using a later weather reading (or a diurnal profile averaged over the FULL history) to predict an earlier energy reading would leak future information; any diurnal/seasonal feature must be computed only from data available before the prediction point.
+- Grain and entity-grouped split: key = (frequency, datetime_utc), single weather source (no station id) -- split by contiguous date range, not by row, and never mix `frequency` values within one split.
+- Join cardinality: this notebook does not assess the energy<->weather join cardinality -- see 03_honda_relationships_and_findings.py for the confirmed match rate; do not assume a 1:1 join without checking that notebook's yield numbers first.
+- Imbalance: stuck-run flags ({'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}) are a rare-event label by construction -- a sensor-anomaly model trained on them will face severe class imbalance.
+- Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample capped at 150k rows) and the hourly-window figure uses only the first 3000 chronological points -- the diurnal-profile figure (`hourly`) IS a full-table groupBy average, not sampled, so it is safe to use as-is; use the full-table `S` aggregate stats, not `value_pdf`, for any threshold decision.
+
 ### Figure -- Honda weather -- frequency overview
 
 ![Honda weather -- frequency overview](figures/honda_weather_frequency.png)
@@ -253,6 +271,16 @@ Pairwise shared-key counts:
 3417894 of 3419508 keys (100.0%) are present in all 7 tables.
 Energy<->weather match rate: {'electricity_p': 100.0, 'electricity_w': 100.0, 'heating_p': 100.0, 'heating_w': 100.0, 'cooling_p': 100.0, 'cooling_w': 100.0}.
 A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)' table is feasible on the intersection but drops the non-overlapping tail; the natural Silver grain is one fact per dataset (or per metric joining P+W), with the wide table left to Gold.
+
+### ML-Readiness Evidence
+
+- No candidate ML target lives across these 7 tables directly -- this notebook is a joinability audit; see 01_energy_eda.py and 02_weather_eda.py for per-table target candidates.
+- Join cardinality: (frequency, datetime_utc) is unique in every table (True), so all pairwise and 7-way joins are 1:1 on the shared key -- no cartesian-explosion risk from fan-out, but the join is NOT complete: only 3417894 of 3419508 keys (100.0%) are present in all 7 tables, so an inner 7-way join drops the rest.
+- Energy<->weather join yield (the join a combined energy+weather model would use): {'electricity_p': 100.0, 'electricity_w': 100.0, 'heating_p': 100.0, 'heating_w': 100.0, 'cooling_p': 100.0, 'cooling_w': 100.0} -- any energy table with <100% match will silently lose rows on an inner join; use an outer join and an explicit missing-weather flag instead.
+- Grain and entity-grouped split: shared key = (frequency, datetime_utc) across all 7 tables -- any model combining them must split by contiguous date range, not by row, so a timestamp's energy and weather readings stay together on the same side of a split.
+- Leakage: because energy and weather share the same timestamp grid, a same-timestamp weather feature is legitimate for predicting same-timestamp energy, but a model must not be fed a later timestamp's energy or weather value when predicting an earlier one.
+- Imbalance: not applicable at this cross-table level -- see per-table stuck-run/outlier imbalance notes in 01_energy_eda.py and 02_weather_eda.py.
+- Sample-vs-full divergence: not applicable -- every statistic here (key presence, pairwise overlap, join yield) is computed from a full Spark aggregation over the tagged-union presence matrix, no `.sample()`/`.limit()` subset feeds any reported number.
 
 ### Silver Implications
 
