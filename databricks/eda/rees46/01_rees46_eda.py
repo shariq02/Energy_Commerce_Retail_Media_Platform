@@ -952,6 +952,13 @@ _ml_readiness = [
         "users span multiple sessions), or a user's behaviour leaks across train/test."
     ),
     (
+        "Join cardinality: this notebook profiles a single Bronze table with no join to another "
+        "table performed here -- product_id/category_id/brand are event-level attributes, not a "
+        "separate dimension table in this source, so no fan-out risk exists at this stage; if a "
+        "future Silver/Gold model joins these events to an external product catalog, that join's "
+        "cardinality is unassessed and must be verified before use."
+    ),
+    (
         f"Imbalance: the event_type funnel is heavily skewed ({funnel}) -- purchases are a small "
         "minority of events, so a purchase-prediction target will face severe class imbalance; do "
         "not evaluate with plain accuracy."
