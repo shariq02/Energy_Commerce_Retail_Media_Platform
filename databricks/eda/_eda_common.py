@@ -209,7 +209,14 @@ def _save_and_show(fig, filename):
 
 
 def barplot(
-    pairs, title, xlabel, ylabel="count", rot=0, figsize=(10, 4), filename=None
+    pairs,
+    title,
+    xlabel,
+    ylabel="count",
+    rot=0,
+    figsize=(10, 4),
+    logy=False,
+    filename=None,
 ):
     # Returns True only if a figure with data was written -- callers gate the
     # markdown figure reference on the return value so an empty result never
@@ -224,8 +231,53 @@ def barplot(
         pairs = pairs[:MAX_XTICKS]
     fig, ax = plt.subplots(figsize=figsize)
     ax.bar(range(len(pairs)), [p[1] for p in pairs])
+    if logy:
+        ax.set_yscale("log")
     _apply_xlabels(ax, [p[0] for p in pairs], rot)
     ax.set_title(title + (f"  (+{hidden} more not shown)" if hidden else ""))
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    fig.tight_layout()
+    _save_and_show(fig, filename)
+    return True
+
+
+def histplot(
+    values, title, xlabel, bins=50, logy=False, figsize=(10, 4), filename=None
+):
+    values = [x for x in values if x is not None]
+    if not values:
+        print(f"  histplot: no data -> {filename} (figure not written)")
+        return False
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.hist(values, bins=bins, log=logy)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("count")
+    fig.tight_layout()
+    _save_and_show(fig, filename)
+    return True
+
+
+def lineplot(
+    pairs, title, xlabel, ylabel="value", rot=90, figsize=(13, 4), filename=None
+):
+    # pairs: [(x_label, y), ...] plotted in the given order.
+    pairs = [p for p in pairs if p is not None]
+    if not pairs:
+        print(f"  lineplot: no data -> {filename} (figure not written)")
+        return False
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(range(len(pairs)), [p[1] for p in pairs], linewidth=0.9)
+    step = max(1, len(pairs) // MAX_XTICKS)
+    ax.set_xticks(range(0, len(pairs), step))
+    ax.set_xticklabels(
+        [str(pairs[i][0]) for i in range(0, len(pairs), step)],
+        rotation=rot,
+        ha="right" if rot else "center",
+        fontsize=7,
+    )
+    ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     fig.tight_layout()
@@ -276,6 +328,24 @@ def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
 
     src = groups.items() if hasattr(groups, "items") else groups
     return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
+
+
+def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
+    # {panel_title: [values]} -> one histogram per panel. A panel with no
+    # (non-None) values is dropped; the whole figure is skipped (returns False,
+    # nothing written) when every panel is empty.
+    def _mk(vals):
+        vals = [v for v in (vals or []) if v is not None]
+        if not vals:
+            return None
+
+        def draw(ax):
+            ax.hist(vals, bins=bins, log=logy)
+
+        return draw
+
+    src = groups.items() if hasattr(groups, "items") else groups
+    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
 
 
 def lines_grid(series, suptitle, filename, ncols=4, panel=(4.0, 2.6)):
@@ -693,15 +763,31 @@ _STEP_SECONDS = {
 }
 
 
+def _step_seconds(step):
+    return _STEP_SECONDS.get(step, step if isinstance(step, int) else None)
+
+
 def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end=None):
     # Coverage of a fixed-step series measured against an INDEPENDENT expected
     # grid: expected = floor((max_ts - min_ts) / step) + 1, NOT the observed
     # distinct-timestamp count (which makes coverage tautologically 100%).
-    # Pass grid_start/grid_end (ISO strings) to measure against a known
-    # collection window instead of the series' own first/last row.
-    step_s = _STEP_SECONDS.get(step, step if isinstance(step, int) else None)
-    if step_s is None:
-        raise ValueError(f"unknown step: {step!r}")
+    # `step` is a label / seconds int, OR a {entity_value: label|seconds} dict
+    # when one call covers several fixed steps (e.g. a table holding 1min +
+    # 15min + 1h partitions). grid_start/grid_end (ISO strings) measure against
+    # a known collection window instead of the series' own first/last row.
+    if isinstance(step, dict):
+        if entity_col is None:
+            raise ValueError("a per-entity step dict needs entity_col")
+        step_map = {str(k): _step_seconds(v) for k, v in step.items()}
+        step_s_col = F.lit(None).cast("long")
+        for k, v in step_map.items():
+            step_s_col = F.when(F.col("k") == F.lit(k), F.lit(v)).otherwise(step_s_col)
+    else:
+        s = _step_seconds(step)
+        if s is None:
+            raise ValueError(f"unknown step: {step!r}")
+        step_map = None
+        step_s_col = F.lit(s)
     t = (
         parse_ts_multi(ts_col)
         if dict(df.dtypes).get(ts_col) == "string"
@@ -723,14 +809,33 @@ def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end
         if grid_end
         else None
     )
+    # Gap profile from consecutive DISTINCT timestamps (one window pass): the
+    # largest gap in steps, and the share of intervals that are exactly one step.
+    from pyspark.sql import Window as _W
+
+    win = _W.partitionBy(*gkeys).orderBy("e") if gkeys else _W.orderBy("e")
+    dist = base.select(*gkeys, "e").distinct().withColumn("ss", step_s_col)
+    dist = dist.withColumn("d", F.col("e") - F.lag("e").over(win))
+    gap = dist.groupBy(*gkeys).agg(
+        F.first("ss").alias("ss"),
+        F.max(F.when(F.col("d") > F.col("ss"), (F.col("d") / F.col("ss")) - 1)).alias(
+            "gap_steps"
+        ),
+        F.sum((F.col("d") == F.col("ss")).cast("long")).alias("on_step"),
+        F.sum(F.col("d").isNotNull().cast("long")).alias("intervals"),
+    )
     g = base.groupBy(*gkeys).agg(
         F.min("e").alias("mn"),
         F.max("e").alias("mx"),
         F.countDistinct("e").alias("obs"),
     )
+    if gkeys:
+        g = g.join(gap, on=gkeys, how="left")
+    else:
+        g = g.crossJoin(gap)
     lo = start_e if start_e is not None else F.col("mn")
     hi = end_e if end_e is not None else F.col("mx")
-    g = g.withColumn("expected", F.floor((hi - lo) / F.lit(step_s)) + F.lit(1))
+    g = g.withColumn("expected", F.floor((hi - lo) / F.col("ss")) + F.lit(1))
     g = g.withColumn(
         "coverage_pct",
         F.round(F.least(F.col("obs") / F.col("expected"), F.lit(1.0)) * 100, 2),
@@ -743,6 +848,14 @@ def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end
             "expected": int(r["expected"]) if r["expected"] is not None else None,
             "coverage_pct": r["coverage_pct"],
             "missing": int(r["missing"]) if r["missing"] is not None else None,
+            "longest_gap_steps": (
+                round(r["gap_steps"], 1) if r["gap_steps"] is not None else 0.0
+            ),
+            "on_step_pct": (
+                round(r["on_step"] / r["intervals"] * 100, 2)
+                if r["intervals"]
+                else None
+            ),
         }
         for r in rows
     }
@@ -750,7 +863,7 @@ def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end
         v["coverage_pct"] for v in per_entity.values() if v["coverage_pct"] is not None
     ]
     return {
-        "step_seconds": step_s,
+        "step_seconds": step_map if step_map is not None else _step_seconds(step),
         "grid_start": grid_start,
         "grid_end": grid_end,
         "per_entity": per_entity,
@@ -831,6 +944,381 @@ def coverage_bias(counts):
 # COMMAND ----------
 
 # DBTITLE 1,Cross-source temporal overlap
+
+
+def _norm_token(s):
+    # Lower-case, drop every non-alphanumeric char -- so "Betriebs-Status" and
+    # "einheitbetriebsstatus" can be compared as substrings.
+    return _re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+
+def load_mastr_catalog(spark, catalog, schema="bronze"):
+    # Build the authoritative code sets from mastr_katalogwerte (+ its category
+    # names from mastr_katalogkategorien). Returns the global set of valid
+    # value-ids and, per category name, the ids in that category. The MaStR
+    # Gesamtdatenexport carries no explicit column -> category binding, so a
+    # column is matched to a category by NAME later (best-effort); membership in
+    # the global id set is the weaker but always-available fallback.
+    kw = spark.table(f"{catalog}.{schema}.mastr_katalogwerte")
+    kk = spark.table(f"{catalog}.{schema}.mastr_katalogkategorien")
+    kw_id = find_col(kw, "Id", "KatalogWertId", "Wert_Id", "KatalogwertId")
+    kw_cat = next((c for c in kw.columns if "kategorie" in c.lower()), None)
+    kw_name = find_col(kw, "Wert", "Name", "Bezeichnung", "Beschreibung")
+    kk_id = find_col(kk, "Id", "KatalogKategorieId", "KatalogkategorieId")
+    kk_name = find_col(kk, "Name", "Bezeichnung", "Kategorie", "KategorieName")
+    cat_name = {}
+    if kk_id and kk_name:
+        cat_name = {r[kk_id]: r[kk_name] for r in kk.select(kk_id, kk_name).collect()}
+    all_ids = set()
+    by_category = {}
+    labels = {}
+    sel = [c for c in (kw_id, kw_cat, kw_name) if c]
+    for r in kw.select(*sel).collect():
+        vid = None if r[kw_id] is None else str(r[kw_id]).strip()
+        if vid in (None, ""):
+            continue
+        all_ids.add(vid)
+        cn = cat_name.get(r[kw_cat], str(r[kw_cat])) if kw_cat else "__all"
+        by_category.setdefault(cn, set()).add(vid)
+        if kw_name:
+            labels.setdefault(cn, {})[vid] = r[kw_name]
+    return {
+        "all_ids": all_ids,
+        "by_category": by_category,
+        "category_labels": labels,
+        "n_values": len(all_ids),
+        "n_categories": len(by_category),
+    }
+
+
+def reconcile_codes(df, colname, catalog, category_hint=None):
+    # Compare the distinct values of a low-cardinality code column against the
+    # MaStR reference catalog. "coded" is True only when every non-empty value is
+    # an integer literal -- a free-text column is not a code column and is
+    # returned as coded=False (no false "unknown code" noise). When the column
+    # name matches a catalog category name, the check is scoped to that category;
+    # otherwise it falls back to global value-id membership, which cannot prove a
+    # code is valid FOR THIS column, only that MaStR uses it somewhere.
+    vc = df.groupBy(F.col(colname).cast("string").alias("v")).count().collect()
+    counts = {}
+    for r in vc:
+        v = r["v"].strip() if r["v"] is not None else None
+        counts[v] = counts.get(v, 0) + r["count"]
+    present = [v for v in counts if v not in (None, "")]
+    coded = bool(present) and all(_re.fullmatch(r"-?\d+", v) for v in present)
+    if not coded:
+        return {"column": colname, "coded": False, "distinct": len(present)}
+    hint = _norm_token(category_hint or colname)
+    cat_key, ref = None, catalog["all_ids"]
+    for k in catalog["by_category"]:
+        nk = _norm_token(k)
+        if nk and len(nk) >= 4 and (nk in hint or hint in nk):
+            cat_key, ref = k, catalog["by_category"][k]
+            break
+    unknown = sorted((v for v in present if v not in ref), key=lambda v: -counts[v])
+    return {
+        "column": colname,
+        "coded": True,
+        "distinct": len(present),
+        "matched_category": cat_key,
+        "checked_against": "category" if cat_key else "all catalog value-ids",
+        "unknown_values": unknown[:25],
+        "unknown_count": len(unknown),
+        "unknown_rows": sum(counts[v] for v in unknown),
+        "total_rows": sum(counts[v] for v in present),
+    }
+
+
+def cardinality_profile(child_df, ccol, child_key_set, parent_set):
+    # Full relationship cardinality, not just an orphan rate: child rows, distinct
+    # child keys, how many parent entities are actually referenced, and the
+    # child-rows-per-parent distribution (p50/p90/p99 + max fan-out). `ccol` is
+    # the FK on the child; because the FK value IS the parent key, rows grouped by
+    # `ccol` is exactly the per-parent child count.
+    key = F.col(ccol).cast("string")
+    per_key = (
+        child_df.where(key.isNotNull() & (F.trim(key) != ""))
+        .groupBy(key.alias("k"))
+        .count()
+    )
+    s = (
+        per_key.agg(
+            F.count(F.lit(1)).alias("keys"),
+            F.sum("count").alias("rows"),
+            F.max("count").alias("mx"),
+            F.expr("percentile_approx(count, 0.5)").alias("p50"),
+            F.expr("percentile_approx(count, 0.9)").alias("p90"),
+            F.expr("percentile_approx(count, 0.99)").alias("p99"),
+        )
+        .first()
+        .asDict()
+    )
+    matched = child_key_set & parent_set
+    return {
+        "child_rows": int(s["rows"] or 0),
+        "distinct_child_keys": int(s["keys"] or 0),
+        "matched_parent_keys": len(matched),
+        "orphan_child_keys": len(child_key_set - parent_set),
+        "parent_keys_total": len(parent_set),
+        "parent_keys_referenced_pct": (
+            round(len(matched) / len(parent_set) * 100, 3) if parent_set else None
+        ),
+        "child_rows_per_parent_p50": int(s["p50"] or 0),
+        "child_rows_per_parent_p90": int(s["p90"] or 0),
+        "child_rows_per_parent_p99": int(s["p99"] or 0),
+        "max_fanout": int(s["mx"] or 0),
+    }
+
+
+def date_order_check(df, earlier_col, later_col, formats=GERMAN_TS_FORMATS, label=None):
+    # Count rows where a date that must not be later than another one is. Both
+    # columns are multi-format parsed; only rows where BOTH parse are comparable.
+    e = parse_ts_multi(earlier_col, formats)
+    ln = parse_ts_multi(later_col, formats)
+    both = e.isNotNull() & ln.isNotNull()
+    r = (
+        df.select(e.alias("e"), ln.alias("l"))
+        .agg(
+            F.sum(both.cast("long")).alias("comparable"),
+            F.sum((both & (F.col("e") > F.col("l"))).cast("long")).alias("bad"),
+        )
+        .first()
+        .asDict()
+    )
+    comp = r["comparable"] or 0
+    bad = r["bad"] or 0
+    return {
+        "label": label or f"{earlier_col} <= {later_col}",
+        "earlier": earlier_col,
+        "later": later_col,
+        "comparable_rows": comp,
+        "violations": bad,
+        "violation_pct": round(bad / comp * 100, 3) if comp else None,
+    }
+
+
+def regime_population_shift(df, date_col, cols, cut_iso, formats=GERMAN_TS_FORMATS):
+    # Split rows on a documented date cut (e.g. the 2019 MaStR migration bulk
+    # load) and measure, per column, the null-rate and distinct-value count on
+    # each side -- so a "the 2019 records are structurally different" claim is
+    # backed by numbers, not narrative. `flipped` lists columns whose null-rate
+    # moves by >= 50 points across the cut.
+    d = parse_ts_multi(date_col, formats)
+    cut = F.lit(cut_iso).cast("timestamp")
+    side = F.when(d.isNull(), "undated").when(d < cut, "pre").otherwise("post")
+    cols = [c for c in cols if c in df.columns and c != date_col]
+    aggs = [F.count(F.lit(1)).alias("n")]
+    for c in cols:
+        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
+        aggs += [
+            F.sum(miss.cast("long")).alias(c + "__m"),
+            F.countDistinct(F.col(c)).alias(c + "__d"),
+        ]
+    rows = {
+        r["__s"]: r.asDict()
+        for r in df.withColumn("__s", side).groupBy("__s").agg(*aggs).collect()
+    }
+    pre, post = rows.get("pre"), rows.get("post")
+
+    def _rate(row, c):
+        return round(row[c + "__m"] / row["n"], 4) if row and row["n"] else None
+
+    per_column = {
+        c: {
+            "pre_null_rate": _rate(pre, c),
+            "post_null_rate": _rate(post, c),
+            "pre_distinct": pre[c + "__d"] if pre else None,
+            "post_distinct": post[c + "__d"] if post else None,
+        }
+        for c in cols
+    }
+    flipped = [
+        c
+        for c, v in per_column.items()
+        if v["pre_null_rate"] is not None
+        and v["post_null_rate"] is not None
+        and abs(v["pre_null_rate"] - v["post_null_rate"]) >= 0.5
+    ]
+    return {
+        "cut": cut_iso,
+        "pre_rows": (pre or {}).get("n", 0),
+        "post_rows": (post or {}).get("n", 0),
+        "undated_rows": (rows.get("undated") or {}).get("n", 0),
+        "per_column": per_column,
+        "flipped": flipped,
+    }
+
+
+def group_attribute_spread(df, group_col, value_col, transform=None):
+    # For each distinct `group_col`, how many distinct `value_col` (optionally
+    # transformed) does it carry -- an internal geographic / attribute
+    # consistency probe that needs no external reference. `inconsistent_groups`
+    # is the count with more than one, i.e. a contradiction within the entity.
+    g = F.col(group_col).cast("string")
+    v = F.col(value_col).cast("string")
+    if transform == "prefix2":
+        v = F.substring(F.regexp_replace(v, r"\s", ""), 1, 2)
+    valid = g.isNotNull() & (F.trim(g) != "") & v.isNotNull() & (F.trim(v) != "")
+    per = df.where(valid).groupBy(g.alias("g")).agg(F.countDistinct(v).alias("nd"))
+    r = (
+        per.agg(
+            F.count(F.lit(1)).alias("groups"),
+            F.sum((F.col("nd") > 1).cast("long")).alias("bad"),
+            F.max("nd").alias("mx"),
+        )
+        .first()
+        .asDict()
+    )
+    return {
+        "group_col": group_col,
+        "value_col": value_col,
+        "transform": transform,
+        "groups": int(r["groups"] or 0),
+        "inconsistent_groups": int(r["bad"] or 0),
+        "max_distinct_values_in_a_group": int(r["mx"] or 0),
+    }
+
+
+def monotonic_series_check(df, value_col, order_col, partition_col=None):
+    # Count steps where a series that must be non-decreasing (a cumulative meter)
+    # goes DOWN, ordered by `order_col` within each `partition_col`. Returns the
+    # comparable step count, the decreasing-step count, and the largest drop.
+    from pyspark.sql import Window as _W
+
+    v = F.col(value_col).cast("double")
+    keys = [partition_col] if partition_col else []
+    win = (
+        _W.partitionBy(*[F.col(k) for k in keys]).orderBy(order_col)
+        if keys
+        else _W.orderBy(order_col)
+    )
+    d = df.select(
+        *[F.col(k) for k in keys],
+        v.alias("__v"),
+        (v - F.lag(v).over(win)).alias("__d"),
+    )
+    r = (
+        d.agg(
+            F.sum(F.col("__d").isNotNull().cast("long")).alias("steps"),
+            F.sum((F.col("__d") < 0).cast("long")).alias("down"),
+            F.min("__d").alias("min_delta"),
+        )
+        .first()
+        .asDict()
+    )
+    steps = r["steps"] or 0
+    return {
+        "column": value_col,
+        "comparable_steps": steps,
+        "decreasing_steps": r["down"] or 0,
+        "decreasing_pct": round((r["down"] or 0) / steps * 100, 4) if steps else None,
+        "largest_drop": r["min_delta"],
+    }
+
+
+def numeric_order_check(df, smaller_col, larger_col):
+    # Count rows where a value that must not exceed another one does. Both cast to
+    # double; only rows where BOTH parse are comparable.
+    a = F.col(smaller_col).cast("double")
+    b = F.col(larger_col).cast("double")
+    both = a.isNotNull() & b.isNotNull()
+    r = (
+        df.agg(
+            F.sum(both.cast("long")).alias("comparable"),
+            F.sum((both & (a > b)).cast("long")).alias("bad"),
+        )
+        .first()
+        .asDict()
+    )
+    comp = r["comparable"] or 0
+    bad = r["bad"] or 0
+    return {
+        "label": f"{smaller_col} <= {larger_col}",
+        "smaller": smaller_col,
+        "larger": larger_col,
+        "comparable_rows": comp,
+        "violations": bad,
+        "violation_pct": round(bad / comp * 100, 4) if comp else None,
+    }
+
+
+def additive_identity_check(df, lhs_col, rhs_cols, rel_tol=0.02, abs_floor=1.0):
+    # Test a claimed additive identity  lhs ~ sum(rhs_cols)  row-by-row. Returns
+    # the share of comparable rows where the relative residual exceeds rel_tol
+    # (with an absolute floor so near-zero rows do not dominate), plus residual
+    # percentiles. All columns cast to double.
+    lhs = F.col(lhs_col).cast("double")
+    rhs = None
+    for c in rhs_cols:
+        term = F.col(c).cast("double")
+        rhs = term if rhs is None else rhs + term
+    comparable = lhs.isNotNull() & rhs.isNotNull()
+    resid = lhs - rhs
+    denom = F.greatest(F.abs(lhs), F.lit(float(abs_floor)))
+    rel = F.abs(resid) / denom
+    r = (
+        df.select(
+            comparable.alias("__c"),
+            resid.alias("__r"),
+            rel.alias("__rel"),
+        )
+        .agg(
+            F.sum(F.col("__c").cast("long")).alias("comparable"),
+            F.sum((F.col("__c") & (F.col("__rel") > rel_tol)).cast("long")).alias(
+                "bad"
+            ),
+            F.expr("percentile_approx(__r, array(0.01, 0.5, 0.99))").alias("resid_p"),
+            F.max(F.abs(F.col("__r"))).alias("max_abs_resid"),
+        )
+        .first()
+        .asDict()
+    )
+    comp = r["comparable"] or 0
+    return {
+        "identity": f"{lhs_col} = " + " + ".join(rhs_cols),
+        "comparable_rows": comp,
+        "violations": r["bad"] or 0,
+        "violation_pct": round((r["bad"] or 0) / comp * 100, 4) if comp else None,
+        "residual_p01_p50_p99": r["resid_p"],
+        "max_abs_residual": r["max_abs_resid"],
+        "rel_tol": rel_tol,
+    }
+
+
+def population_by_group(df, group_col, cols):
+    # Per distinct `group_col`: row count and, per column, null-rate + distinct
+    # count. The categorical-cut analogue of regime_population_shift -- use it
+    # when the regime boundary is a label (archive vintage, month, record type),
+    # not a date.
+    cols = [c for c in cols if c in df.columns and c != group_col]
+    aggs = [F.count(F.lit(1)).alias("__n")]
+    for c in cols:
+        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
+        aggs += [
+            F.sum(miss.cast("long")).alias(c + "__m"),
+            F.countDistinct(F.col(c)).alias(c + "__d"),
+        ]
+    rows = (
+        df.withColumn("__g", F.col(group_col).cast("string"))
+        .groupBy("__g")
+        .agg(*aggs)
+        .collect()
+    )
+    out = {}
+    for r in rows:
+        d = r.asDict()
+        n = d["__n"] or 0
+        out[d["__g"]] = {
+            "rows": n,
+            "columns": {
+                c: {
+                    "null_rate": round(d[c + "__m"] / n, 4) if n else None,
+                    "distinct": d[c + "__d"],
+                }
+                for c in cols
+            },
+        }
+    return out
 
 
 def cross_source_overlap(spans):

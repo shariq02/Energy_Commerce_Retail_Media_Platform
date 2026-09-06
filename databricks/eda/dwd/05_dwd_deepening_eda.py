@@ -12,27 +12,25 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** Profile the eight new DWD deepening measurement Bronze
-# MAGIC tables (dew_point, soil_temperature, visibility, cloud_type,
-# MAGIC wind_synop, extreme_wind, weather_phenomena, solar) and the new
-# MAGIC missing_value_periods metadata table added alongside the original
-# MAGIC seven measurements profiled in 01_weather_measurements_eda.py --
-# MAGIC schema, missingness, constant columns, station coverage, hourly
-# MAGIC frequency, per-station duplicates, value distributions -- as evidence
-# MAGIC for Silver design. Column semantics (units, plausibility bounds) are
-# MAGIC not assumed ahead of a live-schema read, unlike the original seven
-# MAGIC measurements' notebook.
+# MAGIC **Purpose:** Profile the eight DWD deepening measurement Bronze tables
+# MAGIC (dew_point, soil_temperature, visibility, cloud_type, wind_synop,
+# MAGIC extreme_wind, weather_phenomena, solar) and the missing_value_periods
+# MAGIC metadata table alongside the original seven measurements profiled in
+# MAGIC 01_weather_measurements_eda.py -- schema, missingness, constant columns,
+# MAGIC station coverage, hourly continuity, per-station duplicates, value
+# MAGIC distributions, the QN quality-flag domain, per-decade regime evidence,
+# MAGIC and the layered modelling-risk checklist. Column semantics (units,
+# MAGIC plausibility bounds) are not assumed ahead of a live-schema read.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -56,25 +54,19 @@ TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
 META_TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.dwd_missing_value_periods"
 NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR"}
 QN_CANDIDATES = ("QN_9", "QN_8", "QN_7", "QN_4", "QN_3", "QN")
-
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
+DWD_QN_CODES = {"1", "2", "3", "5", "7", "9", "10"}
 
 
-def find_col(df: DataFrame, *cands: str) -> str | None:
-    low = {c.lower(): c for c in df.columns}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
+def as_ts(col):
+    s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
+    return F.coalesce(
+        F.to_timestamp(s, "yyyyMMddHH"),
+        F.to_timestamp(s, "yyyyMMddHHmm"),
+        F.to_timestamp(F.substring(s, 1, 10), "yyyyMMddHH"),
+    )
 
 
-def as_ts(col: str):
-    return F.to_timestamp(F.col(col).cast("string"), "yyyyMMddHH")
-
-
-def value_columns(df: DataFrame) -> list:
+def value_columns(df):
     return [
         c
         for c in df.columns
@@ -82,158 +74,11 @@ def value_columns(df: DataFrame) -> list:
     ]
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -248,10 +93,7 @@ for m in MEASUREMENTS:
     ts_col = find_col(df, "MESS_DATUM")
     exprs = [F.count(F.lit(1)).alias("__rows")]
     if ts_col:
-        exprs += [
-            F.min(ts_col).alias("__min_ts"),
-            F.max(ts_col).alias("__max_ts"),
-        ]
+        exprs += [F.min(ts_col).alias("__min_ts"), F.max(ts_col).alias("__max_ts")]
     for c in cols:
         miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
         exprs += [
@@ -277,8 +119,7 @@ for m in MEASUREMENTS:
     for c in cols:
         rate = prof[m]["miss"][c] / prof[m]["total"] if prof[m]["total"] else 0
         print(
-            f"  {c:<26} missing={prof[m]['miss'][c]:>12} rate={rate:.4f} "
-            f"approx_distinct={prof[m]['acd'][c]}"
+            f"  {c:<26} missing={prof[m]['miss'][c]:>12} rate={rate:.4f} approx_distinct={prof[m]['acd'][c]}"
         )
     print("constant columns:", [c for c in cols if prof[m]["acd"][c] <= 1])
 totals = {m: prof[m]["total"] for m in MEASUREMENTS}
@@ -302,16 +143,18 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
-# DBTITLE 1,QN quality-flag distribution (one groupBy per table, where present)
+# DBTITLE 1,QN quality-flag distribution + domain (one groupBy per table, where present)
 qn_dist = {}
+qn_domain = {}
 for m in MEASUREMENTS:
     df = frames[m]
     qn = find_col(df, *QN_CANDIDATES)
     if qn is None:
         continue
+    qn_domain[m] = categorical_domain(df, qn, DWD_QN_CODES, name=f"{m}.{qn}")
     g = df.groupBy(qn).count().orderBy(F.desc("count")).collect()
     qn_dist[m] = [(x[qn], x["count"]) for x in g]
-    print(f"--- {m} ({qn}) ---", qn_dist[m])
+    print(f"--- {m} ({qn}) ---", qn_dist[m], " domain:", qn_domain[m])
 
 # COMMAND ----------
 
@@ -375,7 +218,7 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
-# DBTITLE 1,Hourly coverage % + longest gap per station (one windowed pass per table)
+# DBTITLE 1,Hourly continuity vs an INDEPENDENT calendar + longest gap per station
 freq_cov = {}
 for m in MEASUREMENTS:
     df = frames[m]
@@ -384,10 +227,7 @@ for m in MEASUREMENTS:
         continue
     w = Window.partitionBy("station").orderBy("ts")
     per_station = (
-        df.select(
-            F.col(sid).alias("station"),
-            F.to_timestamp(F.substring(F.col(dts), 1, 10), "yyyyMMddHH").alias("ts"),
-        )
+        df.select(F.col(sid).alias("station"), as_ts(dts).alias("ts"))
         .where(F.col("ts").isNotNull())
         .distinct()
         .withColumn(
@@ -420,6 +260,25 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
+# DBTITLE 1,Regime evidence -- per-decade rows / QN vocabulary
+regime = {}
+for m in MEASUREMENTS:
+    df = frames[m]
+    dts = find_col(df, "MESS_DATUM")
+    qn = find_col(df, *QN_CANDIDATES)
+    if dts is None:
+        continue
+    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    probe = [c for c in ([qn] if qn else []) + value_columns(df)]
+    regime[m] = population_by_group(
+        df.withColumn("__decade", decade).where(F.col("__decade").isNotNull()),
+        "__decade",
+        probe,
+    )
+    print(f"{m} by decade:", {d: dv["rows"] for d, dv in sorted(regime[m].items())})
+
+# COMMAND ----------
+
 # DBTITLE 1,missing_value_periods -- small metadata table, collected in Python
 mvp = spark.table(META_TABLE)
 mvp_recs = [x.asDict() for x in mvp.collect()]
@@ -434,13 +293,12 @@ print(
 for c in mvp_cols:
     missing = sum(1 for d in mvp_recs if d[c] is None or str(d[c]).strip() == "")
     print(f"  {c:<30} missing={missing:>6}  distinct={len({d[c] for d in mvp_recs})}")
-for d in mvp_recs[:20]:
-    print("  ", d)
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- deepening measurement overview (rows / stations / year span)
-facet_bars(
+# DBTITLE 1,Figure -- deepening measurement overview (rows / stations)
+figs = []
+if facet_bars(
     {
         "rows per measurement": [(m, totals[m]) for m in MEASUREMENTS],
         "distinct stations": [(m, len(station_counts[m])) for m in MEASUREMENTS],
@@ -449,26 +307,38 @@ facet_bars(
     "dwd_deepening_overview.png",
     rot=30,
     ncols=2,
-)
+):
+    figs.append(("DWD deepening -- measurement overview", "dwd_deepening_overview.png"))
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- QN distribution + hourly coverage %
-if qn_dist:
-    facet_bars(
-        qn_dist,
-        "DWD deepening -- QN quality-flag distribution per measurement",
-        "dwd_deepening_qn_distribution.png",
-        rot=0,
+if qn_dist and facet_bars(
+    qn_dist,
+    "DWD deepening -- QN quality-flag distribution per measurement",
+    "dwd_deepening_qn_distribution.png",
+    rot=0,
+):
+    figs.append(
+        (
+            "DWD deepening -- QN quality-flag distribution",
+            "dwd_deepening_qn_distribution.png",
+        )
     )
-facet_bars(
+if facet_bars(
     {
         m: [(r["station"], r["coverage_pct"]) for r in freq_cov.get(m, [])]
         for m in MEASUREMENTS
     },
     "DWD deepening -- hourly coverage % per station, by measurement",
     "dwd_deepening_hourly_coverage_pct.png",
-)
+):
+    figs.append(
+        (
+            "DWD deepening -- hourly coverage % per station",
+            "dwd_deepening_hourly_coverage_pct.png",
+        )
+    )
 
 # COMMAND ----------
 
@@ -504,8 +374,7 @@ _profile = [
 for m in MEASUREMENTS:
     _profile.append(
         f"| {m} | {totals[m]} | {len(prof[m]['cols'])} | {len(station_counts[m])} | "
-        f"{prof[m]['min_ts']} | {prof[m]['max_ts']} | "
-        f"{', '.join(constant_cols[m]) or '-'} |"
+        f"{prof[m]['min_ts']} | {prof[m]['max_ts']} | {', '.join(constant_cols[m]) or '-'} |"
     )
 _profile.append(
     f"| missing_value_periods | {mvp_total} | {len(mvp_cols)} | - | - | - | "
@@ -523,8 +392,27 @@ for m in MEASUREMENTS:
     )
 _dq.append(f"\nmissing_value_periods full-row duplicates: {mvp_dups}.")
 
+_domain = [
+    "QN quality-flag values vs the DWD hourly-historical code set (1/2/3/5/7/9/10):"
+]
+for m in MEASUREMENTS:
+    d = qn_domain.get(m)
+    if not d:
+        _domain.append(f"- {m}: no QN column.")
+        continue
+    _domain.append(
+        f"- {d['column']}: unexpected={d['unexpected'] or 'none'}, unused={d['unused_allowed'] or 'none'}."
+    )
+_domain.append(
+    "An unexpected QN value is a parse artefact or a schema drift, not a real quality level."
+)
+
 _temporal = [
-    "Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddHH:"
+    para(
+        "Hourly grid, expected one row per station per hour; MESS_DATUM parsed",
+        "yyyyMMddHH with a trailing `.0` stripped. Coverage vs an independent",
+        "calendar (span/3600 + 1), so <100% is a genuine gap.",
+    ),
 ]
 for m in MEASUREMENTS:
     cov = [
@@ -533,9 +421,27 @@ for m in MEASUREMENTS:
     worst = max((r["longest_gap_hours"] or 0 for r in freq_cov.get(m, [])), default=0)
     _temporal.append(
         f"- {m}: {prof[m]['min_ts']}..{prof[m]['max_ts']}, "
-        f"per-station coverage {min(cov) if cov else 'n/a'}-{max(cov) if cov else 'n/a'}%, "
-        f"longest gap {worst}h"
+        f"per-station coverage {min(cov) if cov else 'n/a'}-{max(cov) if cov else 'n/a'}%, longest gap {worst}h"
     )
+
+_regime = [
+    para(
+        "Per-decade row count and QN vocabulary. The deepening network came online",
+        "at different times per parameter -- a decade/era indicator and per-station",
+        "availability window are warranted before pooling.",
+    ),
+    "",
+]
+for m in MEASUREMENTS:
+    if m not in regime:
+        continue
+    qn = find_col(frames[m], *QN_CANDIDATES)
+    row = ", ".join(
+        f"{d}s: rows={dv['rows']}"
+        + (f", QN distinct={dv['columns'].get(qn, {}).get('distinct')}" if qn else "")
+        for d, dv in sorted(regime[m].items())
+    )
+    _regime.append(f"- {m}: {row}")
 
 _dist = []
 for m in MEASUREMENTS:
@@ -548,10 +454,8 @@ for m in MEASUREMENTS:
         )
 
 _qn = ["QN quality flag distribution (where present):"]
-for m, pairs in qn_dist.items():
-    _qn.append(f"- {m}: {pairs}")
-
-_findings_md = "\n".join(f"- {ln}" for ln in findings_lines)
+for m, ps in qn_dist.items():
+    _qn.append(f"- {m}: {ps}")
 
 _any_conflict = any(b.get("conflicting", 0) > 0 for b in dup_breakdown.values())
 _any_sentinel = any(
@@ -562,67 +466,98 @@ _any_sentinel = any(
 _silver = []
 if _any_sentinel:
     _silver.append(
-        "- `-999` (and blank) appears as a sentinel in at least one of these columns -> must "
-        "become NULL before any stat, matching the original seven measurements."
+        "- `-999` (and blank) appears as a sentinel in at least one of these columns -> must become NULL before any stat, matching the original seven measurements."
     )
 if _any_conflict:
     _silver.append(
-        "- (STATIONS_ID, MESS_DATUM) has conflicting duplicate rows in at least one measurement "
-        "-> a conflict-resolution rule is required (rule not yet established)."
+        "- (STATIONS_ID, MESS_DATUM) has conflicting duplicate rows in at least one measurement -> a conflict-resolution rule is required (rule not yet established)."
     )
-_silver.append("- Constant columns above carry no information.")
-_silver.append(
-    "- Hourly series are not necessarily continuous (coverage % / gaps above) -> no dense-grid "
-    "assumption, same as the original seven measurements."
-)
-_silver.append(
-    "- Value-column plausibility bounds were not assumed here (unlike 01's PLAUSIBLE table) -> "
-    "define them from the distributions above before enabling an out-of-range quality flag."
-)
-_silver.append(
-    "- missing_value_periods declares known gap windows per station/parameter -> reconcile against "
-    "the observed hourly-coverage gaps above rather than assuming every gap is undeclared."
-)
-
-_ml_readiness = [
-    (
-        "No candidate ML target lives in these 8 deepening measurement tables -- like the original "
-        "seven (01_weather_measurements_eda.py), they feed the shared `dim_weather_context` feature "
-        "source, not a labelled table; `missing_value_periods` (profiled fully in "
-        "03_missing_data_eda.py) is the nearest candidate target for a missingness/outage use case."
-    ),
-    (
-        f"Grain and entity-grouped split: one row per (STATIONS_ID, MESS_DATUM) per measurement "
-        f"({', '.join(MEASUREMENTS)}) -- split by STATIONS_ID or contiguous date range, never by row, "
-        "matching the original seven measurements."
-    ),
-    (
-        "Leakage: QN_* quality flags (where present) are assigned alongside the value, same caveat as "
-        "the original seven -- any forecasting feature set may only use rows strictly before the "
-        "prediction timestamp."
-    ),
-    (
-        "Join cardinality: cross-table join cardinality between these 8 new tables and the "
-        "original seven, and against station metadata, is NOT assessed in this notebook -- verify "
-        "it (e.g. extend 04_dwd_relationships_and_findings.py) before using both groups together "
-        "as joined features."
-    ),
-    (
-        "Imbalance: not applicable -- no categorical target column; QN_* distributions (where present) "
-        "are a quality flag, not a modelling target."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable in this notebook -- unlike 01, no value-column "
-        "figure is drawn from a `.sample()` subset here; all reported stats (`value_stats`, "
-        "`freq_cov`, `station_counts`) come from full-table Spark aggregations."
-    ),
+_silver += [
+    "- Constant columns above carry no information.",
+    "- Hourly series are not necessarily continuous (coverage % / gaps above) -> no dense-grid assumption.",
+    "- Value-column plausibility bounds were not assumed here -> define them from the distributions above before an out-of-range quality flag.",
+    "- missing_value_periods declares known gap windows per station/parameter -> reconcile against the observed hourly-coverage gaps rather than assuming every gap is undeclared.",
+    "- Decode QN against the DWD scheme valid for the record's era (see Regime / Version Evidence).",
 ]
-if _any_conflict:
-    _ml_readiness.append(
-        "Conflicting (STATIONS_ID, MESS_DATUM) duplicates exist in at least one deepening "
-        "measurement (see Data Quality) and must be resolved deterministically before use as a "
-        "feature source."
-    )
+
+_no_target = para(
+    "No candidate ML target lives in these 8 deepening tables -- like the original",
+    "seven they feed the shared weather feature source; missing_value_periods (03)",
+    "is the nearest candidate target for a missingness use case.",
+)
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            "One row per (STATIONS_ID, MESS_DATUM) per measurement -- split by STATIONS_ID or contiguous date range, never by row.",
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            "Cross-table cardinality between these 8 tables, the original seven, and metadata is assessed in 04 -- verify before joining both groups as features.",
+        ),
+        ("Target contamination", _no_target),
+        (
+            "Temporal / post-event leakage",
+            "QN_* flags (where present) are set alongside the value -- a forecasting feature may use only rows strictly before the prediction timestamp.",
+        ),
+        (
+            "Proxy leakage",
+            "STATIONS_ID / city identify a specific site -- a model given them memorises the station.",
+        ),
+        (
+            "Split / entity leakage",
+            "Split by STATIONS_ID -- a station's adjacent hourly rows and its rows across measurements are correlated.",
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            "Station attributes are time-varying (02) -- join on the validity window, not the latest metadata row.",
+        ),
+        (
+            "Survivorship / coverage bias",
+            "The deepening network came online per parameter over time (Regime / Version Evidence) -- early years under-represent the newer parameters.",
+        ),
+        (
+            "Missingness leakage",
+            "-999 / blank rate correlates with station, parameter and era -- an 'is-missing' feature can leak an outage window.",
+        ),
+        (
+            "Duplicate-event leakage",
+            f"Conflicting (station, ts) duplicates: { {m: dup_breakdown.get(m, {}).get('conflicting') for m in MEASUREMENTS} } -- resolve before counting or splitting.",
+        ),
+        (
+            "Target / feature temporal misalignment",
+            "MESS_DATUM is the observation hour -- align a feature/target pair to one hour convention.",
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            "Units are not in Bronze and plausibility bounds are not assumed here -- reconcile via parameter_unit (02) before combining parameters.",
+        ),
+        (
+            "Data-generation-process leakage",
+            "QN_* encodes DWD's QC decision, not the physical weather -- a feature keyed on it encodes the QC pipeline.",
+        ),
+        (
+            "Class / label instability",
+            para(
+                "cloud_type / weather_phenomena are coded categoricals and the QN scheme",
+                "changed over the archive's history (Regime / Version Evidence) -- a class",
+                "defined by a raw code is only stable within one scheme vintage.",
+            ),
+        ),
+        (
+            "Label availability lag",
+            "DWD publishes historical data with a lag and revises it -- a nowcast cannot use the current hour.",
+        ),
+        (
+            "Source / version / regime change",
+            "Per-decade rows and QN vocabulary in Regime / Version Evidence -- a decade/era indicator is warranted before pooling.",
+        ),
+        (
+            "Sample-vs-full divergence",
+            "No value-column figure is drawn from a sample here; every reported stat (value_stats, freq_cov, station_counts) is a full-table Spark aggregation.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -631,21 +566,13 @@ write_profiling(
     blocks=[
         ("Profile", "\n".join(_profile)),
         ("Data Quality", "\n".join(_dq) + "\n\n" + "\n".join(_qn)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
         ("Temporal", "\n".join(_temporal)),
+        ("Regime / Version Evidence", "\n".join(_regime)),
         ("Distributions", "\n".join(_dist)),
-        ("EDA Findings", _findings_md),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("EDA Findings", "\n".join(f"- {ln}" for ln in findings_lines)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        ("DWD deepening -- measurement overview", "dwd_deepening_overview.png"),
-        (
-            "DWD deepening -- QN quality-flag distribution",
-            "dwd_deepening_qn_distribution.png",
-        ),
-        (
-            "DWD deepening -- hourly coverage % per station",
-            "dwd_deepening_hourly_coverage_pct.png",
-        ),
-    ],
+    figures=figs,
 )

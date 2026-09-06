@@ -10,25 +10,24 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** August 2026
+# MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Cross-table checks across the 7 Honda IoT Bronze tables --
-# MAGIC timestamp-grid alignment per frequency, join cardinality on
-# MAGIC (frequency, datetime_utc), pairwise overlap matrix, full 7-way join
-# MAGIC yield, and an evidence-based verdict on combining the datasets. All
-# MAGIC key-overlap analysis is derived from one tagged union + one presence
-# MAGIC matrix rather than repeated pairwise joins.
+# MAGIC (frequency, datetime_utc) key uniqueness, pairwise overlap, full 7-way
+# MAGIC join yield, the energy<->weather match rate and the shared time window,
+# MAGIC and the layered modelling-risk checklist. All key-overlap analysis is
+# MAGIC derived from one tagged union + one presence matrix rather than repeated
+# MAGIC pairwise joins.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -52,177 +51,9 @@ TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{d}" for d in DATASETS}
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper
-
-
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, filename=None):
-    plt.figure(figsize=(10, 4))
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
-
-# COMMAND ----------
-
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -232,11 +63,11 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 u = None
 for d, t in TABLES.items():
     part = spark.table(t).select("frequency", "datetime_utc", F.lit(d).alias("src"))
-    u = part if u is None else u.union(part)
+    u = part if u is None else u.unionByName(part)
 
 # COMMAND ----------
 
-# DBTITLE 1,Timestamp grid + row counts per (dataset, frequency) -- one groupBy
+# DBTITLE 1,Row counts + time span per (dataset, frequency)
 grid = (
     u.groupBy("src", "frequency")
     .agg(
@@ -248,11 +79,12 @@ grid = (
     .collect()
 )
 table_rows = {}
+span = {}
 for x in grid:
     table_rows[x["src"]] = table_rows.get(x["src"], 0) + x["rows"]
+    lo, hi = span.get(x["src"], (x["min_ts"], x["max_ts"]))
+    span[x["src"]] = (min(lo, x["min_ts"]), max(hi, x["max_ts"]))
     print(x.asDict())
-for d, t in TABLES.items():
-    print(f"{d:<16} columns -> {spark.table(t).columns}")
 
 # COMMAND ----------
 
@@ -291,35 +123,24 @@ for d in DATASETS:
         f"  {d:<16} present={present[d]:>10}  missing vs union={grid_missing[d]:>10}  "
         f"rows={table_rows.get(d)}  key_unique={key_unique[d]}"
     )
-for e in ENERGY:
-    total_keys, matched_keys = join_yield[e]
-    print(
-        f"  {e:<16} energy keys={total_keys}  matched to weather={matched_keys}  ({matched_keys / total_keys * 100:.1f}%)"
-        if total_keys
-        else f"  {e}: no keys"
-    )
+_ewr = {e: round(m / t * 100, 1) for e, (t, m) in join_yield.items() if t}
+print("energy<->weather match rate:", _ewr)
 
 # COMMAND ----------
 
-# DBTITLE 1,Verdict -- can the Honda datasets be combined?
-print(f"(frequency, datetime_utc) unique in every table : {all(key_unique.values())}")
-print(
-    f"keys shared by all 7                            : {seven_ct} of {union_ct} "
-    f"({seven_ct / union_ct * 100:.1f}%))"
+# DBTITLE 1,Cross-source temporal overlap (energy vs weather span)
+overlap_win = cross_source_overlap(
+    {
+        "energy": span.get("electricity_p", (None, None)),
+        "weather": span.get("weather", (None, None)),
+    }
 )
-print(
-    f"energy<->weather match rate                     : "
-    f"{ {e: round(matched_keys / total_keys * 100, 1) for e, (total_keys, matched_keys) in join_yield.items() if total_keys} }"
-)
-print(
-    "=> shared 1:1 key exists; a wide 'all Honda metrics at (freq, ts)' table is "
-    "feasible on the intersection but loses the non-overlapping tail; one fact per "
-    "dataset (or per metric joining P+W), a wide table is Gold."
-)
+print("shared window energy x weather:", overlap_win)
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- pairwise overlap heatmap
+figs = []
 n = len(DATASETS)
 m = np.zeros((n, n))
 for i, a in enumerate(DATASETS):
@@ -327,42 +148,53 @@ for i, a in enumerate(DATASETS):
     for j, b in enumerate(DATASETS):
         if (a, b) in overlap:
             m[i, j] = m[j, i] = overlap[(a, b)]
-plt.figure(figsize=(8, 7))
-plt.imshow(np.log10(m + 1), cmap="viridis")
-plt.colorbar(label="log10(shared keys + 1)")
-plt.xticks(range(n), DATASETS, rotation=45, ha="right")
-plt.yticks(range(n), DATASETS)
-plt.title("Honda -- pairwise (frequency, datetime_utc) overlap")
-plt.tight_layout()
-plt.savefig(fig_path("honda_overlap_matrix.png"), dpi=110, bbox_inches="tight")
-plt.show()
+fig, ax = plt.subplots(figsize=(8, 7))
+im = ax.imshow(np.log10(m + 1), cmap="viridis")
+fig.colorbar(im, ax=ax, label="log10(shared keys + 1)")
+ax.set_xticks(range(n))
+ax.set_xticklabels(DATASETS, rotation=45, ha="right")
+ax.set_yticks(range(n))
+ax.set_yticklabels(DATASETS)
+ax.set_title("Honda -- pairwise (frequency, datetime_utc) overlap")
+fig.tight_layout()
+_save_and_show(fig, "honda_overlap_matrix.png")
+figs.append(
+    ("Honda pairwise (frequency, datetime_utc) overlap", "honda_overlap_matrix.png")
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- missing keys vs union, and energy<->weather join yield
-barplot(
+# DBTITLE 1,Figure -- missing keys vs union + energy<->weather join yield
+if barplot(
     list(grid_missing.items()),
     "Honda -- (frequency, datetime_utc) keys missing vs union",
     "dataset",
     "missing keys",
     rot=30,
     filename="honda_keys_missing_vs_union.png",
-)
+):
+    figs.append(
+        (
+            "Honda -- keys missing from each table vs the union",
+            "honda_keys_missing_vs_union.png",
+        )
+    )
 x = np.arange(len(ENERGY))
-plt.figure(figsize=(11, 4))
-plt.bar(x - 0.2, [join_yield[e][0] for e in ENERGY], width=0.4, label="energy keys")
-plt.bar(
+fig, ax = plt.subplots(figsize=(11, 4))
+ax.bar(x - 0.2, [join_yield[e][0] for e in ENERGY], width=0.4, label="energy keys")
+ax.bar(
     x + 0.2, [join_yield[e][1] for e in ENERGY], width=0.4, label="matched to weather"
 )
-plt.xticks(x, ENERGY, rotation=30, ha="right")
-plt.legend()
-plt.title("Honda -- energy<->weather join yield on (frequency, datetime_utc)")
-plt.ylabel("keys")
-plt.tight_layout()
-plt.savefig(
-    fig_path("honda_energy_weather_join_yield.png"), dpi=110, bbox_inches="tight"
+ax.set_xticks(x)
+ax.set_xticklabels(ENERGY, rotation=30, ha="right")
+ax.legend()
+ax.set_title("Honda -- energy<->weather join yield on (frequency, datetime_utc)")
+ax.set_ylabel("keys")
+fig.tight_layout()
+_save_and_show(fig, "honda_energy_weather_join_yield.png")
+figs.append(
+    ("Honda -- energy <-> weather join yield", "honda_energy_weather_join_yield.png")
 )
-plt.show()
 
 # COMMAND ----------
 
@@ -371,7 +203,6 @@ print("key unique per table       :", key_unique)
 print("keys missing vs union      :", grid_missing)
 print("energy<->weather join yield :", join_yield)
 print("keys shared by all 7        :", seven_ct, "of", union_ct)
-print("pairwise overlap            :", overlap)
 
 # COMMAND ----------
 
@@ -382,13 +213,14 @@ _ek = [
 ]
 for d_ in DATASETS:
     _ek.append(
-        f"| honda_iot_{d_} | {table_rows.get(d_)} | {present[d_]} | {grid_missing[d_]} | {key_unique[d_]} |"
+        f"| honda_iot_{d_} | {table_rows.get(d_)} | {present[d_]} | "
+        f"{grid_missing[d_]} | {key_unique[d_]} |"
     )
 _ek += [
     "",
-    (
-        f"Union of (frequency, datetime_utc) keys: {union_ct}. "
-        f"Keys shared by all 7 tables: {seven_ct} ({seven_ct / union_ct * 100:.1f}%)."
+    para(
+        f"Union of (frequency, datetime_utc) keys: {union_ct}.",
+        f"Keys shared by all 7 tables: {seven_ct} ({seven_ct / union_ct * 100:.1f}%).",
     ),
 ]
 
@@ -405,36 +237,69 @@ for e_ in ENERGY:
         if tk
         else f"| honda_iot_{e_} | 0 | 0 | |"
     )
-_rel += ["", "Pairwise shared-key counts:", ""]
-_rel += ["| pair | shared keys |", "|---|---|"]
+_rel += ["", "Pairwise shared-key counts:", "", "| pair | shared keys |", "|---|---|"]
 for (a_, b_), v_ in overlap.items():
     _rel.append(f"| {a_} + {b_} | {v_} |")
+_rel += [
+    "",
+    "Relationship cardinality (energy stream -> weather, on (frequency, datetime_utc)):",
+    "",
+    "| energy table | child rows | distinct child keys | matched to weather | orphan keys | max fan-out |",
+    "|---|---|---|---|---|---|",
+]
+for e_ in ENERGY:
+    tk, mk = join_yield[e_]
+    _rel.append(
+        f"| honda_iot_{e_} | {table_rows.get(e_)} | {present[e_]} | {mk} | {present[e_] - mk} | "
+        f"{'1 (key unique)' if key_unique[e_] else '>1 -- de-dup first'} |"
+    )
+_rel.append(
+    para(
+        "Because (frequency, datetime_utc) is unique in every table, every join here is 1:1 --",
+        "the only cardinality risk is row LOSS on an inner join, quantified by the orphan-keys",
+        "column, not row multiplication.",
+    )
+)
 
-_verdict = []
-_verdict.append(
-    f"(frequency, datetime_utc) is unique in every Honda table: {all(key_unique.values())}."
-)
-_verdict.append(
-    f"{seven_ct} of {union_ct} keys ({seven_ct / union_ct * 100:.1f}%) are present in all 7 tables."
-)
-_ewr = {e_: round(mk / tk * 100, 1) for e_, (tk, mk) in join_yield.items() if tk}
-_verdict.append(f"Energy<->weather match rate: {_ewr}.")
-_verdict.append(
-    "A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)' table "
-    "is feasible on the intersection but drops the non-overlapping tail; the natural Silver grain "
-    "is one fact per dataset (or per metric joining P+W), with the wide table left to Gold."
-)
+_coverage = [
+    para(
+        "Time span per dataset:",
+        str({d: (str(span[d][0]), str(span[d][1])) for d in DATASETS if d in span}),
+    ),
+    para(
+        "Energy x weather shared window:",
+        str(overlap_win["common_window"]),
+        "-- an energy+weather model can only train inside this window; an inner join outside",
+        "it silently drops rows.",
+    ),
+    para(
+        f"{union_ct - seven_ct} of {union_ct} keys are absent from at least one table",
+        f"(per-table gaps: {grid_missing}). This is a CROSS-table completeness gap -- a single",
+        "table can still be internally dense (see 01/02 continuity) while differing from another",
+        "by a handful of timestamps.",
+    ),
+]
+
+_verdict = [
+    f"(frequency, datetime_utc) is unique in every Honda table: {all(key_unique.values())}.",
+    f"{seven_ct} of {union_ct} keys ({seven_ct / union_ct * 100:.1f}%) are in all 7 tables.",
+    f"Energy<->weather match rate: {_ewr}.",
+    para(
+        "A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)' table",
+        "is feasible on the intersection but drops the non-overlapping tail; the natural Silver",
+        "grain is one fact per dataset (or per metric joining P+W), the wide table is Gold.",
+    ),
+]
 
 _findings = []
 if not all(key_unique.values()):
     _findings.append(
-        f"- Some tables have duplicate (frequency, datetime_utc) keys: "
+        f"- Duplicate (frequency, datetime_utc) keys in: "
         f"{[d_ for d_ in DATASETS if not key_unique[d_]]}."
     )
 if seven_ct < union_ct:
     _findings.append(
-        f"- {union_ct - seven_ct} keys are missing from at least one table "
-        f"(per-table gaps: {grid_missing})."
+        f"- {union_ct - seven_ct} keys missing from at least one table (gaps: {grid_missing})."
     )
 if any(v < 100 for v in _ewr.values()):
     _findings.append(
@@ -457,46 +322,122 @@ _silver.append(
 )
 if any(v < 100 for v in _ewr.values()):
     _silver.append(
-        "- Use outer joins (not inner) when combining energy and weather to retain unmatched rows."
+        "- Use outer joins (not inner) when combining energy and weather; carry an explicit "
+        "unmatched flag."
     )
 
-_ml_readiness = [
-    (
-        "No candidate ML target lives across these 7 tables directly -- this notebook is a joinability "
-        "audit; see 01_energy_eda.py and 02_weather_eda.py for per-table target candidates."
-    ),
-    (
-        f"Join cardinality: (frequency, datetime_utc) is unique in every table "
-        f"({all(key_unique.values())}), so all pairwise and 7-way joins are 1:1 on the shared key -- "
-        "no cartesian-explosion risk from fan-out, but the join is NOT complete: only "
-        f"{seven_ct} of {union_ct} keys ({seven_ct / union_ct * 100:.1f}%) are present in all 7 "
-        "tables, so an inner 7-way join drops the rest."
-    ),
-    (
-        f"Energy<->weather join yield (the join a combined energy+weather model would use): "
-        f"{_ewr} -- any energy table with <100% match will silently lose rows on an inner join; use "
-        "an outer join and an explicit missing-weather flag instead."
-    ),
-    (
-        "Grain and entity-grouped split: shared key = (frequency, datetime_utc) across all 7 tables -- "
-        "any model combining them must split by contiguous date range, not by row, so a timestamp's "
-        "energy and weather readings stay together on the same side of a split."
-    ),
-    (
-        "Leakage: because energy and weather share the same timestamp grid, a same-timestamp weather "
-        "feature is legitimate for predicting same-timestamp energy, but a model must not be fed a "
-        "later timestamp's energy or weather value when predicting an earlier one."
-    ),
-    (
-        "Imbalance: not applicable at this cross-table level -- see per-table stuck-run/outlier "
-        "imbalance notes in 01_energy_eda.py and 02_weather_eda.py."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable -- every statistic here (key presence, pairwise "
-        "overlap, join yield) is computed from a full Spark aggregation over the tagged-union presence "
-        "matrix, no `.sample()`/`.limit()` subset feeds any reported number."
-    ),
-]
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                f"(frequency, datetime_utc) is unique in every table ({all(key_unique.values())}); all "
+                "pairwise and 7-way joins hold that grain. Resampling to a common frequency would change it."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                "1:1 on the shared key -- no fan-out. The risk is the opposite: an inner 7-way join keeps "
+                f"only {seven_ct} of {union_ct} keys."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                "No target across these tables -- see 01/02. A wide feature row must not include the target "
+                "metric's own value at the target timestamp."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "Energy and weather share the timestamp grid -- same-timestamp weather is a legitimate "
+                "feature for same-timestamp energy, but no later energy/weather value may feed an earlier "
+                "prediction."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "P and W of one metric are near-redundant; heat/cool total ~ sum of components -- a wide "
+                "join makes these collinear features trivially available."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Split by contiguous date range across ALL tables at once, never per-table by row, so a "
+                "timestamp's energy and weather stay on one side."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            "No slowly-changing attributes; a climatology feature must be built only from pre-cutoff data.",
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                f"Energy x weather shared window {overlap_win['common_window']} -- training outside it is "
+                "impossible; the join yield table shows where each energy stream loses weather coverage."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                "A missing key in one table at a timestamp present in others marks a per-stream outage -- an "
+                "'is-present' flag per stream can leak the outage timing."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            (
+                f"Key uniqueness per table: {key_unique} -- de-duplicate any table that is not unique before "
+                "joining or splitting."
+            ),
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "P (instant), W (cumulative, interval-end) and weather (interval-end) use different "
+                "timestamp conventions -- align to one before building a wide row."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            "See 01 -- P<->W and component<->total relationships are physical identities, not signal.",
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "Any upstream alignment / gap-filling that made the 7 grids match is part of the "
+                "data-generation process; the residual mismatch here is what survived it."
+            ),
+        ),
+        ("Class / label instability", "Not applicable -- continuous metrics only."),
+        (
+            "Label availability lag",
+            (
+                "Interval-end readings are not available until the interval closes -- a nowcast cannot use "
+                "the interval it is predicting."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "One deployment; a sensor swap on any stream would show as a step change and a shift in that "
+                "stream's coverage window."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            (
+                "Every number here (key presence, pairwise overlap, join yield, spans) is a full Spark "
+                "aggregation over the tagged-union presence matrix -- no sampling."
+            ),
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -505,22 +446,10 @@ write_profiling(
     [
         ("Entities / Keys", "\n".join(_ek)),
         ("Relationships", "\n".join(_rel)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("EDA Findings", _findings_md + "\n\n" + "\n".join(_verdict)),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        (
-            "Honda pairwise (frequency, datetime_utc) overlap",
-            "honda_overlap_matrix.png",
-        ),
-        (
-            "Honda -- keys missing from each table vs the union",
-            "honda_keys_missing_vs_union.png",
-        ),
-        (
-            "Honda -- energy <-> weather join yield",
-            "honda_energy_weather_join_yield.png",
-        ),
-    ],
+    figures=figs,
 )

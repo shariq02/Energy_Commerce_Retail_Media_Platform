@@ -10,27 +10,30 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** August 2026
+# MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the four DWD metadata Bronze tables
 # MAGIC (station_geography, station_name_history, device_instrument,
-# MAGIC parameter_unit) -- schema, missingness, constant columns, duplicates,
-# MAGIC validity periods, station relocation / name-history analysis, a
-# MAGIC geographic station plot, parameter -> measurement -> unit
-# MAGIC reconciliation, and metadata coverage gaps vs the measurement tables.
-# MAGIC The metadata tables are small, so each is collected once and analysed
-# MAGIC in Python; only the measurement station set is scanned in Spark.
+# MAGIC parameter_unit) -- schema, missingness, constant columns, duplicates, a
+# MAGIC structural check for parser trailer rows, validity periods and their
+# MAGIC ordering, station relocation / name-history analysis, spatial validity
+# MAGIC of the coordinates, parameter -> measurement -> unit reconciliation,
+# MAGIC metadata coverage gaps vs the measurement tables, and the layered
+# MAGIC modelling-risk checklist. The metadata tables are small, collected once
+# MAGIC and analysed in Python; only the measurement station set is scanned in
+# MAGIC Spark.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
 from functools import reduce
 
 import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -57,6 +60,10 @@ MEASUREMENTS = [
 ]
 MEASUREMENT_TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
 META_NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR", "V_N_I"}
+# A generated DWD metadata export ends with a free-text trailer
+# ("generiert: ... Deutscher Wetterdienst") that a naive CSV read turns into a
+# data row -- a non-numeric STATIONS_ID or a cell carrying these tokens.
+TRAILER_TOKENS = ("wetterdienst", "generiert", "erzeugt", "stand:")
 
 
 def measurement_value_cols(cols):
@@ -65,11 +72,6 @@ def measurement_value_cols(cols):
         for c in cols
         if c.upper() not in META_NON_VALUE and not c.upper().startswith("QN")
     ]
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
 
 
 def find_key(cols, *cands):
@@ -82,14 +84,13 @@ def find_key(cols, *cands):
 
 def find_key_like(cols, *substrings):
     for c in cols:
-        cl = c.lower()
-        if any(s in cl for s in substrings):
+        if any(s in c.lower() for s in substrings):
             return c
     return None
 
 
 def to_float(x):
-    # DWD metadata stores coordinates as strings and sometimes with a German
+    # DWD metadata stores coordinates as strings, sometimes with a German
     # decimal comma; a bare float() silently dropped every lat/lon value.
     if x is None:
         return None
@@ -99,174 +100,11 @@ def to_float(x):
         return None
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -294,7 +132,35 @@ for name, t in TABLES.items():
 
 # COMMAND ----------
 
-# DBTITLE 1,Per-station row counts + validity-period checks (Python)
+# DBTITLE 1,Structural check -- CSV parser trailer rows
+trailer = {}
+for name, x in meta.items():
+    sid = find_key(x["cols"], "Stations_id", "STATIONS_ID", "stations_id")
+    bad_id = []
+    token_rows = []
+    for d in x["recs"]:
+        if (
+            sid
+            and d[sid] is not None
+            and not str(d[sid]).strip().removesuffix(".0").isdigit()
+        ):
+            bad_id.append(d[sid])
+        joined = " ".join(str(v) for v in d.values() if v is not None).lower()
+        if any(tok in joined for tok in TRAILER_TOKENS):
+            token_rows.append({k: d[k] for k in list(d)[:3]})
+    trailer[name] = {
+        "non_numeric_station_id": bad_id[:10],
+        "non_numeric_station_id_count": len(bad_id),
+        "trailer_token_rows": token_rows[:5],
+        "trailer_token_row_count": len(token_rows),
+        "suspect": bool(bad_id or token_rows),
+    }
+    print(f"{name}: {trailer[name]}")
+_trailer_hit = [n for n, v in trailer.items() if v["suspect"]]
+
+# COMMAND ----------
+
+# DBTITLE 1,Per-station row counts + validity-period ordering (Python)
 station_counts = {}
 period_stats = {}
 for name, x in meta.items():
@@ -313,9 +179,9 @@ for name, x in meta.items():
             1
             for d in x["recs"]
             if str(d[bis] or "").strip()
-            and str(d[bis]).strip().isdigit()
-            and str(d[von] or "").strip().isdigit()
-            and int(d[bis]) < int(d[von])
+            and str(d[bis]).strip().removesuffix(".0").isdigit()
+            and str(d[von] or "").strip().removesuffix(".0").isdigit()
+            and int(float(d[bis])) < int(float(d[von]))
         )
         period_stats[name] = (open_ended, inverted, x["total"])
         print(
@@ -336,7 +202,6 @@ lon = find_key(
 elev = find_key(
     geo["cols"], "Stationshoehe", "station_elevation_m", "Stationshoehe_m"
 ) or find_key_like(geo["cols"], "hoehe", "elevation", "height")
-print(f"geography columns -> {geo['cols']}")
 print(f"geography columns -> id={gsid} lat={lat} lon={lon} elev={elev}")
 geo_moves = {}
 for d in geo["recs"]:
@@ -353,6 +218,16 @@ for sid, g in geo_moves.items():
     g["lat_span"] = round(max(g["lat"]) - min(g["lat"]), 5) if g["lat"] else None
     g["lon_span"] = round(max(g["lon"]) - min(g["lon"]), 5) if g["lon"] else None
     g["elev_span_m"] = round(max(g["elev"]) - min(g["elev"]), 2) if g["elev"] else None
+    # crude relocation distance: 1 deg lat ~ 111 km, 1 deg lon ~ 71 km at 52N
+    g["reloc_km"] = (
+        round(
+            (((g["lat_span"] or 0) * 111) ** 2 + ((g["lon_span"] or 0) * 71) ** 2)
+            ** 0.5,
+            2,
+        )
+        if g["location_rows"] > 1
+        else 0.0
+    )
     print(
         f"station {sid}: { ({k: v for k, v in g.items() if k not in ('lat', 'lon', 'elev')}) }"
     )
@@ -373,6 +248,17 @@ for sid, n in name_changes.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Spatial validity of the station coordinates (Germany bounding box)
+geo_df = spark.table(TABLES["station_geography"])
+spatial = None
+if lat and lon:
+    spatial = spatial_validity(geo_df, lat, lon, name="station_geography")
+    print("spatial validity:", spatial)
+big_moves = {sid: g["reloc_km"] for sid, g in geo_moves.items() if g["reloc_km"] > 5}
+print("relocations > 5 km (station -> km):", big_moves)
+
+# COMMAND ----------
+
 # DBTITLE 1,parameter_unit -> measurement -> unit reconciliation
 pu = meta["parameter_unit"]
 pcode = find_key(
@@ -382,23 +268,18 @@ punit = find_key(pu["cols"], "Einheit", "einheit", "unit")
 declared = {str(d[pcode]) for d in pu["recs"]} if pcode else set()
 print("parameter_unit declared codes:", sorted(declared))
 if punit:
-    pairs = {}
+    upairs = {}
     for d in pu["recs"]:
-        pairs[(d[pcode], d[punit])] = pairs.get((d[pcode], d[punit]), 0) + 1
-    print("code -> unit:", pairs)
+        upairs[(d[pcode], d[punit])] = upairs.get((d[pcode], d[punit]), 0) + 1
+    print("code -> unit:", upairs)
 observed = {}
 for m, t in MEASUREMENT_TABLES.items():
     observed[m] = measurement_value_cols(spark.table(t).columns)
 observed_flat = {c for cs in observed.values() for c in cs}
-print("value columns per measurement:", observed)
-print(
-    "value codes in measurements NOT in parameter_unit:",
-    sorted(observed_flat - declared),
-)
-print(
-    "parameter_unit codes never a measurement value column:",
-    sorted(declared - observed_flat),
-)
+codes_unknown = sorted(observed_flat - declared)
+codes_unused = sorted(declared - observed_flat)
+print("value codes in measurements NOT in parameter_unit:", codes_unknown)
+print("parameter_unit codes never a measurement value column:", codes_unused)
 
 # COMMAND ----------
 
@@ -433,24 +314,30 @@ for name, x in meta.items():
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- geographic station plot (lon x lat)
-if gsid and lat and lon:
-    plt.figure(figsize=(7, 8))
+figs = []
+if gsid and lat and lon and any(g["lon"] and g["lat"] for g in geo_moves.values()):
+    fig, ax = plt.subplots(figsize=(7, 8))
     for sid, g in geo_moves.items():
         if g["lon"] and g["lat"]:
-            plt.scatter(g["lon"], g["lat"], label=str(sid), s=60)
-            plt.plot(g["lon"], g["lat"], linewidth=0.6)
-    plt.legend(title="station id", fontsize=8)
-    plt.title("DWD station_geography -- station locations (lines = relocations)")
-    plt.xlabel("longitude")
-    plt.ylabel("latitude")
-    plt.tight_layout()
-    plt.savefig(fig_path("dwd_station_geography.png"), dpi=110, bbox_inches="tight")
-    plt.show()
+            ax.scatter(g["lon"], g["lat"], label=str(sid), s=60)
+            ax.plot(g["lon"], g["lat"], linewidth=0.6)
+    ax.legend(title="station id", fontsize=8)
+    ax.set_title("DWD station_geography -- station locations (lines = relocations)")
+    ax.set_xlabel("longitude")
+    ax.set_ylabel("latitude")
+    fig.tight_layout()
+    _save_and_show(fig, "dwd_station_geography.png")
+    figs.append(
+        (
+            "DWD station_geography -- station locations & relocations",
+            "dwd_station_geography.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- metadata overview (one faceted figure)
-facet_bars(
+if facet_bars(
     {
         "geography: location rows per station": [
             (sid, g["location_rows"]) for sid, g in geo_moves.items()
@@ -470,19 +357,24 @@ facet_bars(
     "dwd_metadata_overview.png",
     rot=45,
     ncols=2,
-)
+):
+    figs.append(("DWD metadata -- overview", "dwd_metadata_overview.png"))
 
-# COMMAND ----------
-
-# DBTITLE 1,Figure -- per-table rows per station + validity-period composition (faceted)
-facet_bars(
+if facet_bars(
     dict(station_counts),
     "DWD metadata -- rows per station, by table",
     "dwd_metadata_rows_per_station.png",
     rot=45,
     ncols=2,
-)
-facet_bars(
+):
+    figs.append(
+        (
+            "DWD metadata -- rows per station, by table",
+            "dwd_metadata_rows_per_station.png",
+        )
+    )
+
+if facet_bars(
     {
         name: [
             ("open-ended", open_ended),
@@ -495,7 +387,13 @@ facet_bars(
     "dwd_metadata_validity_periods.png",
     rot=20,
     ncols=2,
-)
+):
+    figs.append(
+        (
+            "DWD metadata -- validity-period row composition, by table",
+            "dwd_metadata_validity_periods.png",
+        )
+    )
 
 # COMMAND ----------
 
@@ -510,6 +408,7 @@ print("relocations (station -> location rows):", _relocations)
 print("name changes (station -> distinct names):", _renames)
 print("validity periods:", period_stats)
 print("metadata coverage gaps vs measurements:", meta_gaps)
+print("parser trailer suspected in:", _trailer_hit)
 
 # COMMAND ----------
 
@@ -525,6 +424,30 @@ for name, x in meta.items():
         f"| {name} | {x['total']} | {len(x['cols'])} | {dups} | {', '.join(consts) or '-'} |"
     )
 
+_struct = [
+    para(
+        "A generated DWD metadata export ends with a free-text trailer",
+        "(`generiert: ... Deutscher Wetterdienst`); a naive CSV read turns it into",
+        "a data row with a non-numeric STATIONS_ID.",
+    ),
+]
+for name, v in trailer.items():
+    _struct.append(
+        f"- {name}: {v['non_numeric_station_id_count']} non-numeric station id(s) "
+        f"{v['non_numeric_station_id'][:5]}, {v['trailer_token_row_count']} row(s) carrying a "
+        f"trailer token -> {'TRAILER ROW PRESENT' if v['suspect'] else 'clean'}."
+    )
+if _trailer_hit:
+    _struct.append(
+        para(
+            f"-> INGESTION defect in {_trailer_hit}: fix `scripts/ingestion/stage_dwd.py`",
+            "to strip the trailer, re-stage, re-upload to the Volume and re-run the DWD",
+            "Bronze loader; until then, filter non-numeric STATIONS_ID before any join.",
+        )
+    )
+else:
+    _struct.append("-> No trailer rows in the current Bronze metadata tables.")
+
 _dq = ["Validity-period columns (von_datum / bis_datum):"]
 for name, (open_ended, inverted, total) in period_stats.items():
     _dq.append(
@@ -536,10 +459,40 @@ _dq.append(
     + "; ".join(f"{name} -> {dict(pairs)}" for name, pairs in station_counts.items())
 )
 
-_entities = [
-    f"Distinct stations across the 7 measurement tables: {len(measure_stations)} -> {sorted(measure_stations)}."
+_domain = [
+    f"parameter_unit declared codes: {sorted(declared)}",
+    f"value-column codes present in measurements but NOT in parameter_unit: {codes_unknown}",
+    f"parameter_unit codes never used as a measurement value column: {codes_unused}",
+    "value columns per measurement: " + str(observed),
+    para(
+        "An unknown code is a measured parameter with no declared unit -- attach it",
+        "at Silver from the DWD parameter description, do not leave the unit null.",
+    ),
 ]
-_entities.append("Metadata rows per station id:")
+
+_spatial = ["Spatial validity of station_geography coordinates:"]
+if spatial:
+    _spatial.append(
+        f"- present={spatial['present']}, missing={spatial['missing']}, "
+        f"outside the Germany bounding box={spatial['outside_bbox']}, (0,0)={spatial['null_island']}, "
+        f"lat/lon possibly swapped={spatial['looks_swapped']}."
+    )
+else:
+    _spatial.append("- no lat/lon column located by name.")
+_spatial.append(f"- relocations > 5 km (station -> km): {big_moves or 'none'}.")
+_spatial.append(
+    para(
+        "A coordinate outside Germany / at (0,0) is a quarantine class, not a",
+        "silent NULL. A multi-km relocation means the station's location is",
+        "time-varying -- join on the von/bis window, not station id alone. There is",
+        "no second coordinate source to cross-check against (LIMITATION).",
+    )
+)
+
+_entities = [
+    f"Distinct stations across the 7 measurement tables: {len(measure_stations)} -> {sorted(measure_stations)}.",
+    "Metadata rows per station id:",
+]
 for name, pairs in station_counts.items():
     _entities.append(f"- {name}: {dict(pairs)}")
 
@@ -548,8 +501,8 @@ _relo = [
 ]
 for sid, g in geo_moves.items():
     _relo.append(
-        f"- station {sid}: {g['location_rows']} location row(s), "
-        f"lat span={g['lat_span']}, lon span={g['lon_span']}, elevation span={g['elev_span_m']} m"
+        f"- station {sid}: {g['location_rows']} location row(s), lat span={g['lat_span']}, "
+        f"lon span={g['lon_span']}, elevation span={g['elev_span_m']} m, ~{g['reloc_km']} km moved"
     )
 _relo.append("")
 _relo.append("station_name_history name/operator changes:")
@@ -557,13 +510,6 @@ for sid, n in name_changes.items():
     _relo.append(
         f"- station {sid}: {n['history_rows']} history row(s), {len(n['names'])} distinct name(s)"
     )
-
-_recon = [
-    f"parameter_unit declared codes: {sorted(declared)}",
-    f"value-column codes present in measurements but NOT in parameter_unit: {sorted(observed_flat - declared)}",
-    f"parameter_unit codes never used as a measurement value column: {sorted(declared - observed_flat)}",
-    "value columns per measurement: " + str(observed),
-]
 
 _gaps = ["Measurement stations with NO row in each metadata table:"]
 for name, x in meta.items():
@@ -576,9 +522,13 @@ for name, x in meta.items():
     )
 
 _silver = []
+if _trailer_hit:
+    _silver.append(
+        f"- BLOCKED for {_trailer_hit}: strip the parser trailer in stage_dwd.py and re-run Bronze."
+    )
 if _relocations:
     _silver.append(
-        "- station_geography has >1 location row for some stations (relocations) -> station location is time-varying; join measurement rows on the von/bis window, not on station_id alone."
+        "- station_geography has >1 location row for some stations (relocations) -> station location is time-varying; join measurement rows on the von/bis window, not station_id alone."
     )
 if _renames:
     _silver.append(
@@ -596,47 +546,92 @@ _silver.append(
     "- device_instrument / parameter_unit are small static lookups -> reference dimensions; reconcile parameter codes with the measurement value-column names (list above)."
 )
 
-_ml_readiness = [
-    (
-        f"Candidate target signal: station relocation events ({len(_relocations)} station(s) with "
-        ">1 location row) and name/operator change events "
-        f"({len(_renames)} station(s) with >1 distinct name) could support a change-detection use "
-        "case; treat as event indicators, not attributes of a static station dimension."
-    ),
-    (
-        "Leakage: station_geography and station_name_history are time-varying (von/bis validity "
-        "windows) -- joining a measurement row to a station's metadata must use the validity window "
-        "covering that row's MESS_DATUM, not the latest/current metadata row, or a future station "
-        "attribute (e.g. a later relocation's coordinates) would leak into a historical feature."
-    ),
-    (
-        "Grain and entity-grouped split: station_geography/station_name_history grain is one row "
-        "per (station, validity period), not one row per station -- any split for a model using "
-        "these attributes must group by station id, not by row, since multiple validity-period "
-        "rows for the same station must stay on the same side of a split."
-    ),
-    (
-        "Join cardinality: measurement -> metadata is 1:N fan-out for stations with relocations or "
-        "name changes (see Domain Findings) unless the join is scoped to the correct von/bis "
-        "window -- an un-windowed join is a cartesian-explosion risk for any station with >1 "
-        "metadata row."
-    ),
-    (
-        "Imbalance: not applicable -- no categorical target column; parameter_unit/device_instrument "
-        "are static reference lookups, not a modelling signal."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable -- all four metadata tables are fully collected "
-        "(no sampling) since they are small; only the measurement-station union scan is a full Spark "
-        "pass, also unsampled."
-    ),
-]
-if any(v > 0 for v in meta_gaps.values()):
-    _ml_readiness.append(
-        f"Coverage gap: {meta_gaps} measurement stations have no metadata row in at least one "
-        "table -- a feature pipeline joining on station id must handle the resulting nulls "
-        "explicitly rather than silently dropping the station's fact rows."
-    )
+_no_target = para(
+    "Station relocation and name/operator changes are event indicators, not",
+    "attributes of a static station dimension -- if used as a target, treat them",
+    "as change events; the metadata tables carry no other labelled outcome.",
+)
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            para(
+                "station_geography / station_name_history are one row per (station,",
+                "validity period), NOT one row per station -- a split must group by station id.",
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            para(
+                f"measurement -> metadata is 1:N for the {len(_relocations)} relocated and",
+                f"{len(_renames)} renamed stations unless scoped to the von/bis window -- an",
+                "un-windowed join cartesian-explodes those stations' fact rows.",
+            ),
+        ),
+        ("Target contamination", _no_target),
+        (
+            "Temporal / post-event leakage",
+            para(
+                "Joining a measurement row to a station's metadata must use the validity",
+                "window covering that row's MESS_DATUM -- a later relocation's coordinates",
+                "in a historical feature is future information.",
+            ),
+        ),
+        (
+            "Proxy leakage",
+            "Station id / name / exact coordinates identify one site -- a model given them memorises the station.",
+        ),
+        (
+            "Split / entity leakage",
+            "Split by station id, not by row -- a station's multiple validity-period rows must stay on one side.",
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            "Same as Temporal -- use the metadata value valid during the archive row's period, never the latest.",
+        ),
+        (
+            "Survivorship / coverage bias",
+            f"{sum(1 for v in meta_gaps.values() if v)} metadata table(s) miss some measurement stations -- a joined feature set silently drops those stations' rows.",
+        ),
+        (
+            "Missingness leakage",
+            "Whether a station has a geography / name-history row correlates with how long it has been in the network.",
+        ),
+        (
+            "Duplicate-event leakage",
+            "Full-row duplicates per table shown in Profile -- de-duplicate before treating a validity-period row as one event.",
+        ),
+        (
+            "Target / feature temporal misalignment",
+            "von_datum / bis_datum bound the period; align a joined metadata attribute to the fact row's hour, not the period edge.",
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            "parameter_unit reconciliation above -- attach units before combining measured parameters.",
+        ),
+        (
+            "Data-generation-process leakage",
+            "A parser trailer row (Structural Integrity) would inject a non-station into every station-keyed join -- filter it first.",
+        ),
+        (
+            "Class / label instability",
+            "device_instrument / parameter_unit codes are DWD enumerations that evolve between archive versions -- pin the version.",
+        ),
+        ("Label availability lag", "Not applicable -- static reference metadata."),
+        (
+            "Source / version / regime change",
+            para(
+                "Validity periods span decades; the network, instrumentation and the",
+                "metadata schema itself changed over that span -- a metadata attribute is",
+                "only comparable within one era.",
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            "All four metadata tables are fully collected (small); the measurement-station union is a full unsampled Spark scan.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -644,11 +639,14 @@ write_profiling(
     SECTION_TITLE,
     blocks=[
         ("Profile", "\n".join(_profile)),
+        ("Structural Integrity", "\n".join(_struct)),
         ("Data Quality", "\n".join(_dq)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
+        ("Spatial Consistency", "\n".join(_spatial)),
         ("Entities / Keys", "\n".join(_entities)),
         ("Coverage", "\n".join(_gaps)),
-        ("Domain Findings", "\n".join(_relo) + "\n\n" + "\n".join(_recon)),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("Domain Findings", "\n".join(_relo)),
+        ("ML-Readiness Evidence", _ml),
         (
             "EDA Findings",
             "\n".join(
@@ -657,24 +655,11 @@ write_profiling(
                     f"- name changes (station -> distinct names): {_renames}",
                     f"- validity periods (open-ended, inverted, total): {period_stats}",
                     f"- metadata coverage gaps vs measurements: {meta_gaps}",
+                    f"- parser trailer suspected in: {_trailer_hit or 'none'}",
                 ]
             ),
         ),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        (
-            "DWD station_geography -- station locations & relocations",
-            "dwd_station_geography.png",
-        ),
-        ("DWD metadata -- overview", "dwd_metadata_overview.png"),
-        (
-            "DWD metadata -- rows per station, by table",
-            "dwd_metadata_rows_per_station.png",
-        ),
-        (
-            "DWD metadata -- validity-period row composition, by table",
-            "dwd_metadata_validity_periods.png",
-        ),
-    ],
+    figures=figs,
 )

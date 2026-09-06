@@ -163,6 +163,18 @@ for dataset, volume, table in DATASETS:
     try:
         df = read_dataset(files)
 
+        # The BNetzA Kraftwerksliste has title rows above the real header; if
+        # staging skipped the wrong count, the columns arrive as "Unnamed: N"
+        # (or, after sanitize, "Unnamed_N"). Fail loud rather than land a table
+        # whose every column is mislabelled.
+        _unnamed = [c for c in df.columns if c.lower().startswith(("unnamed", "_c"))]
+        if len(_unnamed) > 0.2 * len(df.columns):
+            raise RuntimeError(
+                f"{len(_unnamed)} of {len(df.columns)} columns are unnamed -- the CSV "
+                "header was not applied. Fix scripts/ingestion/stage_power_plant_list.py "
+                "and re-stage the raw BNetzA file."
+            )
+
         explicit = COLUMN_RENAME_MAP.get(dataset, {})
         applied = {old: new for old, new in explicit.items() if old in df.columns}
         for old, new in applied.items():

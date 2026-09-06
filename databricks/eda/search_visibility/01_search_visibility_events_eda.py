@@ -23,13 +23,13 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
 import datetime as dt
-import os as _os
-import re as _re
 
-import matplotlib.pyplot as plt
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -41,185 +41,6 @@ NB_KEY = "01_events"
 SECTION_TITLE = "Search visibility events (search_visibility_events)"
 TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.search_visibility_events"
 KEY = ["repository_id", "url", "date", "country", "device"]
-
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
-
-
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-def histplot(values, title, xlabel, bins=50, log=False, filename=None):
-    plt.figure(figsize=(10, 4))
-    plt.hist(values, bins=bins, log=log)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel("count")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
 
 # COMMAND ----------
 
@@ -444,6 +265,41 @@ print("repositories per country:", [(x["country"], x["repositories"]) for x in c
 
 # COMMAND ----------
 
+# DBTITLE 1,Categorical domain (`device`) + position bounds + date-format cohort
+device_domain = categorical_domain(
+    df,
+    "device",
+    ("desktop", "mobile", "tablet", "DESKTOP", "MOBILE", "TABLET"),
+    name="device",
+)
+pos = F.col("position").cast("double")
+pos_bounds = (
+    df.agg(
+        F.sum((pos < 1).cast("long")).alias("below_1"),
+        F.sum((pos > 100).cast("long")).alias("above_100"),
+        F.sum(pos.isNotNull().cast("long")).alias("present"),
+    )
+    .first()
+    .asDict()
+)
+print("device domain:", device_domain, " position bounds:", pos_bounds)
+
+# The `date` column mixes an ISO archive vintage and an M/D/YYYY one -- do the two
+# cohorts differ in metric scale / completeness? (a staging inconsistency would
+# show here, not as a data finding).
+fmt_col = F.when(F.col("date").rlike(r"^\d{4}-\d{2}-\d{2}"), "iso").otherwise(
+    F.when(F.col("date").rlike(r"^\d{1,2}/\d{1,2}/\d{4}"), "slash").otherwise("other")
+)
+datefmt_cohort = population_by_group(
+    df.withColumn("__fmt", fmt_col),
+    "__fmt",
+    ["clicks", "impressions", "position", "clickThrough", "country", "device"],
+)
+for g, gv in datefmt_cohort.items():
+    print(f"date-format cohort {g}: rows={gv['rows']}")
+
+# COMMAND ----------
+
 # DBTITLE 1,Metric sample for figures (one bounded sampled pass)
 mp = (
     df.select(
@@ -459,13 +315,14 @@ print("metric sample rows:", len(mp))
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- monthly volume, category distributions
+# DBTITLE 1,Figures (each gated so a blank result is never referenced)
+figs = []
 _rows_by_ym = {}
 for rd, n_ in date_rows:
     d, _ = parse_sv_date(rd)
     ym = d.strftime("%Y-%m") if d else str(rd)
     _rows_by_ym[ym] = _rows_by_ym.get(ym, 0) + n_
-barplot(
+if barplot(
     sorted(_rows_by_ym.items()),
     "Search Visibility -- rows per month (archives aggregated)",
     "month",
@@ -473,59 +330,101 @@ barplot(
     rot=90,
     figsize=(12, 4),
     filename="sv_rows_per_monthly_archive.png",
-)
-facet_bars(
+):
+    figs.append(
+        (
+            "Search Visibility rows per month (archives aggregated)",
+            "sv_rows_per_monthly_archive.png",
+        )
+    )
+if facet_bars(
     dict(dist),
     "Search Visibility -- rows by category",
     "sv_category_breakdown.png",
     rot=45,
+):
+    figs.append(("Search Visibility rows by category", "sv_category_breakdown.png"))
+
+_ym_cl = {}
+for rd, cl, im in monthly:
+    d, _ = parse_sv_date(rd)
+    ym = d.strftime("%Y-%m") if d else str(rd)
+    a, b = _ym_cl.get(ym, (0.0, 0.0))
+    _ym_cl[ym] = (a + (cl or 0), b + (im or 0))
+_ym_sorted = sorted(_ym_cl)
+_fig, _ax = plt.subplots(figsize=(12, 4))
+_ax.plot(
+    range(len(_ym_sorted)),
+    [_ym_cl[y][1] for y in _ym_sorted],
+    marker=".",
+    label="impressions",
 )
-xs = [d for d, _, _ in monthly]
-plt.figure(figsize=(12, 4))
-plt.plot(xs, [i for _, _, i in monthly], marker=".", label="impressions")
-plt.plot(xs, [c for _, c, _ in monthly], marker=".", label="clicks")
-plt.legend()
-plt.title("Search Visibility -- total clicks & impressions per month")
-plt.xticks(rotation=90)
-plt.tight_layout()
-plt.savefig(
-    fig_path("sv_clicks_impressions_per_month.png"), dpi=110, bbox_inches="tight"
+_ax.plot(
+    range(len(_ym_sorted)),
+    [_ym_cl[y][0] for y in _ym_sorted],
+    marker=".",
+    label="clicks",
 )
-plt.show()
+_ax.set_xticks(range(len(_ym_sorted)))
+_ax.set_xticklabels(_ym_sorted, rotation=90, fontsize=7)
+_ax.legend()
+_ax.set_title("Search Visibility -- total clicks & impressions per month")
+_fig.tight_layout()
+_save_and_show(_fig, "sv_clicks_impressions_per_month.png")
+figs.append(
+    (
+        "Search Visibility total clicks & impressions per month",
+        "sv_clicks_impressions_per_month.png",
+    )
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- metric distributions, clicks vs impressions, position & CTR
-facet_hists(
+# DBTITLE 1,Figures -- metric distributions, clicks vs impressions, position & CTR
+if facet_hists(
     {c: mp[c].dropna().tolist() for c in ("clicks", "impressions", "position")},
     "Search Visibility -- metric distributions (sampled)",
     "sv_metric_distributions.png",
-)
-sc = mp[(mp["clicks"] > 0) & (mp["impressions"] > 0)]
-if len(sc):
-    plt.figure(figsize=(6, 6))
-    plt.loglog(sc["impressions"], sc["clicks"], marker=".", linestyle="none", alpha=0.3)
-    plt.title("Search Visibility -- clicks vs impressions (sampled)")
-    plt.xlabel("impressions")
-    plt.ylabel("clicks")
-    plt.tight_layout()
-    plt.savefig(fig_path("sv_clicks_vs_impressions.png"), dpi=110, bbox_inches="tight")
-    plt.show()
-barplot(
+):
+    figs.append(
+        ("Search Visibility metric distributions", "sv_metric_distributions.png")
+    )
+_scp = mp[(mp["clicks"] > 0) & (mp["impressions"] > 0)]
+if len(_scp):
+    _fig, _ax = plt.subplots(figsize=(6, 6))
+    _ax.loglog(
+        _scp["impressions"], _scp["clicks"], marker=".", linestyle="none", alpha=0.3
+    )
+    _ax.set_title("Search Visibility -- clicks vs impressions (sampled)")
+    _ax.set_xlabel("impressions")
+    _ax.set_ylabel("clicks")
+    _fig.tight_layout()
+    _save_and_show(_fig, "sv_clicks_vs_impressions.png")
+    figs.append(
+        (
+            "Search Visibility clicks vs impressions (sampled)",
+            "sv_clicks_vs_impressions.png",
+        )
+    )
+if barplot(
     pos_dist,
     "Search Visibility -- rows by rounded position",
     "position",
     "rows",
     filename="sv_rows_by_position.png",
-)
-plt.figure(figsize=(10, 4))
-plt.plot([p for p, _ in pos_ctr], [c for _, c in pos_ctr], marker="o")
-plt.title("Search Visibility -- CTR by search position")
-plt.xlabel("position")
-plt.ylabel("CTR")
-plt.tight_layout()
-plt.savefig(fig_path("sv_ctr_by_position.png"), dpi=110, bbox_inches="tight")
-plt.show()
+):
+    figs.append(
+        ("Search Visibility rows by rounded position", "sv_rows_by_position.png")
+    )
+if barplot(
+    [(p, round(c, 4)) for p, c in pos_ctr if c is not None],
+    "Search Visibility -- CTR by search position",
+    "position",
+    "CTR",
+    figsize=(10, 4),
+    filename="sv_ctr_by_position.png",
+):
+    figs.append(("Search Visibility CTR by search position", "sv_ctr_by_position.png"))
 
 # COMMAND ----------
 
@@ -596,6 +495,22 @@ _entities += [
 _coverage = []
 for c in ("country", "device", "citableContent"):
     _coverage.append(f"- {c}: {dist[c]}")
+_coverage.append("")
+_coverage.append(
+    para(
+        f"{len(repo_cov)} repositories, {acd.get('url')} distinct urls.",
+        "Coverage is uneven: a repository's dates/countries range widely (see Entities), so a",
+        "url/repository absent from an archive is a real gap, not a zero -- an inner join across",
+        "months silently drops the short-history repositories.",
+    )
+)
+_coverage.append(
+    para(
+        "This is a fixed 2017 archive set (open-access institutional repositories), not a live",
+        "feed -- ranking behaviour, the search engine's algorithm and the corpus have all moved",
+        "on since; a model built on it is frozen to 2017.",
+    )
+)
 
 _index_numeric = M["index_min"] is not None or M["index_max"] is not None
 _dist = ["| metric | min | max | avg |", "|---|---|---|---|"]
@@ -674,50 +589,183 @@ if bad_ratio or _neg:
         "- Add validity flags for clicks<=impressions and non-negative metrics."
     )
 
-_ml_readiness = [
-    (
-        "Candidate target signals: `clicks`, `clickThrough` (CTR), and `position` per url are "
-        "plausible forecasting/ranking-optimisation targets, keyed by the candidate key "
-        f"{KEY}."
+_domain = [
+    para(
+        "`device` vs the known set (desktop / mobile / tablet):",
+        f"unexpected={device_domain['unexpected'] or 'none'}.",
     ),
-    (
-        "Leakage: search `position`/`index` are themselves influenced by prior clicks/CTR in most "
-        "search-ranking systems -- using a concurrent-period position as a feature to predict CTR "
-        "(or vice versa) risks a feedback-loop leak; any predictive use case must use position/CTR "
-        "from a period strictly before the target period, not the same monthly archive."
-    ),
-    (
-        f"Grain and entity-grouped split: candidate key = {KEY}, with `date` being a "
-        f"{'monthly' if len(dom) <= 1 else 'daily/other'} archive marker, not a daily timestamp -- "
-        "split by repository_id or url (not by row), so a url's monthly history stays on one side of "
-        "a split."
-    ),
-    (
-        "Join cardinality: this notebook does not assess the events <-> repository join -- see "
-        "02_search_visibility_relationships_and_findings.py for the confirmed cardinality and "
-        "referential-integrity numbers before joining on repository_id."
-    ),
-    (
-        "Imbalance: not applicable -- clicks/impressions/position are continuous; country/device/"
-        "citableContent distributions (Coverage) are categorical breakdowns, not a modelling target."
-    ),
-    (
-        "Sample-vs-full divergence: the metric-distribution and clicks-vs-impressions figures draw "
-        "from `mp`, a 10% sample capped at 150k rows -- use the full-table `M` aggregate "
-        "(min/max/avg/percentiles per metric) above for any feature-quality or threshold decision, "
-        "not these sampled figures."
+    para(
+        f"`position` bounds: {pos_bounds['below_1']} rows < 1, {pos_bounds['above_100']} rows > 100 "
+        f"of {pos_bounds['present']} present -- a search rank below 1 or far past 100 is not valid.",
     ),
 ]
-if db["conflicting_metrics"]:
-    _ml_readiness.append(
-        f"{db['conflicting_metrics']} candidate-key groups have conflicting metric values (see "
-        "Data Quality) -- resolve deterministically before using this table as a training source."
+
+_cohort = [
+    para(
+        "`date` mixes an ISO archive vintage and an M/D/YYYY one. Per-cohort row",
+        "count and per-column null-rate / distinct -- a large difference is a",
+        "staging inconsistency (the two archive sets were built differently), not a",
+        "data-quality finding about the source.",
+    ),
+    "",
+    "| cohort | rows | clicks null | impressions null | position null | country distinct | device distinct |",
+    "|---|---|---|---|---|---|---|",
+]
+for g, gv in sorted(datefmt_cohort.items()):
+    c = gv["columns"]
+    _cohort.append(
+        f"| {g} | {gv['rows']} | {c['clicks']['null_rate']} | {c['impressions']['null_rate']} | "
+        f"{c['position']['null_rate']} | {c['country']['distinct']} | {c['device']['distinct']} |"
     )
-if bad_ratio:
-    _ml_readiness.append(
-        f"{bad_ratio} rows have clicks > impressions -- exclude or flag these before computing a "
-        "CTR-based target, since CTR > 1 is not a physically valid label."
-    )
+
+_temporal_sem = [
+    para(
+        f"`date` is a {_gran} archive marker, not a daily timestamp",
+        f"(distinct day-of-month values: {dom}).",
+        f"It mixes {len([k for k in date_fmt_counts if k != '<unparsed>'])} raw formats",
+        f"({date_fmt_counts}) -- parsing only ISO makes the M/D/YYYY archives look absent.",
+    ),
+    f"Months present ({len(yms)}): {yms}.",
+    f"Missing months within span: {missing_months or 'none'}.",
+    para(
+        "There is no time zone on `date` -- it is a report period, not an instant. Model it as a",
+        "monthly bucket; do not attempt an hourly join.",
+    ),
+]
+
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                f"Candidate key = {KEY}; `date` is a {_gran} archive marker. Grain is one row per "
+                "(repository, url, month, country, device). Aggregating over country/device drifts it."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                "events -> repository on repository_id is checked in "
+                "02_search_visibility_relationships_and_findings.py -- do not assume 1:N without its "
+                "orphan/fan-out numbers."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                "Targets: clicks, CTR, position per url. CTR = clicks/impressions, so clicks and "
+                "impressions must not both be features for a CTR target; position at the target period "
+                "must not be a feature for a click target."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "position and clicks in a search-ranking system are mutually causal within a period -- use "
+                "position / CTR from a period STRICTLY before the target month, never the same archive."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "`index` and `repository_id` are near-unique proxies for a specific corpus; url is a "
+                "proxy for a specific document -- a model given them memorises rather than generalises."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Split by repository_id or by url (hash), not by row -- a url's monthly history is "
+                "autocorrelated and must stay on one side."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "url / repository attributes (citableContent, ir_platform in the dim) may change over the "
+                "archive span -- join the value as of the archive month, not the latest."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                f"{len(repo_cov)} repositories with widely different date/country coverage; "
+                f"{len(missing_months)} missing months. A model trained on the full panel over-weights "
+                "the long-history repositories."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                f"{date_fmt_counts.get('<unparsed>', 0)} unparsed date values; category breakdowns above. "
+                "Whether a url appears in an archive at all is informative (it ranked somewhere) -- an "
+                "'appeared' flag leaks the outcome."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            (
+                f"Candidate key: distinct={db['distinct_keys']}/{total}, dup groups={db['dup_groups']}, "
+                f"identical={db['identical']}, conflicting metrics={db['conflicting_metrics']} -- "
+                "de-duplicate (and resolve conflicts) before counting or splitting."
+            ),
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "All columns share the archive month -- there is no finer alignment available, so any "
+                "before/after feature must be built at the month granularity, one lag minimum."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            (
+                f"{bad_ratio} rows have clicks > impressions (CTR > 1 is not valid); negative metrics: "
+                f"{ {c: M[c + '_negative'] for c in num if M[c + '_negative']} }. Exclude/flag before a "
+                "CTR target. clickThrough is redundant with clicks/impressions."
+            ),
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "This is Google Search Console-style aggregated data -- position is an average over "
+                "impressions, clicks are de-duplicated by Google's own rules; the aggregation method is "
+                "part of the data-generation process and changed over Search Console's history."
+            ),
+        ),
+        (
+            "Class / label instability",
+            (
+                "Not applicable -- clicks/impressions/position are continuous. `device` and "
+                "`citableContent` are stable low-cardinality enums."
+            ),
+        ),
+        (
+            "Label availability lag",
+            (
+                "Search Console data for a month is finalised ~3 days after month end and can be revised "
+                "for ~16 months -- a real-time model cannot use the current month's figures."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "PRIMARY concern: this is a 2017 archive. Google's ranking algorithm, the mobile-first "
+                "index rollout and Search Console's own reporting all changed since -- do not treat it as "
+                "representative of current search behaviour. Regime / Version Evidence above also "
+                "measures whether the ISO and M/D/YYYY archive cohorts differ in scale / completeness."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            (
+                "Metric-distribution and clicks-vs-impressions figures draw from `mp`, a 10% sample capped "
+                "at 150k rows -- use the full-table `M` aggregate for any feature-quality or threshold "
+                "decision."
+            ),
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -726,30 +774,15 @@ write_profiling(
     [
         ("Profile", "\n".join(_prof)),
         ("Data Quality", "\n".join(_dq)),
-        ("Temporal", "\n".join(_temporal)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
+        ("Regime / Version Evidence", "\n".join(_cohort)),
+        ("Temporal Semantics", "\n".join(_temporal_sem)),
         ("Entities / Keys", "\n".join(_entities)),
-        ("Coverage", "\n".join(_coverage)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        ("Search Visibility CTR by search position", "sv_ctr_by_position.png"),
-        (
-            "Search Visibility total clicks & impressions per month",
-            "sv_clicks_impressions_per_month.png",
-        ),
-        (
-            "Search Visibility clicks vs impressions (sampled)",
-            "sv_clicks_vs_impressions.png",
-        ),
-        ("Search Visibility rows by rounded position", "sv_rows_by_position.png"),
-        (
-            "Search Visibility rows per month (archives aggregated)",
-            "sv_rows_per_monthly_archive.png",
-        ),
-        ("Search Visibility rows by category", "sv_category_breakdown.png"),
-        ("Search Visibility metric distributions", "sv_metric_distributions.png"),
-    ],
+    figures=figs,
 )

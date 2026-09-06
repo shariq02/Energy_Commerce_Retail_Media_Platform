@@ -245,6 +245,89 @@ print("coverage bias:", cov)
 
 # COMMAND ----------
 
+# DBTITLE 1,Cross-table spatial consistency -- internal geographic agreement (no external shapefile)
+# Only the einheiten_* tables carry coordinates; lokationen / netzanschlusspunkte
+# carry none, so there is no second table to reconcile lat/lon against. What IS
+# checkable without external data: a unit's own geographic attributes must agree
+# with each other, and units sharing a location must sit in the same place.
+REGION_HINTS = ("bundesland",)
+AGS_HINTS = ("gemeindeschluessel", "gemeindeschl")
+PLZ_HINTS = ("postleitzahl", "plz")
+LOK_HINTS = ("lokationmastrnummer",)
+spatial_consistency = {}
+for name, df in frames.items():
+    cols = df.columns
+    reg = next((c for c in cols if any(h in c.lower() for h in REGION_HINTS)), None)
+    ags = next((c for c in cols if any(h in c.lower() for h in AGS_HINTS)), None)
+    plz = next((c for c in cols if any(h in c.lower() for h in PLZ_HINTS)), None)
+    lok = next((c for c in cols if any(h in c.lower() for h in LOK_HINTS)), None)
+    lat_col = next((c for c in cols if any(h in c.lower() for h in LAT_HINTS)), None)
+    lon_col = next((c for c in cols if any(h in c.lower() for h in LON_HINTS)), None)
+    checks = []
+    if reg and ags:
+        checks.append(
+            (
+                "Bundesland code vs municipality-key (AGS) prefix",
+                group_attribute_spread(df, reg, ags, transform="prefix2"),
+            )
+        )
+    if ags and plz:
+        checks.append(
+            (
+                "municipality-key (AGS) vs postcode prefix",
+                group_attribute_spread(df, ags, plz, transform="prefix2"),
+            )
+        )
+    if lok and lat_col and lon_col:
+        dfc = df.withColumn(
+            "__coordkey",
+            F.concat_ws(
+                "|",
+                F.round(F.col(lat_col).cast("double"), 2),
+                F.round(F.col(lon_col).cast("double"), 2),
+            ),
+        )
+        checks.append(
+            (
+                "units sharing a LokationMaStRNummer vs their coordinates (2dp)",
+                group_attribute_spread(dfc, lok, "__coordkey"),
+            )
+        )
+    spatial_consistency[name] = checks
+    for lbl, res in checks:
+        print(
+            f"{name}: {lbl} -- {res['inconsistent_groups']}/{res['groups']} groups "
+            f"inconsistent (max distinct in one group = "
+            f"{res['max_distinct_values_in_a_group']})"
+        )
+
+# COMMAND ----------
+
+# DBTITLE 1,Regime / version evidence -- measured field population across the 2019 migration
+# MaStR bulk-migrated the legacy Anlagenregister in early 2019, then took native
+# registrations afterwards. Split on the registration date and measure, per
+# column, how differently the two cohorts are populated -- evidence for a
+# migration-era indicator, not a narrative warning.
+REGIME_CUT = "2019-06-01"
+REG_DATE_HINTS = ("registrierungsdatum",)
+regime = {}
+for name, df in frames.items():
+    rdc = next(
+        (c for c in df.columns if any(h in c.lower() for h in REG_DATE_HINTS)), None
+    )
+    if not rdc:
+        regime[name] = None
+        continue
+    shift = regime_population_shift(df, rdc, df.columns, REGIME_CUT)
+    regime[name] = {"date_col": rdc, **shift}
+    print(
+        f"{name}: split on `{rdc}` @ {REGIME_CUT} -> pre={shift['pre_rows']} "
+        f"post={shift['post_rows']} undated={shift['undated_rows']}; "
+        f"columns flipping populated/empty across the cut: {shift['flipped']}"
+    )
+
+# COMMAND ----------
+
 # DBTITLE 1,Figure -- rows / columns / duplicates / exact PK ratio per table
 best_ratio = {
     d: max((u["ratio"] for u in key_report[d].values()), default=0.0) for d in DATASETS
@@ -396,6 +479,74 @@ _ri = [
         "notebook only establishes each table's own-entity key."
     )
 ]
+
+_spatial = [
+    para(
+        "Only the einheiten_* tables carry latitude/longitude -- lokationen,",
+        "netzanschlusspunkte and netze carry no coordinates, so a cross-table",
+        "lat/lon reconciliation is NOT possible (limitation, not a finding).",
+        "The checks below are internal geographic agreement, no external",
+        "shapefile: each is `inconsistent groups / total groups`.",
+    ),
+    "",
+]
+for d in DATASETS:
+    if not spatial_consistency.get(d):
+        continue
+    for lbl, res in spatial_consistency[d]:
+        _spatial.append(
+            f"- {d}: {lbl} -- {res['inconsistent_groups']}/{res['groups']} "
+            f"inconsistent (worst group holds "
+            f"{res['max_distinct_values_in_a_group']} distinct values)."
+        )
+if len(_spatial) <= 2:
+    _spatial.append("- No table exposed a checkable pair of geographic columns.")
+_spatial.append(
+    para(
+        "A non-zero inconsistent count is a source-data finding (a unit whose",
+        "stated region, municipality key and coordinates disagree); it does not",
+        "prove which attribute is wrong.",
+    )
+)
+
+_regime = [
+    para(
+        f"Rows split on the registration date at {REGIME_CUT} (the MaStR legacy",
+        "migration wave vs native registrations). Per-column null-rate and",
+        "distinct-value count on each side; `flipped` = null-rate moves >= 50",
+        "points across the cut.",
+    ),
+    "",
+]
+for d in DATASETS:
+    rg = regime.get(d)
+    if not rg:
+        _regime.append(f"- {d}: no registration-date column -- not assessable.")
+        continue
+    _regime.append(
+        f"- {d} (`{rg['date_col']}`): pre={rg['pre_rows']}, post={rg['post_rows']}, "
+        f"undated={rg['undated_rows']}."
+    )
+    if rg["flipped"]:
+        _regime.append(
+            f"  - columns populated on one side of the cut only: {rg['flipped']}"
+        )
+        for c in rg["flipped"][:10]:
+            v = rg["per_column"][c]
+            _regime.append(
+                f"    - `{c}`: null-rate pre={v['pre_null_rate']} post={v['post_null_rate']}; "
+                f"distinct pre={v['pre_distinct']} post={v['post_distinct']}."
+            )
+    else:
+        _regime.append("  - no column flips populated/empty across the cut.")
+_regime.append(
+    para(
+        "This is a source/version-regime property: pre-migration rows are a",
+        "different data-generating process from native ones. Carry a",
+        "migration-era flag on any feature drawn from these tables; this notebook",
+        "quantifies the gap, it does not choose the feature.",
+    )
+)
 
 _dist = []
 for d in DATASETS:
@@ -557,9 +708,10 @@ _ml = ml_readiness_block(
         (
             "Source / version / regime change",
             (
-                "MaStR replaced the older EEG/Anlagenregister in 2019; pre-2019 units were bulk-migrated "
-                "and their attribute completeness differs from natively-registered units -- a "
-                "registration-era indicator is warranted."
+                "MaStR replaced the older EEG/Anlagenregister in 2019; pre-2019 units were bulk-migrated. "
+                "Regime / Version Evidence above measures the population gap across the "
+                f"{REGIME_CUT} cut per column -- a registration-era indicator is warranted where columns "
+                "flip populated/empty."
             ),
         ),
         (
@@ -582,6 +734,8 @@ write_profiling(
         ("Entities / Keys", "\n".join(_entities)),
         ("Unit & Semantic Validation", "\n".join(_unit)),
         ("Temporal Semantics", "\n".join(_temporal)),
+        ("Spatial Consistency", "\n".join(_spatial)),
+        ("Regime / Version Evidence", "\n".join(_regime)),
         ("Referential Integrity", "\n".join(_ri)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),

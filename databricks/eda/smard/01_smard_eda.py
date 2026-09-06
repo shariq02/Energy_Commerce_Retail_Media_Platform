@@ -10,27 +10,27 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** August 2026
+# MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Profile smard_energy_timeseries (one long-format Bronze
-# MAGIC table: metric / filter_id / region / resolution / timestamp_utc /
-# MAGIC value) -- schema, missingness, constant columns, metric & region
-# MAGIC cardinality, metric x region x resolution coverage, per-series temporal
-# MAGIC continuity (expected vs actual points, gaps), temporal activity, value
-# MAGIC ranges & distributions & suspicious values, per-series duplicates
-# MAGIC (identical vs conflicting) -- as evidence for Silver design.
+# MAGIC table: metric / filter_id / region / resolution / timestamp_utc / value)
+# MAGIC -- schema, missingness, constant columns, metric x region x resolution
+# MAGIC coverage, per-series temporal continuity against an independent calendar,
+# MAGIC value ranges and sign, exact-copy / sign-mirror metrics (a forecast
+# MAGIC series that is the negative of another), per-(series, ts) duplicates
+# MAGIC (identical vs conflicting), and the layered modelling-risk checklist --
+# MAGIC as evidence for Silver design.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -42,9 +42,11 @@ NB_KEY = "01_smard"
 SECTION_TITLE = "SMARD energy time series (smard_energy_timeseries)"
 TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.smard_energy_timeseries"
 SERIES_KEY = ["metric", "filter_id", "region", "resolution"]
+# SMARD publishes on Europe/Berlin wall-clock; the Bronze column is named
+# timestamp_utc, so the loader is expected to have converted -- flagged for
+# verification in Temporal Semantics.
+TS_TZ = "UTC (per column name; SMARD source is Europe/Berlin -- verify the load)"
 
-# Nominal seconds between points per SMARD resolution label (month/year are
-# variable-length and skipped from the expected-vs-actual check).
 RESOLUTION_SECONDS = {
     "quarterhour": 900,
     "quarter_hour": 900,
@@ -58,10 +60,9 @@ RESOLUTION_SECONDS = {
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers
 
-
-def as_ts(col: str):
+# DBTITLE 1,Helpers -- SMARD timestamp (epoch-ms / epoch-s / ISO) + resolution step
+def as_ts(col):
     c = F.col(col).cast("string")
     return F.coalesce(
         F.to_timestamp(c),
@@ -77,186 +78,11 @@ def step_col():
     return e
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-def histplot(values, title, xlabel, bins=50, filename=None):
-    plt.figure(figsize=(10, 4))
-    plt.hist(values, bins=bins)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel("count")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -267,7 +93,7 @@ df = spark.table(TABLE)
 COLS = df.columns
 exprs = [F.count(F.lit(1)).alias("__rows")]
 for c in COLS:
-    miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
+    miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
     exprs += [
         F.sum(miss.cast("long")).alias(c + "__m"),
         F.approx_count_distinct(c).alias(c + "__d"),
@@ -275,14 +101,24 @@ for c in COLS:
 r = df.agg(*exprs).first().asDict()
 total = r["__rows"]
 acd = {c: r[c + "__d"] for c in COLS}
-constant_cols = [c for c in COLS if acd[c] <= 1]
+constant_cands = [c for c in COLS if acd[c] <= 1]
+constant_cols = (
+    sorted(
+        c
+        for c in constant_cands
+        if (df.agg(F.countDistinct(F.col(c)).alias(c)).first()[c] or 0) <= 1
+    )
+    if constant_cands
+    else []
+)
+distinct_rows = df.distinct().count()
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:
     print(
-        f"  {c:<14} missing={r[c + '__m']:>12} rate={r[c + '__m'] / total:.4f} approx_distinct={acd[c]}"
+        f"  {c:<14} missing={r[c + '__m']:>12} "
+        f"rate={r[c + '__m'] / total:.4f} approx_distinct={acd[c]}"
     )
-print("constant columns:", constant_cols)
-distinct_rows = df.distinct().count()
+print("constant columns (exact):", constant_cols)
 print("exact full-row duplicates:", total - distinct_rows)
 
 # COMMAND ----------
@@ -318,9 +154,6 @@ print(
     f"metrics={len(metrics)} regions={len(regions)} resolutions={len(resolutions)}  "
     f"present={len(present)}  absent={len(missing_combos)}"
 )
-print("absent combos:", missing_combos[:50])
-print("regions per metric:", metric_regions)
-print("resolutions per metric:", metric_res)
 
 # COMMAND ----------
 
@@ -333,6 +166,9 @@ db = (
     dk.agg(
         F.count(F.lit(1)).alias("series_ts_keys"),
         F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
+        F.sum(((F.col("n") > 1) & (F.col("value_variants") == 1)).cast("long")).alias(
+            "identical"
+        ),
         F.sum(((F.col("n") > 1) & (F.col("value_variants") > 1)).cast("long")).alias(
             "conflicting"
         ),
@@ -352,17 +188,11 @@ series = (
     .collect()
 )
 series_rows = [("|".join(str(x[k]) for k in SERIES_KEY), x["rows"]) for x in series]
-print(f"distinct series = {len(series)}")
-print(
-    "(series, ts) dup groups:",
-    db["dup_groups"],
-    " conflicting values:",
-    db["conflicting"],
-)
+print(f"distinct series = {len(series)}  (series,ts) dups: {db}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Value stats + filter_id cardinality per metric (one groupBy)
+# DBTITLE 1,Value stats per metric (one groupBy)
 v = F.col("value").cast("double")
 bm = (
     df.groupBy("metric")
@@ -395,32 +225,41 @@ for m, x in by_metric.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Exact-copy / sign-mirror metrics (a forecast series that is -1x another)
+metric_stats = {
+    m: {"mean": x["mean"], "sd": x["sd"], "min": x["min"], "max": x["max"]}
+    for m, x in by_metric.items()
+    if x["sd"] is not None
+}
+mirrors = mirror_columns(metric_stats)
+print("mirror / duplicate metric pairs:")
+for a, b, why in mirrors:
+    print(f"  {a}  <->  {b}  : {why}")
+
+# COMMAND ----------
+
 # DBTITLE 1,5-sigma outliers per metric (one agg using collected mean/sd)
-oe = []
-for m, x in by_metric.items():
-    if x["sd"] and x["sd"] > 0:
-        oe.append(
-            F.sum(
-                ((F.col("metric") == m) & (F.abs(v - x["mean"]) > 5 * x["sd"])).cast(
-                    "long"
-                )
-            ).alias(m)
-        )
+oe = [
+    F.sum(
+        ((F.col("metric") == m) & (F.abs(v - x["mean"]) > 5 * x["sd"])).cast("long")
+    ).alias(m)
+    for m, x in by_metric.items()
+    if x["sd"] and x["sd"] > 0
+]
 outliers = df.agg(*oe).first().asDict() if oe else {}
 print("rows beyond 5 sigma per metric:", outliers)
 
 # COMMAND ----------
 
-# DBTITLE 1,Per-series temporal continuity -- one windowed pass
+# DBTITLE 1,Per-series temporal continuity vs an INDEPENDENT calendar (one windowed pass)
 w = Window.partitionBy(*SERIES_KEY).orderBy("ts")
-sd = (
+sd_rows = (
     df.select(*SERIES_KEY, as_ts("timestamp_utc").alias("ts"), step_col().alias("step"))
     .where(F.col("ts").isNotNull() & F.col("step").isNotNull())
     .distinct()
     .withColumn(
         # Round before subtracting 1: SMARD day/hour timestamps carry DST jumps
-        # (25h / 23h steps), which otherwise produced fractional "missing steps"
-        # like 0.0417 instead of 0.
+        # (25h / 23h steps) that otherwise yield fractional "missing steps".
         "gap_steps",
         F.round(
             (F.col("ts").cast("long") - F.lag("ts").over(w).cast("long"))
@@ -442,7 +281,7 @@ sd = (
     )
 ).collect()
 continuity = []
-for x in sd:
+for x in sd_rows:
     exp = round((x["max_ts"].timestamp() - x["min_ts"].timestamp()) / x["step"]) + 1
     continuity.append(
         {
@@ -451,33 +290,155 @@ for x in sd:
             "observed": x["observed"],
             "expected": exp,
             "coverage_pct": round(x["observed"] / exp * 100, 2) if exp else None,
-            "longest_gap": x["longest_gap"],
-            "missing_steps": x["missing_steps"],
+            "longest_gap": x["longest_gap"] or 0,
+            "missing_steps": x["missing_steps"] or 0,
         }
     )
-    print(continuity[-1])
+for c in continuity:
+    print(c)
 
 # COMMAND ----------
 
-# DBTITLE 1,Temporal activity -- rows per year and per month (one groupBy)
+# DBTITLE 1,Temporal activity -- rows per year (one groupBy)
 ym = (
-    df.groupBy(
-        F.year(as_ts("timestamp_utc")).alias("year"),
-        F.date_format(as_ts("timestamp_utc"), "yyyy-MM").alias("month"),
-    )
+    df.groupBy(F.year(as_ts("timestamp_utc")).alias("year"))
     .count()
+    .orderBy("year")
     .collect()
 )
-by_year = {}
-by_month = {}
-for x in ym:
-    by_year[x["year"]] = by_year.get(x["year"], 0) + x["count"]
-    by_month[x["month"]] = by_month.get(x["month"], 0) + x["count"]
+by_year = {x["year"]: x["count"] for x in ym}
 print("by year:", sorted(by_year.items()))
 
 # COMMAND ----------
 
-# DBTITLE 1,Value sample + per-metric time-series windows
+# DBTITLE 1,Categorical / domain validation -- resolution + region against known sets
+KNOWN_REGIONS = {
+    "DE",
+    "DE-LU",
+    "AT",
+    "LU",
+    "50Hertz",
+    "Amprion",
+    "TenneT",
+    "TransnetBW",
+    "DE-AT-LU",
+}
+res_domain = categorical_domain(
+    df, "resolution", RESOLUTION_SECONDS.keys(), name="resolution"
+)
+region_domain = categorical_domain(df, "region", KNOWN_REGIONS, name="region")
+print("resolution domain:", res_domain)
+print("region domain:", region_domain)
+
+# COMMAND ----------
+
+# DBTITLE 1,Temporal consistency -- does every forecast metric have a realised counterpart on the same grid?
+forecast_metrics = [m for m in metrics if str(m).startswith("forecast_")]
+forecast_pairing = []
+for fm in forecast_metrics:
+    rm = fm[len("forecast_") :]
+    realised = (
+        rm
+        if rm in metrics
+        else next((m for m in metrics if rm in str(m) and m != fm), None)
+    )
+    if realised is None:
+        forecast_pairing.append(
+            {"forecast": fm, "realised": None, "note": "no realised metric by name"}
+        )
+        continue
+    fk = df.where(F.col("metric") == fm).select(*SERIES_KEY, "timestamp_utc")
+    rk = df.where(F.col("metric") == realised).select(
+        *[F.col(k).alias(k) for k in ("filter_id", "region", "resolution")],
+        "timestamp_utc",
+    )
+    fk2 = fk.select("region", "resolution", "timestamp_utc").distinct()
+    matched = fk2.join(
+        rk.select("region", "resolution", "timestamp_utc").distinct(),
+        on=["region", "resolution", "timestamp_utc"],
+        how="left_semi",
+    ).count()
+    total_fk = fk2.count()
+    forecast_pairing.append(
+        {
+            "forecast": fm,
+            "realised": realised,
+            "forecast_points": total_fk,
+            "with_realised_same_grid": matched,
+            "coverage_pct": round(matched / total_fk * 100, 2) if total_fk else None,
+        }
+    )
+    print(forecast_pairing[-1])
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Physical consistency -- residual_load ~ load - wind - solar at the same (region, timestamp)
+def _find_metric(*subs, exclude=()):
+    for m in metrics:
+        ml = str(m).lower()
+        if all(s in ml for s in subs) and not any(x in ml for x in exclude):
+            return m
+    return None
+
+
+m_resid = _find_metric("residual", "load")
+m_load = _find_metric("load", exclude=("residual", "forecast")) or _find_metric(
+    "consumption", exclude=("forecast",)
+)
+m_wind = _find_metric(
+    "generation", "wind", exclude=("forecast", "offshore")
+) or _find_metric("wind", exclude=("forecast",))
+m_pv = _find_metric(
+    "generation", "photovoltaic", exclude=("forecast",)
+) or _find_metric("solar", exclude=("forecast",))
+residual_identity = None
+print(f"residual-load metrics: resid={m_resid} load={m_load} wind={m_wind} pv={m_pv}")
+if all((m_resid, m_load, m_wind, m_pv)):
+    piv = (
+        df.where(F.col("metric").isin([m_resid, m_load, m_wind, m_pv]))
+        .groupBy("region", "resolution", "timestamp_utc")
+        .pivot("metric", [m_resid, m_load, m_wind, m_pv])
+        .agg(F.first(F.col("value").cast("double")))
+    )
+    piv = (
+        piv.where(
+            F.col(m_resid).isNotNull()
+            & F.col(m_load).isNotNull()
+            & F.col(m_wind).isNotNull()
+            & F.col(m_pv).isNotNull()
+        )
+        .withColumn("__neg_wind", -F.col(m_wind))
+        .withColumn("__neg_pv", -F.col(m_pv))
+    )
+    residual_identity = additive_identity_check(
+        piv, m_resid, [m_load, "__neg_wind", "__neg_pv"], rel_tol=0.02, abs_floor=100.0
+    )
+    print("residual-load identity:", residual_identity)
+
+# COMMAND ----------
+
+# DBTITLE 1,Regime evidence -- metric availability + total volume per year (generation-mix shift)
+my = (
+    df.groupBy(F.year(as_ts("timestamp_utc")).alias("year"), "metric")
+    .agg(
+        F.count(F.lit(1)).alias("rows"),
+        F.sum(F.col("value").cast("double")).alias("sum_value"),
+    )
+    .collect()
+)
+metric_years = {}
+for x in my:
+    metric_years.setdefault(x["metric"], {})[x["year"]] = (x["rows"], x["sum_value"])
+metric_first_year = {m: min(y for y in yr) for m, yr in metric_years.items() if yr}
+print(
+    "metric first-seen year:",
+    sorted(metric_first_year.items(), key=lambda p: p[1] or 0),
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Samples -- value histogram + ONE representative series per metric (not mixed)
 value_pdf = (
     df.select("metric", v.alias("value"))
     .where(v.isNotNull())
@@ -485,49 +446,69 @@ value_pdf = (
     .limit(200_000)
     .toPandas()
 )
+# Pick the highest-resolution series per metric so the time-series figure plots
+# a SINGLE (metric, filter_id, region, resolution) series, not several
+# interleaved -- the earlier "per metric" plot mixed day + quarterhour + regions.
+rep_series = {}
+for x in series:
+    m = x["metric"]
+    cur = rep_series.get(m)
+    if cur is None or (x["distinct_ts"] or 0) > (cur["distinct_ts"] or 0):
+        rep_series[m] = x
 ts_pdf = {}
-for m in metrics:
+for m, s in rep_series.items():
+    cond = F.lit(True)
+    for k in SERIES_KEY:
+        cond = cond & (F.col(k) == s[k])
     ts_pdf[m] = (
-        df.where(F.col("metric") == m)
+        df.where(cond)
         .select("timestamp_utc", v.alias("value"))
-        .orderBy("timestamp_utc")
-        .limit(3000)
+        .orderBy(as_ts("timestamp_utc"))
+        .limit(4000)
         .toPandas()
     )
-print("value sample rows:", len(value_pdf))
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- series overview (rows per metric / year, coverage, longest gap)
-facet_bars(
+figs = []
+_cov_pairs = [
+    (c["series"], c["coverage_pct"])
+    for c in continuity
+    if c["coverage_pct"] is not None and c["coverage_pct"] < 100
+]
+if facet_bars(
     {
         "rows per metric": dist.get("metric", []),
         "rows per year": sorted(by_year.items()),
-        "rows per series": series_rows,
-        "per-series coverage %": [
-            (c["series"], c["coverage_pct"])
-            for c in continuity
-            if c["coverage_pct"] is not None
-        ],
-        "per-series longest gap (steps)": [
+        "series with <100% coverage": _cov_pairs or [("all series 100%", 0)],
+        "series longest gap (steps)": [
             (c["series"], c["longest_gap"]) for c in continuity if c["longest_gap"]
-        ],
+        ]
+        or [("no gaps", 0)],
     },
     "SMARD -- series overview",
     "smard_series_overview.png",
     rot=90,
     ncols=2,
-)
+):
+    figs.append(("SMARD series overview", "smard_series_overview.png"))
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- value distribution + time series per metric (faceted)
-facet_hists(
+# DBTITLE 1,Figure -- value distribution + one representative series per metric
+if facet_hists(
     {m: value_pdf.loc[value_pdf["metric"] == m, "value"].tolist() for m in metrics},
     "SMARD -- value distribution per metric (sampled)",
     "smard_value_distributions.png",
     ncols=4,
-)
+):
+    figs.append(
+        (
+            "SMARD value distribution per metric (sampled)",
+            "smard_value_distributions.png",
+        )
+    )
 
 
 def _ts_draw(pdf):
@@ -537,33 +518,59 @@ def _ts_draw(pdf):
     return draw
 
 
-_facet_grid(
-    [(m, _ts_draw(ts_pdf[m])) for m in metrics if not ts_pdf[m].empty],
-    "SMARD -- first 3000 points per metric",
+if _facet_grid(
+    [
+        (
+            f"{m}\n{rep_series[m]['region']}|{rep_series[m]['resolution']}",
+            _ts_draw(ts_pdf[m]),
+        )
+        for m in metrics
+        if not ts_pdf[m].empty
+    ],
+    "SMARD -- first 4000 points of one representative series per metric",
     "smard_time_series.png",
     ncols=4,
-)
+):
+    figs.append(
+        (
+            "SMARD -- one representative series per metric (chronological)",
+            "smard_time_series.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- metric|region x resolution coverage heatmap
-labels_mr = [f"{m}|{rg}" for m in metrics for rg in regions]
+labels_mr = [
+    f"{m}|{rg}"
+    for m in metrics
+    for rg in regions
+    if any((m, rg, rs) in present for rs in resolutions)
+]
 grid = np.array(
     [
         [1 if (m, rg, rs) in present else 0 for rs in resolutions]
         for m in metrics
         for rg in regions
+        if any((m, rg, rs2) in present for rs2 in resolutions)
     ],
     dtype=float,
 )
-plt.figure(figsize=(max(5, 1.2 * len(resolutions)), max(3, 0.35 * len(labels_mr))))
-plt.imshow(grid, aspect="auto", cmap="Greens")
-plt.xticks(range(len(resolutions)), resolutions, rotation=45, ha="right")
-plt.yticks(range(len(labels_mr)), labels_mr, fontsize=7)
-plt.title("SMARD -- metric|region x resolution presence")
-plt.tight_layout()
-plt.savefig(fig_path("smard_coverage_matrix.png"), dpi=110, bbox_inches="tight")
-plt.show()
+if grid.size:
+    fig, ax = plt.subplots(
+        figsize=(max(4, 1.1 * len(resolutions)), max(3, 0.28 * len(labels_mr)))
+    )
+    ax.imshow(grid, aspect="auto", cmap="Greens")
+    ax.set_xticks(range(len(resolutions)))
+    ax.set_xticklabels(resolutions, rotation=45, ha="right")
+    ax.set_yticks(range(len(labels_mr)))
+    ax.set_yticklabels(labels_mr, fontsize=6)
+    ax.set_title("SMARD -- present metric|region x resolution")
+    fig.tight_layout()
+    _save_and_show(fig, "smard_coverage_matrix.png")
+    figs.append(
+        ("SMARD metric|region x resolution presence", "smard_coverage_matrix.png")
+    )
 
 # COMMAND ----------
 
@@ -572,27 +579,11 @@ print("constant columns:", constant_cols)
 print(
     "exact duplicates:",
     total - distinct_rows,
-    " conflicting (series,ts) keys:",
+    " conflicting (series,ts):",
     db["conflicting"],
 )
-print(
-    "distinct series:",
-    len(series),
-    " absent (metric,region,resolution) combos:",
-    len(missing_combos),
-)
-print(
-    "per-series coverage % (sample):",
-    [c["coverage_pct"] for c in continuity if c["coverage_pct"] is not None][:20],
-)
+print("mirror metrics:", mirrors)
 print("5-sigma outliers per metric:", outliers)
-print(
-    "value ranges / zero / negative per metric:",
-    {
-        m: {k: x[k] for k in ("min", "max", "zero_rows", "negative_rows")}
-        for m, x in by_metric.items()
-    },
-)
 
 # COMMAND ----------
 
@@ -602,33 +593,69 @@ for c in COLS:
     _prof.append(f"| {c} | {r[c + '__m']} | {r[c + '__m'] / total:.4f} | {acd[c]} |")
 _prof += [
     "",
-    (
-        f"Rows: {total}. Long format, series key = {SERIES_KEY}. "
-        f"Constant columns: {constant_cols or 'none'}. "
-        f"Distinct series: {len(series)}."
+    para(
+        f"Rows: {total}. Long format, series key = {SERIES_KEY}.",
+        f"Constant columns: {constant_cols or 'none'}. Distinct series: {len(series)}.",
     ),
 ]
 
 _dq = [
     f"Exact full-row duplicates: {total - distinct_rows}.",
-    (
-        f"(series, timestamp_utc) duplicate groups: {db['dup_groups']}, "
-        f"of which conflicting (differing value): {db['conflicting']}."
+    para(
+        f"(series, timestamp_utc) duplicate groups: {db['dup_groups']}",
+        f"(identical: {db['identical']}, conflicting: {db['conflicting']}).",
     ),
 ]
 if db["conflicting"]:
     _dq.append(
-        "Conflicting duplicate series points exist -- Silver needs a deterministic "
-        "value-selection rule per (series, timestamp)."
+        para(
+            "Conflicting duplicate series points exist -- Silver needs a deterministic",
+            "value-selection rule per (series, timestamp).",
+        )
     )
 _nn = {m: x["non_numeric"] for m, x in by_metric.items() if x["non_numeric"]}
 if _nn:
     _dq.append(f"Non-numeric values in `value` per metric: {_nn}.")
 
+_unit = [
+    para(
+        "`value` is a physical quantity whose unit is metric-dependent (MW / MWh for",
+        "generation and load, EUR/MWh for prices) -- the Bronze table does not carry the unit,",
+        "so it must be attached per metric at Silver from the SMARD filter catalog.",
+    ),
+]
+_neg = {m: x["negative_rows"] for m, x in by_metric.items() if x["negative_rows"]}
+if _neg:
+    _unit.append(
+        para(
+            f"Negative values per metric: {_neg}.",
+            "Negative is physical for residual_load, day_ahead_prices and net cross-border",
+            "flows; a negative realised generation is an error.",
+        )
+    )
+_unit.append("")
+_unit.append("Exact-copy / sign-mirror metric pairs (circular feature/target risk):")
+if mirrors:
+    for a, b, why in mirrors:
+        _unit.append(
+            f"- `{a}` <-> `{b}`: {why}. If one is a forecast and the other its "
+            "components' sum, they are not independent series -- do not use one to predict "
+            "the other, and check the Bronze/staging layer for a sign or labelling error."
+        )
+else:
+    _unit.append("- none detected across the metrics.")
+
 _temporal = [
-    "Per-series continuity (fixed-step resolutions only):",
+    para(
+        f"timestamp_utc timezone: {TS_TZ}.",
+        "SMARD's own export is Europe/Berlin wall-clock and has 23h / 25h DST days;",
+        "the continuity check rounds the step ratio so DST transitions do not show as gaps,",
+        "but the load's UTC conversion must be verified before any hourly join.",
+    ),
     "",
-    "| series | resolution | observed | expected | coverage % | longest gap | missing steps |",
+    "Per-series continuity (fixed-step resolutions; expected = span / step + 1, independent of the data):",
+    "",
+    "| series | resolution | observed | expected | coverage % | longest gap (steps) | missing steps |",
     "|---|---|---|---|---|---|---|",
 ]
 for c in continuity:
@@ -636,7 +663,14 @@ for c in continuity:
         f"| {c['series']} | {c['resolution']} | {c['observed']} | {c['expected']} | "
         f"{c['coverage_pct']} | {c['longest_gap']} | {c['missing_steps']} |"
     )
-_temporal += ["", f"Rows per year: {sorted(by_year.items())}."]
+_temporal += [
+    "",
+    (
+        f"Rows per year: {sorted(by_year.items())} -- heavily back-loaded: series added in "
+        "later years are dense from their own start, older series are short. A per-series min/max "
+        "is the right span, NOT the table-wide 2013..now."
+    ),
+]
 
 _entities = [
     f"Distinct series (metric|filter_id|region|resolution): {len(series)}.",
@@ -646,26 +680,121 @@ _entities = [
 ]
 
 _coverage = [
-    (
-        f"metric x region x resolution: {len(present)} present, {len(missing_combos)} absent "
-        f"of {len(metrics) * len(regions) * len(resolutions)} possible."
+    para(
+        f"metric x region x resolution: {len(present)} present,",
+        f"{len(missing_combos)} absent of",
+        f"{len(metrics) * len(regions) * len(resolutions)} possible.",
     ),
     "",
     f"Regions per metric: {metric_regions}",
     "",
     f"Resolutions per metric: {metric_res}",
     "",
-    f"Absent combos (first 30): {missing_combos[:30]}",
+    para(
+        "A model must not pool a metric's regional breakdowns with its DE-LU total, nor its",
+        "day and quarterhour resolutions -- those are the same quantity at different",
+        "aggregations and a random split leaks between them.",
+    ),
 ]
 
+_domain = [
+    para(
+        "`resolution` vs the known step set:",
+        f"unexpected={res_domain['unexpected'] or 'none'}",
+        "(an unexpected step parses to null and is dropped from the continuity check);",
+        f"unused={res_domain['unused_allowed'] or 'none'}.",
+    ),
+    para(
+        "`region` vs the known SMARD zone set:",
+        f"unexpected={region_domain['unexpected'] or 'none'},",
+        f"unused={region_domain['unused_allowed'] or 'none'}.",
+    ),
+    para(
+        "An unexpected `resolution` or `region` is an ingestion/parse issue (SMARD filter",
+        "mapping), not a source-data finding. The known-region list is a best-effort reference,",
+        "not authoritative -- an 'unexpected' region may just be missing from it.",
+    ),
+]
+
+_tcons = [
+    para(
+        "Does every forecast_* metric have a realised counterpart on the same",
+        "(region, resolution, timestamp) grid? A gap means the forecast cannot be",
+        "scored against an outcome from this table alone.",
+    ),
+    "",
+]
+for fp in forecast_pairing:
+    if fp.get("realised") is None:
+        _tcons.append(f"- `{fp['forecast']}`: {fp['note']}.")
+    else:
+        _tcons.append(
+            f"- `{fp['forecast']}` -> `{fp['realised']}`: "
+            f"{fp['with_realised_same_grid']}/{fp['forecast_points']} forecast grid points have a "
+            f"realised value ({fp['coverage_pct']}%)."
+        )
+if not forecast_pairing:
+    _tcons.append("- no forecast_* metrics present.")
+
+_pcons = [
+    para(
+        "Physical identity: residual_load should equal load - wind - solar at the",
+        "same (region, resolution, timestamp).",
+    ),
+]
+if residual_identity:
+    _pcons.append(
+        f"- identity `{residual_identity['identity']}` (neg terms = -wind, -pv): "
+        f"{residual_identity['violations']}/{residual_identity['comparable_rows']} rows exceed "
+        f"{int(residual_identity['rel_tol'] * 100)}% relative residual "
+        f"({residual_identity['violation_pct']}%); residual p01/p50/p99 "
+        f"{residual_identity['residual_p01_p50_p99']}, max abs {residual_identity['max_abs_residual']}."
+    )
+    _pcons.append(
+        para(
+            "A non-trivial violation share means these published series are not a clean additive",
+            "set (rounding, different vintages, or an extra term such as pumped-storage load) --",
+            "do not derive one from the others without reconciling.",
+        )
+    )
+else:
+    _pcons.append(
+        "- LIMITATION: could not identify all of residual-load / load / wind / solar metrics by "
+        f"name (resid={m_resid}, load={m_load}, wind={m_wind}, pv={m_pv}) -- identity not tested."
+    )
+
+_regime2 = [
+    para(
+        "Metric availability and total annual volume per year -- the measurable",
+        "form of the 2013-2026 regime change (nuclear phase-out, coal exit, PV",
+        "growth). `first-seen year` flags metrics that do not span the full table.",
+    ),
+    "",
+    f"Metric first-seen year: {sorted(metric_first_year.items(), key=lambda p: p[1] or 0)}",
+    "",
+]
+_late = [m for m, y in metric_first_year.items() if y and y > min(by_year)]
+if _late:
+    _regime2.append(
+        f"- {len(_late)} metric(s) start after the table's first year {min(by_year)}: {_late}."
+    )
+_regime2.append(
+    para(
+        "Any model pooling across years sees multiple generation-mix regimes and a changing set",
+        "of available series -- a year/era indicator and a per-metric availability window are",
+        "warranted (not chosen here).",
+    )
+)
+
 _dist = [
-    "| metric | min | max | mean | sd | p01/25/50/75/99 | zero | negative | 5-sigma outliers |",
+    "| metric | min | max | mean | sd | p01/25/50/75/99 | zero | negative | 5-sigma |",
     "|---|---|---|---|---|---|---|---|---|",
 ]
 for m, x in by_metric.items():
     _dist.append(
         f"| {m} | {x['min']} | {x['max']} | {x['mean']} | {x['sd']} | "
-        f"{x['p01_25_50_75_99']} | {x['zero_rows']} | {x['negative_rows']} | {outliers.get(m)} |"
+        f"{x['p01_25_50_75_99']} | {x['zero_rows']} | {x['negative_rows']} | "
+        f"{outliers.get(m)} |"
     )
 
 _findings = []
@@ -677,6 +806,10 @@ if db["conflicting"]:
     _findings.append(
         f"- {db['conflicting']} (series, timestamp) keys have conflicting values."
     )
+if mirrors:
+    _findings.append(
+        f"- Sign-mirror / duplicate metric pairs: {[(a, b) for a, b, _ in mirrors]}."
+    )
 _low_cov = [
     c["series"]
     for c in continuity
@@ -684,12 +817,11 @@ _low_cov = [
 ]
 if _low_cov:
     _findings.append(f"- Series with <99% temporal coverage: {_low_cov[:20]}.")
-_neg = {m: x["negative_rows"] for m, x in by_metric.items() if x["negative_rows"]}
 if _neg:
     _findings.append(f"- Negative values present per metric: {_neg}.")
 if any(outliers.values()):
     _findings.append(
-        f"- 5-sigma value outliers per metric: { {m: v for m, v in outliers.items() if v} }."
+        f"- 5-sigma value outliers per metric: { {m: x for m, x in outliers.items() if x} }."
     )
 if missing_combos:
     _findings.append(
@@ -704,61 +836,146 @@ if constant_cols:
     _silver.append(f"- Drop constant columns {constant_cols} from Silver.")
 if db["conflicting"]:
     _silver.append(
-        "- De-duplicate (series key, timestamp_utc) with a deterministic rule."
+        "- De-duplicate (series key, timestamp_utc) with a deterministic value-selection rule."
     )
 elif total - distinct_rows:
     _silver.append("- Apply distinct on load to drop exact duplicate rows.")
 if _nn:
     _silver.append("- Cast `value` to double; quarantine non-numeric values.")
-_silver.append(
-    "- Silver grain: one row per (metric, filter_id, region, resolution, timestamp_utc)."
-)
-if _low_cov:
+if mirrors:
     _silver.append(
-        "- Expect and preserve gaps in series; do not forward-fill without a stated rule."
+        "- Sign-mirror metrics identified above -> keep one, or an explicit note on the "
+        "derivation; investigate the load/staging for a sign error before Silver."
     )
-
-_ml_readiness = [
-    (
-        f"Candidate target signals: any `metric` representing an actual outcome (e.g. realised "
-        f"generation/consumption/price) is a plausible forecasting target keyed by "
-        f"(metric, region, resolution, timestamp_utc); metrics present are {metrics}."
-    ),
-    (
-        "Leakage: if any metric pair represents a forecast vs. an actual for the same underlying "
-        "quantity, the forecast series must not be used as a feature to predict the actual at a "
-        "timestamp on or after its own publication time, and vice versa -- verify metric semantics "
-        "before pairing them as feature/target."
-    ),
-    (
-        f"Grain and entity-grouped split: series key = {SERIES_KEY} -- split by series (metric, "
-        "filter_id, region, resolution), not by row or by shuffled timestamp, since a series' own "
-        "points are temporally correlated and a row-level split would leak adjacent timestamps across "
-        "train/test."
-    ),
-    (
-        "Join cardinality: this notebook does not join SMARD data to another Bronze table -- "
-        "cross-source join cardinality (e.g. to weather or grid-operator data) is unassessed here "
-        "and must be verified before using SMARD as a joined feature source."
-    ),
-    (
-        "Imbalance: not applicable -- `value` is continuous, not a categorical target; metric/region/"
-        "resolution cardinality is reported under Coverage, not as a class-balance concern."
-    ),
-    (
-        "Sample-vs-full divergence: the value-distribution figure draws from `value_pdf`, a 10% "
-        "sample capped at 200k rows, and the time-series figure (`ts_pdf`) shows only each metric's "
-        "first 3000 chronological points -- neither is representative of the full series' later "
-        "history; use the full-table `by_metric` aggregates (min/max/mean/sd/percentiles) for any "
-        "feature-quality decision."
-    ),
+_silver += [
+    "- Silver grain: one row per (metric, filter_id, region, resolution, timestamp_utc).",
+    "- Attach the physical unit per metric from the SMARD filter catalog at Silver.",
+    "- Preserve gaps; do not forward-fill without a stated, per-resolution rule.",
 ]
-if db["conflicting"]:
-    _ml_readiness.append(
-        f"{db['conflicting']} (series, timestamp_utc) keys have conflicting values (see Data "
-        "Quality) -- these must be resolved deterministically before use as a training label; an "
-        "unresolved conflict would otherwise let the label-selection rule vary silently."
-    )
+
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                f"Long format, series key = {SERIES_KEY}. One physical quantity appears at several "
+                "resolutions and regional splits -- pooling them drifts the grain and mixes aggregation "
+                "levels."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                "Single table -- no join here. A future join to weather / grid-operator data is "
+                "unassessed; verify cardinality on (region, timestamp) before using SMARD as a feature."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                f"Forecast metrics ({[m for m in metrics if m.startswith('forecast_')]}) predict a "
+                "realised metric -- using the realised value at or after the forecast's target time as a "
+                "feature for that forecast (or vice versa) is target contamination."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "A forecast series is published BEFORE its target time; a realised series is known only "
+                "after. Any feature/target pair must respect each series' own availability time, not just "
+                "the timestamp label."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "residual_load = load - (wind + pv); day-ahead price is a near-deterministic function of "
+                "the residual-load forecast -- a model given both is partly seeing its own target."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Split by series (metric, filter_id, region, resolution), never by row or shuffled "
+                "timestamp -- adjacent points in a series are highly correlated, and the same quantity's "
+                "day/quarterhour variants must stay on one side."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "SMARD revises published values (a preliminary figure is later corrected). Bronze holds "
+                "the snapshot as downloaded; if re-downloaded, an as-of column is needed to avoid using a "
+                "later revision as a historical feature."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                "Rows-per-year is back-loaded (series added over time). A study window must be the "
+                "intersection of the series it uses, not the table-wide span."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                f"`value` missing per metric: { {m: x['missing'] for m, x in by_metric.items() if x['missing']} }. "
+                "A missing point often marks a data-publication outage -- an 'is-missing' flag can leak it."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            f"(series, ts) duplicates: {db} -- de-duplicate before treating a point as one observation.",
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "Forecast timestamp = target time, not publication time. Aligning a forecast feature to a "
+                "realised target by timestamp alone silently uses a same-time forecast that was actually "
+                "published earlier -- fine -- but a LATER-vintage forecast for the same target is leakage."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            (
+                f"Mirror/copy metrics: {[(a, b) for a, b, _ in mirrors] or 'none'}. Units are not in "
+                "Bronze -- combining metrics before attaching units risks adding MW to MWh to EUR/MWh."
+            ),
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "`filter_id` and `resolution` describe how SMARD aggregated and published the series, not "
+                "the physical system -- a feature keyed on them encodes the publication process."
+            ),
+        ),
+        ("Class / label instability", "Not applicable -- `value` is continuous."),
+        (
+            "Label availability lag",
+            (
+                "Realised generation/load is published with a lag (preliminary then final); a nowcast "
+                "cannot use a value that is not yet published at prediction time."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "SMARD's methodology and the German generation mix both changed materially over 2013-2026 "
+                "(nuclear phase-out, coal exit, PV growth). Regime / Version Evidence above gives the "
+                "per-metric first-seen year and annual volume -- a regime/era indicator and per-metric "
+                "availability window are warranted."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            (
+                "value_pdf is a 10% sample capped at 200k rows and the time-series figure shows the first "
+                "4000 points of ONE representative series per metric -- neither represents later history; "
+                "use the full-table by_metric aggregates for any feature-quality decision."
+            ),
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -767,21 +984,18 @@ write_profiling(
     [
         ("Profile", "\n".join(_prof)),
         ("Data Quality", "\n".join(_dq)),
-        ("Temporal", "\n".join(_temporal)),
+        ("Unit & Semantic Validation", "\n".join(_unit)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
+        ("Temporal Semantics", "\n".join(_temporal)),
+        ("Temporal Consistency", "\n".join(_tcons)),
+        ("Physical Consistency", "\n".join(_pcons)),
+        ("Regime / Version Evidence", "\n".join(_regime2)),
         ("Entities / Keys", "\n".join(_entities)),
-        ("Coverage", "\n".join(_coverage)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        ("SMARD metric|region x resolution presence", "smard_coverage_matrix.png"),
-        ("SMARD series overview", "smard_series_overview.png"),
-        (
-            "SMARD value distribution per metric (sampled)",
-            "smard_value_distributions.png",
-        ),
-        ("SMARD first 3000 points per metric", "smard_time_series.png"),
-    ],
+    figures=figs,
 )

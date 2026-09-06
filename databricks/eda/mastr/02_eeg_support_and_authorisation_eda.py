@@ -201,6 +201,70 @@ print("rows per table:", row_counts, "coverage bias:", cov)
 
 # COMMAND ----------
 
+
+# DBTITLE 1,Point-in-time / temporal consistency -- event ordering within each table
+# Expected ordering of the dated milestones on one record:
+#   application  <=  decision/effective  <=  registration  <=  last-update
+# and the scheme commissioning date must not post-date registration. Each pair
+# is only checked when BOTH columns exist in the table.
+def _first_col(cols, *subs):
+    return next(
+        (
+            c
+            for c in cols
+            if any(s in c.lower() for s in subs) and not c.lower().endswith("_nv")
+        ),
+        None,
+    )
+
+
+order_checks = {}
+for name, df in frames.items():
+    cols = df.columns
+    application = _first_col(cols, "antragstellung")
+    commissioning = _first_col(cols, "inbetriebnahme")
+    decision = "Datum" if "Datum" in cols else _first_col(cols, "zuschlag")
+    registration = _first_col(cols, "registrierungsdatum")
+    last_update = _first_col(cols, "datumletzteaktualisierung")
+    pairs = [
+        (application, decision, "application <= decision"),
+        (application, registration, "application <= registration"),
+        (decision, registration, "decision/effective <= registration"),
+        (commissioning, registration, "commissioning <= registration"),
+        (registration, last_update, "registration <= last-update"),
+    ]
+    checks = []
+    for earlier, later, lbl in pairs:
+        if earlier and later and earlier != later:
+            res = date_order_check(df, earlier, later, label=f"{name}: {lbl}")
+            checks.append(res)
+            print(
+                f"{name}: {lbl} ({earlier} -> {later}) -- {res['violations']}/"
+                f"{res['comparable_rows']} out of order ({res['violation_pct']}%)"
+            )
+    order_checks[name] = checks
+
+# COMMAND ----------
+
+# DBTITLE 1,Regime / version evidence -- field population across EEG scheme eras
+# Split each table on its registration date at the MaStR migration boundary and
+# measure per-column null-rate / distinct-value counts on each side.
+REGIME_CUT = "2019-06-01"
+regime = {}
+for name, df in frames.items():
+    rdc = _first_col(df.columns, "registrierungsdatum")
+    if not rdc:
+        regime[name] = None
+        continue
+    shift = regime_population_shift(df, rdc, df.columns, REGIME_CUT)
+    regime[name] = {"date_col": rdc, **shift}
+    print(
+        f"{name}: split on `{rdc}` @ {REGIME_CUT} -> pre={shift['pre_rows']} "
+        f"post={shift['post_rows']} undated={shift['undated_rows']}; flipped={shift['flipped']}"
+    )
+
+# COMMAND ----------
+
 # DBTITLE 1,Figure -- rows / columns / duplicates / exact own-key ratio
 best_ratio = {
     d: (key_report[d][own_key[d]]["ratio"] if own_key[d] in key_report[d] else 0.0)
@@ -341,6 +405,57 @@ _coverage = [
     ),
 ]
 
+_order = [
+    para(
+        "Event-ordering checks within each record (a pair is checked only when",
+        "both columns exist). A violation is a source-data finding: the record's",
+        "own milestone dates contradict each other.",
+    ),
+    "",
+]
+_any_order = False
+for d in DATASETS:
+    for res in order_checks.get(d, []):
+        _any_order = True
+        _order.append(
+            f"- {res['label']} (`{res['earlier']}` -> `{res['later']}`): "
+            f"{res['violations']}/{res['comparable_rows']} out of order "
+            f"({res['violation_pct']}%)."
+        )
+if not _any_order:
+    _order.append("- No table exposed two comparable milestone-date columns.")
+
+_regime = [
+    para(
+        f"Rows split on the registration date at {REGIME_CUT} (MaStR migration",
+        "wave vs native). Per-column null-rate + distinct count each side;",
+        "`flipped` = null-rate moves >= 50 points across the cut.",
+    ),
+    "",
+]
+for d in DATASETS:
+    rg = regime.get(d)
+    if not rg:
+        _regime.append(f"- {d}: no registration-date column -- not assessable.")
+        continue
+    _regime.append(
+        f"- {d} (`{rg['date_col']}`): pre={rg['pre_rows']}, post={rg['post_rows']}, "
+        f"undated={rg['undated_rows']}; flipped columns: {rg['flipped'] or 'none'}."
+    )
+    for c in rg["flipped"][:8]:
+        v = rg["per_column"][c]
+        _regime.append(
+            f"  - `{c}`: null-rate pre={v['pre_null_rate']} post={v['post_null_rate']}; "
+            f"distinct pre={v['pre_distinct']} post={v['post_distinct']}."
+        )
+_regime.append(
+    para(
+        "EEG 2000/2004/2009/2012/2014/2017/2021/2023 each changed the support",
+        "mechanism; the migration cut above is the measurable discontinuity in",
+        "this export. A scheme-vintage indicator is warranted -- not chosen here.",
+    )
+)
+
 _dist = []
 for d in DATASETS:
     for c, pairs in categorical_dist[d].items():
@@ -473,7 +588,9 @@ _ml = ml_readiness_block(
             "Source / version / regime change",
             (
                 "EEG 2000/2004/2009/2012/2014/2017/2021/2023 each changed the support mechanism (fixed "
-                "feed-in -> auction) -- a scheme-vintage indicator is essential before pooling records."
+                "feed-in -> auction). Regime / Version Evidence above measures the population "
+                f"discontinuity at the {REGIME_CUT} migration cut -- a scheme-vintage indicator is "
+                "warranted where columns flip."
             ),
         ),
         (
@@ -493,6 +610,8 @@ write_profiling(
         ("Entities / Keys", "\n".join(_entities)),
         ("Unit & Semantic Validation", "\n".join(_unit)),
         ("Temporal Semantics", "\n".join(_temporal)),
+        ("Temporal Consistency", "\n".join(_order)),
+        ("Regime / Version Evidence", "\n".join(_regime)),
         ("Referential Integrity", "\n".join(_ri)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),

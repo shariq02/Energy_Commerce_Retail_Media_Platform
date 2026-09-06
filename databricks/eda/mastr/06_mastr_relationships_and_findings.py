@@ -18,7 +18,11 @@
 # MAGIC relationship spec -- child key column, parent key column, both resolved
 # MAGIC case-insensitively because MaStR's field names drift in case
 # MAGIC (EegMaStRNummer vs EegMastrNummer). For each relationship: orphan rate,
-# MAGIC unused-parent count, and a row-level fan-out probe. Key sets are
+# MAGIC unused-parent count, and a full cardinality profile (child rows, distinct
+# MAGIC child keys, parents referenced, child-rows-per-parent distribution, max
+# MAGIC fan-out). Also: every coded column in 01-04 reconciled against the
+# MAGIC reference catalogs (05), cross-table event-date ordering on the shared
+# MAGIC EinheitMastrNummer, and cross-carrier coordinate agreement. Key sets are
 # MAGIC collected and reconciled with Python set math.
 
 # COMMAND ----------
@@ -265,16 +269,17 @@ for child, child_suffix, role, _parent_suffix in JOIN_SPEC:
     ri = referential_integrity(
         child_vals, parent_union[role], child=f"{child}.{ccol}", parent=role
     )
-    # row-level fan-out on the child side: does one child key repeat across rows?
-    fan = (
-        frames[child]
-        .groupBy(F.col(ccol))
-        .count()
-        .agg(F.max("count").alias("mx"), F.avg("count").alias("av"))
-        .first()
+    # Full relationship cardinality (not just the orphan rate): child rows,
+    # distinct child keys, how many parent entities are actually referenced, and
+    # the child-rows-per-parent distribution + max fan-out.
+    cp = cardinality_profile(frames[child], ccol, child_vals, parent_union[role])
+    ri.update(cp)
+    ri["child_max_rows_per_key"] = cp["max_fanout"]
+    ri["child_avg_rows_per_key"] = (
+        round(cp["child_rows"] / cp["distinct_child_keys"], 3)
+        if cp["distinct_child_keys"]
+        else None
     )
-    ri["child_max_rows_per_key"] = int(fan["mx"]) if fan and fan["mx"] else None
-    ri["child_avg_rows_per_key"] = round(fan["av"], 3) if fan and fan["av"] else None
     ri["expectation"] = RELATIONSHIP_EXPECTATION.get(child, "subset")
     # A real integrity problem = orphans where the child was expected to be a
     # subset of the parent. "disjoint" / "partial-scope" orphans are expected.
@@ -282,9 +287,12 @@ for child, child_suffix, role, _parent_suffix in JOIN_SPEC:
     ri_results.append(ri)
     print(
         f"{child}.{ccol} -> {role} [{ri['expectation']}]: match_rate={ri['match_rate']} "
-        f"orphans={ri['orphans']} unused_parent={ri['unused_parent']} "
-        f"child_rows_per_key(max/avg)="
-        f"{ri['child_max_rows_per_key']}/{ri['child_avg_rows_per_key']}"
+        f"orphans={ri['orphans']} child_rows={cp['child_rows']} "
+        f"distinct_child_keys={cp['distinct_child_keys']} "
+        f"parents_referenced={cp['matched_parent_keys']}/{cp['parent_keys_total']} "
+        f"child_rows_per_parent p50/p90/p99={cp['child_rows_per_parent_p50']}/"
+        f"{cp['child_rows_per_parent_p90']}/{cp['child_rows_per_parent_p99']} "
+        f"max_fanout={cp['max_fanout']}"
     )
 
 # COMMAND ----------
@@ -303,6 +311,165 @@ if kk_id and kw_fk:
         parent=f"katalogkategorien.{kk_id}",
     )
     print("catalog lookup:", kat_ri)
+
+# COMMAND ----------
+
+# DBTITLE 1,Catalog / domain reconciliation -- code columns in 01-04 vs the reference catalogs (05)
+# Systematic check: every low-cardinality integer-coded column across the
+# analytical tables is reconciled against mastr_katalogwerte. The export has no
+# explicit column -> category binding, so a column is scoped to a category only
+# when its name matches one; otherwise it falls back to global value-id
+# membership (which proves a code is used SOMEWHERE in MaStR, not that it is
+# valid for this column). An unknown code is a real source-data finding.
+catalog = load_mastr_catalog(spark, CATALOG, BRONZE_SCHEMA)
+print(
+    f"catalog: {catalog['n_values']} value-ids across {catalog['n_categories']} categories"
+)
+ANALYTICAL_FOR_CODES = GENERATION_UNITS + EEG_SUPPORT + CHANGE_HISTORY
+code_reco = {}
+for d in ANALYTICAL_FOR_CODES:
+    df = frames[d]
+    cols = [
+        c
+        for c in df.columns
+        if not c.lower().endswith(("mastrnummer", "mastrnr", "_nv", "id"))
+        and "datum" not in c.lower()
+        and "nummer" not in c.lower()
+    ]
+    if not cols:
+        code_reco[d] = []
+        continue
+    acd = df.agg(*[F.approx_count_distinct(c).alias(c) for c in cols]).first().asDict()
+    flagged = [c for c in cols if 2 <= (acd[c] or 0) <= 60]
+    res = []
+    for c in flagged:
+        r = reconcile_codes(df, c, catalog, category_hint=c)
+        if r.get("coded"):
+            res.append(r)
+    code_reco[d] = res
+    for r in res:
+        tag = "ok" if r["unknown_count"] == 0 else "UNKNOWN"
+        print(
+            f"{d}.{r['column']} [{tag}] category={r['matched_category']} "
+            f"({r['checked_against']}) unknown={r['unknown_count']} vals "
+            f"({r['unknown_rows']} rows): {r['unknown_values'][:8]}"
+        )
+
+# COMMAND ----------
+
+# DBTITLE 1,Point-in-time / temporal consistency -- cross-table event ordering on the same unit
+# Commissioning (einheiten_*) must not post-date a later lifecycle date recorded
+# for the same EinheitMastrNummer in another table. Only pairs linked by a shared
+# key are checkable -- a full unit lifecycle cannot be ordered because the dates
+# live in different tables with partial overlap.
+comm_parts = []
+for d in GENERATION_UNITS:
+    ek = resolve_key(d, "EinheitMastrNummer")
+    ic = next(
+        (c for c in frames[d].columns if c.lower() == "inbetriebnahmedatum"), None
+    )
+    if ek and ic:
+        comm_parts.append(
+            frames[d].select(
+                F.col(ek).cast("string").alias("unit"),
+                F.col(ic).cast("string").alias("commissioning"),
+            )
+        )
+commissioning_df = comm_parts[0] if comm_parts else None
+for p in comm_parts[1:]:
+    commissioning_df = commissioning_df.unionByName(p)
+
+xtab_order = []
+XTAB_TARGETS = [
+    (
+        "geloeschte_deaktivierte_einheiten",
+        "DatumLetzteAktualisierung",
+        "commissioning <= deregistration last-update",
+    ),
+    (
+        "einheiten_aenderung_netzbetreiberzuordnungen",
+        "Netzbetreiberzuordnungsaenderungsdatum",
+        "commissioning <= net-operator-change effective date",
+    ),
+]
+if commissioning_df is not None:
+    for t, dcol, lbl in XTAB_TARGETS:
+        lk = resolve_key(t, "EinheitMastrNummer")
+        rc = next((c for c in frames[t].columns if c.lower() == dcol.lower()), None)
+        if not (lk and rc):
+            continue
+        j = commissioning_df.join(
+            frames[t].select(
+                F.col(lk).cast("string").alias("unit"),
+                F.col(rc).cast("string").alias("later"),
+            ),
+            on="unit",
+            how="inner",
+        )
+        res = date_order_check(j, "commissioning", "later", label=lbl)
+        xtab_order.append(res)
+        print(
+            f"cross-table: {lbl} -- {res['violations']}/{res['comparable_rows']} "
+            f"out of order ({res['violation_pct']}%)"
+        )
+
+# within-table: the net-operator change effective date vs its own registration date
+ea = frames["einheiten_aenderung_netzbetreiberzuordnungen"]
+eff = next(
+    (c for c in ea.columns if c.lower() == "netzbetreiberzuordnungsaenderungsdatum"),
+    None,
+)
+regd = next(
+    (
+        c
+        for c in ea.columns
+        if c.lower() == "registrierungsdatumnetzbetreiberzuordnungsaenderung"
+    ),
+    None,
+)
+if eff and regd:
+    res = date_order_check(
+        ea, eff, regd, label="net-operator change: effective <= registration"
+    )
+    xtab_order.append(res)
+    print(
+        f"within-table: {res['label']} -- {res['violations']}/{res['comparable_rows']} "
+        f"({res['violation_pct']}%)"
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Cross-carrier spatial consistency -- a shared Lokation should resolve to one place
+# Cross-table lat/lon reconciliation is not possible: only the einheiten_* tables
+# carry coordinates (lokationen / netzanschlusspunkte / netze carry none). The
+# one cross-table check available: units in DIFFERENT carrier tables that share a
+# LokationMaStRNummer should have near-identical coordinates.
+LAT_HINTS = ("breitengrad", "breite")
+LON_HINTS = ("laengengrad", "laenge", "längengrad")
+coord_parts = []
+for d in GENERATION_UNITS:
+    cols = frames[d].columns
+    lk = resolve_key(d, "LokationMaStRNummer")
+    la = next((c for c in cols if any(h in c.lower() for h in LAT_HINTS)), None)
+    lo = next((c for c in cols if any(h in c.lower() for h in LON_HINTS)), None)
+    if lk and la and lo:
+        coord_parts.append(
+            frames[d].select(
+                F.col(lk).cast("string").alias("lok"),
+                F.concat_ws(
+                    "|",
+                    F.round(F.col(la).cast("double"), 2),
+                    F.round(F.col(lo).cast("double"), 2),
+                ).alias("coordkey"),
+            )
+        )
+cross_coord = None
+if coord_parts:
+    cdf = coord_parts[0]
+    for p in coord_parts[1:]:
+        cdf = cdf.unionByName(p)
+    cross_coord = group_attribute_spread(cdf, "lok", "coordkey")
+    print("cross-carrier LokationMaStRNummer -> coordinate spread:", cross_coord)
 
 # COMMAND ----------
 
@@ -394,8 +561,12 @@ for r in ri_results:
     _rel.append(
         f"- `{r['child']}` -> {r['parent']} [{r['expectation']}]: "
         f"match_rate={r['match_rate']}, orphans={r['orphans']}/{r['child_distinct']}, "
-        f"unused_parent={r['unused_parent']}, "
-        f"child rows/key max={r['child_max_rows_per_key']} avg={r['child_avg_rows_per_key']}"
+        f"child_rows={r['child_rows']}, distinct_child_keys={r['distinct_child_keys']}, "
+        f"parents_referenced={r['matched_parent_keys']}/{r['parent_keys_total']} "
+        f"({r['parent_keys_referenced_pct']}%), "
+        f"child_rows_per_parent p50/p90/p99="
+        f"{r['child_rows_per_parent_p50']}/{r['child_rows_per_parent_p90']}/"
+        f"{r['child_rows_per_parent_p99']}, max_fanout={r['max_fanout']}"
     )
 _rel.append("")
 _rel.append(
@@ -430,6 +601,83 @@ if kat_ri:
     _rel.append(
         f"katalogwerte -> katalogkategorien: {kat_ri['orphans']} orphan FK values, "
         f"{kat_ri['unused_parent']} unreferenced categories."
+    )
+
+_catalog = [
+    para(
+        "Every low-cardinality integer-coded column across the generation-unit,",
+        "EEG/authorisation and change-history tables, reconciled against",
+        f"mastr_katalogwerte ({catalog['n_values']} value-ids,",
+        f"{catalog['n_categories']} categories). LIMITATION: the export carries no",
+        "column -> category binding, so a column is scoped to a category only when",
+        "its name matches; otherwise the check is global value-id membership,",
+        "which cannot prove a code is valid FOR THAT column.",
+    ),
+    "",
+]
+_code_hits = 0
+for d in ANALYTICAL_FOR_CODES:
+    for r in code_reco.get(d, []):
+        if r["unknown_count"] == 0:
+            continue
+        _code_hits += 1
+        _catalog.append(
+            f"- `{d}.{r['column']}` [{r['checked_against']}"
+            + (f", category `{r['matched_category']}`" if r["matched_category"] else "")
+            + f"]: {r['unknown_count']} unknown code(s) over {r['unknown_rows']} rows "
+            f"-- {r['unknown_values'][:12]}"
+        )
+if _code_hits == 0:
+    _catalog.append(
+        "- No unknown codes: every coded column resolves fully against the catalog "
+        "(within the matching limitation above)."
+    )
+_catalog.append("")
+_catalog.append(
+    "Columns matched to a named category (scoped check, strongest evidence):"
+)
+_scoped = [
+    f"`{d}.{r['column']}` -> `{r['matched_category']}`"
+    for d in ANALYTICAL_FOR_CODES
+    for r in code_reco.get(d, [])
+    if r["matched_category"]
+]
+_catalog.append("- " + (", ".join(_scoped) if _scoped else "none matched by name."))
+
+_tcons = [
+    para(
+        "Cross-table event ordering on the same EinheitMastrNummer. A violation",
+        "is a source-data finding (the unit's dates in two tables contradict).",
+        "Only key-linked pairs are checkable.",
+    ),
+    "",
+]
+if not xtab_order:
+    _tcons.append("- No key-linked date pair was available to check.")
+for res in xtab_order:
+    _tcons.append(
+        f"- {res['label']} (`{res['earlier']}` -> `{res['later']}`): "
+        f"{res['violations']}/{res['comparable_rows']} out of order "
+        f"({res['violation_pct']}%)."
+    )
+
+_spatial = [
+    para(
+        "Cross-table lat/lon reconciliation is NOT possible -- only the einheiten_*",
+        "tables carry coordinates (limitation, not a finding). Per-table internal",
+        "geographic agreement is in section 01. The one cross-table check:",
+    ),
+]
+if cross_coord:
+    _spatial.append(
+        f"- units in different carrier tables sharing a LokationMaStRNummer: "
+        f"{cross_coord['inconsistent_groups']}/{cross_coord['groups']} shared "
+        f"locations resolve to more than one coordinate (2dp); worst holds "
+        f"{cross_coord['max_distinct_values_in_a_group']} distinct coordinates."
+    )
+else:
+    _spatial.append(
+        "- no carrier table exposed both a LokationMaStRNummer and coordinates."
     )
 
 _coverage = [
@@ -502,9 +750,10 @@ _ml = ml_readiness_block(
         (
             "Join multiplication (1:N / M:N expansion)",
             (
-                f"Row-level fan-out probe run per relationship: 1:N in "
-                f"{[r['child'] for r in _fanout] or 'none'}. lokationen link arrays (03) are M:N and "
-                "explode further -- verify exploded row counts against pre-explosion counts."
+                f"Full cardinality profile per relationship (Referential Integrity section): 1:N in "
+                f"{[r['child'] for r in _fanout] or 'none'}, with child-rows-per-parent p50/p90/p99 and "
+                "max fan-out quantified. lokationen link arrays (03) are M:N and explode further -- "
+                "verify exploded row counts against pre-explosion counts."
             ),
         ),
         (
@@ -517,8 +766,9 @@ _ml = ml_readiness_block(
         (
             "Temporal / post-event leakage",
             (
-                "This notebook checks key-set membership only -- it confirms WHICH units have a change/"
-                "support record, not WHEN. A temporally safe feature still needs the date guards in 02/04."
+                "Key-set membership plus cross-table date ordering (Temporal Consistency section): "
+                "commissioning-vs-later-lifecycle-date violations are quantified on the shared "
+                "EinheitMastrNummer. Full per-feature date guards still live in 02/04."
             ),
         ),
         (
@@ -584,7 +834,11 @@ _ml = ml_readiness_block(
         ),
         (
             "Class / label instability",
-            "Catalog codes referenced across tables are version-dependent (05) -- pin the release.",
+            (
+                "Catalog codes referenced across tables are version-dependent (05) -- pin the release. "
+                "The Catalog / Domain Reconciliation section reports any code in 01-04 not resolvable "
+                "against the current catalog vintage."
+            ),
         ),
         (
             "Label availability lag",
@@ -614,6 +868,9 @@ write_profiling(
     blocks=[
         ("Entities / Keys", "\n".join(_ent)),
         ("Referential Integrity", "\n".join(_rel)),
+        ("Catalog / Domain Reconciliation", "\n".join(_catalog)),
+        ("Temporal Consistency", "\n".join(_tcons)),
+        ("Spatial Consistency", "\n".join(_spatial)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("EDA Findings", "\n".join(_verdict)),
         ("ML-Readiness Evidence", _ml),

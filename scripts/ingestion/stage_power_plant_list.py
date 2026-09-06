@@ -28,22 +28,86 @@ STAGING_DIR = DATA_STAGING_DIR / "kraftwerksliste"
 ANALYTICAL_DIR = STAGING_DIR / "analytical"
 
 SOURCE_ENCODING = "latin-1"
-MAIN_LIST_HEADER_ROW = 7  # 7 metadata/title rows precede the real header
+# The BNetzA CSV puts a variable number of title / disclaimer rows above the
+# real header (one of which is a quoted cell spanning several physical lines)
+# and can carry footnote rows below the data -- the counts drift between
+# editions, so detect the header by content instead of hardcoding a skip.
+# Tokens must match the CURRENT column set (Datensatztyp / EinheitMastrNummer /
+# Anlagenbetreiber / Energietraeger / Nettonennleistung_MW / Kraftwerksstatus).
+_HEADER_HINT_TOKENS = (
+    "datensatztyp",
+    "einheitmastrnummer",
+    "anlagenbetreiber",
+    "energietraeger",
+    "nettonennleistung",
+    "kraftwerksstatus",
+    "bruttoleistung",
+)
+
+
+def _read_bnetza_csv(path: Path, scan: int = 30) -> tuple[pd.DataFrame, int]:
+    """Read the whole file with no header (pandas resolves the multi-line quoted
+    preamble cell), find the header row by matching >=2 hint tokens, then slice.
+    Working purely in pandas' row index avoids the physical-line vs parsed-row
+    mismatch that `skiprows` would hit on the embedded newline."""
+    raw = pd.read_csv(
+        path,
+        sep=";",
+        encoding=SOURCE_ENCODING,
+        header=None,
+        dtype=str,
+        keep_default_na=False,
+    )
+    header_idx = None
+    for i in range(min(scan, len(raw))):
+        cells = [str(c).strip().lower() for c in raw.iloc[i].tolist() if str(c).strip()]
+        if sum(any(t in c for t in _HEADER_HINT_TOKENS) for c in cells) >= 2:
+            header_idx = i
+            break
+    if header_idx is None:
+        raise RuntimeError(
+            f"could not find the BNetzA header row in the first {scan} lines of "
+            f"{path} -- inspect the file and update _HEADER_HINT_TOKENS."
+        )
+    cols = [str(c).strip().rstrip("*").strip() for c in raw.iloc[header_idx].tolist()]
+    blank = sum(1 for c in cols if not c or c.lower() == "nan")
+    if blank > 0.2 * len(cols):
+        raise RuntimeError(
+            f"header row {header_idx} in {path} has {blank}/{len(cols)} blank column "
+            "names -- the detected row is not the real header."
+        )
+    df = raw.iloc[header_idx + 1 :].copy()
+    df.columns = cols
+    return df, header_idx
 
 
 def stage_main_list() -> tuple[int, Path]:
     ANALYTICAL_DIR.mkdir(parents=True, exist_ok=True)
     out_path = ANALYTICAL_DIR / "kraftwerksliste.csv"
+    src = RAW_DIR / "Kraftwerksliste_CSV.csv"
 
-    df = pd.read_csv(
-        RAW_DIR / "Kraftwerksliste_CSV.csv",
-        sep=";",
-        encoding=SOURCE_ENCODING,
-        skiprows=MAIN_LIST_HEADER_ROW,
+    df, header_row = _read_bnetza_csv(src)
+    # Empty strings read as "" (keep_default_na=False) -> treat as missing.
+    df = df.replace("", pd.NA)
+    # Drop trailing footnote / fully-empty rows: every key column empty, or the
+    # first column is a disclaimer starting with a symbol / "Stand" / a note.
+    name_col = df.columns[0]
+    foot = (
+        df.drop(columns=[name_col]).isna().all(axis=1)
+        | df[name_col].isna()
+        | df[name_col]
+        .astype(str)
+        .str.strip()
+        .str.match(r"^(\*|\(|\[|Stand|Quelle|Hinweis|\d+\))")
     )
+    df = df[~foot]
     df.to_csv(out_path, index=False, encoding="utf-8")
 
-    logger.info(f"Staged analytical/kraftwerksliste.csv -- {len(df)} rows")
+    logger.info(
+        f"Staged analytical/kraftwerksliste.csv -- {len(df)} rows, "
+        f"{len(df.columns)} columns (header row {header_row}, "
+        f"{int(foot.sum())} footnote/empty rows dropped)"
+    )
     return len(df), out_path
 
 

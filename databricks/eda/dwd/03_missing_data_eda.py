@@ -10,29 +10,28 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** August 2026
+# MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Profile dwd_missing_value_periods (the DWD-reported
 # MAGIC missing-value windows) and reconcile it against the actual -999 /
 # MAGIC blank values observed in the measurement tables -- reported vs
-# MAGIC observed missingness, longest reported periods, missingness over time,
-# MAGIC a station x parameter missingness matrix. Observed consecutive-gap
-# MAGIC runs are in notebook 01. The reported-periods table is small and is
-# MAGIC collected once; each measurement is scanned twice (per-station rollup
-# MAGIC and per-year rollup).
+# MAGIC observed missingness, reported-period ordering, parameter-code domain,
+# MAGIC missingness over time as regime evidence, a station x parameter
+# MAGIC missingness matrix, and the layered modelling-risk checklist. The
+# MAGIC reported-periods table is small and collected once; each measurement is
+# MAGIC scanned twice (per-station rollup and per-year rollup).
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
 import datetime as dt
-import os as _os
-import re as _re
 
-import matplotlib.pyplot as plt
 import numpy as np
-from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -59,18 +58,6 @@ NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR"}
 # 100% missing and contradicted notebook 01.
 INDICATOR_COLS = {"V_N_I"}
 
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
-
-
-def find_col(df: DataFrame, *cands: str) -> str | None:
-    low = {c.lower(): c for c in df.columns}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
-
 
 def value_cols(df):
     return [
@@ -82,166 +69,23 @@ def value_cols(df):
     ]
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
+def to_dt(v):
+    s = str(v or "").strip()
+    s = s.removesuffix(".0")  # column inferred as double -> "2025021300.0"
+    for fmt in (
+        "%Y%m%d%H",
+        "%Y%m%d",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%d.%m.%Y %H:%M",
+        "%d.%m.%Y",
+    ):
+        try:
+            return dt.datetime.strptime(s, fmt).replace(tzinfo=dt.UTC)
+        except ValueError:
             continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
+    return None
 
 
 # COMMAND ----------
@@ -249,7 +93,6 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -283,31 +126,8 @@ print("periods per parameter:", mv_per_param)
 
 # COMMAND ----------
 
-# DBTITLE 1,Reported period spans (von/bis -> hours) per station
-
-
-def to_dt(v):
-    s = str(v or "").strip()
-    s = s.removesuffix(".0")  # column inferred as double -> "2025021300.0"
-    for fmt in (
-        "%Y%m%d%H",
-        "%Y%m%d",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d",
-        "%d.%m.%Y %H:%M",
-        "%d.%m.%Y",
-    ):
-        try:
-            return dt.datetime.strptime(s, fmt).replace(tzinfo=dt.UTC)
-        except ValueError:
-            continue
-    return None
-
-
+# DBTITLE 1,Reported period spans + von<=bis ordering (temporal consistency)
 _TO_DT_UNPARSED: list = []
-
-
 reported_gaps = {}
 period_spans = []
 inverted = 0
@@ -330,11 +150,23 @@ for d in mv_recs:
     g["reported_periods"] += 1
     g["longest"] = max(g["longest"], span_h)
     g["total"] += span_h
-print(f"inverted ranges: {inverted}  parsed spans: {len(period_spans)}")
+print(f"inverted von>bis ranges: {inverted}  parsed spans: {len(period_spans)}")
 if _TO_DT_UNPARSED:
     print(f"unparsed von/bis samples (first {len(_TO_DT_UNPARSED)}): {_TO_DT_UNPARSED}")
 for sid, g in reported_gaps.items():
     print(f"station {sid}: {g}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Parameter-code domain -- reported codes vs measurement value columns
+observed_value_cols = {
+    c for t in MEASUREMENT_TABLES.values() for c in value_cols(spark.table(t))
+}
+reported_codes = {str(d[param_c]) for d in mv_recs} if param_c else set()
+codes_unknown = sorted(reported_codes - observed_value_cols)
+codes_unused = sorted(observed_value_cols - reported_codes)
+print("reported parameter codes not a measurement value column:", codes_unknown)
+print("measurement value columns never in a reported period:", codes_unused)
 
 # COMMAND ----------
 
@@ -352,7 +184,6 @@ for m, t in MEASUREMENT_TABLES.items():
         F.count(F.lit(1)).alias("rows"),
     ]
     for c in vc:
-        # Validate numeric before casting to avoid CAST_INVALID_INPUT errors (e.g., 'I', 'P' in cloudiness)
         v = F.when(
             F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
         ).otherwise(F.lit(None))
@@ -378,14 +209,13 @@ for m, t in MEASUREMENT_TABLES.items():
 
 # COMMAND ----------
 
-# DBTITLE 1,Observed missingness over time -- -999/blank rate by year per measurement (one scan each)
+# DBTITLE 1,Regime evidence -- observed -999/blank rate by year per measurement (one scan each)
 missing_over_time = {}
 for m, t in MEASUREMENT_TABLES.items():
     df = spark.table(t)
     dts = find_col(df, "MESS_DATUM")
     any_missing = F.lit(False)
     for c in value_cols(df):
-        # Validate numeric before casting to avoid CAST_INVALID_INPUT errors (e.g., 'I', 'P' in cloudiness)
         v = F.when(
             F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
         ).otherwise(F.lit(None))
@@ -405,15 +235,11 @@ for m, t in MEASUREMENT_TABLES.items():
         .orderBy("year")
         .collect()
     )
-    print(
-        f"{m}:",
-        [(x["year"], round(x["missing_rate"], 4)) for x in missing_over_time[m]],
-    )
+    print(m, [(x["year"], round(x["missing_rate"], 4)) for x in missing_over_time[m]])
 
 # COMMAND ----------
 
 # DBTITLE 1,Reconciliation -- reported periods vs observed -999/blank per station x parameter
-# The measurement value-column name IS the DWD parameter code (TT_TU, RF_TU, ...).
 reported_pairs = (
     {(str(d[sid_c]), d[param_c]) for d in mv_recs} if (sid_c and param_c) else set()
 )
@@ -423,14 +249,13 @@ for m in MEASUREMENTS:
     vc = value_cols(df)
     for x in station_roll[m]:
         for c in vc:
-            n999, nblank = x[c + "__999"], x[c + "__blank"]
             recon.append(
                 {
                     "station": x["station"],
                     "measurement": m,
                     "parameter": c,
-                    "observed_999": n999,
-                    "observed_blank": nblank,
+                    "observed_999": x[c + "__999"],
+                    "observed_blank": x[c + "__blank"],
                     "rows": x["rows"],
                     "has_reported": (x["station"], c) in reported_pairs,
                 }
@@ -450,6 +275,7 @@ print(
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- station x parameter observed missingness heatmap
+figs = []
 stations = sorted({r["station"] for r in recon})
 params = sorted({r["parameter"] for r in recon})
 rate = {}
@@ -458,20 +284,29 @@ for r in recon:
         (r["station"], r["parameter"]), 0
     ) + (r["observed_999"] + r["observed_blank"]) / max(r["rows"], 1)
 grid = np.array([[rate.get((st, p), 0.0) for p in params] for st in stations])
-plt.figure(figsize=(max(6, 0.8 * len(params)), max(3, 0.5 * len(stations))))
-plt.imshow(grid, aspect="auto", cmap="magma")
-plt.colorbar(label="missing (-999/blank) rate")
-plt.xticks(range(len(params)), params, rotation=45, ha="right")
-plt.yticks(range(len(stations)), stations)
-plt.title("DWD -- observed missingness rate by station x parameter")
-plt.tight_layout()
-plt.savefig(fig_path("dwd_missingness_heatmap.png"), dpi=110, bbox_inches="tight")
-plt.show()
+if grid.size:
+    fig, ax = plt.subplots(
+        figsize=(max(6, 0.8 * len(params)), max(3, 0.5 * len(stations)))
+    )
+    ax.imshow(grid, aspect="auto", cmap="magma")
+    ax.set_xticks(range(len(params)))
+    ax.set_xticklabels(params, rotation=45, ha="right")
+    ax.set_yticks(range(len(stations)))
+    ax.set_yticklabels(stations)
+    ax.set_title("DWD -- observed missingness rate by station x parameter")
+    fig.tight_layout()
+    _save_and_show(fig, "dwd_missingness_heatmap.png")
+    figs.append(
+        (
+            "DWD observed missingness rate by station x parameter",
+            "dwd_missingness_heatmap.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- reported missing periods (one faceted figure)
-facet_bars(
+if facet_bars(
     {
         "reported periods per station": sorted(mv_per_station.items()),
         "reported periods per parameter": sorted(mv_per_param.items()),
@@ -482,33 +317,37 @@ facet_bars(
     "DWD missing_value_periods -- reported windows",
     "dwd_reported_missing_periods.png",
     ncols=2,
-)
+):
+    figs.append(
+        (
+            "DWD missing_value_periods -- reported windows",
+            "dwd_reported_missing_periods.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- observed -999/blank rate by year, per measurement (faceted)
-
-
-def _line_draw(rows):
-    def draw(ax):
-        ax.plot(
-            [x["year"] for x in rows], [x["missing_rate"] for x in rows], marker="."
-        )
-        ax.tick_params(axis="x", labelrotation=90)
-
-    return draw
-
-
-_facet_grid(
-    [(m, _line_draw(rows)) for m, rows in missing_over_time.items() if rows],
+if lines_grid(
+    {
+        m: [(x["year"], x["missing_rate"]) for x in rows]
+        for m, rows in missing_over_time.items()
+        if rows
+    },
     "DWD -- observed -999/blank rate by year, per measurement",
     "dwd_missing_rate_by_year.png",
-)
+):
+    figs.append(
+        (
+            "DWD observed -999/blank rate by year, per measurement",
+            "dwd_missing_rate_by_year.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- missing rate per value column + distinct hours per station (faceted)
-facet_bars(
+if facet_bars(
     {
         m: [(c, miss / tm) for c, (miss, tm) in cols.items()]
         for m, cols in missing_rates.items()
@@ -516,32 +355,40 @@ facet_bars(
     "DWD -- missing / -999 rate by value column, per measurement",
     "dwd_missing_rate_by_column.png",
     rot=30,
-)
-facet_bars(
+):
+    figs.append(
+        (
+            "DWD missing / -999 rate by value column, per measurement",
+            "dwd_missing_rate_by_column.png",
+        )
+    )
+if facet_bars(
     {
         m: [(x["station"], x["distinct_hours"]) for x in station_roll[m]]
         for m in MEASUREMENTS
     },
     "DWD -- distinct observed hours per station, per measurement",
     "dwd_distinct_hours_per_station.png",
-)
+):
+    figs.append(
+        (
+            "DWD distinct observed hours per station, per measurement",
+            "dwd_distinct_hours_per_station.png",
+        )
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Findings
+_worst = {sid: g["longest"] for sid, g in reported_gaps.items()}
+_obs_rate = {
+    f"{m}.{c}": round(miss / tm, 4)
+    for m, cs in missing_rates.items()
+    for c, (miss, tm) in cs.items()
+}
 print("reported periods total:", total, " inverted ranges:", inverted)
-print(
-    "reported longest gap per station:",
-    {sid: g["longest"] for sid, g in reported_gaps.items()},
-)
-print(
-    "observed -999/blank rate per (measurement.column):",
-    {
-        f"{m}.{c}": round(miss / tm, 4)
-        for m, cs in missing_rates.items()
-        for c, (miss, tm) in cs.items()
-    },
-)
+print("reported longest gap per station:", _worst)
+print("observed -999/blank rate per (measurement.column):", _obs_rate)
 print(
     "reconciliation: -999-without-report =",
     obs_no_report,
@@ -552,13 +399,6 @@ print(
 # COMMAND ----------
 
 # DBTITLE 1,Export profiling findings -> src/schemas/profiling/dwd.md
-_obs_rate = {
-    f"{m}.{c}": round(miss / tm, 4)
-    for m, cs in missing_rates.items()
-    for c, (miss, tm) in cs.items()
-}
-_worst = {sid: g["longest"] for sid, g in reported_gaps.items()}
-
 _profile = [
     f"- `dwd_missing_value_periods`: {total} rows, columns {MV_COLS}",
     f"- station-id column: `{sid_c}`  parameter column: `{param_c}`  von/bis: `{von_c}`/`{bis_c}`",
@@ -568,27 +408,46 @@ _profile = [
 
 _dq = [
     "- REPORTED = a row in dwd_missing_value_periods; OBSERVED = a measurement value that is `-999` or blank. They are not guaranteed to line up.",
-    f"- inverted von>bis ranges in the reported table: {inverted}",
     f"- reconciliation: station x parameter with -999 observed but NO reported period: {obs_no_report}",
     f"- reconciliation: station x parameter with a reported period but ZERO observed -999/blank: {report_no_obs}",
 ]
 
-_temporal = [
-    f"reported-period span (hours): parsed {len(period_spans)} of {total} rows"
+_domain = [
+    "Reported parameter codes vs the measurement value-column names (the DWD parameter code IS the column name):",
+    f"- reported codes not a measurement value column: {codes_unknown}",
+    f"- measurement value columns never in a reported period: {codes_unused}",
+    para(
+        "An unknown reported code points to a parameter outside the seven",
+        "measurement tables profiled here (a deepening measurement, 05) or a code",
+        "drift -- reconcile before treating REPORTED and OBSERVED as one signal.",
+    ),
+]
+
+_tcons = [
+    f"Reported-period span (hours): parsed {len(period_spans)} of {total} rows.",
 ]
 if _TO_DT_UNPARSED:
-    _temporal.append(f"  unparsed von/bis samples: {_TO_DT_UNPARSED}")
+    _tcons.append(f"- unparsed von/bis samples: {_TO_DT_UNPARSED}")
 if period_spans:
     _sp = sorted(period_spans)
-    _temporal.append(
-        f"  min={_sp[0]:.1f}, median={_sp[len(_sp) // 2]:.1f}, max={_sp[-1]:.1f}"
+    _tcons.append(
+        f"- span min={_sp[0]:.1f}, median={_sp[len(_sp) // 2]:.1f}, max={_sp[-1]:.1f} hours"
     )
-_temporal.append(f"longest reported missing period per station (hours): {_worst}")
-_temporal.append("observed -999/blank rate by year, per measurement:")
+_tcons.append(
+    f"- `von_datum` > `bis_datum` (inverted) in {inverted} rows -- a validity check is needed at Silver."
+)
+_tcons.append(f"- longest reported missing period per station (hours): {_worst}")
+
+_regime = [
+    para(
+        "Observed -999/blank rate by year per measurement -- missingness is",
+        "time-varying, so no uniform-completeness assumption holds and any",
+        "imputation is an explicit, evidenced choice per era.",
+    ),
+    "",
+]
 for m, rows in missing_over_time.items():
-    _temporal.append(
-        f"- {m}: {[(x['year'], round(x['missing_rate'], 4)) for x in rows]}"
-    )
+    _regime.append(f"- {m}: {[(x['year'], round(x['missing_rate'], 4)) for x in rows]}")
 
 _dist = ["Observed -999/blank rate per (measurement.value-column):"]
 for k, vrate in _obs_rate.items():
@@ -616,41 +475,96 @@ _silver.append(
     "- Missingness is time-varying (year plots) -> no uniform-completeness assumption; any imputation is an explicit, evidenced choice."
 )
 
-_ml_readiness = [
-    (
-        "Candidate target signal: `dwd_missing_value_periods` is itself a natural label source for "
-        "a missingness/outage-prediction use case (predict whether a station x parameter will enter "
-        "a reported gap); the observed -999/blank rate per (measurement.column) is an alternative, "
-        "denser target for the same question."
-    ),
-    (
-        "Leakage: a reported period's von/bis window is only known once DWD has closed the gap -- "
-        "using `dwd_missing_value_periods` rows as a feature to predict the very same gap they "
-        "describe is circular; a forecasting model may only use periods with bis_datum strictly "
-        "before the prediction point."
-    ),
-    (
-        "Grain and entity-grouped split: reported periods and per-station rollups are keyed by "
-        "(station, parameter); split any model of this data by station id, not by row, so a station's "
-        "reported periods don't leak across train/test."
-    ),
-    (
-        f"Join cardinality: the station x parameter reconciliation join ({obs_no_report} observed-"
-        f"without-report, {report_no_obs} reported-without-observed cases) is 1:1 per (station, "
-        "parameter) pair by construction, but the two sides disagree for a nontrivial share of "
-        "pairs -- treat REPORTED and OBSERVED as two different signals, not one validated join."
-    ),
-    (
-        f"Imbalance: reported periods are concentrated per station/parameter ({mv_per_station}, "
-        f"{mv_per_param}) -- a station/parameter-level classifier for 'has a reported gap' would "
-        "see a skewed positive rate; check this before choosing a class-imbalance strategy."
-    ),
-    (
-        "Sample-vs-full divergence: not applicable -- every stat in this notebook (reported-period "
-        "table, per-station rollups, yearly rates) is computed from a full Spark scan or a full "
-        "collected small table, no `.sample()`/`.limit()` subset is used for any reported statistic."
-    ),
-]
+_target = para(
+    "`dwd_missing_value_periods` is itself a natural label source for a",
+    "missingness/outage-prediction use case; the observed -999/blank rate per",
+    "(measurement.column) is a denser alternative target for the same question.",
+)
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            "Reported periods and per-station rollups are keyed by (station, parameter) -- split by station id, not by row.",
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            para(
+                "The station x parameter reconciliation is 1:1 per pair by construction,",
+                f"but the two sides disagree ({obs_no_report} observed-without-report,",
+                f"{report_no_obs} reported-without-observed) -- treat REPORTED and OBSERVED",
+                "as two signals, not one validated join.",
+            ),
+        ),
+        (
+            "Target contamination",
+            para(
+                _target,
+                "The reported period and everything dated inside it must be excluded",
+                "from features for predicting that same gap.",
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            para(
+                "A reported period's von/bis window is only known once DWD closes the",
+                "gap -- a forecasting model may use only periods with bis_datum strictly",
+                "before the prediction point.",
+            ),
+        ),
+        (
+            "Proxy leakage",
+            "`DatumLetzteAktualisierung`-style fields and the parameter/station keys describe the gap itself -- circular for predicting it.",
+        ),
+        (
+            "Split / entity leakage",
+            "Split by station id so a station's reported periods do not leak across train/test.",
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            "Replay reported periods forward from a base date -- do not use the full set joined to a past date.",
+        ),
+        (
+            "Survivorship / coverage bias",
+            f"Reported periods are concentrated per station/parameter ({mv_per_station}) -- a station-level classifier sees a skewed positive rate.",
+        ),
+        (
+            "Missingness leakage",
+            "A missing von or bis value may itself mark the gap type -- check before an 'is-missing' feature.",
+        ),
+        (
+            "Duplicate-event leakage",
+            "De-duplicate the reported-periods table before counting gaps as independent observations.",
+        ),
+        (
+            "Target / feature temporal misalignment",
+            "von_datum (gap start) vs bis_datum (gap end) vs the DWD report date are distinct -- align target and features to one.",
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            "Not applicable -- no numeric measures in the reported-periods table.",
+        ),
+        (
+            "Data-generation-process leakage",
+            "Whether a gap is REPORTED at all is a property of DWD's QC process, not the physical outage -- OBSERVED is the more direct signal.",
+        ),
+        (
+            "Class / label instability",
+            "Parameter codes and the reporting practice change across DWD archive versions -- pin the version.",
+        ),
+        (
+            "Label availability lag",
+            "Reported periods are back-loaded (a gap is logged after it closes) -- a real-time model cannot assume the row exists at the gap time.",
+        ),
+        (
+            "Source / version / regime change",
+            "Observed missingness rate by year (Regime / Version Evidence) shows the reporting regime shifting over the archive span.",
+        ),
+        (
+            "Sample-vs-full divergence",
+            "Every statistic (reported-period table, per-station rollups, yearly rates) is a full Spark scan or fully collected small table -- no sampling.",
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -659,10 +573,12 @@ write_profiling(
     blocks=[
         ("Profile", "\n".join(_profile)),
         ("Data Quality", "\n".join(_dq)),
-        ("Temporal", "\n".join(_temporal)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
+        ("Temporal Consistency", "\n".join(_tcons)),
+        ("Regime / Version Evidence", "\n".join(_regime)),
         ("Distributions", "\n".join(_dist)),
         ("Domain Findings", "\n".join(_dom)),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
+        ("ML-Readiness Evidence", _ml),
         (
             "EDA Findings",
             "\n".join(
@@ -676,26 +592,5 @@ write_profiling(
         ),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        (
-            "DWD observed missingness rate by station x parameter",
-            "dwd_missingness_heatmap.png",
-        ),
-        (
-            "DWD missing_value_periods -- reported windows",
-            "dwd_reported_missing_periods.png",
-        ),
-        (
-            "DWD observed -999/blank rate by year, per measurement",
-            "dwd_missing_rate_by_year.png",
-        ),
-        (
-            "DWD missing / -999 rate by value column, per measurement",
-            "dwd_missing_rate_by_column.png",
-        ),
-        (
-            "DWD distinct observed hours per station, per measurement",
-            "dwd_distinct_hours_per_station.png",
-        ),
-    ],
+    figures=figs,
 )

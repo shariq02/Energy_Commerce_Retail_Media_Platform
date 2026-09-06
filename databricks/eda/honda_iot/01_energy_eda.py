@@ -10,27 +10,26 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** August 2026
+# MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** Profile the six Honda IoT energy Bronze tables
-# MAGIC (electricity / heating / cooling, each P and W) -- schema, missingness,
-# MAGIC constant columns, frequency partitions, sensor/time continuity
-# MAGIC (expected vs actual, interval consistency, gaps), value ranges,
-# MAGIC distributions & suspicious readings (negatives, spikes, stuck runs),
-# MAGIC per-timestamp duplicates (identical vs conflicting), and the P<->W
-# MAGIC value relationship -- as evidence for Silver design.
+# MAGIC **Purpose:** Profile the six Honda IoT energy Bronze tables (electricity
+# MAGIC / heating / cooling, each P and W) -- schema, missingness, constant
+# MAGIC columns, per-frequency continuity measured against an independent
+# MAGIC calendar, value ranges and sign, duplicate keys (identical vs
+# MAGIC conflicting), stuck runs and outliers, exact-copy / sign-mirror columns
+# MAGIC across all tables, the P<->W relationship, and the layered modelling-risk
+# MAGIC checklist -- as evidence for Silver design.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
-import matplotlib.pyplot as plt
 import numpy as np
 from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -52,192 +51,15 @@ TABLES = {e: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{e}" for e in ENERGY}
 KEY_COLS = ["frequency", "datetime_utc"]
 VALUE_EXCLUDE = {"frequency", "datetime_utc"}
 FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
-
-# COMMAND ----------
-
-# DBTITLE 1,Helpers
-
-
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-def histplot(values, title, xlabel, bins=50, filename=None):
-    plt.figure(figsize=(10, 4))
-    plt.hist(values, bins=bins)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel("count")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
+# The dataset name says datetime_utc is UTC; W tables carry a running energy
+# meter (kWh, monotone up), P tables an instantaneous power / flow (kW, signed).
+TS_TZ = "UTC"
 
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -251,7 +73,7 @@ for e in ENERGY:
     cols = df.columns
     exprs = [F.count(F.lit(1)).alias("__rows")]
     for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
+        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
         exprs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
             F.approx_count_distinct(c).alias(c + "__d"),
@@ -261,21 +83,34 @@ for e in ENERGY:
         "cols": cols,
         "total": r["__rows"],
         "acd": {c: r[c + "__d"] for c in cols},
+        "miss": {c: r[c + "__m"] for c in cols},
     }
     print("=" * 88, f"\n{e}  rows={r['__rows']}  ->  {cols}")
     for c in cols:
         print(
-            f"  {c:<28} missing={r[c + '__m']:>12} rate={r[c + '__m'] / r['__rows']:.4f} approx_distinct={r[c + '__d']}"
+            f"  {c:<28} missing={r[c + '__m']:>12} "
+            f"rate={r[c + '__m'] / r['__rows']:.4f} approx_distinct={r[c + '__d']}"
         )
-    print("constant columns:", [c for c in cols if r[c + "__d"] <= 1])
-    df.show(5, truncate=False)
 totals = {e: prof[e]["total"] for e in ENERGY}
 VCOLS = {e: [c for c in prof[e]["cols"] if c not in VALUE_EXCLUDE] for e in ENERGY}
 
 # COMMAND ----------
 
-# DBTITLE 1,Rows per frequency + timestamp coverage (one groupBy per table)
-freq_rows = {}
+# DBTITLE 1,Confirm constant columns exactly
+constant_cols = {}
+for e in ENERGY:
+    cands = [c for c in prof[e]["cols"] if prof[e]["acd"][c] <= 1]
+    if cands:
+        r = frames[e].agg(*[F.countDistinct(F.col(c)).alias(c) for c in cands]).first()
+        constant_cols[e] = sorted(c for c in cands if (r[c] or 0) <= 1)
+    else:
+        constant_cols[e] = []
+    prof[e]["constant"] = constant_cols[e]
+    print(f"{e}: constant columns (exact) = {constant_cols[e]}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Rows per frequency + timestamp span (one groupBy per table)
 freq_cov = {}
 for e in ENERGY:
     d = (
@@ -290,9 +125,9 @@ for e in ENERGY:
         .orderBy("frequency")
         .collect()
     )
-    freq_rows[e] = [(x["frequency"], x["rows"]) for x in d]
     freq_cov[e] = {x["frequency"]: x.asDict() for x in d}
     print(f"{e}:", [x.asDict() for x in d])
+freq_rows = {e: [(k, v["rows"]) for k, v in freq_cov[e].items()] for e in ENERGY}
 
 # COMMAND ----------
 
@@ -304,7 +139,7 @@ for e in ENERGY:
         F.count(F.lit(1)).alias("n"),
         F.countDistinct(F.hash(*[F.col(c) for c in df.columns])).alias("row_variants"),
     )
-    b = (
+    dup[e] = (
         dk.agg(
             F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
             F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
@@ -317,12 +152,11 @@ for e in ENERGY:
         .first()
         .asDict()
     )
-    dup[e] = b
-    print(f"{e:<16} {b}")
+    print(f"{e:<16} {dup[e]}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Value columns -- range, percentiles, zero/negative/non-numeric (one agg per table)
+# DBTITLE 1,Value columns -- range, sign, sentinels, percentiles (one agg per table)
 value_stats = {}
 for e in ENERGY:
     df = frames[e]
@@ -358,8 +192,28 @@ for e in ENERGY:
 
 # COMMAND ----------
 
-# DBTITLE 1,Suspicious readings -- 5-sigma outliers + stuck runs (two passes per table, all cols)
+# DBTITLE 1,Exact-copy / sign-mirror columns across ALL tables (circular-feature detector)
+all_stats = {
+    f"{e}.{c}": {
+        "mean": value_stats[e][c + "_avg"],
+        "sd": value_stats[e][c + "_sd"],
+        "min": value_stats[e][c + "_min"],
+        "max": value_stats[e][c + "_max"],
+    }
+    for e in ENERGY
+    for c in VCOLS[e]
+    if value_stats[e][c + "_sd"] is not None
+}
+mirrors = mirror_columns(all_stats)
+print("mirror / duplicate column pairs:")
+for a, b, why in mirrors:
+    print(f"  {a}  <->  {b}  : {why}")
+
+# COMMAND ----------
+
+# DBTITLE 1,5-sigma outliers + stuck runs (two passes per table)
 outliers = {}
+stuck = {}
 for e in ENERGY:
     df = frames[e]
     vs = value_stats[e]
@@ -373,10 +227,8 @@ for e in ENERGY:
             else F.lit(0).alias(c)
         )
     outliers[e] = df.agg(*oor_exprs).first().asDict()
-    # stuck sensor: a value equal to the value 1 and 9 rows earlier within the 1h series
     w = Window.partitionBy("frequency").orderBy("datetime_utc")
     df_1h = df.where(F.col("frequency") == "1h")
-    # First pass: compute window columns
     for c in VCOLS[e]:
         v = F.col(c).cast("double")
         df_1h = df_1h.withColumn(
@@ -385,71 +237,23 @@ for e in ENERGY:
                 v.isNotNull() & (v == F.lag(v, 1).over(w)) & (v == F.lag(v, 9).over(w))
             ).cast("long"),
         )
-    # Second pass: aggregate the flags
-    stuck_exprs = [F.sum(F.col(f"{c}_stuck")).alias(c) for c in VCOLS[e]]
-    stuck = df_1h.agg(*stuck_exprs).first().asDict()
-    print(f"{e}: 5sigma_outliers={outliers[e]}  stuck>=10run(1h)={stuck}")
+    stuck[e] = (
+        df_1h.agg(*[F.sum(F.col(f"{c}_stuck")).alias(c) for c in VCOLS[e]])
+        .first()
+        .asDict()
+    )
+    print(f"{e}: 5sigma_outliers={outliers[e]}  stuck>=10run(1h)={stuck[e]}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Sensor/time continuity + interval consistency (one windowed pass per table)
+# DBTITLE 1,Temporal continuity -- coverage vs an INDEPENDENT per-frequency calendar
 continuity = {}
 for e in ENERGY:
-    df = frames[e]
-    w = Window.partitionBy("frequency").orderBy("ts")
-    deltas = (
-        df.select("frequency", F.to_timestamp("datetime_utc").alias("ts"))
-        .where(F.col("ts").isNotNull())
-        .distinct()
-        .withColumn(
-            "delta_s", F.col("ts").cast("long") - F.lag("ts").over(w).cast("long")
-        )
+    cg = continuity_grid(
+        frames[e], "datetime_utc", FREQ_SECONDS, entity_col="frequency"
     )
-    g = deltas.groupBy("frequency", "delta_s").count().collect()
-    rows = []
-    for freq, step in FREQ_SECONDS.items():
-        fg = [x for x in g if x["frequency"] == freq]
-        if not fg:
-            continue
-        cov = freq_cov[e].get(freq)
-        span = None
-        if cov and cov["min_ts"] and cov["max_ts"]:
-            # datetime_utc is an ISO string; distinct_ts vs implied span
-            observed = cov["distinct_ts"]
-        else:
-            observed = sum(x["count"] for x in fg) + 1
-        total_intervals = sum(x["count"] for x in fg if x["delta_s"] is not None)
-        on_step = sum(x["count"] for x in fg if x["delta_s"] == step)
-        longest_gap = max(
-            (
-                (x["delta_s"] / step - 1)
-                for x in fg
-                if x["delta_s"] and x["delta_s"] > step
-            ),
-            default=0,
-        )
-        missing_steps = sum(
-            (x["delta_s"] / step - 1) * x["count"]
-            for x in fg
-            if x["delta_s"] and x["delta_s"] > step
-        )
-        expected = observed + missing_steps
-        rows.append(
-            (
-                freq,
-                observed,
-                round(observed / expected * 100, 2) if expected else None,
-                round(on_step / total_intervals * 100, 2) if total_intervals else None,
-                round(longest_gap, 1),
-                round(missing_steps, 1),
-            )
-        )
-    continuity[e] = rows
-    print(
-        f"{e}: (freq, observed, coverage%, on_step%, longest_gap_steps, missing_steps)"
-    )
-    for x in rows:
-        print("  ", x)
+    continuity[e] = cg["per_entity"]
+    print(f"{e}: {cg['per_entity']}")
 
 # COMMAND ----------
 
@@ -468,7 +272,7 @@ for metric in ("electricity", "heating", "cooling"):
         on=KEY_COLS,
         how="inner",
     )
-    a = (
+    pw_rel[metric] = (
         j.agg(
             F.count(F.lit(1)).alias("matched"),
             *[F.corr(f"p_{c}", f"w_{c}").alias(f"corr_{c}") for c in shared],
@@ -476,7 +280,6 @@ for metric in ("electricity", "heating", "cooling"):
         .first()
         .asDict()
     )
-    pw_rel[metric] = a
     pw_scatter[metric] = (
         shared[0],
         j.select(f"p_{shared[0]}", f"w_{shared[0]}")
@@ -487,95 +290,222 @@ for metric in ("electricity", "heating", "cooling"):
         .limit(20_000)
         .toPandas(),
     )
-    print(f"{metric}: {a}")
+    print(f"{metric}: {pw_rel[metric]}")
+
+schema_parity = {
+    m: frames[f"{m}_p"].columns == frames[f"{m}_w"].columns
+    for m in ("electricity", "heating", "cooling")
+}
+print("P/W schema parity:", schema_parity)
 
 # COMMAND ----------
 
-# DBTITLE 1,P vs W schema parity
+# DBTITLE 1,Categorical domain -- `frequency` against the known resolution set
+freq_domain = {
+    e: categorical_domain(
+        frames[e], "frequency", FREQ_SECONDS.keys(), name=f"{e}.frequency"
+    )
+    for e in ENERGY
+}
+for e, d in freq_domain.items():
+    if d["unexpected_count"]:
+        print(
+            f"{e}: UNEXPECTED frequency label(s) {d['unexpected']} -- ingestion defect"
+        )
+
+# COMMAND ----------
+
+# DBTITLE 1,Temporal consistency -- the W meter must be non-decreasing (cumulative energy)
+w_monotonic = {}
+for e in ENERGY:
+    if not e.endswith("_w"):
+        continue
+    w_monotonic[e] = {}
+    for c in VCOLS[e]:
+        res = monotonic_series_check(
+            frames[e], c, "datetime_utc", partition_col="frequency"
+        )
+        w_monotonic[e][c] = res
+        print(
+            f"{e}.{c}: {res['decreasing_steps']}/{res['comparable_steps']} steps decrease "
+            f"({res['decreasing_pct']}%), largest drop {res['largest_drop']}"
+        )
+
+# COMMAND ----------
+
+# DBTITLE 1,Physical consistency -- implied power from dW/dt should match the P table
+# For each metric, take the per-step increment of the cumulative W meter, convert
+# to an average power over the step, and compare it row-for-row with the P value
+# at the same (frequency, datetime_utc). A large residual share means P and W do
+# not describe the same physical quantity (a unit or labelling error).
+pw_identity = {}
 for metric in ("electricity", "heating", "cooling"):
-    p, w = frames[f"{metric}_p"].columns, frames[f"{metric}_w"].columns
-    print(f"{metric}:  identical={p == w}  P={p}  W={w}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Value-column sample for histograms (one sampled pass per table)
-value_pdf = {}
-for e in ENERGY:
-    df = frames[e]
-    value_pdf[e] = (
-        df.select(*[F.col(c).cast("double").alias(c) for c in VCOLS[e]])
-        .sample(0.1, seed=42)
-        .limit(150_000)
-        .toPandas()
+    p, w = frames[f"{metric}_p"], frames[f"{metric}_w"]
+    shared = [c for c in p.columns if c not in VALUE_EXCLUDE and c in w.columns]
+    if not shared:
+        continue
+    c0 = shared[0]
+    win = Window.partitionBy("frequency").orderBy("datetime_utc")
+    step_s = F.lit(None).cast("double")
+    for lbl, secs in FREQ_SECONDS.items():
+        step_s = F.when(F.col("frequency") == lbl, F.lit(float(secs))).otherwise(step_s)
+    wd = w.select(
+        *KEY_COLS,
+        (
+            (F.col(c0).cast("double") - F.lag(F.col(c0).cast("double")).over(win))
+            * 3600.0
+            / step_s
+        ).alias("implied_power"),
     )
-    print(f"{e} value sample rows: {len(value_pdf[e])}")
+    j = wd.join(
+        p.select(*KEY_COLS, F.col(c0).cast("double").alias("p_val")),
+        on=KEY_COLS,
+        how="inner",
+    ).where(F.col("implied_power").isNotNull() & F.col("p_val").isNotNull())
+    pw_identity[metric] = {
+        "column": c0,
+        **additive_identity_check(
+            j, "implied_power", ["p_val"], rel_tol=0.1, abs_floor=0.1
+        ),
+    }
+    print(f"{metric}: dW/dt vs P -- {pw_identity[metric]}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Hourly time-series window (first ~2000 points per table)
-ts_pdf = {}
-for e in ENERGY:
-    ts_pdf[e] = (
-        frames[e]
-        .where(F.col("frequency") == "1h")
-        .select("datetime_utc", *[F.col(c).cast("double").alias(c) for c in VCOLS[e]])
-        .orderBy("datetime_utc")
-        .limit(2000)
-        .toPandas()
-    )
+# DBTITLE 1,Regime evidence -- first half vs second half of the series (recalibration / sensor swap)
+spans = [
+    (fc["min_ts"], fc["max_ts"])
+    for e in ENERGY
+    for fc in freq_cov[e].values()
+    if fc.get("min_ts") and fc.get("max_ts")
+]
+regime = {}
+if spans:
+    lo = min(s[0] for s in spans)
+    hi = max(s[1] for s in spans)
+    mid = (lo + (hi - lo) / 2).replace(microsecond=0).isoformat()
+    for e in ENERGY:
+        shift = regime_population_shift(frames[e], "datetime_utc", VCOLS[e], mid)
+        regime[e] = {"cut": mid, **shift}
+        print(
+            f"{e}: split at {mid} -> pre={shift['pre_rows']} post={shift['post_rows']}; "
+            f"flipped={shift['flipped']}"
+        )
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- rows per frequency, coverage %, duplicate groups
-facet_bars(
+# DBTITLE 1,Samples for figures (sampled + first-N chronological)
+value_pdf = {
+    e: frames[e]
+    .select(*[F.col(c).cast("double").alias(c) for c in VCOLS[e]])
+    .sample(0.1, seed=42)
+    .limit(150_000)
+    .toPandas()
+    for e in ENERGY
+}
+ts_pdf = {
+    e: frames[e]
+    .where(F.col("frequency") == "1h")
+    .select("datetime_utc", *[F.col(c).cast("double").alias(c) for c in VCOLS[e]])
+    .orderBy("datetime_utc")
+    .limit(2000)
+    .toPandas()
+    for e in ENERGY
+}
+
+# COMMAND ----------
+
+# DBTITLE 1,Figure -- rows per frequency + coverage % + duplicate groups
+figs = []
+if facet_bars(
     {e: freq_rows[e] for e in ENERGY},
     "Honda energy -- rows per frequency, by table",
     "honda_energy_rows_per_frequency.png",
     rot=0,
-)
-facet_bars(
-    {e: [(x[0], x[2]) for x in continuity[e]] for e in ENERGY},
-    "Honda energy -- coverage % by frequency, by table",
+):
+    figs.append(
+        (
+            "Honda energy -- rows per frequency, by table",
+            "honda_energy_rows_per_frequency.png",
+        )
+    )
+if facet_bars(
+    {
+        e: [
+            (fq, continuity[e][fq]["coverage_pct"])
+            for fq in FREQ_SECONDS
+            if fq in continuity[e]
+        ]
+        for e in ENERGY
+    },
+    "Honda energy -- coverage % vs independent calendar, by frequency",
     "honda_energy_coverage_pct.png",
     rot=0,
-)
-barplot(
+):
+    figs.append(
+        ("Honda energy -- coverage % by frequency", "honda_energy_coverage_pct.png")
+    )
+if barplot(
     [(e, dup[e]["dup_groups"]) for e in ENERGY],
     "Honda energy -- duplicate (frequency, datetime_utc) groups",
     "table",
     "dup groups",
     rot=30,
     filename="honda_energy_duplicate_groups.png",
-)
+):
+    figs.append(
+        (
+            "Honda energy -- duplicate (frequency, datetime_utc) groups",
+            "honda_energy_duplicate_groups.png",
+        )
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- longest gap (missing steps) per table x frequency
-freqs = list(FREQ_SECONDS)
-x = np.arange(len(ENERGY))
-plt.figure(figsize=(11, 4))
-for i, freq in enumerate(freqs):
-    vals = [next((r[4] for r in continuity[e] if r[0] == freq), 0) for e in ENERGY]
-    plt.bar(x + i * 0.27, vals, width=0.27, label=freq)
-plt.xticks(x + 0.27, ENERGY, rotation=30, ha="right")
-plt.legend()
-plt.title("Honda energy -- longest gap (missing steps) per table x frequency")
-plt.ylabel("steps")
-plt.tight_layout()
-plt.savefig(
-    fig_path("honda_energy_longest_gap_per_table.png"), dpi=110, bbox_inches="tight"
-)
-plt.show()
+# DBTITLE 1,Figure -- longest gap (steps) per table x frequency
+gap_ok = False
+_gap_rows = [
+    (fq, [continuity[e].get(fq, {}).get("longest_gap_steps", 0) or 0 for e in ENERGY])
+    for fq in FREQ_SECONDS
+]
+if any(any(v) for _, v in _gap_rows):
+    x = np.arange(len(ENERGY))
+    fig, ax = plt.subplots(figsize=(11, 4))
+    for i, (fq, vals) in enumerate(_gap_rows):
+        ax.bar(x + i * 0.27, vals, width=0.27, label=fq)
+    ax.set_xticks(x + 0.27)
+    ax.set_xticklabels(ENERGY, rotation=30, ha="right")
+    ax.legend()
+    ax.set_title("Honda energy -- longest gap (missing steps) per table x frequency")
+    ax.set_ylabel("steps")
+    fig.tight_layout()
+    _save_and_show(fig, "honda_energy_longest_gap_per_table.png")
+    gap_ok = True
+if gap_ok:
+    figs.append(
+        (
+            "Honda energy -- longest gap (missing steps) per table x frequency",
+            "honda_energy_longest_gap_per_table.png",
+        )
+    )
+else:
+    print("  no gaps in any series -- longest-gap figure not written")
 
 # COMMAND ----------
 
-# DBTITLE 1,Figure -- value distributions and hourly windows (faceted)
-facet_hists(
+# DBTITLE 1,Figure -- value distributions + hourly window + P vs W scatter
+if facet_hists(
     {f"{e}.{c}": value_pdf[e][c].dropna().tolist() for e in ENERGY for c in VCOLS[e]},
     "Honda energy -- value distribution per table.column (sampled)",
     "honda_energy_value_distributions.png",
     ncols=4,
-)
+):
+    figs.append(
+        (
+            "Honda energy -- value distribution per table.column",
+            "honda_energy_value_distributions.png",
+        )
+    )
 
 
 def _hourly_draw(tp, cols):
@@ -587,15 +517,17 @@ def _hourly_draw(tp, cols):
     return draw
 
 
-_facet_grid(
+if _facet_grid(
     [(e, _hourly_draw(ts_pdf[e], VCOLS[e])) for e in ENERGY if not ts_pdf[e].empty],
     "Honda energy -- first 2000 hourly points, by table",
     "honda_energy_first_hourly_points.png",
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Figure -- P vs W scatter per metric (faceted)
+):
+    figs.append(
+        (
+            "Honda energy -- first 2000 hourly points, by table",
+            "honda_energy_first_hourly_points.png",
+        )
+    )
 
 
 def _scatter_draw(col, pdf):
@@ -607,7 +539,7 @@ def _scatter_draw(col, pdf):
     return draw
 
 
-_facet_grid(
+if _facet_grid(
     [
         (metric, _scatter_draw(col, pdf))
         for metric, (col, pdf) in pw_scatter.items()
@@ -615,17 +547,18 @@ _facet_grid(
     ],
     "Honda energy -- P vs W per metric (sampled)",
     "honda_energy_p_vs_w_scatter.png",
-)
+):
+    figs.append(
+        ("Honda energy -- P vs W per metric", "honda_energy_p_vs_w_scatter.png")
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Findings
 print("dup composition:", dup)
-print(
-    "coverage % / on-step % per table/frequency:",
-    {e: [(x[0], x[2], x[3]) for x in continuity[e]] for e in ENERGY},
-)
+print("continuity:", continuity)
 print("5-sigma outliers:", outliers)
+print("mirror columns:", mirrors)
 print("P<->W relationship:", pw_rel)
 
 # COMMAND ----------
@@ -636,10 +569,10 @@ _profile = [
     "|---|---|---|---|---|",
 ]
 for e in ENERGY:
-    consts = [c for c in prof[e]["cols"] if prof[e]["acd"][c] <= 1]
     _profile.append(
         f"| {e} | {totals[e]} | {len(prof[e]['cols'])} | "
-        f"{ {fr: fc['rows'] for fr, fc in freq_cov[e].items()} } | {', '.join(consts) or '-'} |"
+        f"{ {fr: fc['rows'] for fr, fc in freq_cov[e].items()} } | "
+        f"{', '.join(prof[e]['constant']) or '-'} |"
     )
 _profile.append("")
 _profile.append("Value columns per table: " + str({e: VCOLS[e] for e in ENERGY}))
@@ -649,101 +582,300 @@ for e in ENERGY:
     b = dup[e]
     _dq.append(f"| {e} | {b['dup_groups']} | {b['identical']} | {b['conflicting']} |")
 _dq.append("")
-_dq.append("5-sigma outlier rows per value column: " + str(outliers))
+_dq.append(f"5-sigma outlier rows per value column: {outliers}")
+_dq.append(f"Stuck-run rows (value == value 1 and 9 steps back, 1h): {stuck}")
 
-_temporal = [
-    "Per (table, frequency): observed, coverage %, on-step %, longest gap (steps), missing steps:"
+_unit = [
+    (
+        "Value columns cast to double; P tables are instantaneous power/flow (kW, may be "
+        "signed by convention), W tables a cumulative energy meter (kWh, should be monotone):"
+    ),
 ]
-for e in ENERGY:
-    for row in continuity[e]:
-        _temporal.append(
-            f"- {e} / {row[0]}: observed={row[1]}, coverage={row[2]}%, on-step={row[3]}%, longest gap={row[4]}, missing steps={row[5]}"
-        )
-
-_dist = []
 for e in ENERGY:
     for c in VCOLS[e]:
         vs = value_stats[e]
-        _dist.append(
-            f"- {e}.`{c}`: min/max={vs.get(c + '_min')}/{vs.get(c + '_max')}, "
-            f"p01/25/50/75/99={vs.get(c + '_p')}, mean={vs.get(c + '_avg')}, sd={vs.get(c + '_sd')}, "
-            f"zero rows={vs.get(c + '_zero')}, negative rows={vs.get(c + '_negative')}, non-numeric={vs.get(c + '_non_numeric')}"
+        _unit.append(
+            f"- {e}.`{c}`: range {vs[c + '_min']}..{vs[c + '_max']}, mean {vs[c + '_avg']}, "
+            f"sd {vs[c + '_sd']}, negative rows {vs[c + '_negative']}, zero {vs[c + '_zero']}, "
+            f"non-numeric {vs[c + '_non_numeric']}"
+        )
+_unit.append("")
+_unit.append("Exact-copy / sign-mirror column pairs (circular-feature risk):")
+if mirrors:
+    for a, b, why in mirrors:
+        _unit.append(f"- `{a}` <-> `{b}`: {why}")
+else:
+    _unit.append("- none detected across the six tables.")
+
+_temporal = [
+    (
+        f"datetime_utc is treated as {TS_TZ} per the dataset name. Coverage below is measured "
+        "against an INDEPENDENT calendar (expected = span / step + 1), not the observed distinct "
+        "count -- so 100% means genuinely gap-free, not tautological."
+    ),
+    "",
+    "| table / frequency | observed | expected | coverage % | longest gap (steps) | on-step % |",
+    "|---|---|---|---|---|---|",
+]
+for e in ENERGY:
+    for fq in FREQ_SECONDS:
+        r = continuity[e].get(fq)
+        if not r:
+            continue
+        _temporal.append(
+            f"| {e} / {fq} | {r['observed']} | {r['expected']} | {r['coverage_pct']} | "
+            f"{r['longest_gap_steps']} | {r['on_step_pct']} |"
         )
 
 _rel = [
-    "P<->W value relationship per metric (matched rows on (frequency, datetime_utc) + per-column Pearson corr):"
+    "P<->W value relationship per metric (inner join on (frequency, datetime_utc), Pearson corr):"
 ]
 for metric, a in pw_rel.items():
     _rel.append(f"- {metric}: {a}")
-_rel.append("")
-_rel.append(
-    "P/W schema parity: "
-    + str(
-        {
-            metric: frames[f"{metric}_p"].columns == frames[f"{metric}_w"].columns
-            for metric in ("electricity", "heating", "cooling")
-        }
-    )
-)
+_rel.append(f"P/W schema parity: {schema_parity}")
 
-_any_conflict = any(dup[e]["conflicting"] > 0 for e in ENERGY)
-_silver = [
-    "- Type conversion: datetime_utc -> timestamp; value columns -> double.",
-    "- `frequency` (1min / 15min / 1h) is a real physical resolution -> keep it in the grain; do not blend frequencies.",
+_coverage = [
+    f"Rows per (table, frequency): { {e: {k: v['rows'] for k, v in freq_cov[e].items()} for e in ENERGY} }.",
+    (
+        "The 1min partition dominates every table (~50x the 1h partition). A model must not pool "
+        "frequencies -- they are three resolutions of the same signal, and a random split would put "
+        "near-duplicate 1min/15min/1h rows of the same hour on both sides."
+    ),
+    "Single building, single sensor set -- no entity dimension; the only split axis is time.",
 ]
-if _any_conflict:
-    _silver.append(
-        "- (frequency, datetime_utc) has conflicting duplicate rows in at least one table -> a conflict-resolution rule is required (rule not yet established)."
+
+_domain = ["`frequency` values vs the known resolution set (1min / 15min / 1h):"]
+for e in ENERGY:
+    d = freq_domain[e]
+    _domain.append(
+        f"- {e}: unexpected={d['unexpected'] or 'none'}, "
+        f"unused={d['unused_allowed'] or 'none'}."
     )
-_silver.append("- Identical (frequency, datetime_utc) repeats can be de-duplicated.")
+if any(freq_domain[e]["unexpected_count"] for e in ENERGY):
+    _domain.append(
+        "-> an unexpected `frequency` label is an INGESTION defect (a bad partition value), "
+        "not a source finding."
+    )
+
+_tcons = [
+    para(
+        "The W tables are cumulative energy meters -- the value must be",
+        "non-decreasing when ordered by datetime_utc within a frequency. A",
+        "decreasing step is either a meter reset/rollover or a data error.",
+    ),
+    "",
+]
+for e, cols in w_monotonic.items():
+    for c, res in cols.items():
+        _tcons.append(
+            f"- {e}.`{c}`: {res['decreasing_steps']} of {res['comparable_steps']} steps "
+            f"decrease ({res['decreasing_pct']}%); largest drop {res['largest_drop']}."
+        )
+if not w_monotonic:
+    _tcons.append("- No `*_w` cumulative-meter table in scope.")
+
+_pcons = [
+    para(
+        "Physical identity check: the per-step increment of the W meter, converted",
+        "to an average power over the step, should equal the P value at the same",
+        "(frequency, datetime_utc). Residual = implied_power - P.",
+    ),
+    "",
+]
+for metric, res in pw_identity.items():
+    _pcons.append(
+        f"- {metric} (`{res['column']}`): {res['violations']}/{res['comparable_rows']} rows "
+        f"exceed {int(res['rel_tol'] * 100)}% relative residual ({res['violation_pct']}%); "
+        f"residual p01/p50/p99 {res['residual_p01_p50_p99']}, max abs {res['max_abs_residual']}."
+    )
+if not pw_identity:
+    _pcons.append("- No P/W column pair shared a name for the check.")
+
+_regime = [
+    para(
+        "Rows split at the series midpoint -- a large null-rate or distinct-count",
+        "move on one side points to a sensor swap / outage window rather than a",
+        "physical change. This measures coverage, not signal level.",
+    ),
+    "",
+]
+for e in ENERGY:
+    rg = regime.get(e)
+    if not rg:
+        _regime.append(f"- {e}: no datetime span -- not assessable.")
+        continue
+    _regime.append(
+        f"- {e} (cut {rg['cut']}): pre={rg['pre_rows']}, post={rg['post_rows']}; "
+        f"columns with a >=50pt null-rate move: {rg['flipped'] or 'none'}."
+    )
+
+_conflict = any(dup[e]["conflicting"] for e in ENERGY)
+_neg = {
+    f"{e}.{c}": value_stats[e][c + "_negative"]
+    for e in ENERGY
+    for c in VCOLS[e]
+    if value_stats[e][c + "_negative"]
+}
+
+_silver = [
+    "- Type conversion: datetime_utc -> timestamp (UTC); value columns -> double.",
+    (
+        "- `frequency` (1min / 15min / 1h) is a real physical resolution -> keep it in the grain; "
+        "do not blend frequencies."
+    ),
+    "- Identical (frequency, datetime_utc) repeats can be de-duplicated.",
+]
+if _conflict:
+    _silver.append(
+        "- Conflicting (frequency, datetime_utc) duplicates exist -> a deterministic "
+        "conflict-resolution rule is required before Silver."
+    )
+if mirrors:
+    _silver.append(
+        f"- Exact-copy / sign-mirror columns exist ({[(a, b) for a, b, _ in mirrors]}) -> keep "
+        "ONE per pair, or an SCD/lineage note explaining the derivation; never expose both as "
+        "independent features."
+    )
+if _neg:
+    _silver.append(
+        f"- Negative values in energy columns ({_neg}) -> confirm the sign convention "
+        "(generation as negative? measurement error?) before Silver casting."
+    )
 _silver.append(
-    "- Series are not dense (coverage % / gaps above) -> observed points only; resampling is a downstream choice."
+    "- Series are not necessarily dense (coverage / gaps above) -> observed points only; "
+    "resampling is a downstream choice."
 )
 _silver.append("- Stuck-sensor runs and 5-sigma spikes -> data-quality flag, keep raw.")
-_silver.append(
-    "- P and W tables of a metric are schema-identical, join 1:1 on (frequency, datetime_utc), and are highly correlated (corr above) -> may be modelled as one fact per metric (a Silver modelling choice)."
-)
 
-_ml_readiness = [
-    (
-        "Candidate target signals: the stuck-sensor flags and 5-sigma outlier counts computed "
-        f"above ({outliers}) are natural labels for a sensor-anomaly-detection use case; the value "
-        "columns themselves (electricity/heating/cooling P and W) are candidate forecasting "
-        "targets keyed by (frequency, datetime_utc)."
-    ),
-    (
-        "Leakage: P and W tables per metric are schema-identical and highly correlated (Pearson "
-        f"corr in `pw_rel` = {pw_rel}) -- verify whether P and W are independent physical "
-        "measurements or one is a unit-derived transform of the other before using both as separate "
-        "features; if derived, using one to predict the other is circular, not genuine signal."
-    ),
-    (
-        f"Grain and entity-grouped split: key = {KEY_COLS} per table, no separate device/sensor id -- "
-        "split by contiguous date range, not by row, and never mix `frequency` values within one split "
-        "since 1min/15min/1h are different physical resolutions of the same underlying signal."
-    ),
-    (
-        "Join cardinality: P<->W join per metric is 1:1 on (frequency, datetime_utc) confirmed by "
-        "matched-row counts and schema parity above -- safe to join without fan-out risk."
-    ),
-    (
-        f"Imbalance: stuck-run and 5-sigma-outlier flags are rare-event labels by construction "
-        f"({outliers}) -- an anomaly-detection model trained on these will face severe class "
-        "imbalance; do not evaluate with plain accuracy."
-    ),
-    (
-        "Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample "
-        "capped at 150k rows), the hourly time-series figure uses only the first 2000 chronological "
-        "points per table, and the P-vs-W scatter uses a 10% sample capped at 20k rows -- none of "
-        "these are representative of the full series; use the full-table `value_stats`/`outliers`/"
-        "`continuity` aggregates for any feature-quality or threshold decision."
-    ),
-]
-if any(dup[e]["conflicting"] > 0 for e in ENERGY):
-    _ml_readiness.append(
-        "Conflicting (frequency, datetime_utc) duplicates exist in at least one table (see Data "
-        "Quality) and must be resolved deterministically before use as a training feature or label."
-    )
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            (
+                f"One row per (frequency, datetime_utc) per table. Joining P+W per metric is 1:1 on that "
+                f"key (schema parity {schema_parity}); pooling frequencies changes the grain."
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            (
+                "P<->W join is 1:1 on (frequency, datetime_utc) -- no fan-out. A cross-metric wide join "
+                "(electricity+heating+cooling at one timestamp) is also 1:1 on the intersection but drops "
+                "the non-overlapping tail (see 03)."
+            ),
+        ),
+        (
+            "Target contamination",
+            (
+                "If a value column is the forecast target, the same column at the target timestamp (and "
+                "the cumulative W meter, which encodes the future increment) must be excluded from features."
+            ),
+        ),
+        (
+            "Temporal / post-event leakage",
+            (
+                "The W tables are cumulative meters -- W[t] already contains energy that flows after the "
+                "prediction cutoff if the cutoff sits mid-interval; use first-difference (per-interval "
+                "energy), not the raw meter, and only points strictly before the cutoff. Meter "
+                "monotonicity is measured in Temporal Consistency; the dW/dt-vs-P identity in Physical "
+                "Consistency."
+            ),
+        ),
+        (
+            "Proxy leakage",
+            (
+                "P and W of the same metric are near-redundant (corr above); a heat/cool total is close to "
+                "the sum of its components -- a 'feature' that is an arithmetic function of the target leaks."
+            ),
+        ),
+        (
+            "Split / entity leakage",
+            (
+                "Single building, no entity id -- split by contiguous date range only, and never mix "
+                "frequencies within one split (1min/15min/1h rows of the same hour are near-duplicates)."
+            ),
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            (
+                "No slowly-changing attributes here; a diurnal / seasonal profile used as a feature must be "
+                "computed only from data before the prediction point, never over the full history."
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            (
+                "Continuity above shows the real gap profile. The 1min partition dominates; any statistic "
+                "pooled across frequencies is really a 1min statistic."
+            ),
+        ),
+        (
+            "Missingness leakage",
+            (
+                "Whether a value is present may correlate with sensor downtime windows -- check before "
+                "adding an 'is-missing' feature that a naive model could exploit."
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            (
+                f"Duplicate key groups per table: { {e: dup[e]['dup_groups'] for e in ENERGY} } "
+                f"(conflicting: { {e: dup[e]['conflicting'] for e in ENERGY} }) -- de-duplicate before "
+                "counting observations or splitting."
+            ),
+        ),
+        (
+            "Target / feature temporal misalignment",
+            (
+                "P (instantaneous, timestamped at the instant) and W (cumulative, timestamped at interval "
+                "end) are not aligned to the same instant -- align both to one convention before pairing."
+            ),
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            (
+                f"Mirror/copy columns: {[(a, b) for a, b, _ in mirrors] or 'none'}. Negative energy: "
+                f"{_neg or 'none'}. P<->W is a physical relationship, not independent signal -- using one "
+                "to predict the other is circular."
+            ),
+        ),
+        (
+            "Data-generation-process leakage",
+            (
+                "The W meter reset/rollover behaviour and any gap-filling done upstream are part of the "
+                "data-generation process -- a feature that spikes at a meter reset encodes the process, "
+                "not the building's energy use."
+            ),
+        ),
+        (
+            "Class / label instability",
+            "Not applicable -- all targets here are continuous.",
+        ),
+        (
+            "Label availability lag",
+            (
+                "Meter readings are available at interval end; a nowcast at time t cannot use the interval "
+                "[t, t+step] reading."
+            ),
+        ),
+        (
+            "Source / version / regime change",
+            (
+                "A single deployment; watch for sensor swaps or recalibration (a step change in level with "
+                "no physical cause) when the series is extended."
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            (
+                "value_pdf is a 10% sample capped at 150k rows, the hourly figure uses the first 2000 "
+                "chronological points, the P-vs-W scatter a 10% sample capped at 20k -- none are "
+                "representative; use the full-table value_stats / outliers / continuity aggregates for "
+                "any feature-quality decision."
+            ),
+        ),
+    ]
+)
 
 write_profiling(
     SOURCE,
@@ -752,51 +884,40 @@ write_profiling(
     blocks=[
         ("Profile", "\n".join(_profile)),
         ("Data Quality", "\n".join(_dq)),
-        ("Temporal", "\n".join(_temporal)),
-        ("Distributions", "\n".join(_dist)),
+        ("Unit & Semantic Validation", "\n".join(_unit)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
+        ("Temporal Semantics", "\n".join(_temporal)),
+        ("Temporal Consistency", "\n".join(_tcons)),
+        ("Physical Consistency", "\n".join(_pcons)),
+        ("Regime / Version Evidence", "\n".join(_regime)),
+        ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Relationships", "\n".join(_rel)),
-        ("ML-Readiness Evidence", "\n".join(f"- {ln}" for ln in _ml_readiness)),
         (
             "EDA Findings",
             "\n".join(
                 [
                     f"- dup composition: {dup}",
-                    "- coverage % / on-step % per table/frequency: "
+                    "- continuity (coverage % / longest gap steps): "
                     + str(
-                        {e: [(x[0], x[2], x[3]) for x in continuity[e]] for e in ENERGY}
+                        {
+                            e: {
+                                fq: (
+                                    continuity[e][fq]["coverage_pct"],
+                                    continuity[e][fq]["longest_gap_steps"],
+                                )
+                                for fq in continuity[e]
+                            }
+                            for e in ENERGY
+                        }
                     ),
                     f"- 5-sigma outliers: {outliers}",
+                    f"- mirror/duplicate columns: {[(a, b, w) for a, b, w in mirrors]}",
                     f"- P<->W relationship: {pw_rel}",
                 ]
             ),
         ),
+        ("ML-Readiness Evidence", _ml),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        (
-            "Honda energy -- rows per frequency, by table",
-            "honda_energy_rows_per_frequency.png",
-        ),
-        ("Honda energy -- coverage % by frequency", "honda_energy_coverage_pct.png"),
-        (
-            "Honda energy -- duplicate (frequency, datetime_utc) groups",
-            "honda_energy_duplicate_groups.png",
-        ),
-        (
-            "Honda energy -- longest gap (missing steps) per table x frequency",
-            "honda_energy_longest_gap_per_table.png",
-        ),
-        (
-            "Honda energy -- value distribution per table.column",
-            "honda_energy_value_distributions.png",
-        ),
-        (
-            "Honda energy -- first 2000 hourly points, by table",
-            "honda_energy_first_hourly_points.png",
-        ),
-        (
-            "Honda energy -- P vs W per metric",
-            "honda_energy_p_vs_w_scatter.png",
-        ),
-    ],
+    figures=figs,
 )
