@@ -146,21 +146,88 @@ def _qc(name):
     return F.col("`" + str(name).replace("`", "``") + "`")
 
 
+def _de_number(s):
+    # Normalise a possibly German-formatted number WITHOUT regex lookaround --
+    # Photon's regex engine (RE2) has no lookahead/lookbehind, and a lookaround
+    # pattern de-photonises the whole operator (a 40x slowdown on a large agg).
+    # Rule: if the value contains a comma, '.' is a thousands separator and ','
+    # is the decimal point; otherwise leave it (already dot-decimal / integer).
+    has_comma = F.instr(s, ",") > 0
+    de = F.regexp_replace(F.regexp_replace(s, r"\.", ""), ",", ".")
+    return F.when(has_comma, de).otherwise(s)
+
+
 def safe_num(colname):
     # ANSI-safe, NULL-safe string -> double. A bare `.cast("double")` THROWS
     # CAST_INVALID_INPUT under ANSI mode (the default on this runtime) whenever a
     # row holds a blank or non-numeric string -- Bronze is all-string, so that is
-    # a real hazard. The `when(rlike, ...)` short-circuits so the cast only runs
-    # on values that are already valid numbers; a German decimal comma
-    # ("28,45") and thousands dot are normalised first.
-    s = F.trim(_qc(colname).cast("string"))
-    s = F.regexp_replace(s, r"\.(?=\d{3}(\D|$))", "")
-    s = F.regexp_replace(s, r"(?<=\d),(?=\d)", ".")
+    # a real hazard. `when(rlike, ...)` short-circuits so the cast only runs on
+    # values that are already valid numbers.
+    s = _de_number(F.trim(_qc(colname).cast("string")))
     return F.when(s.rlike(r"^-?\d+(\.\d+)?$"), s.cast("double"))
 
 
 def key_like_cols(cols, suffix="mastrnummer"):
     return [c for c in cols if c.lower().endswith(suffix)]
+
+
+def full_row_dup_count(df, total=None):
+    # Exact full-row duplicate count. Hash each row to ONE bigint before the
+    # distinct shuffle so the shuffle moves 8 bytes/row instead of the whole
+    # (often 60-column) row -- a big saving on the wide multi-million-row tables.
+    # xxhash64 collisions are negligible even at 10^7 rows.
+    if total is None:
+        total = df.count()
+    distinct = (
+        df.select(F.xxhash64(*[_qc(c) for c in df.columns]).alias("__h"))
+        .distinct()
+        .count()
+    )
+    return total - distinct
+
+
+def dup_key_composition(df, key_cols, hash_cols=None, conflict_cols=None):
+    # For rows that share `key_cols`: dup_groups (keys with >1 row), and of those
+    # how many are byte-identical repeats vs carry a differing value.
+    #
+    # Uses one row-hash column + approx_count_distinct (a mergeable HLL sketch,
+    # single pass). Exact `countDistinct(hash(*cols))` INSIDE a groupBy triggers
+    # an Expand + double aggregation -- two full-table shuffles on a
+    # high-cardinality key, the slowest pattern in these notebooks. HLL is exact
+    # for the tiny cardinalities that matter here (1 vs >1).
+    hash_cols = hash_cols or df.columns
+    conflict_cols = conflict_cols or hash_cols
+    sel = [
+        *[_qc(c) for c in key_cols],
+        F.xxhash64(*[_qc(c) for c in hash_cols]).alias("__h"),
+    ]
+    if conflict_cols != hash_cols:
+        sel.append(F.xxhash64(*[_qc(c) for c in conflict_cols]).alias("__c"))
+    h = df.select(*sel)
+    _cv = "__c" if conflict_cols != hash_cols else "__h"
+    per_key = h.groupBy(*[_qc(c) for c in key_cols]).agg(
+        F.count(F.lit(1)).alias("n"),
+        F.approx_count_distinct("__h").alias("row_variants"),
+        F.approx_count_distinct(_cv).alias("conflict_variants"),
+    )
+    r = (
+        per_key.agg(
+            F.count(F.lit(1)).alias("distinct_keys"),
+            F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
+            F.sum(((F.col("n") > 1) & (F.col("row_variants") <= 1)).cast("long")).alias(
+                "identical"
+            ),
+            F.sum(
+                ((F.col("n") > 1) & (F.col("conflict_variants") > 1)).cast("long")
+            ).alias("conflicting"),
+        )
+        .first()
+        .asDict()
+    )
+    return {
+        k: (r[k] or 0)
+        for k in ("distinct_keys", "dup_groups", "identical", "conflicting")
+    }
 
 
 def fmt_pairs(pairs, n=25):
@@ -681,10 +748,9 @@ def numeric_parseability(df, colname, decimal_comma=True):
     s = _qc(colname).cast("string")
     norm = F.trim(s)
     if decimal_comma:
-        # German convention: "1.234,56" -> "1234.56". Drop a dot only when it
-        # groups thousands; turn a decimal comma into a dot.
-        norm = F.regexp_replace(norm, r"\.(?=\d{3}(\D|$))", "")
-        norm = F.regexp_replace(norm, r"(?<=\d),(?=\d)", ".")
+        # German convention: "1.234,56" -> "1234.56" (lookaround-free -- see
+        # _de_number -- so the operator stays Photon-accelerated).
+        norm = _de_number(norm)
     d = df.select(
         (s.isNotNull() & (F.trim(s) != "")).cast("long").alias("__nn"),
         norm.alias("__norm"),
@@ -1141,7 +1207,10 @@ def regime_population_shift(df, date_col, cols, cut_iso, formats=GERMAN_TS_FORMA
         miss = _qc(c).isNull() | (F.trim(_qc(c).cast("string")) == "")
         aggs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
-            F.countDistinct(_qc(c)).alias(c + "__d"),
+            # approx (HLL) -- exact countDistinct per column here means an Expand
+            # union of the whole table once per column (crippling on 10^8 rows);
+            # the distinct count is only used to characterise the two cohorts.
+            F.approx_count_distinct(_qc(c)).alias(c + "__d"),
         ]
     rows = {
         r["__s"]: r.asDict()
@@ -1332,7 +1401,9 @@ def population_by_group(df, group_col, cols):
         miss = _qc(c).isNull() | (F.trim(_qc(c).cast("string")) == "")
         aggs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
-            F.countDistinct(_qc(c)).alias(c + "__d"),
+            # approx (HLL): exact per-column countDistinct here is an Expand
+            # union of the full table once per column.
+            F.approx_count_distinct(_qc(c)).alias(c + "__d"),
         ]
     rows = (
         df.withColumn("__g", _qc(group_col).cast("string"))
@@ -1357,14 +1428,54 @@ def population_by_group(df, group_col, cols):
     return out
 
 
+def parse_ts_py(x):
+    # Best-effort Python parse of an ISO-ish timestamp string (a Spark
+    # F.min/F.max on a Bronze string column returns a STRING, not a datetime).
+    # Tolerates a space or 'T' separator, a trailing 'Z', and date-only input.
+    if x is None:
+        return None
+    if isinstance(x, _dt.datetime):
+        return x if x.tzinfo else x.replace(tzinfo=_dt.UTC)
+    if isinstance(x, _dt.date):
+        return _dt.datetime(x.year, x.month, x.day, tzinfo=_dt.UTC)
+    s = str(x).strip().replace("T", " ").replace("Z", "").split(".")[0]
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%Y%m%d%H",
+        "%Y%m%d",
+    ):
+        try:
+            return _dt.datetime.strptime(s, fmt).replace(tzinfo=_dt.UTC)
+        except ValueError:
+            continue
+    return None
+
+
+def iso_midpoint(a, b):
+    # Midpoint (naive ISO string, space separator -- Spark-castable) between two
+    # ISO-ish timestamp strings/datetimes; None if either cannot be parsed.
+    pa, pb = parse_ts_py(a), parse_ts_py(b)
+    if pa is None or pb is None:
+        return None
+    lo, hi = sorted((pa, pb))
+    return (lo + (hi - lo) / 2).replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
+
+
 def cross_source_overlap(spans):
     # spans: {source: (min_iso, max_iso)}. Returns the common window shared by
     # ALL sources (empty if any pair is disjoint) plus each pairwise overlap in
     # days -- the ceiling on any study that joins these sources on time.
     def _d(x):
-        return _dt.date.fromisoformat(str(x)[:10])
+        p = parse_ts_py(x)
+        return p.date() if p else None
 
-    parsed = {k: (_d(a), _d(b)) for k, (a, b) in spans.items() if a and b}
+    parsed = {
+        k: (_d(a), _d(b))
+        for k, (a, b) in spans.items()
+        if _d(a) is not None and _d(b) is not None
+    }
     if not parsed:
         return {"common_window": None, "pairwise_days": {}}
     common_lo = max(v[0] for v in parsed.values())

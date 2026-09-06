@@ -229,27 +229,9 @@ for m in MEASUREMENTS:
 dup_breakdown = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    cols = df.columns
     key = [find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")]
-    dk = df.groupBy(*key).agg(
-        F.count(F.lit(1)).alias("n"),
-        F.countDistinct(F.hash(*[F.col(c) for c in cols])).alias("row_variants"),
-    )
-    b = (
-        dk.agg(
-            F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
-            F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
-                "identical"
-            ),
-            F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias(
-                "conflicting"
-            ),
-        )
-        .first()
-        .asDict()
-    )
-    dup_breakdown[m] = b
-    print(f"{m:<18} {b}")
+    dup_breakdown[m] = dup_key_composition(df, key)
+    print(f"{m:<18} {dup_breakdown[m]}")
 
 # COMMAND ----------
 
@@ -302,10 +284,12 @@ for m in MEASUREMENTS:
     df = frames[m]
     sid, dts = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     w = Window.partitionBy("station").orderBy("ts")
+    # No pre-.distinct() shuffle: duplicate (station, hour) rows make lag() give
+    # gap_h <= 0, which the `> 0` filters drop; observed_hours uses
+    # countDistinct. Saves a full 91M-row shuffle per table.
     per_station = (
         df.select(F.col(sid).alias("station"), as_ts(dts).alias("ts"))
         .where(F.col("ts").isNotNull())
-        .distinct()
         .withColumn(
             "gap_h",
             (F.col("ts").cast("long") - F.lag("ts").over(w).cast("long")) / 3600 - 1,
@@ -314,7 +298,7 @@ for m in MEASUREMENTS:
         .agg(
             F.min("ts").alias("min_ts"),
             F.max("ts").alias("max_ts"),
-            F.count(F.lit(1)).alias("observed_hours"),
+            F.countDistinct("ts").alias("observed_hours"),
             F.max(F.when(F.col("gap_h") > 0, F.col("gap_h"))).alias(
                 "longest_gap_hours"
             ),

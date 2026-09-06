@@ -126,23 +126,7 @@ print([x.asDict() for x in d])
 # COMMAND ----------
 
 # DBTITLE 1,Duplicate (frequency, datetime_utc) key -- identical vs conflicting (one groupBy)
-dk = df.groupBy("frequency", "datetime_utc").agg(
-    F.count(F.lit(1)).alias("n"),
-    F.countDistinct(F.hash(*[F.col(c) for c in COLS])).alias("row_variants"),
-)
-dq = (
-    dk.agg(
-        F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
-        F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
-            "identical"
-        ),
-        F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias(
-            "conflicting"
-        ),
-    )
-    .first()
-    .asDict()
-)
+dq = dup_key_composition(df, ["frequency", "datetime_utc"])
 print("duplicate key composition:", dq)
 
 # COMMAND ----------
@@ -168,10 +152,11 @@ _span = [
     if v.get("min_ts") and v.get("max_ts")
 ]
 regime = None
-if _span:
-    lo = min(s[0] for s in _span)
-    hi = max(s[1] for s in _span)
-    mid = (lo + (hi - lo) / 2).replace(microsecond=0).isoformat()
+# min/max_ts are strings (F.min/F.max on a Bronze string column) -- parse them.
+mid = (
+    iso_midpoint(min(s[0] for s in _span), max(s[1] for s in _span)) if _span else None
+)
+if mid:
     regime = {"cut": mid, **regime_population_shift(df, "datetime_utc", VCOLS, mid)}
     print(
         f"regime split at {mid}: {regime['pre_rows']} / {regime['post_rows']}, flipped={regime['flipped']}"

@@ -143,7 +143,7 @@ for name, df in frames.items():
 dup_counts = {}
 for name, df in frames.items():
     total = prof[name]["total"]
-    dup_counts[name] = total - df.distinct().count()
+    dup_counts[name] = full_row_dup_count(df, total)
     print(f"{name}: exact full-row duplicates = {dup_counts[name]}")
 
 # COMMAND ----------

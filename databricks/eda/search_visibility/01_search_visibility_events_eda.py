@@ -177,6 +177,10 @@ _ct_delta = F.when(
 )
 exprs += [
     F.sum((num["clicks"] > num["impressions"]).cast("long")).alias("clicks_gt_impr"),
+    # position bounds folded into this same global agg (was a separate scan)
+    F.sum((num["position"] < 1).cast("long")).alias("pos_below_1"),
+    F.sum((num["position"] > 100).cast("long")).alias("pos_above_100"),
+    F.sum(num["position"].isNotNull().cast("long")).alias("pos_present"),
     F.percentile_approx(num["position"], [0.1, 0.25, 0.5, 0.75, 0.9, 0.99]).alias(
         "position_pctiles"
     ),
@@ -215,25 +219,8 @@ print("index top values:", [(x["index"], x["count"]) for x in idx])
 # COMMAND ----------
 
 # DBTITLE 1,Duplicate-key -- identical vs conflicting metrics on the candidate key (one groupBy)
-dk = df.groupBy(*KEY).agg(
-    F.count(F.lit(1)).alias("n"),
-    F.countDistinct(F.hash(*[F.col(c) for c in COLS])).alias("row_variants"),
-    F.countDistinct("clicks", "impressions", "position").alias("metric_variants"),
-)
-db = (
-    dk.agg(
-        F.count(F.lit(1)).alias("distinct_keys"),
-        F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
-        F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
-            "identical"
-        ),
-        F.sum(((F.col("n") > 1) & (F.col("metric_variants") > 1)).cast("long")).alias(
-            "conflicting_metrics"
-        ),
-    )
-    .first()
-    .asDict()
-)
+_dc = dup_key_composition(df, KEY, conflict_cols=["clicks", "impressions", "position"])
+db = {"conflicting_metrics": _dc["conflicting"], **_dc}
 print(
     f"key={KEY}  distinct_keys={db['distinct_keys']} (rows={total}, unique={db['distinct_keys'] == total})  "
     f"dup_groups={db['dup_groups']} identical={db['identical']} conflicting_metrics={db['conflicting_metrics']}"
@@ -270,16 +257,11 @@ device_domain = categorical_domain(
     ("desktop", "mobile", "tablet", "DESKTOP", "MOBILE", "TABLET"),
     name="device",
 )
-pos = safe_num("position")
-pos_bounds = (
-    df.agg(
-        F.sum((pos < 1).cast("long")).alias("below_1"),
-        F.sum((pos > 100).cast("long")).alias("above_100"),
-        F.sum(pos.isNotNull().cast("long")).alias("present"),
-    )
-    .first()
-    .asDict()
-)
+pos_bounds = {
+    "below_1": M["pos_below_1"],
+    "above_100": M["pos_above_100"],
+    "present": M["pos_present"],
+}
 print("device domain:", device_domain, " position bounds:", pos_bounds)
 
 # The `date` column mixes an ISO archive vintage and an M/D/YYYY one -- do the two

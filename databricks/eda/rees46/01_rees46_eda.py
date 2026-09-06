@@ -87,11 +87,16 @@ df.show(10, truncate=False)
 # COMMAND ----------
 
 # DBTITLE 1,Daily x event_type rollup -- funnel, per-day, per-month, min/max all derived
-day_type = (
-    df.groupBy(F.substring("event_time", 1, 10).alias("day"), "event_type")
+day_type = [
+    x
+    for x in df.groupBy(F.substring("event_time", 1, 10).alias("day"), "event_type")
     .count()
     .orderBy("day", "event_type")
-).collect()
+    .collect()
+    # drop rows whose event_time did not parse to a day / has no event_type --
+    # a None key would break every sorted() / slice below
+    if x["day"] and x["event_type"]
+]
 days = sorted({x["day"] for x in day_type})
 event_types = sorted({x["event_type"] for x in day_type})
 funnel = [
@@ -161,19 +166,29 @@ print(
 
 # COMMAND ----------
 
-# DBTITLE 1,Top brands / categories by event volume
+# DBTITLE 1,Top brands + category_code roll-up (one groupBy each; feeds top-N and the code<->id check)
 top_brands = [
     (x["brand"], x["count"])
     for x in df.groupBy("brand").count().orderBy(F.desc("count")).limit(20).collect()
 ]
-top_cats = [
-    (x["category_code"], x["count"])
-    for x in df.groupBy("category_code")
-    .count()
-    .orderBy(F.desc("count"))
-    .limit(20)
+# One groupBy(category_code) -> both the top-20 and the code->id consistency
+# check (was two full scans). category_code is a small catalog taxonomy.
+_ccr = (
+    df.groupBy("category_code")
+    .agg(
+        F.count(F.lit(1)).alias("cnt"),
+        F.approx_count_distinct("category_id").alias("ids"),
+    )
     .collect()
+)
+top_cats = sorted(((x["category_code"], x["cnt"]) for x in _ccr), key=lambda p: -p[1])[
+    :20
 ]
+cc2 = sum(
+    1
+    for x in _ccr
+    if x["category_code"] and str(x["category_code"]).strip() and (x["ids"] or 0) > 1
+)
 print("top brands:", top_brands)
 print("top category_code:", top_cats)
 
@@ -181,6 +196,7 @@ print("top category_code:", top_cats)
 
 # DBTITLE 1,product_id stability + category_id <-> category_code consistency
 prod_roll = df.groupBy("product_id").agg(
+    F.count(F.lit(1)).alias("rows"),
     F.approx_count_distinct("category_id").alias("d_cat_id"),
     F.approx_count_distinct("brand").alias("d_brand"),
 )
@@ -197,13 +213,6 @@ cc = (
     df.groupBy("category_id")
     .agg(F.approx_count_distinct("category_code").alias("codes"))
     .agg(F.sum((F.col("codes") > 1).cast("long")))
-    .first()[0]
-)
-cc2 = (
-    df.where(F.trim(F.coalesce(F.col("category_code"), F.lit(""))) != "")
-    .groupBy("category_code")
-    .agg(F.approx_count_distinct("category_id").alias("ids"))
-    .agg(F.sum((F.col("ids") > 1).cast("long")))
     .first()[0]
 )
 print(
@@ -226,6 +235,9 @@ sc = (
         F.expr("approx_percentile(events, array(0.5, 0.9, 0.99))").alias(
             "events_p50_90_99"
         ),
+        # bucketed histogram computed in this same pass -- avoids a second full
+        # groupBy(user_session) just to draw the distribution
+        F.expr("histogram_numeric(events, 50)").alias("events_hist"),
         F.max("events").alias("max_events"),
         F.sum((F.col("users") > 1).cast("long")).alias("multi_user_sessions"),
         F.sum((F.col("events") > 1000).cast("long")).alias("big_sessions"),
@@ -267,18 +279,17 @@ session_funnel = [
     ("with cart", sc["with_cart"]),
     ("with purchase", sc["with_purchase"]),
 ]
-session_events_sample = [
-    x["events"]
-    for x in session_roll.select("events")
-    .sample(0.02, seed=42)
-    .limit(200_000)
-    .collect()
+events_hist = [
+    (round(b["x"], 1), int(b["y"]))
+    for b in (sc.get("events_hist") or [])
+    if b and b["y"]
 ]
 
 # COMMAND ----------
 
 # DBTITLE 1,User rollup -- buyers, repeat buyers, multi-session users (one pass)
 user_roll = df.groupBy("user_id").agg(
+    F.count(F.lit(1)).alias("rows"),
     F.approx_count_distinct("user_session").alias("sessions"),
     F.sum((F.col("event_type") == "purchase").cast("long")).alias("purchases"),
 )
@@ -307,11 +318,12 @@ print("(user, product) purchased more than once:", rebought)
 
 # COMMAND ----------
 
-# DBTITLE 1,Concentration -- top-N entity share (bounded collect)
+# DBTITLE 1,Concentration -- top-N entity share (derived from the user/product rollups)
+# Reuses user_roll / prod_roll (each carries a "rows" count) instead of a third and
+# fourth full groupBy of the 110M-row table.
 concentration = {}
-for c in ("user_id", "product_id"):
-    pc = df.groupBy(c).count()
-    top = [x["count"] for x in pc.orderBy(F.desc("count")).limit(50).collect()]
+for c, roll in (("user_id", user_roll), ("product_id", prod_roll)):
+    top = [x["rows"] for x in roll.orderBy(F.desc("rows")).limit(50).collect()]
     concentration[c] = {
         "approx_distinct": approx_card[c],
         "top10_share": sum(top[:10]) / total,
@@ -323,27 +335,38 @@ for c in ("user_id", "product_id"):
 # COMMAND ----------
 
 # DBTITLE 1,In-session event-sequence consistency (one windowed pass)
+# Running boolean flags ("has a cart/view appeared earlier in this session"),
+# NOT collect_set over an unbounded window -- collect_set copies a growing set
+# per row, which is O(events^2) for a session and blows up on bot sessions with
+# thousands of events. F.max over the same window is O(events).
 seq = df.select(
     "user_session",
     "event_type",
     F.try_to_timestamp(F.substring("event_time", 1, 19)).alias("ts"),
 )
-w = Window.partitionBy("user_session").orderBy("ts")
+_prior = (
+    Window.partitionBy("user_session")
+    .orderBy("ts")
+    .rowsBetween(Window.unboundedPreceding, -1)
+)
 seq = seq.withColumn(
-    "prior_types",
-    F.collect_set("event_type").over(w.rowsBetween(Window.unboundedPreceding, -1)),
+    "cart_before",
+    F.max(F.when(F.col("event_type") == "cart", 1).otherwise(0)).over(_prior),
+).withColumn(
+    "view_before",
+    F.max(F.when(F.col("event_type") == "view", 1).otherwise(0)).over(_prior),
 )
 sqv = seq.agg(
     F.sum(
         (
             (F.col("event_type") == "purchase")
-            & ~F.array_contains(F.col("prior_types"), "cart")
+            & (F.coalesce(F.col("cart_before"), F.lit(0)) == 0)
         ).cast("long")
     ).alias("purchase_no_cart"),
     F.sum(
         (
             (F.col("event_type") == "cart")
-            & ~F.array_contains(F.col("prior_types"), "view")
+            & (F.coalesce(F.col("view_before"), F.lit(0)) == 0)
         ).cast("long")
     ).alias("cart_no_view"),
 ).first()
@@ -381,8 +404,12 @@ hod_dow = (
 hod = {}
 dow = {}
 for x in hod_dow:
-    hod[x["hod"]] = hod.get(x["hod"], 0) + x["count"]
-    dow[x["dow"]] = dow.get(x["dow"], 0) + x["count"]
+    # F.hour / F.date_format are NULL for an unparsed event_time -> skip so a
+    # None key never reaches sorted()
+    if x["hod"] is not None:
+        hod[x["hod"]] = hod.get(x["hod"], 0) + x["count"]
+    if x["dow"] is not None:
+        dow[x["dow"]] = dow.get(x["dow"], 0) + x["count"]
 print("by hour:", sorted(hod.items()))
 print("by weekday:", sorted(dow.items()))
 
@@ -423,28 +450,12 @@ for mo, mv in sorted(month_pop.items()):
 
 # DBTITLE 1,Duplicate key -- identical vs conflicting (one grouped pass, no full-row distinct)
 key = ["user_session", "product_id", "event_type", "event_time"]
-dup = (
-    df.groupBy(*key)
-    .agg(
-        F.count(F.lit(1)).alias("n"),
-        F.countDistinct(F.hash(*[F.col(c) for c in COLS])).alias("row_variants"),
-    )
-    .where(F.col("n") > 1)
-)
-db = (
-    dup.agg(
-        F.count(F.lit(1)).alias("dup_key_groups"),
-        F.sum((F.col("row_variants") == 1).cast("long")).alias("identical"),
-        F.sum((F.col("row_variants") > 1).cast("long")).alias("conflicting"),
-    )
-    .first()
-    .asDict()
-)
+_dc = dup_key_composition(df, key)
+db = {"dup_key_groups": _dc["dup_groups"], **_dc}
 dup_identical, dup_conflicting = db["identical"], db["conflicting"]
 print(
     f"duplicate {key} groups={db['dup_key_groups']}  identical={dup_identical}  conflicting={dup_conflicting}"
 )
-dup.orderBy(F.desc("n")).limit(10).show(truncate=False)
 
 # COMMAND ----------
 
@@ -602,11 +613,12 @@ for et in event_types:
                 f"rees46_price_distribution_{et}.png",
             )
         )
-if session_events_sample and histplot(
-    session_events_sample,
-    "REES46 -- events per session (sampled)",
-    "events in session",
-    bins=60,
+if events_hist and barplot(
+    events_hist,
+    "REES46 -- events per session (histogram_numeric, 50 buckets)",
+    "events in session (bucket centre)",
+    "sessions",
+    rot=90,
     logy=True,
     filename="rees46_events_per_session.png",
 ):
@@ -1054,9 +1066,9 @@ _ml = ml_readiness_block(
         (
             "Sample-vs-full divergence",
             (
-                "price_pdf is a 2% sample capped at 250k rows (clipped to p99), session_events_sample a "
-                "2% sample capped at 200k -- use the full-table by_type_map / sc / ur aggregates for any "
-                "feature-quality or threshold decision, not these figures."
+                "price_pdf is a 2% sample capped at 250k rows (clipped to p99); the events-per-session "
+                "histogram is a full-table histogram_numeric. Use the full-table by_type_map / sc / ur "
+                "aggregates for any feature-quality or threshold decision, not the price figure."
             ),
         ),
     ]

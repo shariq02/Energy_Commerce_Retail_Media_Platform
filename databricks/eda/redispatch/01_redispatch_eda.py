@@ -78,7 +78,7 @@ constant_cols = (
     if constant_cands
     else []
 )
-distinct_rows = df.distinct().count()
+distinct_rows = total - full_row_dup_count(df, total)
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:
     print(

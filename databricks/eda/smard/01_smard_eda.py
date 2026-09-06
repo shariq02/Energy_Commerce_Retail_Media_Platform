@@ -308,7 +308,9 @@ ym = (
     .orderBy("year")
     .collect()
 )
-by_year = {x["year"]: x["count"] for x in ym}
+# F.year(...) is NULL for any unparsed timestamp -> drop that key so sorting
+# and min() over the years never hit None vs int.
+by_year = {x["year"]: x["count"] for x in ym if x["year"] is not None}
 print("by year:", sorted(by_year.items()))
 
 # COMMAND ----------
@@ -432,8 +434,10 @@ my = (
 )
 metric_years = {}
 for x in my:
+    if x["year"] is None:
+        continue
     metric_years.setdefault(x["metric"], {})[x["year"]] = (x["rows"], x["sum_value"])
-metric_first_year = {m: min(y for y in yr) for m, yr in metric_years.items() if yr}
+metric_first_year = {m: min(yr) for m, yr in metric_years.items() if yr}
 print(
     "metric first-seen year:",
     sorted(metric_first_year.items(), key=lambda p: p[1] or 0),
@@ -776,10 +780,15 @@ _regime2 = [
     f"Metric first-seen year: {sorted(metric_first_year.items(), key=lambda p: p[1] or 0)}",
     "",
 ]
-_late = [m for m, y in metric_first_year.items() if y and y > min(by_year)]
+_first_year = min(by_year) if by_year else None
+_late = [
+    m
+    for m, y in metric_first_year.items()
+    if y and _first_year is not None and y > _first_year
+]
 if _late:
     _regime2.append(
-        f"- {len(_late)} metric(s) start after the table's first year {min(by_year)}: {_late}."
+        f"- {len(_late)} metric(s) start after the table's first year {_first_year}: {_late}."
     )
 _regime2.append(
     para(

@@ -168,8 +168,13 @@ for name, x in meta.items():
     if sid:
         acc = {}
         for d in x["recs"]:
-            acc[d[sid]] = acc.get(d[sid], 0) + 1
-        station_counts[name] = sorted(acc.items())
+            k = None if d[sid] is None else str(d[sid])
+            acc[k] = acc.get(k, 0) + 1
+        # a trailer row / bad parse yields a None or non-numeric station id --
+        # keep the count but sort those last so sorted() never compares None<str
+        station_counts[name] = sorted(
+            acc.items(), key=lambda kv: (kv[0] is None, kv[0] or "")
+        )
         print(f"{name} rows per station:", station_counts[name])
     von = find_key(x["cols"], "von_datum", "Von_Datum", "von")
     bis = find_key(x["cols"], "bis_datum", "Bis_Datum", "bis")

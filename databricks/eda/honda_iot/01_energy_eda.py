@@ -134,24 +134,7 @@ freq_rows = {e: [(k, v["rows"]) for k, v in freq_cov[e].items()] for e in ENERGY
 # DBTITLE 1,Duplicate (frequency, datetime_utc) key -- identical vs conflicting (one groupBy per table)
 dup = {}
 for e in ENERGY:
-    df = frames[e]
-    dk = df.groupBy(*KEY_COLS).agg(
-        F.count(F.lit(1)).alias("n"),
-        F.countDistinct(F.hash(*[F.col(c) for c in df.columns])).alias("row_variants"),
-    )
-    dup[e] = (
-        dk.agg(
-            F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
-            F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
-                "identical"
-            ),
-            F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias(
-                "conflicting"
-            ),
-        )
-        .first()
-        .asDict()
-    )
+    dup[e] = dup_key_composition(frames[e], KEY_COLS)
     print(f"{e:<16} {dup[e]}")
 
 # COMMAND ----------
@@ -373,10 +356,12 @@ spans = [
     if fc.get("min_ts") and fc.get("max_ts")
 ]
 regime = {}
-if spans:
-    lo = min(s[0] for s in spans)
-    hi = max(s[1] for s in spans)
-    mid = (lo + (hi - lo) / 2).replace(microsecond=0).isoformat()
+# freq_cov min/max come from F.min/F.max on a Bronze STRING column -> they are
+# strings, not datetimes; iso_midpoint parses them.
+mid = (
+    iso_midpoint(min(s[0] for s in spans), max(s[1] for s in spans)) if spans else None
+)
+if mid:
     for e in ENERGY:
         shift = regime_population_shift(frames[e], "datetime_utc", VCOLS[e], mid)
         regime[e] = {"cut": mid, **shift}

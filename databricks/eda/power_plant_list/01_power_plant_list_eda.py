@@ -121,7 +121,7 @@ for name, df in frames.items():
         prof[name]["constant"] = sorted(c for c in cands if (rr[c] or 0) <= 1)
     else:
         prof[name]["constant"] = []
-    prof[name]["dups"] = prof[name]["total"] - df.distinct().count()
+    prof[name]["dups"] = full_row_dup_count(df, prof[name]["total"])
     print(
         f"{name}: constant={prof[name]['constant']}  full-row duplicates={prof[name]['dups']}"
     )
