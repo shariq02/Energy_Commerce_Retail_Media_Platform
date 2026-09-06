@@ -34,12 +34,34 @@ Price / category / brand completeness by event_type:
 | cart | 3955446 | 0 | 4558 | 932219 | 277337 |
 | view | 104335509 | 0 | 252203 | 34073918 | 14932154 |
 
-### Temporal
+### Categorical / Domain Validation
 
-Day range: 2019-10-01 .. 2019-11-30.
+`event_type` vs the known set (view / cart / purchase): unexpected=none, unused=none.
+
+### Temporal Semantics
+
+event_time is 'UTC' (suffix stripped, ISO prefix parsed). Day range: 2019-10-01 .. 2019-11-30 -- a fixed two-month snapshot (Oct+Nov 2019), not a live feed; any model built on it is frozen to that window and its promotions (the Nov spike is Black Friday / Singles' Day).
 Rows per month: [('2019-10', 42448764), ('2019-11', 67501979)].
 Events by hour of day: [(0, 755539), (1, 1402424), (2, 2745296), (3, 3949563), (4, 4982552), (5, 5569872), (6, 5823993), (7, 5920460), (8, 6079148), (9, 6005441), (10, 5924965), (11, 5776755), (12, 5726176), (13, 6263336), (14, 7013663), (15, 7431991), (16, 7565811), (17, 7149551), (18, 5391767), (19, 3716881), (20, 2175813), (21, 1263940), (22, 753640), (23, 562166)].
 Events by weekday: [('Fri', 18814507), ('Mon', 12739141), ('Sat', 18859791), ('Sun', 17351486), ('Thu', 14582640), ('Tue', 13890118), ('Wed', 13713060)].
+Hour-of-day is in UTC -- the REES46 shop's local peak shifts by the shop's timezone; a diurnal feature must be computed in the shop's local time, not UTC.
+
+### Regime / Version Evidence
+
+October vs November 2019 -- November carries Black Friday / Singles' Day / Cyber Monday, so its funnel and catalogue completeness differ from a normal month. Measured, not assumed:
+
+| month | events | purchase share | price null | category_code null | brand null |
+|---|---|---|---|---|---|
+| 2019-10 | 42448764 | 1.750% | 0.0 | 0.3184 | 0.1441 |
+| 2019-11 | 67501979 | 1.358% | 0.0 | 0.3244 | 0.1366 |
+
+A model pooling the two months mixes promotion-driven and baseline behaviour -- a promotion/seasonality indicator is warranted (not chosen here).
+
+### Coverage & Sampling Bias
+
+109950743 events over 2019-10-01..2019-11-30. Funnel: [('view', 104335509), ('cart', 3955446), ('purchase', 1659788)] -- purchases are ~1.5% of events.
+category_code missing 32.2%, brand missing 14.0% -- not missing at random: cheaper / long-tail products are less catalogued, so an 'is-catalogued' flag correlates with price and category and can leak.
+Only users/products/sessions active in this window appear -- a user who churned before October or joined after November is absent; a churn label defined on this window is right-censored.
 
 ### Entities / Keys
 
@@ -57,11 +79,11 @@ Multi-user sessions: 937.
 
 | event_type | price min | max | avg | p50/95/99 |
 |---|---|---|---|---|
-| purchase | 0.77 | 2574.07 | 304.3475388242502 | [174.02, 1007.97, 1628.07] |
-| cart | 0.0 | 2574.07 | 300.24630626479006 | [174.73, 1003.37, 1616.36] |
-| view | 0.0 | 2574.07 | 291.1060965565274 | [163.97, 1003.85, 1706.0] |
+| purchase | 0.77 | 2574.07 | 304.3475388242505 | [174.05, 1007.97, 1628.07] |
+| cart | 0.0 | 2574.07 | 300.2463062647634 | [174.73, 1003.37, 1615.67] |
+| view | 0.0 | 2574.07 | 291.1060965563252 | [163.97, 1003.85, 1709.62] |
 
-Overall p99 price: 1706.0.
+Overall p99 price: 1709.62.
 Top brands: [(None, 15341158), ('samsung', 13172020), ('apple', 10381933), ('xiaomi', 7721825), ('huawei', 2521331), ('lucente', 1840936), ('lg', 1659394), ('bosch', 1532149), ('oppo', 1294585), ('sony', 1255101)].
 Top category_code: [(None, 35413780), ('electronics.smartphone', 27882231), ('electronics.clocks', 3397999), ('electronics.video.tv', 3321796), ('computers.notebook', 3318177), ('electronics.audio.headphone', 2917065), ('apparel.shoes', 2650791), ('appliances.environment.vacuum', 2329728), ('appliances.kitchen.refrigerators', 2314917), ('appliances.kitchen.washer', 2273270)].
 Events per session (p50/90/99): [2, 11, 35], max 4128.
@@ -89,15 +111,23 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 
 ### ML-Readiness Evidence
 
-- Candidate target signals: `event_type == 'purchase'` (session/user-level conversion prediction), repeat-purchase behaviour (295325 of 697470 buyers rebuy) for a churn/LTV use case, and session funnel completion (full_path=937336 of 23016651 sessions) are all plausible targets.
-- Leakage: `has_view`/`has_cart`/`has_purchase` session flags are computed over the WHOLE session regardless of event order -- a feature built this way for a mid-session purchase-prediction task would include events that happen AFTER the purchase, which is leakage; any such feature must be recomputed using only events with event_time strictly before the prediction point in the session.
-- Grain and entity-grouped split: grain is one row per event, but user_id (approx_distinct=5291243) and user_session (approx_distinct=22303598) are the real entities -- split by user_id (not by row or by session alone, since 3057138 users span multiple sessions), or a user's behaviour leaks across train/test.
-- Join cardinality: this notebook profiles a single Bronze table with no join to another table performed here -- product_id/category_id/brand are event-level attributes, not a separate dimension table in this source, so no fan-out risk exists at this stage; if a future Silver/Gold model joins these events to an external product catalog, that join's cardinality is unassessed and must be verified before use.
-- Imbalance: the event_type funnel is heavily skewed ([('view', 104335509), ('cart', 3955446), ('purchase', 1659788)]) -- purchases are a small minority of events, so a purchase-prediction target will face severe class imbalance; do not evaluate with plain accuracy.
-- Product/category drift: 22 products have >1 category_id and 277 have >1 brand over the observed period -- a static product-attribute join (rather than a point-in-time/SCD join) risks using a category or brand value that did not exist yet at the event's timestamp, a form of feature leakage for any category-based feature.
-- Sample-vs-full divergence: `price_pdf` is a 2% sample capped at 250k rows (clipped to p99) and `session_events_sample` is a 2% sample capped at 200k rows -- use the full-table `by_type_map`/session (`sc`)/user (`ur`) aggregates above for any feature-quality or threshold decision, not these sampled figures.
-- 12 duplicate key groups have conflicting non-key values (see Data Quality) -- resolve deterministically before using this table as a training source.
-- In-session event order is not strictly funnel-ordered (539567 purchases with no prior cart, 29848 carts with no prior view) -- a sequence-based model must not assume the canonical view->cart->purchase order holds for every session.
+- **Grain / grain drift:** One row per event. The modelling grain is (user_id, user_session) for conversion, or user_id for churn/LTV -- and 937 sessions span >1 user_id, so session alone is not a clean entity.
+- **Join multiplication (1:N / M:N expansion):** Single Bronze table -- no join here. product_id/category_id/brand are event-level attributes. A future join to an external product catalog is unassessed.
+- **Target contamination:** Targets: purchase (conversion), repeat-purchase (295325 of 697470 buyers), full-funnel completion (937336 of 23016651). The purchase event itself, and any session flag computed over the whole session, must be excluded from features for predicting that purchase.
+- **Temporal / post-event leakage:** has_view / has_cart / has_purchase are computed over the WHOLE session regardless of order -- for a mid-session prediction they include post-cutoff events. Recompute every session feature from events with event_time strictly before the prediction point.
+- **Proxy leakage:** A cart event is a near-perfect proxy for an imminent purchase; a product's aggregate conversion rate over the window includes the row being scored -- compute it leave-one-out or from a prior period.
+- **Split / entity leakage:** Split by user_id (5291243 users), not by row or by session -- 3057138 users have multiple sessions and a user's behaviour is correlated across them.
+- **Historical-reference (point-in-time) leakage:** Product attributes drift: 22 products change category_id, 277 change brand. A static product join uses a category/brand that may post-date the event -- use a point-in-time / last-seen-before join.
+- **Survivorship / coverage bias:** Only entities active in Oct-Nov 2019 appear. A churn label defined on this window is right-censored; users who left earlier or joined later are simply absent.
+- **Missingness leakage:** category_code missing 32.2%, brand 14.0% -- correlated with price and long-tail products; an 'is-catalogued' flag leaks that structure.
+- **Duplicate-event leakage:** Duplicate ['user_session', 'product_id', 'event_type', 'event_time']: groups=75658, identical=75646, conflicting=12 -- de-duplicate before counting events or splitting so the same event is not on both sides.
+- **Target / feature temporal misalignment:** event_time granularity is 1s and many events in a session share a timestamp (102 sessions have >20 events on one timestamp) -- ordering within a second is undefined, so a strict before/after cut can misalign the last feature and the label.
+- **Unit / sign / circular-feature leakage:** price is per-event (not per-line-total). 0 zero-price purchases and 0 negative prices exist -- confirm whether these are gifts / refunds before using price as a feature or a revenue target.
+- **Data-generation-process leakage:** Same-timestamp bursts (102 sessions) and multi-user sessions (937) look like bot / instrumentation artefacts -- a feature keyed on burst behaviour encodes the tracking pipeline, not the shopper.
+- **Class / label instability:** Funnel is skewed ([('view', 104335509), ('cart', 3955446), ('purchase', 1659788)]) -- purchase is ~1.5% of events; a conversion classifier faces severe imbalance, do not evaluate with accuracy. event_type itself is a stable 3-value enum.
+- **Label availability lag:** A purchase is logged at the event; there is no lag within this dataset. A real deployment would need to wait for payment confirmation / returns before the label is final.
+- **Source / version / regime change:** November 2019 contains Black Friday / Singles' Day / Cyber Monday. Regime / Version Evidence above measures the Oct-vs-Nov shift in purchase share and catalogue completeness -- a model across the window must carry a promotion/seasonality indicator.
+- **Sample-vs-full divergence:** price_pdf is a 2% sample capped at 250k rows (clipped to p99); the events-per-session histogram is a full-table histogram_numeric. Use the full-table by_type_map / sc / ur aggregates for any feature-quality or threshold decision, not the price figure.
 
 ### Silver Implications
 
@@ -131,6 +161,18 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 
 ![REES46 events per day](figures/rees46_events_per_day.png)
 
+### Figure -- REES46 top brands by event volume
+
+![REES46 top brands by event volume](figures/rees46_top_brands.png)
+
+### Figure -- REES46 top 20 category_code by event volume
+
+![REES46 top 20 category_code by event volume](figures/rees46_top_categories.png)
+
+### Figure -- REES46 products with unstable category / brand
+
+![REES46 products with unstable category / brand](figures/rees46_unstable_product_attributes.png)
+
 ### Figure -- REES46 events per day by type
 
 ![REES46 events per day by type](figures/rees46_events_per_day_by_type.png)
@@ -138,10 +180,6 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 ### Figure -- REES46 price distribution (sampled, clipped to p99)
 
 ![REES46 price distribution (sampled, clipped to p99)](figures/rees46_price_distribution.png)
-
-### Figure -- REES46 price distribution -- view (sampled)
-
-![REES46 price distribution -- view (sampled)](figures/rees46_price_distribution_view.png)
 
 ### Figure -- REES46 price distribution -- cart (sampled)
 
@@ -151,20 +189,12 @@ Same-timestamp burst sessions (>20 events on one event_time): 102. >1000-event s
 
 ![REES46 price distribution -- purchase (sampled)](figures/rees46_price_distribution_purchase.png)
 
-### Figure -- REES46 top brands by event volume
+### Figure -- REES46 price distribution -- view (sampled)
 
-![REES46 top brands by event volume](figures/rees46_top_brands.png)
-
-### Figure -- REES46 top 20 category_code by event volume
-
-![REES46 top 20 category_code by event volume](figures/rees46_top_categories.png)
+![REES46 price distribution -- view (sampled)](figures/rees46_price_distribution_view.png)
 
 ### Figure -- REES46 events per session distribution
 
 ![REES46 events per session distribution](figures/rees46_events_per_session.png)
-
-### Figure -- REES46 products with unstable category / brand
-
-![REES46 products with unstable category / brand](figures/rees46_unstable_product_attributes.png)
 
 <!-- END rees46:01_events -->

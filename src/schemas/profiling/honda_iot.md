@@ -30,81 +30,149 @@ Value columns per table: {'electricity_p': ['total', 'PV', 'CHP'], 'electricity_
 | cooling_w | 0 | 0 | 0 |
 
 5-sigma outlier rows per value column: {'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}
+Stuck-run rows (value == value 1 and 9 steps back, 1h): {'electricity_p': {'total': 0, 'PV': 0, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 742, 'CHP_heat': 23421, 'CHP_elec': 0}, 'heating_w': {'total': 1024, 'CHP_heat': 23135, 'CHP_elec': 0}, 'cooling_p': {'total': 1833, 'cool_elec': 0}, 'cooling_w': {'total': 5063, 'cool_elec': 0}}
 
-### Temporal
+### Unit & Semantic Validation
 
-Per (table, frequency): observed, coverage %, on-step %, longest gap (steps), missing steps:
-- electricity_p / 1min: observed=3155039, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- electricity_p / 15min: observed=210336, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- electricity_p / 1h: observed=52584, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- electricity_w / 1min: observed=3155039, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- electricity_w / 15min: observed=210335, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- electricity_w / 1h: observed=52583, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- heating_p / 1min: observed=3155039, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- heating_p / 15min: observed=210336, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- heating_p / 1h: observed=52584, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- heating_w / 1min: observed=3155029, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- heating_w / 15min: observed=210335, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- heating_w / 1h: observed=52583, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- cooling_p / 1min: observed=3155040, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- cooling_p / 15min: observed=210336, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- cooling_p / 1h: observed=52584, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- cooling_w / 1min: observed=3154980, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- cooling_w / 15min: observed=210332, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
-- cooling_w / 1h: observed=52583, coverage=100.0%, on-step=100.0%, longest gap=0, missing steps=0
+Value columns cast to double; P tables are instantaneous power/flow (kW, may be signed by convention), W tables a cumulative energy meter (kWh, should be monotone):
+- electricity_p.`total`: range -663729.1614583333..788591.3170904393, mean 169774.77319271534, sd 131559.439786418, negative rows 251753, zero 0, non-numeric 0
+- electricity_p.`PV`: range -719598.0706801552..228.05301725539397, mean -62397.16406067588, sd 117531.80186667206, negative rows 2123870, zero 902, non-numeric 22
+- electricity_p.`CHP`: range -282561.8727453294..27705.3, mean -64429.824339454, sd 80113.580470931, negative rows 1424715, zero 2269, non-numeric 1
+- electricity_w.`total`: range -104.47653333339258..8918860.985849153, mean 5083922.119569845, sd 2516610.5823399876, negative rows 225, zero 3, non-numeric 0
+- electricity_w.`PV`: range -2464379.466175354..0.0, mean -1046181.1668661184, sd 795057.0078034729, negative rows 2569378, zero 3, non-numeric 1
+- electricity_w.`CHP`: range -3390184.498498443..0.0, mean -1695281.2134880442, sd 974507.2024406927, negative rows 3417892, zero 3, non-numeric 0
+- heating_p.`total`: range 0.0..2193300.0, mean 245947.95250695854, sd 203773.06045464557, negative rows 0, zero 567358, non-numeric 20
+- heating_p.`CHP_heat`: range 0.0..459285.1413232855, mean 106099.61714698598, sd 128533.62655661609, negative rows 0, zero 1837745, non-numeric 13
+- heating_p.`CHP_elec`: range -282561.8727453294..27705.3, mean -64429.824339454, sd 80113.58047093102, negative rows 1424715, zero 2269, non-numeric 1
+- heating_w.`total`: range 0.0..12975100.000000002, mean 6690127.604245759, sd 3900559.891992284, negative rows 0, zero 20, non-numeric 0
+- heating_w.`CHP_heat`: range 0.0..5583000.0, mean 2765359.1359086484, sd 1613442.8019178216, negative rows 0, zero 9, non-numeric 0
+- heating_w.`CHP_elec`: range -3390184.498498443..0.0, mean -1695255.4217999056, sd 974522.2229910558, negative rows 3417892, zero 55, non-numeric 0
+- cooling_p.`total`: range 0.0..3717000.0, mean 43054.7894697851, sd 54535.94502971594, negative rows 0, zero 167258, non-numeric 92
+- cooling_p.`cool_elec`: range 0.0..332024.7807491248, mean 19460.582344276118, sd 27250.084640577727, negative rows 0, zero 3, non-numeric 0
+- cooling_w.`total`: range 0.0..2270133.4562972225, mean 1154458.3248297796, sd 664635.5387939212, negative rows 0, zero 3960, non-numeric 0
+- cooling_w.`cool_elec`: range 0.0..1024963.8347382598, mean 516459.98544157296, sd 302073.95176798716, negative rows 0, zero 3, non-numeric 0
 
-### Distributions
+Exact-copy / sign-mirror column pairs (circular-feature risk):
+- `electricity_p.CHP` <-> `heating_p.CHP_elec`: identical distribution -- one column duplicates the other
 
-- electricity_p.`total`: min/max=-663729.1614583333/788591.3170904393, p01/25/50/75/99=[-213188.529094282, 83881.0984375, 181623.10266927083, 247678.3535156249, 506519.43307291664], mean=169774.77319271534, sd=131559.439786418, zero rows=0, negative rows=251753, non-numeric=0
-- electricity_p.`PV`: min/max=-719598.0706801552/228.05301725539397, p01/25/50/75/99=[-499682.3493229167, -66527.77305261993, -266.9166666666667, -1.4465944111346736, 15.8449964022168], mean=-62396.62979326242, sd=117531.4405097732, zero rows=902, negative rows=2123878, non-numeric=0
-- electricity_p.`CHP`: min/max=-282561.8727453294/27705.3, p01/25/50/75/99=[-187453.06, -155485.04, 78.76, 89.20373668260895, 2781.95], mean=-64429.805489074475, sd=80113.57633145139, zero rows=2269, negative rows=1424716, non-numeric=0
-- electricity_w.`total`: min/max=-104.47653333339258/8918860.985849153, p01/25/50/75/99=[83708.36135455813, 3006442.362074039, 5496957.509299152, 7220579.611307486, 8872242.862938901], mean=5083922.119569838, sd=2516610.5823399858, zero rows=3, negative rows=225, non-numeric=0
-- electricity_w.`PV`: min/max=-2464379.466175354/0.0, p01/25/50/75/99=[-2459880.5741615626, -1794876.7656312117, -1077214.8796239134, -303141.63940450473, -11260.38751372549], mean=-1046180.7596938224, sd=795057.1209760648, zero rows=3, negative rows=2569379, non-numeric=0
-- electricity_w.`CHP`: min/max=-3390184.498498443/0.0, p01/25/50/75/99=[-3303318.7484984426, -2563919.043311906, -1687631.9333119064, -883556.88, -59629.63458566446], mean=-1695281.213488044, sd=974507.2024406932, zero rows=3, negative rows=3417892, non-numeric=0
-- heating_p.`total`: min/max=-7.275957614183426e-12/2193300.0, p01/25/50/75/99=[0.0, 52700.0, 229000.0, 374400.0, 791200.0], mean=245946.51335597687, sd=203773.33277197226, zero rows=567358, negative rows=11, non-numeric=0
-- heating_p.`CHP_heat`: min/max=-4.547473508864641e-13/459285.1413232855, p01/25/50/75/99=[0.0, 0.0, 0.0, 254920.0, 306020.0], mean=106099.21360351957, sd=128533.5486758921, zero rows=1837745, negative rows=10, non-numeric=0
-- heating_p.`CHP_elec`: min/max=-282561.8727453294/27705.3, p01/25/50/75/99=[-187471.78, -155463.25, 78.76, 89.2057994758886, 2781.95], mean=-64429.80548907447, sd=80113.57633145142, zero rows=2269, negative rows=1424716, non-numeric=0
-- heating_w.`total`: min/max=0.0/12975100.000000002, p01/25/50/75/99=[217100.0, 3352600.0, 6518200.0, 10341300.0, 12770300.0], mean=6690127.6042457605, sd=3900559.891992281, zero rows=20, negative rows=0, non-numeric=0
-- heating_w.`CHP_heat`: min/max=0.0/5583000.0, p01/25/50/75/99=[93695.0, 1421930.0, 2713100.0, 4205950.0, 5441889.999999999], mean=2765359.1359086484, sd=1613442.8019178223, zero rows=9, negative rows=0, non-numeric=0
-- heating_w.`CHP_elec`: min/max=-3390184.498498443/0.0, p01/25/50/75/99=[-3302859.058498442, -2563918.5683119064, -1687801.4733119064, -883556.58, -59570.21843300591], mean=-1695255.4217999058, sd=974522.2229910549, zero rows=55, negative rows=3417892, non-numeric=0
-- cooling_p.`total`: min/max=-1.8189894035458565e-12/3717000.0, p01/25/50/75/99=[0.0, 6300.0, 23000.0, 63500.0, 229000.0], mean=43053.630578824115, sd=54535.66851196102, zero rows=167258, negative rows=70, non-numeric=0
-- cooling_p.`cool_elec`: min/max=0.0/332024.7807491248, p01/25/50/75/99=[896.91, 1197.19, 1257.04, 36032.46000000001, 119132.82], mean=19460.582344276118, sd=27250.084640577727, zero rows=3, negative rows=0, non-numeric=0
-- cooling_w.`total`: min/max=0.0/2270133.4562972225, p01/25/50/75/99=[11200.0, 572826.1653328948, 1155833.4562972223, 1715433.4562972223, 2264233.4562972225], mean=1154458.3248297796, sd=664635.5387939217, zero rows=3960, negative rows=0, non-numeric=0
-- cooling_w.`cool_elec`: min/max=0.0/1024963.8347382598, p01/25/50/75/99=[2159.8442336544176, 256704.41709388536, 515952.0359825874, 767483.2900872543, 1022387.8447382596], mean=516459.98544157285, sd=302073.95176798734, zero rows=3, negative rows=0, non-numeric=0
+### Categorical / Domain Validation
+
+`frequency` values vs the known resolution set (1min / 15min / 1h):
+- electricity_p: unexpected=none, unused=none.
+- electricity_w: unexpected=none, unused=none.
+- heating_p: unexpected=none, unused=none.
+- heating_w: unexpected=none, unused=none.
+- cooling_p: unexpected=none, unused=none.
+- cooling_w: unexpected=none, unused=none.
+
+### Temporal Semantics
+
+datetime_utc is treated as UTC per the dataset name. Coverage below is measured against an INDEPENDENT calendar (expected = span / step + 1), not the observed distinct count -- so 100% means genuinely gap-free, not tautological.
+
+| table / frequency | observed | expected | coverage % | longest gap (steps) | on-step % |
+|---|---|---|---|---|---|
+| electricity_p / 1min | 3155039 | 3155039 | 100.0 | 0.0 | 100.0 |
+| electricity_p / 15min | 210336 | 210336 | 100.0 | 0.0 | 100.0 |
+| electricity_p / 1h | 52584 | 52584 | 100.0 | 0.0 | 100.0 |
+| electricity_w / 1min | 3155039 | 3155039 | 100.0 | 0.0 | 100.0 |
+| electricity_w / 15min | 210335 | 210335 | 100.0 | 0.0 | 100.0 |
+| electricity_w / 1h | 52583 | 52583 | 100.0 | 0.0 | 100.0 |
+| heating_p / 1min | 3155039 | 3155039 | 100.0 | 0.0 | 100.0 |
+| heating_p / 15min | 210336 | 210336 | 100.0 | 0.0 | 100.0 |
+| heating_p / 1h | 52584 | 52584 | 100.0 | 0.0 | 100.0 |
+| heating_w / 1min | 3155029 | 3155029 | 100.0 | 0.0 | 100.0 |
+| heating_w / 15min | 210335 | 210335 | 100.0 | 0.0 | 100.0 |
+| heating_w / 1h | 52583 | 52583 | 100.0 | 0.0 | 100.0 |
+| cooling_p / 1min | 3155040 | 3155040 | 100.0 | 0.0 | 100.0 |
+| cooling_p / 15min | 210336 | 210336 | 100.0 | 0.0 | 100.0 |
+| cooling_p / 1h | 52584 | 52584 | 100.0 | 0.0 | 100.0 |
+| cooling_w / 1min | 3154980 | 3154980 | 100.0 | 0.0 | 100.0 |
+| cooling_w / 15min | 210332 | 210332 | 100.0 | 0.0 | 100.0 |
+| cooling_w / 1h | 52583 | 52583 | 100.0 | 0.0 | 100.0 |
+
+### Temporal Consistency
+
+The W tables are cumulative energy meters -- the value must be non-decreasing when ordered by datetime_utc within a frequency. A decreasing step is either a meter reset/rollover or a data error.
+
+- electricity_w.`total`: 250988 of 3417954 steps decrease (7.3432%); largest drop -2550.69576863572.
+- electricity_w.`PV`: 2257206 of 2569377 steps decrease (87.8503%); largest drop -869.4522393904626.
+- electricity_w.`CHP`: 1428733 of 3417892 steps decrease (41.8016%); largest drop -928.9788165604696.
+- heating_w.`total`: 8912 of 3417944 steps decrease (0.2607%); largest drop -1.862645149230957e-09.
+- heating_w.`CHP_heat`: 16887 of 3417944 steps decrease (0.4941%); largest drop -4840.0.
+- heating_w.`CHP_elec`: 1428733 of 3417944 steps decrease (41.8009%); largest drop -928.9788165604696.
+- cooling_w.`total`: 442 of 3417892 steps decrease (0.0129%); largest drop -9.313225746154785e-10.
+- cooling_w.`cool_elec`: 1375 of 3417892 steps decrease (0.0402%); largest drop -10.82999999995809.
+
+### Physical Consistency
+
+Physical identity check: the per-step increment of the W meter, converted to an average power over the step, should equal the P value at the same (frequency, datetime_utc). Residual = implied_power - P.
+
+- electricity (`total`): 3417758/3417769 rows exceed 10% relative residual (99.9997%); residual p01/p50/p99 [-506328.928435727, -181465.07000098453, 212880.46290101286], max abs 787812.7553131251.
+- heating (`total`): 2839028/3405097 rows exceed 10% relative residual (83.3758%); residual p01/p50/p99 [-790147.4304832183, -228100.0, 0.0], max abs 2193300.0.
+- cooling (`total`): 3250694/3415548 rows exceed 10% relative residual (95.1734%); residual p01/p50/p99 [-228600.0, -23000.0, 0.0], max abs 3714999.9999999627.
+
+### Regime / Version Evidence
+
+Rows split at the series midpoint -- a large null-rate or distinct-count move on one side points to a sensor swap / outage window rather than a physical change. This measures coverage, not signal level.
+
+- electricity_p (cut 2020-12-31 10:59:30): pre=1708980, post=1708979; columns with a >=50pt null-rate move: none.
+- electricity_w (cut 2020-12-31 10:59:30): pre=1708977, post=1708980; columns with a >=50pt null-rate move: none.
+- heating_p (cut 2020-12-31 10:59:30): pre=1708980, post=1708979; columns with a >=50pt null-rate move: none.
+- heating_w (cut 2020-12-31 10:59:30): pre=1708967, post=1708980; columns with a >=50pt null-rate move: none.
+- cooling_p (cut 2020-12-31 10:59:30): pre=1708980, post=1708980; columns with a >=50pt null-rate move: none.
+- cooling_w (cut 2020-12-31 10:59:30): pre=1708915, post=1708980; columns with a >=50pt null-rate move: none.
+
+### Coverage & Sampling Bias
+
+Rows per (table, frequency): {'electricity_p': {'15min': 210336, '1h': 52584, '1min': 3155039}, 'electricity_w': {'15min': 210335, '1h': 52583, '1min': 3155039}, 'heating_p': {'15min': 210336, '1h': 52584, '1min': 3155039}, 'heating_w': {'15min': 210335, '1h': 52583, '1min': 3155029}, 'cooling_p': {'15min': 210336, '1h': 52584, '1min': 3155040}, 'cooling_w': {'15min': 210332, '1h': 52583, '1min': 3154980}}.
+The 1min partition dominates every table (~50x the 1h partition). A model must not pool frequencies -- they are three resolutions of the same signal, and a random split would put near-duplicate 1min/15min/1h rows of the same hour on both sides.
+Single building, single sensor set -- no entity dimension; the only split axis is time.
 
 ### Relationships
 
-P<->W value relationship per metric (matched rows on (frequency, datetime_utc) + per-column Pearson corr):
-- electricity: {'matched': 3417956, 'corr_total': -0.3205019774045346, 'corr_PV': 0.12364898401544824, 'corr_CHP': -0.0010890810054510877}
-- heating: {'matched': 3417946, 'corr_total': -0.0609501173806899, 'corr_CHP_heat': 0.012587110363189692, 'corr_CHP_elec': -0.0011254584876038121}
-- cooling: {'matched': 3417895, 'corr_total': -0.0272440113236412, 'corr_cool_elec': -0.014216150000299979}
-
+P<->W value relationship per metric (inner join on (frequency, datetime_utc), Pearson corr):
+- electricity: {'matched': 3417956, 'corr_total': -0.32050197740454284, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783183488}
+- heating: {'matched': 3417946, 'corr_total': -0.060947432831213046, 'corr_CHP_heat': 0.012585981650608763, 'corr_CHP_elec': -0.0011251212780521035}
+- cooling: {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}
 P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
-
-### ML-Readiness Evidence
-
-- Candidate target signals: the stuck-sensor flags and 5-sigma outlier counts computed above ({'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}) are natural labels for a sensor-anomaly-detection use case; the value columns themselves (electricity/heating/cooling P and W) are candidate forecasting targets keyed by (frequency, datetime_utc).
-- Leakage: P and W tables per metric are schema-identical and highly correlated (Pearson corr in `pw_rel` = {'electricity': {'matched': 3417956, 'corr_total': -0.3205019774045346, 'corr_PV': 0.12364898401544824, 'corr_CHP': -0.0010890810054510877}, 'heating': {'matched': 3417946, 'corr_total': -0.0609501173806899, 'corr_CHP_heat': 0.012587110363189692, 'corr_CHP_elec': -0.0011254584876038121}, 'cooling': {'matched': 3417895, 'corr_total': -0.0272440113236412, 'corr_cool_elec': -0.014216150000299979}}) -- verify whether P and W are independent physical measurements or one is a unit-derived transform of the other before using both as separate features; if derived, using one to predict the other is circular, not genuine signal.
-- Grain and entity-grouped split: key = ['frequency', 'datetime_utc'] per table, no separate device/sensor id -- split by contiguous date range, not by row, and never mix `frequency` values within one split since 1min/15min/1h are different physical resolutions of the same underlying signal.
-- Join cardinality: P<->W join per metric is 1:1 on (frequency, datetime_utc) confirmed by matched-row counts and schema parity above -- safe to join without fan-out risk.
-- Imbalance: stuck-run and 5-sigma-outlier flags are rare-event labels by construction ({'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}) -- an anomaly-detection model trained on these will face severe class imbalance; do not evaluate with plain accuracy.
-- Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample capped at 150k rows), the hourly time-series figure uses only the first 2000 chronological points per table, and the P-vs-W scatter uses a 10% sample capped at 20k rows -- none of these are representative of the full series; use the full-table `value_stats`/`outliers`/`continuity` aggregates for any feature-quality or threshold decision.
 
 ### EDA Findings
 
-- dup composition: {'electricity_p': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'electricity_w': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_p': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_w': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_p': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_w': {'dup_groups': 0, 'identical': 0, 'conflicting': 0}}
-- coverage % / on-step % per table/frequency: {'electricity_p': [('1min', 100.0, 100.0), ('15min', 100.0, 100.0), ('1h', 100.0, 100.0)], 'electricity_w': [('1min', 100.0, 100.0), ('15min', 100.0, 100.0), ('1h', 100.0, 100.0)], 'heating_p': [('1min', 100.0, 100.0), ('15min', 100.0, 100.0), ('1h', 100.0, 100.0)], 'heating_w': [('1min', 100.0, 100.0), ('15min', 100.0, 100.0), ('1h', 100.0, 100.0)], 'cooling_p': [('1min', 100.0, 100.0), ('15min', 100.0, 100.0), ('1h', 100.0, 100.0)], 'cooling_w': [('1min', 100.0, 100.0), ('15min', 100.0, 100.0), ('1h', 100.0, 100.0)]}
+- dup composition: {'electricity_p': {'distinct_keys': 3417959, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'electricity_w': {'distinct_keys': 3417957, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_p': {'distinct_keys': 3417959, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_w': {'distinct_keys': 3417947, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_p': {'distinct_keys': 3417960, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_w': {'distinct_keys': 3417895, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}}
+- continuity (coverage % / longest gap steps): {'electricity_p': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'electricity_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'heating_p': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'heating_w': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'cooling_p': {'15min': (100.0, 0.0), '1h': (100.0, 0.0), '1min': (100.0, 0.0)}, 'cooling_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}}
 - 5-sigma outliers: {'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}
-- P<->W relationship: {'electricity': {'matched': 3417956, 'corr_total': -0.3205019774045346, 'corr_PV': 0.12364898401544824, 'corr_CHP': -0.0010890810054510877}, 'heating': {'matched': 3417946, 'corr_total': -0.0609501173806899, 'corr_CHP_heat': 0.012587110363189692, 'corr_CHP_elec': -0.0011254584876038121}, 'cooling': {'matched': 3417895, 'corr_total': -0.0272440113236412, 'corr_cool_elec': -0.014216150000299979}}
+- mirror/duplicate columns: [('electricity_p.CHP', 'heating_p.CHP_elec', 'identical distribution -- one column duplicates the other')]
+- P<->W relationship: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454284, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783183488}, 'heating': {'matched': 3417946, 'corr_total': -0.060947432831213046, 'corr_CHP_heat': 0.012585981650608763, 'corr_CHP_elec': -0.0011251212780521035}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}
+
+### ML-Readiness Evidence
+
+- **Grain / grain drift:** One row per (frequency, datetime_utc) per table. Joining P+W per metric is 1:1 on that key (schema parity {'electricity': True, 'heating': True, 'cooling': True}); pooling frequencies changes the grain.
+- **Join multiplication (1:N / M:N expansion):** P<->W join is 1:1 on (frequency, datetime_utc) -- no fan-out. A cross-metric wide join (electricity+heating+cooling at one timestamp) is also 1:1 on the intersection but drops the non-overlapping tail (see 03).
+- **Target contamination:** If a value column is the forecast target, the same column at the target timestamp (and the cumulative W meter, which encodes the future increment) must be excluded from features.
+- **Temporal / post-event leakage:** The W tables are cumulative meters -- W[t] already contains energy that flows after the prediction cutoff if the cutoff sits mid-interval; use first-difference (per-interval energy), not the raw meter, and only points strictly before the cutoff. Meter monotonicity is measured in Temporal Consistency; the dW/dt-vs-P identity in Physical Consistency.
+- **Proxy leakage:** P and W of the same metric are near-redundant (corr above); a heat/cool total is close to the sum of its components -- a 'feature' that is an arithmetic function of the target leaks.
+- **Split / entity leakage:** Single building, no entity id -- split by contiguous date range only, and never mix frequencies within one split (1min/15min/1h rows of the same hour are near-duplicates).
+- **Historical-reference (point-in-time) leakage:** No slowly-changing attributes here; a diurnal / seasonal profile used as a feature must be computed only from data before the prediction point, never over the full history.
+- **Survivorship / coverage bias:** Continuity above shows the real gap profile. The 1min partition dominates; any statistic pooled across frequencies is really a 1min statistic.
+- **Missingness leakage:** Whether a value is present may correlate with sensor downtime windows -- check before adding an 'is-missing' feature that a naive model could exploit.
+- **Duplicate-event leakage:** Duplicate key groups per table: {'electricity_p': 0, 'electricity_w': 0, 'heating_p': 0, 'heating_w': 0, 'cooling_p': 0, 'cooling_w': 0} (conflicting: {'electricity_p': 0, 'electricity_w': 0, 'heating_p': 0, 'heating_w': 0, 'cooling_p': 0, 'cooling_w': 0}) -- de-duplicate before counting observations or splitting.
+- **Target / feature temporal misalignment:** P (instantaneous, timestamped at the instant) and W (cumulative, timestamped at interval end) are not aligned to the same instant -- align both to one convention before pairing.
+- **Unit / sign / circular-feature leakage:** Mirror/copy columns: [('electricity_p.CHP', 'heating_p.CHP_elec')]. Negative energy: {'electricity_p.total': 251753, 'electricity_p.PV': 2123870, 'electricity_p.CHP': 1424715, 'electricity_w.total': 225, 'electricity_w.PV': 2569378, 'electricity_w.CHP': 3417892, 'heating_p.CHP_elec': 1424715, 'heating_w.CHP_elec': 3417892}. P<->W is a physical relationship, not independent signal -- using one to predict the other is circular.
+- **Data-generation-process leakage:** The W meter reset/rollover behaviour and any gap-filling done upstream are part of the data-generation process -- a feature that spikes at a meter reset encodes the process, not the building's energy use.
+- **Class / label instability:** Not applicable -- all targets here are continuous.
+- **Label availability lag:** Meter readings are available at interval end; a nowcast at time t cannot use the interval [t, t+step] reading.
+- **Source / version / regime change:** A single deployment; watch for sensor swaps or recalibration (a step change in level with no physical cause) when the series is extended.
+- **Sample-vs-full divergence:** value_pdf is a 10% sample capped at 150k rows, the hourly figure uses the first 2000 chronological points, the P-vs-W scatter a 10% sample capped at 20k -- none are representative; use the full-table value_stats / outliers / continuity aggregates for any feature-quality decision.
 
 ### Silver Implications
 
-- Type conversion: datetime_utc -> timestamp; value columns -> double.
+- Type conversion: datetime_utc -> timestamp (UTC); value columns -> double.
 - `frequency` (1min / 15min / 1h) is a real physical resolution -> keep it in the grain; do not blend frequencies.
 - Identical (frequency, datetime_utc) repeats can be de-duplicated.
-- Series are not dense (coverage % / gaps above) -> observed points only; resampling is a downstream choice.
+- Exact-copy / sign-mirror columns exist ([('electricity_p.CHP', 'heating_p.CHP_elec')]) -> keep ONE per pair, or an SCD/lineage note explaining the derivation; never expose both as independent features.
+- Negative values in energy columns ({'electricity_p.total': 251753, 'electricity_p.PV': 2123870, 'electricity_p.CHP': 1424715, 'electricity_w.total': 225, 'electricity_w.PV': 2569378, 'electricity_w.CHP': 3417892, 'heating_p.CHP_elec': 1424715, 'heating_w.CHP_elec': 3417892}) -> confirm the sign convention (generation as negative? measurement error?) before Silver casting.
+- Series are not necessarily dense (coverage / gaps above) -> observed points only; resampling is a downstream choice.
 - Stuck-sensor runs and 5-sigma spikes -> data-quality flag, keep raw.
-- P and W tables of a metric are schema-identical, join 1:1 on (frequency, datetime_utc), and are highly correlated (corr above) -> may be modelled as one fact per metric (a Silver modelling choice).
 
 ### Figure -- Honda energy -- rows per frequency, by table
 
@@ -117,10 +185,6 @@ P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 ### Figure -- Honda energy -- duplicate (frequency, datetime_utc) groups
 
 ![Honda energy -- duplicate (frequency, datetime_utc) groups](figures/honda_energy_duplicate_groups.png)
-
-### Figure -- Honda energy -- longest gap (missing steps) per table x frequency
-
-![Honda energy -- longest gap (missing steps) per table x frequency](figures/honda_energy_longest_gap_per_table.png)
 
 ### Figure -- Honda energy -- value distribution per table.column
 
@@ -148,33 +212,52 @@ P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 | WeatherStation_Weather_Ta | 81743 | 0.0239 | 1562020 |
 | WeatherStation_Weather_Igm | 81762 | 0.0239 | 1812296 |
 
-Rows: 3419507. Constant columns: none.
+Rows: 3419507. Constant columns (exact): none.
 
 ### Data Quality
 
-Duplicate (frequency, datetime_utc) key composition: {'dup_groups': 0, 'identical': 0, 'conflicting': 0}.
+Duplicate (frequency, datetime_utc) key composition: {'distinct_keys': 3419507, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}.
 (frequency, datetime_utc) is unique in Bronze.
+Stuck-run rows (value == value 1 and 11 steps back, 1h): {'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}.
 
-### Temporal
+### Unit & Semantic Validation
 
-| frequency | rows | coverage % | on-step % | longest gap (steps) |
-|---|---|---|---|---|
-| 15min | 210432 | 100.0 | 100.0 | 0 |
-| 1h | 52608 | 100.0 | 100.0 | 0 |
-| 1min | 3156467 | 100.0 | 100.0 | 0 |
+Value columns: Ta = air temperature (degC), Igm = global irradiance (W/m2). Plausible bounds {'Ta': (-40.0, 50.0), 'Igm': (0.0, 1500.0)}.
+- WeatherStation_Weather_Ta: range -11.6211330890655..39.89799912770584, mean 12.404227616478074, out-of-plausible-range rows 0, negative 128708, non-numeric 7
+- WeatherStation_Weather_Igm: range 0.0..1140.98239746091, mean 133.5618535195616, out-of-plausible-range rows 0, negative 0, non-numeric 881
+Igm at night is 0 by physics -- a large zero count is expected, not missingness; a negative Igm or an Igm far above ~1200 W/m2 in Germany is a sensor fault.
 
-Top interval sizes (frequency, delta_s, count): [('1min', 60, 3156466), ('15min', 900, 210431), ('1h', 3600, 52607), ('1h', None, 1), ('1min', None, 1), ('15min', None, 1)]
+### Categorical / Domain Validation
+
+`frequency` values vs the known resolution set (1min / 15min / 1h): unexpected=none, unused=none.
+
+### Temporal Semantics
+
+datetime_utc is treated as UTC per the dataset name. Coverage below is measured against an INDEPENDENT calendar (expected = span / step + 1), so 100% means genuinely gap-free.
+
+| frequency | observed | expected | coverage % | longest gap (steps) | on-step % |
+|---|---|---|---|---|---|
+| 1min | 3156467 | 3156467 | 100.0 | 0.0 | 100.0 |
+| 15min | 210432 | 210432 | 100.0 | 0.0 | 100.0 |
+| 1h | 52608 | 52608 | 100.0 | 0.0 | 100.0 |
+
+### Regime / Version Evidence
+
+Rows split at the series midpoint. A large null-rate or distinct-count move on one side points to a sensor outage window, not a physical change (this measures coverage, not signal level).
+- cut 2020-12-30 22:59:00: pre=1709747, post=1709760; columns with a >=50pt null-rate move: none.
+
+### Coverage & Sampling Bias
+
+Rows per frequency: {'15min': 210432, '1h': 52608, '1min': 3156467}.
+The 1min partition dominates. Any statistic pooled across frequencies is really a 1min statistic. Single weather source (no station id) -- the only split axis is time.
+This weather series is the feature side of the energy<->weather join (03); if it does not cover the full energy span, an inner join silently truncates the training window.
 
 ### Distributions
 
-| column | min | p01 | p50 | p99 | max | mean | sd | zero | non_numeric |
-|---|---|---|---|---|---|---|---|---|---|
-| WeatherStation_Weather_Ta | -11.6211330890655 | -3.1046586036682 | 11.800457827249776 | 30.87661711374917 | 39.89799912770584 | 12.404201602171133 | 7.975117807441465 | 0 | 0 |
-| WeatherStation_Weather_Igm | 0.0 | 0.0 | 2.8015878200531 | 845.739322916668 | 1140.98239746091 | 133.52659979304494 | 220.24460323755744 | 1455479 | 0 |
-
-Out-of-plausible-range counts (PLAUSIBLE={'Ta': (-40.0, 50.0), 'Igm': (0.0, 1500.0)}): {'WeatherStation_Weather_Ta': 0, 'WeatherStation_Weather_Igm': 0}
-
-Stuck runs (>=12 identical consecutive values, 1h partition): {'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}
+| column | min | p01 | p50 | p99 | max | mean | sd | zero | negative | non_numeric |
+|---|---|---|---|---|---|---|---|---|---|---|
+| WeatherStation_Weather_Ta | -11.6211330890655 | -3.108776317702389 | 11.800457827249776 | 30.87661711374917 | 39.89799912770584 | 12.404227616478074 | 7.975105939313824 | 0 | 128708 | 7 |
+| WeatherStation_Weather_Igm | 0.0 | 0.0 | 2.8015878200531 | 845.778789639606 | 1140.98239746091 | 133.5618535195616 | 220.26298763615017 | 1455479 | 0 | 881 |
 
 ### EDA Findings
 
@@ -182,12 +265,28 @@ Stuck runs (>=12 identical consecutive values, 1h partition): {'WeatherStation_W
 
 ### ML-Readiness Evidence
 
-- Candidate target signals: Ta (air temperature) and Igm (global irradiance) are candidate forecasting targets keyed by (frequency, datetime_utc); the stuck-run flags ({'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}) are a candidate anomaly-detection label.
-- Leakage: this table is the weather side of the energy<->weather join analysed in 03_honda_relationships_and_findings.py -- using same-timestamp weather to predict same-timestamp energy is legitimate, but using a later weather reading (or a diurnal profile averaged over the FULL history) to predict an earlier energy reading would leak future information; any diurnal/seasonal feature must be computed only from data available before the prediction point.
-- Grain and entity-grouped split: key = (frequency, datetime_utc), single weather source (no station id) -- split by contiguous date range, not by row, and never mix `frequency` values within one split.
-- Join cardinality: this notebook does not assess the energy<->weather join cardinality -- see 03_honda_relationships_and_findings.py for the confirmed match rate; do not assume a 1:1 join without checking that notebook's yield numbers first.
-- Imbalance: stuck-run flags ({'WeatherStation_Weather_Ta': 70, 'WeatherStation_Weather_Igm': 1710}) are a rare-event label by construction -- a sensor-anomaly model trained on them will face severe class imbalance.
-- Sample-vs-full divergence: the value-distribution figure uses `value_pdf` (10% sample capped at 150k rows) and the hourly-window figure uses only the first 3000 chronological points -- the diurnal-profile figure (`hourly`) IS a full-table groupBy average, not sampled, so it is safe to use as-is; use the full-table `S` aggregate stats, not `value_pdf`, for any threshold decision.
+- **Grain / grain drift:** One row per (frequency, datetime_utc). Joining to the energy tables (03) must be on the same key at the same frequency; resampling drifts the grain.
+- **Join multiplication (1:N / M:N expansion):** Single weather source -> energy<->weather is at most 1:1 per (frequency, timestamp); see 03 for the confirmed match rate.
+- **Target contamination:** Weather is a feature, not a target here -- but if a weather variable becomes a target, its own future values and any smoothed/rolling version must be excluded from features.
+- **Temporal / post-event leakage:** A weather reading timestamped at interval end already summarises that interval -- for a nowcast at time t use only readings strictly before t.
+- **Proxy leakage:** Igm is a near-deterministic function of time-of-day and season -- a model given both Igm and a fine-grained clock feature is partly memorising the calendar.
+- **Split / entity leakage:** No entity dimension -- split by contiguous date range; never mix frequencies within a split.
+- **Historical-reference (point-in-time) leakage:** A diurnal / seasonal climatology used as a feature must be built only from data before the prediction point, not averaged over the full series.
+- **Survivorship / coverage bias:** Continuity above shows the real gaps; a sensor-outage window is a real absence, not zero. If the weather span is shorter than the energy span, the joined training set is truncated.
+- **Missingness leakage:** Ta/Igm missing together (2.4% each in the first profile) likely marks a station outage -- an 'is-missing' flag can leak the outage timing.
+- **Duplicate-event leakage:** Duplicate key composition {'distinct_keys': 3419507, 'dup_groups': 0, 'identical': 0, 'conflicting': 0} -- de-duplicate before treating a reading as one observation.
+- **Target / feature temporal misalignment:** Weather at interval end vs energy P at the instant vs energy W cumulative -- align all to one timestamp convention before joining.
+- **Unit / sign / circular-feature leakage:** Ta in degC, Igm in W/m2 -- confirm before combining with any external weather source in a different unit. No mirror columns in this single-column-pair table.
+- **Data-generation-process leakage:** Any upstream gap-filling / interpolation of the weather series is part of the data-generation process; an interpolated stretch will look unnaturally smooth.
+- **Class / label instability:** Not applicable -- continuous variables only.
+- **Label availability lag:** Not applicable to weather-as-feature; if forecast weather is used instead of observed, its publication lag and horizon must be respected.
+- **Source / version / regime change:** A single sensor deployment; a recalibration or sensor swap would show as a step change with no physical cause.
+- **Sample-vs-full divergence:** value_pdf is a 10% sample capped at 150k rows and the hourly-window figure uses the first 3000 points -- the diurnal-profile figure IS a full-table groupBy average and is safe; use the full-table S aggregate for any threshold decision.
+
+### Silver Implications
+
+- Type conversion: datetime_utc -> timestamp (UTC); value columns -> double.
+- Keep `frequency` in the grain; do not resample or blend resolutions at Silver.
 
 ### Figure -- Honda weather -- frequency overview
 
@@ -263,24 +362,52 @@ Pairwise shared-key counts:
 | cooling_p + weather | 3417959 |
 | cooling_w + weather | 3417894 |
 
+Relationship cardinality (energy stream -> weather, on (frequency, datetime_utc)):
+
+| energy table | child rows | distinct child keys | matched to weather | orphan keys | max fan-out |
+|---|---|---|---|---|---|
+| honda_iot_electricity_p | 3417959 | 3417959 | 3417959 | 0 | 1 (key unique) |
+| honda_iot_electricity_w | 3417957 | 3417957 | 3417956 | 1 | 1 (key unique) |
+| honda_iot_heating_p | 3417959 | 3417959 | 3417959 | 0 | 1 (key unique) |
+| honda_iot_heating_w | 3417947 | 3417947 | 3417946 | 1 | 1 (key unique) |
+| honda_iot_cooling_p | 3417960 | 3417960 | 3417959 | 1 | 1 (key unique) |
+| honda_iot_cooling_w | 3417895 | 3417895 | 3417894 | 1 | 1 (key unique) |
+Because (frequency, datetime_utc) is unique in every table, every join here is 1:1 -- the only cardinality risk is row LOSS on an inner join, quantified by the orphan-keys column, not row multiplication.
+
+### Coverage & Sampling Bias
+
+Time span per dataset: {'electricity_p': ('2017-12-31 23:00:00', '2023-12-31 22:58:00'), 'electricity_w': ('2017-12-31 23:01:00', '2023-12-31 22:59:00'), 'heating_p': ('2017-12-31 23:00:00', '2023-12-31 22:58:00'), 'heating_w': ('2017-12-31 23:11:00', '2023-12-31 22:59:00'), 'cooling_p': ('2017-12-31 23:00:00', '2023-12-31 22:59:00'), 'cooling_w': ('2018-01-01 00:00:00', '2023-12-31 22:59:00'), 'weather': ('2017-12-30 23:00:00', '2023-12-31 22:58:00')}
+Energy x weather shared window: ('2017-12-31', '2023-12-31') -- an energy+weather model can only train inside this window; an inner join outside it silently drops rows.
+1614 of 3419508 keys are absent from at least one table (per-table gaps: {'electricity_p': 1549, 'electricity_w': 1551, 'heating_p': 1549, 'heating_w': 1561, 'cooling_p': 1548, 'cooling_w': 1613, 'weather': 1}). This is a CROSS-table completeness gap -- a single table can still be internally dense (see 01/02 continuity) while differing from another by a handful of timestamps.
+
 ### EDA Findings
 
-- 1614 keys are missing from at least one table (per-table gaps: {'electricity_p': 1549, 'electricity_w': 1551, 'heating_p': 1549, 'heating_w': 1561, 'cooling_p': 1548, 'cooling_w': 1613, 'weather': 1}).
+- 1614 keys missing from at least one table (gaps: {'electricity_p': 1549, 'electricity_w': 1551, 'heating_p': 1549, 'heating_w': 1561, 'cooling_p': 1548, 'cooling_w': 1613, 'weather': 1}).
 
 (frequency, datetime_utc) is unique in every Honda table: True.
-3417894 of 3419508 keys (100.0%) are present in all 7 tables.
+3417894 of 3419508 keys (100.0%) are in all 7 tables.
 Energy<->weather match rate: {'electricity_p': 100.0, 'electricity_w': 100.0, 'heating_p': 100.0, 'heating_w': 100.0, 'cooling_p': 100.0, 'cooling_w': 100.0}.
-A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)' table is feasible on the intersection but drops the non-overlapping tail; the natural Silver grain is one fact per dataset (or per metric joining P+W), with the wide table left to Gold.
+A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)' table is feasible on the intersection but drops the non-overlapping tail; the natural Silver grain is one fact per dataset (or per metric joining P+W), the wide table is Gold.
 
 ### ML-Readiness Evidence
 
-- No candidate ML target lives across these 7 tables directly -- this notebook is a joinability audit; see 01_energy_eda.py and 02_weather_eda.py for per-table target candidates.
-- Join cardinality: (frequency, datetime_utc) is unique in every table (True), so all pairwise and 7-way joins are 1:1 on the shared key -- no cartesian-explosion risk from fan-out, but the join is NOT complete: only 3417894 of 3419508 keys (100.0%) are present in all 7 tables, so an inner 7-way join drops the rest.
-- Energy<->weather join yield (the join a combined energy+weather model would use): {'electricity_p': 100.0, 'electricity_w': 100.0, 'heating_p': 100.0, 'heating_w': 100.0, 'cooling_p': 100.0, 'cooling_w': 100.0} -- any energy table with <100% match will silently lose rows on an inner join; use an outer join and an explicit missing-weather flag instead.
-- Grain and entity-grouped split: shared key = (frequency, datetime_utc) across all 7 tables -- any model combining them must split by contiguous date range, not by row, so a timestamp's energy and weather readings stay together on the same side of a split.
-- Leakage: because energy and weather share the same timestamp grid, a same-timestamp weather feature is legitimate for predicting same-timestamp energy, but a model must not be fed a later timestamp's energy or weather value when predicting an earlier one.
-- Imbalance: not applicable at this cross-table level -- see per-table stuck-run/outlier imbalance notes in 01_energy_eda.py and 02_weather_eda.py.
-- Sample-vs-full divergence: not applicable -- every statistic here (key presence, pairwise overlap, join yield) is computed from a full Spark aggregation over the tagged-union presence matrix, no `.sample()`/`.limit()` subset feeds any reported number.
+- **Grain / grain drift:** (frequency, datetime_utc) is unique in every table (True); all pairwise and 7-way joins hold that grain. Resampling to a common frequency would change it.
+- **Join multiplication (1:N / M:N expansion):** 1:1 on the shared key -- no fan-out. The risk is the opposite: an inner 7-way join keeps only 3417894 of 3419508 keys.
+- **Target contamination:** No target across these tables -- see 01/02. A wide feature row must not include the target metric's own value at the target timestamp.
+- **Temporal / post-event leakage:** Energy and weather share the timestamp grid -- same-timestamp weather is a legitimate feature for same-timestamp energy, but no later energy/weather value may feed an earlier prediction.
+- **Proxy leakage:** P and W of one metric are near-redundant; heat/cool total ~ sum of components -- a wide join makes these collinear features trivially available.
+- **Split / entity leakage:** Split by contiguous date range across ALL tables at once, never per-table by row, so a timestamp's energy and weather stay on one side.
+- **Historical-reference (point-in-time) leakage:** No slowly-changing attributes; a climatology feature must be built only from pre-cutoff data.
+- **Survivorship / coverage bias:** Energy x weather shared window ('2017-12-31', '2023-12-31') -- training outside it is impossible; the join yield table shows where each energy stream loses weather coverage.
+- **Missingness leakage:** A missing key in one table at a timestamp present in others marks a per-stream outage -- an 'is-present' flag per stream can leak the outage timing.
+- **Duplicate-event leakage:** Key uniqueness per table: {'electricity_p': True, 'electricity_w': True, 'heating_p': True, 'heating_w': True, 'cooling_p': True, 'cooling_w': True, 'weather': True} -- de-duplicate any table that is not unique before joining or splitting.
+- **Target / feature temporal misalignment:** P (instant), W (cumulative, interval-end) and weather (interval-end) use different timestamp conventions -- align to one before building a wide row.
+- **Unit / sign / circular-feature leakage:** See 01 -- P<->W and component<->total relationships are physical identities, not signal.
+- **Data-generation-process leakage:** Any upstream alignment / gap-filling that made the 7 grids match is part of the data-generation process; the residual mismatch here is what survived it.
+- **Class / label instability:** Not applicable -- continuous metrics only.
+- **Label availability lag:** Interval-end readings are not available until the interval closes -- a nowcast cannot use the interval it is predicting.
+- **Source / version / regime change:** One deployment; a sensor swap on any stream would show as a step change and a shift in that stream's coverage window.
+- **Sample-vs-full divergence:** Every number here (key presence, pairwise overlap, join yield, spans) is a full Spark aggregation over the tagged-union presence matrix -- no sampling.
 
 ### Silver Implications
 

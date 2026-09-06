@@ -25,43 +25,32 @@ Rows: 111863691. Constant columns: none. `date` field granularity: daily/other (
 
 ### Data Quality
 
-Candidate key ['repository_id', 'url', 'date', 'country', 'device']: distinct=98942513, unique=False, dup groups=9635135, fully identical=9165617, conflicting metrics=469515.
+Candidate key ['repository_id', 'url', 'date', 'country', 'device']: distinct=98942513, unique=False, dup groups=9635135, fully identical=9166518, conflicting metrics=468675.
 clicks > impressions rows: 0.
 clickThrough vs clicks/impressions delta (p5/50/95): [0.0, 0.0, 0.0].
 
 Negative-value counts: {}
 
-### Temporal
+### Categorical / Domain Validation
 
+`device` vs the known set (desktop / mobile / tablet): unexpected=none.
+`position` bounds: 0 rows < 1, 17239275 rows > 100 of 111863691 present -- a search rank below 1 or far past 100 is not valid.
+
+### Regime / Version Evidence
+
+`date` mixes an ISO archive vintage and an M/D/YYYY one. Per-cohort row count and per-column null-rate / distinct -- a large difference is a staging inconsistency (the two archive sets were built differently), not a data-quality finding about the source.
+
+| cohort | rows | clicks null | impressions null | position null | country distinct | device distinct |
+|---|---|---|---|---|---|---|
+| iso | 110815116 | 0.0 | 0.0 | 0.0 | 236 | 3 |
+| slash | 1048575 | 0.0 | 0.0 | 0.0 | 230 | 3 |
+
+### Temporal Semantics
+
+`date` is a daily/other archive marker, not a daily timestamp (distinct day-of-month values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]). It mixes 2 raw formats ({'%m/%d/%Y': 7, '%Y-%m-%d': 335}) -- parsing only ISO makes the M/D/YYYY archives look absent.
 Months present (12): ['2017-01', '2017-02', '2017-03', '2017-04', '2017-05', '2017-06', '2017-07', '2017-08', '2017-09', '2017-10', '2017-11', '2017-12'].
 Missing months within span: none.
-`date` raw-format breakdown: {'%m/%d/%Y': 7, '%Y-%m-%d': 335}.
-Rows per monthly archive: - 2/1/2017: 175441
-- 2/2/2017: 179400
-- 2/3/2017: 142703
-- 2/4/2017: 113164
-- 2/5/2017: 122018
-- 2/6/2017: 148613
-- 2/7/2017: 167236
-- 2017-01-01: 206104
-- 2017-01-02: 304120
-- 2017-01-03: 313716
-- 2017-01-04: 317514
-- 2017-01-05: 302536
-- 2017-01-06: 316786
-- 2017-01-07: 278490
-- 2017-01-08: 321052
-- 2017-01-09: 364676
-- 2017-01-10: 370616
-- 2017-01-11: 363410
-- 2017-01-12: 352084
-- 2017-01-13: 319688
-- 2017-01-14: 269198
-- 2017-01-15: 309088
-- 2017-01-16: 377024
-- 2017-01-17: 391748
-- 2017-01-18: 387056
-- ... (317 more).
+There is no time zone on `date` -- it is a report period, not an instant. Model it as a monthly bucket; do not attempt an hourly join.
 
 ### Entities / Keys
 
@@ -100,11 +89,14 @@ Per-repository coverage (urls / dates / countries):
 
 url approx distinct: 1475244; repository_id approx distinct: 29.
 
-### Coverage
+### Coverage & Sampling Bias
 
 - country: [('usa', 25490035), ('ind', 8448034), ('gbr', 4887781), ('can', 4324688), ('bra', 3435637), ('phl', 2855378), ('deu', 2224973), ('swe', 2215745), ('fra', 2215465), ('aus', 2146084), ('chn', 2108383), ('rus', 1831178), ('kor', 1784040), ('pak', 1783380), ('idn', 1771097), ('ita', 1756684), ('jpn', 1614881), ('esp', 1551850), ('mys', 1530609), ('tur', 1247024), ('vnm', 1222985), ('nld', 1209492), ('pol', 1109487), ('tha', 1108969), ('mex', 1101511), ('twn', 1029311), ('zaf', 1015062), ('rou', 983858), ('egy', 974481), ('arg', 895385)]
 - device: [('DESKTOP', 86777116), ('MOBILE', 21824327), ('TABLET', 3262248)]
 - citableContent: [('Yes', 87502982), ('No', 24360709)]
+
+28 repositories, 1475244 distinct urls. Coverage is uneven: a repository's dates/countries range widely (see Entities), so a url/repository absent from an archive is a real gap, not a zero -- an inner join across months silently drops the short-history repositories.
+This is a fixed 2017 archive set (open-access institutional repositories), not a live feed -- ranking behaviour, the search engine's algorithm and the corpus have all moved on since; a model built on it is frozen to 2017.
 
 ### Distributions
 
@@ -113,7 +105,7 @@ url approx distinct: 1475244; repository_id approx distinct: 29.
 | clicks | 0.0 | 165.0 | 0.06068590209489869 |
 | impressions | 1.0 | 260271.0 | 1.7117934719318353 |
 | clickThrough | 0.0 | 1.0 | 0.032664906005861465 |
-| position | 1.0 | 115321.0 | 45.283320884331104 |
+| position | 1.0 | 115321.0 | 45.28332088433109 |
 
 `index` is non-numeric (approx_distinct 28); top values: [('um', 19374051), ('texas_am', 11955695), ('colorado', 9696879), ('md_drum', 8172049), ('mcmaster', 8116645), ('rutgers', 7333436), ('univ_kentucky', 7083746), ('new_mexico_dc', 5318828), ('unlv_digital', 4966770), ('krex', 4728503), ('montana', 4432524), ('new_mexico', 4343223), ('epsilon_students', 3307641), ('shareok', 3306492), ('calgary', 3149556), ('epsilon', 1610953), ('md_soar', 1031060), ('u_waterloo', 995221), ('ut_austin', 879215), ('ifpri_rep', 736391)]
 
@@ -157,39 +149,33 @@ CTR by rounded position:
 
 - `date` is a daily/other archive marker, not a daily timestamp.
 - `date` mixes ≥2 raw formats ({'%m/%d/%Y': 7, '%Y-%m-%d': 335}); parsing only ISO previously made some months look absent from the span.
-- 469515 candidate-key groups have conflicting metric values.
+- 468675 candidate-key groups have conflicting metric values.
 - CTR decreases monotonically with search position (expected ranking behaviour).
 
 ### ML-Readiness Evidence
 
-- Candidate target signals: `clicks`, `clickThrough` (CTR), and `position` per url are plausible forecasting/ranking-optimisation targets, keyed by the candidate key ['repository_id', 'url', 'date', 'country', 'device'].
-- Leakage: search `position`/`index` are themselves influenced by prior clicks/CTR in most search-ranking systems -- using a concurrent-period position as a feature to predict CTR (or vice versa) risks a feedback-loop leak; any predictive use case must use position/CTR from a period strictly before the target period, not the same monthly archive.
-- Grain and entity-grouped split: candidate key = ['repository_id', 'url', 'date', 'country', 'device'], with `date` being a daily/other archive marker, not a daily timestamp -- split by repository_id or url (not by row), so a url's monthly history stays on one side of a split.
-- Join cardinality: this notebook does not assess the events <-> repository join -- see 02_search_visibility_relationships_and_findings.py for the confirmed cardinality and referential-integrity numbers before joining on repository_id.
-- Imbalance: not applicable -- clicks/impressions/position are continuous; country/device/citableContent distributions (Coverage) are categorical breakdowns, not a modelling target.
-- Sample-vs-full divergence: the metric-distribution and clicks-vs-impressions figures draw from `mp`, a 10% sample capped at 150k rows -- use the full-table `M` aggregate (min/max/avg/percentiles per metric) above for any feature-quality or threshold decision, not these sampled figures.
-- 469515 candidate-key groups have conflicting metric values (see Data Quality) -- resolve deterministically before using this table as a training source.
+- **Grain / grain drift:** Candidate key = ['repository_id', 'url', 'date', 'country', 'device']; `date` is a daily/other archive marker. Grain is one row per (repository, url, month, country, device). Aggregating over country/device drifts it.
+- **Join multiplication (1:N / M:N expansion):** events -> repository on repository_id is checked in 02_search_visibility_relationships_and_findings.py -- do not assume 1:N without its orphan/fan-out numbers.
+- **Target contamination:** Targets: clicks, CTR, position per url. CTR = clicks/impressions, so clicks and impressions must not both be features for a CTR target; position at the target period must not be a feature for a click target.
+- **Temporal / post-event leakage:** position and clicks in a search-ranking system are mutually causal within a period -- use position / CTR from a period STRICTLY before the target month, never the same archive.
+- **Proxy leakage:** `index` and `repository_id` are near-unique proxies for a specific corpus; url is a proxy for a specific document -- a model given them memorises rather than generalises.
+- **Split / entity leakage:** Split by repository_id or by url (hash), not by row -- a url's monthly history is autocorrelated and must stay on one side.
+- **Historical-reference (point-in-time) leakage:** url / repository attributes (citableContent, ir_platform in the dim) may change over the archive span -- join the value as of the archive month, not the latest.
+- **Survivorship / coverage bias:** 28 repositories with widely different date/country coverage; 0 missing months. A model trained on the full panel over-weights the long-history repositories.
+- **Missingness leakage:** 0 unparsed date values; category breakdowns above. Whether a url appears in an archive at all is informative (it ranked somewhere) -- an 'appeared' flag leaks the outcome.
+- **Duplicate-event leakage:** Candidate key: distinct=98942513/111863691, dup groups=9635135, identical=9166518, conflicting metrics=468675 -- de-duplicate (and resolve conflicts) before counting or splitting.
+- **Target / feature temporal misalignment:** All columns share the archive month -- there is no finer alignment available, so any before/after feature must be built at the month granularity, one lag minimum.
+- **Unit / sign / circular-feature leakage:** 0 rows have clicks > impressions (CTR > 1 is not valid); negative metrics: {}. Exclude/flag before a CTR target. clickThrough is redundant with clicks/impressions.
+- **Data-generation-process leakage:** This is Google Search Console-style aggregated data -- position is an average over impressions, clicks are de-duplicated by Google's own rules; the aggregation method is part of the data-generation process and changed over Search Console's history.
+- **Class / label instability:** Not applicable -- clicks/impressions/position are continuous. `device` and `citableContent` are stable low-cardinality enums.
+- **Label availability lag:** Search Console data for a month is finalised ~3 days after month end and can be revised for ~16 months -- a real-time model cannot use the current month's figures.
+- **Source / version / regime change:** PRIMARY concern: this is a 2017 archive. Google's ranking algorithm, the mobile-first index rollout and Search Console's own reporting all changed since -- do not treat it as representative of current search behaviour. Regime / Version Evidence above also measures whether the ISO and M/D/YYYY archive cohorts differ in scale / completeness.
+- **Sample-vs-full divergence:** Metric-distribution and clicks-vs-impressions figures draw from `mp`, a 10% sample capped at 150k rows -- use the full-table `M` aggregate for any feature-quality or threshold decision.
 
 ### Silver Implications
 
 - Model `date` as a monthly period; Silver grain = one row per ['repository_id', 'url', 'date', 'country', 'device'].
 - Conflicting-metric key groups need a deterministic resolution rule before Silver.
-
-### Figure -- Search Visibility CTR by search position
-
-![Search Visibility CTR by search position](figures/sv_ctr_by_position.png)
-
-### Figure -- Search Visibility total clicks & impressions per month
-
-![Search Visibility total clicks & impressions per month](figures/sv_clicks_impressions_per_month.png)
-
-### Figure -- Search Visibility clicks vs impressions (sampled)
-
-![Search Visibility clicks vs impressions (sampled)](figures/sv_clicks_vs_impressions.png)
-
-### Figure -- Search Visibility rows by rounded position
-
-![Search Visibility rows by rounded position](figures/sv_rows_by_position.png)
 
 ### Figure -- Search Visibility rows per month (archives aggregated)
 
@@ -199,9 +185,25 @@ CTR by rounded position:
 
 ![Search Visibility rows by category](figures/sv_category_breakdown.png)
 
+### Figure -- Search Visibility total clicks & impressions per month
+
+![Search Visibility total clicks & impressions per month](figures/sv_clicks_impressions_per_month.png)
+
 ### Figure -- Search Visibility metric distributions
 
 ![Search Visibility metric distributions](figures/sv_metric_distributions.png)
+
+### Figure -- Search Visibility clicks vs impressions (sampled)
+
+![Search Visibility clicks vs impressions (sampled)](figures/sv_clicks_vs_impressions.png)
+
+### Figure -- Search Visibility rows by rounded position
+
+![Search Visibility rows by rounded position](figures/sv_rows_by_position.png)
+
+### Figure -- Search Visibility CTR by search position
+
+![Search Visibility CTR by search position](figures/sv_ctr_by_position.png)
 
 <!-- END search_visibility:01_events -->
 
@@ -216,6 +218,7 @@ Events table: rows=111863691, approx distinct repository_id=29, overall distinct
 ### Relationships
 
 events <-> repository cardinality on repository_id: 1:N (one repository -> many events).
+Full cardinality profile: 111863691 event rows across 28 referenced repositories; events per repository min=1037, p50=3149556, p90=9696879, p99=19374051, max fan-out=19374051.
 Row-level match of events against the repository id set: 111863691 / 111863691 (100.00%) matched, 0 unmatched.
 Orphan event repository_ids (not in repository table): 0 (e.g. []).
 Unused repository ids (never referenced by events): 36 (e.g. ['arizona_state_keep', 'arizona_state_prism', 'atmire', 'australian_catholic_university', 'california_digital_library', 'carroll_college', 'chinese_university_hong_kong_digital_projects', 'chinese_university_hong_kong_digital_repository', 'cornell_university', 'illinois_institute_technology', 'indiana_university_purdue_university_indianapolis', 'iowa_state_university', 'northeastern_university', 'russian_state_vocational_pedagogical_university', 'sam_houston_state_university', 'smithsonian_research', 'southeast_asian_fisheries_dev_ctr', 'tacc_designsafe', 'universidad_peruana_ciencias', 'university_arizona']).
@@ -228,18 +231,32 @@ Repositories not present in every date/month: 27 of 28.
 
 ### ML-Readiness Evidence
 
-- No candidate ML target lives in the repository table itself -- it is a dimension; see 01_search_visibility_events_eda.py for target candidates (clicks/CTR/position).
-- Join cardinality: events <-> repository on repository_id is 1:N (one repository -> many events); 111863691/111863691 event rows (100.00%) match a repository row -- the remaining 0 unmatched rows (0 orphan repository_id values) mean an inner join silently drops those events from any repository-attribute feature; use a left join with an explicit unmatched flag instead.
-- Grain and entity-grouped split: repository is the entity that owns many url/date rows in events -- split any repository-attribute-enriched model by repository_id, not by row, so a repository's events stay together across train/test.
-- Leakage: repository key is unique in the repository table -- if not unique, a naive join fans out event rows across duplicate repository rows, which can inflate a repository-level feature's effective sample weight without that being a real signal.
-- Coverage: 27 of 28 repositories have partial date/month coverage -- a time-series feature per repository must not assume every repository has the same observed span; missing months are a real absence, not a zero.
-- Imbalance: not applicable at this join-audit level -- see 01 for metric-level imbalance notes.
-- Sample-vs-full divergence: not applicable -- every statistic here (match rate, orphan counts, per-repository coverage) is computed from a full Spark aggregation or a fully collected small repository table, no `.sample()`/`.limit()` subset feeds any reported number.
+- **Grain / grain drift:** repository is one row per repository_id (unique=True); events is one row per (repository, url, month, country, device). A repository-attribute join holds the events grain only if the repository key is unique.
+- **Join multiplication (1:N / M:N expansion):** events -> repository is 1:N (one repository -> many events); events per repository p50=3149556, p99=19374051, max=19374051. repository key is unique -> safe 1:N (repository attributes fan out to that many event rows, as intended).
+- **Target contamination:** No target in the repository dimension -- see 01. A repository-level aggregate feature (e.g. mean CTR) computed over all events includes the row being scored.
+- **Temporal / post-event leakage:** repository attributes carry no date -- joining them to a dated event assumes they were constant; if ir_platform / name changed over the archive span that is point-in-time leakage.
+- **Proxy leakage:** repository_id and the derived index are near-unique identifiers for one corpus -- a model given them memorises the corpus rather than learning transferable ranking behaviour.
+- **Split / entity leakage:** Split any repository-enriched model by repository_id, not by row -- a repository's events are correlated and must stay on one side.
+- **Historical-reference (point-in-time) leakage:** Same as Temporal: no as-of column on repository attributes; use the value valid during the archive month if the dimension ever changes.
+- **Survivorship / coverage bias:** 36 repository rows are never referenced by events; 27 of 28 referenced repositories have partial month coverage. A panel model over-weights the full-history repositories and treats missing months as zeros.
+- **Missingness leakage:** 0 event repository_ids (0 rows) have no repository row -- whether a repository is 'known' correlates with how well it is instrumented; an 'is-resolved' flag leaks that.
+- **Duplicate-event leakage:** Not assessed at this level -- see 01 for the (repository, url, date, country, device) duplicate-key composition.
+- **Target / feature temporal misalignment:** Not applicable in this join audit -- the events and repository tables have no competing timestamps.
+- **Unit / sign / circular-feature leakage:** Not applicable -- no numeric measures joined here.
+- **Data-generation-process leakage:** repository_id is assigned by the aggregator's own crawl configuration -- it encodes which corpora were in scope, not a property of search behaviour.
+- **Class / label instability:** ir_platform and other repository categoricals are small stable enums; no label here.
+- **Label availability lag:** Not applicable -- static dimension.
+- **Source / version / regime change:** The repository set is a 2017 snapshot of instrumented corpora -- repositories added or dropped since are absent; do not extrapolate the coverage to today.
+- **Sample-vs-full divergence:** Every statistic here (match rate, orphan counts, per-repository coverage) is a full Spark aggregation or a fully collected small table -- no sampling.
 
 ### Silver Implications
 
 - Join events to repository on repository_id (1:N (one repository -> many events)); repository key is unique.
 - Unused repository rows are acceptable as a dimension; no action required.
+
+### Figure -- Search Visibility -- distinct dates per repository
+
+![Search Visibility -- distinct dates per repository](figures/sv_distinct_dates_per_repository.png)
 
 ### Figure -- Search Visibility -- repository_id coverage & integrity
 
@@ -248,9 +265,5 @@ Repositories not present in every date/month: 27 of 28.
 ### Figure -- Search Visibility -- events per repository_id (top 30)
 
 ![Search Visibility -- events per repository_id (top 30)](figures/sv_events_per_repository.png)
-
-### Figure -- Search Visibility -- distinct dates per repository
-
-![Search Visibility -- distinct dates per repository](figures/sv_distinct_dates_per_repository.png)
 
 <!-- END search_visibility:02_relationships_and_findings -->

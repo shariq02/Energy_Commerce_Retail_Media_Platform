@@ -36,7 +36,7 @@ Highest-missingness column per measurement (missing includes blank):
 | precipitation | 196992 | 196992 | 0 | WRTR=3369655 | R1=0 |
 | pressure | 204288 | 204288 | 0 | P0=3931010 | P0=757644 |
 | sun | 123226 | 123226 | 0 | SD_SO=4164 | SD_SO=0 |
-| wind | 202865 | 182036 | 20829 | D=3217996 | D=40722 |
+| wind | 202865 | 182082 | 20783 | D=3217996 | D=40722 |
 
 QN quality flag vs -999 sentinel / out-of-range rows:
 - air_temperature: {'QN_9': '3', 'rows': 8341093, 'rows_with_-999': 8425, 'rows_out_of_range': 0}; {'QN_9': '5', 'rows': 6374150, 'rows_with_-999': 45563, 'rows_out_of_range': 1}; {'QN_9': '10', 'rows': 2555902, 'rows_with_-999': 465, 'rows_out_of_range': 0}; {'QN_9': '1', 'rows': 65243, 'rows_with_-999': 35, 'rows_out_of_range': 0}
@@ -47,9 +47,21 @@ QN quality flag vs -999 sentinel / out-of-range rows:
 - sun: {'QN_7': '10', 'rows': 5087935, 'rows_with_-999': 21, 'rows_out_of_range': 0}; {'QN_7': '5', 'rows': 4570452, 'rows_with_-999': 18, 'rows_out_of_range': 0}; {'QN_7': '3', 'rows': 2959847, 'rows_with_-999': 4036, 'rows_out_of_range': 0}; {'QN_7': '1', 'rows': 32328, 'rows_with_-999': 89, 'rows_out_of_range': 0}; {'QN_7': '2', 'rows': 2, 'rows_with_-999': 0, 'rows_out_of_range': 0}
 - wind: {'QN_3': '10', 'rows': 9962165, 'rows_with_-999': 5484, 'rows_out_of_range': 30123}; {'QN_3': '5', 'rows': 4902548, 'rows_with_-999': 3213380, 'rows_out_of_range': 10487}; {'QN_3': '3', 'rows': 1043429, 'rows_with_-999': 2080, 'rows_out_of_range': 112}; {'QN_3': '1', 'rows': 49056, 'rows_with_-999': 810, 'rows_out_of_range': 0}
 
+### Categorical / Domain Validation
+
+QN quality-flag values vs the DWD hourly-historical code set (1/2/3/5/7/9/10):
+- air_temperature.QN_9: unexpected=none, unused=['2', '7', '9'].
+- cloudiness.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- moisture.QN_8: unexpected=none, unused=['1', '10', '2', '5', '7', '9'].
+- precipitation.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- pressure.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- sun.QN_7: unexpected=none, unused=['7', '9'].
+- wind.QN_3: unexpected=none, unused=['2', '7', '9'].
+An unexpected QN value is a parse artefact or a schema drift, not a real quality level -- confirm the raw column encoding before decoding it.
+
 ### Temporal
 
-Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddHH:
+Hourly grid, expected one row per station per hour; MESS_DATUM parsed yyyyMMddHH (a trailing `.0` from a double-inferred column is stripped first). Coverage is observed_hours / (span/3600 + 1) -- an independent calendar, so <100% is a genuine gap.
 - air_temperature: 1893010101..2026090323, per-station coverage 67.16-100.0%, longest gap 217113.0h
 - cloudiness: 1949010100..2026090323, per-station coverage 49.33-99.79%, longest gap 121571.0h
 - moisture: 1949010100..2026090323, per-station coverage 50.4-99.66%, longest gap 80304.0h
@@ -58,10 +70,96 @@ Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddH
 - sun: 1893010103..2026090323, per-station coverage 60.94-74.98%, longest gap 113958.0h
 - wind: 1893010100..2026090323, per-station coverage 63.37-99.97%, longest gap 217113.0h
 
+### Regime / Version Evidence
+
+Per-decade row count and QN-vocabulary / value-column population. DWD's measurement network, instrumentation and QN scheme all changed over its multi-decade history -- a model pooling decades sees several regimes.
+
+- air_temperature:
+  - 1890s: rows=61343, distinct QN codes=1
+  - 1900s: rows=87648, distinct QN codes=1
+  - 1910s: rows=87648, distinct QN codes=1
+  - 1920s: rows=87672, distinct QN codes=1
+  - 1930s: rows=87636, distinct QN codes=1
+  - 1940s: rows=232264, distinct QN codes=1
+  - 1950s: rows=1578997, distinct QN codes=1
+  - 1960s: rows=1996006, distinct QN codes=1
+  - 1970s: rows=1952904, distinct QN codes=1
+  - 1980s: rows=2161104, distinct QN codes=2
+  - 1990s: rows=2275606, distinct QN codes=3
+  - 2000s: rows=2435594, distinct QN codes=3
+  - 2010s: rows=2449405, distinct QN codes=1
+  - 2020s: rows=1842561, distinct QN codes=2
+- cloudiness:
+  - 1940s: rows=75690, distinct QN codes=1
+  - 1950s: rows=801857, distinct QN codes=1
+  - 1960s: rows=921692, distinct QN codes=1
+  - 1970s: rows=739130, distinct QN codes=1
+  - 1980s: rows=1940649, distinct QN codes=1
+  - 1990s: rows=2207865, distinct QN codes=1
+  - 2000s: rows=2168957, distinct QN codes=2
+  - 2010s: rows=2322758, distinct QN codes=1
+  - 2020s: rows=1794718, distinct QN codes=2
+- moisture:
+  - 1940s: rows=57709, distinct QN codes=1
+  - 1950s: rows=478500, distinct QN codes=1
+  - 1960s: rows=449799, distinct QN codes=1
+  - 1970s: rows=637968, distinct QN codes=1
+  - 1980s: rows=1868597, distinct QN codes=1
+  - 1990s: rows=2238623, distinct QN codes=1
+  - 2000s: rows=2443472, distinct QN codes=1
+  - 2010s: rows=2447968, distinct QN codes=1
+  - 2020s: rows=1827222, distinct QN codes=1
+- precipitation:
+  - 1990s: rows=830620, distinct QN codes=1
+  - 2000s: rows=2227616, distinct QN codes=2
+  - 2010s: rows=2320100, distinct QN codes=1
+  - 2020s: rows=1775965, distinct QN codes=2
+- pressure:
+  - 1940s: rows=70149, distinct QN codes=1
+  - 1950s: rows=744383, distinct QN codes=1
+  - 1960s: rows=870423, distinct QN codes=1
+  - 1970s: rows=673089, distinct QN codes=1
+  - 1980s: rows=1834261, distinct QN codes=1
+  - 1990s: rows=2289144, distinct QN codes=1
+  - 2000s: rows=2453645, distinct QN codes=2
+  - 2010s: rows=2450266, distinct QN codes=1
+  - 2020s: rows=1842562, distinct QN codes=2
+- sun:
+  - 1890s: rows=46008, distinct QN codes=1
+  - 1900s: rows=65736, distinct QN codes=1
+  - 1910s: rows=65736, distinct QN codes=1
+  - 1920s: rows=65754, distinct QN codes=1
+  - 1930s: rows=65736, distinct QN codes=1
+  - 1940s: rows=72324, distinct QN codes=1
+  - 1950s: rows=1142136, distinct QN codes=1
+  - 1960s: rows=1407114, distinct QN codes=1
+  - 1970s: rows=1481814, distinct QN codes=1
+  - 1980s: rows=1690578, distinct QN codes=2
+  - 1990s: rows=1736037, distinct QN codes=3
+  - 2000s: rows=1807937, distinct QN codes=3
+  - 2010s: rows=1804465, distinct QN codes=3
+  - 2020s: rows=1199189, distinct QN codes=3
+- wind:
+  - 1890s: rows=61344, distinct QN codes=1
+  - 1900s: rows=87648, distinct QN codes=1
+  - 1910s: rows=78168, distinct QN codes=1
+  - 1920s: rows=87672, distinct QN codes=1
+  - 1930s: rows=131282, distinct QN codes=1
+  - 1940s: rows=209058, distinct QN codes=1
+  - 1950s: rows=714192, distinct QN codes=1
+  - 1960s: rows=1336920, distinct QN codes=1
+  - 1970s: rows=1976664, distinct QN codes=1
+  - 1980s: rows=2252633, distinct QN codes=2
+  - 1990s: rows=2346229, distinct QN codes=2
+  - 2000s: rows=2426878, distinct QN codes=1
+  - 2010s: rows=2416866, distinct QN codes=1
+  - 2020s: rows=1831644, distinct QN codes=3
+A registration-era / decade indicator and a per-station availability window are warranted before pooling -- not chosen here.
+
 ### Coverage
 
 28 distinct station ids across the 7 measurements: ['1048', '1262', '1270', '1303', '1346', '1420', '1550', '1684', '1975', '2014', '2290', '2564', '2667', '2928', '3032', '3126', '3631', '3668', '3987', '4271', '433', '4336', '4928', '5100', '5792', '662', '691', '880'].
-Per-measurement station presence (row count per cell) — see the exported heatmap figure.
+Per-measurement station presence (row count per cell) -- see the exported heatmap figure.
 - station 1048: air_temperature=476783, cloudiness=435374, moisture=434805, precipitation=278677, pressure=435444, sun=341334, wind=473151
 - station 1262: air_temperature=307953, cloudiness=307214, moisture=306632, precipitation=278382, pressure=307654, sun=226666, wind=306450
 - station 1270: air_temperature=666267, cloudiness=424513, moisture=434824, precipitation=278447, pressure=435398, sun=467643, wind=472309
@@ -90,12 +188,13 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 - station 662: air_temperature=670573, cloudiness=488977, moisture=490953, precipitation=259893, pressure=492455, sun=501070, wind=535887
 - station 691: air_temperature=688174, cloudiness=628418, moisture=498720, precipitation=277576, pressure=629135, sun=502048, wind=713721
 - station 880: air_temperature=613556, cloudiness=374026, moisture=383574, precipitation=278027, pressure=384205, sun=470808, wind=387478
+Station presence is uneven -- an inner join across all 7 measurements silently drops a station's rows for hours it lacks one parameter; this is a coverage bias toward the fully-instrumented stations.
 
 ### Distributions
 
-- air_temperature.`TT_TU`: min/max(no sentinel)=-32.7/40.8, p01/p50/p99=[-11.6, 8.6, 27.2], mean=8.597377520684292, sd=8.307730797317502, zero rows=67676, -999=5727, out-of-range=0
+- air_temperature.`TT_TU`: min/max(no sentinel)=-32.7/40.8, p01/p50/p99=[-11.6, 8.6, 27.2], mean=8.597377520684287, sd=8.30773079731752, zero rows=67676, -999=5727, out-of-range=0
 - air_temperature.`RF_TU`: min/max(no sentinel)=1.0/101.0, p01/p50/p99=[30.0, 83.0, 100.0], mean=78.42010564773904, sd=17.327941774352823, zero rows=0, -999=54428, out-of-range=1
-- cloudiness.`V_N`: min/max(no sentinel)=-1.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=5.0976243853152114, sd=3.0820865463605807, zero rows=1460740, -999=0, out-of-range=449412
+- cloudiness.`V_N`: min/max(no sentinel)=-1.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=5.0976243853152114, sd=3.08208654636058, zero rows=1460740, -999=0, out-of-range=449412
 - moisture.`ABSF_STD`: min/max(no sentinel)=-99.9/46.1, p01/p50/p99=[1.5, 6.8, 14.6], mean=7.156621714078992, sd=3.804477405586806, zero rows=13, -999=0
 - moisture.`VP_STD`: min/max(no sentinel)=-99.9/66.3, p01/p50/p99=[1.8, 8.9, 19.9], mean=9.437526259335632, sd=4.805446268826531, zero rows=13, -999=0
 - moisture.`TF_STD`: min/max(no sentinel)=-99.9/38.0, p01/p50/p99=[-11.6, 7.2, 19.5], mean=6.793167026615071, sd=7.330519405045283, zero rows=41581, -999=128648, out-of-range=5718
@@ -106,11 +205,11 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 - precipitation.`R1`: min/max(no sentinel)=0.0/59.9, p01/p50/p99=[0.0, 0.0, 1.9], mean=0.08265114295459901, sd=0.5002707684768429, zero rows=6340975, -999=56600, out-of-range=0
 - precipitation.`RS_IND`: min/max(no sentinel)=0.0/1.0, p01/p50/p99=[0.0, 0.0, 1.0], mean=0.2372006052035729, sd=0.42536631693944454, zero rows=5414180, -999=56524, out-of-range=0
 - precipitation.`WRTR`: min/max(no sentinel)=0.0/9.0, p01/p50/p99=[0.0, 0.0, 8.0], mean=1.4120107930834218, sd=2.6061796093557215, zero rows=2917717, -999=3369655
-- pressure.`P`: min/max(no sentinel)=900.0/1074.0, p01/p50/p99=[990.0, 1016.4, 1037.5], mean=1015.8670775330193, sd=10.226050882492117, zero rows=0, -999=2119687, out-of-range=0
-- pressure.`P0`: min/max(no sentinel)=227.0/1099.8, p01/p50/p99=[703.8, 996.9, 1030.0], mean=976.9323389529771, sd=64.2153770655978, zero rows=0, -999=3931010, out-of-range=757644
+- pressure.`P`: min/max(no sentinel)=900.0/1074.0, p01/p50/p99=[990.0, 1016.4, 1037.5], mean=1015.8670775330176, sd=10.226050882492096, zero rows=0, -999=2119687, out-of-range=0
+- pressure.`P0`: min/max(no sentinel)=227.0/1099.8, p01/p50/p99=[703.9, 996.9, 1030.0], mean=976.9323389529764, sd=64.21537706559778, zero rows=0, -999=3931010, out-of-range=757644
 - sun.`SD_SO`: min/max(no sentinel)=0.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=15.476596897140688, sd=23.37445049153833, zero rows=7738482, -999=4164, out-of-range=0
-- wind.`F`: min/max(no sentinel)=0.0/46.4, p01/p50/p99=[0.0, 3.5, 14.0], mean=4.1197021801088125, sd=2.892144638216186, zero rows=184561, -999=6618, out-of-range=0
-- wind.`D`: min/max(no sentinel)=0.0/990.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=194.7532112294004, sd=103.96101111574563, zero rows=148966, -999=3217996, out-of-range=40722
+- wind.`F`: min/max(no sentinel)=0.0/46.4, p01/p50/p99=[0.0, 3.5, 14.0], mean=4.1197021801088125, sd=2.8921446382161897, zero rows=184561, -999=6618, out-of-range=0
+- wind.`D`: min/max(no sentinel)=0.0/990.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=194.7532112294004, sd=103.96101111574575, zero rows=148966, -999=3217996, out-of-range=40722
 
 ### EDA Findings
 
@@ -120,17 +219,27 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 - precipitation: rows=7154301, stations=28, hourly coverage 82.17-99.87%, longest gap 24492.0h, dup identical=196992/conflicting=0, constant cols=['eor']
 - pressure: rows=13227922, stations=29, hourly coverage 64.99-99.9%, longest gap 55560.0h, dup identical=204288/conflicting=0, constant cols=['eor']
 - sun: rows=12650564, stations=29, hourly coverage 60.94-74.98%, longest gap 113958.0h, dup identical=123226/conflicting=0, constant cols=['eor']
-- wind: rows=15957198, stations=29, hourly coverage 63.37-99.97%, longest gap 217113.0h, dup identical=182036/conflicting=20829, constant cols=['eor']
+- wind: rows=15957198, stations=29, hourly coverage 63.37-99.97%, longest gap 217113.0h, dup identical=182082/conflicting=20783, constant cols=['eor']
 
 ### ML-Readiness Evidence
 
-- No candidate ML target lives in these tables -- they are raw per-station weather measurements feeding the shared `dim_weather_context` conformed dimension, not a labelled table.
-- Grain: one row per (STATIONS_ID, MESS_DATUM) per measurement table (air_temperature, cloudiness, moisture, precipitation, pressure, sun, wind) -- a naive random row split leaks a station's neighbouring hourly rows across train/test; any model consuming these features must split by STATIONS_ID or by contiguous date range, never by row.
-- Leakage: QN_* quality flags are assigned by DWD's own QC process alongside the value and must not be assumed available before the value itself; any forecasting/anomaly use case may only use rows with MESS_DATUM strictly before the prediction timestamp as features.
-- Join cardinality: cross-measurement joins on (STATIONS_ID, MESS_DATUM) are 1:1 where both measurements are present (confirmed in 04_dwd_relationships_and_findings.py), but station presence is uneven across the 28 stations (coverage matrix above) -- an inner join across all 7 silently drops rows rather than exploding them.
-- Imbalance: not applicable -- no categorical target or grouping column in these tables; the QN_* distribution shown under Data Quality is a quality flag, not a modelling target.
-- Sample-vs-full divergence: the value-column spread figure is drawn from `value_pdf`, a 5% sample capped at 150k rows per measurement -- use the full-table `value_stats` (min/max/mean/sd/percentiles/sentinel counts) above for any feature-quality decision, not the sampled figure.
-- Conflicting (STATIONS_ID, MESS_DATUM) duplicates (see Data Quality) must be resolved deterministically before use as a feature source -- an unresolved conflict silently injects row-order-dependent noise.
+- **Grain / grain drift:** One row per (STATIONS_ID, MESS_DATUM) per measurement. Pooling measurements or resampling to a coarser step drifts the grain; a station-level or contiguous-date split is required, never a random row split.
+- **Join multiplication (1:N / M:N expansion):** Cross-measurement joins on (STATIONS_ID, MESS_DATUM) are 1:1 where both sides are present (confirmed in 04) -- the risk is row LOSS on an inner join across uneven station coverage, not multiplication.
+- **Target contamination:** No candidate ML target lives in these tables -- raw per-station hourly measurements feeding the shared weather feature source, not a labelled table.
+- **Temporal / post-event leakage:** QN_* flags are set by DWD's QC alongside the value -- not available before the value; any forecasting feature may use only rows with MESS_DATUM strictly before the prediction timestamp.
+- **Proxy leakage:** STATIONS_ID / city identify a specific site -- a model given them memorises the station.
+- **Split / entity leakage:** Split by STATIONS_ID or by contiguous date range -- a station's adjacent hourly rows are highly correlated.
+- **Historical-reference (point-in-time) leakage:** Station location / name / instrument are time-varying (metadata, 02) -- a climatology or a station attribute joined to a historical row must use the value valid at that row's MESS_DATUM, not the latest.
+- **Survivorship / coverage bias:** Hourly coverage above shows the real gaps; the station x measurement matrix shows uneven instrumentation. A pooled statistic is dominated by the long-history, fully-instrumented stations.
+- **Missingness leakage:** -999 / blank rate correlates with station, parameter and era (Regime / Version Evidence) -- an 'is-missing' feature can leak an outage window.
+- **Duplicate-event leakage:** Conflicting (station, ts) duplicates per measurement: {'air_temperature': 0, 'cloudiness': 6, 'moisture': 0, 'precipitation': 0, 'pressure': 0, 'sun': 0, 'wind': 20783} -- resolve before counting or splitting.
+- **Target / feature temporal misalignment:** MESS_DATUM is the observation hour; a feature/target pair must align to one hour convention (interval start vs end).
+- **Unit / sign / circular-feature leakage:** Units are not in Bronze (reconcile via parameter_unit, 02). Net vs gross / related parameters within a measurement can be near-collinear.
+- **Data-generation-process leakage:** QN_* encodes DWD's QC decision, not the physical weather -- a feature keyed on it encodes the QC pipeline.
+- **Class / label instability:** QN codes are a DWD enumeration that changed across the archive's history (Regime / Version Evidence) -- a class defined by a raw QN is only stable within one scheme vintage.
+- **Label availability lag:** DWD publishes historical data with a lag and revises it -- a nowcast cannot use the current hour's value.
+- **Source / version / regime change:** Per-decade row count, QN vocabulary and value-column population are measured in Regime / Version Evidence -- a decade/era indicator is warranted before pooling.
+- **Sample-vs-full divergence:** The value-column figure is drawn from a 5% sample capped at 150k rows; every reported statistic (value_stats, freq_cov, dup_breakdown) is a full Spark aggregation.
 
 ### Silver Implications
 
@@ -139,7 +248,8 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 - Identical (STATIONS_ID, MESS_DATUM) repeats can be de-duplicated safely.
 - Constant columns above carry no information.
 - Hourly series are not continuous (coverage % / gaps above) -> no dense-grid assumption.
-- Out-of-range non-sentinel values are flagged as suspicious, not proven wrong -> keep raw + a quality flag.
+- Out-of-range non-sentinel values are flagged suspicious, not proven wrong -> keep raw + a quality flag.
+- Decode QN against the DWD scheme valid for the record's era (see Regime / Version Evidence).
 
 ### Figure -- DWD measurement overview
 
@@ -183,6 +293,15 @@ Per-measurement station presence (row count per cell) — see the exported heatm
 | device_instrument | 4008 | 12 | 0 | - |
 | parameter_unit | 5418 | 12 | 0 | Literaturhinweis |
 
+### Structural Integrity
+
+A generated DWD metadata export ends with a free-text trailer (`generiert: ... Deutscher Wetterdienst`); a naive CSV read turns it into a data row with a non-numeric STATIONS_ID.
+- station_geography: 0 non-numeric station id(s) [], 0 row(s) carrying a trailer token -> clean.
+- station_name_history: 6 non-numeric station id(s) ['Stations_ID', 'generiert: 22.04.2026 --  Deutscher Wetterdienst  --', 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --', 'generiert: 24.04.2026 --  Deutscher Wetterdienst  --', 'generiert: 23.04.2026 --  Deutscher Wetterdienst  --'], 31 row(s) carrying a trailer token -> TRAILER ROW PRESENT.
+- device_instrument: 43 non-numeric station id(s) ['generiert: 22.04.2026 --  Deutscher Wetterdienst  --', 'generiert: 22.04.2026 --  Deutscher Wetterdienst  --', 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --', 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --', 'generiert: 24.04.2026 --  Deutscher Wetterdienst  --'], 43 row(s) carrying a trailer token -> TRAILER ROW PRESENT.
+- parameter_unit: 6 non-numeric station id(s) ['Legende: FT  = Folgetag', 'generiert: 22.04.2026 --  Deutscher Wetterdienst  --', 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --', 'generiert: 24.04.2026 --  Deutscher Wetterdienst  --', 'generiert: 23.04.2026 --  Deutscher Wetterdienst  --'], 882 row(s) carrying a trailer token -> TRAILER ROW PRESENT.
+-> INGESTION defect in ['station_name_history', 'device_instrument', 'parameter_unit']: fix `scripts/ingestion/stage_dwd.py` to strip the trailer, re-stage, re-upload to the Volume and re-run the DWD Bronze loader; until then, filter non-numeric STATIONS_ID before any join.
+
 ### Data Quality
 
 Validity-period columns (von_datum / bis_datum):
@@ -192,6 +311,21 @@ Validity-period columns (von_datum / bis_datum):
 - parameter_unit: open-ended=6, inverted ranges=0, of 5418 rows
 
 Per-station row counts: station_geography -> {'1048': 7, '1262': 4, '1270': 6, '1303': 9, '1346': 6, '1420': 10, '1550': 9, '1684': 16, '1975': 6, '2014': 7, '2290': 5, '2564': 10, '2667': 6, '2928': 16, '3032': 5, '3126': 17, '3631': 8, '3668': 7, '3987': 4, '4271': 6, '433': 8, '4336': 5, '4928': 7, '5100': 4, '5792': 2, '662': 6, '691': 17, '880': 9}; station_name_history -> {'1048': 5, '1262': 2, '1270': 5, '1303': 5, '1346': 2, '1420': 3, '1550': 3, '1684': 4, '1975': 3, '2014': 3, '2290': 3, '2564': 5, '2667': 4, '2928': 5, '3032': 3, '3126': 4, '3631': 5, '3668': 3, '3987': 4, '4271': 4, '433': 3, '4336': 4, '4928': 2, '5100': 3, '5792': 3, '662': 3, '691': 3, '880': 4, 'Stations_ID': 1, 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 14.06.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 22.04.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 23.04.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 24.04.2026 --  Deutscher Wetterdienst  --': 1}; device_instrument -> {'1048': 120, '1262': 129, '1270': 193, '1303': 185, '1346': 128, '1420': 163, '1550': 156, '1684': 166, '1975': 154, '2014': 161, '2290': 140, '2564': 120, '2667': 142, '2928': 156, '3032': 100, '3126': 128, '3631': 156, '3668': 133, '3987': 115, '4271': 141, '433': 169, '4336': 114, '4928': 112, '5100': 157, '5792': 77, '662': 152, '691': 164, '880': 134, 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --': 19, 'generiert: 14.06.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 22.04.2026 --  Deutscher Wetterdienst  --': 4, 'generiert: 23.04.2026 --  Deutscher Wetterdienst  --': 9, 'generiert: 24.04.2026 --  Deutscher Wetterdienst  --': 10}; parameter_unit -> {'1048': 174, '1262': 136, '1270': 156, '1303': 229, '1346': 262, '1420': 197, '1550': 209, '1684': 163, '1975': 194, '2014': 232, '2290': 185, '2564': 181, '2667': 199, '2928': 132, '3032': 208, '3126': 177, '3631': 224, '3668': 215, '3987': 164, '4271': 164, '433': 197, '4336': 235, '4928': 169, '5100': 237, '5792': 197, '662': 220, '691': 215, '880': 141, 'Legende: FT  = Folgetag': 1, 'generiert: 04.09.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 14.06.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 22.04.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 23.04.2026 --  Deutscher Wetterdienst  --': 1, 'generiert: 24.04.2026 --  Deutscher Wetterdienst  --': 1}
+
+### Categorical / Domain Validation
+
+parameter_unit declared codes: ['ABSF_STD', 'D', 'DD', 'F', 'FF', 'FX_911', 'None', 'P', 'P0', 'P_STD', 'R1', 'RF_STD', 'RF_TU', 'RS_IND', 'SD_SO', 'TD', 'TD_STD', 'TF_STD', 'TT', 'TT_STD', 'TT_TU', 'VP_STD', 'V_N', 'V_S1_CS', 'V_S1_CSA', 'V_S1_HHS', 'V_S1_NS', 'V_S2_CS', 'V_S2_CSA', 'V_S2_HHS', 'V_S2_NS', 'V_S3_CS', 'V_S3_CSA', 'V_S3_HHS', 'V_S3_NS', 'V_S4_CS', 'V_S4_CSA', 'V_S4_HHS', 'V_S4_NS', 'V_TE002', 'V_TE005', 'V_TE010', 'V_TE020', 'V_TE050', 'V_TE100', 'V_VV', 'WRTR', 'WW']
+value-column codes present in measurements but NOT in parameter_unit: []
+parameter_unit codes never used as a measurement value column: ['DD', 'FF', 'FX_911', 'None', 'TD', 'TT', 'V_S1_CS', 'V_S1_CSA', 'V_S1_HHS', 'V_S1_NS', 'V_S2_CS', 'V_S2_CSA', 'V_S2_HHS', 'V_S2_NS', 'V_S3_CS', 'V_S3_CSA', 'V_S3_HHS', 'V_S3_NS', 'V_S4_CS', 'V_S4_CSA', 'V_S4_HHS', 'V_S4_NS', 'V_TE002', 'V_TE005', 'V_TE010', 'V_TE020', 'V_TE050', 'V_TE100', 'V_VV', 'WW']
+value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudiness': ['V_N'], 'moisture': ['ABSF_STD', 'VP_STD', 'TF_STD', 'P_STD', 'TT_STD', 'RF_STD', 'TD_STD'], 'precipitation': ['R1', 'RS_IND', 'WRTR'], 'pressure': ['P', 'P0'], 'sun': ['SD_SO'], 'wind': ['F', 'D']}
+An unknown code is a measured parameter with no declared unit -- attach it at Silver from the DWD parameter description, do not leave the unit null.
+
+### Spatial Consistency
+
+Spatial validity of station_geography coordinates:
+- present=222, missing=0, outside the Germany bounding box=0, (0,0)=0, lat/lon possibly swapped=0.
+- relocations > 5 km (station -> km): {'662': 6.27, '691': 8.66, '2667': 5.73, '1048': 5.07, '1303': 6.98, '1420': 6.04, '2014': 6.78, '2928': 8.31, '3126': 10.14, '3668': 6.52}.
+A coordinate outside Germany / at (0,0) is a quarantine class, not a silent NULL. A multi-km relocation means the station's location is time-varying -- join on the von/bis window, not station id alone. There is no second coordinate source to cross-check against (LIMITATION).
 
 ### Entities / Keys
 
@@ -213,34 +347,34 @@ Measurement stations with NO row in each metadata table:
 ### Domain Findings
 
 station_geography carries multiple location rows per station where coordinates/elevation changed over time:
-- station 433: 8 location row(s), lat span=0.0189, lon span=0.0319, elevation span=4.0 m
-- station 662: 6 location row(s), lat span=0.0476, lon span=0.0475, elevation span=4.0 m
-- station 691: 17 location row(s), lat span=0.0531, lon span=0.0893, elevation span=10.7 m
-- station 2667: 6 location row(s), lat span=0.0194, lon span=0.0748, elevation span=40.91 m
-- station 880: 9 location row(s), lat span=0.034, lon span=0.0336, elevation span=5.34 m
-- station 1048: 7 location row(s), lat span=0.0442, lon span=0.0178, elevation span=77.0 m
-- station 1270: 6 location row(s), lat span=0.0088, lon span=0.041, elevation span=62.61 m
-- station 1303: 9 location row(s), lat span=0.0409, lon span=0.0747, elevation span=48.5 m
-- station 1346: 6 location row(s), lat span=0.0016, lon span=0.0006, elevation span=5.0 m
-- station 1420: 10 location row(s), lat span=0.0237, lon span=0.0766, elevation span=12.3 m
-- station 1550: 9 location row(s), lat span=0.0168, lon span=0.0509, elevation span=19.25 m
-- station 1684: 16 location row(s), lat span=0.0114, lon span=0.0394, elevation span=37.48 m
-- station 1975: 6 location row(s), lat span=0.0074, lon span=0.0158, elevation span=2.35 m
-- station 2014: 7 location row(s), lat span=0.0461, lon span=0.0626, elevation span=3.94 m
-- station 2290: 5 location row(s), lat span=0.0001, lon span=0.0025, elevation span=9.4 m
-- station 2564: 10 location row(s), lat span=0.008, lon span=0.0177, elevation span=24.41 m
-- station 2928: 16 location row(s), lat span=0.0582, lon span=0.0737, elevation span=41.0 m
-- station 3126: 17 location row(s), lat span=0.0318, lon span=0.1339, elevation span=34.0 m
-- station 1262: 4 location row(s), lat span=0.01, lon span=0.0104, elevation span=1.9 m
-- station 3631: 8 location row(s), lat span=0.0111, lon span=0.0115, elevation span=11.2 m
-- station 3668: 7 location row(s), lat span=0.053, lon span=0.0395, elevation span=14.8 m
-- station 3987: 4 location row(s), lat span=0.0, lon span=0.0, elevation span=0.0 m
-- station 4271: 6 location row(s), lat span=0.0055, lon span=0.0349, elevation span=3.78 m
-- station 4336: 5 location row(s), lat span=0.0058, lon span=0.0037, elevation span=4.04 m
-- station 4928: 7 location row(s), lat span=0.0, lon span=0.0002, elevation span=0.28 m
-- station 3032: 5 location row(s), lat span=0.0118, lon span=0.0254, elevation span=19.7 m
-- station 5100: 4 location row(s), lat span=0.0003, lon span=0.0074, elevation span=65.0 m
-- station 5792: 2 location row(s), lat span=0.0, lon span=0.0, elevation span=0.0 m
+- station 433: 8 location row(s), lat span=0.0189, lon span=0.0319, elevation span=4.0 m, ~3.09 km moved
+- station 662: 6 location row(s), lat span=0.0476, lon span=0.0475, elevation span=4.0 m, ~6.27 km moved
+- station 691: 17 location row(s), lat span=0.0531, lon span=0.0893, elevation span=10.7 m, ~8.66 km moved
+- station 2667: 6 location row(s), lat span=0.0194, lon span=0.0748, elevation span=40.91 m, ~5.73 km moved
+- station 880: 9 location row(s), lat span=0.034, lon span=0.0336, elevation span=5.34 m, ~4.46 km moved
+- station 1048: 7 location row(s), lat span=0.0442, lon span=0.0178, elevation span=77.0 m, ~5.07 km moved
+- station 1270: 6 location row(s), lat span=0.0088, lon span=0.041, elevation span=62.61 m, ~3.07 km moved
+- station 1303: 9 location row(s), lat span=0.0409, lon span=0.0747, elevation span=48.5 m, ~6.98 km moved
+- station 1346: 6 location row(s), lat span=0.0016, lon span=0.0006, elevation span=5.0 m, ~0.18 km moved
+- station 1420: 10 location row(s), lat span=0.0237, lon span=0.0766, elevation span=12.3 m, ~6.04 km moved
+- station 1550: 9 location row(s), lat span=0.0168, lon span=0.0509, elevation span=19.25 m, ~4.07 km moved
+- station 1684: 16 location row(s), lat span=0.0114, lon span=0.0394, elevation span=37.48 m, ~3.07 km moved
+- station 1975: 6 location row(s), lat span=0.0074, lon span=0.0158, elevation span=2.35 m, ~1.39 km moved
+- station 2014: 7 location row(s), lat span=0.0461, lon span=0.0626, elevation span=3.94 m, ~6.78 km moved
+- station 2290: 5 location row(s), lat span=0.0001, lon span=0.0025, elevation span=9.4 m, ~0.18 km moved
+- station 2564: 10 location row(s), lat span=0.008, lon span=0.0177, elevation span=24.41 m, ~1.54 km moved
+- station 2928: 16 location row(s), lat span=0.0582, lon span=0.0737, elevation span=41.0 m, ~8.31 km moved
+- station 3126: 17 location row(s), lat span=0.0318, lon span=0.1339, elevation span=34.0 m, ~10.14 km moved
+- station 1262: 4 location row(s), lat span=0.01, lon span=0.0104, elevation span=1.9 m, ~1.33 km moved
+- station 3631: 8 location row(s), lat span=0.0111, lon span=0.0115, elevation span=11.2 m, ~1.48 km moved
+- station 3668: 7 location row(s), lat span=0.053, lon span=0.0395, elevation span=14.8 m, ~6.52 km moved
+- station 3987: 4 location row(s), lat span=0.0, lon span=0.0, elevation span=0.0 m, ~0.0 km moved
+- station 4271: 6 location row(s), lat span=0.0055, lon span=0.0349, elevation span=3.78 m, ~2.55 km moved
+- station 4336: 5 location row(s), lat span=0.0058, lon span=0.0037, elevation span=4.04 m, ~0.7 km moved
+- station 4928: 7 location row(s), lat span=0.0, lon span=0.0002, elevation span=0.28 m, ~0.01 km moved
+- station 3032: 5 location row(s), lat span=0.0118, lon span=0.0254, elevation span=19.7 m, ~2.23 km moved
+- station 5100: 4 location row(s), lat span=0.0003, lon span=0.0074, elevation span=65.0 m, ~0.53 km moved
+- station 5792: 2 location row(s), lat span=0.0, lon span=0.0, elevation span=0.0 m, ~0.0 km moved
 
 station_name_history name/operator changes:
 - station 433: 3 history row(s), 3 distinct name(s)
@@ -278,19 +412,25 @@ station_name_history name/operator changes:
 - station 5100: 3 history row(s), 3 distinct name(s)
 - station 5792: 3 history row(s), 3 distinct name(s)
 
-parameter_unit declared codes: ['ABSF_STD', 'D', 'DD', 'F', 'FF', 'FX_911', 'None', 'P', 'P0', 'P_STD', 'R1', 'RF_STD', 'RF_TU', 'RS_IND', 'SD_SO', 'TD', 'TD_STD', 'TF_STD', 'TT', 'TT_STD', 'TT_TU', 'VP_STD', 'V_N', 'V_S1_CS', 'V_S1_CSA', 'V_S1_HHS', 'V_S1_NS', 'V_S2_CS', 'V_S2_CSA', 'V_S2_HHS', 'V_S2_NS', 'V_S3_CS', 'V_S3_CSA', 'V_S3_HHS', 'V_S3_NS', 'V_S4_CS', 'V_S4_CSA', 'V_S4_HHS', 'V_S4_NS', 'V_TE002', 'V_TE005', 'V_TE010', 'V_TE020', 'V_TE050', 'V_TE100', 'V_VV', 'WRTR', 'WW']
-value-column codes present in measurements but NOT in parameter_unit: []
-parameter_unit codes never used as a measurement value column: ['DD', 'FF', 'FX_911', 'None', 'TD', 'TT', 'V_S1_CS', 'V_S1_CSA', 'V_S1_HHS', 'V_S1_NS', 'V_S2_CS', 'V_S2_CSA', 'V_S2_HHS', 'V_S2_NS', 'V_S3_CS', 'V_S3_CSA', 'V_S3_HHS', 'V_S3_NS', 'V_S4_CS', 'V_S4_CSA', 'V_S4_HHS', 'V_S4_NS', 'V_TE002', 'V_TE005', 'V_TE010', 'V_TE020', 'V_TE050', 'V_TE100', 'V_VV', 'WW']
-value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudiness': ['V_N'], 'moisture': ['ABSF_STD', 'VP_STD', 'TF_STD', 'P_STD', 'TT_STD', 'RF_STD', 'TD_STD'], 'precipitation': ['R1', 'RS_IND', 'WRTR'], 'pressure': ['P', 'P0'], 'sun': ['SD_SO'], 'wind': ['F', 'D']}
-
 ### ML-Readiness Evidence
 
-- Candidate target signal: station relocation events (28 station(s) with >1 location row) and name/operator change events (28 station(s) with >1 distinct name) could support a change-detection use case; treat as event indicators, not attributes of a static station dimension.
-- Leakage: station_geography and station_name_history are time-varying (von/bis validity windows) -- joining a measurement row to a station's metadata must use the validity window covering that row's MESS_DATUM, not the latest/current metadata row, or a future station attribute (e.g. a later relocation's coordinates) would leak into a historical feature.
-- Grain and entity-grouped split: station_geography/station_name_history grain is one row per (station, validity period), not one row per station -- any split for a model using these attributes must group by station id, not by row, since multiple validity-period rows for the same station must stay on the same side of a split.
-- Join cardinality: measurement -> metadata is 1:N fan-out for stations with relocations or name changes (see Domain Findings) unless the join is scoped to the correct von/bis window -- an un-windowed join is a cartesian-explosion risk for any station with >1 metadata row.
-- Imbalance: not applicable -- no categorical target column; parameter_unit/device_instrument are static reference lookups, not a modelling signal.
-- Sample-vs-full divergence: not applicable -- all four metadata tables are fully collected (no sampling) since they are small; only the measurement-station union scan is a full Spark pass, also unsampled.
+- **Grain / grain drift:** station_geography / station_name_history are one row per (station, validity period), NOT one row per station -- a split must group by station id.
+- **Join multiplication (1:N / M:N expansion):** measurement -> metadata is 1:N for the 28 relocated and 28 renamed stations unless scoped to the von/bis window -- an un-windowed join cartesian-explodes those stations' fact rows.
+- **Target contamination:** Station relocation and name/operator changes are event indicators, not attributes of a static station dimension -- if used as a target, treat them as change events; the metadata tables carry no other labelled outcome.
+- **Temporal / post-event leakage:** Joining a measurement row to a station's metadata must use the validity window covering that row's MESS_DATUM -- a later relocation's coordinates in a historical feature is future information.
+- **Proxy leakage:** Station id / name / exact coordinates identify one site -- a model given them memorises the station.
+- **Split / entity leakage:** Split by station id, not by row -- a station's multiple validity-period rows must stay on one side.
+- **Historical-reference (point-in-time) leakage:** Same as Temporal -- use the metadata value valid during the archive row's period, never the latest.
+- **Survivorship / coverage bias:** 0 metadata table(s) miss some measurement stations -- a joined feature set silently drops those stations' rows.
+- **Missingness leakage:** Whether a station has a geography / name-history row correlates with how long it has been in the network.
+- **Duplicate-event leakage:** Full-row duplicates per table shown in Profile -- de-duplicate before treating a validity-period row as one event.
+- **Target / feature temporal misalignment:** von_datum / bis_datum bound the period; align a joined metadata attribute to the fact row's hour, not the period edge.
+- **Unit / sign / circular-feature leakage:** parameter_unit reconciliation above -- attach units before combining measured parameters.
+- **Data-generation-process leakage:** A parser trailer row (Structural Integrity) would inject a non-station into every station-keyed join -- filter it first.
+- **Class / label instability:** device_instrument / parameter_unit codes are DWD enumerations that evolve between archive versions -- pin the version.
+- **Label availability lag:** Not applicable -- static reference metadata.
+- **Source / version / regime change:** Validity periods span decades; the network, instrumentation and the metadata schema itself changed over that span -- a metadata attribute is only comparable within one era.
+- **Sample-vs-full divergence:** All four metadata tables are fully collected (small); the measurement-station union is a full unsampled Spark scan.
 
 ### EDA Findings
 
@@ -298,10 +438,12 @@ value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudine
 - name changes (station -> distinct names): {'433': 3, '662': 3, '691': 3, '2667': 4, '880': 4, '1048': 5, '1270': 5, '1303': 5, '1346': 2, '1420': 3, '1550': 3, '1684': 4, '1975': 3, '2014': 3, '2290': 3, '2564': 5, '2928': 5, '3126': 4, '1262': 2, '3631': 3, '3668': 3, '3987': 4, '4271': 4, '4336': 3, '4928': 2, '3032': 3, '5100': 3, '5792': 3}
 - validity periods (open-ended, inverted, total): {'station_geography': (31, 0, 222), 'station_name_history': (61, 0, 106), 'device_instrument': (43, 0, 4008), 'parameter_unit': (6, 0, 5418)}
 - metadata coverage gaps vs measurements: {'station_geography': 0, 'station_name_history': 0, 'device_instrument': 0, 'parameter_unit': 0}
+- parser trailer suspected in: ['station_name_history', 'device_instrument', 'parameter_unit']
 
 ### Silver Implications
 
-- station_geography has >1 location row for some stations (relocations) -> station location is time-varying; join measurement rows on the von/bis window, not on station_id alone.
+- BLOCKED for ['station_name_history', 'device_instrument', 'parameter_unit']: strip the parser trailer in stage_dwd.py and re-run Bronze.
+- station_geography has >1 location row for some stations (relocations) -> station location is time-varying; join measurement rows on the von/bis window, not station_id alone.
 - station_name_history has >1 name/operator per station over time -> a second time-varying attribute stream.
 - device_instrument / parameter_unit are small static lookups -> reference dimensions; reconcile parameter codes with the measurement value-column names (list above).
 
@@ -336,16 +478,27 @@ value columns per measurement: {'air_temperature': ['TT_TU', 'RF_TU'], 'cloudine
 ### Data Quality
 
 - REPORTED = a row in dwd_missing_value_periods; OBSERVED = a measurement value that is `-999` or blank. They are not guaranteed to line up.
-- inverted von>bis ranges in the reported table: 0
 - reconciliation: station x parameter with -999 observed but NO reported period: 6
 - reconciliation: station x parameter with a reported period but ZERO observed -999/blank: 42
 
-### Temporal
+### Categorical / Domain Validation
 
-reported-period span (hours): parsed 0 of 5897409 rows
-  unparsed von/bis samples: [('19.01.2005-10:00', '19.01.2005-12:00'), ('19.01.2005-18:00', '19.01.2005-21:00'), ('20.01.2005-08:00', '20.01.2005-08:00'), ('20.01.2005-15:00', '20.01.2005-15:00'), ('20.01.2005-19:00', '20.01.2005-19:00'), ('21.01.2005-06:00', '21.01.2005-09:00'), ('21.01.2005-20:00', '21.01.2005-20:00'), ('22.01.2005-00:00', '22.01.2005-07:00'), ('22.01.2005-09:00', '22.01.2005-12:00'), ('22.01.2005-16:00', '22.01.2005-16:00')]
-longest reported missing period per station (hours): {}
-observed -999/blank rate by year, per measurement:
+Reported parameter codes vs the measurement value-column names (the DWD parameter code IS the column name):
+- reported codes not a measurement value column: ['DD', 'FF', 'FX_911', 'TD', 'TT', 'V_S1_CS', 'V_S1_CSA', 'V_S1_HHS', 'V_S1_NS', 'V_S2_CS', 'V_S2_CSA', 'V_S2_HHS', 'V_S2_NS', 'V_S3_CS', 'V_S3_CSA', 'V_S3_HHS', 'V_S3_NS', 'V_S4_CS', 'V_S4_CSA', 'V_S4_HHS', 'V_S4_NS', 'V_TE002', 'V_TE005', 'V_TE010', 'V_TE020', 'V_TE050', 'V_TE100', 'WW']
+- measurement value columns never in a reported period: ['ABSF_STD', 'P_STD', 'RF_STD', 'TD_STD', 'TF_STD', 'TT_STD', 'VP_STD']
+An unknown reported code points to a parameter outside the seven measurement tables profiled here (a deepening measurement, 05) or a code drift -- reconcile before treating REPORTED and OBSERVED as one signal.
+
+### Temporal Consistency
+
+Reported-period span (hours): parsed 0 of 5897409 rows.
+- unparsed von/bis samples: [('19.01.2005-10:00', '19.01.2005-12:00'), ('19.01.2005-18:00', '19.01.2005-21:00'), ('20.01.2005-08:00', '20.01.2005-08:00'), ('20.01.2005-15:00', '20.01.2005-15:00'), ('20.01.2005-19:00', '20.01.2005-19:00'), ('21.01.2005-06:00', '21.01.2005-09:00'), ('21.01.2005-20:00', '21.01.2005-20:00'), ('22.01.2005-00:00', '22.01.2005-07:00'), ('22.01.2005-09:00', '22.01.2005-12:00'), ('22.01.2005-16:00', '22.01.2005-16:00')]
+- `von_datum` > `bis_datum` (inverted) in 0 rows -- a validity check is needed at Silver.
+- longest reported missing period per station (hours): {}
+
+### Regime / Version Evidence
+
+Observed -999/blank rate by year per measurement -- missingness is time-varying, so no uniform-completeness assumption holds and any imputation is an explicit, evidenced choice per era.
+
 - air_temperature: [('1893', 0.0), ('1894', 0.0), ('1895', 0.0), ('1896', 0.0), ('1897', 0.0), ('1898', 0.0), ('1899', 0.0), ('1900', 0.0), ('1901', 0.0), ('1902', 0.0), ('1903', 0.0), ('1904', 0.0), ('1905', 0.0), ('1906', 0.0), ('1907', 0.0), ('1908', 0.0), ('1909', 0.0), ('1910', 0.0), ('1911', 0.0), ('1912', 0.0), ('1913', 0.0), ('1914', 0.0), ('1915', 0.0), ('1916', 0.0), ('1917', 0.0), ('1918', 0.0), ('1919', 0.0), ('1920', 0.0), ('1921', 0.0), ('1922', 0.0), ('1923', 0.0), ('1924', 0.0), ('1925', 0.0), ('1926', 0.0), ('1927', 0.0), ('1928', 0.0), ('1929', 0.0), ('1930', 0.0), ('1931', 0.0), ('1932', 0.0), ('1933', 0.0), ('1934', 0.0), ('1935', 0.0), ('1936', 0.0), ('1937', 0.0), ('1938', 0.0), ('1939', 0.0), ('1940', 0.0), ('1941', 0.0), ('1942', 0.0), ('1943', 0.0), ('1944', 0.0), ('1945', 0.0), ('1946', 0.0), ('1947', 0.0), ('1948', 0.0), ('1949', 0.0), ('1950', 0.0), ('1951', 0.0), ('1952', 0.0), ('1953', 0.0), ('1954', 0.0), ('1955', 0.0), ('1956', 0.0476), ('1957', 0.0476), ('1958', 0.0488), ('1959', 0.0478), ('1960', 0.0455), ('1961', 0.0), ('1962', 0.0028), ('1963', 0.0), ('1964', 0.0036), ('1965', 0.0022), ('1966', 0.0), ('1967', 0.0), ('1968', 0.0), ('1969', 0.0), ('1970', 0.0), ('1971', 0.0), ('1972', 0.0), ('1973', 0.0), ('1974', 0.0), ('1975', 0.0), ('1976', 0.0), ('1977', 0.0), ('1978', 0.0), ('1979', 0.0), ('1980', 0.0), ('1981', 0.0), ('1982', 0.0), ('1983', 0.0), ('1984', 0.0), ('1985', 0.0), ('1986', 0.0), ('1987', 0.0), ('1988', 0.0), ('1989', 0.0001), ('1990', 0.0001), ('1991', 0.0002), ('1992', 0.0), ('1993', 0.0), ('1994', 0.0), ('1995', 0.0004), ('1996', 0.0), ('1997', 0.0001), ('1998', 0.0001), ('1999', 0.001), ('2000', 0.0007), ('2001', 0.0001), ('2002', 0.0), ('2003', 0.0), ('2004', 0.0002), ('2005', 0.0001), ('2006', 0.0001), ('2007', 0.0), ('2008', 0.0001), ('2009', 0.0), ('2010', 0.0), ('2011', 0.0001), ('2012', 0.0003), ('2013', 0.0001), ('2014', 0.0012), ('2015', 0.0003), ('2016', 0.0003), ('2017', 0.0027), ('2018', 0.0043), ('2019', 0.0026), ('2020', 0.0007), ('2021', 0.0029), ('2022', 0.0021), ('2023', 0.0043), ('2024', 0.0009), ('2025', 0.0042), ('2026', 0.0043)]
 - cloudiness: [('1949', 0.0), ('1950', 0.0), ('1951', 0.0), ('1952', 0.0), ('1953', 0.0), ('1954', 0.0), ('1955', 0.0), ('1956', 0.0), ('1957', 0.0), ('1958', 0.0), ('1959', 0.0), ('1960', 0.0), ('1961', 0.0), ('1962', 0.0), ('1963', 0.0), ('1964', 0.0), ('1965', 0.0), ('1966', 0.0), ('1967', 0.0), ('1968', 0.0), ('1969', 0.0), ('1970', 0.0), ('1971', 0.0), ('1972', 0.0), ('1973', 0.0), ('1974', 0.0), ('1975', 0.0), ('1976', 0.0), ('1977', 0.0), ('1978', 0.0), ('1979', 0.0), ('1980', 0.0), ('1981', 0.0), ('1982', 0.0), ('1983', 0.0), ('1984', 0.0), ('1985', 0.0), ('1986', 0.0), ('1987', 0.0), ('1988', 0.0), ('1989', 0.0), ('1990', 0.0), ('1991', 0.0), ('1992', 0.0), ('1993', 0.0), ('1994', 0.0), ('1995', 0.0), ('1996', 0.0), ('1997', 0.0), ('1998', 0.0), ('1999', 0.0), ('2000', 0.0), ('2001', 0.0), ('2002', 0.0), ('2003', 0.0), ('2004', 0.0), ('2005', 0.0), ('2006', 0.0), ('2007', 0.0), ('2008', 0.0), ('2009', 0.0), ('2010', 0.0), ('2011', 0.0), ('2012', 0.0), ('2013', 0.0), ('2014', 0.0), ('2015', 0.0), ('2016', 0.0), ('2017', 0.0), ('2018', 0.0), ('2019', 0.0), ('2020', 0.0), ('2021', 0.0), ('2022', 0.0), ('2023', 0.0), ('2024', 0.0), ('2025', 0.0), ('2026', 0.0)]
 - moisture: [('1949', 0.0), ('1950', 0.0), ('1951', 0.0), ('1952', 0.0), ('1953', 0.0), ('1954', 0.0), ('1955', 0.0), ('1956', 0.0), ('1957', 0.0), ('1958', 0.0), ('1959', 0.0), ('1960', 0.0), ('1961', 0.0), ('1962', 0.0), ('1963', 0.0), ('1964', 0.0), ('1965', 0.0), ('1966', 0.0), ('1967', 0.0), ('1968', 0.0), ('1969', 0.0), ('1970', 0.0), ('1971', 0.0), ('1972', 0.0), ('1973', 0.0), ('1974', 0.0), ('1975', 0.0), ('1976', 0.0), ('1977', 0.0), ('1978', 0.0), ('1979', 0.0), ('1980', 0.0), ('1981', 0.0), ('1982', 0.0), ('1983', 0.0), ('1984', 0.0), ('1985', 0.0), ('1986', 0.0), ('1987', 0.0), ('1988', 0.0), ('1989', 0.0), ('1990', 0.0352), ('1991', 0.0354), ('1992', 0.0328), ('1993', 0.0335), ('1994', 0.0351), ('1995', 0.0033), ('1996', 0.0), ('1997', 0.0), ('1998', 0.0), ('1999', 0.0), ('2000', 0.0), ('2001', 0.0), ('2002', 0.0), ('2003', 0.0), ('2004', 0.0), ('2005', 0.0), ('2006', 0.0), ('2007', 0.0), ('2008', 0.0), ('2009', 0.0), ('2010', 0.0), ('2011', 0.0), ('2012', 0.001), ('2013', 0.0286), ('2014', 0.0358), ('2015', 0.0357), ('2016', 0.0357), ('2017', 0.0358), ('2018', 0.0342), ('2019', 0.0357), ('2020', 0.0354), ('2021', 0.0358), ('2022', 0.0357), ('2023', 0.0189), ('2024', 0.0), ('2025', 0.0), ('2026', 0.0)]
@@ -389,12 +542,23 @@ Per-station observed distinct hours (measurement completeness proxy):
 
 ### ML-Readiness Evidence
 
-- Candidate target signal: `dwd_missing_value_periods` is itself a natural label source for a missingness/outage-prediction use case (predict whether a station x parameter will enter a reported gap); the observed -999/blank rate per (measurement.column) is an alternative, denser target for the same question.
-- Leakage: a reported period's von/bis window is only known once DWD has closed the gap -- using `dwd_missing_value_periods` rows as a feature to predict the very same gap they describe is circular; a forecasting model may only use periods with bis_datum strictly before the prediction point.
-- Grain and entity-grouped split: reported periods and per-station rollups are keyed by (station, parameter); split any model of this data by station id, not by row, so a station's reported periods don't leak across train/test.
-- Join cardinality: the station x parameter reconciliation join (6 observed-without-report, 42 reported-without-observed cases) is 1:1 per (station, parameter) pair by construction, but the two sides disagree for a nontrivial share of pairs -- treat REPORTED and OBSERVED as two different signals, not one validated join.
-- Imbalance: reported periods are concentrated per station/parameter ({'1975': 346291, '2014': 359772, '2290': 188455, '2564': 144234, '433': 245382, '662': 145518, '691': 322436, '2667': 324565, '1346': 157432, '1420': 324360, '1550': 143903, '1684': 179654, '880': 156513, '1048': 207178, '1270': 213849, '1303': 151015, '2928': 95170, '3126': 190032, '1262': 173228, '3631': 206580, '3668': 301343, '3987': 191507, '4271': 144384, '4336': 260165, '4928': 150261, '3032': 168922, '5100': 197411, '5792': 207849}, {'V_S2_CS': 666636, 'V_S2_CSA': 666636, 'V_S2_HHS': 708547, 'V_S3_NS': 354863, 'V_S3_CS': 313165, 'V_S3_CSA': 313165, 'V_S3_HHS': 354774, 'V_S4_NS': 43539, 'V_S4_CS': 43539, 'V_S4_CSA': 43539, 'V_S4_HHS': 42759, 'V_N': 162243, 'V_S1_NS': 226046, 'V_S1_HHS': 240170, 'V_S2_NS': 708529, 'TT': 66445, 'TD': 67538, 'FX_911': 41812, 'R1': 3369, 'RS_IND': 3363, 'WRTR': 23020, 'P0': 21712, 'P': 57620, 'V_TE005': 4995, 'V_TE010': 5112, 'V_TE020': 4970, 'V_TE050': 3689, 'V_TE100': 22670, 'SD_SO': 916, 'WW': 108152, 'F': 4630, 'D': 4816, 'FF': 69293, 'DD': 69941, 'TT_TU': 1067, 'RF_TU': 1571, 'V_S1_CS': 210075, 'V_S1_CSA': 210075, 'V_TE002': 2408}) -- a station/parameter-level classifier for 'has a reported gap' would see a skewed positive rate; check this before choosing a class-imbalance strategy.
-- Sample-vs-full divergence: not applicable -- every stat in this notebook (reported-period table, per-station rollups, yearly rates) is computed from a full Spark scan or a full collected small table, no `.sample()`/`.limit()` subset is used for any reported statistic.
+- **Grain / grain drift:** Reported periods and per-station rollups are keyed by (station, parameter) -- split by station id, not by row.
+- **Join multiplication (1:N / M:N expansion):** The station x parameter reconciliation is 1:1 per pair by construction, but the two sides disagree (6 observed-without-report, 42 reported-without-observed) -- treat REPORTED and OBSERVED as two signals, not one validated join.
+- **Target contamination:** `dwd_missing_value_periods` is itself a natural label source for a missingness/outage-prediction use case; the observed -999/blank rate per (measurement.column) is a denser alternative target for the same question. The reported period and everything dated inside it must be excluded from features for predicting that same gap.
+- **Temporal / post-event leakage:** A reported period's von/bis window is only known once DWD closes the gap -- a forecasting model may use only periods with bis_datum strictly before the prediction point.
+- **Proxy leakage:** `DatumLetzteAktualisierung`-style fields and the parameter/station keys describe the gap itself -- circular for predicting it.
+- **Split / entity leakage:** Split by station id so a station's reported periods do not leak across train/test.
+- **Historical-reference (point-in-time) leakage:** Replay reported periods forward from a base date -- do not use the full set joined to a past date.
+- **Survivorship / coverage bias:** Reported periods are concentrated per station/parameter ({'1975': 346291, '2014': 359772, '2290': 188455, '2564': 144234, '433': 245382, '662': 145518, '691': 322436, '2667': 324565, '1346': 157432, '1420': 324360, '1550': 143903, '1684': 179654, '880': 156513, '1048': 207178, '1270': 213849, '1303': 151015, '2928': 95170, '3126': 190032, '1262': 173228, '3631': 206580, '3668': 301343, '3987': 191507, '4271': 144384, '4336': 260165, '4928': 150261, '3032': 168922, '5100': 197411, '5792': 207849}) -- a station-level classifier sees a skewed positive rate.
+- **Missingness leakage:** A missing von or bis value may itself mark the gap type -- check before an 'is-missing' feature.
+- **Duplicate-event leakage:** De-duplicate the reported-periods table before counting gaps as independent observations.
+- **Target / feature temporal misalignment:** von_datum (gap start) vs bis_datum (gap end) vs the DWD report date are distinct -- align target and features to one.
+- **Unit / sign / circular-feature leakage:** Not applicable -- no numeric measures in the reported-periods table.
+- **Data-generation-process leakage:** Whether a gap is REPORTED at all is a property of DWD's QC process, not the physical outage -- OBSERVED is the more direct signal.
+- **Class / label instability:** Parameter codes and the reporting practice change across DWD archive versions -- pin the version.
+- **Label availability lag:** Reported periods are back-loaded (a gap is logged after it closes) -- a real-time model cannot assume the row exists at the gap time.
+- **Source / version / regime change:** Observed missingness rate by year (Regime / Version Evidence) shows the reporting regime shifting over the archive span.
+- **Sample-vs-full divergence:** Every statistic (reported-period table, per-station rollups, yearly rates) is a full Spark scan or fully collected small table -- no sampling.
 
 ### EDA Findings
 
@@ -440,20 +604,20 @@ Per-station observed distinct hours (measurement completeness proxy):
 Distinct station ids per Bronze table: {'air_temperature': 28, 'cloudiness': 28, 'moisture': 28, 'precipitation': 27, 'pressure': 28, 'sun': 28, 'wind': 28, 'station_geography': 28, 'station_name_history': 34, 'parameter_unit': 34, 'device_instrument': 33}
 Union of stations across the 7 measurements: 28 -> ['1048', '1262', '1270', '1303', '1346', '1420', '1550', '1684', '1975', '2014', '2290', '2564', '2667', '2928', '3032', '3126', '3631', '3668', '3987', '4271', '433', '4336', '4928', '5100', '5792', '662', '691', '880']
 Stations absent from each measurement (vs the union): {'air_temperature': 0, 'cloudiness': 0, 'moisture': 0, 'precipitation': 1, 'pressure': 0, 'sun': 0, 'wind': 0}
-Stations mapped to >1 city: {}   |   distinct stations per city: {'leipzig': 1, 'essen': 1, 'hohenpeissenberg': 1, 'frankfurt_am_main': 1, 'garmisch_partenkirchen': 1, 'berlin': 1, 'stuttgart': 1, 'bremen': 1, 'zugspitze': 1, 'nuremberg': 1, 'magdeburg': 1, 'potsdam': 1, 'kiel': 1, 'trier': 1, 'hannover': 1, 'saarbruecken': 1, 'goerlitz': 1, 'erfurt': 1, 'norderney': 1, 'rostock_warnemuende': 1, 'hamburg': 1, 'sylt': 1, 'cologne_bonn': 1, 'dresden': 1, 'feldberg_schwarzwald': 1, 'braunschweig': 1, 'cottbus': 1, 'munich': 1}
+Stations mapped to >1 city: {}   |   distinct stations per city: {'leipzig': 1, 'essen': 1, 'hohenpeissenberg': 1, 'frankfurt_am_main': 1, 'garmisch_partenkirchen': 1, 'berlin': 1, 'stuttgart': 1, 'bremen': 1, 'nuremberg': 1, 'zugspitze': 1, 'magdeburg': 1, 'potsdam': 1, 'kiel': 1, 'trier': 1, 'hannover': 1, 'saarbruecken': 1, 'goerlitz': 1, 'erfurt': 1, 'norderney': 1, 'rostock_warnemuende': 1, 'hamburg': 1, 'sylt': 1, 'cologne_bonn': 1, 'dresden': 1, 'feldberg_schwarzwald': 1, 'braunschweig': 1, 'cottbus': 1, 'munich': 1}
 
 ### Relationships
 
-Referential integrity — measurement stations vs metadata (orphans, unused):
+Referential integrity -- measurement stations vs metadata (orphans, unused):
 - station_geography: orphan measurement stations=0, unused metadata stations=0
 - station_name_history: orphan measurement stations=0, unused metadata stations=6
 - parameter_unit: orphan measurement stations=0, unused metadata stations=6
 
-Join cardinality — measurement.station_id -> metadata table (rows per station id):
-- station_geography: 1:N fan-out  {'min': 2, 'max': 17, 'avg': 7.928571428571429, 'stations_with_fanout': 28}
-- station_name_history: 1:N fan-out  {'min': 1, 'max': 5, 'avg': 3.1176470588235294, 'stations_with_fanout': 28}
-- parameter_unit: 1:N fan-out  {'min': 1, 'max': 262, 'avg': 159.35294117647058, 'stations_with_fanout': 28}
-- device_instrument: 1:N fan-out  {'min': 1, 'max': 193, 'avg': 121.45454545454545, 'stations_with_fanout': 32}
+Relationship cardinality -- measurement station -> metadata table:
+- station_geography: 222 rows over 28 station keys; 28 of 28 measurement stations have a row (100.0%); rows-per-station p50/p90/p99 7/16/17, max fan-out 17, orphan keys 0.
+- station_name_history: 106 rows over 34 station keys; 28 of 28 measurement stations have a row (100.0%); rows-per-station p50/p90/p99 3/5/5, max fan-out 5, orphan keys 6.
+- parameter_unit: 5418 rows over 34 station keys; 28 of 28 measurement stations have a row (100.0%); rows-per-station p50/p90/p99 181/232/262, max fan-out 262, orphan keys 6.
+- device_instrument: 4008 rows over 33 station keys; 28 of 28 measurement stations have a row (100.0%); rows-per-station p50/p90/p99 134/166/193, max fan-out 193, orphan keys 5.
 
 (STATIONS_ID, MESS_DATUM) unique within each measurement: {'air_temperature': False, 'cloudiness': False, 'moisture': False, 'precipitation': False, 'pressure': False, 'sun': False, 'wind': False}
 
@@ -482,6 +646,23 @@ Cross-measurement (station, MESS_DATUM) overlap per pair (shared, only_a, only_b
 
 union of (station, ts) across all 7 measurements = 18144972
 
+### Temporal Consistency
+
+Measurement hours vs the station's geography validity window (widest von..bis, open bis -> now). A row outside the window means the station was producing data for a period its geography record does not cover.
+
+- air_temperature: 0/17336388 hours outside the window (0.0%).
+- cloudiness: 720/12973316 hours outside the window (0.0055%).
+- moisture: 707/12449858 hours outside the window (0.0057%).
+- precipitation: 0/7154301 hours outside the window (0.0%).
+- pressure: 720/13227922 hours outside the window (0.0054%).
+- sun: 0/12650564 hours outside the window (0.0%).
+- wind: 0/15957198 hours outside the window (0.0%).
+
+### Spatial Consistency
+
+`city` <-> station_id: 0 station(s) mapped to >1 city .
+Coordinate-level spatial validity is in section 02. There is no second coordinate source to cross-check DWD's own against (LIMITATION); the checkable cross-table consistency is that a station resolves to one city.
+
 ### EDA Findings
 
 - (station, MESS_DATUM) is unique in every measurement: False  -> pairwise measurement<->measurement joins are 1:1 on the overlap.
@@ -491,18 +672,29 @@ union of (station, ts) across all 7 measurements = 18144972
 
 ### ML-Readiness Evidence
 
-- No candidate ML target lives across these 7 measurement + metadata tables -- this notebook is a joinability audit, not a labelled-outcome source.
-- Grain and entity-grouped split: (STATIONS_ID, MESS_DATUM) is unique within every measurement (False) -- a station-level (not row-level) split is still required for any downstream model combining these tables, since a station's rows are correlated across measurements and across time.
-- Join cardinality: measurement -> metadata is 1:1 only where []; ['station_geography', 'station_name_history', 'parameter_unit', 'device_instrument'] fan out (>1 row per station id) and MUST be joined on the von/bis validity window, not station_id alone, or the join cartesian-multiplies fact rows across every metadata version for that station.
-- Cross-measurement join risk: the largest non-shared (station, MESS_DATUM) count in any measurement pair is 10176302 -- an inner join to build a wide 'all weather at station S, hour H' table silently drops that tail; this is a sample-vs-full divergence risk for any feature built from the wide join rather than the per-measurement full table.
-- Leakage: all 7 measurements have disjoint value-column sets (True) so there is no direct column-overlap leakage risk between them, but referential-integrity orphans ({'station_geography': 0, 'station_name_history': 0, 'parameter_unit': 0}) mean a left join can introduce nulls that a naive imputation could turn into leaked population statistics if computed after the train/test split rather than before it.
-- Imbalance: not applicable -- no categorical target; `city` is checked for a 1:1 station mapping (see Findings) as a structural consistency check, not a class-balance concern.
-- Sample-vs-full divergence: not applicable -- every statistic here (station sets, overlap counts, cardinality) is computed from a full Spark aggregation or a fully collected small set, no `.sample()`/`.limit()` subset feeds any reported number.
+- **Grain / grain drift:** (STATIONS_ID, MESS_DATUM) is unique within every measurement (False) -- a station-level (not row-level) split is required for any downstream model combining these tables.
+- **Join multiplication (1:N / M:N expansion):** measurement -> metadata is 1:1 only for []; ['station_geography', 'station_name_history', 'parameter_unit', 'device_instrument'] fan out and MUST be joined on the von/bis window, not station_id alone (full profile above).
+- **Target contamination:** No candidate ML target lives across these 7 measurement + metadata tables -- this notebook is a joinability audit, not a labelled-outcome source.
+- **Temporal / post-event leakage:** Point-in-time consistency above quantifies measurement hours outside the station's geography window -- a metadata attribute joined without the window can attach a future location to a historical row.
+- **Proxy leakage:** Station id / city are near-unique site identifiers -- a model given them memorises the station.
+- **Split / entity leakage:** Split by station id across ALL tables at once so a station's rows stay on one side of every join.
+- **Historical-reference (point-in-time) leakage:** The validity-window join is the point-in-time mechanism -- an un-windowed metadata join is point-in-time leakage.
+- **Survivorship / coverage bias:** Referential-integrity orphans {'station_geography': 0, 'station_name_history': 0, 'parameter_unit': 0} and cross-measurement non-overlap (max 10176302) mean a joined training set silently drops the under-instrumented stations/hours.
+- **Missingness leakage:** Whether a station appears in a metadata table correlates with its tenure in the network -- an 'is-known' flag can leak that.
+- **Duplicate-event leakage:** Per-measurement (station, ts) duplicate composition is in section 01 -- de-duplicate before joining or splitting.
+- **Target / feature temporal misalignment:** MESS_DATUM (hour) vs metadata von/bis (day) are different resolutions -- align before pairing.
+- **Unit / sign / circular-feature leakage:** All 7 measurements have disjoint value-column sets (True) -- no direct column-overlap leakage between them.
+- **Data-generation-process leakage:** A parser trailer row in metadata (02) would inject a non-station into every station-keyed join here -- filter it first.
+- **Class / label instability:** parameter_unit / device_instrument codes are DWD enumerations that change between archive versions -- pin the version.
+- **Label availability lag:** Not applicable -- joinability audit, no label.
+- **Source / version / regime change:** Station coverage and the metadata schema shifted over the archive's multi-decade span (per-decade evidence in 01/03).
+- **Sample-vs-full divergence:** Every statistic here (station sets, overlap counts, cardinality, point-in-time) is a full Spark aggregation or a fully collected small set -- no sampling.
 
 ### Silver Implications
 
-- Shared join key is (STATIONS_ID, MESS_DATUM); unique per measurement -> safe fan-out-free joins.
+- Shared join key is (STATIONS_ID, MESS_DATUM); unique per measurement -> safe fan-out-free measurement<->measurement joins.
 - station_geography / station_name_history are 1:N on station_id -> join with the von/bis validity window, never station_id alone.
+- Some measurement hours fall outside the station's geography validity window -> extend the window or flag; do not silently drop.
 - `city` is consistent 1:1 with station_id here -> safe to carry as a station attribute.
 - A cross-measurement wide 'all weather at station S, hour H' table drops rows (overlap numbers above) -> that is a Gold consolidation, not Silver.
 
@@ -550,7 +742,7 @@ union of (station, ts) across all 7 measurements = 18144972
 | measurement | dup key groups | identical | conflicting |
 |---|---|---|---|
 | dew_point | 204288 | 204288 | 0 |
-| soil_temperature | 196534 | 189238 | 7296 |
+| soil_temperature | 196534 | 189250 | 7284 |
 | visibility | 203353 | 203353 | 0 |
 | cloud_type | 203021 | 203015 | 6 |
 | wind_synop | 204288 | 204288 | 0 |
@@ -562,15 +754,30 @@ missing_value_periods full-row duplicates: 79551.
 
 QN quality flag distribution (where present):
 - dew_point: [('1', 8054488), ('3', 5470295)]
+- soil_temperature: [('3', 5912832), ('1', 806101), ('10', 270880), ('5', 193413)]
 - visibility: [('1', 7858810), ('3', 5265772)]
 - cloud_type: [('1', 7795985), ('3', 5177331), ('-999', 128147)]
 - wind_synop: [('1', 8054488), ('3', 5470295)]
 - extreme_wind: [('3', 5371867), ('1', 1108754)]
 - weather_phenomena: [('1', 7759384), ('3', 5155904)]
+- solar: [('1', 5809249)]
+
+### Categorical / Domain Validation
+
+QN quality-flag values vs the DWD hourly-historical code set (1/2/3/5/7/9/10):
+- dew_point.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- soil_temperature.QN_2: unexpected=none, unused=['2', '7', '9'].
+- visibility.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- cloud_type.QN_8: unexpected=['-999'], unused=['10', '2', '5', '7', '9'].
+- wind_synop.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- extreme_wind.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- weather_phenomena.QN_8: unexpected=none, unused=['10', '2', '5', '7', '9'].
+- solar.QN_592: unexpected=none, unused=['10', '2', '3', '5', '7', '9'].
+An unexpected QN value is a parse artefact or a schema drift, not a real quality level.
 
 ### Temporal
 
-Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddHH:
+Hourly grid, expected one row per station per hour; MESS_DATUM parsed yyyyMMddHH with a trailing `.0` stripped. Coverage vs an independent calendar (span/3600 + 1), so <100% is a genuine gap.
 - dew_point: 1949010100..2026090323, per-station coverage 64.99-99.9%, longest gap 55560.0h
 - soil_temperature: 1951010101..2026090323, per-station coverage 41.02-99.93%, longest gap 6245.0h
 - visibility: 1949010100..2026090323, per-station coverage 63.88-99.75%, longest gap 121571.0h
@@ -580,52 +787,61 @@ Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddH
 - weather_phenomena: 1949010100..2026090300, per-station coverage 49.11-99.43%, longest gap 121571.0h
 - solar: 1945123101:10..2026073123:39, per-station coverage 68.41-100.0%, longest gap 35064.0h
 
+### Regime / Version Evidence
+
+Per-decade row count and QN vocabulary. The deepening network came online at different times per parameter -- a decade/era indicator and per-station availability window are warranted before pooling.
+
+- dew_point: 1940s: rows=75690, QN distinct=1, 1950s: rows=801858, QN distinct=1, 1960s: rows=921695, QN distinct=1, 1970s: rows=739518, QN distinct=1, 1980s: rows=1950405, QN distinct=1, 1990s: rows=2289144, QN distinct=1, 2000s: rows=2453645, QN distinct=2, 2010s: rows=2450266, QN distinct=1, 2020s: rows=1842562, QN distinct=2
+- soil_temperature: 1950s: rows=102713, QN distinct=2, 1960s: rows=191832, QN distinct=2, 1970s: rows=263070, QN distinct=2, 1980s: rows=348386, QN distinct=2, 1990s: rows=283886, QN distinct=3, 2000s: rows=1882300, QN distinct=3, 2010s: rows=2337514, QN distinct=2, 2020s: rows=1773525, QN distinct=2
+- visibility: 1940s: rows=72818, QN distinct=1, 1950s: rows=786316, QN distinct=1, 1960s: rows=921693, QN distinct=1, 1970s: rows=739068, QN distinct=1, 1980s: rows=1940283, QN distinct=1, 1990s: rows=2243360, QN distinct=1, 2000s: rows=2301460, QN distinct=2, 2010s: rows=2324554, QN distinct=1, 2020s: rows=1795030, QN distinct=2
+- cloud_type: 1940s: rows=75690, QN distinct=1, 1950s: rows=801858, QN distinct=2, 1960s: rows=921693, QN distinct=2, 1970s: rows=739130, QN distinct=1, 1980s: rows=1940649, QN distinct=1, 1990s: rows=2208022, QN distinct=2, 2000s: rows=2296546, QN distinct=3, 2010s: rows=2323000, QN distinct=2, 2020s: rows=1794875, QN distinct=3
+- wind_synop: 1940s: rows=75690, QN distinct=1, 1950s: rows=801858, QN distinct=1, 1960s: rows=921695, QN distinct=1, 1970s: rows=739518, QN distinct=1, 1980s: rows=1950405, QN distinct=1, 1990s: rows=2289144, QN distinct=1, 2000s: rows=2453645, QN distinct=2, 2010s: rows=2450266, QN distinct=1, 2020s: rows=1842562, QN distinct=2
+- extreme_wind: 1990s: rows=152864, QN distinct=1, 2000s: rows=2085717, QN distinct=2, 2010s: rows=2414130, QN distinct=1, 2020s: rows=1827910, QN distinct=2
+- weather_phenomena: 1940s: rows=75690, QN distinct=1, 1950s: rows=801858, QN distinct=1, 1960s: rows=921695, QN distinct=1, 1970s: rows=739110, QN distinct=1, 1980s: rows=1934199, QN distinct=1, 1990s: rows=2182840, QN distinct=1, 2000s: rows=2158165, QN distinct=2, 2010s: rows=2308799, QN distinct=1, 2020s: rows=1792932, QN distinct=2
+- solar: 1940s: rows=35087, QN distinct=1, 1950s: rows=184032, QN distinct=1, 1960s: rows=403296, QN distinct=1, 1970s: rows=517127, QN distinct=1, 1980s: rows=692592, QN distinct=1, 1990s: rows=747192, QN distinct=1, 2000s: rows=1040279, QN distinct=1, 2010s: rows=1292040, QN distinct=1, 2020s: rows=897604, QN distinct=1
+
 ### Distributions
 
-- dew_point.`TT`: min/max=-999.0/56.0, p01/p50/p99=[-999.0, 8.0, 27.3], mean=-59.42840362762196, sd=253.5845159210818, zero rows=95695, -999 sentinel rows=917439
-- dew_point.`TD`: min/max=-999.0/46.5, p01/p50/p99=[-999.0, 4.5, 17.3], mean=-63.949617520665534, sd=253.56541430175915, zero rows=129466, -999 sentinel rows=925822
+- dew_point.`TT`: min/max=-999.0/56.0, p01/p50/p99=[-999.0, 8.0, 27.3], mean=-59.428403627621925, sd=253.58451592108224, zero rows=95695, -999 sentinel rows=917439
+- dew_point.`TD`: min/max=-999.0/46.5, p01/p50/p99=[-999.0, 4.5, 17.3], mean=-63.94961752066563, sd=253.565414301759, zero rows=129466, -999 sentinel rows=925822
 - soil_temperature.`V_TE002`: min/max=-999.0/49.7, p01/p50/p99=[-999.0, -999.0, 19.8], mean=-917.1660788063748, sd=275.4190050741, zero rows=11793, -999 sentinel rows=6600469
 - soil_temperature.`V_TE005`: min/max=-999.0/51.4, p01/p50/p99=[-2.3, 10.4, 33.3], mean=10.045840879849807, sd=36.184877217548845, zero rows=120973, -999 sentinel rows=8684
 - soil_temperature.`V_TE010`: min/max=-999.0/42.3, p01/p50/p99=[-1.5, 10.6, 30.1], mean=10.135810511878649, sd=34.61837660349163, zero rows=80197, -999 sentinel rows=7970
 - soil_temperature.`V_TE020`: min/max=-999.0/37.1, p01/p50/p99=[-0.6, 10.8, 27.2], mean=10.223648525049889, sd=32.771589617188575, zero rows=45385, -999 sentinel rows=7158
 - soil_temperature.`V_TE050`: min/max=-999.0/30.1, p01/p50/p99=[-999.0, 10.5, 24.1], mean=-21.509449111026154, sd=179.06536505164632, zero rows=6277, -999 sentinel rows=232932
 - soil_temperature.`V_TE100`: min/max=-999.0/25.8, p01/p50/p99=[-999.0, 8.8, 21.5], mean=-162.24554658310902, sd=381.12034150280607, zero rows=136, -999 sentinel rows=1233998
-- visibility.`V_VV_I`: min/max=None/None, p01/p50/p99=None, mean=None, sd=None, zero rows=None, -999 sentinel rows=None
-- visibility.`V_VV`: min/max=0.0/99990.0, p01/p50/p99=[0.0, 18000.0, 75000.0], mean=23123.29969899232, sd=19763.875210940034, zero rows=177550, -999 sentinel rows=0
-- cloud_type.`V_N`: min/max=-999.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=-4.72357636700573, sd=98.86554227442795, zero rows=1460740, -999 sentinel rows=128147
-- cloud_type.`V_N_I`: min/max=-999.0/-999.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-999.0, sd=0.0, zero rows=0, -999 sentinel rows=148454
-- cloud_type.`V_S1_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, 0.0, 8.0], mean=-422.88773749923956, sd=496.6473581778601, zero rows=709072, -999 sentinel rows=5585466
-- cloud_type.`V_S1_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-902.6854297029934, sd=294.69553568529284, zero rows=0, -999 sentinel rows=5585466
-- cloud_type.`V_S1_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, 450.0, 9000.0], mean=978.3868547352307, sd=2386.673992474372, zero rows=48617, -999 sentinel rows=4083007
-- cloud_type.`V_S1_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, 2.0, 8.0], mean=-295.35522559579795, sd=458.85214231596325, zero rows=24, -999 sentinel rows=3908968
-- cloud_type.`V_S2_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-717.0873033797828, sd=450.88502726838954, zero rows=539074, -999 sentinel rows=9419190
-- cloud_type.`V_S2_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-968.3875616107636, sd=172.0874637383604, zero rows=0, -999 sentinel rows=9419190
-- cloud_type.`V_S2_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 9000.0], mean=403.7016436256012, sd=2510.716520289073, zero rows=79, -999 sentinel rows=8406087
-- cloud_type.`V_S2_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-638.3283666869876, sd=481.9963079165771, zero rows=15, -999 sentinel rows=8398714
+- visibility.`V_VV`: min/max=0.0/99990.0, p01/p50/p99=[0.0, 18000.0, 75000.0], mean=23123.29969899232, sd=19763.87521094002, zero rows=177550, -999 sentinel rows=0
+- cloud_type.`V_N`: min/max=-999.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=-4.72357636700573, sd=98.8655422744278, zero rows=1460740, -999 sentinel rows=128147
+- cloud_type.`V_S1_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, 0.0, 8.0], mean=-422.88773749923956, sd=496.6473581778606, zero rows=709072, -999 sentinel rows=5585466
+- cloud_type.`V_S1_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-902.6854297029934, sd=294.69553568529267, zero rows=0, -999 sentinel rows=5585466
+- cloud_type.`V_S1_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, 450.0, 9000.0], mean=978.3868547352307, sd=2386.673992474371, zero rows=48617, -999 sentinel rows=4083007
+- cloud_type.`V_S1_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, 2.0, 8.0], mean=-295.35522559579795, sd=458.8521423159634, zero rows=24, -999 sentinel rows=3908968
+- cloud_type.`V_S2_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-717.0873033797828, sd=450.8850272683891, zero rows=539074, -999 sentinel rows=9419190
+- cloud_type.`V_S2_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-968.3875616107636, sd=172.08746373836058, zero rows=0, -999 sentinel rows=9419190
+- cloud_type.`V_S2_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 9000.0], mean=403.7016436256012, sd=2510.716520289071, zero rows=79, -999 sentinel rows=8406087
+- cloud_type.`V_S2_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-638.3283666869876, sd=481.99630791657734, zero rows=15, -999 sentinel rows=8398714
 - cloud_type.`V_S3_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 6.0], mean=-938.0691914330483, sd=239.43435749107667, zero rows=111834, -999 sentinel rows=12304620
-- cloud_type.`V_S3_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-986.0690582539489, sd=112.86217980314117, zero rows=0, -999 sentinel rows=12304620
-- cloud_type.`V_S3_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 8550.0], mean=-486.31269339920283, sd=1780.9122114779348, zero rows=14, -999 sentinel rows=11721931
-- cloud_type.`V_S3_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-892.8742181693755, sd=309.0424160767396, zero rows=10, -999 sentinel rows=11719446
-- cloud_type.`V_S4_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5172130013267, sd=92.06764412148436, zero rows=1917, -999 sentinel rows=12991179
-- cloud_type.`V_S4_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-998.9999231786489, sd=0.2768893432385444, zero rows=0, -999 sentinel rows=12991179
-- cloud_type.`V_S4_HHS`: min/max=-999.0/13500.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-982.0906229327213, sd=200.82786849688105, zero rows=15, -999 sentinel rows=12993221
-- cloud_type.`V_S4_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5641988226811, sd=91.55778045780252, zero rows=0, -999 sentinel rows=12991179
-- wind_synop.`FF`: min/max=-999.0/44.7, p01/p50/p99=[0.0, 3.5, 14.4], mean=1.4330123078499983, sd=51.415442953890185, zero rows=350764, -999 sentinel rows=35512
-- wind_synop.`DD`: min/max=-999.0/360.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=184.82263693251122, sd=114.81833027587744, zero rows=416097, -999 sentinel rows=36400
+- cloud_type.`V_S3_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-986.0690582539489, sd=112.8621798031413, zero rows=0, -999 sentinel rows=12304620
+- cloud_type.`V_S3_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 8560.0], mean=-486.31269339920283, sd=1780.912211477934, zero rows=14, -999 sentinel rows=11721931
+- cloud_type.`V_S3_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-892.8742181693755, sd=309.04241607673947, zero rows=10, -999 sentinel rows=11719446
+- cloud_type.`V_S4_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5172130013267, sd=92.06764412148425, zero rows=1917, -999 sentinel rows=12991179
+- cloud_type.`V_S4_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-998.9999231786489, sd=0.2768893432385547, zero rows=0, -999 sentinel rows=12991179
+- cloud_type.`V_S4_HHS`: min/max=-999.0/13500.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-982.0906229327213, sd=200.82786849688122, zero rows=15, -999 sentinel rows=12993221
+- cloud_type.`V_S4_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5641988226811, sd=91.55778045780258, zero rows=0, -999 sentinel rows=12991179
+- wind_synop.`FF`: min/max=-999.0/44.7, p01/p50/p99=[0.0, 3.5, 14.4], mean=1.4330123078499934, sd=51.415442953890235, zero rows=350764, -999 sentinel rows=35512
+- wind_synop.`DD`: min/max=-999.0/360.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=184.82263693251122, sd=114.81833027587764, zero rows=416097, -999 sentinel rows=36400
 - extreme_wind.`FX_911`: min/max=-999.0/67.0, p01/p50/p99=[1.0, 6.0, 22.1], mean=7.224335538214628, sd=5.869683875063618, zero rows=692, -999 sentinel rows=89
-- weather_phenomena.`WW`: min/max=-1.0/189.0, p01/p50/p99=[-1.0, 2.0, 161.0], mean=21.572701592097676, sd=38.39196353385636, zero rows=1010262, -999 sentinel rows=0
-- weather_phenomena.`WW_Text`: min/max=None/None, p01/p50/p99=None, mean=None, sd=None, zero rows=None, -999 sentinel rows=None
+- weather_phenomena.`WW`: min/max=-1.0/189.0, p01/p50/p99=[-1.0, 2.0, 161.0], mean=21.572701592097676, sd=38.391963533856355, zero rows=1010262, -999 sentinel rows=0
 - solar.`ATMO_LBERG`: min/max=-999.0/992.0, p01/p50/p99=[-999.0, -999.0, 141.0], mean=-661.066340588947, sd=511.86262156053107, zero rows=762, -999 sentinel rows=4045166
 - solar.`FD_LBERG`: min/max=-999.0/494.0, p01/p50/p99=[-999.0, 0.0, 136.0], mean=-86.06972605236925, sd=313.91978981891697, zero rows=2774851, -999 sentinel rows=608615
 - solar.`FG_LBERG`: min/max=-999.0/490.0, p01/p50/p99=[-999.0, 1.0, 294.0], mean=23.159174619645327, sd=165.75839648195813, zero rows=2780178, -999 sentinel rows=120254
 - solar.`SD_LBERG`: min/max=-999.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=3.861942223512884, sd=92.56278603548601, zero rows=4018759, -999 sentinel rows=46456
 - solar.`ZENIT`: min/max=24.72/155.28, p01/p50/p99=[30.29, 89.62, 149.47], mean=89.61520203386017, sd=30.379924277345566, zero rows=0, -999 sentinel rows=0
-- solar.`MESS_DATUM_WOZ`: min/max=None/None, p01/p50/p99=None, mean=None, sd=None, zero rows=None, -999 sentinel rows=None
 
 ### EDA Findings
 
 - dew_point: rows=13524783, stations=28, hourly coverage 64.99-99.9%, longest gap 55560.0h, dup identical=204288/conflicting=0, constant cols=['eor']
-- soil_temperature: rows=7183226, stations=27, hourly coverage 41.02-99.93%, longest gap 6245.0h, dup identical=189238/conflicting=7296, constant cols=['eor']
+- soil_temperature: rows=7183226, stations=27, hourly coverage 41.02-99.93%, longest gap 6245.0h, dup identical=189250/conflicting=7284, constant cols=['eor']
 - visibility: rows=13124582, stations=28, hourly coverage 63.88-99.75%, longest gap 121571.0h, dup identical=203353/conflicting=0, constant cols=['eor']
 - cloud_type: rows=13101463, stations=28, hourly coverage 56.22-99.8%, longest gap 121571.0h, dup identical=203015/conflicting=6, constant cols=['eor']
 - wind_synop: rows=13524783, stations=28, hourly coverage 64.99-99.9%, longest gap 55560.0h, dup identical=204288/conflicting=0, constant cols=['eor']
@@ -635,22 +851,33 @@ Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddH
 
 ### ML-Readiness Evidence
 
-- No candidate ML target lives in these 8 deepening measurement tables -- like the original seven (01_weather_measurements_eda.py), they feed the shared `dim_weather_context` feature source, not a labelled table; `missing_value_periods` (profiled fully in 03_missing_data_eda.py) is the nearest candidate target for a missingness/outage use case.
-- Grain and entity-grouped split: one row per (STATIONS_ID, MESS_DATUM) per measurement (dew_point, soil_temperature, visibility, cloud_type, wind_synop, extreme_wind, weather_phenomena, solar) -- split by STATIONS_ID or contiguous date range, never by row, matching the original seven measurements.
-- Leakage: QN_* quality flags (where present) are assigned alongside the value, same caveat as the original seven -- any forecasting feature set may only use rows strictly before the prediction timestamp.
-- Join cardinality: cross-table join cardinality between these 8 new tables and the original seven, and against station metadata, is NOT assessed in this notebook -- verify it (e.g. extend 04_dwd_relationships_and_findings.py) before using both groups together as joined features.
-- Imbalance: not applicable -- no categorical target column; QN_* distributions (where present) are a quality flag, not a modelling target.
-- Sample-vs-full divergence: not applicable in this notebook -- unlike 01, no value-column figure is drawn from a `.sample()` subset here; all reported stats (`value_stats`, `freq_cov`, `station_counts`) come from full-table Spark aggregations.
-- Conflicting (STATIONS_ID, MESS_DATUM) duplicates exist in at least one deepening measurement (see Data Quality) and must be resolved deterministically before use as a feature source.
+- **Grain / grain drift:** One row per (STATIONS_ID, MESS_DATUM) per measurement -- split by STATIONS_ID or contiguous date range, never by row.
+- **Join multiplication (1:N / M:N expansion):** Cross-table cardinality between these 8 tables, the original seven, and metadata is assessed in 04 -- verify before joining both groups as features.
+- **Target contamination:** No candidate ML target lives in these 8 deepening tables -- like the original seven they feed the shared weather feature source; missing_value_periods (03) is the nearest candidate target for a missingness use case.
+- **Temporal / post-event leakage:** QN_* flags (where present) are set alongside the value -- a forecasting feature may use only rows strictly before the prediction timestamp.
+- **Proxy leakage:** STATIONS_ID / city identify a specific site -- a model given them memorises the station.
+- **Split / entity leakage:** Split by STATIONS_ID -- a station's adjacent hourly rows and its rows across measurements are correlated.
+- **Historical-reference (point-in-time) leakage:** Station attributes are time-varying (02) -- join on the validity window, not the latest metadata row.
+- **Survivorship / coverage bias:** The deepening network came online per parameter over time (Regime / Version Evidence) -- early years under-represent the newer parameters.
+- **Missingness leakage:** -999 / blank rate correlates with station, parameter and era -- an 'is-missing' feature can leak an outage window.
+- **Duplicate-event leakage:** Conflicting (station, ts) duplicates: {'dew_point': 0, 'soil_temperature': 7284, 'visibility': 0, 'cloud_type': 6, 'wind_synop': 0, 'extreme_wind': 0, 'weather_phenomena': 0, 'solar': 0} -- resolve before counting or splitting.
+- **Target / feature temporal misalignment:** MESS_DATUM is the observation hour -- align a feature/target pair to one hour convention.
+- **Unit / sign / circular-feature leakage:** Units are not in Bronze and plausibility bounds are not assumed here -- reconcile via parameter_unit (02) before combining parameters.
+- **Data-generation-process leakage:** QN_* encodes DWD's QC decision, not the physical weather -- a feature keyed on it encodes the QC pipeline.
+- **Class / label instability:** cloud_type / weather_phenomena are coded categoricals and the QN scheme changed over the archive's history (Regime / Version Evidence) -- a class defined by a raw code is only stable within one scheme vintage.
+- **Label availability lag:** DWD publishes historical data with a lag and revises it -- a nowcast cannot use the current hour.
+- **Source / version / regime change:** Per-decade rows and QN vocabulary in Regime / Version Evidence -- a decade/era indicator is warranted before pooling.
+- **Sample-vs-full divergence:** No value-column figure is drawn from a sample here; every reported stat (value_stats, freq_cov, station_counts) is a full-table Spark aggregation.
 
 ### Silver Implications
 
 - `-999` (and blank) appears as a sentinel in at least one of these columns -> must become NULL before any stat, matching the original seven measurements.
 - (STATIONS_ID, MESS_DATUM) has conflicting duplicate rows in at least one measurement -> a conflict-resolution rule is required (rule not yet established).
 - Constant columns above carry no information.
-- Hourly series are not necessarily continuous (coverage % / gaps above) -> no dense-grid assumption, same as the original seven measurements.
-- Value-column plausibility bounds were not assumed here (unlike 01's PLAUSIBLE table) -> define them from the distributions above before enabling an out-of-range quality flag.
-- missing_value_periods declares known gap windows per station/parameter -> reconcile against the observed hourly-coverage gaps above rather than assuming every gap is undeclared.
+- Hourly series are not necessarily continuous (coverage % / gaps above) -> no dense-grid assumption.
+- Value-column plausibility bounds were not assumed here -> define them from the distributions above before an out-of-range quality flag.
+- missing_value_periods declares known gap windows per station/parameter -> reconcile against the observed hourly-coverage gaps rather than assuming every gap is undeclared.
+- Decode QN against the DWD scheme valid for the record's era (see Regime / Version Evidence).
 
 ### Figure -- DWD deepening -- measurement overview
 

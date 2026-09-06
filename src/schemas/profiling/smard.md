@@ -21,68 +21,110 @@ Rows: 1255904. Long format, series key = ['metric', 'filter_id', 'region', 'reso
 ### Data Quality
 
 Exact full-row duplicates: 0.
-(series, timestamp_utc) duplicate groups: 0, of which conflicting (differing value): 0.
+(series, timestamp_utc) duplicate groups: 0 (identical: 0, conflicting: 0).
 
-### Temporal
+### Unit & Semantic Validation
 
-Per-series continuity (fixed-step resolutions only):
+`value` is a physical quantity whose unit is metric-dependent (MW / MWh for generation and load, EUR/MWh for prices) -- the Bronze table does not carry the unit, so it must be attached per metric at Silver from the SMARD filter catalog.
+Negative values per metric: {'forecast_generation_photovoltaic': 2897, 'day_ahead_prices': 4372, 'residual_load': 2777}. Negative is physical for residual_load, day_ahead_prices and net cross-border flows; a negative realised generation is an error.
 
-| series | resolution | observed | expected | coverage % | longest gap | missing steps |
+Exact-copy / sign-mirror metric pairs (circular feature/target risk):
+- `forecast_generation_wind_and_photovoltaic` <-> `forecast_generation_photovoltaic`: exact sign mirror -- one column is -1x the other. If one is a forecast and the other its components' sum, they are not independent series -- do not use one to predict the other, and check the Bronze/staging layer for a sign or labelling error.
+
+### Categorical / Domain Validation
+
+`resolution` vs the known step set: unexpected=none (an unexpected step parses to null and is dropped from the continuity check); unused=['15min', 'daily', 'hour', 'hourly', 'quarter_hour', 'week'].
+`region` vs the known SMARD zone set: unexpected=none, unused=['AT', 'DE', 'DE-AT-LU', 'LU'].
+An unexpected `resolution` or `region` is an ingestion/parse issue (SMARD filter mapping), not a source-data finding. The known-region list is a best-effort reference, not authoritative -- an 'unexpected' region may just be missing from it.
+
+### Temporal Semantics
+
+timestamp_utc timezone: UTC (per column name; SMARD source is Europe/Berlin -- verify the load). SMARD's own export is Europe/Berlin wall-clock and has 23h / 25h DST days; the continuity check rounds the step ratio so DST transitions do not show as gaps, but the load's UTC conversion must be verified before any hourly join.
+
+Per-series continuity (fixed-step resolutions; expected = span / step + 1, independent of the data):
+
+| series | resolution | observed | expected | coverage % | longest gap (steps) | missing steps |
 |---|---|---|---|---|---|---|
-| generation_natural_gas|4071|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_nuclear|1224|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_offshore_wind|1225|TenneT|day | day | 4748 | 4748 | 100.0 | None | 0 |
-| forecast_generation_offshore_wind|3791|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| forecast_generation_total|122|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_hard_coal|4069|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_lignite|1223|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_offshore_wind|1225|50Hertz|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_onshore_wind|4067|50Hertz|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_pumped_storage|4070|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| total_power_consumption|410|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| day_ahead_prices|4169|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| forecast_generation_photovoltaic|126|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_biomass|4066|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
-| generation_hard_coal|4069|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| residual_load|4359|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| total_power_consumption|410|TenneT|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_lignite|1223|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_nuclear|1224|DE-LU|day | day | 2557 | 2557 | 100.0 | None | 0 |
-| generation_other_conventional|1227|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_other_renewable|1228|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_photovoltaic|4068|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
-| generation_natural_gas|4071|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
-| generation_onshore_wind|4067|TransnetBW|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_other_conventional|1227|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_photovoltaic|4068|50Hertz|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_photovoltaic|4068|Amprion|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_photovoltaic|4068|TenneT|day | day | 4748 | 4748 | 100.0 | None | 0 |
-| generation_photovoltaic|4068|TransnetBW|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| pumped_storage_consumption|4387|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| pumped_storage_consumption|4387|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| total_power_consumption|410|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| total_power_consumption|410|TransnetBW|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| forecast_generation_onshore_wind|123|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| forecast_generation_wind_and_photovoltaic|5097|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_hydro|1226|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
-| generation_photovoltaic|4068|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| residual_load|4359|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| day_ahead_prices|4169|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_hydro|1226|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_offshore_wind|1225|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_onshore_wind|4067|Amprion|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_pumped_storage|4070|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| total_power_consumption|410|Amprion|day | day | 4383 | 4383 | 100.0 | None | 0 |
-| generation_onshore_wind|4067|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_other_renewable|1228|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| forecast_generation_other|715|DE-LU|day | day | 3287 | 3287 | 100.0 | None | 0 |
-| generation_biomass|4066|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_offshore_wind|1225|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | None | 0 |
-| generation_onshore_wind|4067|DE-LU|day | day | 4018 | 4018 | 100.0 | None | 0 |
-| generation_onshore_wind|4067|TenneT|day | day | 4748 | 4748 | 100.0 | None | 0 |
-| total_power_consumption|410|50Hertz|day | day | 4383 | 4383 | 100.0 | None | 0 |
+| day_ahead_prices|4169|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_offshore_wind|3791|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_photovoltaic|126|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_total|122|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_biomass|4066|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_hard_coal|4069|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_hard_coal|4069|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_lignite|1223|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_lignite|1223|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_natural_gas|4071|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_natural_gas|4071|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_nuclear|1224|DE-LU|day | day | 2557 | 2557 | 100.0 | 0 | 0 |
+| generation_nuclear|1224|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_offshore_wind|1225|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_offshore_wind|1225|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_other_conventional|1227|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_other_conventional|1227|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_other_renewable|1228|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|Amprion|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_pumped_storage|4070|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| pumped_storage_consumption|4387|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| pumped_storage_consumption|4387|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| residual_load|4359|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| total_power_consumption|410|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| total_power_consumption|410|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| total_power_consumption|410|TenneT|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| total_power_consumption|410|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| day_ahead_prices|4169|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| forecast_generation_onshore_wind|123|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_other|715|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_wind_and_photovoltaic|5097|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_hydro|1226|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_hydro|1226|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_offshore_wind|1225|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_offshore_wind|1225|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|Amprion|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
+| generation_other_renewable|1228|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_pumped_storage|4070|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| residual_load|4359|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| total_power_consumption|410|Amprion|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_biomass|4066|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| total_power_consumption|410|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
 
-Rows per year: [(2013, 3), (2014, 1106), (2015, 5115), (2016, 6954), (2017, 6952), (2018, 13140), (2019, 13140), (2020, 13176), (2021, 13140), (2022, 44632), (2023, 48180), (2024, 180811), (2025, 538375), (2026, 371180)].
+Rows per year: [(2013, 3), (2014, 1106), (2015, 5115), (2016, 6954), (2017, 6952), (2018, 13140), (2019, 13140), (2020, 13176), (2021, 13140), (2022, 44632), (2023, 48180), (2024, 180811), (2025, 538375), (2026, 371180)] -- heavily back-loaded: series added in later years are dense from their own start, older series are short. A per-series min/max is the right span, NOT the table-wide 2013..now.
+
+### Temporal Consistency
+
+Does every forecast_* metric have a realised counterpart on the same (region, resolution, timestamp) grid? A gap means the forecast cannot be scored against an outcome from this table alone.
+
+- `forecast_generation_offshore_wind` -> `generation_offshore_wind`: 3287/3287 forecast grid points have a realised value (100.0%).
+- `forecast_generation_onshore_wind` -> `generation_onshore_wind`: 3287/3287 forecast grid points have a realised value (100.0%).
+- `forecast_generation_other` -> `generation_other_conventional`: 3287/3287 forecast grid points have a realised value (100.0%).
+- `forecast_generation_photovoltaic` -> `generation_photovoltaic`: 3287/3287 forecast grid points have a realised value (100.0%).
+- `forecast_generation_total`: no realised metric by name.
+- `forecast_generation_wind_and_photovoltaic`: no realised metric by name.
+
+### Physical Consistency
+
+Physical identity: residual_load should equal load - wind - solar at the same (region, resolution, timestamp).
+- identity `residual_load = pumped_storage_consumption - generation_onshore_wind - generation_photovoltaic`: 72571/72571 rows exceed 2% relative residual (100.0%); residual p01/p50/p99 [7929.0, 12440.46, 1348460.75], max abs 1600885.75.
+A non-trivial violation share means these published series are not a clean additive set (rounding, different vintages, or an extra term such as pumped-storage load) -- do not derive one from the others without reconciling.
+
+### Regime / Version Evidence
+
+Metric availability and total annual volume per year -- the measurable form of the 2013-2026 regime change (nuclear phase-out, coal exit, PV growth). `first-seen year` flags metrics that do not span the full table.
+
+Metric first-seen year: [('generation_photovoltaic', 2013), ('generation_offshore_wind', 2013), ('generation_onshore_wind', 2013), ('total_power_consumption', 2014), ('generation_biomass', 2015), ('generation_natural_gas', 2015), ('generation_hydro', 2015), ('forecast_generation_offshore_wind', 2017), ('forecast_generation_total', 2017), ('generation_lignite', 2017), ('generation_nuclear', 2017), ('generation_other_conventional', 2017), ('generation_other_renewable', 2017), ('generation_pumped_storage', 2017), ('pumped_storage_consumption', 2017), ('day_ahead_prices', 2017), ('forecast_generation_photovoltaic', 2017), ('forecast_generation_other', 2017), ('forecast_generation_wind_and_photovoltaic', 2017), ('generation_hard_coal', 2017), ('forecast_generation_onshore_wind', 2017), ('residual_load', 2017)]
+
+- 19 metric(s) start after the table's first year 2013: ['forecast_generation_offshore_wind', 'forecast_generation_total', 'generation_biomass', 'generation_lignite', 'generation_natural_gas', 'generation_nuclear', 'generation_other_conventional', 'generation_other_renewable', 'generation_pumped_storage', 'pumped_storage_consumption', 'day_ahead_prices', 'forecast_generation_photovoltaic', 'generation_hydro', 'total_power_consumption', 'forecast_generation_other', 'forecast_generation_wind_and_photovoltaic', 'generation_hard_coal', 'forecast_generation_onshore_wind', 'residual_load'].
+Any model pooling across years sees multiple generation-mix regimes and a changing set of available series -- a year/era indicator and a per-metric availability window are warranted (not chosen here).
 
 ### Entities / Keys
 
@@ -91,7 +133,7 @@ Metrics (22): ['day_ahead_prices', 'forecast_generation_offshore_wind', 'forecas
 Regions (5): ['50Hertz', 'Amprion', 'DE-LU', 'TenneT', 'TransnetBW']
 Resolutions (2): ['day', 'quarterhour']
 
-### Coverage
+### Coverage & Sampling Bias
 
 metric x region x resolution: 52 present, 168 absent of 220 possible.
 
@@ -99,11 +141,11 @@ Regions per metric: {'day_ahead_prices': ['DE-LU'], 'forecast_generation_offshor
 
 Resolutions per metric: {'day_ahead_prices': ['day', 'quarterhour'], 'forecast_generation_offshore_wind': ['day'], 'forecast_generation_onshore_wind': ['day'], 'forecast_generation_other': ['day'], 'forecast_generation_photovoltaic': ['day'], 'forecast_generation_total': ['day'], 'forecast_generation_wind_and_photovoltaic': ['day'], 'generation_biomass': ['day', 'quarterhour'], 'generation_hard_coal': ['day', 'quarterhour'], 'generation_hydro': ['day', 'quarterhour'], 'generation_lignite': ['day', 'quarterhour'], 'generation_natural_gas': ['day', 'quarterhour'], 'generation_nuclear': ['day', 'quarterhour'], 'generation_offshore_wind': ['day', 'quarterhour'], 'generation_onshore_wind': ['day', 'quarterhour'], 'generation_other_conventional': ['day', 'quarterhour'], 'generation_other_renewable': ['day', 'quarterhour'], 'generation_photovoltaic': ['day', 'quarterhour'], 'generation_pumped_storage': ['day', 'quarterhour'], 'pumped_storage_consumption': ['day', 'quarterhour'], 'residual_load': ['day', 'quarterhour'], 'total_power_consumption': ['day', 'quarterhour']}
 
-Absent combos (first 30): [('day_ahead_prices', '50Hertz', 'day'), ('day_ahead_prices', '50Hertz', 'quarterhour'), ('day_ahead_prices', 'Amprion', 'day'), ('day_ahead_prices', 'Amprion', 'quarterhour'), ('day_ahead_prices', 'TenneT', 'day'), ('day_ahead_prices', 'TenneT', 'quarterhour'), ('day_ahead_prices', 'TransnetBW', 'day'), ('day_ahead_prices', 'TransnetBW', 'quarterhour'), ('forecast_generation_offshore_wind', '50Hertz', 'day'), ('forecast_generation_offshore_wind', '50Hertz', 'quarterhour'), ('forecast_generation_offshore_wind', 'Amprion', 'day'), ('forecast_generation_offshore_wind', 'Amprion', 'quarterhour'), ('forecast_generation_offshore_wind', 'DE-LU', 'quarterhour'), ('forecast_generation_offshore_wind', 'TenneT', 'day'), ('forecast_generation_offshore_wind', 'TenneT', 'quarterhour'), ('forecast_generation_offshore_wind', 'TransnetBW', 'day'), ('forecast_generation_offshore_wind', 'TransnetBW', 'quarterhour'), ('forecast_generation_onshore_wind', '50Hertz', 'day'), ('forecast_generation_onshore_wind', '50Hertz', 'quarterhour'), ('forecast_generation_onshore_wind', 'Amprion', 'day'), ('forecast_generation_onshore_wind', 'Amprion', 'quarterhour'), ('forecast_generation_onshore_wind', 'DE-LU', 'quarterhour'), ('forecast_generation_onshore_wind', 'TenneT', 'day'), ('forecast_generation_onshore_wind', 'TenneT', 'quarterhour'), ('forecast_generation_onshore_wind', 'TransnetBW', 'day'), ('forecast_generation_onshore_wind', 'TransnetBW', 'quarterhour'), ('forecast_generation_other', '50Hertz', 'day'), ('forecast_generation_other', '50Hertz', 'quarterhour'), ('forecast_generation_other', 'Amprion', 'day'), ('forecast_generation_other', 'Amprion', 'quarterhour')]
+A model must not pool a metric's regional breakdowns with its DE-LU total, nor its day and quarterhour resolutions -- those are the same quantity at different aggregations and a random split leaks between them.
 
 ### Distributions
 
-| metric | min | max | mean | sd | p01/25/50/75/99 | zero | negative | 5-sigma outliers |
+| metric | min | max | mean | sd | p01/25/50/75/99 | zero | negative | 5-sigma |
 |---|---|---|---|---|---|---|---|---|
 | forecast_generation_onshore_wind | 12953.75 | 1055276.75 | 285885.5310390061 | 207238.6940015311 | [32706.36, 123456.75, 227245.0, 396927.25, 897516.75] | 0 | 0 | 0 |
 | generation_biomass | 155.5 | 119197.0 | 5083.13140287375 | 20079.185599647688 | [759.26, 953.85, 1023.1, 1106.25, 109023.25] | 0 | 0 | 1213 |
@@ -130,26 +172,37 @@ Absent combos (first 30): [('day_ahead_prices', '50Hertz', 'day'), ('day_ahead_p
 
 ### EDA Findings
 
+- Sign-mirror / duplicate metric pairs: [('forecast_generation_wind_and_photovoltaic', 'forecast_generation_photovoltaic')].
 - Negative values present per metric: {'forecast_generation_photovoltaic': 2897, 'day_ahead_prices': 4372, 'residual_load': 2777}.
 - 5-sigma value outliers per metric: {'generation_biomass': 1213, 'generation_photovoltaic': 996, 'generation_other_conventional': 1183, 'generation_onshore_wind': 789, 'day_ahead_prices': 271, 'generation_other_renewable': 1074, 'generation_offshore_wind': 979, 'generation_pumped_storage': 1220, 'total_power_consumption': 804, 'generation_natural_gas': 1020, 'generation_hard_coal': 868, 'generation_hydro': 1224, 'generation_nuclear': 1147, 'generation_lignite': 1320, 'pumped_storage_consumption': 1104, 'residual_load': 1212}.
 - 168 metric x region x resolution combinations carry no data.
 
 ### ML-Readiness Evidence
 
-- Candidate target signals: any `metric` representing an actual outcome (e.g. realised generation/consumption/price) is a plausible forecasting target keyed by (metric, region, resolution, timestamp_utc); metrics present are ['day_ahead_prices', 'forecast_generation_offshore_wind', 'forecast_generation_onshore_wind', 'forecast_generation_other', 'forecast_generation_photovoltaic', 'forecast_generation_total', 'forecast_generation_wind_and_photovoltaic', 'generation_biomass', 'generation_hard_coal', 'generation_hydro', 'generation_lignite', 'generation_natural_gas', 'generation_nuclear', 'generation_offshore_wind', 'generation_onshore_wind', 'generation_other_conventional', 'generation_other_renewable', 'generation_photovoltaic', 'generation_pumped_storage', 'pumped_storage_consumption', 'residual_load', 'total_power_consumption'].
-- Leakage: if any metric pair represents a forecast vs. an actual for the same underlying quantity, the forecast series must not be used as a feature to predict the actual at a timestamp on or after its own publication time, and vice versa -- verify metric semantics before pairing them as feature/target.
-- Grain and entity-grouped split: series key = ['metric', 'filter_id', 'region', 'resolution'] -- split by series (metric, filter_id, region, resolution), not by row or by shuffled timestamp, since a series' own points are temporally correlated and a row-level split would leak adjacent timestamps across train/test.
-- Join cardinality: this notebook does not join SMARD data to another Bronze table -- cross-source join cardinality (e.g. to weather or grid-operator data) is unassessed here and must be verified before using SMARD as a joined feature source.
-- Imbalance: not applicable -- `value` is continuous, not a categorical target; metric/region/resolution cardinality is reported under Coverage, not as a class-balance concern.
-- Sample-vs-full divergence: the value-distribution figure draws from `value_pdf`, a 10% sample capped at 200k rows, and the time-series figure (`ts_pdf`) shows only each metric's first 3000 chronological points -- neither is representative of the full series' later history; use the full-table `by_metric` aggregates (min/max/mean/sd/percentiles) for any feature-quality decision.
+- **Grain / grain drift:** Long format, series key = ['metric', 'filter_id', 'region', 'resolution']. One physical quantity appears at several resolutions and regional splits -- pooling them drifts the grain and mixes aggregation levels.
+- **Join multiplication (1:N / M:N expansion):** Single table -- no join here. A future join to weather / grid-operator data is unassessed; verify cardinality on (region, timestamp) before using SMARD as a feature.
+- **Target contamination:** Forecast metrics (['forecast_generation_offshore_wind', 'forecast_generation_onshore_wind', 'forecast_generation_other', 'forecast_generation_photovoltaic', 'forecast_generation_total', 'forecast_generation_wind_and_photovoltaic']) predict a realised metric -- using the realised value at or after the forecast's target time as a feature for that forecast (or vice versa) is target contamination.
+- **Temporal / post-event leakage:** A forecast series is published BEFORE its target time; a realised series is known only after. Any feature/target pair must respect each series' own availability time, not just the timestamp label.
+- **Proxy leakage:** residual_load = load - (wind + pv); day-ahead price is a near-deterministic function of the residual-load forecast -- a model given both is partly seeing its own target.
+- **Split / entity leakage:** Split by series (metric, filter_id, region, resolution), never by row or shuffled timestamp -- adjacent points in a series are highly correlated, and the same quantity's day/quarterhour variants must stay on one side.
+- **Historical-reference (point-in-time) leakage:** SMARD revises published values (a preliminary figure is later corrected). Bronze holds the snapshot as downloaded; if re-downloaded, an as-of column is needed to avoid using a later revision as a historical feature.
+- **Survivorship / coverage bias:** Rows-per-year is back-loaded (series added over time). A study window must be the intersection of the series it uses, not the table-wide span.
+- **Missingness leakage:** `value` missing per metric: {'forecast_generation_onshore_wind': 390, 'generation_biomass': 692, 'forecast_generation_wind_and_photovoltaic': 390, 'generation_photovoltaic': 1531, 'forecast_generation_offshore_wind': 390, 'forecast_generation_other': 478, 'forecast_generation_photovoltaic': 390, 'forecast_generation_total': 542, 'generation_other_conventional': 660, 'generation_onshore_wind': 1531, 'day_ahead_prices': 486, 'generation_other_renewable': 599, 'generation_offshore_wind': 1201, 'generation_pumped_storage': 599, 'total_power_consumption': 1078, 'generation_natural_gas': 691, 'generation_hard_coal': 598, 'generation_hydro': 798, 'generation_nuclear': 1136, 'generation_lignite': 599, 'pumped_storage_consumption': 601, 'residual_load': 603}. A missing point often marks a data-publication outage -- an 'is-missing' flag can leak it.
+- **Duplicate-event leakage:** (series, ts) duplicates: {'series_ts_keys': 1255904, 'dup_groups': 0, 'identical': 0, 'conflicting': 0} -- de-duplicate before treating a point as one observation.
+- **Target / feature temporal misalignment:** Forecast timestamp = target time, not publication time. Aligning a forecast feature to a realised target by timestamp alone silently uses a same-time forecast that was actually published earlier -- fine -- but a LATER-vintage forecast for the same target is leakage.
+- **Unit / sign / circular-feature leakage:** Mirror/copy metrics: [('forecast_generation_wind_and_photovoltaic', 'forecast_generation_photovoltaic')]. Units are not in Bronze -- combining metrics before attaching units risks adding MW to MWh to EUR/MWh.
+- **Data-generation-process leakage:** `filter_id` and `resolution` describe how SMARD aggregated and published the series, not the physical system -- a feature keyed on them encodes the publication process.
+- **Class / label instability:** Not applicable -- `value` is continuous.
+- **Label availability lag:** Realised generation/load is published with a lag (preliminary then final); a nowcast cannot use a value that is not yet published at prediction time.
+- **Source / version / regime change:** SMARD's methodology and the German generation mix both changed materially over 2013-2026 (nuclear phase-out, coal exit, PV growth). Regime / Version Evidence above gives the per-metric first-seen year and annual volume -- a regime/era indicator and per-metric availability window are warranted.
+- **Sample-vs-full divergence:** value_pdf is a 10% sample capped at 200k rows and the time-series figure shows the first 4000 points of ONE representative series per metric -- neither represents later history; use the full-table by_metric aggregates for any feature-quality decision.
 
 ### Silver Implications
 
+- Sign-mirror metrics identified above -> keep one, or an explicit note on the derivation; investigate the load/staging for a sign error before Silver.
 - Silver grain: one row per (metric, filter_id, region, resolution, timestamp_utc).
-
-### Figure -- SMARD metric|region x resolution presence
-
-![SMARD metric|region x resolution presence](figures/smard_coverage_matrix.png)
+- Attach the physical unit per metric from the SMARD filter catalog at Silver.
+- Preserve gaps; do not forward-fill without a stated, per-resolution rule.
 
 ### Figure -- SMARD series overview
 
@@ -159,8 +212,12 @@ Absent combos (first 30): [('day_ahead_prices', '50Hertz', 'day'), ('day_ahead_p
 
 ![SMARD value distribution per metric (sampled)](figures/smard_value_distributions.png)
 
-### Figure -- SMARD first 3000 points per metric
+### Figure -- SMARD -- one representative series per metric (chronological)
 
-![SMARD first 3000 points per metric](figures/smard_time_series.png)
+![SMARD -- one representative series per metric (chronological)](figures/smard_time_series.png)
+
+### Figure -- SMARD metric|region x resolution presence
+
+![SMARD metric|region x resolution presence](figures/smard_coverage_matrix.png)
 
 <!-- END smard:01_smard -->

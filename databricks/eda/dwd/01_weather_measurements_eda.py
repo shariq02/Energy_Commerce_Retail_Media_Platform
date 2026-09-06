@@ -86,8 +86,8 @@ PLAUSIBLE = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers -- DWD hourly timestamp + value-column selection
+
 def as_ts(col):
     # MESS_DATUM is yyyyMMddHH, but a double-inferred column arrives as
     # "2025021300.0" -- to_timestamp(x, "yyyyMMddHH") then parses NOTHING. Strip a

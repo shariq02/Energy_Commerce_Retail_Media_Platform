@@ -103,6 +103,51 @@ Exact `*MastrNummer` key cardinality (column: distinct / ratio-to-rows / unique)
 - einheiten_kernkraft.`Inbetriebnahmedatum`: 1984-09-05 00:00:00 .. 1989-04-15 00:00:00 (Europe/Berlin wall-clock in source; convert to UTC on a documented rule). Future-dated rows: 0 -- planned commissioning dates are recorded ahead of time, so this column is only 'known' up to its own value.
 - einheiten_geothermie_gsgk.`Inbetriebnahmedatum`: 1965-01-01 00:00:00 .. 2026-08-20 00:00:00 (Europe/Berlin wall-clock in source; convert to UTC on a documented rule). Future-dated rows: 0 -- planned commissioning dates are recorded ahead of time, so this column is only 'known' up to its own value.
 
+### Spatial Consistency
+
+Only the einheiten_* tables carry latitude/longitude -- lokationen, netzanschlusspunkte and netze carry no coordinates, so a cross-table lat/lon reconciliation is NOT possible (limitation, not a finding). The checks below are internal geographic agreement, no external shapefile: each is `inconsistent groups / total groups`.
+
+- einheiten_wind: Bundesland code vs municipality-key (AGS) prefix -- 1/16 inconsistent (worst group holds 2 distinct values).
+- einheiten_wind: municipality-key (AGS) vs postcode prefix -- 63/4132 inconsistent (worst group holds 3 distinct values).
+- einheiten_wind: units sharing a LokationMaStRNummer vs their coordinates (2dp) -- 3621/10417 inconsistent (worst group holds 96 distinct values).
+- einheiten_biomasse: Bundesland code vs municipality-key (AGS) prefix -- 2/16 inconsistent (worst group holds 2 distinct values).
+- einheiten_biomasse: municipality-key (AGS) vs postcode prefix -- 37/4906 inconsistent (worst group holds 4 distinct values).
+- einheiten_biomasse: units sharing a LokationMaStRNummer vs their coordinates (2dp) -- 366/15387 inconsistent (worst group holds 4 distinct values).
+- einheiten_wasser: Bundesland code vs municipality-key (AGS) prefix -- 1/15 inconsistent (worst group holds 2 distinct values).
+- einheiten_wasser: municipality-key (AGS) vs postcode prefix -- 9/2740 inconsistent (worst group holds 3 distinct values).
+- einheiten_wasser: units sharing a LokationMaStRNummer vs their coordinates (2dp) -- 42/4021 inconsistent (worst group holds 4 distinct values).
+- einheiten_verbrennung: Bundesland code vs municipality-key (AGS) prefix -- 3/16 inconsistent (worst group holds 3 distinct values).
+- einheiten_verbrennung: municipality-key (AGS) vs postcode prefix -- 31/6938 inconsistent (worst group holds 4 distinct values).
+- einheiten_verbrennung: units sharing a LokationMaStRNummer vs their coordinates (2dp) -- 145/19200 inconsistent (worst group holds 3 distinct values).
+- einheiten_kernkraft: Bundesland code vs municipality-key (AGS) prefix -- 0/4 inconsistent (worst group holds 1 distinct values).
+- einheiten_kernkraft: municipality-key (AGS) vs postcode prefix -- 0/6 inconsistent (worst group holds 1 distinct values).
+- einheiten_kernkraft: units sharing a LokationMaStRNummer vs their coordinates (2dp) -- 0/1 inconsistent (worst group holds 1 distinct values).
+- einheiten_geothermie_gsgk: Bundesland code vs municipality-key (AGS) prefix -- 0/15 inconsistent (worst group holds 1 distinct values).
+- einheiten_geothermie_gsgk: municipality-key (AGS) vs postcode prefix -- 0/172 inconsistent (worst group holds 1 distinct values).
+- einheiten_geothermie_gsgk: units sharing a LokationMaStRNummer vs their coordinates (2dp) -- 1/169 inconsistent (worst group holds 2 distinct values).
+A non-zero inconsistent count is a source-data finding (a unit whose stated region, municipality key and coordinates disagree); it does not prove which attribute is wrong.
+
+### Regime / Version Evidence
+
+Rows split on the registration date at 2019-06-01 (the MaStR legacy migration wave vs native registrations). Per-column null-rate and distinct-value count on each side; `flipped` = null-rate moves >= 50 points across the cut.
+
+- einheiten_wind (`Registrierungsdatum`): pre=5281, post=38176, undated=0.
+  - no column flips populated/empty across the cut.
+- einheiten_biomasse (`Registrierungsdatum`): pre=5635, post=18699, undated=0.
+  - no column flips populated/empty across the cut.
+- einheiten_wasser (`Registrierungsdatum`): pre=957, post=7857, undated=0.
+  - columns populated on one side of the cut only: ['NameKraftwerk']
+    - `NameKraftwerk`: null-rate pre=0.1484 post=0.7266; distinct pre=635 post=1549.
+- einheiten_verbrennung (`Registrierungsdatum`): pre=9012, post=85015, undated=0.
+  - columns populated on one side of the cut only: ['NameKraftwerk', 'NameKraftwerksblock']
+    - `NameKraftwerk`: null-rate pre=0.1117 post=0.7303; distinct pre=4988 post=14565.
+    - `NameKraftwerksblock`: null-rate pre=0.1546 post=0.7483; distinct pre=4434 post=11730.
+- einheiten_kernkraft (`Registrierungsdatum`): pre=0, post=6, undated=0.
+  - no column flips populated/empty across the cut.
+- einheiten_geothermie_gsgk (`Registrierungsdatum`): pre=46, post=290, undated=0.
+  - no column flips populated/empty across the cut.
+This is a source/version-regime property: pre-migration rows are a different data-generating process from native ones. Carry a migration-era flag on any feature drawn from these tables; this notebook quantifies the gap, it does not choose the feature.
+
 ### Referential Integrity
 
 - Cross-carrier and generation-unit <-> support/authorisation/change referential integrity is assessed in `06_mastr_relationships_and_findings.py` against an explicit join spec; this notebook only establishes each table's own-entity key.
@@ -1093,7 +1138,7 @@ This table is a current-state snapshot: a unit decommissioned before the export 
 - **Data-generation-process leakage:** `NetzbetreiberpruefungStatus` and `EinheitSystemstatus` describe MaStR's own registration/validation workflow, not the physical unit -- they encode how/when the record was processed and can leak label timing.
 - **Class / label instability:** Categorical code columns (e.g. status, technology) are MaStR enumerations that change between register releases -- pin the catalog version (see 05) before treating a code as a stable class.
 - **Label availability lag:** A decommission is registered in MaStR after it happens, sometimes with a long lag -- the change-history tables (04) carry the registration date; do not assume a status is known at the physical event time.
-- **Source / version / regime change:** MaStR replaced the older EEG/Anlagenregister in 2019; pre-2019 units were bulk-migrated and their attribute completeness differs from natively-registered units -- a registration-era indicator is warranted.
+- **Source / version / regime change:** MaStR replaced the older EEG/Anlagenregister in 2019; pre-2019 units were bulk-migrated. Regime / Version Evidence above measures the population gap across the 2019-06-01 cut per column -- a registration-era indicator is warranted where columns flip populated/empty.
 - **Sample-vs-full divergence:** Every statistic here is a full Spark aggregation or `.distinct().count()` / `countDistinct` -- no `.sample()` / `.limit()` feeds a reported number.
 
 ### Silver Implications
@@ -1214,6 +1259,42 @@ Scheme / authorisation dates are Europe/Berlin wall-clock. `Registrierungsdatum`
 - einheiten_genehmigung.`DatumDerAntragstellung`: 1925-09-01 00:00:00 .. 2026-08-04 00:00:00 (future-dated: 0).
 - ertuechtigungen.`WiederinbetriebnahmeDatum`: 1990-07-01 00:00:00 .. 2026-08-10 00:00:00 (future-dated: 0).
 - ertuechtigungen.`DatumLetzteAktualisierung`: 2019-02-04 14:31:17.694047 .. 2026-09-03 08:58:12.768874 (future-dated: 0).
+
+### Temporal Consistency
+
+Event-ordering checks within each record (a pair is checked only when both columns exist). A violation is a source-data finding: the record's own milestone dates contradict each other.
+
+- anlagen_eeg_wind: decision/effective <= registration (`AusschreibungZuschlag` -> `Registrierungsdatum`): 0/0 out of order (None%).
+- anlagen_eeg_wind: commissioning <= registration (`EegInbetriebnahmedatum` -> `Registrierungsdatum`): 61/35275 out of order (0.173%).
+- anlagen_eeg_wind: registration <= last-update (`Registrierungsdatum` -> `DatumLetzteAktualisierung`): 9/43457 out of order (0.021%).
+- anlagen_eeg_biomasse: decision/effective <= registration (`AusschreibungZuschlag` -> `Registrierungsdatum`): 0/0 out of order (None%).
+- anlagen_eeg_biomasse: commissioning <= registration (`EegInbetriebnahmedatum` -> `Registrierungsdatum`): 1073/15423 out of order (6.957%).
+- anlagen_eeg_biomasse: registration <= last-update (`Registrierungsdatum` -> `DatumLetzteAktualisierung`): 2/15644 out of order (0.013%).
+- anlagen_eeg_wasser: commissioning <= registration (`EegInbetriebnahmedatum` -> `Registrierungsdatum`): 158/7481 out of order (2.112%).
+- anlagen_eeg_wasser: registration <= last-update (`Registrierungsdatum` -> `DatumLetzteAktualisierung`): 3/7485 out of order (0.04%).
+- anlagen_eeg_geothermie_gsgk: commissioning <= registration (`EegInbetriebnahmedatum` -> `Registrierungsdatum`): 0/132 out of order (0.0%).
+- anlagen_eeg_geothermie_gsgk: registration <= last-update (`Registrierungsdatum` -> `DatumLetzteAktualisierung`): 0/132 out of order (0.0%).
+- anlagen_kwk: decision/effective <= registration (`AusschreibungZuschlag` -> `Registrierungsdatum`): 0/0 out of order (None%).
+- anlagen_kwk: commissioning <= registration (`Inbetriebnahmedatum` -> `Registrierungsdatum`): 1453/92165 out of order (1.577%).
+- anlagen_kwk: registration <= last-update (`Registrierungsdatum` -> `DatumLetzteAktualisierung`): 97/92513 out of order (0.105%).
+- einheiten_genehmigung: application <= decision (`DatumDerAntragstellung` -> `Datum`): 14/4278 out of order (0.327%).
+- einheiten_genehmigung: application <= registration (`DatumDerAntragstellung` -> `Registrierungsdatum`): 41/4278 out of order (0.958%).
+- einheiten_genehmigung: decision/effective <= registration (`Datum` -> `Registrierungsdatum`): 622/37722 out of order (1.649%).
+- einheiten_genehmigung: registration <= last-update (`Registrierungsdatum` -> `DatumLetzteAktualisierung`): 56/37722 out of order (0.148%).
+
+### Regime / Version Evidence
+
+Rows split on the registration date at 2019-06-01 (MaStR migration wave vs native). Per-column null-rate + distinct count each side; `flipped` = null-rate moves >= 50 points across the cut.
+
+- anlagen_eeg_wind (`Registrierungsdatum`): pre=5278, post=38179, undated=0; flipped columns: none.
+- anlagen_eeg_biomasse (`Registrierungsdatum`): pre=3321, post=12323, undated=0; flipped columns: none.
+- anlagen_eeg_wasser (`Registrierungsdatum`): pre=695, post=6790, undated=0; flipped columns: none.
+- anlagen_eeg_geothermie_gsgk (`Registrierungsdatum`): pre=35, post=97, undated=0; flipped columns: none.
+- anlagen_kwk (`Registrierungsdatum`): pre=10895, post=81618, undated=1; flipped columns: ['AusschreibungZuschlag'].
+  - `AusschreibungZuschlag`: null-rate pre=0.881 post=0.1574; distinct pre=2 post=2.
+- einheiten_genehmigung (`Registrierungsdatum`): pre=6420, post=31302, undated=0; flipped columns: none.
+- ertuechtigungen: no registration-date column -- not assessable.
+EEG 2000/2004/2009/2012/2014/2017/2021/2023 each changed the support mechanism; the migration cut above is the measurable discontinuity in this export. A scheme-vintage indicator is warranted -- not chosen here.
 
 ### Referential Integrity
 
@@ -1362,7 +1443,7 @@ Concentration: Gini 0.5623, top-10% share 0.4657. anlagen_kwk and anlagen_eeg_wi
 - **Data-generation-process leakage:** `Registrierungsdatum` and any MaStR status columns describe record handling, not the physical scheme -- they can leak the timing of the label.
 - **Class / label instability:** Support-scheme category codes change with each EEG amendment; pin the catalog release (05).
 - **Label availability lag:** Authorisation and tariff decisions are registered after they are made -- the effective-to-registration gap is the label lag.
-- **Source / version / regime change:** EEG 2000/2004/2009/2012/2014/2017/2021/2023 each changed the support mechanism (fixed feed-in -> auction) -- a scheme-vintage indicator is essential before pooling records.
+- **Source / version / regime change:** EEG 2000/2004/2009/2012/2014/2017/2021/2023 each changed the support mechanism (fixed feed-in -> auction). Regime / Version Evidence above measures the population discontinuity at the 2019-06-01 migration cut -- a scheme-vintage indicator is warranted where columns flip.
 - **Sample-vs-full divergence:** Every statistic is a full Spark aggregation or `.distinct().count()` -- no sampling.
 
 ### Silver Implications
@@ -1461,8 +1542,8 @@ marktakteure / netzanschlusspunkte / lokationen are 5-7M rows; netze / bilanzier
 - 8: 759
 - 5: 137
 - 4: 5
-- 10: 1
 - 7: 1
+- 10: 1
 - marktakteure.`Land`: - None: 5325454
 - 84: 290123
 - 90: 206
@@ -1898,22 +1979,22 @@ Generation-unit population (union of EinheitMastrNummer): 170974
 
 Referential integrity per EXPLICIT relationship (child column -> parent role). `expectation`: subset = child should resolve to a live parent; disjoint = child should NOT be in the live tables by design (deregistered entities); partial-scope = the live parent set is incomplete because solar/storage object types are deferred from staging.
 
-- `anlagen_eeg_wind.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/43457, unused_parent=23261, child rows/key max=1 avg=1.0
-- `anlagen_eeg_biomasse.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/15644, unused_parent=51074, child rows/key max=1 avg=1.0
-- `anlagen_eeg_wasser.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/7485, unused_parent=59233, child rows/key max=1 avg=1.0
-- `anlagen_eeg_geothermie_gsgk.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/132, unused_parent=66586, child rows/key max=1 avg=1.0
-- `anlagen_kwk.KwkMastrNummer` -> gen_kwk [subset]: match_rate=1.0, orphans=0/92514, unused_parent=0, child rows/key max=1 avg=1.0
-- `einheiten_genehmigung.GenMastrNummer` -> gen_gen [subset]: match_rate=0.9504, orphans=1871/37722, unused_parent=0, child rows/key max=1 avg=1.0
-- `ertuechtigungen.EegMastrNummer` -> gen_eeg [partial-scope]: match_rate=0.4503, orphans=807/1468, unused_parent=66057, child rows/key max=8 avg=1.145
-- `geloeschte_deaktivierte_einheiten.EinheitMastrNummer` -> gen_einheit [disjoint]: match_rate=0.0, orphans=244295/244295, unused_parent=170974, child rows/key max=1 avg=1.0
-- `einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer` -> gen_einheit [partial-scope]: match_rate=0.0356, orphans=214142/222056, unused_parent=163060, child rows/key max=4 avg=1.02
-- `geloeschte_deaktivierte_marktakteure.MarktakteurMastrNummer` -> marktakteure [disjoint]: match_rate=0.0, orphans=285315/285315, unused_parent=5616357, child rows/key max=1 avg=1.0
-- `marktakteure_und_rollen.MarktakteurMastrNummer` -> marktakteure [subset]: match_rate=1.0, orphans=0/12887, unused_parent=5603470, child rows/key max=5 avg=1.217
-- `netzanschlusspunkte.LokationMaStRNummer` -> lokationen [subset]: match_rate=0.9986, orphans=7810/5734451, unused_parent=1049753, child rows/key max=132 avg=1.023
-- `netzanschlusspunkte.NetzMaStRNummer` -> netze [subset]: match_rate=1.0, orphans=0/1008, unused_parent=732, child rows/key max=630081 avg=5820.667
-- `netzanschlusspunkte.NetzbetreiberMaStRNummer` -> marktakteure [subset]: match_rate=0.998, orphans=2/1006, unused_parent=5615353, child rows/key max=630130 avg=5832.239
-- `einheiten_wind.AnlagenbetreiberMastrNummer` -> marktakteure [subset]: match_rate=1.0, orphans=0/12394, unused_parent=5603963, child rows/key max=2550 avg=3.506
-- `einheiten_verbrennung.LokationMaStRNummer` -> lokationen [subset]: match_rate=1.0, orphans=0/79269, unused_parent=6697125, child rows/key max=9751 avg=1.186
+- `anlagen_eeg_wind.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/43457, child_rows=43457, distinct_child_keys=43457, parents_referenced=43457/66718 (65.135%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `anlagen_eeg_biomasse.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/15644, child_rows=15644, distinct_child_keys=15644, parents_referenced=15644/66718 (23.448%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `anlagen_eeg_wasser.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/7485, child_rows=7485, distinct_child_keys=7485, parents_referenced=7485/66718 (11.219%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `anlagen_eeg_geothermie_gsgk.EegMaStRNummer` -> gen_eeg [subset]: match_rate=1.0, orphans=0/132, child_rows=132, distinct_child_keys=132, parents_referenced=132/66718 (0.198%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `anlagen_kwk.KwkMastrNummer` -> gen_kwk [subset]: match_rate=1.0, orphans=0/92514, child_rows=92514, distinct_child_keys=92514, parents_referenced=92514/92514 (100.0%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `einheiten_genehmigung.GenMastrNummer` -> gen_gen [subset]: match_rate=0.9504, orphans=1871/37722, child_rows=37722, distinct_child_keys=37722, parents_referenced=35851/35851 (100.0%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `ertuechtigungen.EegMastrNummer` -> gen_eeg [partial-scope]: match_rate=0.4503, orphans=807/1468, child_rows=1681, distinct_child_keys=1468, parents_referenced=661/66718 (0.991%), child_rows_per_parent p50/p90/p99=1/1/4, max_fanout=8
+- `geloeschte_deaktivierte_einheiten.EinheitMastrNummer` -> gen_einheit [disjoint]: match_rate=0.0, orphans=244295/244295, child_rows=244295, distinct_child_keys=244295, parents_referenced=0/170974 (0.0%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer` -> gen_einheit [partial-scope]: match_rate=0.0356, orphans=214142/222056, child_rows=226405, distinct_child_keys=222056, parents_referenced=7914/170974 (4.629%), child_rows_per_parent p50/p90/p99=1/1/2, max_fanout=4
+- `geloeschte_deaktivierte_marktakteure.MarktakteurMastrNummer` -> marktakteure [disjoint]: match_rate=0.0, orphans=285315/285315, child_rows=285315, distinct_child_keys=285315, parents_referenced=0/5616357 (0.0%), child_rows_per_parent p50/p90/p99=1/1/1, max_fanout=1
+- `marktakteure_und_rollen.MarktakteurMastrNummer` -> marktakteure [subset]: match_rate=1.0, orphans=0/12887, child_rows=15689, distinct_child_keys=12887, parents_referenced=12887/5616357 (0.229%), child_rows_per_parent p50/p90/p99=1/2/3, max_fanout=5
+- `netzanschlusspunkte.LokationMaStRNummer` -> lokationen [subset]: match_rate=0.9986, orphans=7810/5734451, child_rows=5867232, distinct_child_keys=5734451, parents_referenced=5726641/6776394 (84.509%), child_rows_per_parent p50/p90/p99=1/1/2, max_fanout=132
+- `netzanschlusspunkte.NetzMaStRNummer` -> netze [subset]: match_rate=1.0, orphans=0/1008, child_rows=5867232, distinct_child_keys=1008, parents_referenced=1008/1740 (57.931%), child_rows_per_parent p50/p90/p99=1229/7261/104074, max_fanout=630081
+- `netzanschlusspunkte.NetzbetreiberMaStRNummer` -> marktakteure [subset]: match_rate=0.998, orphans=2/1006, child_rows=5867232, distinct_child_keys=1006, parents_referenced=1004/5616357 (0.018%), child_rows_per_parent p50/p90/p99=1230/7261/104073, max_fanout=630130
+- `einheiten_wind.AnlagenbetreiberMastrNummer` -> marktakteure [subset]: match_rate=1.0, orphans=0/12394, child_rows=40907, distinct_child_keys=12394, parents_referenced=12394/5616357 (0.221%), child_rows_per_parent p50/p90/p99=2/6/23, max_fanout=325
+- `einheiten_verbrennung.LokationMaStRNummer` -> lokationen [subset]: match_rate=1.0, orphans=0/79269, child_rows=84276, distinct_child_keys=79269, parents_referenced=79269/6776394 (1.17%), child_rows_per_parent p50/p90/p99=1/1/2, max_fanout=110
 
 Interpretation of the SUBSET relationships with a real (unexpected) orphan rate:
 - einheiten_genehmigung.GenMastrNummer: 1871 of 37722 `einheiten_genehmigung.GenMastrNummer` keys (5.0%) have no `gen_gen` row -> an INNER join silently drops those child rows; use a LEFT join with an explicit unmatched flag, and treat the orphan rate as a data-quality signal, not noise.
@@ -1933,6 +2014,96 @@ Expected high-orphan relationships (not a defect):
 
 katalogwerte -> katalogkategorien: 0 orphan FK values, 5 unreferenced categories.
 
+### Catalog / Domain Reconciliation
+
+Every low-cardinality integer-coded column across the generation-unit, EEG/authorisation and change-history tables, reconciled against mastr_katalogwerte (1737 value-ids, 118 categories). LIMITATION: the export carries no column -> category binding, so a column is scoped to a category only when its name matches; otherwise the check is global value-id membership, which cannot prove a code is valid FOR THAT column.
+
+- `einheiten_wind.Bundesland` [category, category `Land`]: 17 unknown code(s) over 43457 rows -- ['1408', '1409', '1400', '1411', '1414', '1407', '1410', '1403', '1416', '1405', '1402', '1415']
+- `einheiten_wind.StrasseNichtGefunden` [all catalog value-ids]: 1 unknown code(s) over 40845 rows -- ['0']
+- `einheiten_wind.FernsteuerbarkeitNb` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 31961 rows -- ['1', '0']
+- `einheiten_wind.FernsteuerbarkeitDv` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 39689 rows -- ['1', '0']
+- `einheiten_wind.WindAnLandOderAufSee` [category, category `Land`]: 2 unknown code(s) over 43457 rows -- ['888', '889']
+- `einheiten_wind.Technologie` [category, category `BrennstoffTechnologieNetzersatz`]: 3 unknown code(s) over 43457 rows -- ['691', '692', '3102']
+- `einheiten_wind.Rotorblattenteisungssystem` [all catalog value-ids]: 1 unknown code(s) over 30450 rows -- ['0']
+- `einheiten_wind.AuflageAbschaltungLeistungsbegrenzung` [all catalog value-ids]: 1 unknown code(s) over 16905 rows -- ['0']
+- `einheiten_wind.AuflagenAbschaltungSchallimmissionsschutzNachts` [all catalog value-ids]: 1 unknown code(s) over 8948 rows -- ['0']
+- `einheiten_wind.AuflagenAbschaltungSchallimmissionsschutzTagsueber` [all catalog value-ids]: 1 unknown code(s) over 17764 rows -- ['0']
+- `einheiten_wind.AuflagenAbschaltungSchattenwurf` [all catalog value-ids]: 1 unknown code(s) over 4069 rows -- ['0']
+- `einheiten_wind.AuflagenAbschaltungTierschutz` [all catalog value-ids]: 1 unknown code(s) over 5297 rows -- ['0']
+- `einheiten_wind.AuflagenAbschaltungEiswurf` [all catalog value-ids]: 1 unknown code(s) over 7527 rows -- ['0']
+- `einheiten_wind.AuflagenAbschaltungSonstige` [all catalog value-ids]: 1 unknown code(s) over 14752 rows -- ['0']
+- `einheiten_wind.Nachtkennzeichnung` [all catalog value-ids]: 1 unknown code(s) over 3844 rows -- ['0']
+- `einheiten_wind.Buergerenergie` [all catalog value-ids]: 1 unknown code(s) over 9573 rows -- ['0']
+- `einheiten_wind.AnschlussAnHoechstOderHochSpannung` [all catalog value-ids]: 1 unknown code(s) over 6315 rows -- ['0']
+- `einheiten_wind.Einsatzverantwortlicher` [all catalog value-ids]: 3 unknown code(s) over 159 rows -- ['9979739000006', '4041404000032', '9911844000000']
+- `einheiten_biomasse.Bundesland` [category, category `Land`]: 16 unknown code(s) over 24334 rows -- ['1403', '1408', '1402', '1409', '1411', '1407', '1400', '1405', '1414', '1413', '1410', '1415']
+- `einheiten_biomasse.StrasseNichtGefunden` [all catalog value-ids]: 1 unknown code(s) over 21945 rows -- ['0']
+- `einheiten_biomasse.FernsteuerbarkeitNb` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 22583 rows -- ['1', '0']
+- `einheiten_biomasse.FernsteuerbarkeitDv` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 20197 rows -- ['1', '0']
+- `einheiten_biomasse.Hauptbrennstoff` [category, category `Brennstoff`]: 20 unknown code(s) over 24330 rows -- ['2445', '2446', '2448', '2442', '2421', '2447', '3032', '2436', '2424', '2415', '2425', '2419']
+- `einheiten_biomasse.Technologie` [category, category `BrennstoffTechnologieNetzersatz`]: 13 unknown code(s) over 24332 rows -- ['542', '546', '840', '835', '545', '836', '838', '833', '544', '834', '839', '543']
+- `einheiten_biomasse.AnschlussAnHoechstOderHochSpannung` [all catalog value-ids]: 1 unknown code(s) over 692 rows -- ['0']
+- `einheiten_biomasse.Einsatzverantwortlicher` [all catalog value-ids]: 25 unknown code(s) over 31 rows -- ['9911568000005', '9979261000003', '9979212000002', '9979393000004', '9911818000002', '9904512000006', '9900730000000', '9911901000000', '9979618000002', '9978673000007', '9906200000009', '9905685000006']
+- `einheiten_wasser.Bundesland` [category, category `Land`]: 15 unknown code(s) over 8784 rows -- ['1403', '1402', '1409', '1405', '1413', '1408', '1410', '1415', '1414', '1400', '1412', '1411']
+- `einheiten_wasser.FernsteuerbarkeitNb` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 8650 rows -- ['0', '1']
+- `einheiten_wasser.MinderungStromerzeugung` [all catalog value-ids]: 1 unknown code(s) over 3744 rows -- ['0']
+- `einheiten_wasser.StrasseNichtGefunden` [all catalog value-ids]: 1 unknown code(s) over 4306 rows -- ['0']
+- `einheiten_wasser.FernsteuerbarkeitDv` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 2797 rows -- ['0', '1']
+- `einheiten_wasser.BestandteilGrenzkraftwerk` [all catalog value-ids]: 1 unknown code(s) over 1827 rows -- ['0']
+- `einheiten_wasser.AnschlussAnHoechstOderHochSpannung` [all catalog value-ids]: 1 unknown code(s) over 417 rows -- ['0']
+- `einheiten_wasser.Einsatzverantwortlicher` [all catalog value-ids]: 13 unknown code(s) over 101 rows -- ['9904257000006', '4041404000032', '9911866000004', '4260016050109', '9900012345678', '9904880000001', '4260016050079', '4260016050055', '9978522000009', '9978071000005', '4041407000008', '9911844000000']
+- `einheiten_verbrennung.Bundesland` [category, category `Land`]: 16 unknown code(s) over 94026 rows -- ['1409', '1402', '1403', '1408', '1405', '1410', '1413', '1411', '1414', '1401', '1400', '1415']
+- `einheiten_verbrennung.FernsteuerbarkeitNb` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 84500 rows -- ['0', '1']
+- `einheiten_verbrennung.Hauptbrennstoff` [category, category `Brennstoff`]: 22 unknown code(s) over 91283 rows -- ['2473', '2467', '2477', '2466', '2469', '2478', '2472', '2483', '2481', '2468', '2480', '2457']
+- `einheiten_verbrennung.Technologie` [category, category `BrennstoffTechnologieNetzersatz`]: 14 unknown code(s) over 93948 rows -- ['542', '543', '544', '836', '840', '835', '545', '838', '834', '833', '837', '839']
+- `einheiten_verbrennung.StrasseNichtGefunden` [all catalog value-ids]: 1 unknown code(s) over 23960 rows -- ['0']
+- `einheiten_verbrennung.AnschlussAnHoechstOderHochSpannung` [all catalog value-ids]: 1 unknown code(s) over 2175 rows -- ['0']
+- `einheiten_verbrennung.FernsteuerbarkeitDv` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 15477 rows -- ['0', '1']
+- `einheiten_verbrennung.AnlageIstImKombibetrieb` [all catalog value-ids]: 1 unknown code(s) over 12355 rows -- ['0']
+- `einheiten_verbrennung.BestandteilGrenzkraftwerk` [all catalog value-ids]: 1 unknown code(s) over 11335 rows -- ['0']
+- `einheiten_verbrennung.Notstromaggregat` [all catalog value-ids]: 1 unknown code(s) over 2507 rows -- ['0']
+- `einheiten_verbrennung.WeitererHauptbrennstoff` [category, category `Brennstoff`]: 45 unknown code(s) over 9148 rows -- ['2473', '2469', '2466', '2467', '2477', '2472', '2445', '2448', '2446', '2442', '3035', '2437']
+- `einheiten_verbrennung.NetzreserveZugeordnet` [all catalog value-ids]: 1 unknown code(s) over 682 rows -- ['0']
+- `einheiten_verbrennung.KapazitaetsreserveZugeordnet` [all catalog value-ids]: 1 unknown code(s) over 708 rows -- ['0']
+- `einheiten_verbrennung.AusschliesslicheVerwendungImKombibetrieb` [all catalog value-ids]: 1 unknown code(s) over 347 rows -- ['0']
+- `einheiten_kernkraft.Bundesland` [category, category `Land`]: 4 unknown code(s) over 6 rows -- ['1408', '1403', '1411', '1402']
+- `einheiten_kernkraft.Gemeindeschluessel` [all catalog value-ids]: 6 unknown code(s) over 6 rows -- ['03252005', '01061018', '09274128', '09774136', '03454032', '08125066']
+- `einheiten_kernkraft.Postleitzahl` [all catalog value-ids]: 6 unknown code(s) over 6 rows -- ['31860', '25576', '84051', '89355', '49811', '74382']
+- `einheiten_kernkraft.StrasseNichtGefunden` [all catalog value-ids]: 1 unknown code(s) over 5 rows -- ['0']
+- `einheiten_geothermie_gsgk.Bundesland` [category, category `Land`]: 15 unknown code(s) over 336 rows -- ['1409', '1402', '1403', '1412', '1405', '1408', '1410', '1414', '1411', '1400', '1407', '1401']
+- `einheiten_geothermie_gsgk.FernsteuerbarkeitNb` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 297 rows -- ['1', '0']
+- `einheiten_geothermie_gsgk.Technologie` [category, category `BrennstoffTechnologieNetzersatz`]: 14 unknown code(s) over 330 rows -- ['542', '840', '546', '545', '835', '834', '838', '836', '833', '544', '1538', '543']
+- `einheiten_geothermie_gsgk.StrasseNichtGefunden` [all catalog value-ids]: 1 unknown code(s) over 273 rows -- ['0']
+- `einheiten_geothermie_gsgk.FernsteuerbarkeitDv` [category, category `Fernsteuerbarkeit`]: 2 unknown code(s) over 241 rows -- ['1', '0']
+- `einheiten_geothermie_gsgk.AnschlussAnHoechstOderHochSpannung` [all catalog value-ids]: 1 unknown code(s) over 74 rows -- ['0']
+- `anlagen_eeg_wind.PilotAnlage` [all catalog value-ids]: 1 unknown code(s) over 6361 rows -- ['0']
+- `anlagen_eeg_wind.AusschreibungZuschlag` [all catalog value-ids]: 1 unknown code(s) over 32990 rows -- ['0']
+- `anlagen_eeg_wind.PrototypAnlage` [all catalog value-ids]: 1 unknown code(s) over 25418 rows -- ['0']
+- `anlagen_eeg_biomasse.AusschliesslicheVerwendungBiomasse` [all catalog value-ids]: 1 unknown code(s) over 414 rows -- ['0']
+- `anlagen_eeg_biomasse.AusschreibungZuschlag` [all catalog value-ids]: 1 unknown code(s) over 11200 rows -- ['0']
+- `anlagen_eeg_biomasse.BiogasInanspruchnahmeFlexiPraemie` [all catalog value-ids]: 1 unknown code(s) over 5275 rows -- ['0']
+- `anlagen_eeg_biomasse.BiogasLeistungserhoehung` [all catalog value-ids]: 1 unknown code(s) over 1534 rows -- ['0']
+- `anlagen_kwk.AusschreibungZuschlag` [all catalog value-ids]: 1 unknown code(s) over 69097 rows -- ['0']
+- `einheiten_genehmigung.Art` [category, category `Sparte`]: 8 unknown code(s) over 37722 rows -- ['846', '41', '845', '40', '2555', '848', '39', '2556']
+- `ertuechtigungen.ErtuechtigungIstZulassungspflichtig` [all catalog value-ids]: 1 unknown code(s) over 712 rows -- ['0']
+- `geloeschte_deaktivierte_einheiten.Einheittyp` [all catalog value-ids]: 3 unknown code(s) over 1390 rows -- ['10', '4', '11']
+
+Columns matched to a named category (scoped check, strongest evidence):
+- `einheiten_wind.Bundesland` -> `Land`, `einheiten_wind.EinheitBetriebsstatus` -> `Betriebsstatus`, `einheiten_wind.FernsteuerbarkeitNb` -> `Fernsteuerbarkeit`, `einheiten_wind.FernsteuerbarkeitDv` -> `Fernsteuerbarkeit`, `einheiten_wind.Einspeisungsart` -> `Einspeisungsart`, `einheiten_wind.WindAnLandOderAufSee` -> `Land`, `einheiten_wind.Technologie` -> `BrennstoffTechnologieNetzersatz`, `einheiten_wind.Seelage` -> `Seelage`, `einheiten_biomasse.Bundesland` -> `Land`, `einheiten_biomasse.EinheitBetriebsstatus` -> `Betriebsstatus`, `einheiten_biomasse.FernsteuerbarkeitNb` -> `Fernsteuerbarkeit`, `einheiten_biomasse.FernsteuerbarkeitDv` -> `Fernsteuerbarkeit`, `einheiten_biomasse.Einspeisungsart` -> `Einspeisungsart`, `einheiten_biomasse.Hauptbrennstoff` -> `Brennstoff`, `einheiten_biomasse.Technologie` -> `BrennstoffTechnologieNetzersatz`, `einheiten_wasser.Land` -> `Land`, `einheiten_wasser.Bundesland` -> `Land`, `einheiten_wasser.EinheitBetriebsstatus` -> `Betriebsstatus`, `einheiten_wasser.FernsteuerbarkeitNb` -> `Fernsteuerbarkeit`, `einheiten_wasser.Einspeisungsart` -> `Einspeisungsart`, `einheiten_wasser.ArtDerWasserkraftanlage` -> `Art der Wasserkraftanlage`, `einheiten_wasser.FernsteuerbarkeitDv` -> `Fernsteuerbarkeit`, `einheiten_verbrennung.Land` -> `Land`, `einheiten_verbrennung.Bundesland` -> `Land`, `einheiten_verbrennung.EinheitBetriebsstatus` -> `Betriebsstatus`, `einheiten_verbrennung.FernsteuerbarkeitNb` -> `Fernsteuerbarkeit`, `einheiten_verbrennung.Einspeisungsart` -> `Einspeisungsart`, `einheiten_verbrennung.Hauptbrennstoff` -> `Brennstoff`, `einheiten_verbrennung.Technologie` -> `BrennstoffTechnologieNetzersatz`, `einheiten_verbrennung.FernsteuerbarkeitDv` -> `Fernsteuerbarkeit`, `einheiten_verbrennung.WeitererHauptbrennstoff` -> `Brennstoff`, `einheiten_verbrennung.Einsatzort` -> `Einsatzort`, `einheiten_kernkraft.Bundesland` -> `Land`, `einheiten_geothermie_gsgk.Bundesland` -> `Land`, `einheiten_geothermie_gsgk.EinheitBetriebsstatus` -> `Betriebsstatus`, `einheiten_geothermie_gsgk.FernsteuerbarkeitNb` -> `Fernsteuerbarkeit`, `einheiten_geothermie_gsgk.Einspeisungsart` -> `Einspeisungsart`, `einheiten_geothermie_gsgk.Technologie` -> `BrennstoffTechnologieNetzersatz`, `einheiten_geothermie_gsgk.FernsteuerbarkeitDv` -> `Fernsteuerbarkeit`, `anlagen_eeg_wind.AnlageBetriebsstatus` -> `Betriebsstatus`, `anlagen_eeg_biomasse.AnlageBetriebsstatus` -> `Betriebsstatus`, `anlagen_eeg_wasser.AnlageBetriebsstatus` -> `Betriebsstatus`, `anlagen_eeg_geothermie_gsgk.AnlageBetriebsstatus` -> `Betriebsstatus`, `anlagen_kwk.AnlageBetriebsstatus` -> `Betriebsstatus`, `einheiten_genehmigung.Art` -> `Sparte`, `geloeschte_deaktivierte_einheiten.EinheitSystemstatus` -> `Systemstatus`, `geloeschte_deaktivierte_einheiten.EinheitBetriebsstatus` -> `Betriebsstatus`, `geloeschte_deaktivierte_marktakteure.MarktakteurStatus` -> `Marktakteurstatus`
+
+### Temporal Consistency
+
+Cross-table event ordering on the same EinheitMastrNummer. A violation is a source-data finding (the unit's dates in two tables contradict). Only key-linked pairs are checkable.
+
+- commissioning <= deregistration last-update (`commissioning` -> `later`): 0/0 out of order (None%).
+- commissioning <= net-operator-change effective date (`commissioning` -> `later`): 32/8192 out of order (0.391%).
+- net-operator change: effective <= registration (`Netzbetreiberzuordnungsaenderungsdatum` -> `RegistrierungsdatumNetzbetreiberzuordnungsaenderung`): 8038/226405 out of order (3.55%).
+
+### Spatial Consistency
+
+Cross-table lat/lon reconciliation is NOT possible -- only the einheiten_* tables carry coordinates (limitation, not a finding). Per-table internal geographic agreement is in section 01. The one cross-table check:
+- units in different carrier tables sharing a LokationMaStRNummer: 4209/48904 shared locations resolve to more than one coordinate (2dp); worst holds 96 distinct coordinates.
+
 ### Coverage & Sampling Bias
 
 Rows per Bronze table: {'einheiten_wind': 43457, 'einheiten_biomasse': 24334, 'einheiten_wasser': 8814, 'einheiten_verbrennung': 94027, 'einheiten_kernkraft': 6, 'einheiten_geothermie_gsgk': 336, 'anlagen_eeg_wind': 43457, 'anlagen_eeg_biomasse': 15644, 'anlagen_eeg_wasser': 7485, 'anlagen_eeg_geothermie_gsgk': 132, 'anlagen_kwk': 92514, 'einheiten_genehmigung': 37722, 'ertuechtigungen': 1681, 'marktakteure': 5616357, 'marktakteure_und_rollen': 15689, 'netzanschlusspunkte': 5867232, 'netze': 1740, 'lokationen': 6776394, 'bilanzierungsgebiete': 1118, 'geloeschte_deaktivierte_einheiten': 244295, 'geloeschte_deaktivierte_marktakteure': 285315, 'einheiten_aenderung_netzbetreiberzuordnungen': 226405, 'einheitentypen': 13, 'katalogkategorien': 123, 'katalogwerte': 1737, 'lokationstypen': 4, 'marktfunktionen': 10, 'marktrollen': 25}.
@@ -1942,15 +2113,15 @@ marktakteure / netzanschlusspunkte / lokationen are ~5-7M rows each; the generat
 
 - Subset relationships with a real orphan problem: ['einheiten_genehmigung.GenMastrNummer', 'netzanschlusspunkte.LokationMaStRNummer', 'netzanschlusspunkte.NetzbetreiberMaStRNummer'].
 - Expected-disjoint / partial-scope relationships (high orphan rate is correct): ['ertuechtigungen.EegMastrNummer', 'geloeschte_deaktivierte_einheiten.EinheitMastrNummer', 'einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer', 'geloeschte_deaktivierte_marktakteure.MarktakteurMastrNummer'].
-- Child-side fan-out (one child key on multiple rows) in: ertuechtigungen.EegMastrNummer (max 8), einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer (max 4), marktakteure_und_rollen.MarktakteurMastrNummer (max 5), netzanschlusspunkte.LokationMaStRNummer (max 132), netzanschlusspunkte.NetzMaStRNummer (max 630081), netzanschlusspunkte.NetzbetreiberMaStRNummer (max 630130), einheiten_wind.AnlagenbetreiberMastrNummer (max 2550), einheiten_verbrennung.LokationMaStRNummer (max 9751) -- these are 1:N and must not be joined as 1:1.
+- Child-side fan-out (one child key on multiple rows) in: ertuechtigungen.EegMastrNummer (max 8), einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer (max 4), marktakteure_und_rollen.MarktakteurMastrNummer (max 5), netzanschlusspunkte.LokationMaStRNummer (max 132), netzanschlusspunkte.NetzMaStRNummer (max 630081), netzanschlusspunkte.NetzbetreiberMaStRNummer (max 630130), einheiten_wind.AnlagenbetreiberMastrNummer (max 325), einheiten_verbrennung.LokationMaStRNummer (max 110) -- these are 1:N and must not be joined as 1:1.
 - Verdict: each table's own-entity `*MastrNummer` (exact ratio above) is the Silver grain key; cross-table joins use the explicit column pairs above, resolved case-insensitively, and must be re-validated per MaStR release.
 
 ### ML-Readiness Evidence
 
 - **Grain / grain drift:** Root any cross-table model at one entity grain (generation unit = `EinheitMastrNummer`, or market actor = `MastrNummer`); every join in JOIN_SPEC either holds that grain (1:1) or drifts it (1:N, flagged above).
-- **Join multiplication (1:N / M:N expansion):** Row-level fan-out probe run per relationship: 1:N in ['ertuechtigungen.EegMastrNummer', 'einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer', 'marktakteure_und_rollen.MarktakteurMastrNummer', 'netzanschlusspunkte.LokationMaStRNummer', 'netzanschlusspunkte.NetzMaStRNummer', 'netzanschlusspunkte.NetzbetreiberMaStRNummer', 'einheiten_wind.AnlagenbetreiberMastrNummer', 'einheiten_verbrennung.LokationMaStRNummer']. lokationen link arrays (03) are M:N and explode further -- verify exploded row counts against pre-explosion counts.
+- **Join multiplication (1:N / M:N expansion):** Full cardinality profile per relationship (Referential Integrity section): 1:N in ['ertuechtigungen.EegMastrNummer', 'einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer', 'marktakteure_und_rollen.MarktakteurMastrNummer', 'netzanschlusspunkte.LokationMaStRNummer', 'netzanschlusspunkte.NetzMaStRNummer', 'netzanschlusspunkte.NetzbetreiberMaStRNummer', 'einheiten_wind.AnlagenbetreiberMastrNummer', 'einheiten_verbrennung.LokationMaStRNummer'], with child-rows-per-parent p50/p90/p99 and max fan-out quantified. lokationen link arrays (03) are M:N and explode further -- verify exploded row counts against pre-explosion counts.
 - **Target contamination:** No target across these tables; a decommission/authorisation target drawn from 04/02 must not be enriched with attributes recorded as a consequence of that same event.
-- **Temporal / post-event leakage:** This notebook checks key-set membership only -- it confirms WHICH units have a change/support record, not WHEN. A temporally safe feature still needs the date guards in 02/04.
+- **Temporal / post-event leakage:** Key-set membership plus cross-table date ordering (Temporal Consistency section): commissioning-vs-later-lifecycle-date violations are quantified on the shared EinheitMastrNummer. Full per-feature date guards still live in 02/04.
 - **Proxy leakage:** Operator identity (`AnlagenbetreiberMastrNummer`), grid connection point, and location MastrNummer are high-cardinality near-keys that can memorise a specific unit's outcome.
 - **Split / entity leakage:** Split at the ROOT entity of the join chain (unit or actor MastrNummer) so a unit's rows across all joined tables stay on one side; a per-table row split leaks across joins.
 - **Historical-reference (point-in-time) leakage:** The current-state tables carry no validity windows; joining them to a dated event as if their attributes were true at the event date is point-in-time leakage.
@@ -1960,7 +2131,7 @@ marktakteure / netzanschlusspunkte / lokationen are ~5-7M rows each; the generat
 - **Target / feature temporal misalignment:** Not resolvable from key sets alone; requires the per-table date columns (02/04) aligned to a single as-of date.
 - **Unit / sign / circular-feature leakage:** Not applicable at the key-graph level (no numeric measures joined here).
 - **Data-generation-process leakage:** MaStR's own processing columns (Systemstatus, Netzbetreiberpruefung, migration flags) propagate through every join and encode record-handling, not physical reality.
-- **Class / label instability:** Catalog codes referenced across tables are version-dependent (05) -- pin the release.
+- **Class / label instability:** Catalog codes referenced across tables are version-dependent (05) -- pin the release. The Catalog / Domain Reconciliation section reports any code in 01-04 not resolvable against the current catalog vintage.
 - **Label availability lag:** Change events are registered after the fact; a clean key match here does not tell you the event was known at its physical date.
 - **Source / version / regime change:** The 2019 MaStR migration means pre-2019 units carry migrated keys with different completeness; a registration-era flag should ride along any cross-table feature.
 - **Sample-vs-full divergence:** Every number here is a full distinct/count or a fully collected key set -- no sampling.
