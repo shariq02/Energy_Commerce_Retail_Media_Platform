@@ -1170,7 +1170,9 @@ def date_order_check(df, earlier_col, later_col, formats=GERMAN_TS_FORMATS, labe
     # columns are multi-format parsed; only rows where BOTH parse are comparable.
     e = parse_ts_multi(earlier_col, formats)
     ln = parse_ts_multi(later_col, formats)
-    both = e.isNotNull() & ln.isNotNull()
+    # `both` must be recomputed from the aliased columns -- the parse expressions
+    # reference the source column names, which the .select() has projected away.
+    both = F.col("e").isNotNull() & F.col("l").isNotNull()
     r = (
         df.select(e.alias("e"), ln.alias("l"))
         .agg(

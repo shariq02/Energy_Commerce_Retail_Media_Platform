@@ -462,7 +462,7 @@ print(
 # DBTITLE 1,Price sample for histograms (one bounded sampled pass)
 price_pdf = (
     df.select(F.col("event_type"), price.alias("price"))
-    .where(price.isNotNull() & (price <= price_p99))
+    .where(F.col("price").isNotNull() & (F.col("price") <= price_p99))
     .sample(0.02, seed=42)
     .limit(250_000)
     .toPandas()

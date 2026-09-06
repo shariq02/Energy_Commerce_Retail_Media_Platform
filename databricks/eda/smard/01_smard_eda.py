@@ -448,7 +448,7 @@ print(
 # DBTITLE 1,Samples -- value histogram + ONE representative series per metric (not mixed)
 value_pdf = (
     df.select("metric", v.alias("value"))
-    .where(v.isNotNull())
+    .where(F.col("value").isNotNull())
     .sample(0.1, seed=42)
     .limit(200_000)
     .toPandas()

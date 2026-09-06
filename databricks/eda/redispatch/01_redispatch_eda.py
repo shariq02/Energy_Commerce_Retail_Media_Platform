@@ -281,7 +281,7 @@ if dcols:
     yr = F.year(parse_ts_multi(c0))
     g = (
         df.select(yr.alias("y"))
-        .where(yr.between(2010, F.year(F.current_timestamp())))
+        .where(F.col("y").between(2010, F.year(F.current_timestamp())))
         .groupBy("y")
         .count()
         .orderBy("y")
