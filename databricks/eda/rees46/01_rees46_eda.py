@@ -58,7 +58,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # DBTITLE 1,Schema, row count, missingness, approx distinct, constant columns (one pass)
 df = spark.table(TABLE)
 COLS = df.columns
-ts = F.to_timestamp(F.substring("event_time", 1, 19))
+ts = F.try_to_timestamp(F.substring("event_time", 1, 19))
 price = safe_num("price")
 
 prof_exprs = [F.count(F.lit(1)).alias("__rows")]
@@ -326,7 +326,7 @@ for c in ("user_id", "product_id"):
 seq = df.select(
     "user_session",
     "event_type",
-    F.to_timestamp(F.substring("event_time", 1, 19)).alias("ts"),
+    F.try_to_timestamp(F.substring("event_time", 1, 19)).alias("ts"),
 )
 w = Window.partitionBy("user_session").orderBy("ts")
 seq = seq.withColumn(

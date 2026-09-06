@@ -62,10 +62,12 @@ _NON_VALUE_SUFFIXES = ("_I", "_TEXT", "_WOZ")
 
 def as_ts(col):
     s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
+    # try_to_timestamp -> NULL on bad input; a plain to_timestamp with a format
+    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI.
     return F.coalesce(
-        F.to_timestamp(s, "yyyyMMddHH"),
-        F.to_timestamp(s, "yyyyMMddHHmm"),
-        F.to_timestamp(F.substring(s, 1, 10), "yyyyMMddHH"),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHHmm")),
+        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
     )
 
 

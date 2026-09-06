@@ -93,10 +93,12 @@ def as_ts(col):
     # "2025021300.0" -- to_timestamp(x, "yyyyMMddHH") then parses NOTHING. Strip a
     # trailing ".0", then try the compact hour / minute forms.
     s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
+    # try_to_timestamp -> NULL on bad input; a plain to_timestamp with a format
+    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI (e.g. a stray "1981010723:38").
     return F.coalesce(
-        F.to_timestamp(s, "yyyyMMddHH"),
-        F.to_timestamp(s, "yyyyMMddHHmm"),
-        F.to_timestamp(F.substring(s, 1, 10), "yyyyMMddHH"),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHHmm")),
+        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
     )
 
 

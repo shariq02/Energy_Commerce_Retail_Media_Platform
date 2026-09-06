@@ -59,10 +59,12 @@ META = {
 
 
 def as_ts(col):
+    # try_to_timestamp -> NULL on bad input (a plain to_timestamp with a format
+    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI).
     s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
     return F.coalesce(
-        F.to_timestamp(s, "yyyyMMddHH"),
-        F.to_timestamp(F.substring(s, 1, 10), "yyyyMMddHH"),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
+        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
     )
 
 
@@ -199,11 +201,13 @@ pit = {}
 if gsid and geo_von:
     win = geo.select(
         F.col(gsid).cast("string").alias("station"),
-        F.to_timestamp(
-            F.regexp_replace(F.col(geo_von).cast("string"), r"\.0$", ""), "yyyyMMdd"
+        F.try_to_timestamp(
+            F.regexp_replace(F.col(geo_von).cast("string"), r"\.0$", ""),
+            F.lit("yyyyMMdd"),
         ).alias("gv"),
-        F.to_timestamp(
-            F.regexp_replace(F.col(geo_bis).cast("string"), r"\.0$", ""), "yyyyMMdd"
+        F.try_to_timestamp(
+            F.regexp_replace(F.col(geo_bis).cast("string"), r"\.0$", ""),
+            F.lit("yyyyMMdd"),
         ).alias("gb")
         if geo_bis
         else F.lit(None).cast("timestamp").alias("gb"),

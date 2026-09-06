@@ -206,10 +206,10 @@ begin_uhr = next(
 end_uhr = next((c for c in COLS if "ende" in c.lower() and "uhr" in c.lower()), None)
 work_identity = None
 if mean_c and work_c and begin_c and end_c and begin_uhr and end_uhr:
-    bt = F.to_timestamp(
+    bt = F.try_to_timestamp(
         F.concat_ws(" ", F.col(begin_c).cast("string"), F.col(begin_uhr).cast("string"))
     )
-    et = F.to_timestamp(
+    et = F.try_to_timestamp(
         F.concat_ws(" ", F.col(end_c).cast("string"), F.col(end_uhr).cast("string"))
     )
     j = df.select(

@@ -213,7 +213,7 @@ ts_pdf = (
 )
 hourly = (
     df.where(F.col("frequency") == "1h")
-    .groupBy(F.hour(F.to_timestamp("datetime_utc")).alias("hod"))
+    .groupBy(F.hour(F.try_to_timestamp("datetime_utc")).alias("hod"))
     .agg(*[F.avg(safe_num(c)).alias(c) for c in VCOLS])
     .orderBy("hod")
     .collect()

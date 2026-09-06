@@ -69,7 +69,7 @@ def as_ts(col):
     c = F.col(col).cast("string")
     n = safe_num(col)
     return F.coalesce(
-        F.to_timestamp(c),
+        F.try_to_timestamp(c),
         (n / 1000).cast("timestamp"),
         n.cast("timestamp"),
     )
