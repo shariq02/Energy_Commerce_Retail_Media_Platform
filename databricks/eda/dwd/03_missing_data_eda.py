@@ -184,9 +184,7 @@ for m, t in MEASUREMENT_TABLES.items():
         F.count(F.lit(1)).alias("rows"),
     ]
     for c in vc:
-        v = F.when(
-            F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
-        ).otherwise(F.lit(None))
+        v = safe_num(c)
         exprs += [
             F.sum((v == -999).cast("long")).alias(c + "__999"),
             F.sum((F.col(c).isNull() | (F.trim(F.col(c)) == "")).cast("long")).alias(
@@ -216,9 +214,7 @@ for m, t in MEASUREMENT_TABLES.items():
     dts = find_col(df, "MESS_DATUM")
     any_missing = F.lit(False)
     for c in value_cols(df):
-        v = F.when(
-            F.col(c).rlike("^-?[0-9]+(\\.[0-9]+)?$"), F.col(c).cast("double")
-        ).otherwise(F.lit(None))
+        v = safe_num(c)
         any_missing = (
             any_missing | (v == -999) | F.col(c).isNull() | (F.trim(F.col(c)) == "")
         )

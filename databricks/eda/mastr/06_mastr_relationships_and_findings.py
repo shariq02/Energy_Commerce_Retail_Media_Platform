@@ -458,8 +458,8 @@ for d in GENERATION_UNITS:
                 F.col(lk).cast("string").alias("lok"),
                 F.concat_ws(
                     "|",
-                    F.round(F.col(la).cast("double"), 2),
-                    F.round(F.col(lo).cast("double"), 2),
+                    F.round(safe_num(la), 2),
+                    F.round(safe_num(lo), 2),
                 ).alias("coordkey"),
             )
         )

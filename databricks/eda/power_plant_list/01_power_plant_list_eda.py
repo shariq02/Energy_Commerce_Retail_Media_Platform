@@ -154,8 +154,20 @@ for name, df in frames.items():
             f"{name}.{cap}: numeric yield={npar['yield']} is_numeric={npar['is_numeric']}"
         )
     dcols = [c for c in cols if any(h in c.lower() for h in DATE_HINTS)]
+    # BNetzA records commissioning / retirement as a YEAR ("2009"), not a date --
+    # column name carries "Jahr". Profile those as integer years, the rest as
+    # timestamps.
     entry["dates"] = {}
-    for c in dcols[:4]:
+    entry["years"] = {}
+    for c in [c for c in dcols if "jahr" in c.lower()][:2]:
+        pl = plausibility(df, c, lo=1850.0, hi=2035.0, sentinels=())
+        npar = numeric_parseability(df, c, decimal_comma=False)
+        entry["years"][c] = {"parse": npar, "plausibility": pl}
+        print(
+            f"  {name}.{c} (year): yield {npar['yield']:.1%}, range "
+            f"{pl['min']}..{pl['max']}, below 1850={pl.get('below')}, above 2035={pl.get('above')}"
+        )
+    for c in [c for c in dcols if "jahr" not in c.lower()][:4]:
         ts = timestamp_semantics(df, c, valid_from="1900-01-01", tz="Europe/Berlin")
         entry["dates"][c] = ts
         for ln in ts["lines"]:
@@ -183,6 +195,17 @@ GERMAN_STATES = {
     "Schleswig-Holstein",
     "Thüringen",
 }
+
+
+def _norm_state(s):
+    # BNetzA concatenates and transliterates ("Baden-Württemberg" ->
+    # "BadenWuerttemberg") -- collapse both sides to a comparable form.
+    s = str(s).lower()
+    for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+        s = s.replace(a, b)
+    return _re.sub(r"[^a-z]", "", s)
+
+
 domain_checks = {}
 for name, df in frames.items():
     cols = df.columns
@@ -190,13 +213,16 @@ for name, df in frames.items():
     fu = next((c for c in cols if any(h in c.lower() for h in FUEL_HINTS)), None)
     if bl:
         domain_checks[f"{name}.{bl}"] = categorical_domain(
-            df, bl, GERMAN_STATES, name=f"{name}.{bl}"
+            df, bl, GERMAN_STATES, name=f"{name}.{bl}", normalize=_norm_state
         )
     if fu:
         # no authoritative fuel list -- report the distinct set for manual review
         vals = [
             x[0]
-            for x in df.select(F.col(fu).cast("string")).distinct().limit(60).collect()
+            for x in df.select(F.col(f"`{fu}`").cast("string"))
+            .distinct()
+            .limit(60)
+            .collect()
             if x[0] is not None
         ]
         domain_checks[f"{name}.{fu}"] = {
@@ -217,9 +243,16 @@ for name, df in frames.items():
         (c for c in cols if "stilllegung" in c.lower() or "stillleg" in c.lower()), None
     )
     if com and dec:
-        date_order[name] = date_order_check(
-            df, com, dec, label=f"{name}: commissioning <= decommissioning"
-        )
+        # year columns -> integer comparison; real date columns -> parsed compare
+        if "jahr" in com.lower() and "jahr" in dec.lower():
+            res = numeric_order_check(df, com, dec)
+            res["label"] = f"{name}: commissioning year <= decommissioning year"
+            res["earlier"], res["later"] = com, dec
+        else:
+            res = date_order_check(
+                df, com, dec, label=f"{name}: commissioning <= decommissioning"
+            )
+        date_order[name] = res
         print(date_order[name])
 
 # COMMAND ----------
@@ -254,7 +287,8 @@ for name, df in frames.items():
     )
     if not com:
         continue
-    decade = (F.floor(F.year(parse_ts_multi(com)) / 10) * 10).cast("int")
+    year = safe_num(com) if "jahr" in com.lower() else F.year(parse_ts_multi(com))
+    decade = (F.floor(year / 10) * 10).cast("int")
     g = (
         df.withColumn("__decade", decade)
         .where(F.col("__decade").isNotNull())
@@ -411,6 +445,13 @@ for d in DATASETS:
             f"- {d}.`{c}` (date): parse yield {ts['yield']:.1%}, range {ts['min_ts']}..{ts['max_ts']}, "
             f"pre-1900={ts['before_valid']}, future-dated={ts['future']}, formats={ts['per_format']}."
         )
+    for c, yr in e.get("years", {}).items():
+        pl = yr["plausibility"]
+        _unit.append(
+            f"- {d}.`{c}` (year, not a date): numeric yield {yr['parse']['yield']:.1%}, "
+            f"range {pl['min']}..{pl['max']}, below 1850={pl.get('below')}, "
+            f"above 2035={pl.get('above')} -- cast to an integer year, not a timestamp."
+        )
 if not _unit:
     _unit.append("- No capacity or date column located by name.")
 
@@ -419,11 +460,16 @@ for d in DATASETS:
     for c, ts in sem[d].get("dates", {}).items():
         _temporal.append(
             f"- {d}.`{c}`: {ts['min_ts']}..{ts['max_ts']} (Europe/Berlin). "
-            "Commissioning/decommission dates -- planned future dates are recorded ahead of time, "
-            "so the column is only 'known' up to its own value."
+            "Planned future dates are recorded ahead of time, so the column is only "
+            "'known' up to its own value."
+        )
+    for c in sem[d].get("years", {}):
+        _temporal.append(
+            f"- {d}.`{c}`: year granularity only (no month/day) -- a within-year ordering "
+            "cannot be established; the commissioning<=decommissioning check runs on the year."
         )
 if not _temporal:
-    _temporal.append("- No date column located; temporal semantics not assessed.")
+    _temporal.append("- No date/year column located; temporal semantics not assessed.")
 
 _domain = []
 for k, v in domain_checks.items():
@@ -435,9 +481,10 @@ for k, v in domain_checks.items():
         )
     else:
         _domain.append(
-            f"- `{k}` vs the 16 German states: unexpected={v['unexpected'] or 'none'}, "
-            f"unused={v['unused_allowed'] or 'none'}. An unexpected value (or a code instead of a "
-            "name) points to a header/parse problem."
+            f"- `{k}` vs the 16 German states (spelling normalised -- BNetzA writes "
+            f"`BadenWuerttemberg` etc): unexpected={v['unexpected'] or 'none'}, "
+            f"unused={v['unused_allowed'] or 'none'}. A remaining unexpected value is a real "
+            "anomaly (a foreign location, a code, or a parse error)."
         )
 if not _domain:
     _domain.append("- No Bundesland or fuel-type column located by name.")

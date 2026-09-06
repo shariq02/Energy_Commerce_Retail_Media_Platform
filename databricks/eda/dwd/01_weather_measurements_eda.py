@@ -51,8 +51,15 @@ MEASUREMENTS = [
 ]
 TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
 NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR"}
-# Any `QN_*` column is a DWD quality byte, never a measured value.
-QN_CANDIDATES = ("QN_9", "QN_8", "QN_7", "QN_4", "QN_3", "QN")
+
+
+# Any `QN*` column is a DWD quality byte, never a measured value. The numeric
+# suffix varies by parameter (QN_9, QN_8, QN_7, QN_3, QN_592, QN_2, ...), so
+# detect by prefix rather than a fixed list.
+def qn_col(df):
+    return next((c for c in df.columns if c.upper().startswith("QN")), None)
+
+
 # DWD companion "Messverfahren-Index" columns -- string indicators, not measured
 # values; treating them as numeric produced all-None distribution rows.
 INDICATOR_COLS = {"V_N_I"}
@@ -187,7 +194,7 @@ qn_quality = {}
 qn_domain = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    qn = find_col(df, *QN_CANDIDATES)
+    qn = qn_col(df)
     vcols = value_columns(df)
     if qn is None:
         continue
@@ -195,7 +202,7 @@ for m in MEASUREMENTS:
     any_sentinel = F.lit(False)
     any_oor = F.lit(False)
     for c in vcols:
-        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
+        v = safe_num(c)
         any_sentinel = any_sentinel | (v == -999)
         b = PLAUSIBLE.get(c.upper())
         if b:
@@ -250,7 +257,7 @@ for m in MEASUREMENTS:
     df = frames[m]
     exprs = []
     for c in value_columns(df):
-        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
+        v = safe_num(c)
         b = PLAUSIBLE.get(c.upper())
         exprs += [
             F.min(v).alias(c + "_min"),
@@ -335,7 +342,7 @@ regime = {}
 for m in MEASUREMENTS:
     df = frames[m]
     dts = find_col(df, "MESS_DATUM")
-    qn = find_col(df, *QN_CANDIDATES)
+    qn = qn_col(df)
     decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
     probe = [c for c in ([qn] if qn else []) + value_columns(df)]
     by_decade = population_by_group(
@@ -368,16 +375,7 @@ for m in MEASUREMENTS:
     df = frames[m]
     vcols = value_columns(df)
     value_pdf[m] = (
-        df.select(
-            *[
-                F.when(
-                    F.col(c).rlike(r"^-?\d+(\.\d+)?$")
-                    & (F.col(c).cast("double") != -999),
-                    F.col(c).cast("double"),
-                ).alias(c)
-                for c in vcols
-            ]
-        )
+        df.select(*[F.when(safe_num(c) != -999, safe_num(c)).alias(c) for c in vcols])
         .sample(0.05, seed=42)
         .limit(150_000)
         .toPandas()
@@ -598,7 +596,7 @@ _regime = [
     "",
 ]
 for m in MEASUREMENTS:
-    qn = find_col(frames[m], *QN_CANDIDATES)
+    qn = qn_col(frames[m])
     _regime.append(f"- {m}:")
     for d, dv in sorted(regime[m].items()):
         qd = dv["columns"].get(qn, {}).get("distinct") if qn else "n/a"

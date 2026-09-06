@@ -64,16 +64,14 @@ for c in COLS:
         F.approx_count_distinct(c).alias(c + "__d"),
     ]
 for c in VCOLS:
-    v = F.col(c).cast("double")
+    v = safe_num(c)
     b = PLAUSIBLE.get(c.split("_")[-1])
     exprs += [
         F.min(v).alias(c + "_min"),
         F.max(v).alias(c + "_max"),
         F.avg(v).alias(c + "_avg"),
         F.stddev(v).alias(c + "_sd"),
-        F.expr(f"percentile_approx(cast(`{c}` as double), array(0.01,0.5,0.99))").alias(
-            c + "_p"
-        ),
+        F.percentile_approx(v, [0.01, 0.5, 0.99]).alias(c + "_p"),
         F.sum((v == 0).cast("long")).alias(c + "_zero"),
         F.sum((v < 0).cast("long")).alias(c + "_negative"),
         F.sum(
@@ -185,7 +183,7 @@ if _span:
 w2 = Window.partitionBy("frequency").orderBy("datetime_utc")
 df_1h = df.where(F.col("frequency") == "1h")
 for c in VCOLS:
-    v = F.col(c).cast("double")
+    v = safe_num(c)
     df_1h = df_1h.withColumn(
         f"{c}_stuck",
         (
@@ -201,14 +199,14 @@ print("stuck>=12-run (1h):", stuck)
 
 # DBTITLE 1,Samples for figures + full-table diurnal profile
 value_pdf = (
-    df.select(*[F.col(c).cast("double").alias(c) for c in VCOLS])
+    df.select(*[safe_num(c).alias(c) for c in VCOLS])
     .sample(0.1, seed=42)
     .limit(150_000)
     .toPandas()
 )
 ts_pdf = (
     df.where(F.col("frequency") == "1h")
-    .select("datetime_utc", *[F.col(c).cast("double").alias(c) for c in VCOLS])
+    .select("datetime_utc", *[safe_num(c).alias(c) for c in VCOLS])
     .orderBy("datetime_utc")
     .limit(3000)
     .toPandas()
@@ -216,7 +214,7 @@ ts_pdf = (
 hourly = (
     df.where(F.col("frequency") == "1h")
     .groupBy(F.hour(F.to_timestamp("datetime_utc")).alias("hod"))
-    .agg(*[F.avg(F.col(c).cast("double")).alias(c) for c in VCOLS])
+    .agg(*[F.avg(safe_num(c)).alias(c) for c in VCOLS])
     .orderBy("hod")
     .collect()
 )

@@ -138,6 +138,27 @@ def find_col(df, *cands):
     return None
 
 
+def _qc(name):
+    # Column reference that survives names with dots / spaces / hyphens -- German
+    # government CSV headers carry them (e.g. dwd_station_geography."Geogr.Breite",
+    # dwd_parameter_unit."Zusatz-Info"). A bare F.col("a.b") is read as struct
+    # access and fails to resolve.
+    return F.col("`" + str(name).replace("`", "``") + "`")
+
+
+def safe_num(colname):
+    # ANSI-safe, NULL-safe string -> double. A bare `.cast("double")` THROWS
+    # CAST_INVALID_INPUT under ANSI mode (the default on this runtime) whenever a
+    # row holds a blank or non-numeric string -- Bronze is all-string, so that is
+    # a real hazard. The `when(rlike, ...)` short-circuits so the cast only runs
+    # on values that are already valid numbers; a German decimal comma
+    # ("28,45") and thousands dot are normalised first.
+    s = F.trim(_qc(colname).cast("string"))
+    s = F.regexp_replace(s, r"\.(?=\d{3}(\D|$))", "")
+    s = F.regexp_replace(s, r"(?<=\d),(?=\d)", ".")
+    return F.when(s.rlike(r"^-?\d+(\.\d+)?$"), s.cast("double"))
+
+
 def key_like_cols(cols, suffix="mastrnummer"):
     return [c for c in cols if c.lower().endswith(suffix)]
 
@@ -453,8 +474,8 @@ def exact_uniqueness(df, cols):
     aggs = [F.count(F.lit(1)).alias("__n")]
     for c in cols:
         aggs += [
-            F.countDistinct(F.col(c)).alias(c + "__d"),
-            F.sum(F.col(c).isNull().cast("long")).alias(c + "__nulls"),
+            F.countDistinct(_qc(c)).alias(c + "__d"),
+            F.sum(_qc(c).isNull().cast("long")).alias(c + "__nulls"),
         ]
     r = df.agg(*aggs).first().asDict()
     n = r["__n"] or 0
@@ -486,7 +507,7 @@ def pick_entity_key(uniq, candidates, prefer=()):
 def collect_key_set(df, colname):
     return {
         r[0]
-        for r in df.select(F.col(colname).cast("string")).distinct().collect()
+        for r in df.select(_qc(colname).cast("string")).distinct().collect()
         if r[0] is not None and str(r[0]).strip() != ""
     }
 
@@ -552,7 +573,7 @@ def ri_interpretation(ri):
 
 
 def parse_ts_multi(colname, formats=GERMAN_TS_FORMATS):
-    s = F.col(colname).cast("string")
+    s = _qc(colname).cast("string")
     expr = F.try_to_timestamp(s)
     for fmt in formats:
         expr = F.coalesce(expr, F.try_to_timestamp(s, F.lit(fmt)))
@@ -566,7 +587,7 @@ def timestamp_semantics(
     # observed range, implausible (pre-`valid_from` / future) rows, sub-day
     # granularity, and a timezone/DST note. One aggregation pass for the
     # summary + one for the per-format counts + a tiny sample of unparsed text.
-    s = F.col(colname).cast("string")
+    s = _qc(colname).cast("string")
     present = s.isNotNull() & (F.trim(s) != "")
     parsed = parse_ts_multi(colname, formats)
     lo = F.lit(valid_from).cast("timestamp")
@@ -657,7 +678,7 @@ def numeric_parseability(df, colname, decimal_comma=True):
     # double (after optional German comma-decimal normalisation). This stops a
     # free-text column (e.g. an affected-plant name) being reported as a numeric
     # column with "0 of N parsed".
-    s = F.col(colname).cast("string")
+    s = _qc(colname).cast("string")
     norm = F.trim(s)
     if decimal_comma:
         # German convention: "1.234,56" -> "1234.56". Drop a dot only when it
@@ -700,7 +721,7 @@ def numeric_parseability(df, colname, decimal_comma=True):
 
 
 def plausibility(df, colname, lo=None, hi=None, sentinels=(-999.0,)):
-    v = F.col(colname).cast("double")
+    v = safe_num(colname)
     is_sent = F.lit(False)
     for x in sentinels:
         is_sent = is_sent | (v == F.lit(float(x)))
@@ -791,11 +812,11 @@ def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end
     t = (
         parse_ts_multi(ts_col)
         if dict(df.dtypes).get(ts_col) == "string"
-        else F.col(ts_col)
+        else _qc(ts_col)
     )
     epoch = F.unix_timestamp(t.cast("timestamp"))
     base = df.select(
-        epoch.alias("e"), *([F.col(entity_col).alias("k")] if entity_col else [])
+        epoch.alias("e"), *([_qc(entity_col).alias("k")] if entity_col else [])
     )
     base = base.where(F.col("e").isNotNull())
     gkeys = ["k"] if entity_col else []
@@ -878,7 +899,7 @@ def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end
 
 
 def spatial_validity(df, lat_col, lon_col, bbox=DE_BBOX, name="coords"):
-    lat, lon = F.col(lat_col).cast("double"), F.col(lon_col).cast("double")
+    lat, lon = safe_num(lat_col), safe_num(lon_col)
     lo_la, hi_la, lo_lo, hi_lo = bbox
     present = lat.isNotNull() & lon.isNotNull()
     r = (
@@ -908,18 +929,26 @@ def spatial_validity(df, lat_col, lon_col, bbox=DE_BBOX, name="coords"):
     return r
 
 
-def categorical_domain(df, colname, allowed, name=None):
+def categorical_domain(df, colname, allowed, name=None, normalize=None):
+    # `normalize` (optional callable) is applied to BOTH the observed values and
+    # `allowed` before comparing -- use it when the source encodes a value
+    # differently from the reference list (umlaut transliteration, spacing,
+    # concatenation, e.g. BNetzA's "BadenWuerttemberg" vs "Baden-Wurttemberg").
+    norm = normalize or (lambda x: x)
     present = {
         r[0]
-        for r in df.select(F.col(colname).cast("string")).distinct().collect()
-        if r[0] is not None
+        for r in df.select(_qc(colname).cast("string")).distinct().collect()
+        if r[0] is not None and str(r[0]).strip() != ""
     }
-    allowed = {str(a) for a in allowed}
+    present_n = {norm(v) for v in present}
+    allowed_n = {norm(str(a)) for a in allowed}
+    unexpected = sorted(v for v in present if norm(v) not in allowed_n)
+    unused = sorted(str(a) for a in allowed if norm(str(a)) not in present_n)
     return {
         "column": name or colname,
-        "unexpected": sorted(present - allowed)[:25],
-        "unexpected_count": len(present - allowed),
-        "unused_allowed": sorted(allowed - present)[:25],
+        "unexpected": unexpected[:25],
+        "unexpected_count": len(unexpected),
+        "unused_allowed": unused[:25],
     }
 
 
@@ -999,7 +1028,7 @@ def reconcile_codes(df, colname, catalog, category_hint=None):
     # name matches a catalog category name, the check is scoped to that category;
     # otherwise it falls back to global value-id membership, which cannot prove a
     # code is valid FOR THIS column, only that MaStR uses it somewhere.
-    vc = df.groupBy(F.col(colname).cast("string").alias("v")).count().collect()
+    vc = df.groupBy(_qc(colname).cast("string").alias("v")).count().collect()
     counts = {}
     for r in vc:
         v = r["v"].strip() if r["v"] is not None else None
@@ -1035,7 +1064,7 @@ def cardinality_profile(child_df, ccol, child_key_set, parent_set):
     # child-rows-per-parent distribution (p50/p90/p99 + max fan-out). `ccol` is
     # the FK on the child; because the FK value IS the parent key, rows grouped by
     # `ccol` is exactly the per-parent child count.
-    key = F.col(ccol).cast("string")
+    key = _qc(ccol).cast("string")
     per_key = (
         child_df.where(key.isNotNull() & (F.trim(key) != ""))
         .groupBy(key.alias("k"))
@@ -1109,10 +1138,10 @@ def regime_population_shift(df, date_col, cols, cut_iso, formats=GERMAN_TS_FORMA
     cols = [c for c in cols if c in df.columns and c != date_col]
     aggs = [F.count(F.lit(1)).alias("n")]
     for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
+        miss = _qc(c).isNull() | (F.trim(_qc(c).cast("string")) == "")
         aggs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
-            F.countDistinct(F.col(c)).alias(c + "__d"),
+            F.countDistinct(_qc(c)).alias(c + "__d"),
         ]
     rows = {
         r["__s"]: r.asDict()
@@ -1154,8 +1183,8 @@ def group_attribute_spread(df, group_col, value_col, transform=None):
     # transformed) does it carry -- an internal geographic / attribute
     # consistency probe that needs no external reference. `inconsistent_groups`
     # is the count with more than one, i.e. a contradiction within the entity.
-    g = F.col(group_col).cast("string")
-    v = F.col(value_col).cast("string")
+    g = _qc(group_col).cast("string")
+    v = _qc(value_col).cast("string")
     if transform == "prefix2":
         v = F.substring(F.regexp_replace(v, r"\s", ""), 1, 2)
     valid = g.isNotNull() & (F.trim(g) != "") & v.isNotNull() & (F.trim(v) != "")
@@ -1185,15 +1214,15 @@ def monotonic_series_check(df, value_col, order_col, partition_col=None):
     # comparable step count, the decreasing-step count, and the largest drop.
     from pyspark.sql import Window as _W
 
-    v = F.col(value_col).cast("double")
+    v = safe_num(value_col)
     keys = [partition_col] if partition_col else []
     win = (
-        _W.partitionBy(*[F.col(k) for k in keys]).orderBy(order_col)
+        _W.partitionBy(*[_qc(k) for k in keys]).orderBy(_qc(order_col))
         if keys
-        else _W.orderBy(order_col)
+        else _W.orderBy(_qc(order_col))
     )
     d = df.select(
-        *[F.col(k) for k in keys],
+        *[_qc(k) for k in keys],
         v.alias("__v"),
         (v - F.lag(v).over(win)).alias("__d"),
     )
@@ -1219,8 +1248,8 @@ def monotonic_series_check(df, value_col, order_col, partition_col=None):
 def numeric_order_check(df, smaller_col, larger_col):
     # Count rows where a value that must not exceed another one does. Both cast to
     # double; only rows where BOTH parse are comparable.
-    a = F.col(smaller_col).cast("double")
-    b = F.col(larger_col).cast("double")
+    a = safe_num(smaller_col)
+    b = safe_num(larger_col)
     both = a.isNotNull() & b.isNotNull()
     r = (
         df.agg(
@@ -1242,15 +1271,19 @@ def numeric_order_check(df, smaller_col, larger_col):
     }
 
 
-def additive_identity_check(df, lhs_col, rhs_cols, rel_tol=0.02, abs_floor=1.0):
-    # Test a claimed additive identity  lhs ~ sum(rhs_cols)  row-by-row. Returns
-    # the share of comparable rows where the relative residual exceeds rel_tol
-    # (with an absolute floor so near-zero rows do not dominate), plus residual
-    # percentiles. All columns cast to double.
-    lhs = F.col(lhs_col).cast("double")
+def additive_identity_check(
+    df, lhs_col, rhs_cols, rel_tol=0.02, abs_floor=1.0, signs=None
+):
+    # Test a claimed identity  lhs ~ sum(sign_i * rhs_col_i)  row-by-row. `signs`
+    # (list of +1 / -1, one per rhs col; default all +1) lets a subtraction like
+    # residual_load = load - wind - pv be expressed without synthetic columns.
+    # Returns the share of comparable rows whose relative residual exceeds
+    # rel_tol (with an absolute floor), plus residual percentiles.
+    signs = signs or [1] * len(rhs_cols)
+    lhs = safe_num(lhs_col)
     rhs = None
-    for c in rhs_cols:
-        term = F.col(c).cast("double")
+    for c, sg in zip(rhs_cols, signs):
+        term = safe_num(c) * F.lit(int(sg))
         rhs = term if rhs is None else rhs + term
     comparable = lhs.isNotNull() & rhs.isNotNull()
     resid = lhs - rhs
@@ -1274,8 +1307,11 @@ def additive_identity_check(df, lhs_col, rhs_cols, rel_tol=0.02, abs_floor=1.0):
         .asDict()
     )
     comp = r["comparable"] or 0
+    _terms = " ".join(
+        f"{'-' if sg < 0 else '+'} {c}" for c, sg in zip(rhs_cols, signs)
+    ).lstrip("+ ")
     return {
-        "identity": f"{lhs_col} = " + " + ".join(rhs_cols),
+        "identity": f"{lhs_col} = {_terms}",
         "comparable_rows": comp,
         "violations": r["bad"] or 0,
         "violation_pct": round((r["bad"] or 0) / comp * 100, 4) if comp else None,
@@ -1293,13 +1329,13 @@ def population_by_group(df, group_col, cols):
     cols = [c for c in cols if c in df.columns and c != group_col]
     aggs = [F.count(F.lit(1)).alias("__n")]
     for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
+        miss = _qc(c).isNull() | (F.trim(_qc(c).cast("string")) == "")
         aggs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
-            F.countDistinct(F.col(c)).alias(c + "__d"),
+            F.countDistinct(_qc(c)).alias(c + "__d"),
         ]
     rows = (
-        df.withColumn("__g", F.col(group_col).cast("string"))
+        df.withColumn("__g", _qc(group_col).cast("string"))
         .groupBy("__g")
         .agg(*aggs)
         .collect()

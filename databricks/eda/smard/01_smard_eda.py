@@ -63,11 +63,15 @@ RESOLUTION_SECONDS = {
 
 # DBTITLE 1,Helpers -- SMARD timestamp (epoch-ms / epoch-s / ISO) + resolution step
 def as_ts(col):
+    # SMARD timestamps arrive as ISO, epoch-ms or epoch-s. coalesce evaluates
+    # every branch, so the numeric branches use safe_num (an ANSI-safe .cast
+    # would otherwise throw on the ISO string).
     c = F.col(col).cast("string")
+    n = safe_num(col)
     return F.coalesce(
         F.to_timestamp(c),
-        (c.cast("double") / 1000).cast("timestamp"),
-        c.cast("double").cast("timestamp"),
+        (n / 1000).cast("timestamp"),
+        n.cast("timestamp"),
     )
 
 
@@ -193,7 +197,7 @@ print(f"distinct series = {len(series)}  (series,ts) dups: {db}")
 # COMMAND ----------
 
 # DBTITLE 1,Value stats per metric (one groupBy)
-v = F.col("value").cast("double")
+v = safe_num("value")
 bm = (
     df.groupBy("metric")
     .agg(
@@ -201,9 +205,7 @@ bm = (
         F.max(v).alias("max"),
         F.avg(v).alias("mean"),
         F.stddev(v).alias("sd"),
-        F.expr(
-            "percentile_approx(cast(value as double), array(0.01,0.25,0.5,0.75,0.99))"
-        ).alias("p01_25_50_75_99"),
+        F.percentile_approx(v, [0.01, 0.25, 0.5, 0.75, 0.99]).alias("p01_25_50_75_99"),
         F.sum((v == 0).cast("long")).alias("zero_rows"),
         F.sum((v < 0).cast("long")).alias("negative_rows"),
         F.sum(
@@ -399,20 +401,21 @@ if all((m_resid, m_load, m_wind, m_pv)):
         df.where(F.col("metric").isin([m_resid, m_load, m_wind, m_pv]))
         .groupBy("region", "resolution", "timestamp_utc")
         .pivot("metric", [m_resid, m_load, m_wind, m_pv])
-        .agg(F.first(F.col("value").cast("double")))
+        .agg(F.first(safe_num("value")))
     )
-    piv = (
-        piv.where(
-            F.col(m_resid).isNotNull()
-            & F.col(m_load).isNotNull()
-            & F.col(m_wind).isNotNull()
-            & F.col(m_pv).isNotNull()
-        )
-        .withColumn("__neg_wind", -F.col(m_wind))
-        .withColumn("__neg_pv", -F.col(m_pv))
+    piv = piv.where(
+        F.col(f"`{m_resid}`").isNotNull()
+        & F.col(f"`{m_load}`").isNotNull()
+        & F.col(f"`{m_wind}`").isNotNull()
+        & F.col(f"`{m_pv}`").isNotNull()
     )
     residual_identity = additive_identity_check(
-        piv, m_resid, [m_load, "__neg_wind", "__neg_pv"], rel_tol=0.02, abs_floor=100.0
+        piv,
+        m_resid,
+        [m_load, m_wind, m_pv],
+        signs=[1, -1, -1],
+        rel_tol=0.02,
+        abs_floor=100.0,
     )
     print("residual-load identity:", residual_identity)
 
@@ -423,7 +426,7 @@ my = (
     df.groupBy(F.year(as_ts("timestamp_utc")).alias("year"), "metric")
     .agg(
         F.count(F.lit(1)).alias("rows"),
-        F.sum(F.col("value").cast("double")).alias("sum_value"),
+        F.sum(safe_num("value")).alias("sum_value"),
     )
     .collect()
 )
@@ -744,7 +747,7 @@ _pcons = [
 ]
 if residual_identity:
     _pcons.append(
-        f"- identity `{residual_identity['identity']}` (neg terms = -wind, -pv): "
+        f"- identity `{residual_identity['identity']}`: "
         f"{residual_identity['violations']}/{residual_identity['comparable_rows']} rows exceed "
         f"{int(residual_identity['rel_tol'] * 100)}% relative residual "
         f"({residual_identity['violation_pct']}%); residual p01/p50/p99 "

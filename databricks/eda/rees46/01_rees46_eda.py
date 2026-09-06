@@ -59,7 +59,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 df = spark.table(TABLE)
 COLS = df.columns
 ts = F.to_timestamp(F.substring("event_time", 1, 19))
-price = F.col("price").cast("double")
+price = safe_num("price")
 
 prof_exprs = [F.count(F.lit(1)).alias("__rows")]
 for c in COLS:
@@ -117,9 +117,7 @@ by_type = (
         F.min(price).alias("price_min"),
         F.max(price).alias("price_max"),
         F.avg(price).alias("price_avg"),
-        F.expr(
-            "percentile_approx(cast(price as double), array(0.5, 0.95, 0.99))"
-        ).alias("price_p50_95_99"),
+        F.percentile_approx(price, [0.5, 0.95, 0.99]).alias("price_p50_95_99"),
         F.sum(
             F.when(
                 F.col("price").isNull() | (F.trim(F.col("price")) == ""), 1

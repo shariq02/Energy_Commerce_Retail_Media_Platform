@@ -213,8 +213,8 @@ if mean_c and work_c and begin_c and end_c and begin_uhr and end_uhr:
         F.concat_ws(" ", F.col(end_c).cast("string"), F.col(end_uhr).cast("string"))
     )
     j = df.select(
-        (F.col(mean_c).cast("double")).alias("mean_mw"),
-        (F.col(work_c).cast("double")).alias("work_mwh"),
+        safe_num(mean_c).alias("mean_mw"),
+        safe_num(work_c).alias("work_mwh"),
         ((et.cast("long") - bt.cast("long")) / 3600.0).alias("dur_h"),
     ).where(F.col("dur_h").isNotNull() & (F.col("dur_h") > 0))
     j = j.withColumn("implied_mwh", F.col("mean_mw") * F.col("dur_h"))

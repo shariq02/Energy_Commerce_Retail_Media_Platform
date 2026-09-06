@@ -88,8 +88,8 @@ dg = (
     df.groupBy("date")
     .agg(
         F.count(F.lit(1)).alias("rows"),
-        F.sum(F.col("clicks").cast("double")).alias("clicks"),
-        F.sum(F.col("impressions").cast("double")).alias("impressions"),
+        F.sum(safe_num("clicks")).alias("clicks"),
+        F.sum(safe_num("impressions")).alias("impressions"),
     )
     .orderBy("date")
     .collect()
@@ -171,22 +171,20 @@ for c, v in num.items():
         F.avg(v).alias(c + "_avg"),
         F.sum((v < 0).cast("long")).alias(c + "_negative"),
     ]
+_ct_delta = F.when(
+    num["impressions"] > 0,
+    num["clickThrough"] - num["clicks"] / num["impressions"],
+)
 exprs += [
     F.sum((num["clicks"] > num["impressions"]).cast("long")).alias("clicks_gt_impr"),
-    F.expr(
-        "percentile_approx(cast(position as double), array(0.1,0.25,0.5,0.75,0.9,0.99))"
-    ).alias("position_pctiles"),
-    F.expr("percentile_approx(cast(clicks as double), array(0.5,0.9,0.99))").alias(
-        "clicks_pctiles"
+    F.percentile_approx(num["position"], [0.1, 0.25, 0.5, 0.75, 0.9, 0.99]).alias(
+        "position_pctiles"
     ),
-    F.expr("percentile_approx(cast(impressions as double), array(0.5,0.9,0.99))").alias(
+    F.percentile_approx(num["clicks"], [0.5, 0.9, 0.99]).alias("clicks_pctiles"),
+    F.percentile_approx(num["impressions"], [0.5, 0.9, 0.99]).alias(
         "impressions_pctiles"
     ),
-    F.expr(
-        "percentile_approx(case when cast(impressions as double) > 0 then "
-        "cast(clickThrough as double) - cast(clicks as double)/cast(impressions as double) end, "
-        "array(0.05,0.5,0.95))"
-    ).alias("ct_delta_pctiles"),
+    F.percentile_approx(_ct_delta, [0.05, 0.5, 0.95]).alias("ct_delta_pctiles"),
 ]
 M = df.agg(*exprs).first().asDict()
 bad_ratio = M["clicks_gt_impr"]
@@ -200,11 +198,11 @@ print("position percentiles:", M["position_pctiles"])
 
 # DBTITLE 1,Ranking -- rounded-position rows + CTR (one groupBy) and index distribution
 pr = (
-    df.groupBy(F.round(F.col("position").cast("double")).alias("pos"))
+    df.groupBy(F.round(safe_num("position")).alias("pos"))
     .agg(
         F.count(F.lit(1)).alias("rows"),
-        F.sum(F.col("clicks").cast("double")).alias("clk"),
-        F.sum(F.col("impressions").cast("double")).alias("imp"),
+        F.sum(safe_num("clicks")).alias("clk"),
+        F.sum(safe_num("impressions")).alias("imp"),
     )
     .orderBy("pos")
     .collect()
@@ -272,7 +270,7 @@ device_domain = categorical_domain(
     ("desktop", "mobile", "tablet", "DESKTOP", "MOBILE", "TABLET"),
     name="device",
 )
-pos = F.col("position").cast("double")
+pos = safe_num("position")
 pos_bounds = (
     df.agg(
         F.sum((pos < 1).cast("long")).alias("below_1"),
@@ -303,9 +301,9 @@ for g, gv in datefmt_cohort.items():
 # DBTITLE 1,Metric sample for figures (one bounded sampled pass)
 mp = (
     df.select(
-        F.col("clicks").cast("double").alias("clicks"),
-        F.col("impressions").cast("double").alias("impressions"),
-        F.col("position").cast("double").alias("position"),
+        safe_num("clicks").alias("clicks"),
+        safe_num("impressions").alias("impressions"),
+        safe_num("position").alias("position"),
     )
     .sample(0.1, seed=42)
     .limit(150_000)

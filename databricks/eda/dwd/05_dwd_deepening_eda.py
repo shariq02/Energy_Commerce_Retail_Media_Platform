@@ -53,8 +53,11 @@ MEASUREMENTS = [
 TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
 META_TABLE = f"{CATALOG}.{BRONZE_SCHEMA}.dwd_missing_value_periods"
 NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR"}
-QN_CANDIDATES = ("QN_9", "QN_8", "QN_7", "QN_4", "QN_3", "QN")
 DWD_QN_CODES = {"1", "2", "3", "5", "7", "9", "10"}
+# Companion columns that are indices / text / alternative timestamps, not
+# measured values: a `*_I` index byte, a `*_Text` label, the true-solar-time
+# `MESS_DATUM_WOZ`.
+_NON_VALUE_SUFFIXES = ("_I", "_TEXT", "_WOZ")
 
 
 def as_ts(col):
@@ -66,11 +69,19 @@ def as_ts(col):
     )
 
 
+def qn_col(df):
+    # QN suffix varies by parameter (QN_8, QN_7, QN_2, QN_592, ...) -- match by
+    # prefix, not a fixed list.
+    return next((c for c in df.columns if c.upper().startswith("QN")), None)
+
+
 def value_columns(df):
     return [
         c
         for c in df.columns
-        if c.upper() not in NON_VALUE and not c.upper().startswith("QN")
+        if c.upper() not in NON_VALUE
+        and not c.upper().startswith("QN")
+        and not c.upper().endswith(_NON_VALUE_SUFFIXES)
     ]
 
 
@@ -148,7 +159,7 @@ qn_dist = {}
 qn_domain = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    qn = find_col(df, *QN_CANDIDATES)
+    qn = qn_col(df)
     if qn is None:
         continue
     qn_domain[m] = categorical_domain(df, qn, DWD_QN_CODES, name=f"{m}.{qn}")
@@ -195,7 +206,7 @@ for m in MEASUREMENTS:
     vcols = value_columns(df)
     exprs = []
     for c in vcols:
-        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
+        v = safe_num(c)
         exprs += [
             F.min(v).alias(c + "_min"),
             F.max(v).alias(c + "_max"),
@@ -265,7 +276,7 @@ regime = {}
 for m in MEASUREMENTS:
     df = frames[m]
     dts = find_col(df, "MESS_DATUM")
-    qn = find_col(df, *QN_CANDIDATES)
+    qn = qn_col(df)
     if dts is None:
         continue
     decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
@@ -435,7 +446,7 @@ _regime = [
 for m in MEASUREMENTS:
     if m not in regime:
         continue
-    qn = find_col(frames[m], *QN_CANDIDATES)
+    qn = qn_col(frames[m])
     row = ", ".join(
         f"{d}s: rows={dv['rows']}"
         + (f", QN distinct={dv['columns'].get(qn, {}).get('distinct')}" if qn else "")

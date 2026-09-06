@@ -283,8 +283,8 @@ for name, df in frames.items():
             "__coordkey",
             F.concat_ws(
                 "|",
-                F.round(F.col(lat_col).cast("double"), 2),
-                F.round(F.col(lon_col).cast("double"), 2),
+                F.round(safe_num(lat_col), 2),
+                F.round(safe_num(lon_col), 2),
             ),
         )
         checks.append(

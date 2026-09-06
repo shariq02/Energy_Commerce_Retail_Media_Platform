@@ -162,15 +162,13 @@ for e in ENERGY:
     df = frames[e]
     exprs = []
     for c in VCOLS[e]:
-        v = F.col(c).cast("double")
+        v = safe_num(c)
         exprs += [
             F.min(v).alias(c + "_min"),
             F.max(v).alias(c + "_max"),
             F.avg(v).alias(c + "_avg"),
             F.stddev(v).alias(c + "_sd"),
-            F.expr(
-                f"percentile_approx(cast(`{c}` as double), array(0.01,0.25,0.5,0.75,0.99))"
-            ).alias(c + "_p"),
+            F.percentile_approx(v, [0.01, 0.25, 0.5, 0.75, 0.99]).alias(c + "_p"),
             F.sum((v < 0).cast("long")).alias(c + "_negative"),
             F.sum((v == 0).cast("long")).alias(c + "_zero"),
             F.sum(
@@ -219,7 +217,7 @@ for e in ENERGY:
     vs = value_stats[e]
     oor_exprs = []
     for c in VCOLS[e]:
-        v = F.col(c).cast("double")
+        v = safe_num(c)
         m, sd = vs[c + "_avg"], vs[c + "_sd"]
         oor_exprs.append(
             F.sum((F.abs(v - F.lit(m)) > 5 * F.lit(sd)).cast("long")).alias(c)
@@ -230,7 +228,7 @@ for e in ENERGY:
     w = Window.partitionBy("frequency").orderBy("datetime_utc")
     df_1h = df.where(F.col("frequency") == "1h")
     for c in VCOLS[e]:
-        v = F.col(c).cast("double")
+        v = safe_num(c)
         df_1h = df_1h.withColumn(
             f"{c}_stuck",
             (
@@ -265,10 +263,8 @@ for metric in ("electricity", "heating", "cooling"):
     shared = [c for c in p.columns if c not in VALUE_EXCLUDE and c in w.columns]
     if not shared:
         continue
-    j = p.select(
-        *KEY_COLS, *[F.col(c).cast("double").alias(f"p_{c}") for c in shared]
-    ).join(
-        w.select(*KEY_COLS, *[F.col(c).cast("double").alias(f"w_{c}") for c in shared]),
+    j = p.select(*KEY_COLS, *[safe_num(c).alias(f"p_{c}") for c in shared]).join(
+        w.select(*KEY_COLS, *[safe_num(c).alias(f"w_{c}") for c in shared]),
         on=KEY_COLS,
         how="inner",
     )
@@ -349,16 +345,13 @@ for metric in ("electricity", "heating", "cooling"):
     step_s = F.lit(None).cast("double")
     for lbl, secs in FREQ_SECONDS.items():
         step_s = F.when(F.col("frequency") == lbl, F.lit(float(secs))).otherwise(step_s)
+    wc = safe_num(c0)
     wd = w.select(
         *KEY_COLS,
-        (
-            (F.col(c0).cast("double") - F.lag(F.col(c0).cast("double")).over(win))
-            * 3600.0
-            / step_s
-        ).alias("implied_power"),
+        ((wc - F.lag(wc).over(win)) * 3600.0 / step_s).alias("implied_power"),
     )
     j = wd.join(
-        p.select(*KEY_COLS, F.col(c0).cast("double").alias("p_val")),
+        p.select(*KEY_COLS, safe_num(c0).alias("p_val")),
         on=KEY_COLS,
         how="inner",
     ).where(F.col("implied_power").isNotNull() & F.col("p_val").isNotNull())
@@ -397,7 +390,7 @@ if spans:
 # DBTITLE 1,Samples for figures (sampled + first-N chronological)
 value_pdf = {
     e: frames[e]
-    .select(*[F.col(c).cast("double").alias(c) for c in VCOLS[e]])
+    .select(*[safe_num(c).alias(c) for c in VCOLS[e]])
     .sample(0.1, seed=42)
     .limit(150_000)
     .toPandas()
@@ -406,7 +399,7 @@ value_pdf = {
 ts_pdf = {
     e: frames[e]
     .where(F.col("frequency") == "1h")
-    .select("datetime_utc", *[F.col(c).cast("double").alias(c) for c in VCOLS[e]])
+    .select("datetime_utc", *[safe_num(c).alias(c) for c in VCOLS[e]])
     .orderBy("datetime_utc")
     .limit(2000)
     .toPandas()
