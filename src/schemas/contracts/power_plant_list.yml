@@ -1,0 +1,181 @@
+# Data contract -- power plant list (BNetzA Kraftwerksliste, Germany)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: formal contract for the BNetzA power plant list source -- 2 Bronze
+# tables (the plant list itself + a forward-looking capacity-additions summary).
+# Every *_observed value and every quality-rule bound is traceable to
+# src/schemas/profiling/power_plant_list.md. Authored; the per-table JSON Schema
+# under src/schemas/contracts/generated/power_plant_*.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit those by hand.
+
+source: power_plant_list
+source_system: power_plant_list
+domain: Energy / Generation Assets
+description: >
+  Bundesnetzagentur Kraftwerksliste -- the register of German power plants above
+  the ~10 MW net reporting threshold (plus aggregated small-plant rows and
+  decommissioned plants), one quarterly snapshot. Includes a separate summary of
+  expected conventional-capacity retirements 2026-2029 driven by the coal-exit
+  law (KVBG) and grid-relevance provisions. Static one-time acquisition, public
+  download, no auth.
+profiling_evidence: src/schemas/profiling/power_plant_list.md
+bronze_physical_types: string
+
+acquisition:
+  method: scripted_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+  licence: "DL-DE-BY-4.0 (Datenlizenz Deutschland Namensnennung 4.0)"
+  attribution: "Bundesnetzagentur, Kraftwerksliste"
+  header_note: >
+    the source CSV carries title / disclaimer rows above the real header and a
+    footnote block below the data. scripts/ingestion/stage_power_plant_list.py
+    auto-detects and applies the header -- profiling confirms 0 unnamed / 0
+    footnote-named columns in the current Bronze tables for power_plant_list.
+    power_plant_capacity_additions still has footnote text in a data column
+    (see quality_rules.capacity_additions_footnote_rows).
+
+conventions:
+  snapshot_note: >
+    a single quarterly export -- plant status is current-as-of the export, NOT a
+    history. There are no validity windows; a plant's earlier state cannot be
+    reconstructed from this table (use MaStR change history for that).
+  coverage_note: >
+    only plants above the BNetzA reporting threshold plus aggregated small-plant
+    rows -- this is not the full German fleet (MaStR is the complete register).
+  german_decimal_note: "numeric columns use the German comma decimal separator -- cast explicitly at Silver"
+  year_columns_note: "Jahr_Inbetriebnahme / Jahr_Stilllegung are integer YEARS, not dates -- cast to int year, never to a timestamp"
+
+tables:
+
+  - name: power_plant_list
+    kind: register_snapshot
+    grain:
+      key: [EinheitMastrNummer]
+      unique: false            # 2169 distinct MaStR ids over 2613 rows (blocks of one plant share an id; aggregated small-plant rows have none)
+      row_count_observed: 2613
+      description: >
+        one row per reportable plant / block, plus aggregated small-plant rows
+        and decommissioned plants. No clean natural key -- EinheitMastrNummer is
+        the MaStR cross-reference, populated on ~83% of rows and not unique.
+    full_row_duplicates_observed: 0
+    columns:
+      - { name: Datensatztyp,                        type: string, required: true,  nullable: true,  notes: "record classification: Einzelanlage (1903) / stillgelegte Anlagen (420) / Kleinanlagen_aggregiert (290). A BNetzA compilation attribute, not a physical property." }
+      - { name: EinheitMastrNummer,                  type: string, required: true,  nullable: true,  notes: "MaStR unit id (SEE...); the reconciliation key to mastr_einheiten_*; ~17% null (aggregated small-plant rows)" }
+      - { name: Anlagenbetreiber,                    type: string, required: true,  nullable: true,  notes: "operator name (free text)" }
+      - { name: Anzeigename,                         type: string, required: true,  nullable: true,  notes: "plant display name" }
+      - { name: Postleitzahl,                        type: string, required: false, nullable: true,  notes: "postcode; join key to the German geography spine" }
+      - { name: Ort,                                 type: string, required: false, nullable: true,  notes: "municipality name" }
+      - { name: Strasse,                             type: string, required: false, nullable: true }
+      - { name: Hausnummer,                          type: string, required: false, nullable: true }
+      - { name: Bundesland,                          type: string, required: true,  nullable: true,  notes: "German federal state (BNetzA spelling, e.g. 'BadenWuerttemberg'); one out-of-set value 'Nordsee' (offshore); 63 'None'" }
+      - { name: Land,                                type: string, required: true,  nullable: true,  notes: "country: Deutschland (2550) + Oesterreich / Schweiz / Luxemburg / Daenemark border plants" }
+      - { name: Jahr_Inbetriebnahme,                 type: integer, required: true, nullable: true,  notes: "commissioning YEAR (integer); observed 1901..2026" }
+      - { name: Jahr_Stilllegung,                    type: integer, required: false, nullable: true, notes: "decommissioning YEAR (integer); observed 2011..2026; null for in-service plants (2347 rows)" }
+      - { name: Kraftwerksstatus,                    type: string, required: true,  nullable: true,  notes: "operating status: InBetrieb (2016) + 9 legal-basis-specific shutdown/reserve categories (KVBG / § 13b / § 13e / § 50 EnWG). Taxonomy changes with each coal-exit amendment." }
+      - { name: Energietraeger,                      type: string, required: true,  nullable: true,  notes: "primary energy carrier / fuel (18 values); no authoritative list -- reconcile against the MaStR carrier catalog at Silver" }
+      - { name: Hauptbrennstoff,                     type: string, required: false, nullable: true,  notes: "main fuel (finer than Energietraeger); ~half null" }
+      - { name: Waermeauskopplung_KWK,               type: string, required: false, nullable: true,  notes: "combined heat and power flag: Ja / Nein / None" }
+      - { name: Erneuerbarer_Energietraeger,         type: string, required: true,  nullable: true,  notes: "renewable-carrier flag: Ja / Nein" }
+      - { name: Bruttoleistung_MW,                   type: double, required: true,  nullable: true,  notes: "gross rated capacity. Semantic interpretation: MEGAWATTS (column name asserts MW; observed 0..33196.83, 16 zeros, 0 negative). MW vs kW still to be confirmed against the BNetzA source layout at Silver. German-comma decimal." }
+      - { name: Nettonennleistung_MW,               type: double, required: true,  nullable: true,  notes: "net nominal capacity, MW (same MW-vs-kW confirmation as Bruttoleistung_MW); near-collinear with gross -- do not use both as independent features" }
+      - { name: Technologie_Stromerzeugung,         type: string, required: false, nullable: true,  notes: "generation technology (17 values); ~22% null" }
+      - { name: Volleinspeisung_Teileinspeisung,    type: string, required: false, nullable: true,  notes: "full-feed vs partial-feed/self-consumption" }
+      - { name: Spannungsebene,                      type: string, required: false, nullable: true,  notes: "grid voltage level; some rows list multiple comma-joined levels" }
+      - { name: Anschlussnetzbetreiber,             type: string, required: false, nullable: true,  notes: "connecting grid operator (free text)" }
+      - { name: Bestandteil_Grenzkraftwerk,         type: string, required: false, nullable: true,  notes: "part of a border power plant: Ja (80) / Nein" }
+      - { name: Grenzkraftwerk_Nettonennleistung_MW, type: double, required: false, nullable: true, notes: "net capacity attributable to the German side of a border plant, MW; null for non-border plants (2559 rows); German-comma decimal" }
+
+  - name: power_plant_capacity_additions
+    kind: planning_summary
+    grain:
+      key: [energietraeger]
+      unique: false
+      row_count_observed: 17
+      description: >
+        a forward-looking summary of expected conventional-capacity retirements
+        by carrier for 2026-2029 -- projections that are revised each edition,
+        NOT an observed event log. Wide format: one column per year.
+    full_row_duplicates_observed: 0
+    columns:
+      - { name: energietraeger,     type: string, required: true,  nullable: true,  notes: "SHOULD be an energy carrier, but the column also holds section headers, sub-total labels and multi-sentence footnote text ingested as data -- see quality_rules.capacity_additions_footnote_rows" }
+      - { name: "2026",             type: double, required: false, nullable: true,  notes: "expected retiring capacity in 2026, MW; German-comma decimal; 8 rows null" }
+      - { name: "2027",             type: double, required: false, nullable: true,  notes: "expected retiring capacity in 2027, MW" }
+      - { name: "2028",             type: double, required: false, nullable: true,  notes: "expected retiring capacity in 2028, MW" }
+      - { name: "2029",             type: double, required: false, nullable: true,  notes: "expected retiring capacity in 2029, MW" }
+      - { name: "2026_2029_total",  type: double, required: false, nullable: true,  notes: "row total 2026-2029, MW" }
+
+quality_rules:
+  - id: capacity_semantics_mw
+    expr: "Bruttoleistung_MW / Nettonennleistung_MW / Grenzkraftwerk_Nettonennleistung_MW are interpreted as MEGAWATTS"
+    severity: info
+    evidence: >
+      column names assert MW and observed ranges (0..33196.83 gross) are
+      consistent with a plant-level MW register. MW-vs-kW is to be confirmed
+      against the BNetzA Kraftwerksliste source layout during Silver, not left
+      generically unresolved.
+  - id: german_comma_decimal
+    expr: "every numeric column uses ',' as the decimal separator -- cast explicitly, quarantine parse failures"
+    severity: block
+  - id: year_not_date
+    expr: "Jahr_Inbetriebnahme / Jahr_Stilllegung are integer years -- cast to int, never to a timestamp; within-year ordering is not available"
+    severity: block
+  - id: commissioning_before_decommissioning
+    expr: "Jahr_Inbetriebnahme <= Jahr_Stilllegung where both present"
+    severity: warn
+    evidence: "profiling: 0 / 265 out of order"
+  - id: bundesland_out_of_set
+    expr: "Bundesland should be one of the 16 German states; 'Nordsee' (offshore) and 'None' also occur"
+    severity: warn
+  - id: mastr_link_is_subset
+    expr: >
+      EinheitMastrNummer links to mastr_einheiten_* for large plants only
+      (~83% of rows carry an id, not unique) -- this is a reference /
+      reconciliation relationship, NOT an identity join; aggregated small-plant
+      rows have no id
+    severity: block
+  - id: capacity_additions_footnote_rows
+    expr: >
+      power_plant_capacity_additions.energietraeger contains section headers,
+      sub-total labels ('Insgesamt', 'davon aus 1. Ausschreibungsrunde') and
+      multi-sentence legal footnote text ('(1) Es ist zu beachten, dass ...',
+      '[2] Der zustaendige Uebertragungsnetzbetreiber ...') ingested as data
+      rows, mixed with the ~5 real carrier values (Erdgas, Braunkohle,
+      Batteriespeicher, Pumpspeicher, Abfall, ...)
+    severity: block
+    finding: "footnote / structure rows from the source CSV were not stripped by staging for this table"
+    remediation: >
+      Silver (9a): keep only rows whose energietraeger resolves to a real energy
+      carrier (reconciled against the MaStR carrier catalog); route the
+      'Insgesamt' row to a documented total and drop the footnote rows. A
+      permanent staging fix is parked for a batched staging-fix pass, not this
+      phase.
+  - id: capacity_additions_is_projection
+    expr: "power_plant_capacity_additions rows are revised projections -- model as a Silver planning/forecast fact, never merged into current-state plant attributes"
+    severity: block
+
+localisation:
+  required: true
+  approach: german_native_with_english_business_layer
+  detail:
+    geography: >
+      German plants (plus a handful of border plants in AT/CH/LU/DK). Postleitzahl
+      / Ort / Bundesland resolve to the conformed German geography spine (AGS/ARS)
+      at Silver; the border-country rows are kept with their Land value and not
+      forced onto the German spine.
+    language: >
+      every column header and every coded value (Datensatztyp, Kraftwerksstatus,
+      Energietraeger, Technologie_Stromerzeugung, Spannungsebene, the Ja/Nein
+      flags) is German. The mapping (src/schemas/mappings/power_plant_list.yml)
+      gives the English business name for every field and an English label for
+      every coded value, with the German source value retained for traceability.
+    units: "capacity in MW; recorded per column in the mapping"
+    currency: not_applicable
+
+references:
+  carrier_catalog: "mastr_katalogwerte (category Energietraeger / Brennstoff) -- Energietraeger / Hauptbrennstoff reconcile here at Silver"
+  unit_register: "mastr_einheiten_* -- EinheitMastrNummer reconciles here (subset, large plants only)"

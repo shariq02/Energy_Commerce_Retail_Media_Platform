@@ -1,13 +1,16 @@
 # Source-to-canonical mapping -- SMARD
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
-# Date: August 2026
+# Date: September 2026
 #
 # Purpose: map the acquired SMARD schema (see contracts/smard.yml) to the
-# canonical model. Design only -- no transform code here.
+# canonical model, and record the English business meaning and physical unit for
+# every metric so the Silver treatment is fully specified. Design only -- no
+# transform code here.
 
 source: smard
 source_system: smard
+ecosystem: energy
 profiling_evidence: src/schemas/profiling/smard.md
 contract: src/schemas/contracts/smard.yml
 
@@ -16,10 +19,10 @@ targets:
 
   - canonical_fact: fact_market_price
     applies_when: "metric = 'day_ahead_prices'"
-    canonical_grain: [market_zone, date]
+    canonical_grain: [market_zone, timestamp]
     grain_note: >
-      Source resolution is 'day', so the hour/interval part of the canonical
-      grain is not populated from this source.
+      populated at both 'day' (daily mean) and 'quarterhour' resolution -- carry
+      resolution as an attribute; never blend the two.
     field_map:
       - source: "metric + filter_id + region + resolution + timestamp_utc"
         canonical: source_record_id
@@ -28,41 +31,109 @@ targets:
         canonical: "dim_market.market_zone"
         transform: "'DE-LU' -> market zone 'DE-LU' (German-Luxembourg bidding zone)"
       - source: timestamp_utc
-        canonical: "dim_date.date_key"
-        transform: "cast to timestamp (UTC), truncate to date"
+        canonical: "dim_date.date_key (+ dim_time for quarterhour)"
+        transform: "verify Europe/Berlin -> UTC, then cast"
       - source: value
         canonical: "fact_market_price.price"
-        transform: "cast to double"
+        transform: "cast to double; negative prices are valid"
         unit: EUR/MWh
     provenance:
       source_system: smard
       source_record_id: "the concat_ws key above"
 
   - canonical_fact: fact_market_timeseries
-    applies_when: >
-      metric like 'generation_%'
-      or metric in ('residual_load', 'total_power_consumption', 'pumped_storage_consumption')
+    applies_when: "metric like 'generation_%' or metric in ('residual_load', 'total_power_consumption', 'pumped_storage_consumption')"
     metrics_affected: 15
-    canonical_grain: [metric, market_zone, date]
+    canonical_grain: [metric, market_zone, resolution, timestamp]
     field_map:
-      - { source: metric,        canonical: "fact_market_timeseries.metric" }
-      - { source: region,        canonical: "dim_market.market_zone", transform: "'DE-LU'" }
-      - { source: timestamp_utc, canonical: "dim_date.date_key", transform: "cast UTC, truncate to date" }
+      - { source: metric,        canonical: "fact_market_timeseries.metric (English business name below)" }
+      - { source: region,        canonical: "dim_market.market_zone / dim_geography (DE-LU or a control area)" }
+      - { source: resolution,    canonical: "fact_market_timeseries.resolution attribute" }
+      - { source: timestamp_utc, canonical: "dim_date / dim_time", transform: "verify Europe/Berlin -> UTC, then cast" }
       - { source: value,         canonical: "fact_market_timeseries.value", transform: "cast to double" }
-      - { source: "(constant)",  canonical: "fact_market_timeseries.unit", transform: "'MWh/day'" }
+      - { source: "(derived)",   canonical: "fact_market_timeseries.unit", transform: "from business_names.metrics[metric].unit x resolution" }
     provenance:
       source_system: smard
       source_record_id: "concat_ws('|', metric, filter_id, region, resolution, timestamp_utc)"
-    also_feeds: >
-      cross-domain fact_market_impact / fact_energy_demand intermediate models.
+    also_feeds: "cross-domain fact_market_impact / int_energy_demand intermediate models"
+
+  - canonical_fact: fact_generation_forecast
+    applies_when: "metric like 'forecast_generation_%'"
+    metrics_affected: 6
+    canonical_grain: [metric, market_zone, resolution, target_timestamp]
+    field_map:
+      - { source: metric,        canonical: "fact_generation_forecast.metric (English business name below)" }
+      - { source: region,        canonical: "dim_market.market_zone ('DE-LU')" }
+      - { source: timestamp_utc, canonical: "target_timestamp (the forecast is FOR this time, published earlier)" }
+      - { source: value,         canonical: "fact_generation_forecast.forecast_value", transform: "cast to double" }
+    leakage_note: >
+      forecast_generation_photovoltaic is currently -1x forecast_generation_wind_and_photovoltaic
+      (contract quality_rules.forecast_pv_sign_mirror) -- resolve at Silver before
+      surfacing; never use one to predict the other.
+    pairs_with_realised:
+      forecast_generation_offshore_wind: generation_offshore_wind
+      forecast_generation_onshore_wind: generation_onshore_wind
+      forecast_generation_photovoltaic: generation_photovoltaic
+      forecast_generation_other: generation_other_conventional
+      forecast_generation_total: "(no single realised counterpart -- compare to summed realised generation)"
+      forecast_generation_wind_and_photovoltaic: "(sum of realised wind + pv)"
+
+# ---------------------------------------------------------------------------
+# Business glossary -- metric -> English business name + physical unit
+# filter_id is retained inside source_record_id, never a canonical field.
+# ---------------------------------------------------------------------------
+
+business_names:
+  metrics:
+    day_ahead_prices:                          { business_name: day_ahead_electricity_price,        unit_day: EUR_per_MWh,  unit_quarterhour: EUR_per_MWh }
+    generation_biomass:                        { business_name: generation_biomass,                 unit_day: MWh,          unit_quarterhour: MW }
+    generation_hard_coal:                      { business_name: generation_hard_coal,               unit_day: MWh,          unit_quarterhour: MW }
+    generation_hydro:                          { business_name: generation_hydropower,              unit_day: MWh,          unit_quarterhour: MW }
+    generation_lignite:                        { business_name: generation_lignite,                 unit_day: MWh,          unit_quarterhour: MW }
+    generation_natural_gas:                    { business_name: generation_natural_gas,             unit_day: MWh,          unit_quarterhour: MW }
+    generation_nuclear:                        { business_name: generation_nuclear,                 unit_day: MWh,          unit_quarterhour: MW }
+    generation_offshore_wind:                  { business_name: generation_wind_offshore,           unit_day: MWh,          unit_quarterhour: MW }
+    generation_onshore_wind:                   { business_name: generation_wind_onshore,            unit_day: MWh,          unit_quarterhour: MW }
+    generation_other_conventional:             { business_name: generation_other_conventional,      unit_day: MWh,          unit_quarterhour: MW }
+    generation_other_renewable:                { business_name: generation_other_renewable,         unit_day: MWh,          unit_quarterhour: MW }
+    generation_photovoltaic:                   { business_name: generation_solar_photovoltaic,      unit_day: MWh,          unit_quarterhour: MW }
+    generation_pumped_storage:                 { business_name: generation_pumped_storage,          unit_day: MWh,          unit_quarterhour: MW }
+    pumped_storage_consumption:                { business_name: pumped_storage_load,                unit_day: MWh,          unit_quarterhour: MW }
+    residual_load:                             { business_name: residual_load,                      unit_day: MWh,          unit_quarterhour: MW }
+    total_power_consumption:                   { business_name: total_electricity_consumption,      unit_day: MWh,          unit_quarterhour: MW }
+    forecast_generation_offshore_wind:         { business_name: forecast_generation_wind_offshore,  unit_day: MWh,          unit_quarterhour: MW }
+    forecast_generation_onshore_wind:          { business_name: forecast_generation_wind_onshore,   unit_day: MWh,          unit_quarterhour: MW }
+    forecast_generation_other:                 { business_name: forecast_generation_other,          unit_day: MWh,          unit_quarterhour: MW }
+    forecast_generation_photovoltaic:          { business_name: forecast_generation_solar_photovoltaic, unit_day: MWh,      unit_quarterhour: MW }
+    forecast_generation_total:                 { business_name: forecast_generation_total,          unit_day: MWh,          unit_quarterhour: MW }
+    forecast_generation_wind_and_photovoltaic: { business_name: forecast_generation_wind_and_solar, unit_day: MWh,          unit_quarterhour: MW }
+
+  columns:
+    metric:        metric
+    filter_id:     smard_series_id
+    region:        market_zone
+    resolution:    aggregation_resolution
+    timestamp_utc: observation_timestamp
+    value:         value
 
 # Columns dropped on the way to canonical (recorded so the decision is explicit)
 dropped_columns:
-  - column: resolution
-    reason: "constant 'day'; not part of any canonical grain at this resolution"
-  - column: filter_id
-    reason: "SMARD-internal series id; retained inside source_record_id, not a canonical field"
+  - { column: resolution, reason: "kept as a canonical attribute, not dropped -- both 'day' and 'quarterhour' are retained and never blended" }
+  - { column: filter_id,  reason: "SMARD-internal publication series id; retained inside source_record_id, not a standalone canonical field" }
 
 localisation:
-  required: false
-  reason: "natively German (DE-LU zone, Bundesnetzagentur)"
+  required: true
+  approach: german_native_with_english_business_layer
+  geography: "DE-LU bidding zone + 4 control areas -> conformed dim_geography / dim_market as named zones"
+  language: "metric names Englishised via business_names.metrics; filter_id retained for traceability"
+  units: "unit is metric-and-resolution dependent -- recorded in business_names.metrics, attached at Silver"
+  currency: "EUR (day_ahead_prices only)"
+  never: "SMARD series are never presented without provenance; the SMARD metric/filter ids remain authoritative"
+
+cross_source:
+  note: >
+    SMARD is an Energy-ecosystem market source. It joins to DWD weather and to
+    MaStR / power_plant_list only through the conformed dim_date / dim_time /
+    dim_geography / dim_market dimensions and real grid relationships (control
+    area, bidding zone) -- never by an identity join. SMARD carries no plant or
+    unit identifier, so there is no plant-level linkage to MaStR.

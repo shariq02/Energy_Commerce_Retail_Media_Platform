@@ -1,0 +1,144 @@
+# Data contract -- Redispatch measures (Germany, pre-Redispatch-2.0 regime)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: formal contract for the German redispatch source -- 1 Bronze table of
+# grid-congestion redispatch / countertrade measures. Every *_observed value and
+# every quality-rule bound is traceable to src/schemas/profiling/redispatch.md.
+# Authored; src/schemas/contracts/generated/redispatch_measures.schema.json is
+# produced by src/schemas/_generate_jsonschema.py -- do not edit it by hand.
+
+source: redispatch
+source_system: redispatch
+domain: Energy / Grid Operations
+description: >
+  German transmission-grid redispatch and countertrade measures -- each row is
+  one instructed change to a generation unit's active-power feed-in to relieve a
+  grid congestion or voltage problem. Static one-time acquisition. The acquired
+  window is 2013-04 .. 2020-12, i.e. the OLD reporting regime BEFORE the
+  NABEG 2.0 / Redispatch 2.0 switch of October 2021 -- this extract does not
+  describe current redispatch practice.
+profiling_evidence: src/schemas/profiling/redispatch.md
+bronze_physical_types: string
+
+acquisition:
+  method: scripted_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+  licence: >
+    no open licence -- kept local-only, never redistributed. Retained in scope
+    on the basis that the data stays inside the platform (source-scope decision).
+  regime_note: >
+    pre-Redispatch-2.0 extract (2013-2020). Reporting scope, thresholds and the
+    actor model all changed in Oct 2021 -- do not treat this as continuous with
+    any later redispatch data.
+
+conventions:
+  key_note: >
+    there is NO natural key -- no measure id in the source. The event grain is
+    one row per measure; 568 exact full-row duplicates exist and must be
+    de-duplicated at Silver.
+  german_date_format: "dd.MM.yyyy for BEGINN_DATUM / ENDE_DATUM"
+  german_decimal_note: "MITTLERE_LEISTUNG_MW / MAXIMALE_LEISTUNG_MW / GESAMTE_ARBEIT_MWH use the German comma decimal separator"
+  time_columns_are_text: >
+    BEGINN_UHRZEIT / ENDE_UHRZEIT are text time-of-day strings, not numeric --
+    combine with the matching *_DATUM and convert Europe/Berlin -> UTC at Silver.
+  affected_plant_note: >
+    BETROFFENE_ANLAGE is a FREE-TEXT plant name -- there is no shared identifier
+    with power_plant_list or MaStR. Linking is a Silver fuzzy-match task with its
+    own match rate, not a keyed join.
+
+tables:
+
+  - name: redispatch_measures
+    kind: event_log
+    grain:
+      key: [BEGINN_DATUM, BEGINN_UHRZEIT, BETROFFENE_ANLAGE, RICHTUNG]
+      unique: false           # no source key; 568 exact full-row duplicates
+      row_count_observed: 40118
+      description: one row per instructed redispatch / countertrade measure
+    full_row_duplicates_observed: 568
+    constant_columns_observed: [coverage_regime, ZEITZONE_VON, ZEITZONE_BIS]
+    observed_year_range: [2013, 2020]
+    columns:
+      - { name: coverage_regime,       type: string,  required: true,  nullable: false, constant_observed: true, notes: "describes how the extract was produced, not the measure -- constant, dropped at Silver" }
+      - { name: BEGINN_DATUM,          type: string,  required: true,  nullable: false, notes: "measure start date, dd.MM.yyyy; observed 2013-04-02 .. 2020-12-31" }
+      - { name: BEGINN_UHRZEIT,        type: string,  required: true,  nullable: false, notes: "measure start time-of-day (text)" }
+      - { name: ZEITZONE_VON,          type: string,  required: true,  nullable: false, constant_observed: true, notes: "source timezone for the start stamp -- constant (Europe/Berlin)" }
+      - { name: ENDE_DATUM,            type: string,  required: true,  nullable: false, notes: "measure end date, dd.MM.yyyy; 109 rows have ENDE_DATUM < BEGINN_DATUM" }
+      - { name: ENDE_UHRZEIT,          type: string,  required: true,  nullable: false, notes: "measure end time-of-day (text); post-event -- not available at the measure start" }
+      - { name: ZEITZONE_BIS,          type: string,  required: true,  nullable: false, constant_observed: true, notes: "source timezone for the end stamp -- constant" }
+      - { name: GRUND_DER_MASSNAHME,   type: string,  required: true,  nullable: true,  notes: "reason for the measure (11 values incl. blank); e.g. Strombedingter Redispatch, Spannungsbedingter Redispatch, Countertrade DE-DK1/DK2/NO2; 27 null" }
+      - { name: RICHTUNG,              type: string,  required: true,  nullable: false, notes: "direction: 'Wirkleistungseinspeisung erhoehen' (increase, 21884) / '... reduzieren' (reduce, 18234)" }
+      - { name: MITTLERE_LEISTUNG_MW,  type: double,  required: true,  nullable: true,  notes: "mean instructed power over the measure, MW; observed 0..4338; ~144 zeros; German-comma decimal" }
+      - { name: MAXIMALE_LEISTUNG_MW,  type: double,  required: true,  nullable: true,  notes: "maximum instructed power, MW; observed 0..4478; MITTLERE <= MAXIMALE with 7 violations" }
+      - { name: GESAMTE_ARBEIT_MWH,    type: double,  required: true,  nullable: true,  notes: "total energy of the measure, MWh; observed 0..55914; ~153 zeros; post-event quantity" }
+      - { name: ANWEISENDER_UENB,      type: string,  required: true,  nullable: false, notes: "instructing TSO (5 values): TenneT DE / TransnetBW / 50Hertz / Amprion / PSE" }
+      - { name: ANFORDERNDER_UENB,     type: string,  required: true,  nullable: true,  notes: "requesting TSO(s) -- 33 values, many are '&'-joined combinations; 19 null" }
+      - { name: BETROFFENE_ANLAGE,     type: string,  required: true,  nullable: true,  notes: "affected generation unit -- FREE-TEXT name, no shared key with power_plant_list / MaStR; 71 null" }
+      - { name: PRIMAERENERGIEART,     type: string,  required: true,  nullable: true,  notes: "primary energy type of the affected unit (4 values): Konventionell / Sonstiges / Erneuerbar / blank; 73 null" }
+
+quality_rules:
+  - id: no_source_key_dedupe
+    expr: "no measure id in the source; 568 exact full-row duplicates -- de-duplicate with distinct() at Silver before counting measures"
+    severity: block
+  - id: german_date_and_decimal
+    expr: "BEGINN_DATUM / ENDE_DATUM are dd.MM.yyyy; MW / MWh columns use the German comma decimal -- parse explicitly, quarantine failures"
+    severity: block
+  - id: time_columns_text
+    expr: "BEGINN_UHRZEIT / ENDE_UHRZEIT are text time-of-day strings -- combine with the matching *_DATUM and convert Europe/Berlin -> UTC at Silver"
+    severity: block
+  - id: start_before_end
+    expr: "combined start timestamp <= combined end timestamp"
+    severity: warn
+    evidence: "profiling: 109 / 40118 rows have the end date before the start date -- flag, do not delete"
+  - id: mean_le_max_power
+    expr: "MITTLERE_LEISTUNG_MW <= MAXIMALE_LEISTUNG_MW"
+    severity: warn
+    evidence: "profiling: 7 / 40118 violations"
+  - id: work_identity_unverifiable
+    expr: "GESAMTE_ARBEIT_MWH ~ mean power x duration could not be checked (0/0 rows) -- documented limitation, no rule enforced"
+    severity: info
+  - id: collinear_measures
+    expr: "MITTLERE_LEISTUNG_MW, MAXIMALE_LEISTUNG_MW and GESAMTE_ARBEIT_MWH are near-collinear -- do not use all three as independent features"
+    severity: info
+  - id: post_event_columns
+    expr: "ENDE_DATUM / ENDE_UHRZEIT / GESAMTE_ARBEIT_MWH are known only after the measure -- never features for predicting whether/when a measure starts"
+    severity: warn
+  - id: drop_constants
+    expr: "coverage_regime / ZEITZONE_VON / ZEITZONE_BIS are constant -- drop at Silver (a mixed-regime future extract would make coverage_regime a process feature)"
+    severity: warn
+  - id: pre_redispatch_2_0_only
+    expr: "the acquired window is 2013-2020, the OLD reporting regime -- any model must carry a regime indicator and must not assume continuity with post-2021 redispatch"
+    severity: block
+  - id: affected_plant_is_free_text
+    expr: "BETROFFENE_ANLAGE is a free-text name -- linking to power_plant_list / MaStR is a Silver fuzzy-match with its own match rate, never a keyed join"
+    severity: block
+  - id: requesting_tso_combinations
+    expr: "ANFORDERNDER_UENB values may be '&'-joined TSO combinations -- split to a list at Silver before any per-TSO aggregation"
+    severity: warn
+
+localisation:
+  required: true
+  approach: german_native_with_english_business_layer
+  detail:
+    geography: >
+      German transmission grid. No plant coordinates in this source; geography is
+      reachable only after BETROFFENE_ANLAGE is resolved to a power_plant_list /
+      MaStR unit (Silver). TSO control areas map to the conformed dim_geography /
+      dim_market as named zones.
+    language: >
+      every column header and every coded value (GRUND_DER_MASSNAHME, RICHTUNG,
+      PRIMAERENERGIEART, the TSO names) is German -- the mapping
+      (src/schemas/mappings/redispatch.yml) gives the English business name for
+      every field and an English label for every coded value, with the German
+      source value retained for traceability.
+    units: "power in MW, energy in MWh -- recorded per column in the mapping"
+    currency: not_applicable
+
+references:
+  affected_unit: "power_plant_list / mastr_einheiten_* -- BETROFFENE_ANLAGE resolves here by fuzzy name match at Silver (no key)"
+  tso_zones: "the 4 German control areas (50Hertz, Amprion, TenneT, TransnetBW) shared with SMARD.region"

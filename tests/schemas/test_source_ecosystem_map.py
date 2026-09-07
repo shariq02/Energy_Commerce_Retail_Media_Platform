@@ -58,6 +58,9 @@ def test_expected_current_scope_sources_present(doc):
     expected = {
         "smard",
         "dwd",
+        "mastr",
+        "power_plant_list",
+        "redispatch",
         "honda_iot",
         "rees46",
         "search_visibility_ramp_dryad",

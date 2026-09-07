@@ -1,0 +1,1147 @@
+# Data contract -- MaStR (Marktstammdatenregister, Germany)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: formal contract for the German Marktstammdatenregister source -- 28
+# Bronze tables covering generation units, EEG / KWK support & authorisation,
+# market actors, grid connection points / grids / locations / balancing zones,
+# change-history logs, and the MaStR reference catalogs. Every *_observed value
+# and every quality-rule bound is traceable to src/schemas/profiling/mastr.md.
+#
+# Contract depth (hybrid):
+#   DEEP    -- full column list + per-column notes + grain + FK + quality rules:
+#              the 13 tables that feed a canonical fact / dimension.
+#   LIGHT   -- full column list + grain + role + key/relationship + quality
+#              rules, minimal per-column notes: the 15 reference / link /
+#              change-log / catalog tables (several are 5-7M rows).
+#
+# Authored; the per-table JSON Schema under
+# src/schemas/contracts/generated/mastr_*.schema.json is produced by
+# src/schemas/_generate_jsonschema.py -- do not edit those by hand.
+
+source: mastr
+source_system: mastr
+domain: Energy / Generation Register
+description: >
+  The Bundesnetzagentur Marktstammdatenregister -- the complete legal register
+  of the German electricity (and gas) market: every generation unit, its EEG /
+  KWK support and its authorisation, the market actors, the grid connection
+  topology, and MaStR's own change history and code catalogs. A single
+  Gesamtdatenexport snapshot. Static one-time acquisition, public download,
+  no auth. Solar and pure-storage object types are deferred from staging for
+  this wave (they explain several 'partial-scope' orphan rates below).
+profiling_evidence: src/schemas/profiling/mastr.md
+bronze_physical_types: string
+
+acquisition:
+  method: scripted_download
+  auth: none
+  cadence: static_snapshot
+  update_frequency: none
+  sla: none
+  licence: "DL-DE-BY-2.0 (Datenlizenz Deutschland Namensnennung 2.0)"
+  attribution: "Bundesnetzagentur, Marktstammdatenregister"
+  export_note: >
+    the Gesamtdatenexport is a set of per-object-type XML files flattened to one
+    table each. The wide tables (marktakteure 61 cols, einheiten_wind 75 cols)
+    were structural-integrity checked -- no column shift detected in the current
+    Bronze (profiling section 03 Structural Integrity).
+
+conventions:
+  identifiers:
+    EinheitMastrNummer: "unit id (prefix SEE...) -- primary key of every einheiten_* table"
+    EegMaStRNummer: "EEG support-record id (prefix EEG...) -- primary key of every anlagen_eeg_* table; also a 1:1 column on wind/biomasse/wasser/geothermie units"
+    KwkMaStRNummer: "KWK support-record id (prefix KWK...) -- primary key of anlagen_kwk"
+    GenMastrNummer: "authorisation-record id (prefix GEN...) -- primary key of einheiten_genehmigung"
+    LokationMaStRNummer: "location id (prefix SEL...) -- primary key of lokationen"
+    NetzMaStRNummer: "grid id (prefix SNG...) -- primary key of netze"
+    MarktakteurMastrNummer / MastrNummer: "market-actor id (prefix SNB.../ ABR...) -- primary key of marktakteure"
+    NetzanschlusspunktMastrNummer: "grid connection point id -- primary key of netzanschlusspunkte"
+  spelling_note: >
+    the source is inconsistent between 'MaStRNummer' and 'MastrNummer' and
+    between 'DatumLetzteAktualisierung' and 'DatumLetzeAktualisierung'
+    (marktakteure) -- column names below are the exact Bronze headers.
+  date_note: >
+    dates are Europe/Berlin wall-clock. Milestone dates (Inbetriebnahmedatum,
+    EegInbetriebnahmedatum, Datum, effective dates) are the events;
+    Registrierungsdatum is when the record entered MaStR (>= 2019-01-31 for
+    natively registered records); DatumLetzteAktualisierung is the last edit.
+    GeplantesInbetriebnahmedatum and future commissioning dates are legitimately
+    forward-dated -- a column is only 'known' up to its own value.
+  migration_note: >
+    records with Registrierungsdatum < 2019-06-01 are the 2019 MaStR migration
+    wave and differ in completeness from natively registered ones -- a
+    pre/post-migration indicator is warranted (not applied here).
+  capacity_unit: kilowatts
+  capacity_unit_evidence: >
+    Bruttoleistung / Nettonennleistung / InstallierteLeistung are interpreted as
+    kW -- the MaStR Gesamtdatenexport layout documents kW, and the observed
+    ranges are consistent (einheiten_kernkraft 1,344,000..1,485,000 kW = a
+    ~1.3-1.5 GW reactor block; einheiten_verbrennung up to 1,110,000 kW). This
+    interpretation is to be CONFIRMED against the MaStR source layout during
+    Silver, and is distinct from a generic 'unit unresolved' state.
+  catalog_note: >
+    every low-cardinality integer-coded column (status, technology, carrier,
+    Bundesland, market role, ...) is a code into mastr_katalogwerte. The export
+    carries NO column -> category binding, so a code is scoped to a category
+    only when the column name matches; otherwise reconciliation is global
+    value-id membership. Codes are a quarantine class when unknown, never a
+    silent NULL. Catalog vintage must be pinned -- code meanings change between
+    MaStR releases.
+  coordinate_note: "Laengengrad / Breitengrad are EPSG:4326; only the einheiten_* tables carry coordinates"
+  geography_codes: "Bundesland / Landkreis / Gemeinde / Gemeindeschluessel (AGS) / Postleitzahl carry the German administrative geography -- Gemeindeschluessel is the join to the AGS/ARS spine"
+
+# ===========================================================================
+# DEEP tables (13)
+# ===========================================================================
+
+tables:
+
+  # ---- Generation units: einheiten_* (6) ---------------------------------
+  # Shared core (~first 25 columns) is near-identical across the six; notes
+  # are given once here and abbreviated per table.
+  #   EinheitMastrNummer            unit id (PK, unique)
+  #   DatumLetzteAktualisierung     last edit ts
+  #   LokationMaStRNummer           FK -> lokationen (nullable; fill rate varies 26-89%)
+  #   NetzbetreiberpruefungStatus / NetzbetreiberpruefungDatum   grid-operator review
+  #   AnlagenbetreiberMastrNummer   FK -> marktakteure (operator)
+  #   Land / Bundesland / Landkreis / Gemeinde / Gemeindeschluessel / Postleitzahl / Ort   geography (coded + text)
+  #   Laengengrad / Breitengrad     EPSG:4326 coordinates (nullable)
+  #   Registrierungsdatum / Inbetriebnahmedatum   MaStR registration / commissioning date
+  #   EinheitSystemstatus / EinheitBetriebsstatus   system / operating status (catalog codes)
+  #   NichtVorhandenInMigriertenEinheiten   migration flag
+  #   NameStromerzeugungseinheit    unit name
+  #   Energietraeger                energy carrier (catalog code; constant within a carrier table)
+  #   Bruttoleistung / Nettonennleistung   gross / net capacity, kW
+  #   FernsteuerbarkeitNb / FernsteuerbarkeitDv   remote-controllability flags (catalog codes)
+  #   Einspeisungsart              feed-in type (catalog code)
+  #   GenMastrNummer               FK -> einheiten_genehmigung (nullable)
+
+  - name: mastr_einheiten_wind
+    kind: deep
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 43457
+    constant_columns_observed: [EinheitSystemstatus, Energietraeger, Land, NichtVorhandenInMigriertenEinheiten]
+    foreign_keys:
+      LokationMaStRNummer: { target: mastr_lokationen, fill_rate_observed: 0.264, cardinality: many_to_one }
+      AnlagenbetreiberMastrNummer: { target: mastr_marktakteure, fill_rate_observed: 0.285, match_rate_observed: 1.0 }
+      GenMastrNummer: { target: mastr_einheiten_genehmigung, fill_rate_observed: 0.485 }
+      EegMaStRNummer: { target: mastr_anlagen_eeg_wind, cardinality: one_to_one, note: "unique in this table -- every wind unit has exactly one EEG record" }
+    capacity_observed: { Bruttoleistung: {min: 0.1, max: 15000.0, unit: kW}, note: "confirm kW vs MW against the MaStR source layout" }
+    coordinates_observed: { present: 42166, missing: 1291, outside_germany_bbox: 54 }
+    commissioning_observed: { Inbetriebnahmedatum: {min: "1949-07-31", max: "2026-09-03"} }
+    columns:
+      - { name: EinheitMastrNummer,          type: string,    required: true,  nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,   type: timestamp, required: true,  nullable: true,  notes: "last edit" }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationen; 26% populated" }
+      - { name: NetzbetreiberpruefungStatus,  type: string,    required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum,   type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer,  type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktakteure (operator)" }
+      - { name: Land,                         type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true,  notes: "catalog code (category Land); codes 1400-1416 seen but not in katalogwerte -- likely Regierungsbezirk-level" }
+      - { name: Landkreis,                    type: string,    required: false, nullable: true }
+      - { name: Gemeinde,                     type: string,    required: false, nullable: true }
+      - { name: Gemeindeschluessel,           type: string,    required: false, nullable: true,  notes: "AGS -- join key to the German geography spine" }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Gemarkung,                    type: string,    required: false, nullable: true }
+      - { name: FlurFlurstuecknummern,        type: string,    required: false, nullable: true }
+      - { name: StrasseNichtGefunden,         type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true,  notes: "'nicht veroeffentlicht' flag" }
+      - { name: HausnummerNichtGefunden,      type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Laengengrad,                  type: double,    required: false, nullable: true,  notes: "longitude EPSG:4326" }
+      - { name: Breitengrad,                  type: double,    required: false, nullable: true,  notes: "latitude EPSG:4326" }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true,  notes: "MaStR registration date" }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true,  notes: "commissioning date; may be forward-dated (planned)" }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true,  notes: "operating status (catalog category Betriebsstatus): 31 planned / 35 in operation / 37 temp. shut down / 38 perm. shut down" }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: NameStromerzeugungseinheit,   type: string,    required: false, nullable: true }
+      - { name: Weic_nv,                      type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv,          type: string,    required: false, nullable: true }
+      - { name: Energietraeger,               type: string,    required: false, nullable: true,  constant_observed: true, notes: "= wind" }
+      - { name: Bruttoleistung,               type: double,    required: true,  nullable: true,  notes: "gross capacity, kW (confirm vs MW)" }
+      - { name: Nettonennleistung,            type: double,    required: true,  nullable: true,  notes: "net nominal capacity, kW; near-collinear with gross" }
+      - { name: FernsteuerbarkeitNb,          type: string,    required: false, nullable: true,  notes: "catalog category Fernsteuerbarkeit" }
+      - { name: FernsteuerbarkeitDv,          type: string,    required: false, nullable: true }
+      - { name: Einspeisungsart,              type: string,    required: false, nullable: true,  notes: "catalog category Einspeisungsart" }
+      - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_einheiten_genehmigung; 49% populated" }
+      - { name: NameWindpark,                 type: string,    required: false, nullable: true }
+      - { name: WindAnLandOderAufSee,         type: string,    required: false, nullable: true,  notes: "onshore / offshore (catalog category Land); 888/889 codes" }
+      - { name: Hersteller,                   type: string,    required: false, nullable: true,  notes: "turbine manufacturer (catalog code)" }
+      - { name: Technologie,                  type: string,    required: false, nullable: true,  notes: "catalog category BrennstoffTechnologieNetzersatz" }
+      - { name: Typenbezeichnung,             type: string,    required: false, nullable: true,  notes: "turbine model designation" }
+      - { name: Nabenhoehe,                   type: double,    required: false, nullable: true,  notes: "hub height, m" }
+      - { name: Rotordurchmesser,             type: double,    required: false, nullable: true,  notes: "rotor diameter, m" }
+      - { name: Rotorblattenteisungssystem,   type: string,    required: false, nullable: true }
+      - { name: AuflageAbschaltungLeistungsbegrenzung,               type: string, required: false, nullable: true, notes: "curtailment condition flag" }
+      - { name: AuflagenAbschaltungSchallimmissionsschutzNachts,     type: string, required: false, nullable: true }
+      - { name: AuflagenAbschaltungSchallimmissionsschutzTagsueber,  type: string, required: false, nullable: true }
+      - { name: AuflagenAbschaltungSchattenwurf,                     type: string, required: false, nullable: true }
+      - { name: AuflagenAbschaltungTierschutz,                       type: string, required: false, nullable: true }
+      - { name: AuflagenAbschaltungEiswurf,                          type: string, required: false, nullable: true }
+      - { name: AuflagenAbschaltungSonstige,                         type: string, required: false, nullable: true }
+      - { name: Nachtkennzeichnung,           type: string,    required: false, nullable: true }
+      - { name: Buergerenergie,               type: string,    required: false, nullable: true,  notes: "citizen-energy flag" }
+      - { name: EegMaStRNummer,               type: string,    required: true,  nullable: true,  notes: "FK -> mastr_anlagen_eeg_wind; unique here (1:1)" }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: GroesseDerInAnspruchGenommenenFlaeche,          type: double, required: false, nullable: true, notes: "land area used, m2" }
+      - { name: UeberwiegendeNutzungsartDerFlaecheVorErrichtung, type: string, required: false, nullable: true }
+      - { name: VorherigerNutzungsartenbereichDerFlaeche,       type: string, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true,  notes: "planned commissioning date (forward-dated by design)" }
+      - { name: Adresszusatz,                 type: string,    required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string,  required: false, nullable: true,  notes: "previous operator (FK -> mastr_marktakteure)" }
+      - { name: DatumDesBetreiberwechsels,    type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung,  type: timestamp, required: false, nullable: true,  notes: "final decommissioning date" }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: Weic,                         type: string,    required: false, nullable: true }
+      - { name: WeicDisplayName,              type: string,    required: false, nullable: true }
+      - { name: Seelage,                      type: string,    required: false, nullable: true,  notes: "offshore sea area (catalog category Seelage)" }
+      - { name: GebietNachDemFlaechenentwicklungsplanNordsee, type: string, required: false, nullable: true }
+      - { name: Wassertiefe,                  type: double,    required: false, nullable: true,  notes: "water depth, m (offshore)" }
+      - { name: Kuestenentfernung,            type: double,    required: false, nullable: true,  notes: "distance to coast, km (offshore)" }
+      - { name: GebietNachDemFlaechenentwicklungsplanOstsee,  type: string, required: false, nullable: true }
+      - { name: DatumWiederaufnahmeBetrieb,   type: timestamp, required: false, nullable: true }
+      - { name: Einsatzverantwortlicher,      type: string,    required: false, nullable: true }
+
+  - name: mastr_einheiten_biomasse
+    kind: deep
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 24334
+    constant_columns_observed: [EinheitSystemstatus, Energietraeger, KapazitaetsreserveZugeordnet, Land, NetzreserveZugeordnet, NichtVorhandenInMigriertenEinheiten]
+    foreign_keys:
+      LokationMaStRNummer: { target: mastr_lokationen, fill_rate_observed: 0.662 }
+      AnlagenbetreiberMastrNummer: { target: mastr_marktakteure, fill_rate_observed: 0.455 }
+      GenMastrNummer: { target: mastr_einheiten_genehmigung, fill_rate_observed: 0.444 }
+      EegMaStRNummer: { target: mastr_anlagen_eeg_biomasse, fill_rate_observed: 0.643 }
+      KwkMaStRNummer: { target: mastr_anlagen_kwk, fill_rate_observed: 0.557 }
+    capacity_observed: { Bruttoleistung: {min: 0.01, max: 99720.0, unit: kW} }
+    commissioning_observed: { Inbetriebnahmedatum: {min: "1955-12-06", max: "2026-09-01"} }
+    columns:
+      - { name: EinheitMastrNummer,          type: string,    required: true,  nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,   type: timestamp, required: true,  nullable: true }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationen" }
+      - { name: NetzbetreiberpruefungStatus,  type: string,    required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum,   type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer,  type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktakteure" }
+      - { name: Land,                         type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true,  notes: "catalog category Land" }
+      - { name: Landkreis,                    type: string,    required: false, nullable: true }
+      - { name: Gemeinde,                     type: string,    required: false, nullable: true }
+      - { name: Gemeindeschluessel,           type: string,    required: false, nullable: true,  notes: "AGS" }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: StrasseNichtGefunden,         type: string,    required: false, nullable: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true }
+      - { name: HausnummerNichtGefunden,      type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Laengengrad,                  type: double,    required: false, nullable: true }
+      - { name: Breitengrad,                  type: double,    required: false, nullable: true }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: NameStromerzeugungseinheit,   type: string,    required: false, nullable: true }
+      - { name: Weic_nv,                      type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv,          type: string,    required: false, nullable: true }
+      - { name: Energietraeger,               type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bruttoleistung,               type: double,    required: true,  nullable: true,  notes: "kW" }
+      - { name: Nettonennleistung,            type: double,    required: true,  nullable: true }
+      - { name: FernsteuerbarkeitNb,          type: string,    required: false, nullable: true }
+      - { name: FernsteuerbarkeitDv,          type: string,    required: false, nullable: true }
+      - { name: Einspeisungsart,              type: string,    required: false, nullable: true }
+      - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_einheiten_genehmigung" }
+      - { name: Hauptbrennstoff,              type: string,    required: false, nullable: true,  notes: "catalog category Brennstoff" }
+      - { name: Biomasseart,                  type: string,    required: false, nullable: true,  notes: "biomass type (catalog code)" }
+      - { name: Technologie,                  type: string,    required: false, nullable: true,  notes: "catalog category BrennstoffTechnologieNetzersatz" }
+      - { name: EegMaStRNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_anlagen_eeg_biomasse" }
+      - { name: KwkMaStRNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_anlagen_kwk" }
+      - { name: DatumEndgueltigeStilllegung,  type: timestamp, required: false, nullable: true }
+      - { name: Gemarkung,                    type: string,    required: false, nullable: true }
+      - { name: FlurFlurstuecknummern,        type: string,    required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string,  required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels,    type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: Adresszusatz,                 type: string,    required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: Weic,                         type: string,    required: false, nullable: true }
+      - { name: WeicDisplayName,              type: string,    required: false, nullable: true }
+      - { name: NetzreserveZugeordnet,        type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: KapazitaetsreserveZugeordnet, type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: DatumWiederaufnahmeBetrieb,   type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: Kraftwerksnummer,             type: string,    required: false, nullable: true }
+      - { name: InbetriebnahmedatumAmAktuellenStandort, type: timestamp, required: false, nullable: true }
+      - { name: Einsatzverantwortlicher,      type: string,    required: false, nullable: true }
+
+  - name: mastr_einheiten_wasser
+    kind: deep
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 8814
+    constant_columns_observed: [EinheitSystemstatus, Energietraeger, InbetriebnahmedatumAmAktuellenStandort, KapazitaetsreserveZugeordnet, NetzreserveZugeordnet, NichtVorhandenInMigriertenEinheiten]
+    foreign_keys:
+      LokationMaStRNummer: { target: mastr_lokationen, fill_rate_observed: 0.887 }
+      AnlagenbetreiberMastrNummer: { target: mastr_marktakteure, fill_rate_observed: 0.677 }
+      EegMaStRNummer: { target: mastr_anlagen_eeg_wasser, fill_rate_observed: 0.849 }
+      GenMastrNummer: { target: mastr_einheiten_genehmigung, fill_rate_observed: 0.124 }
+    capacity_observed: { Bruttoleistung: {min: 0.75, max: 96000.0, unit: kW} }
+    columns:
+      - { name: EinheitMastrNummer,          type: string,    required: true,  nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,   type: timestamp, required: true,  nullable: true }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationen" }
+      - { name: NetzbetreiberpruefungStatus,  type: string,    required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum,   type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer,  type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktakteure" }
+      - { name: Land,                         type: string,    required: false, nullable: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true }
+      - { name: Landkreis,                    type: string,    required: false, nullable: true }
+      - { name: Gemeinde,                     type: string,    required: false, nullable: true }
+      - { name: Gemeindeschluessel,           type: string,    required: false, nullable: true,  notes: "AGS" }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: NameStromerzeugungseinheit,   type: string,    required: false, nullable: true }
+      - { name: Weic_nv,                      type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv,          type: string,    required: false, nullable: true }
+      - { name: Energietraeger,               type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bruttoleistung,               type: double,    required: true,  nullable: true,  notes: "kW" }
+      - { name: Nettonennleistung,            type: double,    required: true,  nullable: true }
+      - { name: FernsteuerbarkeitNb,          type: string,    required: false, nullable: true }
+      - { name: Einspeisungsart,              type: string,    required: false, nullable: true }
+      - { name: NameKraftwerk,                type: string,    required: false, nullable: true }
+      - { name: ArtDerWasserkraftanlage,      type: string,    required: false, nullable: true,  notes: "hydro plant type (catalog category 'Art der Wasserkraftanlage')" }
+      - { name: MinderungStromerzeugung,      type: string,    required: false, nullable: true }
+      - { name: ArtDesZuflusses,              type: string,    required: false, nullable: true,  notes: "inflow type (run-of-river / reservoir / pumped)" }
+      - { name: EegMaStRNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_anlagen_eeg_wasser" }
+      - { name: Gemarkung,                    type: string,    required: false, nullable: true }
+      - { name: FlurFlurstuecknummern,        type: string,    required: false, nullable: true }
+      - { name: StrasseNichtGefunden,         type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true }
+      - { name: HausnummerNichtGefunden,      type: string,    required: false, nullable: true }
+      - { name: Laengengrad,                  type: double,    required: false, nullable: true }
+      - { name: Breitengrad,                  type: double,    required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string,  required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels,    type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_einheiten_genehmigung" }
+      - { name: DatumEndgueltigeStilllegung,  type: timestamp, required: false, nullable: true }
+      - { name: FernsteuerbarkeitDv,          type: string,    required: false, nullable: true }
+      - { name: BestandteilGrenzkraftwerk,    type: string,    required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: Adresszusatz,                 type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer,             type: string,    required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: DatumWiederaufnahmeBetrieb,   type: timestamp, required: false, nullable: true }
+      - { name: NetzreserveZugeordnet,        type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: KapazitaetsreserveZugeordnet, type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: InbetriebnahmedatumAmAktuellenStandort, type: timestamp, required: false, nullable: true, constant_observed: true }
+      - { name: NettonennleistungDeutschland, type: double,    required: false, nullable: true,  notes: "net capacity on the German side (border plants), kW" }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: Weic,                         type: string,    required: false, nullable: true }
+      - { name: Einsatzverantwortlicher,      type: string,    required: false, nullable: true }
+      - { name: WeicDisplayName,              type: string,    required: false, nullable: true }
+
+  - name: mastr_einheiten_verbrennung
+    kind: deep
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 94027
+    constant_columns_observed: [EinheitSystemstatus, NichtVorhandenInMigriertenEinheiten]
+    foreign_keys:
+      LokationMaStRNummer: { target: mastr_lokationen, fill_rate_observed: 0.843, match_rate_observed: 1.0 }
+      AnlagenbetreiberMastrNummer: { target: mastr_marktakteure, fill_rate_observed: 0.605 }
+      KwkMaStRNummer: { target: mastr_anlagen_kwk, fill_rate_observed: 0.840 }
+      GenMastrNummer: { target: mastr_einheiten_genehmigung, fill_rate_observed: 0.030 }
+    capacity_observed: { Bruttoleistung: {min: 0.001, max: 1110000.0, unit: kW} }
+    columns:
+      - { name: EinheitMastrNummer,          type: string,    required: true,  nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,   type: timestamp, required: true,  nullable: true }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationen" }
+      - { name: NetzbetreiberpruefungStatus,  type: string,    required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum,   type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer,  type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktakteure" }
+      - { name: Land,                         type: string,    required: false, nullable: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true }
+      - { name: Landkreis,                    type: string,    required: false, nullable: true }
+      - { name: Gemeinde,                     type: string,    required: false, nullable: true }
+      - { name: Gemeindeschluessel,           type: string,    required: false, nullable: true,  notes: "AGS" }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: NameStromerzeugungseinheit,   type: string,    required: false, nullable: true }
+      - { name: Weic_nv,                      type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv,          type: string,    required: false, nullable: true }
+      - { name: Energietraeger,               type: string,    required: false, nullable: true,  notes: "carrier (catalog code); not constant here -- gas / coal / oil / waste / ..." }
+      - { name: Bruttoleistung,               type: double,    required: true,  nullable: true,  notes: "kW" }
+      - { name: Nettonennleistung,            type: double,    required: true,  nullable: true }
+      - { name: FernsteuerbarkeitNb,          type: string,    required: false, nullable: true }
+      - { name: Einspeisungsart,              type: string,    required: false, nullable: true }
+      - { name: NameKraftwerk,                type: string,    required: false, nullable: true }
+      - { name: NameKraftwerksblock,          type: string,    required: false, nullable: true }
+      - { name: Hauptbrennstoff,              type: string,    required: false, nullable: true,  notes: "catalog category Brennstoff" }
+      - { name: KwkMaStRNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_anlagen_kwk" }
+      - { name: Technologie,                  type: string,    required: false, nullable: true,  notes: "catalog category BrennstoffTechnologieNetzersatz" }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: StrasseNichtGefunden,         type: string,    required: false, nullable: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true }
+      - { name: HausnummerNichtGefunden,      type: string,    required: false, nullable: true }
+      - { name: Laengengrad,                  type: double,    required: false, nullable: true }
+      - { name: Breitengrad,                  type: double,    required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung,  type: timestamp, required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: FernsteuerbarkeitDv,          type: string,    required: false, nullable: true }
+      - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_einheiten_genehmigung" }
+      - { name: AnlageIstImKombibetrieb,      type: string,    required: false, nullable: true,  notes: "combined-operation flag" }
+      - { name: BestandteilGrenzkraftwerk,    type: string,    required: false, nullable: true }
+      - { name: Notstromaggregat,             type: string,    required: false, nullable: true,  notes: "emergency generator flag" }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string,  required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels,    type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: SteigerungNettonennleistungKombibetrieb, type: double, required: false, nullable: true }
+      - { name: MastrNummernKombibetrieb,     type: string,    required: false, nullable: true,  notes: "linked unit ids in combined operation (delimited list)" }
+      - { name: Weic,                         type: string,    required: false, nullable: true }
+      - { name: WeicDisplayName,              type: string,    required: false, nullable: true }
+      - { name: Einsatzverantwortlicher,      type: string,    required: false, nullable: true }
+      - { name: WeitererHauptbrennstoff,      type: string,    required: false, nullable: true,  notes: "catalog category Brennstoff" }
+      - { name: Adresszusatz,                 type: string,    required: false, nullable: true }
+      - { name: Einsatzort,                   type: string,    required: false, nullable: true,  notes: "catalog category Einsatzort" }
+      - { name: WeitereBrennstoffe,           type: string,    required: false, nullable: true }
+      - { name: NetzreserveZugeordnet,        type: string,    required: false, nullable: true }
+      - { name: DatumNetzreserve,             type: timestamp, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: Kraftwerksnummer,             type: string,    required: false, nullable: true }
+      - { name: Gemarkung,                    type: string,    required: false, nullable: true }
+      - { name: FlurFlurstuecknummern,        type: string,    required: false, nullable: true }
+      - { name: KapazitaetsreserveZugeordnet, type: string,    required: false, nullable: true }
+      - { name: DatumWiederaufnahmeBetrieb,   type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: AusschliesslicheVerwendungImKombibetrieb, type: string, required: false, nullable: true }
+      - { name: InbetriebnahmedatumAmAktuellenStandort, type: timestamp, required: false, nullable: true }
+      - { name: NettonennleistungDeutschland, type: double,    required: false, nullable: true }
+      - { name: SicherheitsbereitschaftAbDatum, type: timestamp, required: false, nullable: true, notes: "standby-reserve start date (lignite security standby)" }
+      - { name: DatumKapazitaetsreserve,     type: timestamp, required: false, nullable: true }
+      - { name: DatumBaubeginn,               type: timestamp, required: false, nullable: true,  notes: "construction start date" }
+
+  - name: mastr_einheiten_kernkraft
+    kind: deep
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 6
+    constant_columns_observed: [AltAnlagenbetreiberMastrNummer, AnlagenbetreiberMastrNummer, AnschlussAnHoechstOderHochSpannung, DatumDesBetreiberwechsels, DatumRegistrierungDesBetreiberwechsels, EinheitBetriebsstatus, EinheitSystemstatus, Einspeisungsart, Energietraeger, FernsteuerbarkeitNb, GenMastrNummer, Kraftwerksnummer_nv, Land, LokationMaStRNummer, NetzbetreiberpruefungStatus, NichtVorhandenInMigriertenEinheiten, Technologie, Weic_nv]
+    capacity_observed: { Bruttoleistung: {min: 1344000.0, max: 1485000.0, unit: kW} }
+    notes: "only 6 rows -- the phased-out German nuclear fleet. Most columns are constant / null at this size."
+    columns:
+      - { name: EinheitMastrNummer,          type: string,    required: true,  nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,   type: timestamp, required: true,  nullable: true }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: NetzbetreiberpruefungStatus,  type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: NetzbetreiberpruefungDatum,   type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer,  type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Land,                         type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true }
+      - { name: Landkreis,                    type: string,    required: false, nullable: true }
+      - { name: Gemeinde,                     type: string,    required: false, nullable: true }
+      - { name: Gemeindeschluessel,           type: string,    required: false, nullable: true }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: StrasseNichtGefunden,         type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true }
+      - { name: HausnummerNichtGefunden,      type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Laengengrad,                  type: double,    required: false, nullable: true }
+      - { name: Breitengrad,                  type: double,    required: false, nullable: true }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung,  type: timestamp, required: false, nullable: true,  notes: "final shutdown -- all German reactors" }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string,  required: false, nullable: true,  constant_observed: true }
+      - { name: DatumDesBetreiberwechsels,    type: timestamp, required: false, nullable: true,  constant_observed: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true, constant_observed: true }
+      - { name: NameStromerzeugungseinheit,   type: string,    required: false, nullable: true }
+      - { name: Weic_nv,                      type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Kraftwerksnummer_nv,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Energietraeger,               type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bruttoleistung,               type: double,    required: true,  nullable: true,  notes: "kW -- ~1.3-1.5 GW per reactor block" }
+      - { name: Nettonennleistung,            type: double,    required: true,  nullable: true }
+      - { name: Einspeisungsart,              type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: NameKraftwerk,                type: string,    required: false, nullable: true }
+      - { name: NameKraftwerksblock,          type: string,    required: false, nullable: true }
+      - { name: Technologie,                  type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: FernsteuerbarkeitNb,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: Weic,                         type: string,    required: false, nullable: true }
+      - { name: WeicDisplayName,              type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer,             type: string,    required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  constant_observed: true }
+
+  - name: mastr_einheiten_geothermie_gsgk
+    kind: deep
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 336
+    constant_columns_observed: [DatumBeginnVoruebergehendeStilllegung, EinheitSystemstatus, KapazitaetsreserveZugeordnet, Kraftwerksnummer_nv, Land, NetzreserveZugeordnet, NichtVorhandenInMigriertenEinheiten]
+    foreign_keys:
+      LokationMaStRNummer: { target: mastr_lokationen, fill_rate_observed: 0.613 }
+      AnlagenbetreiberMastrNummer: { target: mastr_marktakteure, fill_rate_observed: 0.417 }
+      KwkMaStRNummer: { target: mastr_anlagen_kwk, fill_rate_observed: 0.241 }
+      EegMaStRNummer: { target: mastr_anlagen_eeg_geothermie_gsgk, fill_rate_observed: 0.393 }
+      GenMastrNummer: { target: mastr_einheiten_genehmigung, fill_rate_observed: 0.283 }
+    capacity_observed: { Bruttoleistung: {min: 0.75, max: 30000.0, unit: kW} }
+    notes: "geothermal + Grubengas / Solarthermie / Klaergas (GSGK) units"
+    columns:
+      - { name: EinheitMastrNummer,          type: string,    required: true,  nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,   type: timestamp, required: true,  nullable: true }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationen" }
+      - { name: NetzbetreiberpruefungStatus,  type: string,    required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum,   type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer,  type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktakteure" }
+      - { name: Land,                         type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true }
+      - { name: Landkreis,                    type: string,    required: false, nullable: true }
+      - { name: Gemeinde,                     type: string,    required: false, nullable: true }
+      - { name: Gemeindeschluessel,           type: string,    required: false, nullable: true,  notes: "AGS" }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true, constant_observed: true }
+      - { name: NameStromerzeugungseinheit,   type: string,    required: false, nullable: true }
+      - { name: Weic_nv,                      type: string,    required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: Energietraeger,               type: string,    required: false, nullable: true,  notes: "carrier code (geothermie / grubengas / solarthermie / klaergas)" }
+      - { name: Bruttoleistung,               type: double,    required: true,  nullable: true,  notes: "kW" }
+      - { name: Nettonennleistung,            type: double,    required: true,  nullable: true }
+      - { name: FernsteuerbarkeitNb,          type: string,    required: false, nullable: true }
+      - { name: Einspeisungsart,              type: string,    required: false, nullable: true }
+      - { name: Technologie,                  type: string,    required: false, nullable: true }
+      - { name: KwkMaStRNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_anlagen_kwk" }
+      - { name: Gemarkung,                    type: string,    required: false, nullable: true }
+      - { name: FlurFlurstuecknummern,        type: string,    required: false, nullable: true }
+      - { name: StrasseNichtGefunden,         type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true }
+      - { name: HausnummerNichtGefunden,      type: string,    required: false, nullable: true }
+      - { name: Laengengrad,                  type: double,    required: false, nullable: true }
+      - { name: Breitengrad,                  type: double,    required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung,  type: timestamp, required: false, nullable: true }
+      - { name: FernsteuerbarkeitDv,          type: string,    required: false, nullable: true }
+      - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_einheiten_genehmigung" }
+      - { name: EegMaStRNummer,               type: string,    required: false, nullable: true,  notes: "FK -> mastr_anlagen_eeg_geothermie_gsgk" }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: Adresszusatz,                 type: string,    required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: NetzreserveZugeordnet,        type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: KapazitaetsreserveZugeordnet, type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true, constant_observed: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string,  required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels,    type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+
+  # ---- EEG / KWK support & authorisation (7) ----------------------------
+
+  - name: mastr_anlagen_eeg_wind
+    kind: deep
+    grain: { key: [EegMaStRNummer], unique: true }
+    row_count_observed: 43457
+    relationship_to_unit:
+      via: EegMaStRNummer
+      target: mastr_einheiten_wind
+      cardinality: one_to_one
+      match_rate_observed: 1.0
+    installed_power_observed: { InstallierteLeistung: {min: 0.1, max: 15000.0, unit: kW, note: "confirm unit against source layout"} }
+    columns:
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true,  notes: "MaStR registration date (>= 2019)" }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: EegInbetriebnahmedatum,       type: timestamp, required: false, nullable: true,  notes: "EEG commissioning date; 61/35275 after Registrierungsdatum (0.17%)" }
+      - { name: EegMaStRNummer,               type: string,    required: true,  nullable: false, notes: "EEG record id (PK, unique)" }
+      - { name: AnlagenkennzifferAnlagenregister,     type: string, required: false, nullable: true, notes: "Anlagenregister code" }
+      - { name: AnlagenkennzifferAnlagenregister_nv,  type: string, required: false, nullable: true, notes: "'nicht veroeffentlicht' flag (0/1)" }
+      - { name: AnlagenschluesselEeg,          type: string,    required: false, nullable: true,  notes: "EEG plant key" }
+      - { name: PilotAnlage,                   type: string,    required: false, nullable: true,  notes: "pilot-plant flag (0/1/None)" }
+      - { name: InstallierteLeistung,          type: double,    required: true,  nullable: true,  notes: "installed capacity, kW (overlaps the unit's Bruttoleistung -- do not use both as independent features)" }
+      - { name: VerhaeltnisErtragsschaetzungReferenzertrag,     type: double, required: false, nullable: true, notes: "yield-estimate to reference-yield ratio, %" }
+      - { name: VerhaeltnisErtragsschaetzungReferenzertrag_nv,  type: string, required: false, nullable: true }
+      - { name: VerhaeltnisReferenzertragErtrag5Jahre,          type: double, required: false, nullable: true }
+      - { name: VerhaeltnisReferenzertragErtrag5Jahre_nv,       type: string, required: false, nullable: true }
+      - { name: VerhaeltnisReferenzertragErtrag10Jahre_nv,      type: string, required: false, nullable: true }
+      - { name: VerhaeltnisReferenzertragErtrag15Jahre_nv,      type: string, required: false, nullable: true }
+      - { name: AusschreibungZuschlag,        type: string,    required: false, nullable: true,  notes: "auction-award flag (0/1/None)" }
+      - { name: AnlageBetriebsstatus,         type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus: 31 planned / 35 in operation / 37 temp / 38 perm" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list) -- an M:N bridge; explode at Silver" }
+      - { name: PrototypAnlage,               type: string,    required: false, nullable: true,  notes: "prototype-plant flag" }
+      - { name: Zuschlagsnummer,              type: string,    required: false, nullable: true,  notes: "auction award number" }
+      - { name: VerhaeltnisReferenzertragErtrag10Jahre, type: double, required: false, nullable: true }
+      - { name: VerhaeltnisReferenzertragErtrag15Jahre, type: double, required: false, nullable: true }
+
+  - name: mastr_anlagen_eeg_biomasse
+    kind: deep
+    grain: { key: [EegMaStRNummer], unique: true }
+    row_count_observed: 15644
+    relationship_to_unit: { via: EegMaStRNummer, target: mastr_einheiten_biomasse, cardinality: one_to_one }
+    installed_power_observed: { InstallierteLeistung: {min: 0.0, max: 148000.0, unit: kW, zeros: 8} }
+    columns:
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: EegInbetriebnahmedatum,       type: timestamp, required: false, nullable: true,  notes: "1073/15423 after Registrierungsdatum (6.96%) -- flag" }
+      - { name: EegMaStRNummer,               type: string,    required: true,  nullable: false, notes: "EEG record id (PK, unique)" }
+      - { name: AnlagenschluesselEeg,         type: string,    required: false, nullable: true }
+      - { name: AnlagenkennzifferAnlagenregister_nv, type: string, required: false, nullable: true }
+      - { name: InstallierteLeistung,         type: double,    required: true,  nullable: true,  notes: "installed capacity, kW" }
+      - { name: AusschliesslicheVerwendungBiomasse, type: string, required: false, nullable: true, notes: "exclusive-biomass-use flag" }
+      - { name: AusschreibungZuschlag,        type: string,    required: false, nullable: true }
+      - { name: BiogasInanspruchnahmeFlexiPraemie,   type: string, required: false, nullable: true, notes: "flexibility-premium claimed flag" }
+      - { name: BiogasDatumInanspruchnahmeFlexiPraemie, type: timestamp, required: false, nullable: true, notes: "2106 rows implausibly early -- quarantine" }
+      - { name: BiogasLeistungserhoehung,     type: string,    required: false, nullable: true,  notes: "capacity-increase flag" }
+      - { name: BiogasGaserzeugungskapazitaet, type: double,   required: false, nullable: true,  notes: "gas production capacity" }
+      - { name: BiogasGaserzeugungskapazitaet_nv, type: string, required: false, nullable: true }
+      - { name: BiogasHoechstbemessungsleistung, type: double, required: false, nullable: true }
+      - { name: BiomethanErstmaligerEinsatz_nv, type: string,  required: false, nullable: true }
+      - { name: AnlageBetriebsstatus,         type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: Zuschlagsnummer,              type: string,    required: false, nullable: true }
+      - { name: BiogasDatumLeistungserhoehung, type: timestamp, required: false, nullable: true }
+      - { name: BiogasUmfangLeistungserhoehung, type: double,  required: false, nullable: true }
+      - { name: BiomethanErstmaligerEinsatz,  type: timestamp, required: false, nullable: true }
+      - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
+
+  - name: mastr_anlagen_eeg_wasser
+    kind: deep
+    grain: { key: [EegMaStRNummer], unique: true }
+    row_count_observed: 7485
+    relationship_to_unit: { via: EegMaStRNummer, target: mastr_einheiten_wasser, cardinality: one_to_one }
+    installed_power_observed: { InstallierteLeistung: {min: 0.006, max: 288000.0, unit: kW} }
+    columns:
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: EegInbetriebnahmedatum,       type: timestamp, required: false, nullable: true,  notes: "158/7481 after Registrierungsdatum (2.1%)" }
+      - { name: EegMaStRNummer,               type: string,    required: true,  nullable: false, notes: "EEG record id (PK, unique)" }
+      - { name: AnlagenkennzifferAnlagenregister_nv, type: string, required: false, nullable: true }
+      - { name: InstallierteLeistung,         type: double,    required: true,  nullable: true,  notes: "installed capacity, kW" }
+      - { name: AnlageBetriebsstatus,         type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: AnlagenschluesselEeg,         type: string,    required: false, nullable: true }
+      - { name: ErtuechtigungIds,             type: string,    required: false, nullable: true,  notes: "linked mastr_ertuechtigungen ids (delimited list)" }
+      - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
+
+  - name: mastr_anlagen_eeg_geothermie_gsgk
+    kind: deep
+    grain: { key: [EegMaStRNummer], unique: true }
+    row_count_observed: 132
+    relationship_to_unit: { via: EegMaStRNummer, target: mastr_einheiten_geothermie_gsgk, cardinality: one_to_one }
+    installed_power_observed: { InstallierteLeistung: {min: 4.68, max: 30000.0, unit: kW} }
+    columns:
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: EegInbetriebnahmedatum,       type: timestamp, required: false, nullable: true }
+      - { name: EegMaStRNummer,               type: string,    required: true,  nullable: false, notes: "EEG record id (PK, unique)" }
+      - { name: AnlagenschluesselEeg,         type: string,    required: false, nullable: true }
+      - { name: AnlagenkennzifferAnlagenregister_nv, type: string, required: false, nullable: true }
+      - { name: InstallierteLeistung,         type: double,    required: true,  nullable: true,  notes: "installed capacity, kW" }
+      - { name: AnlageBetriebsstatus,         type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true }
+      - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
+
+  - name: mastr_anlagen_kwk
+    kind: deep
+    grain: { key: [KwkMastrNummer], unique: true }
+    row_count_observed: 92514
+    relationship_to_unit:
+      via: KwkMastrNummer
+      target: "mastr_einheiten_verbrennung / biomasse / geothermie_gsgk (KwkMaStRNummer column)"
+      cardinality: one_to_one
+      match_rate_observed: 1.0
+    columns:
+      - { name: KwkMastrNummer,               type: string,    required: true,  nullable: false, notes: "KWK record id (PK, unique). NOTE the source spelling 'Kwk' not 'KwkMaStR' here." }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: Inbetriebnahmedatum,          type: timestamp, required: false, nullable: true,  notes: "1453/92165 after Registrierungsdatum (1.6%)" }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: ThermischeNutzleistung,       type: double,    required: true,  nullable: true,  notes: "useful thermal output, kW; observed 0.01..4390400" }
+      - { name: ElektrischeKwkLeistung,       type: double,    required: true,  nullable: true,  notes: "electrical CHP capacity, kW" }
+      - { name: AnlageBetriebsstatus,         type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: AusschreibungZuschlag,        type: string,    required: false, nullable: true,  notes: "null-rate drops 0.88 -> 0.16 across the 2019 migration cut" }
+      - { name: Zuschlagnummer,               type: string,    required: false, nullable: true }
+
+  - name: mastr_einheiten_genehmigung
+    kind: deep
+    grain: { key: [GenMastrNummer], unique: true }
+    row_count_observed: 37722
+    relationship_to_unit:
+      via: GenMastrNummer
+      target: "mastr_einheiten_* (GenMastrNummer column)"
+      cardinality: one_to_one
+      match_rate_observed: 0.9504
+      note: "1871 / 37722 GenMastrNummer keys (5.0%) have no live unit -- LEFT join with an unmatched flag; treat the orphan rate as a data-quality signal"
+    columns:
+      - { name: GenMastrNummer,               type: string,    required: true,  nullable: false, notes: "authorisation record id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: Art,                          type: string,    required: false, nullable: true,  notes: "authorisation type (catalog category Sparte): 846 / 41 / 845 / 40 / 2555 / 848 / 39 / 2556" }
+      - { name: Datum,                        type: timestamp, required: false, nullable: true,  notes: "authorisation decision date; 24977 rows dated 1900-01-02 (a sentinel for 'unknown') -- quarantine" }
+      - { name: Behoerde,                     type: string,    required: false, nullable: true,  notes: "issuing authority (free text)" }
+      - { name: Aktenzeichen,                 type: string,    required: false, nullable: true,  notes: "file reference" }
+      - { name: Frist,                        type: timestamp, required: false, nullable: true,  notes: "authorisation deadline" }
+      - { name: Frist_nv,                     type: string,    required: false, nullable: true }
+      - { name: WasserrechtAblaufdatum_nv,    type: string,    required: false, nullable: true }
+      - { name: Registrierungsdatum,          type: timestamp, required: true,  nullable: true }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: DatumDerAntragstellung,       type: timestamp, required: false, nullable: true,  notes: "application date; 14/4278 after the decision date (0.3%)" }
+      - { name: WasserrechtsNummer,           type: string,    required: false, nullable: true,  notes: "water-rights permit number (hydro)" }
+      - { name: WasserrechtAblaufdatum,       type: timestamp, required: false, nullable: true }
+
+  - name: mastr_ertuechtigungen
+    kind: deep
+    grain: { key: [Id], unique: true }
+    row_count_observed: 1681
+    relationship_to_unit:
+      via: EegMastrNummer
+      target: mastr_anlagen_eeg_*
+      cardinality: one_to_many
+      match_rate_observed: 0.4503
+      note: >
+        1:N by design (a unit can be repowered more than once; EegMastrNummer is
+        87% unique here). 55% of child keys have no live parent -- 'partial-scope'
+        because solar / storage EEG records are deferred from staging; the orphan
+        rate reflects staging scope, not a key mismatch.
+    columns:
+      - { name: Id,                           type: string,    required: true,  nullable: false, notes: "repowering record id (PK, unique)" }
+      - { name: EegMastrNummer,               type: string,    required: true,  nullable: true,  notes: "FK -> mastr_anlagen_eeg_* (note source spelling 'EegMastr' not 'EegMaStR')" }
+      - { name: Leistungserhoehung,           type: double,    required: false, nullable: true,  notes: "capacity increase; observed 0..680; 118 zeros; confirm unit against source layout" }
+      - { name: WiederinbetriebnahmeDatum,    type: timestamp, required: false, nullable: true,  notes: "recommissioning date after upgrade" }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: Ertuechtigungsart,            type: string,    required: false, nullable: true,  notes: "upgrade type (catalog code): 798 / 792 / 795 / 794 / 796 / 793 / 1534 / 797" }
+      - { name: ErtuechtigungIstZulassungspflichtig, type: string, required: false, nullable: true, notes: "approval-required flag (0/1/None)" }
+
+  # ===========================================================================
+  # LIGHT tables (15)
+  # ===========================================================================
+
+  - name: mastr_marktakteure
+    kind: light
+    role: "market-actor dimension (operators, suppliers, grid operators, service providers, authorities)"
+    grain: { key: [MastrNummer], unique: true }
+    row_count_observed: 5616357
+    constant_columns_observed: [MarktakteurNachname, MarktakteurVorname]
+    keys_and_relationships:
+      MastrNummer: "PK, unique"
+      referenced_by: "einheiten_*.AnlagenbetreiberMastrNummer, netzanschlusspunkte.NetzbetreiberMaStRNummer, marktakteure_und_rollen.MarktakteurMastrNummer -- only ~0.2% of actors are ever referenced by a generation unit"
+    coded_columns: [Personenart, Marktfunktion, Land, Bundesland, Rechtsform, RegisternummerPraefix, HauptwirtdschaftszweigAbschnitt, MarktakteurAnrede]
+    quality_notes:
+      - "Personenart 518 = natural person (95%), 517 = organisation -- for natural persons name/address columns are null by design (privacy)"
+      - "structural-integrity check passed -- no column shift in the wide 61-col table"
+      - "no validity windows -- a current-state snapshot; deregistered actors move to mastr_geloeschte_deaktivierte_marktakteure"
+    columns:
+      - { name: MastrNummer,                  type: string,    required: true,  nullable: false }
+      - { name: DatumLetzeAktualisierung,     type: timestamp, required: true,  nullable: true,  notes: "source misspelling of DatumLetzteAktualisierung" }
+      - { name: Personenart,                  type: string,    required: false, nullable: true,  notes: "517 organisation / 518 natural person" }
+      - { name: Firmenname,                   type: string,    required: false, nullable: true }
+      - { name: Marktfunktion,                type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktfunktionen" }
+      - { name: Rechtsform,                   type: string,    required: false, nullable: true,  notes: "legal form (catalog code)" }
+      - { name: Land,                         type: string,    required: false, nullable: true,  notes: "country (catalog code)" }
+      - { name: Strasse,                      type: string,    required: false, nullable: true }
+      - { name: Hausnummer,                   type: string,    required: false, nullable: true }
+      - { name: Hausnummer_nv,                type: string,    required: false, nullable: true }
+      - { name: Postleitzahl,                 type: string,    required: false, nullable: true }
+      - { name: Ort,                          type: string,    required: false, nullable: true }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true,  notes: "catalog code" }
+      - { name: Telefon,                      type: string,    required: false, nullable: true }
+      - { name: Fax_nv,                       type: string,    required: false, nullable: true }
+      - { name: Webseite_nv,                  type: string,    required: false, nullable: true }
+      - { name: Taetigkeitsbeginn,            type: timestamp, required: false, nullable: true,  notes: "activity start date" }
+      - { name: AcerCode_nv,                  type: string,    required: false, nullable: true }
+      - { name: Umsatzsteueridentifikationsnummer_nv, type: string, required: false, nullable: true }
+      - { name: BundesnetzagenturBetriebsnummer,      type: string, required: false, nullable: true }
+      - { name: BundesnetzagenturBetriebsnummer_nv,   type: string, required: false, nullable: true }
+      - { name: LandAnZustelladresse,         type: string,    required: false, nullable: true }
+      - { name: PostleitzahlAnZustelladresse, type: string,    required: false, nullable: true }
+      - { name: OrtAnZustelladresse,          type: string,    required: false, nullable: true }
+      - { name: StrasseAnZustelladresse,      type: string,    required: false, nullable: true }
+      - { name: HausnummerAnZustelladresse,   type: string,    required: false, nullable: true }
+      - { name: HausnummerAnZustelladresse_nv, type: string,   required: false, nullable: true }
+      - { name: RegistrierungsdatumMarktakteur, type: timestamp, required: false, nullable: true }
+      - { name: Email,                        type: string,    required: false, nullable: true }
+      - { name: RegistergerichtAusland,       type: string,    required: false, nullable: true }
+      - { name: Marktrollen,                  type: string,    required: false, nullable: true,  notes: "delimited role list -- normalised form is mastr_marktakteure_und_rollen" }
+      - { name: Netz,                         type: string,    required: false, nullable: true }
+      - { name: Webseite,                     type: string,    required: false, nullable: true }
+      - { name: Registergericht,              type: string,    required: false, nullable: true }
+      - { name: RegisternummerPraefix,        type: string,    required: false, nullable: true }
+      - { name: Registernummer,               type: string,    required: false, nullable: true }
+      - { name: AcerCode,                     type: string,    required: false, nullable: true }
+      - { name: Umsatzsteueridentifikationsnummer, type: string, required: false, nullable: true }
+      - { name: Fax,                          type: string,    required: false, nullable: true }
+      - { name: Adresszusatz,                 type: string,    required: false, nullable: true }
+      - { name: Taetigkeitsende,              type: timestamp, required: false, nullable: true,  notes: "activity end date" }
+      - { name: WebportalDesNetzbetreibers,   type: string,    required: false, nullable: true }
+      - { name: AdresszusatzAnZustelladresse, type: string,    required: false, nullable: true }
+      - { name: Region,                       type: string,    required: false, nullable: true }
+      - { name: Nuts2,                        type: string,    required: false, nullable: true,  notes: "NUTS-2 region code" }
+      - { name: MarktakteurVorname,           type: string,    required: false, nullable: true,  constant_observed: true, notes: "null for organisations; suppressed for natural persons" }
+      - { name: MarktakteurNachname,          type: string,    required: false, nullable: true,  constant_observed: true }
+      - { name: SonstigeRechtsform,           type: string,    required: false, nullable: true }
+      - { name: Kmu,                          type: string,    required: false, nullable: true,  notes: "SME flag" }
+      - { name: HauptwirtdschaftszweigAbteilung, type: string, required: false, nullable: true, notes: "source misspelling of Hauptwirtschaftszweig" }
+      - { name: HauptwirtdschaftszweigGruppe,    type: string, required: false, nullable: true }
+      - { name: HauptwirtdschaftszweigAbschnitt, type: string, required: false, nullable: true, notes: "economic-sector code (catalog)" }
+      - { name: Direktvermarktungsunternehmen,  type: string, required: false, nullable: true }
+      - { name: BelieferungVonLetztverbrauchernStrom, type: string, required: false, nullable: true }
+      - { name: BelieferungHaushaltskundenStrom,      type: string, required: false, nullable: true }
+      - { name: Stromgrosshaendler,           type: string,    required: false, nullable: true }
+      - { name: Gasgrosshaendler,             type: string,    required: false, nullable: true }
+      - { name: BelieferungVonLetztverbrauchernGas,   type: string, required: false, nullable: true }
+      - { name: BelieferungHaushaltskundenGas,        type: string, required: false, nullable: true }
+      - { name: RegisternummerAusland,        type: string,    required: false, nullable: true }
+      - { name: MarktakteurAnrede,            type: string,    required: false, nullable: true }
+
+  - name: mastr_marktakteure_und_rollen
+    kind: light
+    role: "normalised (actor, role) bridge -- one row per role an actor holds"
+    grain: { key: [MastrNummer], unique: true, note: "MastrNummer is the row PK; MarktakteurMastrNummer is the FK to the actor (82% unique -- 1:N)" }
+    row_count_observed: 15689
+    keys_and_relationships:
+      MarktakteurMastrNummer: "FK -> mastr_marktakteure (match rate 1.0; up to 5 roles per actor)"
+      Marktrolle: "role name in plain German text (also FK-able to mastr_marktrollen by value)"
+    columns:
+      - { name: MarktakteurMastrNummer,       type: string,    required: true,  nullable: false, notes: "FK -> mastr_marktakteure" }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: false, nullable: true,  notes: "83% null" }
+      - { name: MastrNummer,                  type: string,    required: true,  nullable: false, notes: "row PK, unique" }
+      - { name: Marktrolle,                   type: string,    required: true,  nullable: true,  notes: "role (German text): Stromlieferant / Dienstleister / Bilanzkreisverantwortlicher / Anschlussnetzbetreiber / ..." }
+      - { name: BundesnetzagenturBetriebsnummer,    type: string, required: false, nullable: true }
+      - { name: BundesnetzagenturBetriebsnummer_nv, type: string, required: false, nullable: true }
+      - { name: Marktpartneridentifikationsnummer_nv, type: string, required: false, nullable: true }
+      - { name: KontaktdatenMarktrolle,       type: string,    required: false, nullable: true }
+      - { name: Marktpartneridentifikationsnummer, type: string, required: false, nullable: true }
+
+  - name: mastr_netzanschlusspunkte
+    kind: light
+    role: "grid connection point dimension -- links a location to a grid and a grid operator"
+    grain: { key: [NetzanschlusspunktMastrNummer], unique: true }
+    row_count_observed: 5867232
+    keys_and_relationships:
+      NetzanschlusspunktMastrNummer: "PK, unique"
+      LokationMaStRNummer: "FK -> mastr_lokationen (98% populated; 0.1% orphan -> LEFT join + flag)"
+      NetzMaStRNummer: "FK -> mastr_netze (0.02% distinct -> extreme fan-out, max 630081 -- a join-explosion risk)"
+      NetzbetreiberMaStRNummer: "FK -> mastr_marktakteure (grid operator; 0.2% orphan)"
+    coded_columns: [Lokationtyp, Spannungsebene, RegelzoneNetzanschlusspunkt, Gasqualitaet]
+    columns:
+      - { name: NetzanschlusspunktMastrNummer, type: string,   required: true,  nullable: false }
+      - { name: LetzteAenderung,              type: timestamp, required: false, nullable: true }
+      - { name: LokationMaStRNummer,          type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationen" }
+      - { name: NameDerTechnischenLokation,   type: string,    required: false, nullable: true }
+      - { name: Lokationtyp,                  type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationstypen (1 = generation, dominant)" }
+      - { name: Messlokation,                 type: string,    required: false, nullable: true }
+      - { name: Spannungsebene,               type: string,    required: false, nullable: true,  notes: "voltage level (catalog code)" }
+      - { name: Nettoengpassleistung,         type: double,    required: false, nullable: true,  notes: "net bottleneck capacity, kW" }
+      - { name: BilanzierungsgebietNetzanschlusspunktId, type: string, required: false, nullable: true, notes: "-> mastr_bilanzierungsgebiete" }
+      - { name: RegelzoneNetzanschlusspunkt,  type: string,    required: false, nullable: true,  notes: "control zone (catalog code: 1000001/1000010/1001564/1001572)" }
+      - { name: NetzMaStRNummer,              type: string,    required: false, nullable: true,  notes: "FK -> mastr_netze" }
+      - { name: NochInPlanung,                type: string,    required: false, nullable: true,  notes: "still-in-planning flag (0/1)" }
+      - { name: NetzbetreiberMaStRNummer,     type: string,    required: false, nullable: true,  notes: "FK -> mastr_marktakteure (grid operator)" }
+      - { name: NetzanschlusspunktBezeichnung, type: string,   required: false, nullable: true }
+      - { name: MaximaleAusspeiseleistung,    type: double,    required: false, nullable: true,  notes: "max withdrawal power, kW" }
+      - { name: Gasqualitaet,                 type: string,    required: false, nullable: true }
+      - { name: Netzanschlusskapazitaet,      type: double,    required: false, nullable: true,  notes: "grid connection capacity, kW" }
+      - { name: MaximaleEinspeiseleistung,    type: double,    required: false, nullable: true,  notes: "max feed-in power, kW" }
+
+  - name: mastr_netze
+    kind: light
+    role: "grid dimension"
+    grain: { key: [MastrNummer], unique: true }
+    row_count_observed: 1740
+    constant_columns_observed: [Marktgebiet]
+    keys_and_relationships:
+      MastrNummer: "PK, unique (grid id, prefix SNG)"
+      referenced_by: "netzanschlusspunkte.NetzMaStRNummer (1008 of 1740 grids referenced, 58%)"
+    columns:
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: MastrNummer,                  type: string,    required: true,  nullable: false }
+      - { name: Sparte,                       type: string,    required: false, nullable: true,  notes: "sector (20 electricity / 21 gas)" }
+      - { name: KundenAngeschlossen,          type: string,    required: false, nullable: true,  notes: "customers-connected flag" }
+      - { name: GeschlossenesVerteilnetz,     type: string,    required: false, nullable: true,  notes: "closed-distribution-network flag" }
+      - { name: Bezeichnung,                  type: string,    required: false, nullable: true,  notes: "grid name" }
+      - { name: Bilanzierungsgebiete,         type: string,    required: false, nullable: true,  notes: "delimited list of balancing-zone ids" }
+      - { name: Bundesland,                   type: string,    required: false, nullable: true }
+      - { name: Marktgebiet,                  type: string,    required: false, nullable: true,  constant_observed: true, notes: "gas market area -- constant/empty for electricity grids" }
+
+  - name: mastr_lokationen
+    kind: light
+    role: "location dimension -- the physical site that links units and grid connection points (M:N via delimited link arrays)"
+    grain: { key: [MastrNummer], unique: true }
+    row_count_observed: 6776394
+    keys_and_relationships:
+      MastrNummer: "PK, unique (location id, prefix SEL)"
+      VerknuepfteEinheitenMaStRNummern: "delimited unit-id list, up to 1806 entries (avg 1.36) -- an M:N bridge to einheiten_*; explode at Silver"
+      NetzanschlusspunkteMaStRNummern: "delimited connection-point-id list, up to 90 (avg 1.02) -- M:N bridge to netzanschlusspunkte"
+      referenced_by: "netzanschlusspunkte.LokationMaStRNummer, einheiten_*.LokationMaStRNummer (most locations never referenced by a unit)"
+    columns:
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+      - { name: MastrNummer,                  type: string,    required: true,  nullable: false }
+      - { name: NameDerTechnischenLokation,   type: string,    required: false, nullable: true }
+      - { name: Lokationtyp,                  type: string,    required: false, nullable: true,  notes: "FK -> mastr_lokationstypen" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "delimited unit-id list -- M:N bridge, explode at Silver" }
+      - { name: NetzanschlusspunkteMaStRNummern, type: string, required: false, nullable: true, notes: "delimited connection-point-id list -- M:N bridge" }
+
+  - name: mastr_bilanzierungsgebiete
+    kind: light
+    role: "balancing-zone reference"
+    grain: { key: [Id], unique: false, note: "no unique key established by profiling" }
+    row_count_observed: 1118
+    columns:
+      - { name: Id,                           type: string,    required: true,  nullable: true }
+      - { name: Yeic,                         type: string,    required: false, nullable: true,  notes: "Y-EIC energy identification code" }
+      - { name: RegelzoneNetzanschlusspunkt,  type: string,    required: false, nullable: true,  notes: "control zone (catalog code)" }
+      - { name: BilanzierungsgebietNetzanschlusspunkt, type: string, required: false, nullable: true, notes: "balancing-zone EIC" }
+
+  - name: mastr_geloeschte_deaktivierte_einheiten
+    kind: light
+    role: "change-event log -- units that have LEFT the current-state register (deleted / deactivated)"
+    grain: { key: [EinheitMastrNummer], unique: true, note: "one row per departed unit" }
+    row_count_observed: 244295
+    keys_and_relationships:
+      EinheitMastrNummer: "unit id; DISJOINT from the live einheiten_* tables by design (match rate 0.0) -- join only to confirm a unit is gone"
+      survivorship_note: "any population built from the live tables (01/03) is missing exactly this set; rows-per-year is back-loaded (export-cadence artefact, not a decommissioning spike)"
+    columns:
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true,  notes: "the deletion / deactivation timestamp" }
+      - { name: EinheitMastrNummer,           type: string,    required: true,  nullable: false }
+      - { name: Einheittyp,                   type: string,    required: false, nullable: true,  notes: "unit type -- FK -> mastr_einheitentypen; codes 10/4/11 not in the catalog (quarantine)" }
+      - { name: EinheitSystemstatus,          type: string,    required: false, nullable: true,  notes: "catalog category Systemstatus" }
+      - { name: EinheitBetriebsstatus,        type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
+
+  - name: mastr_geloeschte_deaktivierte_marktakteure
+    kind: light
+    role: "change-event log -- market actors that have left the current-state register"
+    grain: { key: [MarktakteurMastrNummer], unique: true }
+    row_count_observed: 285315
+    keys_and_relationships:
+      MarktakteurMastrNummer: "actor id; DISJOINT from live mastr_marktakteure (match rate 0.0) -- join only to confirm departure"
+    columns:
+      - { name: MarktakteurMastrNummer,       type: string,    required: true,  nullable: false }
+      - { name: MarktakteurStatus,            type: string,    required: false, nullable: true,  notes: "catalog category Marktakteurstatus" }
+      - { name: DatumLetzteAktualisierung,    type: timestamp, required: true,  nullable: true }
+
+  - name: mastr_einheiten_aenderung_netzbetreiberzuordnungen
+    kind: light
+    role: "change-event log -- grid-operator reassignments per unit (append-only; a unit recurs)"
+    grain: { key: [EinheitMastrNummer, Netzbetreiberzuordnungsaenderungsdatum], unique: false }
+    row_count_observed: 226405
+    keys_and_relationships:
+      EinheitMastrNummer: "FK -> einheiten_* (98% unique here; 3.6% match to live units -- 'partial-scope', solar/storage deferred)"
+      LokationMastrNummer: "FK -> mastr_lokationen"
+      NetzanschlusspunktMastrNummer: "FK -> mastr_netzanschlusspunkte"
+    quality_notes:
+      - "carries BOTH a registration date and an effective date -- keep both; effective is the event time, registration is when it became knowable"
+      - "8038/226405 rows (3.55%) have the effective date after the registration date -- flag"
+    columns:
+      - { name: EinheitMastrNummer,           type: string,    required: true,  nullable: false }
+      - { name: LokationMastrNummer,          type: string,    required: false, nullable: true }
+      - { name: NetzbetreiberMastrNummerAlt,  type: string,    required: false, nullable: true,  notes: "previous grid operator (FK -> mastr_marktakteure)" }
+      - { name: NetzbetreiberMastrNummerNeu,  type: string,    required: false, nullable: true,  notes: "new grid operator (FK -> mastr_marktakteure)" }
+      - { name: ArtDerAenderung,              type: string,    required: false, nullable: true,  notes: "change type (catalog code)" }
+      - { name: RegistrierungsdatumNetzbetreiberzuordnungsaenderung, type: timestamp, required: false, nullable: true, notes: "when the change was registered" }
+      - { name: Netzbetreiberzuordnungsaenderungsdatum, type: timestamp, required: false, nullable: true, notes: "when the change took effect" }
+      - { name: NetzanschlusspunktMastrNummer, type: string,   required: false, nullable: true }
+
+  - name: mastr_einheitentypen
+    kind: light
+    role: "code catalog -- unit type"
+    grain: { key: [Id], unique: true }
+    row_count_observed: 13
+    columns:
+      - { name: Id,   type: string, required: true, nullable: false, notes: "code" }
+      - { name: Wert, type: string, required: true, nullable: false, notes: "German label" }
+
+  - name: mastr_katalogkategorien
+    kind: light
+    role: "code catalog -- the category dimension for mastr_katalogwerte"
+    grain: { key: [Id], unique: true }
+    row_count_observed: 123
+    keys_and_relationships:
+      Id: "PK; 5 categories (43/54/60/64/75) are never referenced by a katalogwerte row -- harmless for a dimension"
+    columns:
+      - { name: Id,   type: string, required: true, nullable: false, notes: "category id" }
+      - { name: Name, type: string, required: true, nullable: false, notes: "category name (e.g. Land, Betriebsstatus, Brennstoff, Fernsteuerbarkeit)" }
+
+  - name: mastr_katalogwerte
+    kind: light
+    role: "code catalog -- the authoritative code -> value table for every coded column in MaStR (1737 value ids across 118 used categories)"
+    grain: { key: [Id], unique: true }
+    row_count_observed: 1737
+    keys_and_relationships:
+      KatalogKategorieId: "FK -> mastr_katalogkategorien.Id (match rate 1.0, 0 orphans)"
+      usage_note: >
+        the export carries no column -> category binding. Reconcile a coded
+        column to a category ONLY when the column name matches a category name
+        (strong evidence); otherwise the only check is global value-id
+        membership. Unknown codes are a quarantine class. Pin the catalog
+        vintage -- meanings change between MaStR releases.
+    columns:
+      - { name: Id,               type: string, required: true, nullable: false, notes: "value id -- the code stored in the coded columns" }
+      - { name: Wert,             type: string, required: true, nullable: false, notes: "German label" }
+      - { name: KatalogKategorieId, type: string, required: true, nullable: false, notes: "FK -> mastr_katalogkategorien" }
+
+  - name: mastr_lokationstypen
+    kind: light
+    role: "code catalog -- location type"
+    grain: { key: [Id], unique: true }
+    row_count_observed: 4
+    columns:
+      - { name: Id,   type: string, required: true, nullable: false }
+      - { name: Wert, type: string, required: true, nullable: false }
+
+  - name: mastr_marktfunktionen
+    kind: light
+    role: "code catalog -- market function"
+    grain: { key: [Id], unique: true }
+    row_count_observed: 10
+    columns:
+      - { name: Id,   type: string, required: true, nullable: false }
+      - { name: Wert, type: string, required: true, nullable: false }
+
+  - name: mastr_marktrollen
+    kind: light
+    role: "code catalog -- market role"
+    grain: { key: [Id], unique: true }
+    row_count_observed: 25
+    columns:
+      - { name: Id,   type: string, required: true, nullable: false }
+      - { name: Wert, type: string, required: true, nullable: false }
+
+# ===========================================================================
+
+quality_rules:
+  - id: unit_key_unique
+    expr: "EinheitMastrNummer is unique in every einheiten_* table; EegMaStRNummer / KwkMastrNummer / GenMastrNummer unique in their own table (ertuechtigungen.Id unique, EegMastrNummer 87%)"
+    severity: block
+  - id: no_full_row_duplicates
+    expr: "0 exact full-row duplicates in all 28 tables"
+    severity: block
+    evidence: "profiling sections 01-05"
+  - id: capacity_unit_kw
+    expr: "Bruttoleistung / Nettonennleistung / InstallierteLeistung / ThermischeNutzleistung / ElektrischeKwkLeistung are interpreted as kW"
+    severity: info
+    evidence: "MaStR Gesamtdatenexport layout + observed ranges; to be confirmed against the source layout at Silver, NOT left generically unresolved"
+  - id: catalog_reconciliation
+    expr: >
+      every coded column must reconcile against mastr_katalogwerte -- scoped to a
+      category where the column name matches a mastr_katalogkategorien.Name,
+      global value-id membership otherwise. Unknown code = quarantine class.
+    severity: block
+  - id: bundesland_codes_1400_1416
+    expr: "Bundesland codes 1400-1416 appear on einheiten_* rows but are not in katalogwerte category 'Land' -- likely Regierungsbezirk-level codes; document, do not drop"
+    severity: warn
+  - id: catalog_vintage_pinned
+    expr: "the MaStR catalog release must be pinned -- a code decoded against the wrong vintage is a silent label error"
+    severity: block
+  - id: dates_europe_berlin
+    expr: "all date columns are Europe/Berlin wall-clock -- convert to UTC on a documented rule; parse with an explicit multi-format list, quarantine failures and sentinel dates (Datum = 1900-01-02, BiogasDatumInanspruchnahmeFlexiPraemie pre-2007)"
+    severity: block
+  - id: milestone_vs_registration_ordering
+    expr: "commissioning / effective dates may legitimately precede Registrierungsdatum (migrated + backdated records); a small fraction post-date it -- flag, do not delete"
+    severity: warn
+    evidence: "profiling section 02 Temporal Consistency: 0.02-7% out-of-order per table"
+  - id: forward_dated_commissioning_ok
+    expr: "GeplantesInbetriebnahmedatum and future Inbetriebnahmedatum values are legitimate planned dates -- a column is 'known' only up to its own value (point-in-time)"
+    severity: info
+  - id: unit_to_support_cardinality
+    expr: >
+      EEG (anlagen_eeg_*) and KWK (anlagen_kwk) are 1:1 with a unit;
+      einheiten_genehmigung is ~1:1 (5% orphan); ertuechtigungen is 1:N.
+      Use the confirmed cardinality (profiling section 06) with a LEFT join and
+      an unmatched flag -- never an assumed 1:1 that multiplies unit attributes.
+    severity: block
+  - id: genehmigung_orphans
+    expr: "1871/37722 GenMastrNummer keys (5.0%) resolve to no live unit -- LEFT join + unmatched flag; treat the rate as a data-quality signal"
+    severity: warn
+  - id: partial_scope_orphans_expected
+    expr: >
+      high orphan rates on ertuechtigungen.EegMastrNummer (55%) and
+      einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer (96%) are
+      EXPECTED -- solar / storage object types are deferred from staging this
+      wave. Do NOT treat these as key mismatches.
+    severity: info
+  - id: deletion_logs_are_disjoint
+    expr: >
+      geloeschte_deaktivierte_einheiten / _marktakteure are DISJOINT from the
+      live tables by design (match rate 0.0) -- join only to confirm an entity
+      has departed; they are the survivorship record the live tables omit
+    severity: block
+  - id: change_logs_append_only
+    expr: >
+      geloeschte_deaktivierte_* and einheiten_aenderung_netzbetreiberzuordnungen
+      are append-only event logs -> model as Silver change/event facts, never
+      overwrite the current-state unit / actor tables with them
+    severity: block
+  - id: netz_fanout_risk
+    expr: "netzanschlusspunkte.NetzMaStRNummer -> netze has max fan-out 630081 -- a naive join explodes; aggregate or scope first"
+    severity: block
+  - id: lokationen_link_arrays
+    expr: >
+      mastr_lokationen.VerknuepfteEinheitenMaStRNummern (up to 1806 entries) and
+      NetzanschlusspunkteMaStRNummern must be split/exploded into proper M:N
+      bridge tables at Silver before any join; also
+      anlagen_eeg_*.VerknuepfteEinheitenMaStRNummern,
+      einheiten_verbrennung.MastrNummernKombibetrieb,
+      anlagen_eeg_wasser.ErtuechtigungIds, netze.Bilanzierungsgebiete
+    severity: block
+  - id: marktakteure_natural_persons
+    expr: >
+      95% of mastr_marktakteure are natural persons (Personenart 518) with
+      name/address columns null by design -- absence is privacy suppression,
+      not missing data
+    severity: info
+  - id: no_validity_windows_in_dimensions
+    expr: >
+      marktakteure / netze / lokationen / netzanschlusspunkte are current-state
+      snapshots with no validity windows -- a point-in-time operator assignment
+      must come from einheiten_aenderung_netzbetreiberzuordnungen, not a static
+      join
+    severity: warn
+  - id: einheiten_verbrennung_bruttoleistung_thousandths
+    expr: "einheiten_verbrennung.Bruttoleistung observed min 0.001 kW -- plausible micro-generators; keep, do not treat sub-1-kW as a decimal error"
+    severity: info
+
+localisation:
+  required: true
+  approach: german_native_with_english_business_layer
+  detail:
+    geography: >
+      natively German. Gemeindeschluessel (AGS) is the join key to the conformed
+      German geography spine (AGS/ARS); Laengengrad/Breitengrad (EPSG:4326) give
+      a point where present. Bundesland / Landkreis / Gemeinde carry catalog
+      codes that decode to names at Silver.
+    language: >
+      every column header is a German compound and every low-cardinality column
+      is an integer catalog code. The source-to-canonical mapping (src/schemas/mappings/mastr.yml)
+      gives the English business name for every retained field and, for the
+      status / carrier / technology / role / Bundesland code sets, an English
+      label sourced from mastr_katalogwerte. The MaStR code and the German
+      katalogwerte label are BOTH retained on every row for traceability.
+    units: "capacity in kW (see conventions.capacity_unit); geometry in m; distances in km/m as noted per column"
+    currency: not_applicable
+
+references:
+  code_catalog: [mastr_katalogkategorien, mastr_katalogwerte, mastr_einheitentypen, mastr_lokationstypen, mastr_marktfunktionen, mastr_marktrollen]
+  actor_dimension: mastr_marktakteure
+  location_topology: [mastr_lokationen, mastr_netzanschlusspunkte, mastr_netze, mastr_bilanzierungsgebiete]
+  survivorship: [mastr_geloeschte_deaktivierte_einheiten, mastr_geloeschte_deaktivierte_marktakteure]
+  operator_change_log: mastr_einheiten_aenderung_netzbetreiberzuordnungen

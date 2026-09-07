@@ -1,38 +1,63 @@
 # Source-to-canonical mapping -- DWD
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
-# Date: August 2026
+# Date: September 2026
 #
 # Purpose: map the acquired DWD schema (see contracts/dwd.yml) to the canonical
-# model. Design only -- no transform code here.
+# model, and define the English business meaning for every retained German /
+# coded field so the Silver treatment is fully specified. Design only -- no
+# transform code here.
 
 source: dwd
 source_system: dwd
+ecosystem: energy
 profiling_evidence: src/schemas/profiling/dwd.md
 contract: src/schemas/contracts/dwd.yml
+
+# ---------------------------------------------------------------------------
+# Canonical targets
+# ---------------------------------------------------------------------------
 
 targets:
 
   - canonical_fact: fact_weather
-    from_tables: [dwd_air_temperature, dwd_cloudiness, dwd_moisture, dwd_precipitation,
-                  dwd_pressure, dwd_sun, dwd_wind]
-    canonical_grain: [weather_location, hour_ts, parameter]
-    silver_grain: [weather_location, hour_ts, parameter, value, quality_flag]
+    from_tables: [dwd_air_temperature, dwd_cloudiness, dwd_moisture,
+                  dwd_precipitation, dwd_pressure, dwd_sun, dwd_wind,
+                  dwd_dew_point, dwd_soil_temperature, dwd_visibility,
+                  dwd_cloud_type, dwd_wind_synop, dwd_extreme_wind,
+                  dwd_weather_phenomena, dwd_solar]
+    canonical_grain: [weather_location, observation_ts, parameter]
+    silver_grain: [weather_location, observation_ts, parameter, value, quality_flag, quality_flag_label]
+    shape: >
+      long form -- one row per (station, timestamp, parameter). Each measurement
+      table contributes its value columns as parameters. Keep one model per
+      measurement in Silver; the wide 'all weather at station S, hour H' table is
+      a Gold consolidation (measurement timestamp overlap is partial).
     field_map:
-      - source: "STATIONS_ID"
-        canonical: "dim_weather_location.station_id  (+ city as a station attribute)"
-        transform: "map STATIONS_ID -> weather_location; city column carries the German city name"
-      - source: "MESS_DATUM"
-        canonical: "dim_date.date_key + hour"
-        transform: "parse yyyyMMddHH as UTC hour timestamp"
-      - source: "<value columns> (TT_TU, RF_TU, V_N, ABSF_STD, ... F, D)"
-        canonical: "fact_weather.value  (long form: one row per parameter)"
+      - source: "STATIONS_ID (+ city)"
+        canonical: "dim_weather_location.station_id ; city carried as a station attribute"
         transform: >
-          replace -999 / -999.0 / -99.9 / '' with NULL FIRST; then cast to double.
-          parameter name = the source column code (reconciled against dwd_parameter_unit).
-      - source: "QN_9 / QN_8 / QN_7 / QN_3"
-        canonical: "fact_weather.quality_flag"
-        transform: "carry the DWD quality level as-is (1 / 3 / 10)"
+          map STATIONS_ID -> weather_location. Resolve the station's point-in-time
+          coordinates from dwd_station_geography on the von/bis window covering
+          observation_ts, never the latest row.
+      - source: "MESS_DATUM"
+        canonical: "observation_ts (+ dim_date / dim_time keys)"
+        transform: >
+          strip a trailing '.0', parse yyyyMMddHH as the DWD reference time and
+          confirm UTC; for dwd_solar parse yyyyMMddHH:mm (10-minute) and also
+          carry MESS_DATUM_WOZ as true local solar time.
+      - source: "<value columns> (TT_TU, RF_TU, V_N, ABSF_STD ... FG_LBERG, ZENIT)"
+        canonical: "fact_weather.value (one row per parameter)"
+        transform: >
+          replace -999 / -999.0 / -99.9 / '' with NULL FIRST, then cast to double.
+          parameter = the English business name below (source code retained as
+          parameter_source_code). unit = dwd_parameter_unit.Einheit for that code.
+      - source: "QN_9 / QN_8 / QN_7 / QN_3 / QN_2 / QN_592"
+        canonical: "fact_weather.quality_flag (+ quality_flag_label)"
+        transform: >
+          carry the DWD quality level as-is; attach the decoded English label
+          (see coded_value_labels.qn_level). Decode against the scheme valid for
+          the record's era. Quarantine dwd_cloud_type rows where QN_8 = '-999'.
       - source: "eor"
         canonical: dropped
         transform: "constant end-of-row marker -- no information"
@@ -43,32 +68,211 @@ targets:
   - canonical_dimension: dim_weather_location
     scd2: false
     from_tables: [dwd_station_geography, dwd_station_name_history]
-    shape: "one row per station -- representative city / latitude / longitude / elevation"
+    shape: >
+      one row per station for the fact join (representative coordinates / city /
+      elevation). The full relocation and name history stays as Silver reference
+      tables for point-in-time detail.
     field_map:
-      - { source: "STATIONS_ID", canonical: "dim_weather_location.station_id" }
+      - { source: "Stations_id", canonical: "dim_weather_location.station_id" }
       - { source: "city",        canonical: "dim_weather_location.city" }
-      - { source: "latitude / longitude / station_elevation_m (representative row)", canonical: "dim_weather_location coordinates" }
+      - { source: "Geogr.Breite / Geogr.Laenge / Stationshoehe (representative row)", canonical: "latitude / longitude (EPSG:4326) / elevation_m" }
+      - { source: "Stationsname", canonical: "dim_weather_location.station_name" }
     history_kept_as_reference: [dwd_station_geography, dwd_station_name_history]
-    note: >
-      Full location / name history stays as Silver reference tables for anyone
-      who needs point-in-time detail; the fact joins to the one-row dimension.
+    filter_first: >
+      dwd_station_name_history: drop the 'Stations_ID' header row and every
+      'generiert: ...' trailer row before use (id column not one of the 28
+      numeric station ids).
 
   - reference_only: true
     from_tables: [dwd_device_instrument, dwd_parameter_unit, dwd_missing_value_periods]
     note: >
-      Small static lookups. dwd_parameter_unit -> parameter/unit reference for
-      fact_weather. dwd_missing_value_periods -> a data-quality reference keyed
-      by (station, parameter, from_ts, to_ts); NOT reconciled against observed
-      sentinels by row deletion. dwd_device_instrument -> instrument-history
-      reference, not required for any canonical fact. All three need footer/legend
-      rows filtered first.
+      dwd_parameter_unit -> the parameter/unit reference for fact_weather
+      (Parameter -> Einheit + Parameterbeschreibung). dwd_device_instrument ->
+      instrument-history reference, not required for any canonical fact.
+      dwd_missing_value_periods -> a data-quality reference keyed by
+      (station, parameter, from_ts, to_ts); NOT reconciled against observed
+      sentinels by row deletion. dwd_device_instrument and dwd_parameter_unit
+      need their 'generiert:' / 'Legende:' rows filtered first.
+
+# ---------------------------------------------------------------------------
+# Business glossary -- German / coded field -> English business name
+# Source codes are retained alongside; nothing here is a transform.
+# ---------------------------------------------------------------------------
+
+business_names:
+
+  # measurement value columns -> parameter business name + unit
+  parameters:
+    TT_TU:      { business_name: air_temperature_2m,            unit: degC }
+    RF_TU:      { business_name: relative_humidity_2m,          unit: percent }
+    V_N:        { business_name: total_cloud_cover,             unit: eighths }
+    V_N_I:      { business_name: cloud_cover_observation_method, unit: code }
+    ABSF_STD:   { business_name: absolute_humidity,             unit: g_per_m3 }
+    VP_STD:     { business_name: vapour_pressure,               unit: hPa }
+    TF_STD:     { business_name: wet_bulb_temperature,          unit: degC }
+    P_STD:      { business_name: pressure_station_level,        unit: hPa }
+    TT_STD:     { business_name: air_temperature_2m,            unit: degC }
+    RF_STD:     { business_name: relative_humidity,             unit: percent }
+    TD_STD:     { business_name: dew_point_temperature,         unit: degC }
+    R1:         { business_name: precipitation_hourly_total,    unit: mm }
+    RS_IND:     { business_name: precipitation_occurred_flag,   unit: boolean }
+    WRTR:       { business_name: precipitation_form_code,       unit: code }
+    P:          { business_name: pressure_sea_level,            unit: hPa }
+    P0:         { business_name: pressure_station_level,        unit: hPa }
+    SD_SO:      { business_name: sunshine_duration_hourly,      unit: minutes }
+    F:          { business_name: wind_speed_mean,               unit: m_per_s }
+    D:          { business_name: wind_direction_mean,           unit: degrees }
+    TT:         { business_name: air_temperature_2m,            unit: degC }
+    TD:         { business_name: dew_point_temperature_2m,      unit: degC }
+    V_TE002:    { business_name: soil_temperature_2cm,          unit: degC }
+    V_TE005:    { business_name: soil_temperature_5cm,          unit: degC }
+    V_TE010:    { business_name: soil_temperature_10cm,         unit: degC }
+    V_TE020:    { business_name: soil_temperature_20cm,         unit: degC }
+    V_TE050:    { business_name: soil_temperature_50cm,         unit: degC }
+    V_TE100:    { business_name: soil_temperature_100cm,        unit: degC }
+    V_VV:       { business_name: horizontal_visibility,         unit: metres }
+    V_VV_I:     { business_name: visibility_observation_method,  unit: code }
+    V_S1_CS:    { business_name: cloud_layer1_genus_code,        unit: code }
+    V_S1_CSA:   { business_name: cloud_layer1_genus_abbrev,      unit: code }
+    V_S1_HHS:   { business_name: cloud_layer1_base_height,       unit: metres }
+    V_S1_NS:    { business_name: cloud_layer1_cover,             unit: eighths }
+    V_S2_CS:    { business_name: cloud_layer2_genus_code,        unit: code }
+    V_S2_CSA:   { business_name: cloud_layer2_genus_abbrev,      unit: code }
+    V_S2_HHS:   { business_name: cloud_layer2_base_height,       unit: metres }
+    V_S2_NS:    { business_name: cloud_layer2_cover,             unit: eighths }
+    V_S3_CS:    { business_name: cloud_layer3_genus_code,        unit: code }
+    V_S3_CSA:   { business_name: cloud_layer3_genus_abbrev,      unit: code }
+    V_S3_HHS:   { business_name: cloud_layer3_base_height,       unit: metres }
+    V_S3_NS:    { business_name: cloud_layer3_cover,             unit: eighths }
+    V_S4_CS:    { business_name: cloud_layer4_genus_code,        unit: code }
+    V_S4_CSA:   { business_name: cloud_layer4_genus_abbrev,      unit: code }
+    V_S4_HHS:   { business_name: cloud_layer4_base_height,       unit: metres }
+    V_S4_NS:    { business_name: cloud_layer4_cover,             unit: eighths }
+    FF:         { business_name: wind_speed_synop,              unit: m_per_s }
+    DD:         { business_name: wind_direction_synop,          unit: degrees }
+    FX_911:     { business_name: wind_gust_max_hourly,          unit: m_per_s }
+    WW:         { business_name: present_weather_code,          unit: code }
+    WW_Text:    { business_name: present_weather_text_de,       unit: text }
+    ATMO_LBERG: { business_name: longwave_downward_radiation,   unit: J_per_cm2 }
+    FD_LBERG:   { business_name: diffuse_solar_radiation,       unit: J_per_cm2 }
+    FG_LBERG:   { business_name: global_solar_radiation,        unit: J_per_cm2 }
+    SD_LBERG:   { business_name: sunshine_duration_10min,       unit: minutes }
+    ZENIT:      { business_name: solar_zenith_angle,            unit: degrees }
+
+  # metadata column headers (German) -> English business name
+  metadata_fields:
+    Stations_id:            station_id
+    Stations_ID:            station_id
+    Stationshoehe:          station_elevation_m
+    "Geogr.Breite":         latitude
+    "Geogr.Laenge":         longitude
+    Stationsname:           station_name
+    Stations_Name:          station_name
+    von_datum:              valid_from
+    Von_Datum:              valid_from
+    bis_datum:              valid_to
+    Bis_Datum:              valid_to
+    device_category:        parameter_category
+    geo_longitude_deg:      longitude
+    geo_latitude_deg:       latitude
+    station_elevation_m:    station_elevation_m
+    sensor_height_m:        sensor_height_m
+    device_type_name:       device_type
+    Messverfahren:          measurement_method
+    Parameter:              parameter_source_code
+    Parameterbeschreibung:  parameter_description_de
+    Einheit:                parameter_unit
+    data_source:            parameter_data_source
+    "Zusatz-Info":          parameter_extra_info
+    Besonderheiten:         parameter_special_notes
+    Literaturhinweis:       parameter_reference
+    Anzahl_Fehlwerte:       missing_value_count
+    Beschreibung:           gap_description
+
+# ---------------------------------------------------------------------------
+# Coded-value dictionaries -- code -> English label. Source code retained;
+# label attached as a sibling column. Applied at Silver.
+# ---------------------------------------------------------------------------
+
+coded_value_labels:
+
+  qn_level:
+    scope: "QN_9 / QN_8 / QN_7 / QN_3 / QN_2 / QN_592 (DWD hourly-historical quality level)"
+    era_dependent: true
+    map:
+      "1":  only_formal_check
+      "2":  checked_against_individual_criteria
+      "3":  automatic_check_and_correction
+      "5":  historic_subjective_check
+      "7":  second_check_before_correction
+      "9":  not_all_parameters_corrected
+      "10": quality_check_and_correction_complete
+      "-999": invalid_flag_quarantine   # dwd_cloud_type source defect
+
+  precipitation_form_wrtr:
+    scope: "dwd_precipitation.WRTR -- WMO precipitation form / WR code"
+    map:
+      "0": no_precipitation
+      "1": only_liquid_at_automatic_station
+      "2": only_solid_at_automatic_station
+      "3": liquid_and_solid_at_automatic_station
+      "6": liquid_precipitation
+      "7": solid_precipitation
+      "8": liquid_and_solid_precipitation
+      "9": no_measurement_signal
+
+  cloud_cover_eighths:
+    scope: "V_N / V_S*_NS -- total or layer cloud cover in eighths (okta)"
+    map:
+      "-1": sky_not_recognisable
+      "0":  clear
+      "1":  one_eighth
+      "2":  two_eighths
+      "3":  three_eighths
+      "4":  four_eighths
+      "5":  five_eighths
+      "6":  six_eighths
+      "7":  seven_eighths
+      "8":  overcast
+
+  observation_method_indicator:
+    scope: "V_N_I / V_VV_I -- how the value was obtained"
+    map:
+      "P": human_observation
+      "I": instrument
+
+  present_weather_ww:
+    scope: "dwd_weather_phenomena.WW -- WMO present-weather code table (0-99 manual, 100-199 automatic)"
+    note: >
+      full 0-189 dictionary is applied at Silver from the WMO ww table;
+      dwd_weather_phenomena.WW_Text already carries DWD's German gloss which is
+      translated alongside. -1 = no phenomenon coded.
+
+# ---------------------------------------------------------------------------
 
 dropped_columns:
-  - column: eor
-    reason: "constant end-of-row marker in every measurement + missing_value_periods table"
-  - column: "Literaturhinweis (dwd_parameter_unit)"
-    reason: "constant / empty"
+  - { column: eor, reason: "constant end-of-row marker in every measurement + missing_value_periods table" }
+  - { column: "Literaturhinweis (dwd_parameter_unit)", reason: "constant / empty" }
+  - { column: "Beschreibung (dwd_missing_value_periods)", reason: "constant / empty" }
 
 localisation:
-  required: false
-  reason: "natively German (DWD, 8 German city stations)"
+  required: true
+  approach: german_native_with_english_business_layer
+  geography: >
+    natively German; station point-in-time coordinates (EPSG:4326) resolve to
+    the conformed German geography spine (AGS/ARS) at Silver via spatial lookup.
+  language: >
+    German headers and coded columns are given English business names
+    (business_names) and English labels for coded values (coded_value_labels);
+    the source code / German text is retained on every row for traceability.
+  units: "resolved per parameter from dwd_parameter_unit.Einheit; recorded in business_names.parameters"
+  never: >
+    DWD data is never presented without its provenance; the English labels are a
+    platform-added convenience, the DWD codes remain authoritative.
+
+cross_source:
+  note: >
+    DWD is the shared weather feature source for the Energy ecosystem. It joins
+    to other sources only through the conformed dim_date / dim_time / dim_geography
+    /dim_weather_context dimensions -- never by an identity join to any generation,
+    market or mobility record.

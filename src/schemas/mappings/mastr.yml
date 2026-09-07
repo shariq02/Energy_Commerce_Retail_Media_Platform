@@ -1,0 +1,400 @@
+# Source-to-canonical mapping -- MaStR (Marktstammdatenregister)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: map the acquired MaStR schema (see contracts/mastr.yml) to the
+# canonical model, and define the English business meaning for the German /
+# coded fields so the Silver treatment is fully specified. Design only -- no
+# transform code here.
+
+source: mastr
+source_system: mastr
+ecosystem: energy
+profiling_evidence: src/schemas/profiling/mastr.md
+contract: src/schemas/contracts/mastr.yml
+
+# ---------------------------------------------------------------------------
+# Canonical targets
+# ---------------------------------------------------------------------------
+
+targets:
+
+  - canonical_dimension: dim_generation_unit
+    from_tables: [mastr_einheiten_wind, mastr_einheiten_biomasse, mastr_einheiten_wasser,
+                  mastr_einheiten_verbrennung, mastr_einheiten_kernkraft,
+                  mastr_einheiten_geothermie_gsgk]
+    canonical_grain: [generation_unit_key]
+    key: EinheitMastrNummer
+    shape: >
+      one row per generation unit, unioned across the six carrier tables with
+      carrier as an attribute. This is the COMPLETE German register (contrast
+      power_plant_list, the >10 MW subset). Carrier-specific columns (wind hub
+      height, hydro inflow type, offshore sea area, combustion fuels) are kept
+      as nullable carrier-scoped attributes.
+    field_map:
+      - { source: EinheitMastrNummer,        canonical: "dim_generation_unit.unit_id (natural key)" }
+      - { source: "NameStromerzeugungseinheit / NameKraftwerk / NameWindpark", canonical: "unit_name / plant_name / wind_farm_name" }
+      - { source: "Land / Bundesland / Landkreis / Gemeinde / Gemeindeschluessel / Postleitzahl / Ort", canonical: "dim_geography (AGS via Gemeindeschluessel; codes decoded via mastr_katalogwerte)" }
+      - { source: "Laengengrad / Breitengrad", canonical: "longitude / latitude (EPSG:4326); quarantine the 54 wind rows outside the Germany bbox" }
+      - { source: "Registrierungsdatum / Inbetriebnahmedatum / GeplantesInbetriebnahmedatum / DatumEndgueltigeStilllegung / DatumBeginnVoruebergehendeStilllegung / DatumWiederaufnahmeBetrieb", canonical: "registration_date / commissioning_date / planned_commissioning_date / final_decommissioning_date / provisional_shutdown_start / recommissioning_date" }
+      - { source: "EinheitBetriebsstatus / EinheitSystemstatus", canonical: "operating_status / system_status (+ *_label from katalogwerte)" }
+      - { source: Energietraeger,             canonical: "energy_carrier (+ label); the union discriminator" }
+      - { source: "Bruttoleistung / Nettonennleistung / NettonennleistungDeutschland", canonical: "capacity_gross_kw / capacity_net_kw / capacity_net_germany_kw (confirm kW vs MW)" }
+      - { source: "FernsteuerbarkeitNb / FernsteuerbarkeitDv / Einspeisungsart / Technologie / Hauptbrennstoff / WeitererHauptbrennstoff / Biomasseart / ArtDerWasserkraftanlage / ArtDesZuflusses / WindAnLandOderAufSee / Hersteller / Seelage / Einsatzort", canonical: "coded attributes -- carry the code + attach the katalogwerte English label" }
+      - { source: "Nabenhoehe / Rotordurchmesser / Wassertiefe / Kuestenentfernung / GroesseDerInAnspruchGenommenenFlaeche", canonical: "wind/offshore geometry attributes" }
+      - { source: "AnlagenbetreiberMastrNummer / AltAnlagenbetreiberMastrNummer", canonical: "operator_id / previous_operator_id -> dim_market_actor (FK)" }
+      - { source: "LokationMaStRNummer",      canonical: "location_id -> dim_location (FK, nullable)" }
+      - { source: "GenMastrNummer / EegMaStRNummer / KwkMaStRNummer", canonical: "authorisation_id / eeg_support_id / kwk_support_id (FK to the support facts)" }
+      - { source: NichtVorhandenInMigriertenEinheiten, canonical: "migration_flag" }
+    provenance:
+      source_system: mastr
+      source_record_id: "EinheitMastrNummer"
+
+  - canonical_fact: fact_eeg_support
+    from_tables: [mastr_anlagen_eeg_wind, mastr_anlagen_eeg_biomasse, mastr_anlagen_eeg_wasser,
+                  mastr_anlagen_eeg_geothermie_gsgk]
+    canonical_grain: [eeg_support_key]
+    key: EegMaStRNummer
+    shape: >
+      one row per EEG support record, unioned across the four carrier tables.
+      1:1 with a generation unit via EegMaStRNummer. Biomass-specific biogas
+      columns kept as nullable carrier-scoped attributes.
+    field_map:
+      - { source: EegMaStRNummer,             canonical: "fact_eeg_support.eeg_support_id (natural key)" }
+      - { source: "EegInbetriebnahmedatum / Registrierungsdatum", canonical: "eeg_commissioning_date / registration_date" }
+      - { source: InstallierteLeistung,       canonical: "installed_capacity_kw (overlaps dim_generation_unit.capacity -- not an independent measure)" }
+      - { source: "AusschreibungZuschlag / Zuschlagsnummer / PilotAnlage / PrototypAnlage", canonical: "auction_award_flag / auction_award_number / pilot_flag / prototype_flag" }
+      - { source: AnlageBetriebsstatus,       canonical: "support_status (+ label)" }
+      - { source: "VerhaeltnisReferenzertrag* / VerhaeltnisErtragsschaetzung*", canonical: "reference-yield ratio attributes (wind)" }
+      - { source: "Biogas* columns",          canonical: "biogas attributes (biomass only)" }
+      - { source: VerknuepfteEinheitenMaStRNummern, canonical: "linked_unit_ids -- explode to an eeg_support_unit bridge at Silver" }
+      - { source: ErtuechtigungIds,           canonical: "linked_repowering_ids (wasser) -> fact_repowering" }
+    provenance: { source_system: mastr, source_record_id: EegMaStRNummer }
+
+  - canonical_fact: fact_kwk_support
+    from_tables: [mastr_anlagen_kwk]
+    canonical_grain: [kwk_support_key]
+    key: KwkMastrNummer
+    field_map:
+      - { source: KwkMastrNummer,             canonical: "kwk_support_id (natural key)" }
+      - { source: "ThermischeNutzleistung / ElektrischeKwkLeistung", canonical: "useful_thermal_output_kw / electrical_chp_capacity_kw" }
+      - { source: "Inbetriebnahmedatum / Registrierungsdatum", canonical: "commissioning_date / registration_date" }
+      - { source: AnlageBetriebsstatus,       canonical: "support_status (+ label)" }
+      - { source: "AusschreibungZuschlag / Zuschlagnummer", canonical: "auction_award_flag / auction_award_number" }
+      - { source: VerknuepfteEinheitenMaStRNummern, canonical: "linked_unit_ids -> kwk_support_unit bridge" }
+    provenance: { source_system: mastr, source_record_id: KwkMastrNummer }
+
+  - canonical_fact: fact_unit_authorisation
+    from_tables: [mastr_einheiten_genehmigung]
+    canonical_grain: [authorisation_key]
+    key: GenMastrNummer
+    shape: "~1:1 with a unit (5% orphan) -- LEFT join + unmatched flag"
+    field_map:
+      - { source: GenMastrNummer,             canonical: "authorisation_id (natural key)" }
+      - { source: Art,                        canonical: "authorisation_type (+ label from katalogwerte category Sparte)" }
+      - { source: "Datum / DatumDerAntragstellung / Frist / Registrierungsdatum / WasserrechtAblaufdatum", canonical: "decision_date / application_date / deadline / registration_date / water_rights_expiry" }
+      - { source: "Behoerde / Aktenzeichen / WasserrechtsNummer", canonical: "issuing_authority / file_reference / water_rights_number" }
+      - { source: VerknuepfteEinheitenMaStRNummern, canonical: "linked_unit_ids -> authorisation_unit bridge" }
+    quarantine: "Datum = 1900-01-02 is a null sentinel (24977 rows)"
+    provenance: { source_system: mastr, source_record_id: GenMastrNummer }
+
+  - canonical_fact: fact_repowering
+    from_tables: [mastr_ertuechtigungen]
+    canonical_grain: [repowering_key]
+    key: Id
+    shape: "1:N against an EEG support record (a unit can be repowered more than once)"
+    field_map:
+      - { source: Id,                         canonical: "repowering_id (natural key)" }
+      - { source: EegMastrNummer,             canonical: "eeg_support_id (FK -> fact_eeg_support; 87% unique here)" }
+      - { source: "Leistungserhoehung",       canonical: "capacity_increase (confirm unit)" }
+      - { source: WiederinbetriebnahmeDatum,  canonical: "recommissioning_date" }
+      - { source: "Ertuechtigungsart / ErtuechtigungIstZulassungspflichtig", canonical: "repowering_type (+ label) / approval_required_flag" }
+    provenance: { source_system: mastr, source_record_id: Id }
+
+  - canonical_dimension: dim_market_actor
+    from_tables: [mastr_marktakteure, mastr_marktakteure_und_rollen]
+    canonical_grain: [market_actor_key]
+    key: MastrNummer
+    scd: "type 1 (snapshot) -- no validity windows in the source; departures via mastr_geloeschte_deaktivierte_marktakteure"
+    shape: >
+      one row per actor from mastr_marktakteure; the roles come from
+      mastr_marktakteure_und_rollen as a 1:N actor_role bridge (up to 5 roles
+      per actor). Natural-person actors (95%) have name/address suppressed --
+      keep the row, mark it a natural person.
+    field_map:
+      - { source: MastrNummer,               canonical: "market_actor_id (natural key)" }
+      - { source: "Firmenname / MarktakteurVorname / MarktakteurNachname", canonical: "company_name / (person name -- suppressed)" }
+      - { source: Personenart,               canonical: "actor_person_type (organisation / natural_person)" }
+      - { source: "Marktfunktion / Marktrollen", canonical: "market_function (+ label) ; roles via the bridge" }
+      - { source: "Rechtsform / SonstigeRechtsform", canonical: "legal_form (+ label)" }
+      - { source: "Land / Bundesland / Postleitzahl / Ort / Strasse / Nuts2 / Region", canonical: "actor geography (codes decoded via katalogwerte / NUTS)" }
+      - { source: "BundesnetzagenturBetriebsnummer / AcerCode / Umsatzsteueridentifikationsnummer / Registernummer(+Praefix)", canonical: "external identifiers (retained, not a canonical key)" }
+      - { source: "Taetigkeitsbeginn / Taetigkeitsende / RegistrierungsdatumMarktakteur", canonical: "activity_start / activity_end / registration_date" }
+      - { source: "Kmu / HauptwirtdschaftszweigAbschnitt", canonical: "sme_flag / economic_sector (+ label)" }
+      - { source: "the supplier / wholesaler / household-supply flags", canonical: "actor activity flags" }
+      - { source: "marktakteure_und_rollen.Marktrolle", canonical: "actor_role bridge (one row per (actor, role))" }
+    provenance: { source_system: mastr, source_record_id: MastrNummer }
+
+  - canonical_dimension: dim_location
+    from_tables: [mastr_lokationen, mastr_netzanschlusspunkte, mastr_netze, mastr_bilanzierungsgebiete]
+    canonical_grain: [location_key]
+    shape: >
+      dim_location from mastr_lokationen (PK MastrNummer); the delimited link
+      arrays (VerknuepfteEinheitenMaStRNummern up to 1806 entries,
+      NetzanschlusspunkteMaStRNummern) explode to M:N bridge tables at Silver.
+      mastr_netzanschlusspunkte -> bridge_connection_point (links a location to
+      a grid + grid operator; watch the NetzMaStRNummer fan-out to 630081).
+      mastr_netze -> dim_grid. mastr_bilanzierungsgebiete -> ref_balancing_zone.
+    field_map:
+      - { source: "lokationen.MastrNummer",  canonical: "location_id" }
+      - { source: "lokationen.Lokationtyp",  canonical: "location_type (+ label from mastr_lokationstypen)" }
+      - { source: "netzanschlusspunkte.* (capacity / voltage / control zone)", canonical: "connection-point attributes -- codes decoded via katalogwerte" }
+      - { source: "netze.* (Sparte / Bezeichnung / Bundesland / customer flags)", canonical: "grid attributes" }
+      - { source: "bilanzierungsgebiete.* (Yeic / EIC / control zone)", canonical: "balancing-zone reference" }
+    provenance: { source_system: mastr, source_record_id: "the table's own MastrNummer / Id" }
+
+  - canonical_fact: fact_unit_lifecycle_event
+    from_tables: [mastr_geloeschte_deaktivierte_einheiten, mastr_geloeschte_deaktivierte_marktakteure,
+                  mastr_einheiten_aenderung_netzbetreiberzuordnungen]
+    canonical_grain: [entity_id, event_ts, event_type]
+    shape: >
+      one row per lifecycle event -- unit deletion / deactivation, actor
+      departure, grid-operator reassignment. Append-only Silver change facts;
+      NEVER overwrite the current-state dimensions. These carry the
+      survivorship record the live tables omit -- a decommission / churn /
+      reassignment model draws its labels here.
+    field_map:
+      - { source: "geloeschte_*.EinheitMastrNummer / MarktakteurMastrNummer", canonical: "entity_id (DISJOINT from the live tables -- join only to confirm departure)" }
+      - { source: "geloeschte_*.DatumLetzteAktualisierung", canonical: "event_ts (deletion / deactivation time)" }
+      - { source: "geloeschte_deaktivierte_einheiten.Einheittyp / *Status", canonical: "unit_type (+ label) / status codes" }
+      - { source: "aenderung.NetzbetreiberMastrNummerAlt / *Neu", canonical: "previous_grid_operator_id / new_grid_operator_id (FK -> dim_market_actor)" }
+      - { source: "aenderung.Netzbetreiberzuordnungsaenderungsdatum", canonical: "effective_ts (the event time)" }
+      - { source: "aenderung.RegistrierungsdatumNetzbetreiberzuordnungsaenderung", canonical: "registered_ts (when it became knowable)" }
+      - { source: "aenderung.ArtDerAenderung", canonical: "change_type (+ label)" }
+    provenance: { source_system: mastr, source_record_id: "concat_ws('|', <table>, entity_id, event_ts)" }
+
+  - reference_only: true
+    from_tables: [mastr_katalogkategorien, mastr_katalogwerte, mastr_einheitentypen,
+                  mastr_lokationstypen, mastr_marktfunktionen, mastr_marktrollen]
+    note: >
+      the authoritative MaStR code sets. mastr_katalogwerte (Id -> Wert, keyed
+      by KatalogKategorieId -> mastr_katalogkategorien) is the decode table for
+      every coded column. Silver reference dimensions, SCD type 1. Pin the
+      catalog vintage -- meanings change between MaStR releases.
+
+# ---------------------------------------------------------------------------
+# Business glossary -- German field -> English business name
+# The German source header and the katalogwerte German label are retained on
+# every row alongside the English name / label.
+# ---------------------------------------------------------------------------
+
+business_names:
+  identifiers:
+    EinheitMastrNummer:            unit_id
+    EegMaStRNummer:                eeg_support_id
+    EegMastrNummer:                eeg_support_id
+    KwkMaStRNummer:                kwk_support_id
+    KwkMastrNummer:                kwk_support_id
+    GenMastrNummer:                authorisation_id
+    LokationMaStRNummer:           location_id
+    LokationMastrNummer:           location_id
+    NetzMaStRNummer:               grid_id
+    NetzanschlusspunktMastrNummer: connection_point_id
+    MarktakteurMastrNummer:        market_actor_id
+    AnlagenbetreiberMastrNummer:   operator_id
+    AltAnlagenbetreiberMastrNummer: previous_operator_id
+    NetzbetreiberMaStRNummer:      grid_operator_id
+    NetzbetreiberMastrNummerAlt:   previous_grid_operator_id
+    NetzbetreiberMastrNummerNeu:   new_grid_operator_id
+
+  common_fields:
+    DatumLetzteAktualisierung:     last_updated_at
+    DatumLetzeAktualisierung:      last_updated_at
+    Registrierungsdatum:           registration_date
+    Inbetriebnahmedatum:           commissioning_date
+    GeplantesInbetriebnahmedatum:  planned_commissioning_date
+    EegInbetriebnahmedatum:        eeg_commissioning_date
+    InbetriebnahmedatumAmAktuellenStandort: commissioning_date_current_site
+    DatumEndgueltigeStilllegung:   final_decommissioning_date
+    DatumBeginnVoruebergehendeStilllegung:  provisional_shutdown_start_date
+    DatumWiederaufnahmeBetrieb:    recommissioning_date
+    NameStromerzeugungseinheit:    unit_name
+    NameKraftwerk:                 plant_name
+    NameKraftwerksblock:           plant_block_name
+    NameWindpark:                  wind_farm_name
+    Energietraeger:                energy_carrier
+    Bruttoleistung:                capacity_gross_kw
+    Nettonennleistung:             capacity_net_kw
+    NettonennleistungDeutschland:  capacity_net_germany_kw
+    InstallierteLeistung:          installed_capacity_kw
+    ThermischeNutzleistung:        useful_thermal_output_kw
+    ElektrischeKwkLeistung:        electrical_chp_capacity_kw
+    Land:                          country
+    Bundesland:                    federal_state
+    Landkreis:                     district
+    Gemeinde:                      municipality
+    Gemeindeschluessel:            municipality_key_ags
+    Postleitzahl:                  postcode
+    Ort:                           locality
+    Laengengrad:                   longitude
+    Breitengrad:                   latitude
+    EinheitBetriebsstatus:         operating_status
+    EinheitSystemstatus:           system_status
+    AnlageBetriebsstatus:          support_status
+    FernsteuerbarkeitNb:           remote_control_by_grid_operator
+    FernsteuerbarkeitDv:           remote_control_by_direct_marketer
+    Einspeisungsart:               feed_in_type
+    Technologie:                   generation_technology
+    Hauptbrennstoff:               main_fuel
+    WeitererHauptbrennstoff:       additional_main_fuel
+    Biomasseart:                   biomass_type
+    ArtDerWasserkraftanlage:       hydro_plant_type
+    ArtDesZuflusses:               hydro_inflow_type
+    WindAnLandOderAufSee:          wind_onshore_or_offshore
+    Hersteller:                    manufacturer
+    Typenbezeichnung:              model_designation
+    Nabenhoehe:                    hub_height_m
+    Rotordurchmesser:              rotor_diameter_m
+    Seelage:                       offshore_sea_area
+    Wassertiefe:                   water_depth_m
+    Kuestenentfernung:             distance_to_coast_km
+    AusschreibungZuschlag:         auction_award_flag
+    Zuschlagsnummer:               auction_award_number
+    Zuschlagnummer:                auction_award_number
+    PilotAnlage:                   pilot_plant_flag
+    PrototypAnlage:                prototype_plant_flag
+    VerknuepfteEinheitenMaStRNummern: linked_unit_ids
+    NichtVorhandenInMigriertenEinheiten: migration_absence_flag
+    # authorisation
+    Art:                           authorisation_type
+    Datum:                         decision_date
+    DatumDerAntragstellung:        application_date
+    Behoerde:                      issuing_authority
+    Aktenzeichen:                  file_reference
+    Frist:                         authorisation_deadline
+    WasserrechtsNummer:            water_rights_number
+    WasserrechtAblaufdatum:        water_rights_expiry_date
+    # repowering
+    Leistungserhoehung:            capacity_increase
+    WiederinbetriebnahmeDatum:     recommissioning_date
+    Ertuechtigungsart:             repowering_type
+    ErtuechtigungIstZulassungspflichtig: repowering_approval_required_flag
+    # market actor
+    Firmenname:                    company_name
+    Personenart:                   actor_person_type
+    Marktfunktion:                 market_function
+    Marktrolle:                    market_role
+    Marktrollen:                   market_roles
+    Rechtsform:                    legal_form
+    Taetigkeitsbeginn:             activity_start_date
+    Taetigkeitsende:               activity_end_date
+    Kmu:                           is_sme
+    HauptwirtdschaftszweigAbschnitt: economic_sector_section
+    Nuts2:                         nuts2_region
+    # grid / connection
+    Sparte:                        grid_sector
+    Bezeichnung:                   name
+    Lokationtyp:                   location_type
+    Spannungsebene:                voltage_level
+    RegelzoneNetzanschlusspunkt:   control_zone
+    NochInPlanung:                 still_in_planning_flag
+    Nettoengpassleistung:          net_bottleneck_capacity_kw
+    MaximaleEinspeiseleistung:     max_feed_in_power_kw
+    MaximaleAusspeiseleistung:     max_withdrawal_power_kw
+    Netzanschlusskapazitaet:       grid_connection_capacity_kw
+    KundenAngeschlossen:           customers_connected_flag
+    GeschlossenesVerteilnetz:      is_closed_distribution_network
+    # change logs
+    Einheittyp:                    unit_type
+    MarktakteurStatus:             actor_status
+    ArtDerAenderung:               change_type
+    Netzbetreiberzuordnungsaenderungsdatum: grid_operator_change_effective_date
+    RegistrierungsdatumNetzbetreiberzuordnungsaenderung: grid_operator_change_registered_date
+
+coded_value_labels:
+  mechanism: mastr_katalogwerte
+  rule: >
+    every coded column is decoded at Silver by joining its value to
+    mastr_katalogwerte.Id -- scoped to the category named in the contract's
+    per-column notes where the column name matches a mastr_katalogkategorien.Name,
+    otherwise global value-id membership. The English label is a translation of
+    katalogwerte.Wert; both the MaStR code and the German Wert are retained.
+  named_category_bindings:   # strongest evidence -- column name matches a category
+    Bundesland: Land
+    WindAnLandOderAufSee: Land
+    EinheitBetriebsstatus: Betriebsstatus
+    AnlageBetriebsstatus: Betriebsstatus
+    MarktakteurStatus: Marktakteurstatus
+    EinheitSystemstatus: Systemstatus
+    FernsteuerbarkeitNb: Fernsteuerbarkeit
+    FernsteuerbarkeitDv: Fernsteuerbarkeit
+    Einspeisungsart: Einspeisungsart
+    Hauptbrennstoff: Brennstoff
+    WeitererHauptbrennstoff: Brennstoff
+    Technologie: BrennstoffTechnologieNetzersatz
+    Seelage: Seelage
+    ArtDerWasserkraftanlage: "Art der Wasserkraftanlage"
+    Art: Sparte
+    Einsatzort: Einsatzort
+  status_label_hint:   # decoded meaning of the most common operating-status codes (confirm against the pinned catalog)
+    "31": planned
+    "35": in_operation
+    "37": temporarily_shut_down
+    "38": permanently_shut_down
+  unknown_code_policy: quarantine   # never a silent NULL
+
+dropped_columns:
+  - { column: "constant columns per table (contracts/mastr.yml constant_columns_observed)", reason: "no information at the observed population" }
+  - { column: "*_nv 'nicht veroeffentlicht' flags", reason: "retained only where they disambiguate a suppressed value; otherwise dropped at Silver" }
+
+localisation:
+  required: true
+  approach: german_native_with_english_business_layer
+  geography: >
+    Gemeindeschluessel (AGS) -> conformed German geography spine (AGS/ARS);
+    Laengengrad/Breitengrad (EPSG:4326) where present; Bundesland / Landkreis /
+    Gemeinde codes decoded via mastr_katalogwerte.
+  language: >
+    German compound headers -> English business names (business_names); integer
+    catalog codes -> English labels via mastr_katalogwerte (coded_value_labels).
+    The MaStR code and the German katalogwerte label are retained on every row.
+  units: "capacity kW; geometry m; distance km/m -- per business_names suffixes"
+  currency: not_applicable
+  never: "a decoded label is never presented without the source code and catalog vintage"
+
+cross_source:
+  power_plant_list:
+    relationship: authoritative_shared_identifier
+    rule: >
+      MaStR and power_plant_list share the MaStR unit id
+      (mastr_einheiten_*.EinheitMastrNummer <-> power_plant_list.EinheitMastrNummer).
+      A keyed join IS permitted on this authoritative identifier, but it is a
+      SUBSET join (power_plant_list is the >10 MW register plus aggregated
+      small-plant rows; ~83% of its rows carry an id, id not unique there),
+      resolved with a LEFT join and an unmatched flag. It is NOT an assumed 1:1
+      identity join. dim_generation_unit (MaStR, complete) is the grain; the
+      power_plant_list attributes (BNetzA status taxonomy, coal-exit legal
+      basis) attach to the large-plant subset. Same-ecosystem membership does
+      not by itself justify a join.
+  redispatch:
+    relationship: fuzzy_name_reconciliation
+    rule: >
+      redispatch_measures.BETROFFENE_ANLAGE is free text with NO shared key --
+      resolution to a MaStR unit id is a Silver fuzzy match with an explicit
+      match rate, never a keyed or identity join.
+  smard:
+    relationship: conformed_dimension_only
+    rule: >
+      SMARD carries no unit or plant identifier -- MaStR connects to SMARD
+      generation / forecast series only through conformed dim_date / dim_time /
+      dim_geography / dim_market and real grid relationships (control zone,
+      carrier vocabulary), never by an identity join. MaStR capacity by carrier
+      x region can be compared to SMARD generation by carrier x region as a
+      contextual aggregate, not a row join.
+  dwd:
+    relationship: conformed_dimension_only
+    rule: >
+      unit coordinates (EPSG:4326) join to DWD weather only via the conformed
+      dim_geography / dim_weather_context (nearest-station or grid-cell context),
+      never a direct identity join.

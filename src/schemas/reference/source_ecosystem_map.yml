@@ -42,6 +42,15 @@ mappings:
   - source_system: dwd
     ecosystem: energy
     first_mapped: "first wave"
+  - source_system: mastr
+    ecosystem: energy
+    first_mapped: "energy/weather deepening wave"
+  - source_system: power_plant_list
+    ecosystem: energy
+    first_mapped: "energy/weather deepening wave"
+  - source_system: redispatch
+    ecosystem: energy
+    first_mapped: "energy/weather deepening wave"
   - source_system: honda_iot
     ecosystem: energy
     first_mapped: "first wave"

@@ -1,21 +1,24 @@
 # Data contract -- SMARD (energy market, Germany)
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
-# Date: August 2026
+# Date: September 2026
 #
 # Purpose: formal contract for the SMARD source. Every *_observed value and every
 # quality-rule bound is traceable to src/schemas/profiling/smard.md. This file is
-# authored; src/schemas/contracts/generated/smard.schema.json is generated from it
-# by src/schemas/_generate_jsonschema.py -- do not edit that by hand.
+# authored; src/schemas/contracts/generated/smard_energy_timeseries.schema.json is
+# generated from it by src/schemas/_generate_jsonschema.py -- do not edit that by
+# hand.
 
 source: smard
 source_system: smard            # provenance value carried on every canonical row
 domain: Energy / Market
 description: >
-  Bundesnetzagentur SMARD open electricity-market data for the DE-LU bidding
-  zone -- day-ahead prices plus generation / load / residual-load series in
-  long format, one metric per row. Static one-time acquisition, public API,
-  no authentication.
+  Bundesnetzagentur SMARD open electricity-market data -- day-ahead prices,
+  realised generation by fuel, load / consumption, residual load, and
+  transmission-system-operator forecasts, in long format (one metric per row).
+  Covers the DE-LU bidding zone plus the four control areas (50Hertz, Amprion,
+  TenneT, TransnetBW) for the metrics SMARD breaks down regionally, at daily and
+  quarter-hourly resolution. Static one-time acquisition, public API, no auth.
 bronze_table: energy_commerce_retail_media.bronze.smard_energy_timeseries
 profiling_evidence: src/schemas/profiling/smard.md
 bronze_physical_types: string   # Bronze load reads every column as string (inferSchema=false)
@@ -26,14 +29,17 @@ acquisition:
   cadence: static_snapshot      # not replayed as a stream
   update_frequency: none        # not re-acquired on a schedule
   sla: none
+  licence: "CC BY 4.0 (Bundesnetzagentur | SMARD.de)"
   reacquisition_note: >
     If re-acquired at a newer vintage, treat as a batch schema change --
-    re-profile, version this contract, record the change.
+    re-profile, version this contract, record the change. SMARD also revises
+    published values (preliminary -> final); a re-download needs an as-of column.
 
 grain:
   key: [metric, filter_id, region, resolution, timestamp_utc]
-  unique: true                  # profiling: 0 full-row duplicates, 0 conflicting (series, timestamp) groups
-  row_count_observed: 55517
+  unique: true                  # profiling: 0 full-row duplicates, 0 (series, timestamp) duplicate groups
+  row_count_observed: 1255904
+  series_observed: 52            # distinct (metric, filter_id, region, resolution)
   description: one row per (metric, filter_id, region, resolution, timestamp_utc)
 
 columns:
@@ -41,9 +47,15 @@ columns:
     type: string
     required: true
     nullable: false             # missing rate 0.0000
-    distinct_observed: 16
+    distinct_observed: 22
     allowed_values:
       - day_ahead_prices
+      - forecast_generation_offshore_wind
+      - forecast_generation_onshore_wind
+      - forecast_generation_other
+      - forecast_generation_photovoltaic
+      - forecast_generation_total
+      - forecast_generation_wind_and_photovoltaic
       - generation_biomass
       - generation_hard_coal
       - generation_hydro
@@ -59,99 +71,179 @@ columns:
       - pumped_storage_consumption
       - residual_load
       - total_power_consumption
-    notes: series discriminator for the long format
+    notes: >
+      series discriminator for the long format. 6 forecast_* metrics are TSO
+      forecasts (published before the target time); the rest are realised.
+      19 of the 22 start after the table's first year -- see profiling
+      Regime / Version Evidence for the per-metric first-seen year.
 
   - name: filter_id
     type: string                # SMARD numeric filter id; kept as string, not arithmetic
     required: true
     nullable: false
-    distinct_observed: 16
-    allowed_values: ["4169", "4066", "4069", "1226", "1223", "4071", "1224", "1225",
-                     "4067", "1227", "1228", "4068", "4070", "4387", "4359", "410"]
-    notes: 1:1 with metric (see mappings/smard.yml for the pairing)
+    distinct_observed: 22
+    allowed_values: ["4169", "3791", "126", "122", "4066", "4069", "1223", "4071",
+                     "1224", "1225", "4067", "1227", "1228", "4068", "4070",
+                     "4387", "4359", "410", "123", "715", "5097", "1226"]
+    notes: >
+      1:1 with metric (22 metrics, 22 filter_ids). It is the SMARD publication
+      series id, not a physical-system attribute -- see mappings/smard.yml.
 
   - name: region
     type: string
     required: true
     nullable: false
-    constant_observed: "DE-LU"
-    allowed_values: ["DE-LU"]
+    distinct_observed: 5
+    allowed_values: ["DE-LU", "50Hertz", "Amprion", "TenneT", "TransnetBW"]
     notes: >
-      constant in the acquired data -- German-Luxembourg bidding zone. Flagged
-      for a Silver drop only after Silver confirms no second zone is ever added.
+      DE-LU is the bidding zone; 50Hertz / Amprion / TenneT / TransnetBW are the
+      four German control areas. Only generation_offshore_wind,
+      generation_onshore_wind, generation_photovoltaic and total_power_consumption
+      carry a regional breakdown; every other metric is DE-LU only. A metric's
+      regional rows and its DE-LU total are the same quantity at different
+      aggregation -- never pool them.
 
   - name: resolution
     type: string
     required: true
     nullable: false
-    constant_observed: "day"
-    allowed_values: ["day"]
-    notes: "only 'day' present; SMARD also publishes hourly / quarter-hourly -- not acquired"
+    distinct_observed: 2
+    allowed_values: ["day", "quarterhour"]
+    notes: >
+      'day' = daily total (or daily mean for prices), 'quarterhour' = 15-minute.
+      A metric's day and quarterhour series are the same quantity at different
+      aggregation -- never pool them or split them across train/test.
 
   - name: timestamp_utc
     type: timestamp
     required: true
     nullable: false
     timezone: UTC
-    observed_year_range: [2015, 2026]
-    notes: series start dates vary by metric (nuclear from 2019, biomass from 2015)
+    observed_year_range: [2013, 2026]
+    notes: >
+      column name asserts UTC; SMARD's own export is Europe/Berlin wall-clock
+      with 23h / 25h DST days -- the UTC conversion must be verified at Silver
+      before any hourly/quarter-hourly join. Series start dates vary by metric
+      (use a per-series min/max, not the table-wide span).
 
   - name: value
     type: double
     required: true              # column always present
-    nullable: true              # 13.01% null overall -- expected, not a defect
-    null_rate_observed: 0.1301
-    null_rate_max: 0.15         # tolerance = observed + margin
+    nullable: true              # 1.27% null overall -- expected publication outages, not a defect
+    null_rate_observed: 0.0127
+    null_rate_max: 0.03         # tolerance = observed + margin
     unit_note: >
-      MWh per day for generation / load / consumption metrics;
-      EUR/MWh for day_ahead_prices. Unit is metric-dependent -- see mappings/smard.yml.
-    value_ranges_observed:      # profiling distributions, min / max per metric
-      day_ahead_prices:               {min: -53.87, max: 699.44, negatives: 20}
-      generation_biomass:             {min: 155.5, max: 119197.0}
-      generation_hard_coal:           {min: 5127.0, max: 393590.65}
-      generation_hydro:               {min: 7.5, max: 65880.75}
-      generation_lignite:             {min: 49067.0, max: 413439.75}
-      generation_natural_gas:         {min: 217.75, max: 420468.5}
-      generation_nuclear:             {min: 0.0, max: 228116.75, zeros: 289}
-      generation_offshore_wind:       {min: 179.0, max: 190655.5}
-      generation_onshore_wind:        {min: 17.5, max: 1064138.0}
-      generation_other_conventional:  {min: 19712.0, max: 56661.25}
-      generation_other_renewable:     {min: 1625.5, max: 5636.5}
-      generation_photovoltaic:        {min: 3.25, max: 528207.22}
-      generation_pumped_storage:      {min: 4308.61, max: 61197.75}
-      pumped_storage_consumption:     {min: 2950.91, max: 70895.25}
-      residual_load:                  {min: 26994.41, max: 1585773.0}
-      total_power_consumption:        {min: 875102.5, max: 1698425.5}
+      MWh (daily) or MW (quarter-hourly) for generation / load / consumption /
+      forecast metrics; EUR/MWh for day_ahead_prices. Unit is
+      metric-and-resolution dependent and is NOT in Bronze -- attach per metric
+      from the SMARD filter catalog at Silver. See mappings/smard.yml.
+    value_ranges_observed:      # profiling distributions, min / max per metric (day + quarterhour pooled)
+      day_ahead_prices:                          {min: -499.99, max: 936.28, negatives: 4372, zeros: 728}
+      forecast_generation_offshore_wind:         {min: 1070.75, max: 170186.35}
+      forecast_generation_onshore_wind:          {min: 12953.75, max: 1055276.75}
+      forecast_generation_other:                 {min: 160906.24, max: 1425941.75}
+      forecast_generation_photovoltaic:          {min: -1271057.75, max: -66771.0, negatives: 2897, note: "sign-flipped -- see quality_rules.forecast_pv_sign_mirror"}
+      forecast_generation_total:                 {min: 726680.0, max: 1843656.0}
+      forecast_generation_wind_and_photovoltaic: {min: 66771.0, max: 1271057.75}
+      generation_biomass:                        {min: 155.5, max: 119197.0}
+      generation_hard_coal:                      {min: 32.75, max: 393590.65}
+      generation_hydro:                          {min: 7.5, max: 65880.75}
+      generation_lignite:                        {min: 338.11, max: 413439.75}
+      generation_natural_gas:                    {min: 217.75, max: 420468.5}
+      generation_nuclear:                        {min: 0.0, max: 228116.75, zeros: 28087}
+      generation_offshore_wind:                  {min: 0.0, max: 190655.5, zeros: 65}
+      generation_onshore_wind:                   {min: 0.0, max: 1064138.0, zeros: 16}
+      generation_other_conventional:             {min: 274.25, max: 56661.25}
+      generation_other_renewable:                {min: 12.37, max: 5636.5}
+      generation_photovoltaic:                   {min: 0.0, max: 528207.22, zeros: 61}
+      generation_pumped_storage:                 {min: 0.0, max: 61197.75, zeros: 760}
+      pumped_storage_consumption:                {min: 0.0, max: 70895.25, zeros: 345}
+      residual_load:                             {min: -4019.13, max: 1585773.0, negatives: 2777}
+      total_power_consumption:                   {min: 8175.0, max: 1698425.5}
 
 quality_rules:
   - id: key_unique
     expr: "grain key (metric, filter_id, region, resolution, timestamp_utc) is unique"
     severity: block
-    evidence: "profiling: 0 conflicting duplicate groups"
+    evidence: "profiling: 0 duplicate groups, 0 conflicting"
   - id: value_null_rate
-    expr: "null(value) / count(*) <= 0.15"
+    expr: "null(value) / count(*) <= 0.03"
     severity: warn
-    evidence: "profiling: 0.1301 overall"
-  - id: generation_non_negative
+    evidence: "profiling: 0.0127 overall; a null usually marks a SMARD publication outage"
+  - id: forecast_pv_sign_mirror
     expr: >
-      value >= 0 where metric like 'generation_%'
-      or metric in ('residual_load', 'total_power_consumption', 'pumped_storage_consumption')
+      metric='forecast_generation_photovoltaic' is an EXACT -1x mirror of
+      metric='forecast_generation_wind_and_photovoltaic' (observed range
+      -1,271,058 .. -66,771; every other forecast metric is positive)
     severity: block
-    evidence: "profiling: 0 negatives on every non-price metric"
-  - id: price_plausible_range
-    expr: "value between -100 and 1000 where metric = 'day_ahead_prices'"
+    finding: >
+      read-only diagnostic (code only, no Databricks query): the label comes from
+      scripts/download/download_smard.py FORECAST_FILTERS, which maps filter id
+      126 -> 'forecast_generation_photovoltaic' and 5097 ->
+      'forecast_generation_wind_and_photovoltaic'. stage_smard.py copies the
+      value through unchanged (no arithmetic). Two independent SMARD series being
+      an exact -1x mirror is not physical -- filter 126 is very likely the wrong
+      SMARD chart id for the PV day-ahead forecast (or its sign is inverted at
+      the source URL). A corrected filter id would require re-download, which is
+      out of scope here; the value is carried as-is into Bronze.
+    remediation: >
+      Silver: confirm the correct SMARD chart id for the PV day-ahead forecast
+      against the SMARD filter catalog, then either negate the value or drop the
+      metric pending a re-download. Until resolved, do not surface
+      forecast_generation_photovoltaic and do not use it as a feature or
+      target for forecast_generation_wind_and_photovoltaic (circular).
+  - id: generation_non_negative
+    expr: "value >= 0 where metric like 'generation_%' or metric = 'total_power_consumption'"
+    severity: block
+    evidence: "profiling: 0 negatives on every realised generation / consumption metric"
+  - id: residual_load_may_be_negative
+    expr: "value may be < 0 where metric = 'residual_load' (load minus renewables can be negative)"
+    severity: info
+    evidence: "profiling: 2777 negative rows, min -4019.13 -- physical, keep"
+  - id: price_may_be_negative
+    expr: "value may be < 0 where metric = 'day_ahead_prices' (negative prices are a real market outcome)"
+    severity: info
+    evidence: "profiling: 4372 negative rows, observed -499.99 .. 936.28"
+  - id: forecast_metrics_are_forecasts
+    expr: >
+      the 6 forecast_generation_* metrics are published BEFORE their target time
+      -- pairing a forecast with its realised counterpart must respect each
+      series' own availability time, and a later-vintage forecast for the same
+      target timestamp is leakage
+    severity: warn
+  - id: additive_identity_not_clean
+    expr: >
+      the published generation / load series are NOT a clean additive set --
+      residual_load cannot be reconstructed from the other series without an
+      extra term / vintage reconciliation
     severity: warn
     evidence: >
-      profiling: observed -53.87 .. 699.44; negative day-ahead prices are a real
-      market phenomenon, so this is a warn, not a block. 13 five-sigma outliers
-      on this metric are within plausible crisis-period bounds.
+      profiling ran the identity with pumped_storage_consumption as the load
+      term (the wrong LHS) and every row violated; a correct check needs
+      total_power_consumption. Left as a documented limitation per owner.
   - id: metric_filter_id_consistent
     expr: "each metric maps to exactly one filter_id and vice versa"
     severity: block
-    evidence: "profiling: 16 distinct metrics, 16 distinct filter_ids, 16 distinct series"
+    evidence: "profiling: 22 distinct metrics, 22 distinct filter_ids"
+  - id: no_regional_total_pooling
+    expr: >
+      a metric's regional (control-area) rows must not be pooled with its DE-LU
+      total, nor its day resolution with its quarterhour resolution -- same
+      quantity, different aggregation
+    severity: block
 
 localisation:
-  required: false
-  note: >
-    Natively German -- DE-LU bidding zone, Bundesnetzagentur source. No Germany
-    localisation mapping needed (contrast REES46 / iPinYou).
+  required: true
+  approach: german_native_with_english_business_layer
+  detail:
+    geography: >
+      natively German -- DE-LU bidding zone and the four German control areas.
+      region maps to the conformed dim_geography / dim_market at Silver as a
+      named zone, not a numeric code.
+    language: >
+      metric names are already English tokens. filter_id is an opaque SMARD
+      series number -- the mapping (src/schemas/mappings/smard.yml) records the
+      English business name and the physical unit for every metric, with
+      filter_id retained inside source_record_id for traceability.
+    units: "attached per metric at Silver from the SMARD filter catalog; recorded in the mapping"
+    currency: "EUR for day_ahead_prices (EUR/MWh)"

@@ -1,0 +1,150 @@
+# Source-to-canonical mapping -- Redispatch measures
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: map the acquired redispatch schema (see contracts/redispatch.yml) to
+# the canonical model, and define the English business meaning for every German /
+# coded field. Design only -- no transform code here.
+
+source: redispatch
+source_system: redispatch
+ecosystem: energy
+profiling_evidence: src/schemas/profiling/redispatch.md
+contract: src/schemas/contracts/redispatch.yml
+
+targets:
+
+  - canonical_fact: fact_redispatch_measure
+    from_tables: [redispatch_measures]
+    canonical_grain: [measure_start_ts, affected_unit_key, direction]
+    shape: >
+      one row per redispatch / countertrade measure (after de-duplication). A
+      pre-Redispatch-2.0 fact -- carries a regime attribute fixed to
+      'pre_redispatch_2_0' so it is never pooled with later data.
+    field_map:
+      - source: "BEGINN_DATUM + BEGINN_UHRZEIT (+ ZEITZONE_VON)"
+        canonical: "measure_start_ts (dim_date / dim_time)"
+        transform: "parse dd.MM.yyyy + text time, treat as Europe/Berlin, convert to UTC"
+      - source: "ENDE_DATUM + ENDE_UHRZEIT (+ ZEITZONE_BIS)"
+        canonical: "measure_end_ts (post-event -- not a feature for measure-start prediction)"
+        transform: "same as start; validate start <= end, flag the 109 inverted rows"
+      - source: GRUND_DER_MASSNAHME
+        canonical: "fact_redispatch_measure.reason (+ reason_label)"
+        transform: "carry the German reason; attach the English label (coded_value_labels.grund_der_massnahme)"
+      - source: RICHTUNG
+        canonical: "fact_redispatch_measure.direction (+ direction_label)"
+        transform: "map to increase_feed_in / reduce_feed_in"
+      - source: "MITTLERE_LEISTUNG_MW / MAXIMALE_LEISTUNG_MW"
+        canonical: "mean_power_mw / max_power_mw"
+        transform: "German-comma decimal -> double"
+      - source: GESAMTE_ARBEIT_MWH
+        canonical: "total_energy_mwh (post-event quantity)"
+        transform: "German-comma decimal -> double"
+      - source: ANWEISENDER_UENB
+        canonical: "instructing_tso (-> dim_geography / dim_market control area)"
+      - source: ANFORDERNDER_UENB
+        canonical: "requesting_tsos (split '&'-joined combinations to a list)"
+      - source: BETROFFENE_ANLAGE
+        canonical: "affected_unit_key -- resolved by fuzzy name match to a power_plant_list / MaStR unit at Silver; retain the raw name as affected_unit_name_raw"
+      - source: PRIMAERENERGIEART
+        canonical: "affected_unit_primary_energy (+ label)"
+      - source: "coverage_regime / ZEITZONE_VON / ZEITZONE_BIS"
+        canonical: dropped
+        transform: "constant -- no information"
+    provenance:
+      source_system: redispatch
+      source_record_id: "concat_ws('|', BEGINN_DATUM, BEGINN_UHRZEIT, BETROFFENE_ANLAGE, RICHTUNG, ANWEISENDER_UENB)"
+
+# ---------------------------------------------------------------------------
+# Business glossary -- German field / coded value -> English business name
+# ---------------------------------------------------------------------------
+
+business_names:
+  fields:
+    coverage_regime:      extract_coverage_regime
+    BEGINN_DATUM:         measure_start_date
+    BEGINN_UHRZEIT:       measure_start_time
+    ZEITZONE_VON:         start_timezone
+    ENDE_DATUM:           measure_end_date
+    ENDE_UHRZEIT:         measure_end_time
+    ZEITZONE_BIS:         end_timezone
+    GRUND_DER_MASSNAHME:  measure_reason
+    RICHTUNG:             direction
+    MITTLERE_LEISTUNG_MW: mean_power_mw
+    MAXIMALE_LEISTUNG_MW: max_power_mw
+    GESAMTE_ARBEIT_MWH:   total_energy_mwh
+    ANWEISENDER_UENB:     instructing_tso
+    ANFORDERNDER_UENB:    requesting_tso
+    BETROFFENE_ANLAGE:    affected_unit_name
+    PRIMAERENERGIEART:    affected_unit_primary_energy
+
+coded_value_labels:
+
+  grund_der_massnahme:
+    scope: "redispatch_measures.GRUND_DER_MASSNAHME -- reason for the measure"
+    map:
+      "Strombedingter Redispatch":                            current_driven_redispatch
+      "Spannungsbedingter Redispatch":                        voltage_driven_redispatch
+      "Strom- und Spannungsbedingter RD":                     current_and_voltage_driven_redispatch
+      "Strombedingter Countertrade DE-DK1":                   current_driven_countertrade_de_dk1
+      "Strombedingter Countertrade DE-DK2":                   current_driven_countertrade_de_dk2
+      "Strombedingter Countertrade DE-NO2":                   current_driven_countertrade_de_no2
+      "Probestart (NetzRes)":                                 test_start_grid_reserve
+      "Testfahrt (KapRes)":                                   test_run_capacity_reserve
+      "Funktionstest (KapRes)":                               function_test_capacity_reserve
+      "Gezielter Leistungsausgleich bei Einspeisemanagement": targeted_power_balancing_feed_in_management
+
+  richtung:
+    scope: "redispatch_measures.RICHTUNG -- instructed direction of active-power feed-in"
+    map:
+      "Wirkleistungseinspeisung erhöhen":    increase_feed_in
+      "Wirkleistungseinspeisung reduzieren": reduce_feed_in
+
+  primaerenergieart:
+    scope: "redispatch_measures.PRIMAERENERGIEART -- primary energy type of the affected unit"
+    map:
+      Konventionell: conventional
+      Erneuerbar:    renewable
+      Sonstiges:     other
+
+  instructing_tso:
+    scope: "redispatch_measures.ANWEISENDER_UENB -- instructing transmission system operator"
+    map:
+      "TenneT DE":  tennet_de
+      TransnetBW:   transnetbw
+      "50Hertz":    fifty_hertz
+      Amprion:      amprion
+      PSE:          pse_poland
+
+dropped_columns:
+  - { column: coverage_regime, reason: "constant -- describes the extract, not the measure" }
+  - { column: ZEITZONE_VON,    reason: "constant (Europe/Berlin)" }
+  - { column: ZEITZONE_BIS,    reason: "constant (Europe/Berlin)" }
+
+localisation:
+  required: true
+  approach: german_native_with_english_business_layer
+  geography: "TSO control areas -> conformed dim_geography / dim_market as named zones; plant geography only via the resolved affected unit"
+  language: "German headers and coded values Englishised via business_names / coded_value_labels; German source values retained"
+  units: "power MW, energy MWh -- recorded in business_names"
+  currency: not_applicable
+  never: "the affected-plant name is never presented as a resolved plant id without the fuzzy-match confidence attached"
+
+cross_source:
+  power_plant_list_and_mastr:
+    relationship: fuzzy_name_reconciliation
+    rule: >
+      BETROFFENE_ANLAGE is free text -- there is NO shared key with
+      power_plant_list or MaStR. Resolution to a unit id is a Silver fuzzy-match
+      with an explicit match rate and ambiguity flag; it is never a keyed or
+      identity join, and belonging to the same Energy ecosystem does not justify
+      one.
+  smard:
+    relationship: conformed_dimension_only
+    rule: >
+      the TSO / control-area names (ANWEISENDER_UENB, ANFORDERNDER_UENB) share
+      the vocabulary of SMARD.region (50Hertz, Amprion, TenneT, TransnetBW) --
+      that is a conformed grid-infrastructure relationship, joined through
+      dim_geography / dim_market, not an identity join between measures and
+      generation series.
