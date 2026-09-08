@@ -32,6 +32,12 @@ data/cdc/
 *.json.gz
 *.json
 
+# ...except the Silver field-class registry seed: a generated build artifact
+# (src/schemas/_generate_field_classes.py) that the setup notebook loads on
+# Databricks, so it must be committed.
+!src/schemas/field_classes/
+!src/schemas/field_classes/*.csv
+
 # Logs
 logs/
 *.log

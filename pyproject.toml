@@ -68,6 +68,10 @@ extend-ignore = ["E402", "BLE001"]
 # fully lint-clean.
 "databricks/eda/*/*_eda.py" = ["F821"]
 "databricks/eda/*/*_relationships_and_findings.py" = ["F821"]
+# Silver source notebooks pull `%run ../../_silver_common` (a Databricks
+# runtime magic). databricks/silver/_silver_common.py is NOT exempted.
+"databricks/silver/[0-9]*_*.py" = ["F821"]
+"databricks/silver/energy/**/*.py" = ["F821"]
 
 [tool.pytest.ini_options]
 markers = [

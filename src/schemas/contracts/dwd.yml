@@ -493,7 +493,7 @@ quality_rules:
       does not yet strip them.
     severity: block
     remediation: >
-      Silver (9a): filter every metadata row whose id column is not one of the
+      Silver: filter every metadata row whose id column is not one of the
       28 numeric station ids, before any join. A permanent fix (strip in
       stage_dwd.py, re-stage, re-upload, re-run Bronze) is parked for a
       batched staging-fix pass, not this phase.

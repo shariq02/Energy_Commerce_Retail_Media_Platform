@@ -1,0 +1,1664 @@
+table_name,column_name,field_class,derivation_rule,source_reference
+dwd_air_temperature,QN_9,source_provided,typed cast,dwd contract / business-name mapping
+dwd_air_temperature,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_air_temperature,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_air_temperature,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_air_temperature,_silver_run_id,derived,the Silver run id,silver governance
+dwd_air_temperature,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_air_temperature,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_air_temperature,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_air_temperature,air_temperature_2m,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_air_temperature,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_air_temperature,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_air_temperature,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_air_temperature,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_air_temperature,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_air_temperature,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_air_temperature,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_air_temperature,relative_humidity_2m,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_air_temperature,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_air_temperature,source_system,derived,constant per source,silver governance
+dwd_city_bundesland_xref,ags_code,derived,curated 28-station city -> Bundesland AGS,geography attribution
+dwd_city_bundesland_xref,ags_level,derived,'bundesland',geography attribution limit
+dwd_city_bundesland_xref,bundesland_name,derived,curated 28-station city -> Bundesland,geography attribution
+dwd_city_bundesland_xref,city,source_provided,DWD station folder name,dwd contract station_set
+dwd_cloud_type,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloud_type,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloud_type,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_cloud_type,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_cloud_type,_silver_run_id,derived,the Silver run id,silver governance
+dwd_cloud_type,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_cloud_type,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_cloud_type,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_cloud_type,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloud_type,cloud_cover_observation_method,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer1_base_height,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer1_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer1_genus_abbrev,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer1_genus_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer2_base_height,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer2_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer2_genus_abbrev,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer2_genus_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer3_base_height,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer3_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer3_genus_abbrev,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer3_genus_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer4_base_height,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer4_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer4_genus_abbrev,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,cloud_layer4_genus_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_cloud_type,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloud_type,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloud_type,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_cloud_type,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_cloud_type,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_cloud_type,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_cloud_type,source_system,derived,constant per source,silver governance
+dwd_cloud_type,total_cloud_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloudiness,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloudiness,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloudiness,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_cloudiness,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_cloudiness,_silver_run_id,derived,the Silver run id,silver governance
+dwd_cloudiness,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_cloudiness,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_cloudiness,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_cloudiness,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloudiness,cloud_cover_observation_method,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloudiness,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_cloudiness,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_cloudiness,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_cloudiness,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_cloudiness,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_cloudiness,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_cloudiness,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_cloudiness,source_system,derived,constant per source,silver governance
+dwd_cloudiness,total_cloud_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_device_instrument,_silver_run_id,derived,the Silver run id,silver governance
+dwd_device_instrument,device_type,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_device_instrument,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_device_instrument,latitude,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,longitude,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,measurement_method,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,parameter_category,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,sensor_height_m,source_provided,typed cast,dwd contract / business-name mapping
+dwd_device_instrument,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_device_instrument,source_system,derived,constant per source,silver governance
+dwd_device_instrument,station_elevation_m,source_provided,typed cast,dwd contract / business-name mapping
+dwd_device_instrument,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,valid_from,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_device_instrument,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_dew_point,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_dew_point,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_dew_point,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_dew_point,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_dew_point,_silver_run_id,derived,the Silver run id,silver governance
+dwd_dew_point,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_dew_point,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_dew_point,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_dew_point,air_temperature_2m,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_dew_point,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_dew_point,dew_point_temperature_2m,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_dew_point,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_dew_point,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_dew_point,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_dew_point,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_dew_point,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_dew_point,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_dew_point,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_dew_point,source_system,derived,constant per source,silver governance
+dwd_extreme_wind,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_extreme_wind,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_extreme_wind,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_extreme_wind,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_extreme_wind,_silver_run_id,derived,the Silver run id,silver governance
+dwd_extreme_wind,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_extreme_wind,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_extreme_wind,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_extreme_wind,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_extreme_wind,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_extreme_wind,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_extreme_wind,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_extreme_wind,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_extreme_wind,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_extreme_wind,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_extreme_wind,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_extreme_wind,source_system,derived,constant per source,silver governance
+dwd_extreme_wind,wind_gust_max_hourly,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_missing_value_periods,_silver_run_id,derived,the Silver run id,silver governance
+dwd_missing_value_periods,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_missing_value_periods,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_missing_value_periods,gap_description,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,missing_value_count,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,parameter_source_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_missing_value_periods,source_system,derived,constant per source,silver governance
+dwd_missing_value_periods,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,valid_from,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_missing_value_periods,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_moisture,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_moisture,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_moisture,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_moisture,_silver_run_id,derived,the Silver run id,silver governance
+dwd_moisture,absolute_humidity,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_moisture,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_moisture,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_moisture,air_temperature_2m,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_moisture,dew_point_temperature,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_moisture,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_moisture,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,pressure_station_level,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_moisture,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_moisture,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_moisture,relative_humidity,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_moisture,source_system,derived,constant per source,silver governance
+dwd_moisture,vapour_pressure,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_moisture,wet_bulb_temperature,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_catalog,catalog_vintage,derived,pinned DWD archive vintage,decode-authority vintage
+dwd_parameter_catalog,parameter_business_name,derived,business-name mapping (parameters),business-name mapping
+dwd_parameter_catalog,parameter_description_de,source_provided,dwd_parameter_unit.Parameterbeschreibung,dwd contract
+dwd_parameter_catalog,parameter_source_code,source_provided,dwd_parameter_unit.Parameter,dwd contract
+dwd_parameter_catalog,parameter_unit,derived,dwd_parameter_unit.Einheit,unit registry
+dwd_parameter_unit,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_parameter_unit,_silver_run_id,derived,the Silver run id,silver governance
+dwd_parameter_unit,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_parameter_unit,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_data_source,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_description_de,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_extra_info,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_reference,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_source_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_special_notes,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,parameter_unit,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_parameter_unit,source_system,derived,constant per source,silver governance
+dwd_parameter_unit,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,valid_from,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_parameter_unit,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_precipitation,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_precipitation,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_precipitation,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_precipitation,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_precipitation,_silver_run_id,derived,the Silver run id,silver governance
+dwd_precipitation,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_precipitation,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_precipitation,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_precipitation,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_precipitation,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_precipitation,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_precipitation,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_precipitation,precipitation_form_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_precipitation,precipitation_form_code_code,derived,"source code, verbatim",coded-value decode triple
+dwd_precipitation,precipitation_form_code_label_de,derived,German label from the decode reference,coded-value decode triple
+dwd_precipitation,precipitation_hourly_total,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_precipitation,precipitation_occurred_flag,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_precipitation,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_precipitation,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_precipitation,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_precipitation,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_precipitation,source_system,derived,constant per source,silver governance
+dwd_pressure,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_pressure,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_pressure,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_pressure,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_pressure,_silver_run_id,derived,the Silver run id,silver governance
+dwd_pressure,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_pressure,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_pressure,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_pressure,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_pressure,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_pressure,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_pressure,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_pressure,pressure_sea_level,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_pressure,pressure_station_level,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_pressure,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_pressure,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_pressure,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_pressure,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_pressure,source_system,derived,constant per source,silver governance
+dwd_soil_temperature,QN_2,source_provided,typed cast,dwd contract / business-name mapping
+dwd_soil_temperature,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_soil_temperature,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_soil_temperature,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_soil_temperature,_silver_run_id,derived,the Silver run id,silver governance
+dwd_soil_temperature,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_soil_temperature,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_soil_temperature,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_soil_temperature,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_soil_temperature,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_soil_temperature,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_soil_temperature,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_soil_temperature,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_soil_temperature,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_soil_temperature,soil_temperature_100cm,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,soil_temperature_10cm,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,soil_temperature_20cm,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,soil_temperature_2cm,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,soil_temperature_50cm,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,soil_temperature_5cm,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_soil_temperature,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_soil_temperature,source_system,derived,constant per source,silver governance
+dwd_solar,MESS_DATUM_WOZ,source_provided,typed cast,dwd contract / business-name mapping
+dwd_solar,QN_592,source_provided,typed cast,dwd contract / business-name mapping
+dwd_solar,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_solar,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_solar,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_solar,_silver_run_id,derived,the Silver run id,silver governance
+dwd_solar,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_solar,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_solar,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_solar,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_solar,diffuse_solar_radiation,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_solar,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_solar,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_solar,global_solar_radiation,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_solar,longwave_downward_radiation,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_solar,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_solar,observation_woz,derived,MESS_DATUM_WOZ kept as true local solar time,local solar time
+dwd_solar,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_solar,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_solar,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_solar,solar_zenith_angle,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_solar,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_solar,source_system,derived,constant per source,silver governance
+dwd_solar,sunshine_duration_10min,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_station_geography,_silver_run_id,derived,the Silver run id,silver governance
+dwd_station_geography,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_station_geography,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_station_geography,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_station_geography,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_station_geography,latitude,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,longitude,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_station_geography,source_system,derived,constant per source,silver governance
+dwd_station_geography,station_elevation_m,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,valid_from,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_geography,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_name_history,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_station_name_history,_silver_run_id,derived,the Silver run id,silver governance
+dwd_station_name_history,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_station_name_history,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_station_name_history,source_system,derived,constant per source,silver governance
+dwd_station_name_history,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_name_history,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_name_history,valid_from,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_station_name_history,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_sun,QN_7,source_provided,typed cast,dwd contract / business-name mapping
+dwd_sun,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_sun,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_sun,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_sun,_silver_run_id,derived,the Silver run id,silver governance
+dwd_sun,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_sun,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_sun,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_sun,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_sun,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_sun,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_sun,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_sun,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_sun,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_sun,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_sun,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_sun,source_system,derived,constant per source,silver governance
+dwd_sun,sunshine_duration_hourly,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_visibility,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_visibility,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_visibility,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_visibility,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_visibility,_silver_run_id,derived,the Silver run id,silver governance
+dwd_visibility,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_visibility,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_visibility,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_visibility,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_visibility,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_visibility,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_visibility,horizontal_visibility,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_visibility,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_visibility,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_visibility,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_visibility,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_visibility,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_visibility,source_system,derived,constant per source,silver governance
+dwd_visibility,visibility_observation_method,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_weather_phenomena,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_weather_phenomena,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_weather_phenomena,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_weather_phenomena,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_weather_phenomena,_silver_run_id,derived,the Silver run id,silver governance
+dwd_weather_phenomena,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_weather_phenomena,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_weather_phenomena,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_weather_phenomena,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_weather_phenomena,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_weather_phenomena,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_weather_phenomena,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_weather_phenomena,present_weather_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_weather_phenomena,present_weather_code_code,derived,"source code, verbatim",coded-value decode triple
+dwd_weather_phenomena,present_weather_code_label_de,derived,German label from the decode reference,coded-value decode triple
+dwd_weather_phenomena,present_weather_text_de,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_weather_phenomena,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_weather_phenomena,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_weather_phenomena,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_weather_phenomena,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_weather_phenomena,source_system,derived,constant per source,silver governance
+dwd_wind,QN_3,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_wind,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_wind,_silver_run_id,derived,the Silver run id,silver governance
+dwd_wind,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_wind,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_wind,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_wind,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_wind,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_wind,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_wind,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_wind,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_wind,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_wind,source_system,derived,constant per source,silver governance
+dwd_wind,wind_direction_mean,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_wind,wind_speed_mean,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_wind_synop,QN_8,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind_synop,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind_synop,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+dwd_wind_synop,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+dwd_wind_synop,_silver_run_id,derived,the Silver run id,silver governance
+dwd_wind_synop,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+dwd_wind_synop,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+dwd_wind_synop,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+dwd_wind_synop,city,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind_synop,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+dwd_wind_synop,eor,source_provided,typed cast,dwd contract / business-name mapping
+dwd_wind_synop,observation_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_wind_synop,qn_level,derived,DWD quality-level decode,DWD quality-level decode
+dwd_wind_synop,qn_level_code,derived,DWD quality-level decode,DWD quality-level decode
+dwd_wind_synop,qn_level_label_de,derived,DWD quality-level decode,DWD quality-level decode
+dwd_wind_synop,source_record_id,derived,natural key or deterministic composite,silver governance
+dwd_wind_synop,source_system,derived,constant per source,silver governance
+dwd_wind_synop,wind_direction_synop,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+dwd_wind_synop,wind_speed_synop,source_provided,typed cast + English business rename,dwd contract / business-name mapping
+honda_cooling_p,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_cooling_p,_silver_run_id,derived,the Silver run id,silver governance
+honda_cooling_p,cool_elec,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_p,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_p,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_cooling_p,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_p,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_cooling_p,source_system,derived,constant per source,silver governance
+honda_cooling_p,total,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_w,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_cooling_w,_silver_run_id,derived,the Silver run id,silver governance
+honda_cooling_w,cool_elec,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_w,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_w,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_cooling_w,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_cooling_w,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_cooling_w,source_system,derived,constant per source,silver governance
+honda_cooling_w,total,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_p,CHP,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_p,PV,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_p,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_electricity_p,_silver_run_id,derived,the Silver run id,silver governance
+honda_electricity_p,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_p,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_electricity_p,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_p,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_electricity_p,source_system,derived,constant per source,silver governance
+honda_electricity_p,total,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_w,CHP,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_w,PV,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_w,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_electricity_w,_silver_run_id,derived,the Silver run id,silver governance
+honda_electricity_w,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_w,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_electricity_w,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_electricity_w,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_electricity_w,source_system,derived,constant per source,silver governance
+honda_electricity_w,total,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_p,CHP_elec,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_p,CHP_heat,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_p,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_heating_p,_silver_run_id,derived,the Silver run id,silver governance
+honda_heating_p,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_p,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_heating_p,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_p,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_heating_p,source_system,derived,constant per source,silver governance
+honda_heating_p,total,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_w,CHP_elec,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_w,CHP_heat,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_w,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_heating_w,_silver_run_id,derived,the Silver run id,silver governance
+honda_heating_w,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_w,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_heating_w,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_heating_w,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_heating_w,source_system,derived,constant per source,silver governance
+honda_heating_w,total,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_weather,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+honda_weather,_silver_run_id,derived,the Silver run id,silver governance
+honda_weather,air_temperature_2m,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_weather,datetime_utc,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_weather,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+honda_weather,frequency,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_weather,global_irradiance,source_provided,typed cast (+ rename where localised),honda_iot contract
+honda_weather,source_record_id,derived,natural key or deterministic composite,silver governance
+honda_weather,source_system,derived,constant per source,silver governance
+honda_weather,weather_location,synthetic,constant 'honda_site' -- single fixed site,synthetic field
+mastr_actor_deletion_events,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_actor_deletion_events,_silver_run_id,derived,the Silver run id,silver governance
+mastr_actor_deletion_events,actor_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_actor_deletion_events,actor_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_actor_deletion_events,actor_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_actor_deletion_events,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_actor_deletion_events,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_actor_deletion_events,market_actor_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_actor_deletion_events,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_actor_deletion_events,source_system,derived,constant per source,silver governance
+mastr_actor_role_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_actor_role_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_actor_role_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_actor_role_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_actor_role_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_actor_role_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_actor_role_bridge,source_system,derived,constant per source,silver governance
+mastr_anlagen_eeg_biomasse,AnlagenkennzifferAnlagenregister,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,AnlagenkennzifferAnlagenregister_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,AnlagenschluesselEeg,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,AusschliesslicheVerwendungBiomasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasDatumInanspruchnahmeFlexiPraemie,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasDatumLeistungserhoehung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasGaserzeugungskapazitaet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasGaserzeugungskapazitaet_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasHoechstbemessungsleistung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasInanspruchnahmeFlexiPraemie,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasLeistungserhoehung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiogasUmfangLeistungserhoehung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiomethanErstmaligerEinsatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,BiomethanErstmaligerEinsatz_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_anlagen_eeg_biomasse,_silver_run_id,derived,the Silver run id,silver governance
+mastr_anlagen_eeg_biomasse,auction_award_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,auction_award_number,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_anlagen_eeg_biomasse,eeg_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,installed_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_anlagen_eeg_biomasse,source_system,derived,constant per source,silver governance
+mastr_anlagen_eeg_biomasse,support_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_biomasse,support_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_anlagen_eeg_biomasse,support_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_anlagen_eeg_geothermie_gsgk,AnlagenkennzifferAnlagenregister,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,AnlagenkennzifferAnlagenregister_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,AnlagenschluesselEeg,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_anlagen_eeg_geothermie_gsgk,_silver_run_id,derived,the Silver run id,silver governance
+mastr_anlagen_eeg_geothermie_gsgk,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_anlagen_eeg_geothermie_gsgk,eeg_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,installed_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_anlagen_eeg_geothermie_gsgk,source_system,derived,constant per source,silver governance
+mastr_anlagen_eeg_geothermie_gsgk,support_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_geothermie_gsgk,support_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_anlagen_eeg_geothermie_gsgk,support_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_anlagen_eeg_wasser,AnlagenkennzifferAnlagenregister,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,AnlagenkennzifferAnlagenregister_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,AnlagenschluesselEeg,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,ErtuechtigungIds,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_anlagen_eeg_wasser,_silver_run_id,derived,the Silver run id,silver governance
+mastr_anlagen_eeg_wasser,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_anlagen_eeg_wasser,eeg_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,installed_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_anlagen_eeg_wasser,source_system,derived,constant per source,silver governance
+mastr_anlagen_eeg_wasser,support_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wasser,support_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_anlagen_eeg_wasser,support_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_anlagen_eeg_wind,AnlagenkennzifferAnlagenregister,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,AnlagenkennzifferAnlagenregister_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,AnlagenschluesselEeg,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisErtragsschaetzungReferenzertrag,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisErtragsschaetzungReferenzertrag_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisReferenzertragErtrag10Jahre,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisReferenzertragErtrag10Jahre_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisReferenzertragErtrag15Jahre,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisReferenzertragErtrag15Jahre_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisReferenzertragErtrag5Jahre,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,VerhaeltnisReferenzertragErtrag5Jahre_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_anlagen_eeg_wind,_silver_run_id,derived,the Silver run id,silver governance
+mastr_anlagen_eeg_wind,auction_award_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,auction_award_number,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_anlagen_eeg_wind,eeg_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,installed_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,pilot_plant_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,prototype_plant_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_anlagen_eeg_wind,source_system,derived,constant per source,silver governance
+mastr_anlagen_eeg_wind,support_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_eeg_wind,support_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_anlagen_eeg_wind,support_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_anlagen_kwk,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_anlagen_kwk,_silver_run_id,derived,the Silver run id,silver governance
+mastr_anlagen_kwk,auction_award_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,auction_award_number,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_anlagen_kwk,electrical_chp_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,kwk_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_anlagen_kwk,source_system,derived,constant per source,silver governance
+mastr_anlagen_kwk,support_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_anlagen_kwk,support_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_anlagen_kwk,support_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_anlagen_kwk,useful_thermal_output_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_authorisation_unit_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_authorisation_unit_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_authorisation_unit_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_authorisation_unit_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_authorisation_unit_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_authorisation_unit_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_authorisation_unit_bridge,source_system,derived,constant per source,silver governance
+mastr_bilanzierungsgebiete,BilanzierungsgebietNetzanschlusspunkt,source_provided,typed cast,mastr contract / business-name mapping
+mastr_bilanzierungsgebiete,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_bilanzierungsgebiete,Yeic,source_provided,typed cast,mastr contract / business-name mapping
+mastr_bilanzierungsgebiete,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_bilanzierungsgebiete,_silver_run_id,derived,the Silver run id,silver governance
+mastr_bilanzierungsgebiete,control_zone,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_bilanzierungsgebiete,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_bilanzierungsgebiete,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_bilanzierungsgebiete,source_system,derived,constant per source,silver governance
+mastr_eeg_support_unit_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_eeg_support_unit_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_eeg_support_unit_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_eeg_support_unit_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_eeg_support_unit_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_eeg_support_unit_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_eeg_support_unit_bridge,source_system,derived,constant per source,silver governance
+mastr_einheiten_biomasse,Adresszusatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,AnschlussAnHoechstOderHochSpannung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,DatumDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,DatumRegistrierungDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Einsatzverantwortlicher,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,FlurFlurstuecknummern,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Gemarkung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,HausnummerNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,KapazitaetsreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Kraftwerksnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Kraftwerksnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,NetzbetreiberpruefungDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,NetzbetreiberpruefungStatus,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,NetzreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,StrasseNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Weic,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,WeicDisplayName,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,Weic_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_biomasse,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_biomasse,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_biomasse,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+mastr_einheiten_biomasse,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+mastr_einheiten_biomasse,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+mastr_einheiten_biomasse,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,biomass_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,capacity_gross_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,capacity_net_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,commissioning_date_current_site,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,district,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_biomasse,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,energy_carrier,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,feed_in_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,final_decommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,generation_technology,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,generation_technology_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,generation_technology_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,kwk_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,latitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,longitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,main_fuel,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,main_fuel_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,main_fuel_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,migration_absence_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,municipality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,municipality_key_ags,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,planned_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,previous_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,provisional_shutdown_start_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,recommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,remote_control_by_direct_marketer,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,remote_control_by_direct_marketer_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,remote_control_by_direct_marketer_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,remote_control_by_grid_operator,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,remote_control_by_grid_operator_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,remote_control_by_grid_operator_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_biomasse,source_system,derived,constant per source,silver governance
+mastr_einheiten_biomasse,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_biomasse,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_biomasse,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_biomasse,unit_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,Frist_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,WasserrechtAblaufdatum_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_genehmigung,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_genehmigung,application_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,authorisation_deadline,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,authorisation_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,authorisation_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_genehmigung,authorisation_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_genehmigung,decision_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_genehmigung,file_reference,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,issuing_authority,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_genehmigung,source_system,derived,constant per source,silver governance
+mastr_einheiten_genehmigung,water_rights_expiry_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_genehmigung,water_rights_number,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Adresszusatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,AnschlussAnHoechstOderHochSpannung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,DatumDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,DatumRegistrierungDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,FlurFlurstuecknummern,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Gemarkung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,HausnummerNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,KapazitaetsreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Kraftwerksnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,NetzbetreiberpruefungDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,NetzbetreiberpruefungStatus,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,NetzreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,StrasseNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,Weic_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_geothermie_gsgk,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_geothermie_gsgk,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+mastr_einheiten_geothermie_gsgk,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+mastr_einheiten_geothermie_gsgk,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+mastr_einheiten_geothermie_gsgk,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,capacity_gross_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,capacity_net_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,district,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_geothermie_gsgk,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,energy_carrier,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,feed_in_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,final_decommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,generation_technology,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,generation_technology_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,generation_technology_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,kwk_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,latitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,longitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,migration_absence_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,municipality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,municipality_key_ags,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,planned_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,previous_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,provisional_shutdown_start_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,remote_control_by_direct_marketer,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,remote_control_by_direct_marketer_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,remote_control_by_direct_marketer_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,remote_control_by_grid_operator,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,remote_control_by_grid_operator_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,remote_control_by_grid_operator_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_geothermie_gsgk,source_system,derived,constant per source,silver governance
+mastr_einheiten_geothermie_gsgk,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_geothermie_gsgk,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_geothermie_gsgk,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_geothermie_gsgk,unit_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,AnschlussAnHoechstOderHochSpannung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,DatumDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,DatumRegistrierungDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,HausnummerNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Kraftwerksnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Kraftwerksnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,NetzbetreiberpruefungDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,NetzbetreiberpruefungStatus,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,StrasseNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Weic,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,WeicDisplayName,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,Weic_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_kernkraft,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_kernkraft,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+mastr_einheiten_kernkraft,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+mastr_einheiten_kernkraft,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+mastr_einheiten_kernkraft,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,capacity_gross_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,capacity_net_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,district,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_kernkraft,energy_carrier,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_kernkraft,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_kernkraft,feed_in_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_kernkraft,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_kernkraft,final_decommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,generation_technology,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,generation_technology_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_kernkraft,generation_technology_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_kernkraft,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,latitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,longitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,migration_absence_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,municipality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,municipality_key_ags,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_kernkraft,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_kernkraft,operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,plant_block_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,plant_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,previous_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,remote_control_by_grid_operator,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,remote_control_by_grid_operator_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_kernkraft,remote_control_by_grid_operator_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_kernkraft,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_kernkraft,source_system,derived,constant per source,silver governance
+mastr_einheiten_kernkraft,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_kernkraft,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_kernkraft,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_kernkraft,unit_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Adresszusatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,AnlageIstImKombibetrieb,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,AnschlussAnHoechstOderHochSpannung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,AusschliesslicheVerwendungImKombibetrieb,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,BestandteilGrenzkraftwerk,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,DatumBaubeginn,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,DatumDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,DatumKapazitaetsreserve,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,DatumNetzreserve,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,DatumRegistrierungDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Einsatzort,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Einsatzort_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,Einsatzort_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,Einsatzverantwortlicher,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,FlurFlurstuecknummern,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Gemarkung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,HausnummerNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,KapazitaetsreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Kraftwerksnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Kraftwerksnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,MastrNummernKombibetrieb,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,NetzbetreiberpruefungDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,NetzbetreiberpruefungStatus,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,NetzreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Notstromaggregat,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,SicherheitsbereitschaftAbDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,SteigerungNettonennleistungKombibetrieb,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,StrasseNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Weic,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,WeicDisplayName,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,Weic_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,WeitereBrennstoffe,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_verbrennung,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_verbrennung,additional_main_fuel,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,additional_main_fuel_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,additional_main_fuel_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+mastr_einheiten_verbrennung,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+mastr_einheiten_verbrennung,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+mastr_einheiten_verbrennung,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,capacity_gross_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,capacity_net_germany_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,capacity_net_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,commissioning_date_current_site,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,district,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_verbrennung,energy_carrier,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,feed_in_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,final_decommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,generation_technology,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,generation_technology_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,generation_technology_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,kwk_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,latitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,longitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,main_fuel,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,main_fuel_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,main_fuel_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,migration_absence_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,municipality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,municipality_key_ags,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,planned_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,plant_block_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,plant_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,previous_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,provisional_shutdown_start_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,recommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,remote_control_by_direct_marketer,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,remote_control_by_direct_marketer_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,remote_control_by_direct_marketer_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,remote_control_by_grid_operator,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,remote_control_by_grid_operator_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,remote_control_by_grid_operator_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_verbrennung,source_system,derived,constant per source,silver governance
+mastr_einheiten_verbrennung,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_verbrennung,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_verbrennung,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_verbrennung,unit_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,Adresszusatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,AnschlussAnHoechstOderHochSpannung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,BestandteilGrenzkraftwerk,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,DatumDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,DatumRegistrierungDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Einsatzverantwortlicher,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,FlurFlurstuecknummern,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Gemarkung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,HausnummerNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,KapazitaetsreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Kraftwerksnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Kraftwerksnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,MinderungStromerzeugung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,NetzbetreiberpruefungDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,NetzbetreiberpruefungStatus,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,NetzreserveZugeordnet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,StrasseNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Weic,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,WeicDisplayName,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,Weic_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wasser,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_wasser,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_wasser,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+mastr_einheiten_wasser,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+mastr_einheiten_wasser,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+mastr_einheiten_wasser,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,capacity_gross_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,capacity_net_germany_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,capacity_net_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,commissioning_date_current_site,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,district,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_wasser,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,energy_carrier,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,feed_in_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,final_decommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,hydro_inflow_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,hydro_plant_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,hydro_plant_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,hydro_plant_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,latitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,longitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,migration_absence_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,municipality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,municipality_key_ags,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,planned_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,plant_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,previous_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,provisional_shutdown_start_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,recommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,remote_control_by_direct_marketer,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,remote_control_by_direct_marketer_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,remote_control_by_direct_marketer_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,remote_control_by_grid_operator,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,remote_control_by_grid_operator_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,remote_control_by_grid_operator_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_wasser,source_system,derived,constant per source,silver governance
+mastr_einheiten_wasser,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wasser,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wasser,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wasser,unit_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,Adresszusatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AnschlussAnHoechstOderHochSpannung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflageAbschaltungLeistungsbegrenzung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflagenAbschaltungEiswurf,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflagenAbschaltungSchallimmissionsschutzNachts,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflagenAbschaltungSchallimmissionsschutzTagsueber,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflagenAbschaltungSchattenwurf,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflagenAbschaltungSonstige,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,AuflagenAbschaltungTierschutz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Buergerenergie,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,DatumDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,DatumRegistrierungDesBetreiberwechsels,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Einsatzverantwortlicher,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,FlurFlurstuecknummern,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,GebietNachDemFlaechenentwicklungsplanNordsee,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,GebietNachDemFlaechenentwicklungsplanOstsee,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Gemarkung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,GroesseDerInAnspruchGenommenenFlaeche,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,HausnummerNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Kraftwerksnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Nachtkennzeichnung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,NetzbetreiberpruefungDatum,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,NetzbetreiberpruefungStatus,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Rotorblattenteisungssystem,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,StrasseNichtGefunden,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,UeberwiegendeNutzungsartDerFlaecheVorErrichtung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,VorherigerNutzungsartenbereichDerFlaeche,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Weic,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,WeicDisplayName,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,Weic_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheiten_wind,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheiten_wind,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheiten_wind,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+mastr_einheiten_wind,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+mastr_einheiten_wind,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+mastr_einheiten_wind,authorisation_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,capacity_gross_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,capacity_net_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,distance_to_coast_km,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,district,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheiten_wind,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,energy_carrier,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,feed_in_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,final_decommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,generation_technology,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,generation_technology_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,generation_technology_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,hub_height_m,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,latitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,longitude,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,manufacturer,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,migration_absence_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,model_designation,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,municipality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,municipality_key_ags,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,offshore_sea_area,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,offshore_sea_area_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,offshore_sea_area_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,planned_commissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,previous_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,provisional_shutdown_start_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,recommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,registration_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,remote_control_by_direct_marketer,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,remote_control_by_direct_marketer_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,remote_control_by_direct_marketer_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,remote_control_by_grid_operator,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,remote_control_by_grid_operator_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,remote_control_by_grid_operator_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,rotor_diameter_m,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheiten_wind,source_system,derived,constant per source,silver governance
+mastr_einheiten_wind,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheiten_wind,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,unit_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,water_depth_m,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,wind_farm_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,wind_onshore_or_offshore,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_einheiten_wind,wind_onshore_or_offshore_code,derived,"source code, verbatim",coded-value decode triple
+mastr_einheiten_wind,wind_onshore_or_offshore_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_einheitentypen,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheitentypen,Wert,source_provided,typed cast,mastr contract / business-name mapping
+mastr_einheitentypen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_einheitentypen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_einheitentypen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_einheitentypen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_einheitentypen,source_system,derived,constant per source,silver governance
+mastr_ertuechtigungen,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_ertuechtigungen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_ertuechtigungen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_ertuechtigungen,capacity_increase,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_ertuechtigungen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_ertuechtigungen,eeg_support_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_ertuechtigungen,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_ertuechtigungen,recommissioning_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_ertuechtigungen,repowering_approval_required_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_ertuechtigungen,repowering_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_ertuechtigungen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_ertuechtigungen,source_system,derived,constant per source,silver governance
+mastr_grid_operator_change_events,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_grid_operator_change_events,_silver_run_id,derived,the Silver run id,silver governance
+mastr_grid_operator_change_events,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule
+mastr_grid_operator_change_events,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule
+mastr_grid_operator_change_events,change_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,connection_point_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_grid_operator_change_events,grid_operator_change_effective_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,grid_operator_change_registered_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,new_grid_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,previous_grid_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_grid_operator_change_events,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_grid_operator_change_events,source_system,derived,constant per source,silver governance
+mastr_grid_operator_change_events,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_katalogkategorien,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_katalogkategorien,Name,source_provided,typed cast,mastr contract / business-name mapping
+mastr_katalogkategorien,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_katalogkategorien,_silver_run_id,derived,the Silver run id,silver governance
+mastr_katalogkategorien,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_katalogkategorien,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_katalogkategorien,source_system,derived,constant per source,silver governance
+mastr_katalogwerte,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_katalogwerte,KatalogKategorieId,source_provided,typed cast,mastr contract / business-name mapping
+mastr_katalogwerte,Wert,source_provided,typed cast,mastr contract / business-name mapping
+mastr_katalogwerte,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_katalogwerte,_silver_run_id,derived,the Silver run id,silver governance
+mastr_katalogwerte,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_katalogwerte,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_katalogwerte,source_system,derived,constant per source,silver governance
+mastr_kwk_support_unit_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_kwk_support_unit_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_kwk_support_unit_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_kwk_support_unit_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_kwk_support_unit_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_kwk_support_unit_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_kwk_support_unit_bridge,source_system,derived,constant per source,silver governance
+mastr_location_connection_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_location_connection_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_location_connection_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_location_connection_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_location_connection_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_location_connection_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_location_connection_bridge,source_system,derived,constant per source,silver governance
+mastr_location_unit_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_location_unit_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_location_unit_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_location_unit_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_location_unit_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_location_unit_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_location_unit_bridge,source_system,derived,constant per source,silver governance
+mastr_lokationen,MastrNummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_lokationen,NameDerTechnischenLokation,source_provided,typed cast,mastr contract / business-name mapping
+mastr_lokationen,NetzanschlusspunkteMaStRNummern,source_provided,typed cast,mastr contract / business-name mapping
+mastr_lokationen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_lokationen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_lokationen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_lokationen,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_lokationen,linked_unit_ids,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_lokationen,location_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_lokationen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_lokationen,source_system,derived,constant per source,silver governance
+mastr_lokationstypen,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_lokationstypen,Wert,source_provided,typed cast,mastr contract / business-name mapping
+mastr_lokationstypen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_lokationstypen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_lokationstypen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_lokationstypen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_lokationstypen,source_system,derived,constant per source,silver governance
+mastr_marktakteure,AcerCode,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,AcerCode_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Adresszusatz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,AdresszusatzAnZustelladresse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,BelieferungHaushaltskundenGas,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,BelieferungHaushaltskundenStrom,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,BelieferungVonLetztverbrauchernGas,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,BelieferungVonLetztverbrauchernStrom,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,BundesnetzagenturBetriebsnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,BundesnetzagenturBetriebsnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Direktvermarktungsunternehmen,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Email,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Fax,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Fax_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Gasgrosshaendler,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,HauptwirtdschaftszweigAbteilung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,HauptwirtdschaftszweigGruppe,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Hausnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,HausnummerAnZustelladresse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,HausnummerAnZustelladresse_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Hausnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,LandAnZustelladresse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,MarktakteurAnrede,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,MarktakteurNachname,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,MarktakteurVorname,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,MastrNummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Netz,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,OrtAnZustelladresse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,PostleitzahlAnZustelladresse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Region,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Registergericht,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,RegistergerichtAusland,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Registernummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,RegisternummerAusland,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,RegisternummerPraefix,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,RegistrierungsdatumMarktakteur,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,SonstigeRechtsform,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Strasse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,StrasseAnZustelladresse,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Stromgrosshaendler,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Telefon,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Umsatzsteueridentifikationsnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Umsatzsteueridentifikationsnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,WebportalDesNetzbetreibers,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Webseite,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,Webseite_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_marktakteure,_silver_run_id,derived,the Silver run id,silver governance
+mastr_marktakteure,activity_end_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,activity_start_date,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,actor_person_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,company_name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,country,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,economic_sector_section,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_marktakteure,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_marktakteure,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_marktakteure,is_sme,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,legal_form,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,locality,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,market_function,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,market_roles,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,nuts2_region,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,postcode,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_marktakteure,source_system,derived,constant per source,silver governance
+mastr_marktakteure_und_rollen,BundesnetzagenturBetriebsnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,BundesnetzagenturBetriebsnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,KontaktdatenMarktrolle,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,Marktpartneridentifikationsnummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,Marktpartneridentifikationsnummer_nv,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,MastrNummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_marktakteure_und_rollen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_marktakteure_und_rollen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_marktakteure_und_rollen,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,market_actor_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,market_role,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_marktakteure_und_rollen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_marktakteure_und_rollen,source_system,derived,constant per source,silver governance
+mastr_marktfunktionen,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktfunktionen,Wert,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktfunktionen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_marktfunktionen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_marktfunktionen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_marktfunktionen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_marktfunktionen,source_system,derived,constant per source,silver governance
+mastr_marktrollen,Id,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktrollen,Wert,source_provided,typed cast,mastr contract / business-name mapping
+mastr_marktrollen,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_marktrollen,_silver_run_id,derived,the Silver run id,silver governance
+mastr_marktrollen,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_marktrollen,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_marktrollen,source_system,derived,constant per source,silver governance
+mastr_netzanschlusspunkte,BilanzierungsgebietNetzanschlusspunktId,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,Gasqualitaet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,LetzteAenderung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,Messlokation,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,NameDerTechnischenLokation,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,NetzanschlusspunktBezeichnung,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_netzanschlusspunkte,_silver_run_id,derived,the Silver run id,silver governance
+mastr_netzanschlusspunkte,connection_point_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,control_zone,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_netzanschlusspunkte,grid_connection_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,grid_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,grid_operator_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,location_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,location_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,max_feed_in_power_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,max_withdrawal_power_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,net_bottleneck_capacity_kw,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_netzanschlusspunkte,source_system,derived,constant per source,silver governance
+mastr_netzanschlusspunkte,still_in_planning_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netzanschlusspunkte,voltage_level,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,Bilanzierungsgebiete,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netze,Marktgebiet,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netze,MastrNummer,source_provided,typed cast,mastr contract / business-name mapping
+mastr_netze,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_netze,_silver_run_id,derived,the Silver run id,silver governance
+mastr_netze,customers_connected_flag,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_netze,federal_state,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,federal_state_code,derived,"source code, verbatim",coded-value decode triple
+mastr_netze,federal_state_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_netze,grid_sector,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,is_closed_distribution_network,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,name,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_netze,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_netze,source_system,derived,constant per source,silver governance
+mastr_repowering_eeg_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_repowering_eeg_bridge,_silver_run_id,derived,the Silver run id,silver governance
+mastr_repowering_eeg_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_repowering_eeg_bridge,linked_id,source_provided,one exploded id from the delimited link array,mastr contract
+mastr_repowering_eeg_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract
+mastr_repowering_eeg_bridge,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_repowering_eeg_bridge,source_system,derived,constant per source,silver governance
+mastr_unit_deletion_events,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+mastr_unit_deletion_events,_silver_run_id,derived,the Silver run id,silver governance
+mastr_unit_deletion_events,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+mastr_unit_deletion_events,last_updated_at,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_unit_deletion_events,operating_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_unit_deletion_events,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_unit_deletion_events,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_unit_deletion_events,source_record_id,derived,natural key or deterministic composite,silver governance
+mastr_unit_deletion_events,source_system,derived,constant per source,silver governance
+mastr_unit_deletion_events,system_status,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_unit_deletion_events,system_status_code,derived,"source code, verbatim",coded-value decode triple
+mastr_unit_deletion_events,system_status_label_de,derived,German label from the decode reference,coded-value decode triple
+mastr_unit_deletion_events,unit_id,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+mastr_unit_deletion_events,unit_type,source_provided,typed cast + English business rename,mastr contract / business-name mapping
+op_customer_contracts,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_customer_contracts,_silver_run_id,derived,the Silver run id,silver governance
+op_customer_contracts,billing_day,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,contract_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,contract_number,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,customer_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_customer_contracts,end_date,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,source_record_id,derived,natural key or deterministic composite,silver governance
+op_customer_contracts,source_system,derived,constant per source,silver governance
+op_customer_contracts,start_date,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,status,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,tariff_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_customer_contracts,updated_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_customers,_silver_run_id,derived,the Silver run id,silver governance
+op_customers,city,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,country_code,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,customer_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,customer_number,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,date_of_birth,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_customers,email,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,first_name,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,house_number,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,last_name,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,phone,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,postal_code,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,signed_up_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,source_record_id,derived,natural key or deterministic composite,silver governance
+op_customers,source_system,derived,constant per source,silver governance
+op_customers,status,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,street,source_provided,typed cast (+ rename where localised),cdc contract
+op_customers,updated_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_meters,_silver_run_id,derived,the Silver run id,silver governance
+op_meters,contract_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_meters,installed_on,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,melo_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,meter_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,meter_serial,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,meter_type,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,removed_on,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,source_record_id,derived,natural key or deterministic composite,silver governance
+op_meters,source_system,derived,constant per source,silver governance
+op_meters,status,source_provided,typed cast (+ rename where localised),cdc contract
+op_meters,updated_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_order_items,_silver_run_id,derived,the Silver run id,silver governance
+op_order_items,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_order_items,line_total_eur,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,order_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,order_item_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,product_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,quantity,source_provided,typed cast (+ rename where localised),cdc contract
+op_order_items,source_record_id,derived,natural key or deterministic composite,silver governance
+op_order_items,source_system,derived,constant per source,silver governance
+op_order_items,unit_price_eur,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_orders,_silver_run_id,derived,the Silver run id,silver governance
+op_orders,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,currency,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,customer_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_orders,items_subtotal_eur,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,order_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,order_number,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,order_status,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,ordered_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,shipping_fee_eur,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,source_record_id,derived,natural key or deterministic composite,silver governance
+op_orders,source_system,derived,constant per source,silver governance
+op_orders,total_eur,source_provided,typed cast (+ rename where localised),cdc contract
+op_orders,updated_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_products,_silver_run_id,derived,the Silver run id,silver governance
+op_products,active,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,category,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_products,name,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,product_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,sku,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,source_record_id,derived,natural key or deterministic composite,silver governance
+op_products,source_system,derived,constant per source,silver governance
+op_products,unit_price_eur,source_provided,typed cast (+ rename where localised),cdc contract
+op_products,updated_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,_event_ts,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,_lsn,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,_op,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+op_tariffs,_silver_run_id,derived,the Silver run id,silver governance
+op_tariffs,active,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,contract_term_months,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,created_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+op_tariffs,energy_type,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,name,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,source_record_id,derived,natural key or deterministic composite,silver governance
+op_tariffs,source_system,derived,constant per source,silver governance
+op_tariffs,standing_charge_eur_per_month,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,tariff_code,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,tariff_id,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,unit_price_eur_per_kwh,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,updated_at,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,valid_from,source_provided,typed cast (+ rename where localised),cdc contract
+op_tariffs,valid_to,source_provided,typed cast (+ rename where localised),cdc contract
+power_plant_capacity_additions,2026,source_provided,typed cast,power_plant_list contract / business-name mapping
+power_plant_capacity_additions,2027,source_provided,typed cast,power_plant_list contract / business-name mapping
+power_plant_capacity_additions,2028,source_provided,typed cast,power_plant_list contract / business-name mapping
+power_plant_capacity_additions,2029,source_provided,typed cast,power_plant_list contract / business-name mapping
+power_plant_capacity_additions,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+power_plant_capacity_additions,_silver_run_id,derived,the Silver run id,silver governance
+power_plant_capacity_additions,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule
+power_plant_capacity_additions,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule
+power_plant_capacity_additions,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+power_plant_capacity_additions,energy_carrier,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_capacity_additions,retiring_capacity_total_2026_2029_mw,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_capacity_additions,source_record_id,derived,natural key or deterministic composite,silver governance
+power_plant_capacity_additions,source_system,derived,constant per source,silver governance
+power_plant_list,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+power_plant_list,_silver_run_id,derived,the Silver run id,silver governance
+power_plant_list,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule
+power_plant_list,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule
+power_plant_list,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level"
+power_plant_list,ags_level,derived,geography level achieved (bundesland),geography attribution limit
+power_plant_list,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution
+power_plant_list,border_plant_net_capacity_mw,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,capacity_gross_mw,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,capacity_net_mw,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,commissioning_year,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,connecting_grid_operator,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,country,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,decommissioning_year,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+power_plant_list,energy_carrier,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,energy_carrier_code,derived,"source code, verbatim",coded-value decode triple
+power_plant_list,energy_carrier_label_de,derived,German label from the decode reference,coded-value decode triple
+power_plant_list,federal_state,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,feed_in_type,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,feed_in_type_code,derived,"source code, verbatim",coded-value decode triple
+power_plant_list,feed_in_type_label_de,derived,German label from the decode reference,coded-value decode triple
+power_plant_list,generation_technology,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,grid_voltage_level,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,house_number,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,is_border_plant,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,is_combined_heat_and_power,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,is_renewable_carrier,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,main_fuel,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,mastr_unit_id,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,municipality,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,operating_status,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,operating_status_code,derived,"source code, verbatim",coded-value decode triple
+power_plant_list,operating_status_label_de,derived,German label from the decode reference,coded-value decode triple
+power_plant_list,operator_name,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,plant_name,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,postcode,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,record_type,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+power_plant_list,record_type_code,derived,"source code, verbatim",coded-value decode triple
+power_plant_list,record_type_label_de,derived,German label from the decode reference,coded-value decode triple
+power_plant_list,source_record_id,derived,natural key or deterministic composite,silver governance
+power_plant_list,source_system,derived,constant per source,silver governance
+power_plant_list,street,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping
+redispatch_measures,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+redispatch_measures,_silver_run_id,derived,the Silver run id,silver governance
+redispatch_measures,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule
+redispatch_measures,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule
+redispatch_measures,affected_unit_name,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,affected_unit_primary_energy,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,affected_unit_primary_energy_code,derived,"source code, verbatim",coded-value decode triple
+redispatch_measures,affected_unit_primary_energy_label_de,derived,German label from the decode reference,coded-value decode triple
+redispatch_measures,direction,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,direction_code,derived,"source code, verbatim",coded-value decode triple
+redispatch_measures,direction_label_de,derived,German label from the decode reference,coded-value decode triple
+redispatch_measures,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+redispatch_measures,end_timezone,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,extract_coverage_regime,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,instructing_tso,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,instructing_tso_code,derived,"source code, verbatim",coded-value decode triple
+redispatch_measures,instructing_tso_label_de,derived,German label from the decode reference,coded-value decode triple
+redispatch_measures,max_power_mw,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,mean_power_mw,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,measure_end_date,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,measure_end_time,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,measure_end_ts,derived,"ENDE_DATUM + ENDE_UHRZEIT, Europe/Berlin -> UTC",redispatch contract / localisation
+redispatch_measures,measure_reason,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,measure_reason_code,derived,"source code, verbatim",coded-value decode triple
+redispatch_measures,measure_reason_label_de,derived,German label from the decode reference,coded-value decode triple
+redispatch_measures,measure_start_date,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,measure_start_time,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,measure_start_ts,derived,"BEGINN_DATUM + BEGINN_UHRZEIT, Europe/Berlin -> UTC",redispatch contract / localisation
+redispatch_measures,requesting_tso,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,requesting_tso_list,derived,ANFORDERNDER_UENB split on '&',redispatch contract / localisation
+redispatch_measures,source_record_id,derived,natural key or deterministic composite,silver governance
+redispatch_measures,source_system,derived,constant per source,silver governance
+redispatch_measures,start_timezone,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+redispatch_measures,total_energy_mwh,source_provided,typed cast + English business rename,redispatch contract / business-name mapping
+rees46_events,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+rees46_events,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+rees46_events,_silver_run_id,derived,the Silver run id,silver governance
+rees46_events,brand,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,category_code,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,category_id,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,currency_unknown,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+rees46_events,event_time,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,event_type,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,price,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,product_id,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,source_record_id,derived,natural key or deterministic composite,silver governance
+rees46_events,source_system,derived,constant per source,silver governance
+rees46_events,user_id,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_events,user_session,source_provided,typed cast (+ rename where localised),rees46 contract
+rees46_user_country_synthetic,country_synthetic,synthetic,DEFERRED -- no defensible generation rule; not built in the silver layer,localisation design
+search_visibility_events,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule
+search_visibility_events,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+search_visibility_events,_silver_run_id,derived,the Silver run id,silver governance
+search_visibility_events,citableContent,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,click_through,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,clicks,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,country,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,device,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+search_visibility_events,impressions,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,index,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,period,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,position,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,repository_id,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_events,source_record_id,derived,natural key or deterministic composite,silver governance
+search_visibility_events,source_system,derived,constant per source,silver governance
+search_visibility_events,url,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_repository,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+search_visibility_repository,_silver_run_id,derived,the Silver run id,silver governance
+search_visibility_repository,country,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_repository,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+search_visibility_repository,ir_platform,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_repository,name,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_repository,repository_id,source_provided,typed cast (+ rename where localised),search_visibility contract
+search_visibility_repository,source_record_id,derived,natural key or deterministic composite,silver governance
+search_visibility_repository,source_system,derived,constant per source,silver governance
+smard_energy_timeseries,_silver_loaded_at,derived,current_timestamp() at write,silver governance
+smard_energy_timeseries,_silver_run_id,derived,the Silver run id,silver governance
+smard_energy_timeseries,aggregation_resolution,source_provided,typed cast + English business rename,smard contract / business-name mapping
+smard_energy_timeseries,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard
+smard_energy_timeseries,market_zone,source_provided,typed cast + English business rename,smard contract / business-name mapping
+smard_energy_timeseries,metric,source_provided,typed cast,smard contract / business-name mapping
+smard_energy_timeseries,metric_business_name,derived,business-name mapping (metrics),smard contract / localisation
+smard_energy_timeseries,metric_semantic_status,derived,"'disputed' for the PV-forecast mirror, else 'confirmed'",smard contract / localisation
+smard_energy_timeseries,observation_timestamp,source_provided,typed cast + English business rename,smard contract / business-name mapping
+smard_energy_timeseries,observation_ts,derived,timestamp_utc verified Europe/Berlin -> UTC,smard contract / localisation
+smard_energy_timeseries,semantic_issue_ref,derived,link to the contract quality rule for a disputed metric,smard contract / localisation
+smard_energy_timeseries,smard_series_id,source_provided,typed cast + English business rename,smard contract / business-name mapping
+smard_energy_timeseries,source_record_id,derived,natural key or deterministic composite,silver governance
+smard_energy_timeseries,source_system,derived,constant per source,silver governance
+smard_energy_timeseries,unit,derived,"per metric x resolution, unit registry",smard contract / localisation
+smard_energy_timeseries,value,source_provided,typed cast,smard contract / business-name mapping

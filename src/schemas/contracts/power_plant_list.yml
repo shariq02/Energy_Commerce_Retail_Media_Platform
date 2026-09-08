@@ -149,7 +149,7 @@ quality_rules:
     severity: block
     finding: "footnote / structure rows from the source CSV were not stripped by staging for this table"
     remediation: >
-      Silver (9a): keep only rows whose energietraeger resolves to a real energy
+      Silver: keep only rows whose energietraeger resolves to a real energy
       carrier (reconciled against the MaStR carrier catalog); route the
       'Insgesamt' row to a documented total and drop the footnote rows. A
       permanent staging fix is parked for a batched staging-fix pass, not this
