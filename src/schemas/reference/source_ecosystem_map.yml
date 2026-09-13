@@ -60,12 +60,12 @@ mappings:
   - source_system: search_visibility_ramp_dryad
     ecosystem: energy
     first_mapped: "first wave"
-  - source_system: synthetic_operational
-    ecosystem: energy
-    first_mapped: "operational CDC source"
-  - source_system: ga4
-    ecosystem: energy
-    first_mapped: "secondary/harmonisation source"
+
+# Pending the Commerce wave: `commerce` is added to `allowed_ecosystems` and
+# `rees46` + `search_visibility_ramp_dryad` are re-mapped from `energy` to
+# `commerce`, together with the new `ga4` primary source, as one governed
+# change when Commerce Bronze lands. `synthetic_operational` was removed with
+# the operational/CDC system (see archive/historical/).
 
 # Historical, out-of-scope entries -- listed here ONLY as a documented
 # negative record, so this file itself is traceable evidence that they were

@@ -3,6 +3,16 @@
 # Author: Sharique Mohammad
 # Date: August 2026
 #
+# ============================================================================
+# HISTORICAL RECORD -- NOT AN ACTIVE CONTRACT.
+# The synthetic operational PostgreSQL system and its CDC pipeline were
+# removed from the platform in the September 2026 architecture redesign. This
+# file is retained only as the schema-level record of what that system
+# contained. No pipeline reads it; `source_ecosystem_map.yml` no longer lists
+# `synthetic_operational`. Do not re-activate without a new architecture
+# decision.
+# ============================================================================
+#
 # Operational PostgreSQL source: database `ecrmap`, schema `operational`.
 # 6 business entities across 7 tables (orders header + order_items child).
 # Types are the contract's abstract vocabulary; PostgreSQL precision

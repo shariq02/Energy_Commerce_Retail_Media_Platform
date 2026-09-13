@@ -1,5 +1,5 @@
 # ====================================================================
-# Energy Commerce & Retail Media Analytics Platform - .gitignore
+# ECRMAP - Ecosystem-Centric Real-World Multi-Domain Analytics Platform - .gitignore
 # ====================================================================
 
 # Python
@@ -26,7 +26,6 @@ data/raw/
 data/samples/
 data/staging/
 data/processed/
-data/cdc/
 *.csv
 *.parquet
 *.json.gz
@@ -73,15 +72,6 @@ override.tf.json
 # Databricks
 .databricks/
 databricks/.databricks/
-
-# CDC runtime (Debezium / Kafka Connect)
-cdc/connect/offsets/
-cdc/connect/connect.pid
-cdc/plugins/
-
-# Dagster
-.dagster/
-dagster_home/
 
 # ChromaDB / vector store
 ai/vector_store/data/

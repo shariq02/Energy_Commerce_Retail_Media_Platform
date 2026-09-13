@@ -8,13 +8,13 @@ Energy, Commerce / Digital Behaviour, Mobility, Healthcare, and Agriculture — 
 
 ## Tech Stack
 
-GCP | BigQuery | Databricks | PySpark | Redpanda | PostgreSQL | Debezium | Dagster | Terraform | FastAPI | Grafana | Power BI | GitHub Actions
+Databricks | PySpark | Delta Lake / Unity Catalog | BigQuery (Google-source acquisition only) | GCP | Terraform | PostgreSQL (BI serving only) | FastAPI | Grafana | Power BI | GitHub Actions
 
-The analytical-modelling layer above BigQuery (staging → intermediate → marts → semantic) is a future detailed-design decision — no specific tool is assumed.
+Databricks owns Bronze → Silver → Gold → Analytical Processing and the semantic layer. Execution is a direct notebook/script sequence — no orchestration platform. Governance is cross-cutting, not a separate layer.
 
 ## Status
 
-Environment, infrastructure, first-wave source acquisition/profiling/contracts, the operational PostgreSQL database, CDC/streaming, and the multi-ecosystem platform architecture are complete. Live build status and the full plan are tracked in the design documentation.
+Environment, infrastructure, first-wave source acquisition/profiling/contracts, the multi-ecosystem platform architecture, and the German energy & weather deepening wave (through Bronze/profiling/contracts/localisation) are complete. The September 2026 architecture redesign and its repository cleanup are done. The current build step is the Commerce acquisition wave (GA4 + REES46 + Search Visibility), then Commerce Bronze/profiling/contracts, then Databricks Silver. Live build status and the full plan are tracked in the design documentation.
 
 ## Documentation
 

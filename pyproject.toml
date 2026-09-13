@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "energy-commerce-retail-media-platform"
+name = "ecrmap"
 version = "0.1.0"
-description = "Energy Commerce & Retail Media Analytics Platform - Germany-focused multi-domain data engineering, analytics engineering, and AI platform"
+description = "ECRMAP - Ecosystem-Centric Real-World Multi-Domain Analytics Platform - Germany-focused multi-domain data engineering, analytics engineering, and AI platform"
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2.0",
@@ -15,16 +15,10 @@ dependencies = [
     "psycopg2-binary>=2.9.9",
     "SQLAlchemy>=2.0.28",
     "google-cloud-bigquery>=3.25.0",
-    "google-cloud-storage>=2.17.0",
     "google-auth>=2.32.0",
-    "confluent-kafka>=2.3.0",
-    "fastavro>=1.9.0",
     "pyspark>=3.5.0",
     "databricks-sdk>=0.20.0",
     "databricks-sql-connector>=3.0.0",
-    "dagster>=1.7.0",
-    "dagster-webserver>=1.7.0",
-    "dagster-gcp>=0.23.0",
     "chromadb>=0.5.0",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
@@ -80,12 +74,8 @@ markers = [
     "regression: Regression tests",
     "performance: Performance tests",
     "schema: Schema validation tests",
-    "streaming: Kafka and Redpanda integration tests",
-    "cdc: CDC and Debezium tests",
     "databricks: Databricks processing tests",
-    "bigquery: BigQuery tests",
-    "dagster: Dagster orchestration tests",
-    "generator: Data generator tests",
+    "bigquery: BigQuery acquisition tests",
     "api: FastAPI endpoint tests",
     "ai: AI agent, tool, and RAG evaluation tests",
     "data_quality: Data quality tests",

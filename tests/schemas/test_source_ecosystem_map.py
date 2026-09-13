@@ -64,8 +64,6 @@ def test_expected_current_scope_sources_present(doc):
         "honda_iot",
         "rees46",
         "search_visibility_ramp_dryad",
-        "synthetic_operational",
-        "ga4",
     }
     assert sources == expected
 
