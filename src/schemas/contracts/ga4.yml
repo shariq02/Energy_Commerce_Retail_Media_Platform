@@ -1,0 +1,311 @@
+# Data contract -- GA4 (Google Analytics 4 sample ecommerce export)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: formal contract for the GA4 source (1 logical Bronze table, sourced
+# from 50 physical daily BigQuery tables). UNLIKE every other contract in this
+# directory, this one is written BEFORE acquisition and BEFORE any profiling
+# run -- no Bronze table exists yet for this source. Every field below is
+# either (a) read directly from the source's own BigQuery catalog metadata
+# (`bq show --schema`, `bq show`), which requires no data extraction and was
+# pulled read-only, or (b) taken from Google's own public GA4 BigQuery Export
+# schema reference, explicitly marked as such. Nothing here is inferred from
+# row-level data -- none has been read. Fields that can only be answered by
+# profiling real rows are listed under `open_questions`, not guessed.
+#
+# generated/ga4_events.schema.json is produced by
+# src/schemas/_generate_jsonschema.py, which now supports `record` (nested
+# object) and `record_repeated` (array of that object) in addition to its
+# flat types -- extended for this contract, the first nested-schema source in
+# the project. src/schemas/_generate_field_classes.py does not read this
+# contract yet (it enumerates sources explicitly, not by globbing
+# contracts/*.yml) -- extending it for GA4's field-class rows is Silver-phase
+# work, not part of this source contract.
+
+source: ga4
+source_system: ga4
+domain: Commerce / Digital Behaviour
+description: >
+  Google Analytics 4 event-level export for the Google Merchandise Store,
+  Google's own public GA4-BigQuery-export-shaped sample dataset
+  (`bigquery-public-data.ga4_obfuscated_sample_ecommerce`). Real GA4 export
+  schema and real (obfuscated) event data, but not a live production GA4
+  property this project owns or controls. Static historical snapshot: 50
+  daily tables, 2020-11-01 through 2020-12-20. Not a German source -- GA4's
+  own `geo` fields carry whatever countries the sample traffic came from,
+  observed or not.
+
+profiling_evidence: >
+  PENDING -- no Bronze table, no EDA/profiling run exists for this source yet
+  (see open_questions below for what a profiling pass needs to answer before
+  Silver work starts). The schema and catalog facts below come from BigQuery
+  metadata calls only (SHOW SCHEMA / table metadata), not from reading rows.
+
+bronze_physical_types: >
+  OPEN QUESTION -- every other Bronze table in this project stores all
+  columns as STRING (inferSchema=false), cast to logical types in Silver.
+  GA4's schema is not flat (event_params, items, user_properties are
+  RECORD/REPEATED; device, geo, app_info, traffic_source, ecommerce,
+  privacy_info, user_ltv, event_dimensions are RECORD). Whether Bronze
+  preserves this nested shape as-is (Delta natively supports STRUCT/ARRAY) or
+  something else is a Bronze-load design decision, not decided by this
+  contract.
+
+acquisition:
+  method: bigquery_public_dataset
+  auth: service_account (project-level roles/bigquery.jobUser; the source
+    project bigquery-public-data grants public read on its own datasets, no
+    additional grant needed on our side)
+  cadence: static_snapshot
+  update_frequency: none  # Google's sample export is fixed/historical, not appended to
+  sla: none
+  source_location: US  # bigquery-public-data.ga4_obfuscated_sample_ecommerce, confirmed live via `bq show`
+  destination_location: europe-west3  # ecrmap_acquisition, confirmed live via `bq show`
+  region_constraint: >
+    HARD CONSTRAINT, empirically confirmed live against the real project (not
+    theoretical): a single BigQuery query job cannot read the US-located
+    source table(s) and write a destination table in ecrmap_acquisition
+    (europe-west3) -- BigQuery requires a job's location to match every table
+    it reads AND its destination table's dataset. Confirmed both ways:
+    job pinned to US + destination in ecrmap_acquisition ->
+    "Not found: Dataset ecrmap_acquisition was not found in location US";
+    job pinned to europe-west3 + reading the US source table -> "Access
+    Denied" on the source table. The acquisition step MUST be two separate
+    jobs: (1) query the source with no destination table, job location US;
+    (2) retrieve the result locally (google-cloud-bigquery client
+    pagination/to_dataframe -- confirmed installed, 3.43.0; no GCS export
+    needed at this data volume); (3) a separate local-file load job into
+    ecrmap_acquisition (europe-west3) -- a plain local upload, not bound by
+    any source-table region. Never attempt a destination-table query across
+    these two regions.
+
+source_catalog_facts:
+  # Read-only BigQuery catalog metadata, not data. Collected 2026-09-14.
+  dataset: bigquery-public-data.ga4_obfuscated_sample_ecommerce
+  table_naming: "events_YYYYMMDD, one physical table per calendar day"
+  tables_observed: 50
+  date_range_observed: "2020-11-01 .. 2020-12-20"
+  sample_table_row_count_observed: 31272   # events_20201101, via `bq show` metadata (single day, not the full range)
+  sample_table_size_bytes_observed: 23566064  # events_20201101, via `bq show` metadata
+  full_range_full_column_scan_bytes_observed: 3583657854  # ~3.6GB, via dry-run SELECT * across events_*, metadata-cost query validation, no data read
+  full_range_row_count_observed: NOT COLLECTED  # would require summing 50 per-table metadata calls or a COUNT(*) query; not done for this contract
+
+tables:
+
+  - name: ga4_events
+    physical_source: >
+      50 BigQuery tables (events_20201101 .. events_20201220) in the source
+      dataset, consolidated to one logical Bronze table at acquisition time --
+      same pattern as REES46's 2 monthly CSVs -> one events table.
+    grain:
+      key: NOT DETERMINED  # candidate below is unverified -- no dedup/uniqueness profiling has run
+      candidate_key: [event_date, event_timestamp, user_pseudo_id, event_name]
+      unique: unknown
+      row_count_observed: NOT COLLECTED  # see source_catalog_facts -- only a single day's count is known
+      description: >
+        One row per GA4 event (page_view, view_item, add_to_cart, purchase,
+        etc.). event_timestamp is microseconds since the Unix epoch per
+        Google's GA4 BigQuery Export schema reference -- not yet confirmed
+        against this sample's own values.
+    columns:
+      # Column list, types, and nesting are the literal BigQuery catalog
+      # schema for events_20201101 (`bq show --schema`), assumed representative
+      # of all 50 daily tables (not individually verified). `required` here
+      # means "column always present in the schema", matching this project's
+      # existing convention (see rees46.yml) -- it does NOT mean NOT NULL.
+      # `nullable` reflects BigQuery's NULLABLE/REQUIRED mode where the
+      # catalog metadata states it; where the catalog metadata leaves mode
+      # unset (NULLABLE by default) but Google's schema reference documents
+      # the field as always populated, that is noted explicitly as a
+      # documentation-sourced claim, not an observed one.
+      - { name: event_date, type: string, required: true, nullable: true, notes: "YYYYMMDD string, per GA4 export reference; always populated per that reference, not yet confirmed against this sample" }
+      - { name: event_timestamp, type: integer, required: true, nullable: true, notes: "microseconds since Unix epoch, per GA4 export reference; not yet confirmed" }
+      - { name: event_name, type: string, required: true, nullable: true, notes: "per GA4 export reference always populated; the event-type vocabulary itself is unknown until profiled" }
+      - name: event_params
+        type: record_repeated
+        required: true
+        nullable: true
+        notes: "dynamic key/value event parameters -- the set of `key` values is unknown until profiled; a wide, sparse vocabulary is expected"
+        fields:
+          - { name: key, type: string, nullable: true }
+          - name: value
+            type: record
+            nullable: true
+            fields:
+              - { name: string_value, type: string, nullable: true }
+              - { name: int_value, type: integer, nullable: true }
+              - { name: float_value, type: float, nullable: true }
+              - { name: double_value, type: float, nullable: true }
+      - { name: event_previous_timestamp, type: integer, required: true, nullable: true }
+      - { name: event_value_in_usd, type: float, required: true, nullable: true }
+      - { name: event_bundle_sequence_id, type: integer, required: true, nullable: true }
+      - { name: event_server_timestamp_offset, type: integer, required: true, nullable: true }
+      - { name: user_id, type: string, required: true, nullable: true, notes: "obfuscated sample -- expected mostly/entirely null; not confirmed" }
+      - { name: user_pseudo_id, type: string, required: true, nullable: true, notes: "GA4's device/client identifier; candidate grain component" }
+      - name: privacy_info
+        type: record
+        required: true
+        nullable: true
+        fields:
+          - { name: analytics_storage, type: integer, nullable: true }
+          - { name: ads_storage, type: integer, nullable: true }
+          - { name: uses_transient_token, type: string, nullable: true }
+      - name: user_properties
+        type: record_repeated
+        required: true
+        nullable: true
+        fields:
+          - { name: key, type: integer, nullable: true, notes: "typed integer in this sample's catalog metadata -- unusual for a property name; verify at profiling time" }
+          - name: value
+            type: record
+            nullable: true
+            fields:
+              - { name: string_value, type: integer, nullable: true, notes: "typed integer in this sample's catalog metadata -- verify at profiling time" }
+              - { name: int_value, type: integer, nullable: true }
+              - { name: float_value, type: integer, nullable: true }
+              - { name: double_value, type: integer, nullable: true }
+              - { name: set_timestamp_micros, type: integer, nullable: true }
+      - { name: user_first_touch_timestamp, type: integer, required: true, nullable: true }
+      - name: user_ltv
+        type: record
+        required: true
+        nullable: true
+        fields:
+          - { name: revenue, type: float, nullable: true }
+          - { name: currency, type: string, nullable: true }
+      - name: device
+        type: record
+        required: true
+        nullable: true
+        fields:
+          - { name: category, type: string, nullable: true }
+          - { name: mobile_brand_name, type: string, nullable: true }
+          - { name: mobile_model_name, type: string, nullable: true }
+          - { name: mobile_marketing_name, type: string, nullable: true }
+          - { name: mobile_os_hardware_model, type: integer, nullable: true }
+          - { name: operating_system, type: string, nullable: true }
+          - { name: operating_system_version, type: string, nullable: true }
+          - { name: vendor_id, type: integer, nullable: true }
+          - { name: advertising_id, type: integer, nullable: true }
+          - { name: language, type: string, nullable: true }
+          - { name: is_limited_ad_tracking, type: string, nullable: true }
+          - { name: time_zone_offset_seconds, type: integer, nullable: true }
+          - name: web_info
+            type: record
+            nullable: true
+            fields:
+              - { name: browser, type: string, nullable: true }
+              - { name: browser_version, type: string, nullable: true }
+      - name: geo
+        type: record
+        required: true
+        nullable: true
+        notes: "search-engine/IP-derived geography, not a claim of German or any specific market -- see localisation below"
+        fields:
+          - { name: continent, type: string, nullable: true }
+          - { name: sub_continent, type: string, nullable: true }
+          - { name: country, type: string, nullable: true }
+          - { name: region, type: string, nullable: true }
+          - { name: city, type: string, nullable: true }
+          - { name: metro, type: string, nullable: true }
+      - name: app_info
+        type: record
+        required: true
+        nullable: true
+        fields:
+          - { name: id, type: string, nullable: true }
+          - { name: version, type: string, nullable: true }
+          - { name: install_store, type: string, nullable: true }
+          - { name: firebase_app_id, type: string, nullable: true }
+          - { name: install_source, type: string, nullable: true }
+      - name: traffic_source
+        type: record
+        required: true
+        nullable: true
+        fields:
+          - { name: medium, type: string, nullable: true }
+          - { name: name, type: string, nullable: true }
+          - { name: source, type: string, nullable: true }
+      - { name: stream_id, type: integer, required: true, nullable: true }
+      - { name: platform, type: string, required: true, nullable: true, notes: "e.g. WEB; single-valued in a web-only export -- not confirmed for this sample" }
+      - name: event_dimensions
+        type: record
+        required: true
+        nullable: true
+        fields:
+          - { name: hostname, type: string, nullable: true }
+      - name: ecommerce
+        type: record
+        required: true
+        nullable: true
+        notes: "populated only on ecommerce-relevant events (add_to_cart, purchase, refund, ...); null on most rows -- not confirmed"
+        fields:
+          - { name: total_item_quantity, type: integer, nullable: true }
+          - { name: purchase_revenue_in_usd, type: float, nullable: true }
+          - { name: purchase_revenue, type: float, nullable: true }
+          - { name: refund_value_in_usd, type: float, nullable: true }
+          - { name: refund_value, type: float, nullable: true }
+          - { name: shipping_value_in_usd, type: float, nullable: true }
+          - { name: shipping_value, type: float, nullable: true }
+          - { name: tax_value_in_usd, type: float, nullable: true }
+          - { name: tax_value, type: float, nullable: true }
+          - { name: unique_items, type: integer, nullable: true }
+          - { name: transaction_id, type: string, nullable: true }
+      - name: items
+        type: record_repeated
+        required: true
+        nullable: true
+        notes: "one entry per cart/product line on the triggering event; empty array on non-product events -- not confirmed"
+        fields:
+          - { name: item_id, type: string, nullable: true }
+          - { name: item_name, type: string, nullable: true }
+          - { name: item_brand, type: string, nullable: true }
+          - { name: item_variant, type: string, nullable: true }
+          - { name: item_category, type: string, nullable: true }
+          - { name: item_category2, type: string, nullable: true }
+          - { name: item_category3, type: string, nullable: true }
+          - { name: item_category4, type: string, nullable: true }
+          - { name: item_category5, type: string, nullable: true }
+          - { name: price_in_usd, type: float, nullable: true }
+          - { name: price, type: float, nullable: true }
+          - { name: quantity, type: integer, nullable: true }
+          - { name: item_revenue_in_usd, type: float, nullable: true }
+          - { name: item_revenue, type: float, nullable: true }
+          - { name: item_refund_in_usd, type: float, nullable: true }
+          - { name: item_refund, type: float, nullable: true }
+          - { name: coupon, type: string, nullable: true }
+          - { name: affiliation, type: string, nullable: true }
+          - { name: location_id, type: string, nullable: true }
+          - { name: item_list_id, type: string, nullable: true }
+          - { name: item_list_name, type: string, nullable: true }
+          - { name: item_list_index, type: string, nullable: true }
+          - { name: promotion_id, type: string, nullable: true }
+          - { name: promotion_name, type: string, nullable: true }
+          - { name: creative_name, type: string, nullable: true }
+          - { name: creative_slot, type: string, nullable: true }
+
+open_questions:
+  # Everything here needs a real profiling pass (Bronze load + EDA) to
+  # answer. None of it is guessed above.
+  - "Row grain / uniqueness: does (event_date, event_timestamp, user_pseudo_id, event_name) actually identify one row, or does it collide (concurrent events, batched client uploads)?"
+  - "Total row count across all 50 daily tables (only one day's count -- 31272 -- is known; see source_catalog_facts)."
+  - "Null rates for every field -- none observed yet; the `nullable: true` on every column above is structural (BigQuery mode), not a claim about actual null frequency."
+  - "event_name vocabulary -- the full set of distinct event types actually present (page_view, view_item, add_to_cart, purchase, etc. expected per GA4 convention, not confirmed)."
+  - "event_params.key vocabulary -- GA4's dynamic parameter bag; likely wide and sparse, needs enumeration before any Silver decode/flatten design."
+  - "user_properties.key / value.string_value / value.int_value typed as INTEGER in this sample's own catalog metadata, not STRING -- unusual for GA4's normal key/value shape; needs verification, not assumed to be a metadata artifact or a real schema quirk."
+  - "ecommerce and items population rate -- expected null/empty on the majority of (non-purchase-funnel) events, not confirmed."
+  - "Whether user_id is ever populated in this obfuscated sample, or always null."
+  - "geo.country distribution -- whether any German (`DE`/`Germany`) traffic exists in this sample at all."
+  - "Whether the 50-day window (2020-11-01..2020-12-20) has any date gaps."
+
+localisation:
+  required: true
+  approach: honest_provenance
+  note: >
+    GA4's geo fields are IP/network-derived visitor geography for an
+    unrelated ecommerce site (the Google Merchandise Store), not a claim
+    about German commerce. Whether the sample contains any German traffic at
+    all is an open question (see open_questions), not assumed either way.
+    Retained with source_system='ga4', never presented as a German source
+    regardless of what geo.country values turn out to contain.

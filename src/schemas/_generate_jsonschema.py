@@ -12,6 +12,11 @@ derived from the table's ``columns`` list. A contract carries a top-level
 stays the source of truth; the generated JSON Schema is what ingestion-time
 validation loads.
 
+Most column types are flat (see ``_TYPE_MAP``). Two nested types are also
+supported for semi-structured sources: ``record`` (a JSON object) and
+``record_repeated`` (a JSON array of that object) -- both require a non-empty
+``fields:`` list of the same column-entry shape, nested to any depth.
+
 Usage:
     python3 src/schemas/_generate_jsonschema.py            # regenerate all
     python3 src/schemas/_generate_jsonschema.py --source smard
@@ -45,15 +50,46 @@ _TYPE_MAP: dict[str, dict[str, object]] = {
     "timestamp": {"type": "string", "format": "date-time"},
 }
 
+# Nested types -- an object (record) or an array of that object
+# (record_repeated). Each requires a non-empty 'fields' list of column
+# entries, same shape as a table's 'columns' (nestable to any depth).
+_NESTED_TYPES = frozenset({"record", "record_repeated"})
+
+
+def _fields_schema(fields: list[dict]) -> dict:
+    """Build the object schema (properties + required) for a nested 'fields' list."""
+    properties = {f["name"]: _column_schema(f) for f in fields}
+    required = [f["name"] for f in fields if f.get("required", False)]
+    schema: dict = {"type": "object", "properties": properties}
+    if required:
+        schema["required"] = required
+    return schema
+
 
 def _column_schema(column: dict) -> dict:
     """Build the JSON Schema fragment for one contract column."""
     raw_type = column["type"]
-    if raw_type not in _TYPE_MAP:
-        message = f"column {column['name']!r}: unknown type {raw_type!r}"
-        raise ValueError(message)
 
-    base = dict(_TYPE_MAP[raw_type])
+    if raw_type in _NESTED_TYPES:
+        fields = column.get("fields")
+        if not fields:
+            message = (
+                f"column {column['name']!r}: type {raw_type!r} requires a "
+                "non-empty 'fields' list"
+            )
+            raise ValueError(message)
+        object_schema = _fields_schema(fields)
+        base = (
+            object_schema
+            if raw_type == "record"
+            else {"type": "array", "items": object_schema}
+        )
+    else:
+        if raw_type not in _TYPE_MAP:
+            message = f"column {column['name']!r}: unknown type {raw_type!r}"
+            raise ValueError(message)
+        base = dict(_TYPE_MAP[raw_type])
+
     if column.get("nullable", False):
         base["type"] = [base["type"], "null"]
 
