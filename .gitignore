@@ -10,6 +10,11 @@ __pycache__/
 .Python
 env/
 venv/
+*.egg-info/
+
+# uv -- not the project's package manager (pip + pyproject.toml/requirements.txt is);
+# this lockfile is a local byproduct if uv is ever run against the repo, not tracked
+uv.lock
 
 # Jupyter
 .ipynb_checkpoints/
