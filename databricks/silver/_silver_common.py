@@ -40,15 +40,24 @@ from pyspark.sql.window import Window
 # DBTITLE 1,Configuration constants
 CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
-SILVER_SCHEMA = "energy_silver"
 QUALITY_SCHEMA = "quality"
 
-QUARANTINE_TABLE = f"{CATALOG}.{SILVER_SCHEMA}.quarantine"
-FIELD_CLASS_TABLE = f"{CATALOG}.{SILVER_SCHEMA}.field_class_registry"
+# Silver data lives in one schema per ecosystem (energy_silver /
+# energy_silver_reference / commerce_silver / commerce_silver_reference);
+# which one a given TABLE belongs to is resolved from the seeded
+# field_class_registry's own target_schema column (src/schemas/_generate_
+# field_classes.py), not re-derived here -- a source can own both a primary
+# and a reference table (e.g. dwd), so ecosystem-per-source alone can't
+# express this, only a per-table lookup can. quarantine and
+# field_class_registry themselves are shared across every ecosystem, same as
+# quality_audit_log / pipeline_watermarks.
+_DEFAULT_ECOSYSTEM = "energy"
+
+QUARANTINE_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.quarantine"
+FIELD_CLASS_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.field_class_registry"
 AUDIT_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.quality_audit_log"
 WATERMARK_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.pipeline_watermarks"
 
-ECOSYSTEM = "energy"
 STAGE = "silver"
 
 # Value strings that mean "missing" in DWD measurement columns. Stripped to
@@ -157,6 +166,52 @@ def load_contract(source: str) -> dict:
 
 def load_mapping(source: str) -> dict:
     return load_yaml(f"src/schemas/mappings/{source}.yml")
+
+
+_ecosystem_by_source: dict[str, str] | None = None  # cached after first load
+
+
+def ecosystem_for(source: str) -> str:
+    """source_system -> ecosystem, from the governed source_ecosystem_map.yml
+    (loaded once per session, not per call)."""
+    global _ecosystem_by_source
+    if _ecosystem_by_source is None:
+        doc = load_yaml("src/schemas/reference/source_ecosystem_map.yml")
+        _ecosystem_by_source = {
+            m["source_system"]: m["ecosystem"] for m in doc["mappings"]
+        }
+    return _ecosystem_by_source.get(source, _DEFAULT_ECOSYSTEM)
+
+
+_target_schema_by_table: dict[str, str] | None = None  # cached after first load
+
+
+def target_schema_for(silver_table: str) -> str:
+    """silver_table (short name) -> its schema, from the seeded
+    field_class_registry's own target_schema column -- the authoritative
+    source, since a source can own both a primary and a reference table
+    (e.g. dwd), which ecosystem-per-source alone can't express."""
+    global _target_schema_by_table
+    if _target_schema_by_table is None:
+        try:
+            rows = (
+                spark.table(FIELD_CLASS_TABLE)
+                .select("table_name", "target_schema")
+                .distinct()
+                .collect()
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"{FIELD_CLASS_TABLE} missing -- run databricks/silver/00_silver_setup"
+            ) from exc
+        _target_schema_by_table = {r["table_name"]: r["target_schema"] for r in rows}
+    schema = _target_schema_by_table.get(silver_table)
+    if schema is None:
+        raise RuntimeError(
+            f"{silver_table} has no field_class_registry entry -- update the seed "
+            "(src/schemas/_generate_field_classes.py) and reload"
+        )
+    return schema
 
 
 def contract_tables(contract: dict) -> dict:
@@ -315,7 +370,7 @@ def add_provenance(
     )
     return (
         df.withColumn("source_system", F.lit(source_system))
-        .withColumn("ecosystem", F.lit(ECOSYSTEM))
+        .withColumn("ecosystem", F.lit(ecosystem_for(source_system)))
         .withColumn("_silver_loaded_at", F.current_timestamp())
         .withColumn("_silver_run_id", F.lit(rid))
     )
@@ -688,7 +743,7 @@ def write_silver(
     Delta rollback line, records rows_written from Delta metrics (no pre-write
     count), writes a watermark row."""
     started = now_utc()
-    full = f"{CATALOG}.{SILVER_SCHEMA}.{silver_table}"
+    full = f"{CATALOG}.{target_schema_for(silver_table)}.{silver_table}"
     validate_field_classes(df, full)
     if spark.catalog.tableExists(full):
         v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
@@ -803,7 +858,7 @@ def decode_via_labeled_map(
 
 
 def read_silver(table: str) -> DataFrame:
-    return spark.table(f"{CATALOG}.{SILVER_SCHEMA}.{table}")
+    return spark.table(f"{CATALOG}.{target_schema_for(table)}.{table}")
 
 
 def attach_city_ags(df: DataFrame, city_col: str = "city") -> DataFrame:

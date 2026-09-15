@@ -29,7 +29,7 @@
 from pyspark.sql import functions as F
 
 SOURCE = "rees46"
-COMPONENT = "silver/energy/customer/01_rees46_events"
+COMPONENT = "silver/commerce/journey/01_rees46_events"
 RID = run_id()
 BT = "rees46_events"
 

@@ -12,10 +12,14 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** create the `energy_silver` schema, the slim `quarantine`
-# MAGIC table, and load the central `field_class_registry` from its seed file
+# MAGIC **Purpose:** create the four Silver schemas (`energy_silver`,
+# MAGIC `energy_silver_reference`, `commerce_silver`,
+# MAGIC `commerce_silver_reference`), the shared `quality.quarantine` table, and
+# MAGIC load the shared `quality.field_class_registry` from its seed file
 # MAGIC (`src/schemas/field_classes/energy_silver_field_classes.csv`, produced by
-# MAGIC `src/schemas/_generate_field_classes.py`). Idempotent -- safe to re-run.
+# MAGIC `src/schemas/_generate_field_classes.py` -- one seed covering every
+# MAGIC ecosystem, disambiguated by its `target_schema` column). Idempotent --
+# MAGIC safe to re-run.
 # MAGIC
 # MAGIC The `quality.pipeline_watermarks` and `quality.quality_audit_log` tables
 # MAGIC already exist (`databricks/setup/00_create_schemas.py`); this notebook
@@ -34,13 +38,25 @@ import os as _os
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the energy_silver schema
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}")
-print(f"OK  schema ready: {CATALOG}.{SILVER_SCHEMA}")
+# DBTITLE 1,Configuration
+SILVER_SCHEMAS = (
+    "energy_silver",
+    "energy_silver_reference",
+    "commerce_silver",
+    "commerce_silver_reference",
+)
+VALID_TARGET_SCHEMAS = set(SILVER_SCHEMAS)
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the slim quarantine table
+# DBTITLE 1,Create the Silver schemas
+for schema in SILVER_SCHEMAS:
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{schema}")
+    print(f"OK  schema ready: {CATALOG}.{schema}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Create the slim quarantine table (shared, in quality)
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {QUARANTINE_TABLE} (
     source_system    STRING,
@@ -54,23 +70,24 @@ CREATE TABLE IF NOT EXISTS {QUARANTINE_TABLE} (
     quarantined_at   TIMESTAMP
 )
 USING DELTA
-COMMENT 'Slim Silver quarantine -- diagnostic fields only. Bronze is the authoritative raw record; complete rows are never duplicated here.'
+COMMENT 'Slim Silver quarantine -- diagnostic fields only, shared across every ecosystem (disambiguated by source_system). Bronze is the authoritative raw record; complete rows are never duplicated here.'
 """)
 print(f"OK  table ready: {QUARANTINE_TABLE}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the central field-class registry
+# DBTITLE 1,Create the central field-class registry (shared, in quality)
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {FIELD_CLASS_TABLE} (
-    table_name      STRING NOT NULL,
-    column_name     STRING NOT NULL,
-    field_class     STRING NOT NULL,
-    derivation_rule STRING,
-    source_reference STRING
+    table_name       STRING NOT NULL,
+    column_name      STRING NOT NULL,
+    field_class      STRING NOT NULL,
+    derivation_rule  STRING,
+    source_reference STRING,
+    target_schema    STRING NOT NULL
 )
 USING DELTA
-COMMENT 'One central registry for energy_silver. Seeded from the source contracts + mappings + the fixed Silver governance column set. Silver notebooks validate against it; they never author it.'
+COMMENT 'One central registry for every Silver table across every ecosystem. Seeded from the source contracts + mappings + the fixed Silver governance column set; target_schema resolves which of the four Silver schemas each table belongs to. Silver notebooks validate against it; they never author it.'
 """)
 print(f"OK  table ready: {FIELD_CLASS_TABLE}")
 
@@ -93,20 +110,25 @@ with open(SEED, encoding="utf-8", newline="") as fh:
             r["field_class"],
             r.get("derivation_rule") or None,
             r.get("source_reference") or None,
+            r["target_schema"],
         )
         for r in _csv.DictReader(fh)
     ]
 
 bad_class = sorted(
-    {c for _, _, c, _, _ in rows} - {"source_provided", "derived", "synthetic"}
+    {c for _, _, c, _, _, _ in rows} - {"source_provided", "derived", "synthetic"}
 )
 if bad_class:
     raise RuntimeError(f"seed carries unknown field_class value(s): {bad_class}")
 
+bad_schema = sorted({s for *_, s in rows} - VALID_TARGET_SCHEMAS)
+if bad_schema:
+    raise RuntimeError(f"seed carries unknown target_schema value(s): {bad_schema}")
+
 seed_df = spark.createDataFrame(
     rows,
     "table_name string, column_name string, field_class string, "
-    "derivation_rule string, source_reference string",
+    "derivation_rule string, source_reference string, target_schema string",
 )
 seed_df.write.format("delta").mode("overwrite").option(
     "overwriteSchema", "true"
@@ -129,10 +151,19 @@ for t in (AUDIT_TABLE, WATERMARK_TABLE):
 print("=" * 70)
 print("SILVER SETUP SUMMARY")
 print("=" * 70)
-print(f"Schema           : {CATALOG}.{SILVER_SCHEMA}")
+for schema in SILVER_SCHEMAS:
+    print(f"Schema           : {CATALOG}.{schema}")
 print(f"Quarantine table : {QUARANTINE_TABLE}")
 print(f"Field-class rows : {spark.table(FIELD_CLASS_TABLE).count()}")
-distinct_tables = spark.table(FIELD_CLASS_TABLE).select("table_name").distinct().count()
-print(f"Tables covered   : {distinct_tables}")
+by_schema = (
+    spark.table(FIELD_CLASS_TABLE)
+    .select("target_schema", "table_name")
+    .distinct()
+    .groupBy("target_schema")
+    .count()
+    .collect()
+)
+for r in sorted(by_schema, key=lambda r: r["target_schema"]):
+    print(f"  {r['target_schema']:<25} {r['count']} table(s)")
 print("RESULT: PASS")
 print("=" * 70)

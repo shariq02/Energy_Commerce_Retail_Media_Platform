@@ -5,12 +5,17 @@ Author: Sharique Mohammad
 Date: September 2026
 
 Purpose: one authoritative place that enumerates every column every Silver
-notebook emits, with its class -- source_provided / derived / synthetic. The
-Silver notebooks validate against this; they never author it.
+notebook emits, with its class -- source_provided / derived / synthetic --
+and its target_schema (energy_silver / energy_silver_reference /
+commerce_silver / commerce_silver_reference), resolved from
+source_ecosystem_map.yml plus the fixed reference-table set. The Silver
+notebooks validate against this; they never author it.
 
-Reads: src/schemas/contracts/*.yml + src/schemas/mappings/*.yml.
-Writes: src/schemas/field_classes/energy_silver_field_classes.csv
-(loaded into energy_silver.field_class_registry by databricks/silver/00_silver_setup.py).
+Reads: src/schemas/contracts/*.yml + src/schemas/mappings/*.yml +
+src/schemas/reference/source_ecosystem_map.yml.
+Writes: src/schemas/field_classes/energy_silver_field_classes.csv -- one
+seed covering every ecosystem, disambiguated by its target_schema column
+(loaded into quality.field_class_registry by databricks/silver/00_silver_setup.py).
 
 Usage:
     python3 src/schemas/_generate_field_classes.py
@@ -345,7 +350,82 @@ FOUNDATION_SOURCES = {
             ],
         },
     },
+    "ga4": {
+        "silver": {
+            # The 8 top-level Bronze columns -- event_params/ecommerce/items
+            # stay nested (Delta STRUCT/ARRAY); the registry classifies the
+            # top-level column only, matching what df.columns returns for a
+            # nested field, not each inner field individually.
+            "ga4_events": [
+                "event_date",
+                "event_timestamp",
+                "event_name",
+                "user_pseudo_id",
+                "geo_country",
+                "event_params",
+                "ecommerce",
+                "items",
+            ],
+        },
+    },
 }
+
+
+# Reference-layer tables -- additive/decode/catalog tables, never the primary
+# source-grain table. Every other table is primary. Matches exactly what
+# databricks/silver/{energy,commerce}/_reference/*.py write (verified against
+# those notebooks' write_silver() calls, not re-derived from a naming rule).
+REFERENCE_TABLES = {
+    "dwd_city_bundesland_xref",
+    "dwd_station_geography",
+    "dwd_station_name_history",
+    "dwd_device_instrument",
+    "dwd_parameter_unit",
+    "dwd_parameter_catalog",
+    "dwd_missing_value_periods",
+    "mastr_katalogkategorien",
+    "mastr_katalogwerte",
+    "mastr_einheitentypen",
+    "mastr_lokationstypen",
+    "mastr_marktfunktionen",
+    "mastr_marktrollen",
+    "search_visibility_repository",
+}
+
+# table_name prefix -> the contract's source_system (the source_ecosystem_map.yml
+# key), longest/most-specific prefix first so "search_visibility_" is checked
+# before any shorter prefix could apply.
+_PREFIX_TO_SOURCE_SYSTEM = (
+    ("search_visibility_", "search_visibility_ramp_dryad"),
+    ("power_plant_", "power_plant_list"),
+    ("redispatch_", "redispatch"),
+    ("mastr_", "mastr"),
+    ("smard_", "smard"),
+    ("honda_", "honda_iot"),
+    ("rees46_", "rees46"),
+    ("dwd_", "dwd"),
+    ("ga4_", "ga4"),
+)
+
+
+def _ecosystem_by_source_system() -> dict[str, str]:
+    doc = _load(ROOT / "src" / "schemas" / "reference" / "source_ecosystem_map.yml")
+    return {m["source_system"]: m["ecosystem"] for m in doc["mappings"]}
+
+
+def _source_system_for_table(table_name: str) -> str:
+    for prefix, source_system in _PREFIX_TO_SOURCE_SYSTEM:
+        if table_name.startswith(prefix):
+            return source_system
+    message = f"no known source prefix for table {table_name!r}"
+    raise ValueError(message)
+
+
+def target_schema_for(table_name: str, ecosystem_map: dict[str, str]) -> str:
+    source_system = _source_system_for_table(table_name)
+    ecosystem = ecosystem_map.get(source_system, "energy")
+    base = f"{ecosystem}_silver"
+    return f"{base}_reference" if table_name in REFERENCE_TABLES else base
 
 
 def build_rows() -> list[dict]:
@@ -544,7 +624,11 @@ def build_rows() -> list[dict]:
                     add(st, c, cls, rule, ref)
                     continue
                 add(st, c, cls, rule, f"{src} contract")
-            has_conflict = st in ("rees46_events", "search_visibility_events")
+            has_conflict = st in (
+                "rees46_events",
+                "search_visibility_events",
+                "ga4_events",
+            )
             add_governance(st, conflict=has_conflict)
         for st, cols in spec.get("deferred", {}).items():
             for c, (cls, rule, ref) in cols.items():
@@ -568,6 +652,11 @@ def build_rows() -> list[dict]:
             continue
         seen.add(key)
         uniq.append(r)
+
+    ecosystem_map = _ecosystem_by_source_system()
+    for r in uniq:
+        r["target_schema"] = target_schema_for(r["table_name"], ecosystem_map)
+
     return sorted(uniq, key=lambda r: (r["table_name"], r["column_name"]))
 
 
@@ -581,6 +670,7 @@ def render(rows: list[dict]) -> str:
             "field_class",
             "derivation_rule",
             "source_reference",
+            "target_schema",
         ],
         lineterminator="\n",
     )

@@ -66,6 +66,7 @@ extend-ignore = ["E402", "BLE001"]
 # runtime magic). databricks/silver/_silver_common.py is NOT exempted.
 "databricks/silver/[0-9]*_*.py" = ["F821"]
 "databricks/silver/energy/**/*.py" = ["F821"]
+"databricks/silver/commerce/**/*.py" = ["F821"]
 
 [tool.pytest.ini_options]
 markers = [

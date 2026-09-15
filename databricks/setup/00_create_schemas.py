@@ -17,10 +17,11 @@
 # MAGIC
 # MAGIC This notebook creates structure only:
 # MAGIC - the project schemas (`bronze`, `energy_silver`, `energy_silver_reference`,
-# MAGIC   `energy_gold`, `shared_conformed`, `quality`, `eda`). Silver is split
-# MAGIC   per the 100-table-per-schema quota; domain separation stays at folder
-# MAGIC   level. Commerce schemas are added when the Commerce wave reaches Silver.
-# MAGIC   `shared_conformed`'s tables are built by `03_create_shared_conformed.py`.
+# MAGIC   `commerce_silver`, `commerce_silver_reference`, `energy_gold`,
+# MAGIC   `shared_conformed`, `quality`, `eda`). Silver is split per the
+# MAGIC   100-table-per-schema quota and per ecosystem; domain separation stays
+# MAGIC   at folder level. `shared_conformed`'s tables are built by
+# MAGIC   `03_create_shared_conformed.py`.
 # MAGIC - the frozen Bronze upload-unit Volumes (staging -> Volume -> Bronze)
 # MAGIC - the 2 quality/control Delta tables (`pipeline_watermarks`, `quality_audit_log`)
 # MAGIC
@@ -67,6 +68,8 @@ SCHEMAS = [
     "bronze",
     "energy_silver",
     "energy_silver_reference",
+    "commerce_silver",
+    "commerce_silver_reference",
     "energy_gold",
     "shared_conformed",
     "quality",
