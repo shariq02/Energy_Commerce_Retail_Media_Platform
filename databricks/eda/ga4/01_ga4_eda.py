@@ -62,6 +62,13 @@ RETAINED_PARAM_KEYS = {
 }
 SCALAR_COLS = ["event_date", "event_timestamp", "event_name", "user_pseudo_id"]
 
+# GA4's own "no value" sentinel for string fields -- a real, non-null string,
+# not an empty field. Staging deliberately keeps it as-is (raw fidelity;
+# cleaning is Silver's job), so a plain isNotNull() population rate on these
+# fields overstates genuine content -- checked explicitly below.
+UNSET_SENTINELS = ("(not set)", "(none)", "")
+PROMOTION_EVENTS = {"view_promotion", "select_promotion"}
+
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
@@ -201,7 +208,24 @@ ecom_field_pop = {
 print(
     f"rows with a populated ecommerce struct: {ecom_pop_rows} ({ecom_pop_rows / total:.4f} of all rows)"
 )
-print("field population within those rows:", ecom_field_pop)
+print(
+    "field population within those rows (isNotNull -- includes the sentinel):",
+    ecom_field_pop,
+)
+
+# transaction_id's isNotNull population above counts GA4's own "(not set)"
+# sentinel as populated. Real (genuine-value) rate, computed separately:
+txn_sentinel = F.col("ecommerce.transaction_id").isin(*UNSET_SENTINELS)
+txn_real = df.where(
+    F.col("ecommerce.transaction_id").isNotNull() & ~txn_sentinel
+).count()
+txn_sentinel_rows = df.where(txn_sentinel).count()
+txn_real_rate = txn_real / ecom_pop_rows if ecom_pop_rows else 0.0
+print(
+    f"transaction_id real (non-sentinel) population: {txn_real} of {ecom_pop_rows} "
+    f"ecommerce-populated rows ({txn_real_rate:.4f}) -- {txn_sentinel_rows} rows carry "
+    "the '(not set)' sentinel instead of a real value."
+)
 
 revenue_stats = (
     df.where(F.col("ecommerce.purchase_revenue").isNotNull())
@@ -221,13 +245,15 @@ print("purchase_revenue distribution:", revenue_stats)
 # COMMAND ----------
 
 # DBTITLE 1,items -- explode once, field population + top categories + price/revenue
-items_exploded = df.select(F.explode("items").alias("i")).select(
+items_exploded = df.select("event_name", F.explode("items").alias("i")).select(
+    "event_name",
     F.col("i.item_id").alias("item_id"),
     F.col("i.item_name").alias("item_name"),
     F.col("i.item_category").alias("item_category"),
     F.col("i.price").alias("price"),
     F.col("i.quantity").alias("quantity"),
     F.col("i.item_revenue").alias("item_revenue"),
+    F.col("event_name").isin(*PROMOTION_EVENTS).alias("is_promotion_entry"),
 )
 items_total = items_exploded.count()
 item_field_pop = {}
@@ -238,7 +264,30 @@ for f in ["item_id", "item_name", "item_category", "price", "quantity", "item_re
         else 0.0
     )
 print(f"total item entries: {items_total}")
-print("item field population rate:", item_field_pop)
+print(
+    "item field population rate (isNotNull -- includes the sentinel):", item_field_pop
+)
+
+# item_category/item_id/item_name real (non-sentinel) population -- GA4's
+# "(not set)" is a non-null string, so isNotNull() above overstates genuine
+# content on these three string fields.
+sentinel_pop = {}
+for f in ["item_id", "item_name", "item_category"]:
+    real = items_exploded.where(
+        F.col(f).isNotNull() & ~F.col(f).isin(*UNSET_SENTINELS)
+    ).count()
+    sentinel_pop[f] = real / items_total if items_total else 0.0
+print("real (non-sentinel) population rate:", sentinel_pop)
+
+# item_id is overloaded -- GA4 reuses it for promotion/campaign identifiers
+# on view_promotion / select_promotion entries, not just real products.
+promo_entries = items_exploded.where(F.col("is_promotion_entry")).count()
+print(
+    f"item entries from promotion events (view_promotion/select_promotion): "
+    f"{promo_entries} of {items_total} ({promo_entries / items_total:.4f})"
+    if items_total
+    else "item entries from promotion events: 0"
+)
 
 top_categories = [
     (x["item_category"], x["count"])
@@ -269,6 +318,7 @@ print("quantity / item_revenue distribution:", qty_rev_stats)
 # COMMAND ----------
 
 # DBTITLE 1,Session-level funnel -- (user_pseudo_id, ga_session_id) grain
+
 
 def _param_value(col_name, key):
     matched = F.filter(F.col(col_name), lambda x: x["key"] == F.lit(key))
@@ -335,12 +385,26 @@ session_funnel = [
 # COMMAND ----------
 
 # DBTITLE 1,Entity cardinality + concentration
+# item_id concentration is split product vs promotion entries -- GA4 reuses
+# item_id for promotion/campaign identifiers on view_promotion/
+# select_promotion, so a single combined figure conflates two different kinds
+# of entity and overstates "one product" concentration.
 user_roll = df.groupBy("user_pseudo_id").agg(F.count(F.lit(1)).alias("rows"))
-item_roll = items_exploded.groupBy("item_id").agg(F.count(F.lit(1)).alias("rows"))
+product_entries = items_exploded.where(~F.col("is_promotion_entry"))
+promo_item_entries = items_exploded.where(F.col("is_promotion_entry"))
+product_item_roll = product_entries.groupBy("item_id").agg(
+    F.count(F.lit(1)).alias("rows")
+)
+promo_item_roll = promo_item_entries.groupBy("item_id").agg(
+    F.count(F.lit(1)).alias("rows")
+)
+product_entries_total = product_entries.count()
+
 concentration = {}
 for name, roll, base_total in (
     ("user_pseudo_id", user_roll, total),
-    ("item_id", item_roll, items_total),
+    ("item_id (product events only)", product_item_roll, product_entries_total),
+    ("item_id (promotion events only)", promo_item_roll, promo_entries),
 ):
     top = [x["rows"] for x in roll.orderBy(F.desc("rows")).limit(50).collect()]
     concentration[name] = {
@@ -476,11 +540,27 @@ _dq = [
     ),
     f"Duplicate key groups: {db['dup_groups']} (identical={db['identical']}, conflicting={db['conflicting']}).",
     "",
-    "ecommerce field population (of rows with a populated ecommerce struct):",
+    "ecommerce field population (of rows with a populated ecommerce struct, isNotNull -- includes the sentinel):",
     str(ecom_field_pop),
+    para(
+        f"transaction_id real (non-sentinel) population: {txn_real} of {ecom_pop_rows}",
+        f"({txn_real_rate:.4f}); {txn_sentinel_rows} rows carry '(not set)' instead of a real value.",
+    ),
     "",
-    "items field population (of exploded item entries):",
+    "items field population (of exploded item entries, isNotNull -- includes the sentinel):",
     str(item_field_pop),
+    para(
+        "real (non-sentinel) population for item_id/item_name/item_category:",
+        str(sentinel_pop),
+    ),
+    (
+        para(
+            f"item entries from promotion events (view_promotion/select_promotion): {promo_entries}",
+            f"of {items_total} ({promo_entries / items_total:.4f}).",
+        )
+        if items_total
+        else "item entries from promotion events: 0."
+    ),
 ]
 
 _domain = [
@@ -512,7 +592,11 @@ _coverage = [
 ]
 
 _entities = [
-    f"Approx distinct: user_pseudo_id={approx_card.get('user_pseudo_id')}, item_id≈{concentration['item_id']['approx_distinct']}.",
+    para(
+        f"Approx distinct: user_pseudo_id={approx_card.get('user_pseudo_id')},",
+        f"item_id (product)≈{concentration['item_id (product events only)']['approx_distinct']},",
+        f"item_id (promotion)≈{concentration['item_id (promotion events only)']['approx_distinct']}.",
+    ),
     "",
     "Concentration:",
 ]
@@ -553,16 +637,28 @@ if db["conflicting"]:
     _findings.append(
         f"- {db['conflicting']} duplicate-key groups have conflicting non-key values."
     )
-_findings_md = (
-    "\n".join(_findings)
-    if _findings
-    else "- No defects found; staged allowlists held in Bronze."
+_findings.append(
+    f"- Staging allowlists held cleanly in Bronze (event_name, event_params keys), but "
+    f"GA4's own '(not set)' sentinel is not a null and passes through as-is (deliberate -- "
+    f"raw fidelity at Bronze, cleaning is Silver's job): item_category real population "
+    f"{sentinel_pop['item_category']:.1%} vs {item_field_pop['item_category']:.1%} isNotNull; "
+    f"transaction_id real population {txn_real_rate:.1%} vs {ecom_field_pop['transaction_id']:.1%} isNotNull."
 )
+if promo_entries:
+    _findings.append(
+        f"- item_id is overloaded: {promo_entries} of {items_total} item entries "
+        f"({promo_entries / items_total:.1%}) come from promotion events "
+        "(view_promotion/select_promotion) and carry a campaign identifier, not a product id -- "
+        "combined item_id concentration figures would conflate the two."
+    )
+_findings_md = "\n".join(_findings)
 
 _silver = [
     "- Grain = one row per event; if the candidate key is not unique, add a synthetic row id at Silver.",
     "- Session grain is (user_pseudo_id, ga_session_id), not user_pseudo_id alone.",
     "- ecommerce/items are sparse (populated only on transaction-relevant events) -- keep as nullable structs, not flattened columns with a default.",
+    "- Normalise GA4's '(not set)'/'(none)' sentinel to null on item_id/item_name/item_category/ecommerce.transaction_id at Silver -- Bronze intentionally keeps it raw.",
+    "- Model item_id from promotion events (view_promotion/select_promotion) separately from product item_id -- they are different entity types sharing one field.",
 ]
 
 _ml = ml_readiness_block(
