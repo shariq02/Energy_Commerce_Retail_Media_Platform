@@ -154,7 +154,8 @@ sg, q = value_quarantine(
     bronze_table=BT,
 )
 write_quarantine(q, RID)
-sg = add_provenance(sg, SOURCE, sha_key("station_id", "valid_from"), RID)
+sg = sg.withColumn("_srid", sha_key("station_id", "valid_from"))
+sg = add_provenance(sg, SOURCE, "_srid", RID)
 write_silver(sg, "dwd_station_geography", source=SOURCE, component=COMPONENT, rid=RID)
 
 # COMMAND ----------
@@ -168,7 +169,8 @@ snh = (
     .withColumn("valid_to", parse_ts("Bis_Datum", ("yyyyMMdd",), "UTC"))
     .drop("Von_Datum", "Bis_Datum")
 )
-snh = add_provenance(snh, SOURCE, sha_key("station_id", "valid_from"), RID)
+snh = snh.withColumn("_srid", sha_key("station_id", "valid_from"))
+snh = add_provenance(snh, SOURCE, "_srid", RID)
 write_silver(
     snh, "dwd_station_name_history", source=SOURCE, component=COMPONENT, rid=RID
 )
@@ -181,9 +183,8 @@ di = keep_real_stations(read_bronze(BT), "Stations_ID", BT)
 di = rename_meta(di, BT)
 di = di.withColumn("valid_from", parse_ts("valid_from", ("yyyyMMdd",), "UTC"))
 di = di.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
-di = add_provenance(
-    di, SOURCE, sha_key("station_id", "parameter_category", "valid_from"), RID
-)
+di = di.withColumn("_srid", sha_key("station_id", "parameter_category", "valid_from"))
+di = add_provenance(di, SOURCE, "_srid", RID)
 write_silver(di, "dwd_device_instrument", source=SOURCE, component=COMPONENT, rid=RID)
 
 # COMMAND ----------
@@ -194,9 +195,10 @@ pu = keep_real_stations(read_bronze(BT), "Stations_ID", BT)
 pu = rename_meta(pu, BT)
 pu = pu.withColumn("valid_from", parse_ts("valid_from", ("yyyyMMdd",), "UTC"))
 pu = pu.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
-pu = add_provenance(
-    pu, SOURCE, sha_key("station_id", "parameter_source_code", "valid_from"), RID
+pu = pu.withColumn(
+    "_srid", sha_key("station_id", "parameter_source_code", "valid_from")
 )
+pu = add_provenance(pu, SOURCE, "_srid", RID)
 write_silver(pu, "dwd_parameter_unit", source=SOURCE, component=COMPONENT, rid=RID)
 
 # derived: source parameter code -> business name -> physical unit
@@ -243,9 +245,8 @@ mvp = within_group_ordinal(
     ["station_id", "parameter_source_code", "gap_start_ts", "gap_end_ts"],
     ["missing_value_count", "gap_description", "eor"],
 )
-mvp = add_provenance(
-    mvp,
-    SOURCE,
+mvp = mvp.withColumn(
+    "_srid",
     sha_key(
         "station_id",
         "parameter_source_code",
@@ -253,8 +254,8 @@ mvp = add_provenance(
         "gap_end_ts",
         "_src_id_ord",
     ),
-    RID,
 )
+mvp = add_provenance(mvp, SOURCE, "_srid", RID)
 write_silver(
     mvp, "dwd_missing_value_periods", source=SOURCE, component=COMPONENT, rid=RID
 )
