@@ -23,11 +23,14 @@ Rows: 779485.
 Candidate key ['event_date', 'event_timestamp', 'user_pseudo_id', 'event_name']: distinct/row ratio {'event_date': 0.000118, 'event_timestamp': 0.930589, 'user_pseudo_id': 0.170638, 'event_name': 1.4e-05} -- rows sharing the full key combination: 0.
 Duplicate key groups: 0 (identical=0, conflicting=0).
 
-ecommerce field population (of rows with a populated ecommerce struct):
+ecommerce field population (of rows with a populated ecommerce struct, isNotNull -- includes the sentinel):
 {'transaction_id': 0.9953082511032545, 'purchase_revenue': 0.006990945911523591, 'unique_items': 0.6832856112143201, 'total_item_quantity': 0.1253609165847589}
+transaction_id real (non-sentinel) population: 4786 of 749827 (0.0064); 741523 rows carry '(not set)' instead of a real value.
 
-items field population (of exploded item entries):
+items field population (of exploded item entries, isNotNull -- includes the sentinel):
 {'item_id': 1.0, 'item_name': 1.0, 'item_category': 1.0, 'price': 0.9627243309366535, 'quantity': 0.03773891891294719, 'item_revenue': 0.0039056105206175056}
+real (non-sentinel) population for item_id/item_name/item_category: {'item_id': 0.9671981443893287, 'item_name': 0.9627245820205829, 'item_category': 0.9586073077475462}
+item entries from promotion events (view_promotion/select_promotion): 143197 of 3982732 (0.0360).
 
 ### Categorical / Domain Validation
 
@@ -41,16 +44,17 @@ This table is already the staged, filtered subset -- browsing/engagement events 
 
 ### Entities / Keys
 
-Approx distinct: user_pseudo_id=132506, item_id≈1338.
+Approx distinct: user_pseudo_id=132506, item_id (product)≈1338, item_id (promotion)≈2.
 
 Concentration:
 - user_pseudo_id: approx_distinct=132506, top10=0.0040, top50=0.0152, max_one_entity=393
-- item_id: approx_distinct=1338, top10=0.1688, top50=0.4909, max_one_entity=130641
+- item_id (product events only): approx_distinct=1338, top10=0.1540, top50=0.4806, max_one_entity=78806
+- item_id (promotion events only): approx_distinct=2, top10=1.0000, top50=1.0000, max_one_entity=125379
 
 ### Distributions
 
-purchase_revenue distribution: {'min': 1.0, 'max': 1530.0, 'avg': 69.08908813429989, 'p50_95_99': [48.0, 186.0, 364.0]}.
-item quantity / item_revenue (p50/90/99): {'qty_p50_90_99': [1, 2, 11], 'rev_p50_90_99': [16.0, 48.0, 112.0]}.
+purchase_revenue distribution: {'min': 1.0, 'max': 1530.0, 'avg': 69.08908813429989, 'p50_95_99': [48.0, 186.0, 363.0]}.
+item quantity / item_revenue (p50/90/99): {'qty_p50_90_99': [1, 2, 12], 'rev_p50_90_99': [16.0, 48.0, 110.0]}.
 Top item_category: [("Home/Apparel/Men's / Unisex/", 666832), ('Home/Sale/', 543276), ('Home/Apparel/', 225866), ('Lifestyle/Drinkware/', 207665), ("Home/Apparel/Women's/", 202874), ('Home/Apparel/Hats/', 190073), ('Home/New/', 154949), ('Lifestyle/Bags/', 150352), ('(not set)', 148459), ('Home/Shop by Brand/Google/', 140726)].
 
 ### Relationships
@@ -60,7 +64,8 @@ cart->purchase session rate = 0.1875.
 
 ### EDA Findings
 
-- No defects found; staged allowlists held in Bronze.
+- Staging allowlists held cleanly in Bronze (event_name, event_params keys), but GA4's own '(not set)' sentinel is not a null and passes through as-is (deliberate -- raw fidelity at Bronze, cleaning is Silver's job): item_category real population 95.9% vs 100.0% isNotNull; transaction_id real population 0.6% vs 99.5% isNotNull.
+- item_id is overloaded: 143197 of 3982732 item entries (3.6%) come from promotion events (view_promotion/select_promotion) and carry a campaign identifier, not a product id -- combined item_id concentration figures would conflate the two.
 
 ### ML-Readiness Evidence
 
@@ -87,6 +92,8 @@ cart->purchase session rate = 0.1875.
 - Grain = one row per event; if the candidate key is not unique, add a synthetic row id at Silver.
 - Session grain is (user_pseudo_id, ga_session_id), not user_pseudo_id alone.
 - ecommerce/items are sparse (populated only on transaction-relevant events) -- keep as nullable structs, not flattened columns with a default.
+- Normalise GA4's '(not set)'/'(none)' sentinel to null on item_id/item_name/item_category/ecommerce.transaction_id at Silver -- Bronze intentionally keeps it raw.
+- Model item_id from promotion events (view_promotion/select_promotion) separately from product item_id -- they are different entity types sharing one field.
 
 ### Figure -- GA4 event_name funnel
 
