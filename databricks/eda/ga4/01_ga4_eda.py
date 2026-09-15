@@ -268,8 +268,8 @@ print("quantity / item_revenue distribution:", qty_rev_stats)
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Session-level funnel -- (user_pseudo_id, ga_session_id) grain
+
 def _param_value(col_name, key):
     matched = F.filter(F.col(col_name), lambda x: x["key"] == F.lit(key))
     v = F.element_at(matched, 1)["value"]
