@@ -29,20 +29,21 @@ description: >
   sample traffic came from, observed or not.
 
 profiling_evidence: >
-  PENDING -- no Bronze table, no EDA/profiling run exists for this source yet
-  (see open_questions below for what a profiling pass needs to answer before
-  Silver work starts). The schema and catalog facts below come from BigQuery
-  metadata calls only (SHOW SCHEMA / table metadata), not from reading rows.
+  src/schemas/profiling/ga4.md, from databricks/eda/ga4/01_ga4_eda.py against
+  the staged/Bronze table (bronze.ga4_events, 779,485 rows -- the 11-event
+  retained subset, not the full raw archive). The catalog facts in this
+  section (pre-profiling) came from BigQuery metadata calls only; row-level
+  facts below (grain, population rates, vocabularies) come from that
+  profiling pass, plus a full-92-file raw-archive measurement pass run before
+  staging existed (see the resolved questions below for which source each
+  fact comes from).
 
 bronze_physical_types: >
-  OPEN QUESTION -- every other Bronze table in this project stores all
-  columns as STRING (inferSchema=false), cast to logical types in Silver.
-  GA4's schema is not flat (event_params, items, user_properties are
-  RECORD/REPEATED; device, geo, app_info, traffic_source, ecommerce,
-  privacy_info, user_ltv, event_dimensions are RECORD). Whether Bronze
-  preserves this nested shape as-is (Delta natively supports STRUCT/ARRAY) or
-  something else is a Bronze-load design decision, not decided by this
-  contract.
+  RESOLVED -- unlike every other Bronze table in this project (all-STRING,
+  cast in Silver), GA4's nested fields (event_params, ecommerce, items) are
+  kept as Delta STRUCT/ARRAY as-is, inferred from JSON. Decided in
+  databricks/bronze/09_load_ga4_bronze.py: flattening structured
+  arrays/records to opaque strings would have made them unusable downstream.
 
 acquisition:
   method: bigquery_public_dataset_to_local
@@ -103,46 +104,88 @@ tables:
       this reaches Bronze -- same pattern as REES46's 2 monthly CSVs -> one
       events table.
     grain:
-      key: NOT DETERMINED  # candidate below is unverified -- no dedup/uniqueness profiling has run
+      key: [event_date, event_timestamp, user_pseudo_id, event_name]  # confirmed unique on Bronze, see below
       candidate_key: [event_date, event_timestamp, user_pseudo_id, event_name]
-      unique: unknown
-      row_count_observed: NOT COLLECTED  # see source_catalog_facts -- only a single day's count is known
+      unique: true  # 0 rows share the full key combination, exact check (not HLL), on bronze.ga4_events (779,485 rows)
+      row_count_observed: >
+        779,485 in bronze.ga4_events (the staged, 11-event-retained subset).
+        The full raw archive (92 files, all 17 event types, before staging)
+        is 4,295,584 rows -- not loaded to Bronze in full; measured directly
+        against the local raw files.
       description: >
-        One row per GA4 event (page_view, view_item, add_to_cart, purchase,
-        etc.). event_timestamp is microseconds since the Unix epoch per
-        Google's GA4 BigQuery Export schema reference -- not yet confirmed
-        against this sample's own values.
+        One row per GA4 event. event_timestamp is microseconds since the
+        Unix epoch, confirmed against this sample's own values (not just
+        Google's schema reference) -- ordering within a session is
+        well-defined at that precision.
     columns:
-      # Literal BigQuery catalog schema for events_20201101, assumed
-      # representative of all daily tables (not individually verified).
-      # `required` = always present in schema, not NOT NULL (project
-      # convention, see rees46.yml). `nullable` follows BigQuery mode
-      # where stated; where unset but Google's reference claims
-      # always-populated, that's noted as documentation-sourced, not observed.
-      - { name: event_date, type: string, required: true, nullable: true, notes: "YYYYMMDD string, per GA4 export reference; always populated per that reference, not yet confirmed against this sample" }
-      - { name: event_timestamp, type: integer, required: true, nullable: true, notes: "microseconds since Unix epoch, per GA4 export reference; not yet confirmed" }
-      - { name: event_name, type: string, required: true, nullable: true, notes: "per GA4 export reference always populated; the event-type vocabulary itself is unknown until profiled" }
+      # This is the Bronze reality (bronze.ga4_events, verified against
+      # bronze_schema_v003.md), not the full raw GA4 export -- staging
+      # (scripts/ingestion/stage_ga4.py) filters/projects before Bronze. The
+      # full raw export schema is preserved for reference under
+      # `source_schema_reference` below, not lost.
+      - { name: event_date, type: string, required: true, nullable: false, distinct_observed: 91, notes: "YYYYMMDD string; 92 raw daily files exist but approx_count_distinct on Bronze reports 91 -- HLL estimation error at this cardinality, not confirmed as a real gap" }
+      - { name: event_timestamp, type: long, required: true, nullable: false, notes: "microseconds since Unix epoch, confirmed against real values (not just the GA4 schema reference) -- session ordering is well-defined at this precision" }
+      - { name: event_name, type: string, required: true, nullable: false, allowed_values: [view_item, view_item_list, select_item, view_promotion, select_promotion, view_search_results, add_to_cart, begin_checkout, add_shipping_info, add_payment_info, purchase], notes: "the 11-event staging allowlist; refund is a valid GA4 event type with zero rows in this archive, not part of the allowlist output" }
+      - { name: user_pseudo_id, type: string, required: true, nullable: false, distinct_observed: 132506, notes: "GA4's device/client identifier; not part of the row grain's uniqueness on its own" }
+      - { name: geo_country, type: string, required: true, nullable: true, null_rate_observed: 0.0000, distinct_observed: 108, notes: "flattened from geo.country; search-engine/IP-derived geography, not a claim of German or any specific market -- see localisation below" }
       - name: event_params
         type: record_repeated
         required: true
-        nullable: true
-        notes: "dynamic key/value event parameters -- the set of `key` values is unknown until profiled; a wide, sparse vocabulary is expected"
+        nullable: false
+        notes: "populated on 100% of rows (always has at least ga_session_id/ga_session_number). Only 6 of GA4's ~32 observed keys are retained by staging."
         fields:
-          - { name: key, type: string, nullable: true }
+          - { name: key, type: string, nullable: false, allowed_values: [ga_session_id, ga_session_number, page_location, page_title, search_term, unique_search_term] }
           - name: value
             type: record
-            nullable: true
+            nullable: false
             fields:
               - { name: string_value, type: string, nullable: true }
               - { name: int_value, type: integer, nullable: true }
-              - { name: float_value, type: float, nullable: true }
-              - { name: double_value, type: float, nullable: true }
+              - { name: float_value, type: float, nullable: true, notes: "observed as Spark-inferred STRING in Bronze -- every retained key's value is int_value or string_value, so this field is always null and Spark's JSON inference defaults an all-null field to string; not a declared contract type change" }
+              - { name: double_value, type: float, nullable: true, notes: "same all-null STRING inference as float_value above" }
+      - name: ecommerce
+        type: record
+        required: false
+        nullable: true
+        null_rate_observed: 0.0380
+        notes: "populated on 96.2% of retained (staged) rows -- much higher than the 17.46% observed on the full raw archive, because staging already filters to commerce/journey events"
+        fields:
+          - { name: transaction_id, type: string, nullable: true, notes: "isNotNull population 99.5% of ecommerce-populated rows, but REAL (non-'(not set)') population is only 0.64% -- GA4's own sentinel passes through Bronze uncleaned, see profiling_findings" }
+          - { name: purchase_revenue, type: float, nullable: true, notes: "population 0.70% of ecommerce-populated rows (i.e. actual purchases); observed range 1.0..1530.0, p50/95/99 = 48.0/186.0/363.0" }
+          - { name: unique_items, type: integer, nullable: true, notes: "population 68.3% of ecommerce-populated rows" }
+          - { name: total_item_quantity, type: integer, nullable: true, notes: "population 12.5% of ecommerce-populated rows" }
+      - name: items
+        type: record_repeated
+        required: false
+        nullable: true
+        null_rate_observed: 0.3427
+        notes: "populated on 65.7% of retained rows; 3,982,732 exploded item entries observed. item_id is overloaded -- 3.6% of entries come from view_promotion/select_promotion and carry a campaign identifier (only 2 distinct values), not a product id; see profiling_findings"
+        fields:
+          - { name: item_id, type: string, nullable: true, notes: "isNotNull 100%, real (non-sentinel) population 96.72%" }
+          - { name: item_name, type: string, nullable: true, notes: "isNotNull 100%, real (non-sentinel) population 96.27%" }
+          - { name: item_category, type: string, nullable: true, notes: "isNotNull 100%, real (non-sentinel) population 95.86%" }
+          - { name: price, type: float, nullable: true, notes: "population 96.27% of item entries" }
+          - { name: quantity, type: integer, nullable: true, notes: "population 3.77% of item entries -- only set on true cart/checkout/purchase lines, not on impression/discovery entries" }
+          - { name: item_revenue, type: float, nullable: true, notes: "population 0.39% of item entries; p50/90/99 = 16.0/48.0/110.0" }
+
+source_schema_reference:
+  # The FULL raw GA4 export schema (all fields BigQuery/Google document for
+  # this source), preserved for reference only -- NOT what's in Bronze. The
+  # `columns:` block above is the actual Bronze contract; this block exists
+  # so the fields staging dropped (and why they were safe to drop) stay
+  # documented rather than disappearing. Real population figures for the
+  # dropped fields, measured against the full 92-file raw archive: user_id
+  # always null (0 of 4,295,584); user_properties populated on 0.0031% of
+  # rows (134); app_info and event_dimensions always null; device.category
+  # always populated (desktop 58.2% / mobile 39.7% / tablet 2.2%);
+  # privacy_info, user_ltv, traffic_source always populated with real values
+  # but carry no signal any locked use case needs.
+  columns:
       - { name: event_previous_timestamp, type: integer, required: true, nullable: true }
       - { name: event_value_in_usd, type: float, required: true, nullable: true }
       - { name: event_bundle_sequence_id, type: integer, required: true, nullable: true }
       - { name: event_server_timestamp_offset, type: integer, required: true, nullable: true }
-      - { name: user_id, type: string, required: true, nullable: true, notes: "obfuscated sample -- expected mostly/entirely null; not confirmed" }
-      - { name: user_pseudo_id, type: string, required: true, nullable: true, notes: "GA4's device/client identifier; candidate grain component" }
+      - { name: user_id, type: string, required: true, nullable: true, notes: "obfuscated sample -- confirmed always null (0 of 4,295,584 rows)" }
       - name: privacy_info
         type: record
         required: true
@@ -156,12 +199,12 @@ tables:
         required: true
         nullable: true
         fields:
-          - { name: key, type: integer, nullable: true, notes: "typed integer in this sample's catalog metadata -- unusual for a property name; verify at profiling time" }
+          - { name: key, type: integer, nullable: true, notes: "typed integer in this sample's catalog metadata -- unusual for a property name; never investigated further, field is populated on only 0.0031% of rows" }
           - name: value
             type: record
             nullable: true
             fields:
-              - { name: string_value, type: integer, nullable: true, notes: "typed integer in this sample's catalog metadata -- verify at profiling time" }
+              - { name: string_value, type: integer, nullable: true }
               - { name: int_value, type: integer, nullable: true }
               - { name: float_value, type: integer, nullable: true }
               - { name: double_value, type: integer, nullable: true }
@@ -201,7 +244,7 @@ tables:
         type: record
         required: true
         nullable: true
-        notes: "search-engine/IP-derived geography, not a claim of German or any specific market -- see localisation below"
+        notes: "only geo.country is retained (as geo_country) in the columns: block above"
         fields:
           - { name: continent, type: string, nullable: true }
           - { name: sub_continent, type: string, nullable: true }
@@ -228,52 +271,42 @@ tables:
           - { name: name, type: string, nullable: true }
           - { name: source, type: string, nullable: true }
       - { name: stream_id, type: integer, required: true, nullable: true }
-      - { name: platform, type: string, required: true, nullable: true, notes: "e.g. WEB; single-valued in a web-only export -- not confirmed for this sample" }
+      - { name: platform, type: string, required: true, nullable: true, notes: "always WEB, single-valued -- confirmed" }
       - name: event_dimensions
         type: record
         required: true
         nullable: true
         fields:
           - { name: hostname, type: string, nullable: true }
-      - name: ecommerce
+      - name: ecommerce_dropped_fields
         type: record
-        required: true
+        required: false
         nullable: true
-        notes: "populated only on ecommerce-relevant events (add_to_cart, purchase, refund, ...); null on most rows -- not confirmed"
+        notes: "the ecommerce fields NOT retained by staging (all confirmed 0 population in the full raw archive)"
         fields:
-          - { name: total_item_quantity, type: integer, nullable: true }
-          - { name: purchase_revenue_in_usd, type: float, nullable: true }
-          - { name: purchase_revenue, type: float, nullable: true }
           - { name: refund_value_in_usd, type: float, nullable: true }
           - { name: refund_value, type: float, nullable: true }
           - { name: shipping_value_in_usd, type: float, nullable: true }
           - { name: shipping_value, type: float, nullable: true }
           - { name: tax_value_in_usd, type: float, nullable: true }
           - { name: tax_value, type: float, nullable: true }
-          - { name: unique_items, type: integer, nullable: true }
-          - { name: transaction_id, type: string, nullable: true }
-      - name: items
+          - { name: purchase_revenue_in_usd, type: float, nullable: true }
+      - name: items_dropped_fields
         type: record_repeated
-        required: true
+        required: false
         nullable: true
-        notes: "one entry per cart/product line on the triggering event; empty array on non-product events -- not confirmed"
+        notes: "the items fields NOT retained by staging -- item_category2-5, coupon, affiliation, location_id, promotion_id, creative_slot confirmed 0.000% populated across all 3,982,732 raw-archive item entries; the rest below are real but not required by a locked use case"
         fields:
-          - { name: item_id, type: string, nullable: true }
-          - { name: item_name, type: string, nullable: true }
           - { name: item_brand, type: string, nullable: true }
           - { name: item_variant, type: string, nullable: true }
-          - { name: item_category, type: string, nullable: true }
           - { name: item_category2, type: string, nullable: true }
           - { name: item_category3, type: string, nullable: true }
           - { name: item_category4, type: string, nullable: true }
           - { name: item_category5, type: string, nullable: true }
           - { name: price_in_usd, type: float, nullable: true }
-          - { name: price, type: float, nullable: true }
-          - { name: quantity, type: integer, nullable: true }
           - { name: item_revenue_in_usd, type: float, nullable: true }
-          - { name: item_revenue, type: float, nullable: true }
           - { name: item_refund_in_usd, type: float, nullable: true }
-          - { name: item_refund, type: float, nullable: true }
+          - { name: item_refund, type: float, nullable: true, notes: "confirmed 0 population -- no refund signal anywhere in the archive, consistent with the event_name-level refund finding" }
           - { name: coupon, type: string, nullable: true }
           - { name: affiliation, type: string, nullable: true }
           - { name: location_id, type: string, nullable: true }
@@ -285,19 +318,103 @@ tables:
           - { name: creative_name, type: string, nullable: true }
           - { name: creative_slot, type: string, nullable: true }
 
-open_questions:
-  # Everything here needs a real profiling pass (Bronze load + EDA) to
-  # answer. None of it is guessed above.
-  - "Row grain / uniqueness: does (event_date, event_timestamp, user_pseudo_id, event_name) actually identify one row, or does it collide (concurrent events, batched client uploads)?"
-  - "Total row count across all 50 daily tables (only one day's count -- 31272 -- is known; see source_catalog_facts)."
-  - "Null rates for every field -- none observed yet; the `nullable: true` on every column above is structural (BigQuery mode), not a claim about actual null frequency."
-  - "event_name vocabulary -- the full set of distinct event types actually present (page_view, view_item, add_to_cart, purchase, etc. expected per GA4 convention, not confirmed)."
-  - "event_params.key vocabulary -- GA4's dynamic parameter bag; likely wide and sparse, needs enumeration before any Silver decode/flatten design."
-  - "user_properties.key / value.string_value / value.int_value typed as INTEGER in this sample's own catalog metadata, not STRING -- unusual for GA4's normal key/value shape; needs verification, not assumed to be a metadata artifact or a real schema quirk."
-  - "ecommerce and items population rate -- expected null/empty on the majority of (non-purchase-funnel) events, not confirmed."
-  - "Whether user_id is ever populated in this obfuscated sample, or always null."
-  - "geo.country distribution -- whether any German (`DE`/`Germany`) traffic exists in this sample at all."
-  - "Whether the 50-day window (2020-11-01..2020-12-20) has any date gaps."
+open_questions: []  # all resolved below -- kept as an empty list, not removed, so the key stays a stable place to add a real future question
+
+resolved_questions:
+  # Each answered by either the full-92-file raw-archive measurement pass
+  # (before staging existed) or the Bronze/EDA profiling pass against
+  # bronze.ga4_events (the staged, 11-event-retained subset) -- labelled per
+  # item. See src/schemas/profiling/ga4.md for the Bronze-side evidence.
+  - q: "Row grain / uniqueness: does (event_date, event_timestamp, user_pseudo_id, event_name) actually identify one row?"
+    a: "Yes, confirmed unique -- 0 rows share the full key combination (exact check, not HLL) on bronze.ga4_events."
+    source: bronze_profiling
+  - q: "Total row count."
+    a: "Raw archive (92 files, all 17 event types): 4,295,584 rows. Staged/Bronze (11 retained events): 779,485 rows."
+    source: raw_archive_measurement+bronze_profiling
+  - q: "Null rates for every field."
+    a: >
+      Retained fields (Bronze): event_date/event_timestamp/event_name/user_pseudo_id
+      0% missing; event_params populated 100% of rows; ecommerce struct populated
+      96.2% of rows; items populated 65.7% of rows. Dropped-at-staging fields
+      (measured against the raw archive, never loaded to Bronze): user_id always
+      null (0 of 4,295,584); user_properties populated on 0.0031% of rows (134);
+      app_info and event_dimensions always null; privacy_info and user_ltv and
+      traffic_source always populated with real (non-sentinel) values but carry
+      no signal this pipeline uses.
+    source: raw_archive_measurement+bronze_profiling
+  - q: "event_name vocabulary -- the full set of distinct event types actually present."
+    a: >
+      17 distinct values in the raw archive: page_view, user_engagement, scroll,
+      view_item, session_start, first_visit, view_promotion, add_to_cart,
+      begin_checkout, select_item, view_search_results, add_shipping_info,
+      add_payment_info, select_promotion, purchase, click, view_item_list.
+      refund has zero rows anywhere in the archive. 11 of the 17 are retained at
+      staging (all commerce/journey-relevant events); the rest are browsing/
+      engagement telemetry with no items/ecommerce signal.
+    source: raw_archive_measurement
+  - q: "event_params.key vocabulary."
+    a: >
+      32 distinct keys in the raw archive. 6 retained at staging
+      (ga_session_id, ga_session_number, page_location, page_title,
+      search_term, unique_search_term -- all genuinely load-bearing); the rest
+      is debug/engagement flags, marketing-attribution parameters, and
+      outbound-link tracking.
+    source: raw_archive_measurement
+  - q: "user_properties.key / value typed as INTEGER, not STRING -- metadata artifact or real quirk?"
+    a: >
+      Moot for this pipeline -- user_properties is populated on only 0.0031%
+      of rows (134 of 4,295,584) and was dropped entirely at staging; the
+      typing quirk was never investigated further since the field carries no
+      usable signal.
+    source: raw_archive_measurement
+  - q: "ecommerce and items population rate."
+    a: >
+      On the raw archive (all event types): ecommerce 17.46%, items 11.93% of
+      rows. On the staged/Bronze table (commerce/journey events only): ecommerce
+      96.2%, items 65.7% -- as expected, staging already filtered out the
+      events that never carry this signal.
+    source: raw_archive_measurement+bronze_profiling
+  - q: "Whether user_id is ever populated in this obfuscated sample."
+    a: "Never -- 0 of 4,295,584 rows. Always null, as expected for an obfuscated public sample."
+    source: raw_archive_measurement
+  - q: "geo.country distribution -- whether any German traffic exists."
+    a: >
+      Yes -- Germany is present at 1.669% of the raw archive (71,673 of
+      4,295,584 rows), not dominant, not zero. geo_country (flattened from
+      geo.country) is retained at staging; 108 distinct countries observed on
+      the staged/Bronze table.
+    source: raw_archive_measurement+bronze_profiling
+  - q: "Whether the acquisition window has any date gaps."
+    a: >
+      No gaps -- 92 daily files span 2020-11-01..2021-01-31 inclusive, which
+      is exactly 92 calendar days (30 + 31 + 31); the file count matching the
+      day-span exactly confirms complete daily coverage.
+    source: raw_archive_measurement
+
+# Found during Bronze/EDA profiling, not anticipated as open_questions above --
+# recorded here rather than silently only in src/schemas/profiling/ga4.md.
+profiling_findings:
+  - finding: >
+      GA4's own "(not set)" string is a real, non-null sentinel for "no
+      value" on several string fields -- NOT the same as the field being
+      absent. Staging deliberately keeps it as-is (raw fidelity at Bronze;
+      cleaning is Silver's job), so a plain non-null population rate
+      overstates genuine content: item_category real (non-sentinel)
+      population is 95.9% vs. 100.0% by isNotNull(); ecommerce.transaction_id
+      real population is 0.64% vs. 99.5% by isNotNull().
+    silver_action: >
+      Normalise "(not set)"/"(none)" to null on item_id/item_name/
+      item_category/ecommerce.transaction_id at Silver.
+  - finding: >
+      item_id is overloaded by GA4 -- on view_promotion/select_promotion
+      entries it carries a campaign/promotion identifier (only 2 distinct
+      values across 143,197 such entries, one dominating almost all of them),
+      not a product id. Product-event item_id (1,338 distinct values) looks
+      like a genuine product-popularity distribution; the two must not be
+      combined in one concentration/cardinality figure.
+    silver_action: >
+      Model promotion-event item_id and product-event item_id as separate
+      entities sharing one physical field, distinguished by event_name.
 
 localisation:
   required: true
