@@ -10,10 +10,10 @@
 #
 # Rules (do not violate when editing):
 # - Allowed `ecosystem` values are a closed, governed vocabulary -- currently
-#   only `energy` is populated (the completed first wave). `mobility` /
-#   `healthcare` / `agriculture` are added here only once that ecosystem's
-#   sources are actually acquired -- adding a new ecosystem value to this
-#   file is a governed change requiring an architecture decision and review.
+#   `energy` and `commerce` are populated. `mobility` / `healthcare` /
+#   `agriculture` are added here only once that ecosystem's sources are
+#   actually acquired -- adding a new ecosystem value to this file is a
+#   governed change requiring an architecture decision and review.
 # - Every acquired, current-scope source_system maps to exactly one
 #   ecosystem, for the life of the platform (immutable per canonical_id).
 # - This file lists only sources with live Bronze data today. iPinYou,
@@ -31,6 +31,7 @@ schema:
 
 allowed_ecosystems:
   - energy
+  - commerce
   # - mobility      # add only when Mobility & Electrification sources are acquired, as a governed change
   # - healthcare    # add only when Healthcare sources are acquired, as a governed change
   # - agriculture   # add only when Agriculture sources are acquired, as a governed change
@@ -55,17 +56,19 @@ mappings:
     ecosystem: energy
     first_mapped: "first wave"
   - source_system: rees46
-    ecosystem: energy
-    first_mapped: "first wave"
+    ecosystem: commerce
+    first_mapped: "first wave (re-mapped from energy to commerce, Commerce wave)"
   - source_system: search_visibility_ramp_dryad
-    ecosystem: energy
-    first_mapped: "first wave"
+    ecosystem: commerce
+    first_mapped: "first wave (re-mapped from energy to commerce, Commerce wave)"
+  - source_system: ga4
+    ecosystem: commerce
+    first_mapped: "Commerce wave"
 
-# Pending the Commerce wave: `commerce` is added to `allowed_ecosystems` and
-# `rees46` + `search_visibility_ramp_dryad` are re-mapped from `energy` to
-# `commerce`, together with the new `ga4` primary source, as one governed
-# change when Commerce Bronze lands. `synthetic_operational` was removed with
-# the operational/CDC system (see archive/historical/).
+# `rees46` and `search_visibility_ramp_dryad` were provisionally mapped to
+# `energy` before `commerce` existed as an ecosystem; corrected above now
+# that Commerce Bronze (ga4) has landed. `synthetic_operational` was removed
+# with the operational/CDC system (see archive/historical/).
 
 # Historical, out-of-scope entries -- listed here ONLY as a documented
 # negative record, so this file itself is traceable evidence that they were

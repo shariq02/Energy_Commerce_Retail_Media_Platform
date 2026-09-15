@@ -35,7 +35,7 @@ def test_file_exists_and_parses(doc):
 
 def test_allowed_ecosystems_is_closed_vocabulary(doc):
     allowed = doc["allowed_ecosystems"]
-    assert allowed == ["energy"], (
+    assert allowed == ["energy", "commerce"], (
         "allowed_ecosystems must only grow via a governed change -- if this "
         "fails because a new value was added, confirm an architecture "
         "decision backs it."
@@ -64,13 +64,25 @@ def test_expected_current_scope_sources_present(doc):
         "honda_iot",
         "rees46",
         "search_visibility_ramp_dryad",
+        "ga4",
     }
     assert sources == expected
 
 
-def test_all_current_scope_sources_map_to_energy(doc):
+def test_current_scope_sources_map_to_the_expected_ecosystem(doc):
+    expected_ecosystem = {
+        "smard": "energy",
+        "dwd": "energy",
+        "mastr": "energy",
+        "power_plant_list": "energy",
+        "redispatch": "energy",
+        "honda_iot": "energy",
+        "rees46": "commerce",
+        "search_visibility_ramp_dryad": "commerce",
+        "ga4": "commerce",
+    }
     for entry in doc["mappings"]:
-        assert entry["ecosystem"] == "energy"
+        assert entry["ecosystem"] == expected_ecosystem[entry["source_system"]], entry
 
 
 def test_historical_out_of_scope_sources_are_not_in_mappings(doc):
