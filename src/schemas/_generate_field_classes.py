@@ -392,6 +392,24 @@ REFERENCE_TABLES = {
     "search_visibility_repository",
 }
 
+# flag_col columns value_quarantine() adds on top of the source's own
+# contract columns -- verified against every value_quarantine() call in
+# databricks/silver/, not derivable from the contract itself.
+VALUE_QUARANTINE_FLAGS = {
+    "dwd_station_geography": [
+        (
+            "_coord_outside_de_bbox",
+            "station coordinate outside the Germany bounding box",
+        ),
+    ],
+    "power_plant_list": [
+        (
+            "_capacity_all_null",
+            "no capacity value parsed on the row",
+        ),
+    ],
+}
+
 # table_name prefix -> the contract's source_system (the source_ecosystem_map.yml
 # key), longest/most-specific prefix first so "search_visibility_" is checked
 # before any shorter prefix could apply.
@@ -524,6 +542,17 @@ def build_rows() -> list[dict]:
                 source == "mastr" and st == "mastr_grid_operator_change_events"
             )
             add_governance(st, conflict=has_conflict, disambig=disambig)
+            # value_quarantine flag columns -- the notebook's own flag_col=
+            # argument, not derivable from the contract; verified against every
+            # value_quarantine() call in databricks/silver/, not guessed.
+            for flag_col, reason in VALUE_QUARANTINE_FLAGS.get(st, []):
+                add(
+                    st,
+                    flag_col,
+                    "derived",
+                    reason,
+                    "value_quarantine flag column",
+                )
             # geo
             if bt in topo.get("geo_tables", set()):
                 for c, (cls, rule, ref) in GEO_COLS.items():

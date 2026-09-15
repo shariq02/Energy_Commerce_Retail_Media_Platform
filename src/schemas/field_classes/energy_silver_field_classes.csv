@@ -277,6 +277,7 @@ dwd_solar,solar_zenith_angle,source_provided,typed cast + English business renam
 dwd_solar,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver
 dwd_solar,source_system,derived,constant per source,silver governance,energy_silver
 dwd_solar,sunshine_duration_10min,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver
+dwd_station_geography,_coord_outside_de_bbox,derived,station coordinate outside the Germany bounding box,value_quarantine flag column,energy_silver_reference
 dwd_station_geography,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
 dwd_station_geography,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
 dwd_station_geography,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level",energy_silver_reference
@@ -1410,6 +1411,7 @@ power_plant_capacity_additions,energy_carrier,source_provided,typed cast + Engli
 power_plant_capacity_additions,retiring_capacity_total_2026_2029_mw,source_provided,typed cast + English business rename,power_plant_list contract / business-name mapping,energy_silver
 power_plant_capacity_additions,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver
 power_plant_capacity_additions,source_system,derived,constant per source,silver governance,energy_silver
+power_plant_list,_capacity_all_null,derived,no capacity value parsed on the row,value_quarantine flag column,energy_silver
 power_plant_list,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver
 power_plant_list,_silver_run_id,derived,the Silver run id,silver governance,energy_silver
 power_plant_list,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver
