@@ -55,7 +55,9 @@ from pyspark.sql.utils import AnalysisException
 # MAGIC `VOLUME_UNITS` are the first-wave Bronze upload units -- one Volume per
 # MAGIC upload unit, never one Volume per physical chunk. Chunks are files
 # MAGIC stored inside their upload unit's Volume. The energy/weather deepening
-# MAGIC wave's Volumes are created by `02_create_energy_weather_deepening_volumes.py`.
+# MAGIC wave's Volumes are created by `02_create_energy_weather_deepening_volumes.py`;
+# MAGIC the Commerce wave's net-new Volume is created by
+# MAGIC `04_create_commerce_volumes.py`.
 
 # COMMAND ----------
 

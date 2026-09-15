@@ -3,25 +3,16 @@
 # Author: Sharique Mohammad
 # Date: September 2026
 #
-# Purpose: formal contract for the GA4 source (1 logical Bronze table, sourced
-# from 50 physical daily BigQuery tables). UNLIKE every other contract in this
-# directory, this one is written BEFORE acquisition and BEFORE any profiling
-# run -- no Bronze table exists yet for this source. Every field below is
-# either (a) read directly from the source's own BigQuery catalog metadata
-# (`bq show --schema`, `bq show`), which requires no data extraction and was
-# pulled read-only, or (b) taken from Google's own public GA4 BigQuery Export
-# schema reference, explicitly marked as such. Nothing here is inferred from
-# row-level data -- none has been read. Fields that can only be answered by
-# profiling real rows are listed under `open_questions`, not guessed.
+# Purpose: formal contract for the GA4 source (1 logical Bronze table, 92
+# physical daily BigQuery tables). Unlike other contracts, written before
+# any profiling run -- fields come from BigQuery catalog metadata or
+# Google's published GA4 export schema, not row-level data; profiling-only
+# questions are under `open_questions`, not guessed.
 #
-# generated/ga4_events.schema.json is produced by
-# src/schemas/_generate_jsonschema.py, which now supports `record` (nested
-# object) and `record_repeated` (array of that object) in addition to its
-# flat types -- extended for this contract, the first nested-schema source in
-# the project. src/schemas/_generate_field_classes.py does not read this
-# contract yet (it enumerates sources explicitly, not by globbing
-# contracts/*.yml) -- extending it for GA4's field-class rows is Silver-phase
-# work, not part of this source contract.
+# generated/ga4_events.schema.json comes from
+# src/schemas/_generate_jsonschema.py, extended here to support `record`/
+# `record_repeated` nesting -- the first nested-schema source in the
+# project.
 
 source: ga4
 source_system: ga4
@@ -31,10 +22,11 @@ description: >
   Google's own public GA4-BigQuery-export-shaped sample dataset
   (`bigquery-public-data.ga4_obfuscated_sample_ecommerce`). Real GA4 export
   schema and real (obfuscated) event data, but not a live production GA4
-  property this project owns or controls. Static historical snapshot: 50
-  daily tables, 2020-11-01 through 2020-12-20. Not a German source -- GA4's
-  own `geo` fields carry whatever countries the sample traffic came from,
-  observed or not.
+  property this project owns or controls. Static historical snapshot: 92
+  daily tables, 2020-11-01 through 2021-01-31 (Google's sample grows over
+  time; re-check table count before assuming this range is still current).
+  Not a German source -- GA4's own `geo` fields carry whatever countries the
+  sample traffic came from, observed or not.
 
 profiling_evidence: >
   PENDING -- no Bronze table, no EDA/profiling run exists for this source yet
@@ -53,7 +45,7 @@ bronze_physical_types: >
   contract.
 
 acquisition:
-  method: bigquery_public_dataset
+  method: bigquery_public_dataset_to_local
   auth: service_account (project-level roles/bigquery.jobUser; the source
     project bigquery-public-data grants public read on its own datasets, no
     additional grant needed on our side)
@@ -61,43 +53,55 @@ acquisition:
   update_frequency: none  # Google's sample export is fixed/historical, not appended to
   sla: none
   source_location: US  # bigquery-public-data.ga4_obfuscated_sample_ecommerce, confirmed live via `bq show`
-  destination_location: europe-west3  # ecrmap_acquisition, confirmed live via `bq show`
-  region_constraint: >
-    HARD CONSTRAINT, empirically confirmed live against the real project (not
-    theoretical): a single BigQuery query job cannot read the US-located
-    source table(s) and write a destination table in ecrmap_acquisition
-    (europe-west3) -- BigQuery requires a job's location to match every table
-    it reads AND its destination table's dataset. Confirmed both ways:
-    job pinned to US + destination in ecrmap_acquisition ->
-    "Not found: Dataset ecrmap_acquisition was not found in location US";
-    job pinned to europe-west3 + reading the US source table -> "Access
-    Denied" on the source table. The acquisition step MUST be two separate
-    jobs: (1) query the source with no destination table, job location US;
-    (2) retrieve the result locally (google-cloud-bigquery client
-    pagination/to_dataframe -- confirmed installed, 3.43.0; no GCS export
-    needed at this data volume); (3) a separate local-file load job into
-    ecrmap_acquisition (europe-west3) -- a plain local upload, not bound by
-    any source-table region. Never attempt a destination-table query across
-    these two regions.
+  script: scripts/download/download_ga4.py
+  status: COMPLETE -- all 92 daily tables downloaded locally to data/raw/ga4/*.jsonl (~15GB)
+  scope: all tables present in the source dataset (discovered live, not hardcoded), all columns
+  destination: >
+    LOCAL ONLY -- data/raw/ga4/<table_id>.jsonl, one file per source daily
+    table. This script does not write to any BigQuery dataset (including
+    ecrmap_acquisition) and does not touch Databricks. Loading the local
+    files into Databricks Unity Catalog is a separate, manual step performed
+    by the project owner, outside this script and outside this contract.
+  region_constraint_note: >
+    Not currently exercised by this path (there is no destination-table
+    write), but recorded because it is a real, empirically-confirmed
+    constraint on this source and would apply again if a BigQuery-side
+    landing table is ever added later: a single BigQuery query job cannot
+    read the US-located source table(s) and write a destination table in a
+    europe-west3 dataset (e.g. ecrmap_acquisition) -- BigQuery requires a
+    job's location to match every table it reads AND its destination
+    table's dataset. Confirmed both ways against this project's own
+    ecrmap_acquisition dataset: job pinned to US + a europe-west3
+    destination -> "Not found: Dataset ecrmap_acquisition was not found in
+    location US"; job pinned to europe-west3 + reading the US source table
+    -> "Access Denied" on the source table. Any future BigQuery-side landing
+    would need the same two-job shape (query with no destination, job
+    location US; separate local-file load into the europe-west3 dataset).
 
 source_catalog_facts:
-  # Read-only BigQuery catalog metadata, not data. Collected 2026-09-14.
+  # Catalog metadata only (not row data), pulled 2026-09-14 at feasibility-
+  # check time; tables_observed/date_range_observed below are corrected to
+  # the actual completed download; size/scan figures predate it and are
+  # not re-verified against the larger set.
   dataset: bigquery-public-data.ga4_obfuscated_sample_ecommerce
   table_naming: "events_YYYYMMDD, one physical table per calendar day"
-  tables_observed: 50
-  date_range_observed: "2020-11-01 .. 2020-12-20"
+  tables_observed: 92   # local download actually completed against 92 tables -- see acquisition.status
+  date_range_observed: "2020-11-01 .. 2021-01-31"   # from the completed local download's filenames
   sample_table_row_count_observed: 31272   # events_20201101, via `bq show` metadata (single day, not the full range)
   sample_table_size_bytes_observed: 23566064  # events_20201101, via `bq show` metadata
-  full_range_full_column_scan_bytes_observed: 3583657854  # ~3.6GB, via dry-run SELECT * across events_*, metadata-cost query validation, no data read
-  full_range_row_count_observed: NOT COLLECTED  # would require summing 50 per-table metadata calls or a COUNT(*) query; not done for this contract
+  full_range_full_column_scan_bytes_observed: 3583657854  # ~3.6GB estimate for the ORIGINAL 50-table check, via dry-run SELECT * across events_*, metadata-cost query validation, no data read -- NOT re-measured for the actual 92-table download
+  full_range_row_count_observed: NOT COLLECTED  # would require summing 92 per-table metadata calls, a COUNT(*) query, or a full local wc -l; not done for this contract
+  local_download_size_observed: "~15GB (data/raw/ga4/*.jsonl, 92 files)"
 
 tables:
 
   - name: ga4_events
     physical_source: >
-      50 BigQuery tables (events_20201101 .. events_20201220) in the source
-      dataset, consolidated to one logical Bronze table at acquisition time --
-      same pattern as REES46's 2 monthly CSVs -> one events table.
+      92 BigQuery tables (events_20201101 .. events_20210131) in the source
+      dataset, downloaded locally as one JSONL file per table
+      (data/raw/ga4/*.jsonl); consolidated to one logical Bronze table when
+      this reaches Bronze -- same pattern as REES46's 2 monthly CSVs -> one
+      events table.
     grain:
       key: NOT DETERMINED  # candidate below is unverified -- no dedup/uniqueness profiling has run
       candidate_key: [event_date, event_timestamp, user_pseudo_id, event_name]
@@ -109,16 +113,12 @@ tables:
         Google's GA4 BigQuery Export schema reference -- not yet confirmed
         against this sample's own values.
     columns:
-      # Column list, types, and nesting are the literal BigQuery catalog
-      # schema for events_20201101 (`bq show --schema`), assumed representative
-      # of all 50 daily tables (not individually verified). `required` here
-      # means "column always present in the schema", matching this project's
-      # existing convention (see rees46.yml) -- it does NOT mean NOT NULL.
-      # `nullable` reflects BigQuery's NULLABLE/REQUIRED mode where the
-      # catalog metadata states it; where the catalog metadata leaves mode
-      # unset (NULLABLE by default) but Google's schema reference documents
-      # the field as always populated, that is noted explicitly as a
-      # documentation-sourced claim, not an observed one.
+      # Literal BigQuery catalog schema for events_20201101, assumed
+      # representative of all daily tables (not individually verified).
+      # `required` = always present in schema, not NOT NULL (project
+      # convention, see rees46.yml). `nullable` follows BigQuery mode
+      # where stated; where unset but Google's reference claims
+      # always-populated, that's noted as documentation-sourced, not observed.
       - { name: event_date, type: string, required: true, nullable: true, notes: "YYYYMMDD string, per GA4 export reference; always populated per that reference, not yet confirmed against this sample" }
       - { name: event_timestamp, type: integer, required: true, nullable: true, notes: "microseconds since Unix epoch, per GA4 export reference; not yet confirmed" }
       - { name: event_name, type: string, required: true, nullable: true, notes: "per GA4 export reference always populated; the event-type vocabulary itself is unknown until profiled" }
