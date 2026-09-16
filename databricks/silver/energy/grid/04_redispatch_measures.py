@@ -70,7 +70,7 @@ df = bronze_df.dropDuplicates()
 df = df.withColumn("_srid_base", F.concat_ws("|", *[F.col(c) for c in KEY_COLS]))
 
 for c in ("MITTLERE_LEISTUNG_MW", "MAXIMALE_LEISTUNG_MW", "GESAMTE_ARBEIT_MWH"):
-    df = df.withColumn(c, F.col(c).cast("double"))
+    df = df.withColumn(c, F.regexp_replace(F.col(c), ",", ".").cast("double"))
 
 for raw, (pref, en_map) in CODED.items():
     df = decode_via_labeled_map(df, raw, pref, en_map).drop(raw)
