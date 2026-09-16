@@ -139,7 +139,7 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,MASTR-3 -- location coordinate-conflict flag (additive)
+# DBTITLE 1,Location coordinate-conflict flag (additive)
 # Reads the generation-unit Silver tables (must run first). Flags conflicting
 # coordinates per location_id; never picks a "correct" one.
 _GENERATION_UNIT_TABLES = [
@@ -168,7 +168,7 @@ for _t in _GENERATION_UNIT_TABLES:
             )
         )
     except Exception as exc:
-        print(f"SKIP {_t} in MASTR-3 coordinate check: {exc}")
+        print(f"SKIP {_t} in coordinate-conflict check: {exc}")
         continue
     _coords = _part if _coords is None else _coords.unionByName(_part)
 
@@ -212,4 +212,4 @@ if _coords is not None:
         _findings_blocks,
     )
 else:
-    print("MASTR-3: no generation-unit Silver tables available yet -- skipped.")
+    print("no generation-unit Silver tables available yet -- coordinate check skipped.")

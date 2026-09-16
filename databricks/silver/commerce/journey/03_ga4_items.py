@@ -95,7 +95,7 @@ items_df = (
     .withColumn("item_category", _clean_str(F.col("item_category")))
 )
 
-# D2's core disambiguation: item_id means a campaign id on promotion events,
+# Core disambiguation: item_id means a campaign id on promotion events,
 # a product id everywhere else (ga4.md EDA Findings) -- these are different
 # entity types sharing one physical field.
 items_df = items_df.withColumn(

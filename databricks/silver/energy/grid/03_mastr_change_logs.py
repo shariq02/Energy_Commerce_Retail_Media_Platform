@@ -102,7 +102,7 @@ _key = ["unit_id", "grid_operator_change_effective_date"]
 g = within_group_ordinal(g, _key, [c for c in g.columns if c not in _key])
 g = g.withColumn("_srid", sha_key(*_key, "_src_id_ord"))
 
-# MASTR-2: two date-order flags, additive, never drop/correct rows --
+# Two date-order flags, additive, never drop/correct rows --
 # (1) registration before effective date; (2) commissioning after the change
 # (needs 01_mastr_generation_units.py to have run first).
 g = g.withColumn(
@@ -132,7 +132,7 @@ for _t in _GENERATION_UNIT_TABLES:
             .select("unit_id", "commissioning_date")
         )
     except Exception as exc:
-        print(f"SKIP {_t} in MASTR-2 commissioning check: {exc}")
+        print(f"SKIP {_t} in commissioning check: {exc}")
         continue
     _commissioning = (
         _part if _commissioning is None else _commissioning.unionByName(_part)
@@ -157,7 +157,7 @@ else:
         "_date_order_violation_commissioning_after_change", F.lit(None).cast("boolean")
     )
     print(
-        "MASTR-2: no generation-unit Silver tables available yet -- commissioning check skipped."
+        "no generation-unit Silver tables available yet -- commissioning check skipped."
     )
 
 g = add_provenance(g, SOURCE, "_srid", RID)

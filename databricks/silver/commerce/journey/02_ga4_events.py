@@ -94,7 +94,7 @@ df = df.withColumn("items", _clean_items(F.col("items"))).withColumn(
     "ecommerce", _clean_ecommerce(F.col("ecommerce"))
 )
 
-# D1: pivot the closed, 100%-populated event_params vocabulary (6 keys) to
+# Pivot the closed, 100%-populated event_params vocabulary (6 keys) to
 # named columns -- exposes ga_session_id, needed for GA4's session grain.
 _PARAM_KEYS = {
     "session_id": ("ga_session_id", "int_value"),
@@ -108,7 +108,7 @@ for _out_col, (_key_name, _value_field) in _PARAM_KEYS.items():
     _matched = F.filter(
         F.col("event_params"), lambda x, _k=_key_name: x["key"] == F.lit(_k)
     )
-    _first = F.element_at(_matched, 1)
+    _first = F.get(_matched, 0)
     df = df.withColumn(_out_col, _first.getField("value").getField(_value_field))
 
 df = df.withColumn("_srid", sha_key(*KEY_COLS))

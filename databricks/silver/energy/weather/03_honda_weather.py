@@ -44,6 +44,11 @@ RENAMES = {
     "WeatherStation_Weather_Igm": "global_irradiance",
 }
 
+# Stuck-reading lookback per frequency, scaled to the same ~10-hour window
+# profiling measured at 1h (9 steps back = 10 readings = 10h) -- same as
+# 01_honda_energy.py.
+STUCK_LOOKBACK_STEPS_BY_FREQ = {"1h": 9, "15min": 39, "1min": 599}
+
 # COMMAND ----------
 
 # DBTITLE 1,honda_iot_weather -> Silver
@@ -58,19 +63,24 @@ df = (
     .withColumn("weather_location", F.lit("honda_site"))
 )
 
-# D5/H4 (design record §4 Honda): stuck-reading flag, same "10 consecutive
-# identical readings" definition as 01_honda_energy.py (honda_iot.md S02 --
-# 70 stuck-runs on Ta, 1710 on Igm at 1h).
+# Stuck-reading flag, frequency-scaled lookback (see
+# STUCK_LOOKBACK_STEPS_BY_FREQ) -- same fix as 01_honda_energy.py.
 from pyspark.sql.window import Window as _Window
 
 _w = _Window.partitionBy("frequency").orderBy("datetime_utc")
 for _c in ("air_temperature_2m", "global_irradiance"):
-    _lag1 = F.lag(F.col(_c), 1).over(_w)
-    _lag9 = F.lag(F.col(_c), 9).over(_w)
-    df = df.withColumn(
-        f"_{_c}_stuck_reading_flag",
-        F.col(_c).isNotNull() & (F.col(_c) == _lag1) & (F.col(_c) == _lag9),
-    )
+    _stuck_expr = F.lit(False)
+    for _freq, _lag_n in STUCK_LOOKBACK_STEPS_BY_FREQ.items():
+        _lag1 = F.lag(F.col(_c), 1).over(_w)
+        _lagN = F.lag(F.col(_c), _lag_n).over(_w)
+        _cond = (
+            (F.col("frequency") == _freq)
+            & F.col(_c).isNotNull()
+            & (F.col(_c) == _lag1)
+            & (F.col(_c) == _lagN)
+        )
+        _stuck_expr = F.when(_cond, F.lit(True)).otherwise(_stuck_expr)
+    df = df.withColumn(f"_{_c}_stuck_reading_flag", _stuck_expr)
 
 df = df.withColumn("_srid", sha_key(F.lit(BT), "frequency", "datetime_utc"))
 df = add_provenance(df, SOURCE, "_srid", RID)

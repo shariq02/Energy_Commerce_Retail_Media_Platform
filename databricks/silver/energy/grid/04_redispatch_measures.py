@@ -77,7 +77,7 @@ for raw, (pref, en_map) in CODED.items():
 
 df = apply_renames(df, NAME_MAP)
 
-# D8: drop the columns mappings/redispatch.yml already documents as constant.
+# Drop the columns mappings/redispatch.yml already documents as constant.
 _drop_cols = [d["column"] for d in (MAPPING.get("dropped_columns") or [])]
 for _raw in _drop_cols:
     _target = NAME_MAP.get(_raw, _raw)
@@ -130,7 +130,7 @@ write_quarantine(
 )
 
 
-# D9 first pass: exact match on a normalised name only, additive. Match rate
+# First pass: exact match on a normalised name only, additive. Match rate
 # below decides whether a substring/fuzzy pass is warranted.
 def _normalise_name(col):
     return F.upper(F.trim(F.regexp_replace(F.col(col), r"\s+", " ")))
@@ -161,7 +161,7 @@ try:
         .drop("_norm_affected", "_norm_plant", "plant_name")
     )
 except Exception as exc:
-    print(f"SKIP D9 affected-unit match: {exc}")
+    print(f"SKIP affected-unit match: {exc}")
     df = df.withColumn(
         "affected_unit_match_name", F.lit(None).cast("string")
     ).withColumn("affected_unit_match_confidence", F.lit("unmatched"))

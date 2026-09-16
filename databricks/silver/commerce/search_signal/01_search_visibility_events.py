@@ -74,13 +74,13 @@ ev = (
     .drop("date")
 )
 
-# D6: Yes/No -> boolean (raw kept); country -> traffic_country (the
+# Yes/No -> boolean (raw kept); country -> traffic_country (the
 # reference table's `country` means something different -- repository home).
 ev = ev.withColumn(
     "is_citable_content", F.col("citableContent") == F.lit("Yes")
 ).withColumnRenamed("country", "traffic_country")
 
-# D7: `index` is a short alias of repository_id (not independent) -- kept,
+# `index` is a short alias of repository_id (not independent) -- kept,
 # renamed, not dropped. Inspection below confirms the 1:1 relationship.
 ev = ev.withColumnRenamed("index", "repository_index_alias")
 

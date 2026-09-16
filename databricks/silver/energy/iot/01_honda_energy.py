@@ -47,9 +47,13 @@ TABLE_MAP = {
     "honda_iot_cooling_w": "honda_cooling_w",
 }
 
-# H1 (owner decision): drop heating_p.CHP_elec, no alias -- electricity_p.CHP
-# is canonical. Pre-drop safeguard below re-checks the duplication first.
+# Owner decision: drop heating_p.CHP_elec, no alias -- electricity_p.CHP is
+# canonical. Pre-drop safeguard below re-checks the duplication first.
 _DUPLICATE_AGREEMENT_THRESHOLD = 0.99
+
+# Stuck-reading lookback per frequency, scaled to the same ~10-hour window
+# profiling measured at 1h (9 steps back = 10 readings = 10h).
+STUCK_LOOKBACK_STEPS_BY_FREQ = {"1h": 9, "15min": 39, "1min": 599}
 
 # COMMAND ----------
 
@@ -66,10 +70,10 @@ def process(bt: str, silver_table: str) -> None:
 
     value_cols = [c for c in df.columns if c not in ("frequency", "datetime_utc")]
 
-    # H1 -- pre-drop duplication safeguard (heating_p only). electricity_p is
+    # Pre-drop duplication safeguard (heating_p only). electricity_p is
     # processed first (TABLE_MAP order), so its Silver output already exists
     # by the time heating_p runs.
-    _h1_agreement = None
+    _dup_agreement = None
     if bt == "honda_iot_heating_p" and "CHP_elec" in df.columns:
         try:
             _elec = read_silver("honda_electricity_p").select(
@@ -78,30 +82,30 @@ def process(bt: str, silver_table: str) -> None:
             _joined = df.join(_elec, ["frequency", "datetime_utc"], "inner")
             _total = _joined.count()
             _agree = _joined.filter(F.col("CHP_elec") == F.col("_elec_chp")).count()
-            _h1_agreement = (_agree / _total) if _total else None
+            _dup_agreement = (_agree / _total) if _total else None
         except Exception as exc:
-            print(f"SKIP H1 pre-drop safeguard (electricity_p not yet written?): {exc}")
+            print(f"SKIP pre-drop safeguard (electricity_p not yet written?): {exc}")
         if (
-            _h1_agreement is not None
-            and _h1_agreement >= _DUPLICATE_AGREEMENT_THRESHOLD
+            _dup_agreement is not None
+            and _dup_agreement >= _DUPLICATE_AGREEMENT_THRESHOLD
         ):
             df = df.drop("CHP_elec")
             value_cols = [c for c in value_cols if c != "CHP_elec"]
             print(
-                f"H1: dropped heating_p.CHP_elec -- agreement with "
-                f"electricity_p.CHP = {_h1_agreement:.4f} (>= "
+                f"dropped heating_p.CHP_elec -- agreement with "
+                f"electricity_p.CHP = {_dup_agreement:.4f} (>= "
                 f"{_DUPLICATE_AGREEMENT_THRESHOLD})"
             )
-        elif _h1_agreement is not None:
+        elif _dup_agreement is not None:
             print(
-                f"H1 REOPENED: heating_p.CHP_elec vs electricity_p.CHP agreement = "
-                f"{_h1_agreement:.4f} (< {_DUPLICATE_AGREEMENT_THRESHOLD}) -- "
-                "keeping the column, not dropping. Investigate before H1 is "
-                "reapplied."
+                f"REOPENED: heating_p.CHP_elec vs electricity_p.CHP agreement = "
+                f"{_dup_agreement:.4f} (< {_DUPLICATE_AGREEMENT_THRESHOLD}) -- "
+                "keeping the column, not dropping. Investigate before this "
+                "decision is reapplied."
             )
 
-    # D5/H4 -- 5-sigma outlier flag per value column, computed from that
-    # column's own mean/sd (honda_iot.md S01/S02 Data Quality).
+    # 5-sigma outlier flag per value column, computed from that column's own
+    # mean/sd (per-source profiling data-quality section).
     if value_cols:
         stat_exprs = []
         for c in value_cols:
@@ -117,22 +121,28 @@ def process(bt: str, silver_table: str) -> None:
                 ).otherwise(F.lit(False)),
             )
 
-    # D5/H4 -- stuck-reading flag (10 consecutive identical non-null readings,
-    # matching profiling's own "value == value 1 and 9 steps back" definition,
-    # honda_iot.md). Quantified by profiling only at 1h resolution -- computed
-    # here across every frequency using the same step definition, but treat
-    # the 1min/15min result as unvalidated against a known baseline until
-    # inspected (the 1h result has a direct profiling baseline to compare to).
+    # Stuck-reading flag: flat for a ~10-hour window, matching
+    # profiling's "value == value 1 and 9 steps back" definition AT 1h
+    # (9 steps back = 10 readings = 10h). A fixed 9-step lookback applied
+    # uniformly across frequencies previously inflated the 1min/15min result
+    # (10 minutes/150 minutes flat is a much weaker signal than 10 hours) --
+    # the lookback now scales per frequency to the same ~10h window.
     w = Window.partitionBy("frequency").orderBy("datetime_utc")
     for c in value_cols:
-        lag1 = F.lag(F.col(c), 1).over(w)
-        lag9 = F.lag(F.col(c), 9).over(w)
-        df = df.withColumn(
-            f"_{c}_stuck_reading_flag",
-            F.col(c).isNotNull() & (F.col(c) == lag1) & (F.col(c) == lag9),
-        )
+        stuck_expr = F.lit(False)
+        for freq, lag_n in STUCK_LOOKBACK_STEPS_BY_FREQ.items():
+            lag1 = F.lag(F.col(c), 1).over(w)
+            lagN = F.lag(F.col(c), lag_n).over(w)
+            cond = (
+                (F.col("frequency") == freq)
+                & F.col(c).isNotNull()
+                & (F.col(c) == lag1)
+                & (F.col(c) == lagN)
+            )
+            stuck_expr = F.when(cond, F.lit(True)).otherwise(stuck_expr)
+        df = df.withColumn(f"_{c}_stuck_reading_flag", stuck_expr)
 
-    # H2 -- meter monotonicity-violation flag, _w (cumulative-meter) tables
+    # Meter monotonicity-violation flag, _w (cumulative-meter) tables
     # only (honda_iot.md S01 Temporal Consistency). Row-level: value decreased
     # vs the immediately preceding reading in the same frequency partition.
     if silver_table.endswith("_w"):
@@ -153,8 +163,8 @@ def process(bt: str, silver_table: str) -> None:
         component=COMPONENT,
         rid=RID,
         key_cols=["frequency", "datetime_utc"],
-        extra_checks={"h1_chp_elec_agreement": _h1_agreement}
-        if _h1_agreement is not None
+        extra_checks={"chp_elec_duplicate_agreement": _dup_agreement}
+        if _dup_agreement is not None
         else None,
     )
     write_silver_findings(

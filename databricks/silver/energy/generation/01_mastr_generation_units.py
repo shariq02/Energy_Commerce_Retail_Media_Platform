@@ -50,7 +50,7 @@ UNIT_TABLES = [
     "mastr_einheiten_geothermie_gsgk",
 ]
 
-# MASTR-1: drop only columns constant BY CONSTRUCTION (single-carrier tables,
+# Drop only columns constant BY CONSTRUCTION (single-carrier tables,
 # German-only register). Other flagged constants may be incidental -- kept.
 STRUCTURAL_CONSTANT_COLS = ["Energietraeger", "Land"]
 

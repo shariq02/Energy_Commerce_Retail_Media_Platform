@@ -63,7 +63,7 @@ MEASUREMENT_TABLES = [
 
 # DBTITLE 1,One measurement table -> Silver
 
-# DWD-1: (station, parameter_source_code, has_observed_missing) accumulated
+# (station, parameter_source_code, has_observed_missing) accumulated
 # across tables, captured pre-rename so codes match parameter_source_code.
 _observed_rows: list[tuple] = []
 
@@ -122,7 +122,7 @@ def process(bt: str) -> None:
         source=SOURCE,
         component=COMPONENT,
         rid=RID,
-        key_cols=["station_id", "observation_ts"],
+        key_cols=["STATIONS_ID", "observation_ts"],
         df_before=bronze_df,
     )
     write_silver_findings(
@@ -138,7 +138,7 @@ for _bt in MEASUREMENT_TABLES:
 
 # COMMAND ----------
 
-# DBTITLE 1,DWD-1 -- missingness reconciliation (REPORTED vs OBSERVED)
+# DBTITLE 1,Missingness reconciliation (REPORTED vs OBSERVED)
 # REPORTED = dwd_missing_value_periods; OBSERVED = captured above. Flags
 # disagreement only -- never deletes or corrects either signal.
 

@@ -56,17 +56,16 @@ df = df.withColumn("currency_unknown", F.lit(True)).withColumn(
     "_srid", sha_key(*KEY_COLS)
 )
 
-# D3 (design record §4 REES46): category_code is a source-provided dotted
-# hierarchy path (e.g. "electronics.smartphone.android") -- split on the
-# delimiter, not an invented taxonomy (rees46.md Top category_code list).
+# category_code is a dotted hierarchy path -- split on the delimiter.
+# F.get (not getItem/element_at) tolerates a short array under ANSI mode.
 _cat_parts = F.split(F.col("category_code"), r"\.")
 df = (
-    df.withColumn("category_l1", _cat_parts.getItem(0))
-    .withColumn("category_l2", _cat_parts.getItem(1))
-    .withColumn("category_l3", _cat_parts.getItem(2))
+    df.withColumn("category_l1", F.get(_cat_parts, 0))
+    .withColumn("category_l2", F.get(_cat_parts, 1))
+    .withColumn("category_l3", F.get(_cat_parts, 2))
 )
 
-# D4: bot-burst + category-ambiguity flags. Session = (user_id, user_session),
+# Bot-burst + category-ambiguity flags. Session = (user_id, user_session),
 # never user_session alone.
 _burst_w = Window.partitionBy("user_id", "user_session", "event_time")
 df = df.withColumn("_bot_burst_suspected", F.count(F.lit(1)).over(_burst_w) > 20)

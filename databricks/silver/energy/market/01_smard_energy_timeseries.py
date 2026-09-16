@@ -95,7 +95,7 @@ df = (
     )
 )
 
-# S1: 5-sigma flag per metric's own mean/sd (scales differ wildly by metric).
+# 5-sigma flag per metric's own mean/sd (scales differ wildly by metric).
 # Independent of metric_semantic_status -- never suppresses/replaces it.
 _metric_stats = df.groupBy("metric").agg(
     F.mean("value").alias("_mean"), F.stddev("value").alias("_sd")

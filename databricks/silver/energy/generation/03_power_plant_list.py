@@ -90,8 +90,13 @@ BUNDESLAND_NAME_AGS = {
 
 
 def _bundesland_ags(colname: str):
-    m = F.create_map([F.lit(x) for kv in BUNDESLAND_NAME_AGS.items() for x in kv])
-    return m[F.col(colname)]
+    # Raw Bundesland values are unhyphenated (e.g. "NordrheinWestfalen"),
+    # unlike BUNDESLAND_NAME_AGS's keys -- normalise both sides by stripping
+    # "-" so every multi-word state actually resolves (fixes the out-of-set
+    # flag below surfacing 1165 rows where only ~64 were expected).
+    normalised_map = {k.replace("-", ""): v for k, v in BUNDESLAND_NAME_AGS.items()}
+    m = F.create_map([F.lit(x) for kv in normalised_map.items() for x in kv])
+    return m[F.regexp_replace(F.trim(F.col(colname)), "-", "")]
 
 
 # COMMAND ----------
@@ -137,7 +142,7 @@ p = (
     .withColumn("ags_method", F.lit("bundesland_code"))
 )
 
-# D10: flag Bundesland values _bundesland_ags silently nulls (Nordsee, None).
+# Flag Bundesland values _bundesland_ags silently nulls (Nordsee, None).
 p = p.withColumn(
     "_bundesland_out_of_set",
     (F.col("country") == "Deutschland")
@@ -145,11 +150,14 @@ p = p.withColumn(
     & _bundesland_ags("federal_state").isNull(),
 )
 
-# P1: additive cross-check of energy_carrier_code against MaStR's own
-# Energietraeger katalog -- does not replace the existing decode map.
+# Additive cross-check of energy_carrier_code against MaStR's own fuel
+# katalog. MaStR has no "Energietraeger" category (confirmed against
+# mappings/mastr.yml and mastr.md's category list) -- the correct category
+# is "Brennstoff" (used to decode Hauptbrennstoff/WeitererHauptbrennstoff).
+# Does not replace the existing decode map.
 try:
     _mastr_carrier_ref = (
-        mastr_catalog_ref("Energietraeger")
+        mastr_catalog_ref("Brennstoff")
         .select(F.col("cat_wert").alias("_mastr_carrier_value"))
         .dropDuplicates(["_mastr_carrier_value"])
     )
@@ -165,7 +173,7 @@ try:
         .drop("_mastr_carrier_value")
     )
 except Exception as exc:
-    print(f"SKIP P1 MaStR carrier cross-check: {exc}")
+    print(f"SKIP MaStR carrier cross-check: {exc}")
     p = p.withColumn("energy_carrier_mastr_matched", F.lit(None).cast("boolean"))
 
 p = p.withColumn(

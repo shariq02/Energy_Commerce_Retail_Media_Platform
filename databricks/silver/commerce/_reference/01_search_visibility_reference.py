@@ -46,7 +46,7 @@ REPO_BT = "search_visibility_repository"
 bronze_repo = read_bronze(REPO_BT)
 repo = bronze_repo.withColumn("_srid", F.col("repository_id").cast("string"))
 
-# D6 (design record §4 Search Visibility): rename the reference side's
+# Rename the reference side's
 # `country` too -- it means the repository's home country, a different
 # concept from the events table's traffic-geography `country`.
 repo = repo.withColumnRenamed("country", "repository_home_country")

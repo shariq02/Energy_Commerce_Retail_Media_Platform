@@ -373,7 +373,7 @@ write_silver_findings(
     "dwd_missing_value_periods",
     _findings_blocks,
 )
-# DWD-1 missingness reconciliation runs in 01_dwd_hourly_measurements.py --
+# Missingness reconciliation runs in 01_dwd_hourly_measurements.py --
 # the OBSERVED side doesn't exist until the measurement tables do.
 
 # COMMAND ----------

@@ -80,7 +80,7 @@ _findings_blocks = inspect_table(
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    key_cols=["station_id", "observation_ts"],
+    key_cols=["STATIONS_ID", "observation_ts"],
     df_before=bronze_df,
 )
 write_silver_findings(
