@@ -392,6 +392,19 @@ REFERENCE_TABLES = {
     "search_visibility_repository",
 }
 
+# Per-table column-rename override for a bespoke rename that diverges from
+# the source's generic business-name mapping. dwd_missing_value_periods
+# keeps Von_Datum/Bis_Datum as gap_start_ts/gap_end_ts (its own notebook's
+# explicit .withColumnRenamed), not the generic valid_from/valid_to every
+# other DWD metadata table uses -- verified against that notebook, not
+# guessed.
+TABLE_COLUMN_RENAME_OVERRIDES = {
+    "dwd_missing_value_periods": {
+        "Von_Datum": "gap_start_ts",
+        "Bis_Datum": "gap_end_ts",
+    },
+}
+
 # flag_col columns value_quarantine() adds on top of the source's own
 # contract columns -- verified against every value_quarantine() call in
 # databricks/silver/, not derivable from the contract itself.
@@ -487,6 +500,8 @@ def build_rows() -> list[dict]:
                 out_name = bn.get(name, name)
                 # DWD MESS_DATUM -> observation_ts
                 out_name = topo.get("ts_rename", {}).get(name, out_name)
+                # per-table override (e.g. dwd_missing_value_periods)
+                out_name = TABLE_COLUMN_RENAME_OVERRIDES.get(st, {}).get(name, out_name)
                 add(
                     st,
                     out_name,
@@ -538,8 +553,10 @@ def build_rows() -> list[dict]:
                     and any(c["name"] == "MESS_DATUM" for c in tdef["columns"])
                 )
             )
-            disambig = source in ("power_plant_list", "redispatch") or (
-                source == "mastr" and st == "mastr_grid_operator_change_events"
+            disambig = (
+                source in ("power_plant_list", "redispatch")
+                or (source == "mastr" and st == "mastr_grid_operator_change_events")
+                or st == "dwd_missing_value_periods"
             )
             add_governance(st, conflict=has_conflict, disambig=disambig)
             # value_quarantine flag columns -- the notebook's own flag_col=

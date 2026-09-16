@@ -132,17 +132,19 @@ dwd_extreme_wind,source_system,derived,constant per source,silver governance,ene
 dwd_extreme_wind,wind_gust_max_hourly,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver
 dwd_missing_value_periods,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
 dwd_missing_value_periods,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
+dwd_missing_value_periods,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver_reference
+dwd_missing_value_periods,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule,energy_silver_reference
 dwd_missing_value_periods,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver_reference
 dwd_missing_value_periods,eor,source_provided,typed cast,dwd contract / business-name mapping,energy_silver_reference
 dwd_missing_value_periods,gap_description,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
+dwd_missing_value_periods,gap_end_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
+dwd_missing_value_periods,gap_start_ts,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_missing_value_periods,missing_value_count,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_missing_value_periods,parameter_source_code,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_missing_value_periods,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver_reference
 dwd_missing_value_periods,source_system,derived,constant per source,silver governance,energy_silver_reference
 dwd_missing_value_periods,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_missing_value_periods,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
-dwd_missing_value_periods,valid_from,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
-dwd_missing_value_periods,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_moisture,QN_8,source_provided,typed cast,dwd contract / business-name mapping,energy_silver
 dwd_moisture,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping,energy_silver
 dwd_moisture,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule,energy_silver
