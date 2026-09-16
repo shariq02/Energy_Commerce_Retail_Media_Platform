@@ -66,6 +66,11 @@ extend-ignore = ["E402", "BLE001"]
 # runtime magic). databricks/silver/_silver_common.py is NOT exempted.
 "databricks/silver/[0-9]*_*.py" = ["F821"]
 "databricks/silver/energy/**/*.py" = ["F821"]
+# _silver_inspect.py is a second shared library, always %run directly after
+# _silver_common.py (never first) -- unlike _silver_common.py it legitimately
+# depends on that prior %run's names (CATALOG, QUALITY_SCHEMA, now_utc,
+# target_schema_for), same as every numbered notebook above.
+"databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
 
 [tool.pytest.ini_options]

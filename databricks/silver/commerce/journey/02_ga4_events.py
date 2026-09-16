@@ -28,6 +28,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -79,7 +84,8 @@ def _clean_ecommerce(ecommerce_col: F.Column) -> F.Column:
 # COMMAND ----------
 
 # DBTITLE 1,ga4_events -> Silver
-df = read_bronze(BT)
+bronze_df = read_bronze(BT)
+df = bronze_df
 
 df, q = resolve_conflicts(df, KEY_COLS, CONTENT_COLS, bronze_table=BT)
 write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
@@ -88,9 +94,35 @@ df = df.withColumn("items", _clean_items(F.col("items"))).withColumn(
     "ecommerce", _clean_ecommerce(F.col("ecommerce"))
 )
 
+# D1: pivot the closed, 100%-populated event_params vocabulary (6 keys) to
+# named columns -- exposes ga_session_id, needed for GA4's session grain.
+_PARAM_KEYS = {
+    "session_id": ("ga_session_id", "int_value"),
+    "session_number": ("ga_session_number", "int_value"),
+    "page_location": ("page_location", "string_value"),
+    "page_title": ("page_title", "string_value"),
+    "search_term": ("search_term", "string_value"),
+    "unique_search_term": ("unique_search_term", "string_value"),
+}
+for _out_col, (_key_name, _value_field) in _PARAM_KEYS.items():
+    _matched = F.filter(
+        F.col("event_params"), lambda x, _k=_key_name: x["key"] == F.lit(_k)
+    )
+    _first = F.element_at(_matched, 1)
+    df = df.withColumn(_out_col, _first.getField("value").getField(_value_field))
+
 df = df.withColumn("_srid", sha_key(*KEY_COLS))
 df = add_provenance(df, SOURCE, "_srid", RID)
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    df,
+    BT,
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=KEY_COLS,
+    df_before=bronze_df,
+)
 
 # COMMAND ----------
 

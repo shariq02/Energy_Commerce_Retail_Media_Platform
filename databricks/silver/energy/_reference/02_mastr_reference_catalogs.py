@@ -24,6 +24,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -48,9 +53,21 @@ CATALOG_TABLES = [
 # DBTITLE 1,Reference catalogs -> Silver
 for bt in CATALOG_TABLES:
     pk = TABLES[bt]["grain"]["key"][0]
-    df = read_bronze(bt).withColumn("_srid", F.col(pk).cast("string"))
+    _bronze = read_bronze(bt)
+    df = _bronze.withColumn("_srid", F.col(pk).cast("string"))
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
+    # No transformation candidate identified for the reference catalogs beyond
+    # the existing typed pass-through -- inspection only (design record §4).
+    inspect_table(
+        df,
+        bt,
+        source=SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=[pk],
+        df_before=_bronze,
+    )
 
 # COMMAND ----------
 

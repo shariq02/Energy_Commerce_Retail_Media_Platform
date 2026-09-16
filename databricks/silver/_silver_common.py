@@ -186,11 +186,17 @@ def ecosystem_for(source: str) -> str:
 _target_schema_by_table: dict[str, str] | None = None  # cached after first load
 
 
-def target_schema_for(silver_table: str) -> str:
-    """silver_table (short name) -> its schema, from the seeded
-    field_class_registry's own target_schema column -- the authoritative
-    source, since a source can own both a primary and a reference table
-    (e.g. dwd), which ecosystem-per-source alone can't express."""
+def target_schema_for(silver_table: str, *, source: str | None = None) -> str:
+    """silver_table (short name) -> its schema. Prefers the seeded
+    field_class_registry's own target_schema column (authoritative once a table
+    is classified -- a source can own both a primary and a reference table,
+    e.g. dwd, which ecosystem-per-source alone can't express).
+
+    A brand-new Silver table with no registry entry yet is NOT blocked: pass
+    `source=` and it falls back to that source's ecosystem default schema
+    (`{ecosystem}_silver`), prints a NEW TABLE notice, and lets the write
+    proceed. Classification happens after inspecting the actual Silver output
+    (see _silver_inspect.py), never as a precondition for writing it."""
     global _target_schema_by_table
     if _target_schema_by_table is None:
         try:
@@ -206,11 +212,21 @@ def target_schema_for(silver_table: str) -> str:
             ) from exc
         _target_schema_by_table = {r["table_name"]: r["target_schema"] for r in rows}
     schema = _target_schema_by_table.get(silver_table)
-    if schema is None:
+    if schema is not None:
+        return schema
+    if source is None:
         raise RuntimeError(
-            f"{silver_table} has no field_class_registry entry -- update the seed "
-            "(src/schemas/_generate_field_classes.py) and reload"
+            f"{silver_table} has no field_class_registry entry and no source= "
+            "was given to derive a default -- pass source= to write_silver for a "
+            "new table, or register it in the seed"
         )
+    schema = f"{ecosystem_for(source)}_silver"
+    print(
+        f"NEW TABLE  {silver_table} has no field_class_registry entry -- "
+        f"defaulting to {schema} (ecosystem default for source={source!r}); "
+        "classify via the seed generator (src/schemas/_generate_field_classes.py) "
+        "and reload when convenient -- this does not block the write."
+    )
     return schema
 
 
@@ -376,9 +392,15 @@ def add_provenance(
     )
 
 
-def validate_field_classes(df: DataFrame, silver_table: str) -> None:
-    """Hard-fail if any output column is not classified in the central registry.
-    Notebooks never write the registry -- it is a seeded build artifact."""
+def validate_field_classes(df: DataFrame, silver_table: str) -> list[str]:
+    """Detect output columns not yet classified in the central registry and
+    report them -- does NOT block the write. A legitimate new Silver column (or
+    a brand-new table, see target_schema_for) is allowed to exist before it is
+    registered; classification is a post-hoc reconciliation step against the
+    actual Silver output (see _silver_inspect.py), not a pre-run whitelist.
+    Notebooks never write the registry itself -- it is a seeded build artifact,
+    reconciled separately. Returns the sorted list of unclassified column names
+    (empty if none)."""
     short = silver_table.split(".")[-1]
     try:
         reg = spark.table(FIELD_CLASS_TABLE).filter(F.col("table_name") == short)
@@ -389,10 +411,13 @@ def validate_field_classes(df: DataFrame, silver_table: str) -> None:
     classified = {r["column_name"] for r in reg.select("column_name").collect()}
     missing = sorted(set(df.columns) - classified)
     if missing:
-        raise RuntimeError(
-            f"field_class_registry has no entry for {short}.{{{', '.join(missing)}}} "
-            f"-- update the seed (src/schemas/_generate_field_classes.py) and reload"
+        print(
+            f"UNCLASSIFIED  {short}.{{{', '.join(missing)}}} -- not yet in "
+            f"field_class_registry; write proceeds. Classify via the seed "
+            f"generator (src/schemas/_generate_field_classes.py) and reload "
+            "when convenient."
         )
+    return missing
 
 
 # COMMAND ----------
@@ -739,12 +764,15 @@ def watermark(
 def write_silver(
     df: DataFrame, silver_table: str, *, source: str, component: str, rid: str
 ) -> int | None:
-    """Deterministic full overwrite. Validates field classes first, prints the
-    Delta rollback line, records rows_written from Delta metrics (no pre-write
-    count), writes a watermark row."""
+    """Deterministic full overwrite. Detects unclassified columns (non-blocking
+    -- see validate_field_classes), prints the Delta rollback line, records
+    rows_written from Delta metrics (no pre-write count), writes a watermark
+    row. A brand-new table (no field_class_registry entry at all) defaults to
+    its ecosystem's schema via `source` rather than failing -- see
+    target_schema_for."""
     started = now_utc()
-    full = f"{CATALOG}.{target_schema_for(silver_table)}.{silver_table}"
-    validate_field_classes(df, full)
+    full = f"{CATALOG}.{target_schema_for(silver_table, source=source)}.{silver_table}"
+    unclassified = validate_field_classes(df, full)
     if spark.catalog.tableExists(full):
         v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
         print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
@@ -757,6 +785,16 @@ def write_silver(
     n = _delta_rows_written(full)
     watermark(component, source, n, "COMPLETE", rid, started)
     audit(component, source, "rows_written", n, status="PASS", rid=rid)
+    if unclassified:
+        audit(
+            component,
+            source,
+            "unclassified_columns",
+            float(len(unclassified)),
+            status="WARN",
+            error=",".join(unclassified),
+            rid=rid,
+        )
     print(f"OK  {full}: {n if n is not None else '?'} rows")
     return n
 
@@ -933,10 +971,11 @@ def explode_link_bridge(
     bronze_table: str,
     rid: str,
     sep: str = r"[,;\s]+",
-) -> None:
+) -> DataFrame:
     """Explode a delimited link array to an additive `(parent_id, linked_id)`
     bridge -- one row per pair, deterministic `source_record_id`. The bridge
-    never replaces the owning source table."""
+    never replaces the owning source table. Returns the written DataFrame so
+    the caller can run inspect_table() on it without re-deriving it."""
     b = (
         df.select(
             F.col(parent_col).cast("string").alias("parent_id"),
@@ -948,6 +987,7 @@ def explode_link_bridge(
     )
     b = add_provenance(b, source, "_srid", rid)
     write_silver(b, silver_table, source=source, component=component, rid=rid)
+    return b
 
 
 def mastr_catalog_ref(category_name: str) -> DataFrame:

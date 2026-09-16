@@ -25,6 +25,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -90,8 +95,30 @@ df = (
     )
 )
 
+# S1: 5-sigma flag per metric's own mean/sd (scales differ wildly by metric).
+# Independent of metric_semantic_status -- never suppresses/replaces it.
+_metric_stats = df.groupBy("metric").agg(
+    F.mean("value").alias("_mean"), F.stddev("value").alias("_sd")
+)
+df = df.join(F.broadcast(_metric_stats), "metric", "left")
+df = df.withColumn(
+    "_5sigma_outlier",
+    F.when(
+        F.col("_sd").isNotNull() & (F.col("_sd") > 0) & F.col("value").isNotNull(),
+        F.abs(F.col("value") - F.col("_mean")) > (F.lit(5.0) * F.col("_sd")),
+    ).otherwise(F.lit(False)),
+).drop("_mean", "_sd")
+
 df = add_provenance(df, SOURCE, "_srid", RID)
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    df,
+    BT,
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    df_before=read_bronze(BT),
+)
 
 # COMMAND ----------
 

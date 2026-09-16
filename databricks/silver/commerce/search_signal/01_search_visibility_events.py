@@ -25,6 +25,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -52,7 +57,8 @@ DATE_FORMATS = ("M/d/yyyy", "yyyy-MM-dd")
 # COMMAND ----------
 
 # DBTITLE 1,search_visibility_events -> Silver
-ev = read_bronze(EVENTS_BT)
+bronze_ev = read_bronze(EVENTS_BT)
+ev = bronze_ev
 for c in ("clickThrough", "clicks", "impressions", "position"):
     ev = ev.withColumn(c, F.col(c).cast("double"))
 
@@ -67,8 +73,37 @@ ev = (
     )
     .drop("date")
 )
+
+# D6: Yes/No -> boolean (raw kept); country -> traffic_country (the
+# reference table's `country` means something different -- repository home).
+ev = ev.withColumn(
+    "is_citable_content", F.col("citableContent") == F.lit("Yes")
+).withColumnRenamed("country", "traffic_country")
+
+# D7: `index` is a short alias of repository_id (not independent) -- kept,
+# renamed, not dropped. Inspection below confirms the 1:1 relationship.
+ev = ev.withColumnRenamed("index", "repository_index_alias")
+
 ev = add_provenance(ev, SOURCE_SYSTEM, "_srid", RID)
 write_silver(ev, EVENTS_BT, source=SOURCE_SYSTEM, component=COMPONENT, rid=RID)
+inspect_table(
+    ev,
+    EVENTS_BT,
+    source=SOURCE_SYSTEM,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["repository_id", "url", "period", "traffic_country", "device"],
+    df_before=bronze_ev,
+    extra_checks={
+        "index_repository_id_1to1": ev.select("repository_index_alias", "repository_id")
+        .distinct()
+        .groupBy("repository_index_alias")
+        .agg(F.countDistinct("repository_id").alias("n"))
+        .filter(F.col("n") > 1)
+        .count()
+        == 0,
+    },
+)
 
 # COMMAND ----------
 

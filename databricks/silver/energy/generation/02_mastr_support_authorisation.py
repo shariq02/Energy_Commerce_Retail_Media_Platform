@@ -25,6 +25,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -55,11 +60,24 @@ LINK_COL = "VerknuepfteEinheitenMaStRNummern"
 
 
 def process(bt: str, pk: str) -> None:
-    df = mastr_standardise(read_bronze(bt), NAME_MAP, CODED, source=SOURCE)
+    bronze_df = read_bronze(bt)
+    df = mastr_standardise(bronze_df, NAME_MAP, CODED, source=SOURCE)
     id_col = NAME_MAP.get(pk, pk)
     df = df.withColumn("_srid", F.col(id_col).cast("string"))
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
+    # No constant columns / other transformation candidate found for these
+    # tables (mastr.md S02 EDA Findings: constant=[] for all seven) --
+    # inspection only, per the design record.
+    inspect_table(
+        df,
+        bt,
+        source=SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=[id_col],
+        df_before=bronze_df,
+    )
 
 
 for _bt, _pk in PRIMARY_TABLES.items():
@@ -78,7 +96,7 @@ def _link_src(tables: list[str], parent: str) -> "DataFrame":
     return out
 
 
-explode_link_bridge(
+_b1 = explode_link_bridge(
     _link_src(EEG_TABLES, "EegMaStRNummer"),
     "EegMaStRNummer",
     LINK_COL,
@@ -88,7 +106,15 @@ explode_link_bridge(
     bronze_table=",".join(EEG_TABLES),
     rid=RID,
 )
-explode_link_bridge(
+inspect_table(
+    _b1,
+    "mastr_eeg_support_unit_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
+)
+_b2 = explode_link_bridge(
     read_bronze("mastr_anlagen_kwk"),
     "KwkMastrNummer",
     LINK_COL,
@@ -98,7 +124,15 @@ explode_link_bridge(
     bronze_table="mastr_anlagen_kwk",
     rid=RID,
 )
-explode_link_bridge(
+inspect_table(
+    _b2,
+    "mastr_kwk_support_unit_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
+)
+_b3 = explode_link_bridge(
     read_bronze("mastr_einheiten_genehmigung"),
     "GenMastrNummer",
     LINK_COL,
@@ -108,7 +142,15 @@ explode_link_bridge(
     bronze_table="mastr_einheiten_genehmigung",
     rid=RID,
 )
-explode_link_bridge(
+inspect_table(
+    _b3,
+    "mastr_authorisation_unit_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
+)
+_b4 = explode_link_bridge(
     read_bronze("mastr_ertuechtigungen"),
     "Id",
     "EegMastrNummer",
@@ -117,6 +159,14 @@ explode_link_bridge(
     component=COMPONENT,
     bronze_table="mastr_ertuechtigungen",
     rid=RID,
+)
+inspect_table(
+    _b4,
+    "mastr_repowering_eeg_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
 )
 
 # COMMAND ----------

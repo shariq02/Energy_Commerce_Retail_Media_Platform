@@ -25,6 +25,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -39,23 +44,39 @@ CODED = coded_columns(MAPPING, SOURCE)
 # COMMAND ----------
 
 # DBTITLE 1,mastr_marktakteure -> Silver
-act = mastr_standardise(
-    read_bronze("mastr_marktakteure"), NAME_MAP, CODED, source=SOURCE
-)
+_act_bronze = read_bronze("mastr_marktakteure")
+act = mastr_standardise(_act_bronze, NAME_MAP, CODED, source=SOURCE)
 act = act.withColumn("_srid", F.col("MastrNummer").cast("string"))
 act = add_provenance(act, SOURCE, "_srid", RID)
 write_silver(act, "mastr_marktakteure", source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    act,
+    "mastr_marktakteure",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["MastrNummer"],
+    df_before=_act_bronze,
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,mastr_marktakteure_und_rollen -> Silver
-rol = mastr_standardise(
-    read_bronze("mastr_marktakteure_und_rollen"), NAME_MAP, CODED, source=SOURCE
-)
+_rol_bronze = read_bronze("mastr_marktakteure_und_rollen")
+rol = mastr_standardise(_rol_bronze, NAME_MAP, CODED, source=SOURCE)
 rol = rol.withColumn("_srid", F.col("MastrNummer").cast("string"))
 rol = add_provenance(rol, SOURCE, "_srid", RID)
 write_silver(
     rol, "mastr_marktakteure_und_rollen", source=SOURCE, component=COMPONENT, rid=RID
+)
+inspect_table(
+    rol,
+    "mastr_marktakteure_und_rollen",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["MastrNummer"],
+    df_before=_rol_bronze,
 )
 
 # COMMAND ----------
@@ -74,6 +95,14 @@ brg = (
 brg = add_provenance(brg, SOURCE, "_srid", RID)
 write_silver(
     brg, "mastr_actor_role_bridge", source=SOURCE, component=COMPONENT, rid=RID
+)
+inspect_table(
+    brg,
+    "mastr_actor_role_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
 )
 
 # COMMAND ----------

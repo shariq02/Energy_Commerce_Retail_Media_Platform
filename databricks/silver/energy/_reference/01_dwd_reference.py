@@ -30,6 +30,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -126,6 +131,14 @@ xref = spark.createDataFrame(
 write_silver(
     xref, "dwd_city_bundesland_xref", source=SOURCE, component=COMPONENT, rid=RID
 )
+inspect_table(
+    xref,
+    "dwd_city_bundesland_xref",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["city"],
+)
 
 # COMMAND ----------
 
@@ -157,6 +170,15 @@ write_quarantine(q, RID)
 sg = sg.withColumn("_srid", sha_key("station_id", "valid_from"))
 sg = add_provenance(sg, SOURCE, "_srid", RID)
 write_silver(sg, "dwd_station_geography", source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    sg,
+    "dwd_station_geography",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["station_id", "valid_from"],
+    df_before=read_bronze(BT),
+)
 
 # COMMAND ----------
 
@@ -174,6 +196,15 @@ snh = add_provenance(snh, SOURCE, "_srid", RID)
 write_silver(
     snh, "dwd_station_name_history", source=SOURCE, component=COMPONENT, rid=RID
 )
+inspect_table(
+    snh,
+    "dwd_station_name_history",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["station_id", "valid_from"],
+    df_before=read_bronze(BT),
+)
 
 # COMMAND ----------
 
@@ -186,6 +217,15 @@ di = di.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
 di = di.withColumn("_srid", sha_key("station_id", "parameter_category", "valid_from"))
 di = add_provenance(di, SOURCE, "_srid", RID)
 write_silver(di, "dwd_device_instrument", source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    di,
+    "dwd_device_instrument",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["station_id", "parameter_category", "valid_from"],
+    df_before=read_bronze(BT),
+)
 
 # COMMAND ----------
 
@@ -200,6 +240,15 @@ pu = pu.withColumn(
 )
 pu = add_provenance(pu, SOURCE, "_srid", RID)
 write_silver(pu, "dwd_parameter_unit", source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    pu,
+    "dwd_parameter_unit",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["station_id", "parameter_source_code", "valid_from"],
+    df_before=read_bronze(BT),
+)
 
 # derived: source parameter code -> business name -> physical unit
 param_bn = (MAPPING.get("business_names", {}) or {}).get("parameters", {})
@@ -224,6 +273,14 @@ cat = (
     .drop("mapped_unit")
 )
 write_silver(cat, "dwd_parameter_catalog", source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    cat,
+    "dwd_parameter_catalog",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parameter_source_code"],
+)
 
 # COMMAND ----------
 
@@ -259,6 +316,23 @@ mvp = add_provenance(mvp, SOURCE, "_srid", RID)
 write_silver(
     mvp, "dwd_missing_value_periods", source=SOURCE, component=COMPONENT, rid=RID
 )
+inspect_table(
+    mvp,
+    "dwd_missing_value_periods",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=[
+        "station_id",
+        "parameter_source_code",
+        "gap_start_ts",
+        "gap_end_ts",
+        "_src_id_ord",
+    ],
+    df_before=read_bronze(BT),
+)
+# DWD-1 missingness reconciliation runs in 01_dwd_hourly_measurements.py --
+# the OBSERVED side doesn't exist until the measurement tables do.
 
 # COMMAND ----------
 

@@ -26,6 +26,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -51,7 +56,8 @@ VALUE_COLS = [
 # COMMAND ----------
 
 # DBTITLE 1,dwd_solar -> Silver
-df = strip_sentinels(read_bronze(BT), [*VALUE_COLS, QN_COL])
+bronze_df = read_bronze(BT)
+df = strip_sentinels(bronze_df, [*VALUE_COLS, QN_COL])
 df, q = resolve_conflicts(
     df, ["STATIONS_ID", "MESS_DATUM"], VALUE_COLS, qn_col=QN_COL, bronze_table=BT
 )
@@ -68,6 +74,15 @@ df = df.withColumn("observation_woz", parse_mess_datum_10min("MESS_DATUM_WOZ", "
 df = attach_city_ags(df, "city")
 df = add_provenance(df, SOURCE, "_srid", RID)
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    df,
+    BT,
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["station_id", "observation_ts"],
+    df_before=bronze_df,
+)
 
 # COMMAND ----------
 

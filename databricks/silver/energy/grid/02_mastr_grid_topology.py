@@ -26,6 +26,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -50,7 +55,8 @@ PRIMARY_TABLES = {
 
 
 def process(bt: str, pk: str) -> None:
-    df = read_bronze(bt)
+    bronze_df = read_bronze(bt)
+    df = bronze_df
     if bt == "mastr_bilanzierungsgebiete":
         df = df.dropDuplicates()
     df = mastr_standardise(df, NAME_MAP, CODED, source=SOURCE)
@@ -58,6 +64,15 @@ def process(bt: str, pk: str) -> None:
     df = df.withColumn("_srid", F.col(id_col).cast("string"))
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
+    inspect_table(
+        df,
+        bt,
+        source=SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=[id_col],
+        df_before=bronze_df,
+    )
 
 
 for _bt, _pk in PRIMARY_TABLES.items():
@@ -67,7 +82,7 @@ for _bt, _pk in PRIMARY_TABLES.items():
 
 # DBTITLE 1,Additive location bridges
 _lok = read_bronze("mastr_lokationen")
-explode_link_bridge(
+_bridge1 = explode_link_bridge(
     _lok,
     "MastrNummer",
     "VerknuepfteEinheitenMaStRNummern",
@@ -77,7 +92,15 @@ explode_link_bridge(
     bronze_table="mastr_lokationen",
     rid=RID,
 )
-explode_link_bridge(
+inspect_table(
+    _bridge1,
+    "mastr_location_unit_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
+)
+_bridge2 = explode_link_bridge(
     _lok,
     "MastrNummer",
     "NetzanschlusspunkteMaStRNummern",
@@ -87,6 +110,85 @@ explode_link_bridge(
     bronze_table="mastr_lokationen",
     rid=RID,
 )
+inspect_table(
+    _bridge2,
+    "mastr_location_connection_bridge",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["parent_id", "linked_id"],
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,MASTR-3 -- location coordinate-conflict flag (additive)
+# Reads the generation-unit Silver tables (must run first). Flags conflicting
+# coordinates per location_id; never picks a "correct" one.
+_GENERATION_UNIT_TABLES = [
+    "mastr_einheiten_wind",
+    "mastr_einheiten_biomasse",
+    "mastr_einheiten_wasser",
+    "mastr_einheiten_verbrennung",
+    "mastr_einheiten_kernkraft",
+    "mastr_einheiten_geothermie_gsgk",
+]
+
+_coords = None
+for _t in _GENERATION_UNIT_TABLES:
+    try:
+        _part = (
+            read_silver(_t)
+            .filter(
+                F.col("location_id").isNotNull()
+                & F.col("latitude").isNotNull()
+                & F.col("longitude").isNotNull()
+            )
+            .select(
+                "location_id",
+                F.round("latitude", 2).alias("lat2dp"),
+                F.round("longitude", 2).alias("lon2dp"),
+            )
+        )
+    except Exception as exc:
+        print(f"SKIP {_t} in MASTR-3 coordinate check: {exc}")
+        continue
+    _coords = _part if _coords is None else _coords.unionByName(_part)
+
+if _coords is not None:
+    _conflict = (
+        _coords.dropDuplicates(["location_id", "lat2dp", "lon2dp"])
+        .groupBy("location_id")
+        .agg(
+            F.countDistinct(F.concat_ws(",", "lat2dp", "lon2dp")).alias(
+                "distinct_coords"
+            )
+        )
+        .withColumn("_coordinate_conflict", F.col("distinct_coords") > 1)
+    )
+    _conflict = _conflict.withColumn("_srid", F.col("location_id").cast("string"))
+    _conflict = add_provenance(_conflict, SOURCE, "_srid", RID)
+    write_silver(
+        _conflict,
+        "mastr_location_coordinate_conflict",
+        source=SOURCE,
+        component=COMPONENT,
+        rid=RID,
+    )
+    inspect_table(
+        _conflict,
+        "mastr_location_coordinate_conflict",
+        source=SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=["location_id"],
+        extra_checks={
+            "conflicting_location_count": _conflict.filter(
+                F.col("_coordinate_conflict")
+            ).count(),
+        },
+    )
+else:
+    print("MASTR-3: no generation-unit Silver tables available yet -- skipped.")
 
 # COMMAND ----------
 

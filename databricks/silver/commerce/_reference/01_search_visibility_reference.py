@@ -24,6 +24,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -38,9 +43,25 @@ REPO_BT = "search_visibility_repository"
 # COMMAND ----------
 
 # DBTITLE 1,search_visibility_repository -> Silver
-repo = read_bronze(REPO_BT).withColumn("_srid", F.col("repository_id").cast("string"))
+bronze_repo = read_bronze(REPO_BT)
+repo = bronze_repo.withColumn("_srid", F.col("repository_id").cast("string"))
+
+# D6 (design record §4 Search Visibility): rename the reference side's
+# `country` too -- it means the repository's home country, a different
+# concept from the events table's traffic-geography `country`.
+repo = repo.withColumnRenamed("country", "repository_home_country")
+
 repo = add_provenance(repo, SOURCE_SYSTEM, "_srid", RID)
 write_silver(repo, REPO_BT, source=SOURCE_SYSTEM, component=COMPONENT, rid=RID)
+inspect_table(
+    repo,
+    REPO_BT,
+    source=SOURCE_SYSTEM,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["repository_id"],
+    df_before=bronze_repo,
+)
 
 # COMMAND ----------
 

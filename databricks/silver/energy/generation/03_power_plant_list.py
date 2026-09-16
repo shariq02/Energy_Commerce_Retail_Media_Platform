@@ -26,6 +26,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ../../_silver_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports + config
 from pyspark.sql import functions as F
 
@@ -132,6 +137,37 @@ p = (
     .withColumn("ags_method", F.lit("bundesland_code"))
 )
 
+# D10: flag Bundesland values _bundesland_ags silently nulls (Nordsee, None).
+p = p.withColumn(
+    "_bundesland_out_of_set",
+    (F.col("country") == "Deutschland")
+    & F.col("federal_state").isNotNull()
+    & _bundesland_ags("federal_state").isNull(),
+)
+
+# P1: additive cross-check of energy_carrier_code against MaStR's own
+# Energietraeger katalog -- does not replace the existing decode map.
+try:
+    _mastr_carrier_ref = (
+        mastr_catalog_ref("Energietraeger")
+        .select(F.col("cat_wert").alias("_mastr_carrier_value"))
+        .dropDuplicates(["_mastr_carrier_value"])
+    )
+    p = (
+        p.join(
+            F.broadcast(_mastr_carrier_ref),
+            p["energy_carrier_code"] == _mastr_carrier_ref["_mastr_carrier_value"],
+            "left",
+        )
+        .withColumn(
+            "energy_carrier_mastr_matched", F.col("_mastr_carrier_value").isNotNull()
+        )
+        .drop("_mastr_carrier_value")
+    )
+except Exception as exc:
+    print(f"SKIP P1 MaStR carrier cross-check: {exc}")
+    p = p.withColumn("energy_carrier_mastr_matched", F.lit(None).cast("boolean"))
+
 p = p.withColumn(
     "_ppl_key",
     F.concat_ws(
@@ -148,6 +184,22 @@ p = p.withColumn("_srid", sha_key("_ppl_key", "_src_id_ord")).drop(
 )
 p = add_provenance(p, SOURCE, "_srid", RID)
 write_silver(p, PLANT_BT, source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(
+    p,
+    PLANT_BT,
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    extra_checks={
+        "bundesland_out_of_set_count": p.filter(
+            F.col("_bundesland_out_of_set")
+        ).count(),
+        "energy_carrier_mastr_unmatched_count": p.filter(
+            F.col("energy_carrier_mastr_matched").isNotNull()
+            & ~F.col("energy_carrier_mastr_matched")
+        ).count(),
+    },
+)
 
 # COMMAND ----------
 
@@ -175,6 +227,7 @@ a = within_group_ordinal(a, ["energy_carrier"], ["2026", "2027", "2028", "2029"]
 a = a.withColumn("_srid", sha_key("energy_carrier", "_src_id_ord"))
 a = add_provenance(a, SOURCE, "_srid", RID)
 write_silver(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
+inspect_table(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
 
 # COMMAND ----------
 
