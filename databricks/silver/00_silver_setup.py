@@ -93,30 +93,6 @@ print(f"OK  table ready: {FIELD_CLASS_TABLE}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the Silver inspection log (shared, in quality)
-spark.sql(f"""
-CREATE TABLE IF NOT EXISTS {CATALOG}.{QUALITY_SCHEMA}.silver_inspection_log (
-    inspection_timestamp TIMESTAMP,
-    run_id                STRING,
-    source_system         STRING,
-    component             STRING,
-    table_name            STRING,
-    check_category        STRING,
-    check_name            STRING,
-    metric                STRING,
-    observed_value        DOUBLE,
-    expected_value        DOUBLE,
-    status                STRING,
-    severity              STRING,
-    details               STRING
-)
-USING DELTA
-COMMENT 'Automatic post-Silver inspection results, one row per check per table per run, written by every Silver notebook via _silver_inspect.inspect_table(). Append-only, shared across every ecosystem (disambiguated by source_system/table_name). Feeds the second-pass Silver exploration -- read this table rather than re-deriving findings from notebook print output.'
-""")
-print(f"OK  table ready: {CATALOG}.{QUALITY_SCHEMA}.silver_inspection_log")
-
-# COMMAND ----------
-
 # DBTITLE 1,Load the field-class registry from its seed
 SEED = _os.path.join(
     repo_root(), "src", "schemas", "field_classes", "energy_silver_field_classes.csv"
@@ -178,7 +154,6 @@ print("=" * 70)
 for schema in SILVER_SCHEMAS:
     print(f"Schema           : {CATALOG}.{schema}")
 print(f"Quarantine table : {QUARANTINE_TABLE}")
-print(f"Inspection log   : {CATALOG}.{QUALITY_SCHEMA}.silver_inspection_log")
 print(f"Field-class rows : {spark.table(FIELD_CLASS_TABLE).count()}")
 by_schema = (
     spark.table(FIELD_CLASS_TABLE)

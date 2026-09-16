@@ -131,13 +131,19 @@ xref = spark.createDataFrame(
 write_silver(
     xref, "dwd_city_bundesland_xref", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     xref,
     "dwd_city_bundesland_xref",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["city"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_city_bundesland_xref",
+    "dwd_city_bundesland_xref",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -170,7 +176,7 @@ write_quarantine(q, RID)
 sg = sg.withColumn("_srid", sha_key("station_id", "valid_from"))
 sg = add_provenance(sg, SOURCE, "_srid", RID)
 write_silver(sg, "dwd_station_geography", source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     sg,
     "dwd_station_geography",
     source=SOURCE,
@@ -178,6 +184,12 @@ inspect_table(
     rid=RID,
     key_cols=["station_id", "valid_from"],
     df_before=read_bronze(BT),
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_station_geography",
+    "dwd_station_geography",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -196,7 +208,7 @@ snh = add_provenance(snh, SOURCE, "_srid", RID)
 write_silver(
     snh, "dwd_station_name_history", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     snh,
     "dwd_station_name_history",
     source=SOURCE,
@@ -204,6 +216,12 @@ inspect_table(
     rid=RID,
     key_cols=["station_id", "valid_from"],
     df_before=read_bronze(BT),
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_station_name_history",
+    "dwd_station_name_history",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -217,7 +235,7 @@ di = di.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
 di = di.withColumn("_srid", sha_key("station_id", "parameter_category", "valid_from"))
 di = add_provenance(di, SOURCE, "_srid", RID)
 write_silver(di, "dwd_device_instrument", source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     di,
     "dwd_device_instrument",
     source=SOURCE,
@@ -225,6 +243,12 @@ inspect_table(
     rid=RID,
     key_cols=["station_id", "parameter_category", "valid_from"],
     df_before=read_bronze(BT),
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_device_instrument",
+    "dwd_device_instrument",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -240,7 +264,7 @@ pu = pu.withColumn(
 )
 pu = add_provenance(pu, SOURCE, "_srid", RID)
 write_silver(pu, "dwd_parameter_unit", source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     pu,
     "dwd_parameter_unit",
     source=SOURCE,
@@ -248,6 +272,12 @@ inspect_table(
     rid=RID,
     key_cols=["station_id", "parameter_source_code", "valid_from"],
     df_before=read_bronze(BT),
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_parameter_unit",
+    "dwd_parameter_unit",
+    _findings_blocks,
 )
 
 # derived: source parameter code -> business name -> physical unit
@@ -273,13 +303,19 @@ cat = (
     .drop("mapped_unit")
 )
 write_silver(cat, "dwd_parameter_catalog", source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     cat,
     "dwd_parameter_catalog",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["parameter_source_code"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_parameter_catalog",
+    "dwd_parameter_catalog",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -316,7 +352,7 @@ mvp = add_provenance(mvp, SOURCE, "_srid", RID)
 write_silver(
     mvp, "dwd_missing_value_periods", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     mvp,
     "dwd_missing_value_periods",
     source=SOURCE,
@@ -331,6 +367,12 @@ inspect_table(
     ],
     df_before=read_bronze(BT),
 )
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_missing_value_periods",
+    "dwd_missing_value_periods",
+    _findings_blocks,
+)
 # DWD-1 missingness reconciliation runs in 01_dwd_hourly_measurements.py --
 # the OBSERVED side doesn't exist until the measurement tables do.
 
@@ -338,6 +380,3 @@ inspect_table(
 
 # DBTITLE 1,Summary
 audit(COMPONENT, SOURCE, "reference_tables_written", 7.0, status="PASS", rid=RID)
-print("=" * 70)
-print(f"DWD REFERENCE -- COMPLETE  (run_id {RID})")
-print("=" * 70)

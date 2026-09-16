@@ -75,7 +75,7 @@ for _c in ("air_temperature_2m", "global_irradiance"):
 df = df.withColumn("_srid", sha_key(F.lit(BT), "frequency", "datetime_utc"))
 df = add_provenance(df, SOURCE, "_srid", RID)
 write_silver(df, SILVER_TABLE, source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     df,
     SILVER_TABLE,
     source=SOURCE,
@@ -84,10 +84,9 @@ inspect_table(
     key_cols=["frequency", "datetime_utc"],
     df_before=bronze_df,
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"HONDA SITE WEATHER -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__{SILVER_TABLE}",
+    SILVER_TABLE,
+    _findings_blocks,
+)

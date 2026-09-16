@@ -69,7 +69,7 @@ def process(bt: str, pk: str) -> None:
     # No constant columns / other transformation candidate found for these
     # tables (mastr.md S02 EDA Findings: constant=[] for all seven) --
     # inspection only, per the design record.
-    inspect_table(
+    _findings_blocks = inspect_table(
         df,
         bt,
         source=SOURCE,
@@ -77,6 +77,12 @@ def process(bt: str, pk: str) -> None:
         rid=RID,
         key_cols=[id_col],
         df_before=bronze_df,
+    )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{bt}",
+        bt,
+        _findings_blocks,
     )
 
 
@@ -106,13 +112,19 @@ _b1 = explode_link_bridge(
     bronze_table=",".join(EEG_TABLES),
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _b1,
     "mastr_eeg_support_unit_bridge",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["parent_id", "linked_id"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_eeg_support_unit_bridge",
+    "mastr_eeg_support_unit_bridge",
+    _findings_blocks,
 )
 _b2 = explode_link_bridge(
     read_bronze("mastr_anlagen_kwk"),
@@ -124,13 +136,19 @@ _b2 = explode_link_bridge(
     bronze_table="mastr_anlagen_kwk",
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _b2,
     "mastr_kwk_support_unit_bridge",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["parent_id", "linked_id"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_kwk_support_unit_bridge",
+    "mastr_kwk_support_unit_bridge",
+    _findings_blocks,
 )
 _b3 = explode_link_bridge(
     read_bronze("mastr_einheiten_genehmigung"),
@@ -142,13 +160,19 @@ _b3 = explode_link_bridge(
     bronze_table="mastr_einheiten_genehmigung",
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _b3,
     "mastr_authorisation_unit_bridge",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["parent_id", "linked_id"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_authorisation_unit_bridge",
+    "mastr_authorisation_unit_bridge",
+    _findings_blocks,
 )
 _b4 = explode_link_bridge(
     read_bronze("mastr_ertuechtigungen"),
@@ -160,7 +184,7 @@ _b4 = explode_link_bridge(
     bronze_table="mastr_ertuechtigungen",
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _b4,
     "mastr_repowering_eeg_bridge",
     source=SOURCE,
@@ -168,10 +192,9 @@ inspect_table(
     rid=RID,
     key_cols=["parent_id", "linked_id"],
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"MASTR SUPPORT / AUTHORISATION -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_repowering_eeg_bridge",
+    "mastr_repowering_eeg_bridge",
+    _findings_blocks,
+)

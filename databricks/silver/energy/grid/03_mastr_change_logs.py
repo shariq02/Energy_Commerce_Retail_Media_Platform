@@ -51,7 +51,7 @@ u = add_provenance(u, SOURCE, "_srid", RID)
 write_silver(
     u, "mastr_unit_deletion_events", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     u,
     "mastr_unit_deletion_events",
     source=SOURCE,
@@ -59,6 +59,12 @@ inspect_table(
     rid=RID,
     key_cols=["unit_id"],
     df_before=_u_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_unit_deletion_events",
+    "mastr_unit_deletion_events",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -71,7 +77,7 @@ a = add_provenance(a, SOURCE, "_srid", RID)
 write_silver(
     a, "mastr_actor_deletion_events", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     a,
     "mastr_actor_deletion_events",
     source=SOURCE,
@@ -79,6 +85,12 @@ inspect_table(
     rid=RID,
     key_cols=["market_actor_id"],
     df_before=_a_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_actor_deletion_events",
+    "mastr_actor_deletion_events",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -152,7 +164,7 @@ g = add_provenance(g, SOURCE, "_srid", RID)
 write_silver(
     g, "mastr_grid_operator_change_events", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     g,
     "mastr_grid_operator_change_events",
     source=SOURCE,
@@ -161,10 +173,9 @@ inspect_table(
     key_cols=_key,
     df_before=_g_bronze,
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"MASTR CHANGE LOGS -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_grid_operator_change_events",
+    "mastr_grid_operator_change_events",
+    _findings_blocks,
+)

@@ -146,7 +146,7 @@ def process(bt: str, silver_table: str) -> None:
     df = df.withColumn("_srid", sha_key(F.lit(bt), "frequency", "datetime_utc"))
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, silver_table, source=SOURCE, component=COMPONENT, rid=RID)
-    inspect_table(
+    _findings_blocks = inspect_table(
         df,
         silver_table,
         source=SOURCE,
@@ -157,14 +157,13 @@ def process(bt: str, silver_table: str) -> None:
         if _h1_agreement is not None
         else None,
     )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{silver_table}",
+        silver_table,
+        _findings_blocks,
+    )
 
 
 for _bt, _st in TABLE_MAP.items():
     process(_bt, _st)
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"HONDA ENERGY -- COMPLETE  (run_id {RID})")
-print("=" * 70)

@@ -64,7 +64,7 @@ def process(bt: str, pk: str) -> None:
     df = df.withColumn("_srid", F.col(id_col).cast("string"))
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
-    inspect_table(
+    _findings_blocks = inspect_table(
         df,
         bt,
         source=SOURCE,
@@ -72,6 +72,12 @@ def process(bt: str, pk: str) -> None:
         rid=RID,
         key_cols=[id_col],
         df_before=bronze_df,
+    )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{bt}",
+        bt,
+        _findings_blocks,
     )
 
 
@@ -92,13 +98,19 @@ _bridge1 = explode_link_bridge(
     bronze_table="mastr_lokationen",
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _bridge1,
     "mastr_location_unit_bridge",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["parent_id", "linked_id"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_location_unit_bridge",
+    "mastr_location_unit_bridge",
+    _findings_blocks,
 )
 _bridge2 = explode_link_bridge(
     _lok,
@@ -110,13 +122,19 @@ _bridge2 = explode_link_bridge(
     bronze_table="mastr_lokationen",
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _bridge2,
     "mastr_location_connection_bridge",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
     key_cols=["parent_id", "linked_id"],
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_location_connection_bridge",
+    "mastr_location_connection_bridge",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -174,7 +192,7 @@ if _coords is not None:
         component=COMPONENT,
         rid=RID,
     )
-    inspect_table(
+    _findings_blocks = inspect_table(
         _conflict,
         "mastr_location_coordinate_conflict",
         source=SOURCE,
@@ -187,12 +205,11 @@ if _coords is not None:
             ).count(),
         },
     )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__mastr_location_coordinate_conflict",
+        "mastr_location_coordinate_conflict",
+        _findings_blocks,
+    )
 else:
     print("MASTR-3: no generation-unit Silver tables available yet -- skipped.")
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"MASTR GRID TOPOLOGY -- COMPLETE  (run_id {RID})")
-print("=" * 70)

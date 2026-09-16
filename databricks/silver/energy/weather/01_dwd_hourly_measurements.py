@@ -116,7 +116,7 @@ def process(bt: str) -> None:
     df = attach_city_ags(df, "city")
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
-    inspect_table(
+    _findings_blocks = inspect_table(
         df,
         bt,
         source=SOURCE,
@@ -124,6 +124,12 @@ def process(bt: str) -> None:
         rid=RID,
         key_cols=["station_id", "observation_ts"],
         df_before=bronze_df,
+    )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{bt}",
+        bt,
+        _findings_blocks,
     )
 
 
@@ -174,7 +180,7 @@ write_silver(
     component=COMPONENT,
     rid=RID,
 )
-inspect_table(
+_findings_blocks = inspect_table(
     _recon,
     "dwd_missingness_reconciliation",
     source=SOURCE,
@@ -190,6 +196,12 @@ inspect_table(
         ).count(),
     },
 )
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__dwd_missingness_reconciliation",
+    "dwd_missingness_reconciliation",
+    _findings_blocks,
+)
 
 # COMMAND ----------
 
@@ -202,6 +214,3 @@ audit(
     status="PASS",
     rid=RID,
 )
-print("=" * 70)
-print(f"DWD HOURLY MEASUREMENTS -- COMPLETE  (run_id {RID})")
-print("=" * 70)

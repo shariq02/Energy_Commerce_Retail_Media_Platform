@@ -96,7 +96,7 @@ def process(bt: str) -> None:
     df = df.withColumn("_srid", F.col("unit_id").cast("string"))
     df = add_provenance(df, SOURCE, "_srid", RID)
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
-    inspect_table(
+    _findings_blocks = inspect_table(
         df,
         bt,
         source=SOURCE,
@@ -111,6 +111,12 @@ def process(bt: str) -> None:
                 if NAME_MAP.get(c, c) not in df.columns and c not in df.columns
             )
         },
+    )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{bt}",
+        bt,
+        _findings_blocks,
     )
 
 
@@ -128,6 +134,3 @@ audit(
     status="PASS",
     rid=RID,
 )
-print("=" * 70)
-print(f"MASTR GENERATION UNITS -- COMPLETE  (run_id {RID})")
-print("=" * 70)

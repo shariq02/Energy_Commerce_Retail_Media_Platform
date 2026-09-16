@@ -114,7 +114,7 @@ for _out_col, (_key_name, _value_field) in _PARAM_KEYS.items():
 df = df.withColumn("_srid", sha_key(*KEY_COLS))
 df = add_provenance(df, SOURCE, "_srid", RID)
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     df,
     BT,
     source=SOURCE,
@@ -123,10 +123,9 @@ inspect_table(
     key_cols=KEY_COLS,
     df_before=bronze_df,
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"GA4 EVENTS -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__{BT}",
+    BT,
+    _findings_blocks,
+)

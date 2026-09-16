@@ -111,7 +111,7 @@ items_df = items_df.withColumn(
 )
 items_df = add_provenance(items_df, SOURCE, "_srid", RID)
 write_silver(items_df, "ga4_items", source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     items_df,
     "ga4_items",
     source=SOURCE,
@@ -127,10 +127,9 @@ inspect_table(
         ).count(),
     },
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"GA4 ITEMS -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__ga4_items",
+    "ga4_items",
+    _findings_blocks,
+)

@@ -184,7 +184,7 @@ p = p.withColumn("_srid", sha_key("_ppl_key", "_src_id_ord")).drop(
 )
 p = add_provenance(p, SOURCE, "_srid", RID)
 write_silver(p, PLANT_BT, source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     p,
     PLANT_BT,
     source=SOURCE,
@@ -199,6 +199,12 @@ inspect_table(
             & ~F.col("energy_carrier_mastr_matched")
         ).count(),
     },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__{PLANT_BT}",
+    PLANT_BT,
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -227,11 +233,10 @@ a = within_group_ordinal(a, ["energy_carrier"], ["2026", "2027", "2028", "2029"]
 a = a.withColumn("_srid", sha_key("energy_carrier", "_src_id_ord"))
 a = add_provenance(a, SOURCE, "_srid", RID)
 write_silver(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"POWER PLANT LIST -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+_findings_blocks = inspect_table(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__{ADD_BT}",
+    ADD_BT,
+    _findings_blocks,
+)

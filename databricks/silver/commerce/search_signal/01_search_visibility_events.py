@@ -86,7 +86,7 @@ ev = ev.withColumnRenamed("index", "repository_index_alias")
 
 ev = add_provenance(ev, SOURCE_SYSTEM, "_srid", RID)
 write_silver(ev, EVENTS_BT, source=SOURCE_SYSTEM, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     ev,
     EVENTS_BT,
     source=SOURCE_SYSTEM,
@@ -104,10 +104,9 @@ inspect_table(
         == 0,
     },
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"SEARCH VISIBILITY EVENTS -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE_SYSTEM,
+    f"{COMPONENT.split('/')[-1]}__{EVENTS_BT}",
+    EVENTS_BT,
+    _findings_blocks,
+)

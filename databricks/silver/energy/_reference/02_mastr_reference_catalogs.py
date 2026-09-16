@@ -59,7 +59,7 @@ for bt in CATALOG_TABLES:
     write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
     # No transformation candidate identified for the reference catalogs beyond
     # the existing typed pass-through -- inspection only (design record §4).
-    inspect_table(
+    _findings_blocks = inspect_table(
         df,
         bt,
         source=SOURCE,
@@ -67,6 +67,12 @@ for bt in CATALOG_TABLES:
         rid=RID,
         key_cols=[pk],
         df_before=_bronze,
+    )
+    write_silver_findings(
+        SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{bt}",
+        bt,
+        _findings_blocks,
     )
 
 # COMMAND ----------
@@ -80,6 +86,3 @@ audit(
     status="PASS",
     rid=RID,
 )
-print("=" * 70)
-print(f"MASTR REFERENCE CATALOGS -- COMPLETE  (run_id {RID})")
-print("=" * 70)

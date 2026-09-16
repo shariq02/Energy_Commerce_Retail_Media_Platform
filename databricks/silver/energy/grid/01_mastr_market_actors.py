@@ -49,7 +49,7 @@ act = mastr_standardise(_act_bronze, NAME_MAP, CODED, source=SOURCE)
 act = act.withColumn("_srid", F.col("MastrNummer").cast("string"))
 act = add_provenance(act, SOURCE, "_srid", RID)
 write_silver(act, "mastr_marktakteure", source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     act,
     "mastr_marktakteure",
     source=SOURCE,
@@ -57,6 +57,12 @@ inspect_table(
     rid=RID,
     key_cols=["MastrNummer"],
     df_before=_act_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_marktakteure",
+    "mastr_marktakteure",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -69,7 +75,7 @@ rol = add_provenance(rol, SOURCE, "_srid", RID)
 write_silver(
     rol, "mastr_marktakteure_und_rollen", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     rol,
     "mastr_marktakteure_und_rollen",
     source=SOURCE,
@@ -77,6 +83,12 @@ inspect_table(
     rid=RID,
     key_cols=["MastrNummer"],
     df_before=_rol_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_marktakteure_und_rollen",
+    "mastr_marktakteure_und_rollen",
+    _findings_blocks,
 )
 
 # COMMAND ----------
@@ -96,7 +108,7 @@ brg = add_provenance(brg, SOURCE, "_srid", RID)
 write_silver(
     brg, "mastr_actor_role_bridge", source=SOURCE, component=COMPONENT, rid=RID
 )
-inspect_table(
+_findings_blocks = inspect_table(
     brg,
     "mastr_actor_role_bridge",
     source=SOURCE,
@@ -104,10 +116,9 @@ inspect_table(
     rid=RID,
     key_cols=["parent_id", "linked_id"],
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"MASTR MARKET ACTORS -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_actor_role_bridge",
+    "mastr_actor_role_bridge",
+    _findings_blocks,
+)

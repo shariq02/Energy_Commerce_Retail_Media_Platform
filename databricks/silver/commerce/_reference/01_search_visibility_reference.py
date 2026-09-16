@@ -53,7 +53,7 @@ repo = repo.withColumnRenamed("country", "repository_home_country")
 
 repo = add_provenance(repo, SOURCE_SYSTEM, "_srid", RID)
 write_silver(repo, REPO_BT, source=SOURCE_SYSTEM, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     repo,
     REPO_BT,
     source=SOURCE_SYSTEM,
@@ -62,10 +62,9 @@ inspect_table(
     key_cols=["repository_id"],
     df_before=bronze_repo,
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"SEARCH VISIBILITY REPOSITORY -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE_SYSTEM,
+    f"{COMPONENT.split('/')[-1]}__{REPO_BT}",
+    REPO_BT,
+    _findings_blocks,
+)

@@ -171,7 +171,7 @@ df = within_group_ordinal(df, ["_srid_base"], content)
 df = df.withColumn("_srid", sha_key("_srid_base", "_src_id_ord")).drop("_srid_base")
 df = add_provenance(df, SOURCE, "_srid", RID)
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
-inspect_table(
+_findings_blocks = inspect_table(
     df,
     BT,
     source=SOURCE,
@@ -185,10 +185,9 @@ inspect_table(
         / df.count(),
     },
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Summary
-print("=" * 70)
-print(f"REDISPATCH MEASURES -- COMPLETE  (run_id {RID})")
-print("=" * 70)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__{BT}",
+    BT,
+    _findings_blocks,
+)
