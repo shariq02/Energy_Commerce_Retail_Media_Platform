@@ -30,9 +30,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "honda_iot"
 COMPONENT = "silver/energy/weather/03_honda_weather"
 RID = run_id()
@@ -51,8 +55,12 @@ STUCK_LOOKBACK_STEPS_BY_FREQ = {"1h": 9, "15min": 39, "1min": 599}
 
 # COMMAND ----------
 
-# DBTITLE 1,honda_iot_weather -> Silver
+# DBTITLE 1,Read Bronze -- honda_iot_weather
 bronze_df = read_bronze(BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- honda_weather (rename + cast)
 df = bronze_df
 for src, tgt in RENAMES.items():
     df = df.withColumnRenamed(src, tgt)
@@ -63,11 +71,12 @@ df = (
     .withColumn("weather_location", F.lit("honda_site"))
 )
 
-# Stuck-reading flag, frequency-scaled lookback (see
-# STUCK_LOOKBACK_STEPS_BY_FREQ) -- same fix as 01_honda_energy.py.
-from pyspark.sql.window import Window as _Window
+# COMMAND ----------
 
-_w = _Window.partitionBy("frequency").orderBy("datetime_utc")
+# DBTITLE 1,Transform -- honda_weather (stuck-reading flags)
+# Frequency-scaled lookback (see STUCK_LOOKBACK_STEPS_BY_FREQ) -- same fix as
+# 01_honda_energy.py.
+_w = Window.partitionBy("frequency").orderBy("datetime_utc")
 for _c in ("air_temperature_2m", "global_irradiance"):
     _stuck_expr = F.lit(False)
     for _freq, _lag_n in STUCK_LOOKBACK_STEPS_BY_FREQ.items():
@@ -82,9 +91,20 @@ for _c in ("air_temperature_2m", "global_irradiance"):
         _stuck_expr = F.when(_cond, F.lit(True)).otherwise(_stuck_expr)
     df = df.withColumn(f"_{_c}_stuck_reading_flag", _stuck_expr)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- honda_weather (provenance)
 df = df.withColumn("_srid", sha_key(F.lit(BT), "frequency", "datetime_utc"))
 df = add_provenance(df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- honda_weather
 write_silver(df, SILVER_TABLE, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect honda_weather + export findings
 _findings_blocks = inspect_table(
     df,
     SILVER_TABLE,

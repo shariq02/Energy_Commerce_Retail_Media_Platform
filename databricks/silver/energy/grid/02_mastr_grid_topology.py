@@ -19,6 +19,7 @@
 # MAGIC `mastr_location_connection_bridge`). Runs after
 # MAGIC `02_mastr_reference_catalogs`.
 
+
 # COMMAND ----------
 
 # DBTITLE 1,Shared library
@@ -31,9 +32,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "mastr"
 COMPONENT = "silver/energy/grid/02_mastr_grid_topology"
 RID = run_id()
@@ -42,52 +46,174 @@ MAPPING = load_mapping(SOURCE)
 NAME_MAP = flatten_business_names(MAPPING, SOURCE)
 CODED = coded_columns(MAPPING, SOURCE)
 
-PRIMARY_TABLES = {
-    "mastr_lokationen": "MastrNummer",
-    "mastr_netzanschlusspunkte": "NetzanschlusspunktMastrNummer",
-    "mastr_netze": "MastrNummer",
-    "mastr_bilanzierungsgebiete": "Id",
-}
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_lokationen
+_lok_bronze = read_bronze("mastr_lokationen")
 
 # COMMAND ----------
 
-# DBTITLE 1,Primary topology tables -> Silver
-
-
-def process(bt: str, pk: str) -> None:
-    bronze_df = read_bronze(bt)
-    df = bronze_df
-    if bt == "mastr_bilanzierungsgebiete":
-        df = df.dropDuplicates()
-    df = mastr_standardise(df, NAME_MAP, CODED, source=SOURCE)
-    id_col = NAME_MAP.get(pk, pk)
-    df = df.withColumn("_srid", F.col(id_col).cast("string"))
-    df = add_provenance(df, SOURCE, "_srid", RID)
-    write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
-    _findings_blocks = inspect_table(
-        df,
-        bt,
-        source=SOURCE,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=[id_col],
-        df_before=bronze_df,
-    )
-    write_silver_findings(
-        SOURCE,
-        f"{COMPONENT.split('/')[-1]}__{bt}",
-        bt,
-        _findings_blocks,
-    )
-
-
-for _bt, _pk in PRIMARY_TABLES.items():
-    process(_bt, _pk)
+# DBTITLE 1,Read Bronze -- mastr_netzanschlusspunkte
+_nap_bronze = read_bronze("mastr_netzanschlusspunkte")
 
 # COMMAND ----------
 
-# DBTITLE 1,Additive location bridges
+# DBTITLE 1,Read Bronze -- mastr_netze
+_netze_bronze = read_bronze("mastr_netze")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_bilanzierungsgebiete
+_bil_bronze = read_bronze("mastr_bilanzierungsgebiete")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_lokationen (source for both bridges)
 _lok = read_bronze("mastr_lokationen")
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_lokationen
+lok = mastr_standardise(_lok_bronze, NAME_MAP, CODED, source=SOURCE)
+lok = lok.withColumn(
+    "_srid", F.col(NAME_MAP.get("MastrNummer", "MastrNummer")).cast("string")
+)
+lok = add_provenance(lok, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_lokationen
+write_silver(lok, "mastr_lokationen", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_lokationen + export findings
+_findings_blocks = inspect_table(
+    lok,
+    "mastr_lokationen",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=[NAME_MAP.get("MastrNummer", "MastrNummer")],
+    df_before=_lok_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_lokationen",
+    "mastr_lokationen",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_netzanschlusspunkte
+nap = mastr_standardise(_nap_bronze, NAME_MAP, CODED, source=SOURCE)
+nap = nap.withColumn(
+    "_srid",
+    F.col(
+        NAME_MAP.get("NetzanschlusspunktMastrNummer", "NetzanschlusspunktMastrNummer")
+    ).cast("string"),
+)
+nap = add_provenance(nap, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_netzanschlusspunkte
+write_silver(
+    nap, "mastr_netzanschlusspunkte", source=SOURCE, component=COMPONENT, rid=RID
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_netzanschlusspunkte + export findings
+_findings_blocks = inspect_table(
+    nap,
+    "mastr_netzanschlusspunkte",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=[
+        NAME_MAP.get("NetzanschlusspunktMastrNummer", "NetzanschlusspunktMastrNummer")
+    ],
+    df_before=_nap_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_netzanschlusspunkte",
+    "mastr_netzanschlusspunkte",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_netze
+netze = mastr_standardise(_netze_bronze, NAME_MAP, CODED, source=SOURCE)
+netze = netze.withColumn(
+    "_srid", F.col(NAME_MAP.get("MastrNummer", "MastrNummer")).cast("string")
+)
+netze = add_provenance(netze, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_netze
+write_silver(netze, "mastr_netze", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_netze + export findings
+_findings_blocks = inspect_table(
+    netze,
+    "mastr_netze",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=[NAME_MAP.get("MastrNummer", "MastrNummer")],
+    df_before=_netze_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_netze",
+    "mastr_netze",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_bilanzierungsgebiete
+bil = _bil_bronze.dropDuplicates()
+bil = mastr_standardise(bil, NAME_MAP, CODED, source=SOURCE)
+bil = bil.withColumn("_srid", F.col(NAME_MAP.get("Id", "Id")).cast("string"))
+bil = add_provenance(bil, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_bilanzierungsgebiete
+write_silver(
+    bil, "mastr_bilanzierungsgebiete", source=SOURCE, component=COMPONENT, rid=RID
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_bilanzierungsgebiete + export findings
+_findings_blocks = inspect_table(
+    bil,
+    "mastr_bilanzierungsgebiete",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=[NAME_MAP.get("Id", "Id")],
+    df_before=_bil_bronze,
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_bilanzierungsgebiete",
+    "mastr_bilanzierungsgebiete",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write mastr_location_unit_bridge (additive)
 _bridge1 = explode_link_bridge(
     _lok,
     "MastrNummer",
@@ -98,6 +224,10 @@ _bridge1 = explode_link_bridge(
     bronze_table="mastr_lokationen",
     rid=RID,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_location_unit_bridge + export findings
 _findings_blocks = inspect_table(
     _bridge1,
     "mastr_location_unit_bridge",
@@ -112,6 +242,10 @@ write_silver_findings(
     "mastr_location_unit_bridge",
     _findings_blocks,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write mastr_location_connection_bridge (additive)
 _bridge2 = explode_link_bridge(
     _lok,
     "MastrNummer",
@@ -122,6 +256,10 @@ _bridge2 = explode_link_bridge(
     bronze_table="mastr_lokationen",
     rid=RID,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_location_connection_bridge + export findings
 _findings_blocks = inspect_table(
     _bridge2,
     "mastr_location_connection_bridge",
@@ -139,7 +277,7 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,Location coordinate-conflict flag (additive)
+# DBTITLE 1,Coordinate-conflict check -- read the generation-unit Silver tables
 # Reads the generation-unit Silver tables (must run first). Flags conflicting
 # coordinates per location_id; never picks a "correct" one.
 _GENERATION_UNIT_TABLES = [
@@ -172,6 +310,9 @@ for _t in _GENERATION_UNIT_TABLES:
         continue
     _coords = _part if _coords is None else _coords.unionByName(_part)
 
+# COMMAND ----------
+
+# DBTITLE 1,Build + write mastr_location_coordinate_conflict (additive)
 if _coords is not None:
     _conflict = (
         _coords.dropDuplicates(["location_id", "lat2dp", "lon2dp"])
@@ -192,6 +333,11 @@ if _coords is not None:
         component=COMPONENT,
         rid=RID,
     )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_location_coordinate_conflict + export findings
+if _coords is not None:
     _findings_blocks = inspect_table(
         _conflict,
         "mastr_location_coordinate_conflict",

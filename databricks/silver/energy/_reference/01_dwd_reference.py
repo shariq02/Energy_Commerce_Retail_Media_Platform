@@ -23,6 +23,7 @@
 # MAGIC `dwd_missing_value_periods` (~5.9M rows) is an isolated final section --
 # MAGIC its own single scan, no shared work with the tiny metadata tables.
 
+
 # COMMAND ----------
 
 # DBTITLE 1,Shared library
@@ -35,9 +36,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "dwd"
 COMPONENT = "silver/energy/_reference/01_dwd_reference"
 RID = run_id()
@@ -86,11 +90,16 @@ assert len(CITY_BUNDESLAND) == 28, len(CITY_BUNDESLAND)
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers
+# DBTITLE 1,Helper -- normalise a raw station-id column (definition only)
 
 
 def clean_station_id(id_col):
     return F.regexp_replace(F.trim(F.col(id_col)), r"\.0$", "")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- quarantine trailer/header rows (definition only)
 
 
 def keep_real_stations(df, id_col, bronze_table):
@@ -112,6 +121,11 @@ def keep_real_stations(df, id_col, bronze_table):
     return kept.drop(id_col)
 
 
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- rename metadata columns to business names (definition only)
+
+
 def rename_meta(df, bronze_table):
     for col in TABLES[bronze_table]["columns"]:
         n = col["name"]
@@ -123,14 +137,22 @@ def rename_meta(df, bronze_table):
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_city_bundesland_xref (curated derived reference)
+# DBTITLE 1,Transform -- dwd_city_bundesland_xref (curated, no Bronze source)
 xref = spark.createDataFrame(
     [(c, bl, ags, "bundesland") for c, (bl, ags) in CITY_BUNDESLAND.items()],
     "city string, bundesland_name string, ags_code string, ags_level string",
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_city_bundesland_xref
 write_silver(
     xref, "dwd_city_bundesland_xref", source=SOURCE, component=COMPONENT, rid=RID
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_city_bundesland_xref + export findings
 _findings_blocks = inspect_table(
     xref,
     "dwd_city_bundesland_xref",
@@ -148,9 +170,38 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_station_geography (SCD, source grain)
-BT = "dwd_station_geography"
-sg = keep_real_stations(read_bronze(BT), "Stations_id", BT)
+# DBTITLE 1,Read Bronze -- dwd_station_geography
+_sg_bt = "dwd_station_geography"
+_sg_bronze = read_bronze(_sg_bt)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- dwd_station_name_history
+_snh_bt = "dwd_station_name_history"
+_snh_bronze = read_bronze(_snh_bt)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- dwd_device_instrument
+_di_bt = "dwd_device_instrument"
+_di_bronze = read_bronze(_di_bt)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- dwd_parameter_unit
+_pu_bt = "dwd_parameter_unit"
+_pu_bronze = read_bronze(_pu_bt)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- dwd_missing_value_periods (~5.9M rows, one scan)
+_mvp_bt = "dwd_missing_value_periods"
+_mvp_bronze = read_bronze(_mvp_bt)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_station_geography (typing + renames)
+sg = keep_real_stations(_sg_bronze, "Stations_id", _sg_bt)
 sg = (
     sg.withColumn("latitude", F.col("`Geogr.Breite`").cast("double"))
     .withColumn("longitude", F.col("`Geogr.Laenge`").cast("double"))
@@ -160,6 +211,10 @@ sg = (
     .withColumnRenamed("Stationsname", "station_name")
     .drop("Geogr.Breite", "Geogr.Laenge", "Stationshoehe", "von_datum", "bis_datum")
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_station_geography (bbox quarantine)
 sg, q = value_quarantine(
     sg,
     bbox_outside_de("latitude", "longitude"),
@@ -170,12 +225,28 @@ sg, q = value_quarantine(
     value_col="latitude",
     sr_id_col="station_id",
     source_system=SOURCE,
-    bronze_table=BT,
+    bronze_table=_sg_bt,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- dwd_station_geography out-of-bbox rows
 write_quarantine(q, RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_station_geography (provenance)
 sg = sg.withColumn("_srid", sha_key("station_id", "valid_from"))
 sg = add_provenance(sg, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_station_geography
 write_silver(sg, "dwd_station_geography", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_station_geography + export findings
 _findings_blocks = inspect_table(
     sg,
     "dwd_station_geography",
@@ -183,7 +254,7 @@ _findings_blocks = inspect_table(
     component=COMPONENT,
     rid=RID,
     key_cols=["station_id", "valid_from"],
-    df_before=read_bronze(BT),
+    df_before=_sg_bronze,
 )
 write_silver_findings(
     SOURCE,
@@ -194,9 +265,8 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_station_name_history (SCD, source grain)
-BT = "dwd_station_name_history"
-snh = keep_real_stations(read_bronze(BT), "Stations_ID", BT)
+# DBTITLE 1,Transform -- dwd_station_name_history
+snh = keep_real_stations(_snh_bronze, "Stations_ID", _snh_bt)
 snh = (
     snh.withColumnRenamed("Stationsname", "station_name")
     .withColumn("valid_from", parse_ts("Von_Datum", ("yyyyMMdd",), "UTC"))
@@ -205,9 +275,17 @@ snh = (
 )
 snh = snh.withColumn("_srid", sha_key("station_id", "valid_from"))
 snh = add_provenance(snh, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_station_name_history
 write_silver(
     snh, "dwd_station_name_history", source=SOURCE, component=COMPONENT, rid=RID
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_station_name_history + export findings
 _findings_blocks = inspect_table(
     snh,
     "dwd_station_name_history",
@@ -215,7 +293,7 @@ _findings_blocks = inspect_table(
     component=COMPONENT,
     rid=RID,
     key_cols=["station_id", "valid_from"],
-    df_before=read_bronze(BT),
+    df_before=_snh_bronze,
 )
 write_silver_findings(
     SOURCE,
@@ -226,15 +304,22 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_device_instrument (source grain)
-BT = "dwd_device_instrument"
-di = keep_real_stations(read_bronze(BT), "Stations_ID", BT)
-di = rename_meta(di, BT)
+# DBTITLE 1,Transform -- dwd_device_instrument
+di = keep_real_stations(_di_bronze, "Stations_ID", _di_bt)
+di = rename_meta(di, _di_bt)
 di = di.withColumn("valid_from", parse_ts("valid_from", ("yyyyMMdd",), "UTC"))
 di = di.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
 di = di.withColumn("_srid", sha_key("station_id", "parameter_category", "valid_from"))
 di = add_provenance(di, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_device_instrument
 write_silver(di, "dwd_device_instrument", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_device_instrument + export findings
 _findings_blocks = inspect_table(
     di,
     "dwd_device_instrument",
@@ -242,7 +327,7 @@ _findings_blocks = inspect_table(
     component=COMPONENT,
     rid=RID,
     key_cols=["station_id", "parameter_category", "valid_from"],
-    df_before=read_bronze(BT),
+    df_before=_di_bronze,
 )
 write_silver_findings(
     SOURCE,
@@ -253,17 +338,24 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_parameter_unit (source grain) + derived dwd_parameter_catalog
-BT = "dwd_parameter_unit"
-pu = keep_real_stations(read_bronze(BT), "Stations_ID", BT)
-pu = rename_meta(pu, BT)
+# DBTITLE 1,Transform -- dwd_parameter_unit
+pu = keep_real_stations(_pu_bronze, "Stations_ID", _pu_bt)
+pu = rename_meta(pu, _pu_bt)
 pu = pu.withColumn("valid_from", parse_ts("valid_from", ("yyyyMMdd",), "UTC"))
 pu = pu.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
 pu = pu.withColumn(
     "_srid", sha_key("station_id", "parameter_source_code", "valid_from")
 )
 pu = add_provenance(pu, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_parameter_unit
 write_silver(pu, "dwd_parameter_unit", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_parameter_unit + export findings
 _findings_blocks = inspect_table(
     pu,
     "dwd_parameter_unit",
@@ -271,7 +363,7 @@ _findings_blocks = inspect_table(
     component=COMPONENT,
     rid=RID,
     key_cols=["station_id", "parameter_source_code", "valid_from"],
-    df_before=read_bronze(BT),
+    df_before=_pu_bronze,
 )
 write_silver_findings(
     SOURCE,
@@ -280,15 +372,16 @@ write_silver_findings(
     _findings_blocks,
 )
 
-# derived: source parameter code -> business name -> physical unit
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_parameter_catalog (derived: code -> business name -> unit)
 param_bn = (MAPPING.get("business_names", {}) or {}).get("parameters", {})
 bn_df = spark.createDataFrame(
     [(c, s["business_name"], s.get("unit")) for c, s in param_bn.items()],
     "parameter_source_code string, parameter_business_name string, mapped_unit string",
 )
 pu_units = (
-    read_bronze("dwd_parameter_unit")
-    .select(
+    _pu_bronze.select(
         F.trim(F.col("Parameter")).alias("parameter_source_code"),
         F.trim(F.col("Einheit")).alias("parameter_unit"),
         F.trim(F.col("Parameterbeschreibung")).alias("parameter_description_de"),
@@ -302,7 +395,15 @@ cat = (
     .withColumn("catalog_vintage", F.lit("dwd_hourly_historical_20260904"))
     .drop("mapped_unit")
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_parameter_catalog
 write_silver(cat, "dwd_parameter_catalog", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_parameter_catalog + export findings
 _findings_blocks = inspect_table(
     cat,
     "dwd_parameter_catalog",
@@ -320,9 +421,8 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_missing_value_periods (isolated -- ~5.9M rows, one scan)
-BT = "dwd_missing_value_periods"
-mvp = keep_real_stations(read_bronze(BT), "Stations_ID", BT)
+# DBTITLE 1,Transform -- dwd_missing_value_periods (typing + renames)
+mvp = keep_real_stations(_mvp_bronze, "Stations_ID", _mvp_bt)
 mvp = (
     mvp.withColumnRenamed("Stations_Name", "station_name")
     .withColumnRenamed("Parameter", "parameter_source_code")
@@ -333,6 +433,10 @@ mvp = (
     .drop("Von_Datum", "Bis_Datum", "Anzahl_Fehlwerte")
     .dropDuplicates()
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_missing_value_periods (provenance)
 mvp = within_group_ordinal(
     mvp,
     ["station_id", "parameter_source_code", "gap_start_ts", "gap_end_ts"],
@@ -349,9 +453,17 @@ mvp = mvp.withColumn(
     ),
 )
 mvp = add_provenance(mvp, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_missing_value_periods
 write_silver(
     mvp, "dwd_missing_value_periods", source=SOURCE, component=COMPONENT, rid=RID
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_missing_value_periods + export findings
 _findings_blocks = inspect_table(
     mvp,
     "dwd_missing_value_periods",
@@ -365,7 +477,7 @@ _findings_blocks = inspect_table(
         "gap_end_ts",
         "_src_id_ord",
     ],
-    df_before=read_bronze(BT),
+    df_before=_mvp_bronze,
 )
 write_silver_findings(
     SOURCE,

@@ -30,10 +30,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "rees46"
 COMPONENT = "silver/commerce/journey/01_rees46_events"
 RID = run_id()
@@ -44,18 +47,32 @@ CONTENT_COLS = ["category_id", "category_code", "brand", "price", "user_id"]
 
 # COMMAND ----------
 
-# DBTITLE 1,rees46_events -> Silver
+# DBTITLE 1,Read Bronze -- rees46_events
 bronze_df = read_bronze(BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- rees46_events (typing + conflict resolution)
 df = bronze_df.withColumn("event_time", F.col("event_time").cast("timestamp"))
 df = df.withColumn("price", F.col("price").cast("double"))
 
 df, q = resolve_conflicts(df, KEY_COLS, CONTENT_COLS, bronze_table=BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- rees46_events residual key collisions
 write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- rees46_events (currency flag + provenance key)
 df = df.withColumn("currency_unknown", F.lit(True)).withColumn(
     "_srid", sha_key(*KEY_COLS)
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- rees46_events (category hierarchy split)
 # category_code is a dotted hierarchy path -- split on the delimiter.
 # F.get (not getItem/element_at) tolerates a short array under ANSI mode.
 _cat_parts = F.split(F.col("category_code"), r"\.")
@@ -65,8 +82,10 @@ df = (
     .withColumn("category_l3", F.get(_cat_parts, 2))
 )
 
-# Bot-burst + category-ambiguity flags. Session = (user_id, user_session),
-# never user_session alone.
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- rees46_events (bot-burst + category-ambiguity flags)
+# Session = (user_id, user_session), never user_session alone.
 _burst_w = Window.partitionBy("user_id", "user_session", "event_time")
 df = df.withColumn("_bot_burst_suspected", F.count(F.lit(1)).over(_burst_w) > 20)
 
@@ -79,8 +98,19 @@ df = (
     .drop("_n_category_ids")
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- rees46_events (provenance)
 df = add_provenance(df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- rees46_events
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect rees46_events + export findings
 _findings_blocks = inspect_table(
     df,
     BT,

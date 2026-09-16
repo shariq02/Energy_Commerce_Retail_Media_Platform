@@ -13,10 +13,13 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** the six MaStR `einheiten_*` carrier Bronze tables into
-# MAGIC source-scoped Silver at their unit grain (`EinheitMastrNummer`) --
-# MAGIC catalog decode, English business names, capacities in kW, coordinates
-# MAGIC unchanged (out-of-Germany points recorded to quarantine), AGS from the
-# MAGIC Gemeindeschluessel prefix. Runs after `02_mastr_reference_catalogs`.
+# MAGIC source-scoped Silver at their unit grain (`EinheitMastrNummer`), one
+# MAGIC block per table (read / transform / write / inspect each their own
+# MAGIC cell) -- catalog decode, English business names, capacities in kW,
+# MAGIC coordinates unchanged (out-of-Germany points recorded to quarantine),
+# MAGIC AGS from the Gemeindeschluessel prefix. Runs after
+# MAGIC `02_mastr_reference_catalogs`.
+
 
 # COMMAND ----------
 
@@ -30,9 +33,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "mastr"
 COMPONENT = "silver/energy/generation/01_mastr_generation_units"
 RID = run_id()
@@ -41,22 +47,13 @@ MAPPING = load_mapping(SOURCE)
 NAME_MAP = flatten_business_names(MAPPING, SOURCE)
 CODED = coded_columns(MAPPING, SOURCE)
 
-UNIT_TABLES = [
-    "mastr_einheiten_wind",
-    "mastr_einheiten_biomasse",
-    "mastr_einheiten_wasser",
-    "mastr_einheiten_verbrennung",
-    "mastr_einheiten_kernkraft",
-    "mastr_einheiten_geothermie_gsgk",
-]
-
 # Drop only columns constant BY CONSTRUCTION (single-carrier tables,
 # German-only register). Other flagged constants may be incidental -- kept.
 STRUCTURAL_CONSTANT_COLS = ["Energietraeger", "Land"]
 
 # COMMAND ----------
 
-# DBTITLE 1,One einheiten_* table -> Silver
+# DBTITLE 1,Helper -- drop structural constants (definition only)
 
 
 def _drop_structural_constants(df):
@@ -72,56 +69,410 @@ def _drop_structural_constants(df):
     return df
 
 
-def process(bt: str) -> None:
-    bronze_df = read_bronze(bt)
-    df = mastr_standardise(bronze_df, NAME_MAP, CODED, source=SOURCE)
-    df = _drop_structural_constants(df)
+# COMMAND ----------
 
-    bad = df.filter(bbox_outside_de("latitude", "longitude"))
-    write_quarantine(
-        _q_rows(
-            bad,
-            "coord_outside_de_bbox",
-            "unit coordinate outside the Germany bounding box",
-            "latitude,longitude",
-            "latitude",
-            "unit_id",
-            SOURCE,
-            bt,
-        ),
-        RID,
-    )
+# DBTITLE 1,Read Bronze -- mastr_einheiten_wind
+_bronze_wind = read_bronze("mastr_einheiten_wind")
 
-    df = attach_ags_prefix(df, "municipality_key_ags")
-    df = df.withColumn("_srid", F.col("unit_id").cast("string"))
-    df = add_provenance(df, SOURCE, "_srid", RID)
-    write_silver(df, bt, source=SOURCE, component=COMPONENT, rid=RID)
-    _findings_blocks = inspect_table(
-        df,
-        bt,
-        source=SOURCE,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["unit_id"],
-        df_before=bronze_df,
-        extra_checks={
-            "structural_constants_dropped": ",".join(
-                c
-                for c in STRUCTURAL_CONSTANT_COLS
-                if NAME_MAP.get(c, c) not in df.columns and c not in df.columns
-            )
-        },
-    )
-    write_silver_findings(
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_einheiten_biomasse
+_bronze_biomasse = read_bronze("mastr_einheiten_biomasse")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_einheiten_wasser
+_bronze_wasser = read_bronze("mastr_einheiten_wasser")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_einheiten_verbrennung
+_bronze_verbrennung = read_bronze("mastr_einheiten_verbrennung")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_einheiten_kernkraft
+_bronze_kernkraft = read_bronze("mastr_einheiten_kernkraft")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_einheiten_geothermie_gsgk
+_bronze_geothermie_gsgk = read_bronze("mastr_einheiten_geothermie_gsgk")
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_einheiten_wind
+_df_wind = mastr_standardise(_bronze_wind, NAME_MAP, CODED, source=SOURCE)
+_df_wind = _drop_structural_constants(_df_wind)
+
+_bad_wind = _df_wind.filter(bbox_outside_de("latitude", "longitude"))
+write_quarantine(
+    _q_rows(
+        _bad_wind,
+        "coord_outside_de_bbox",
+        "unit coordinate outside the Germany bounding box",
+        "latitude,longitude",
+        "latitude",
+        "unit_id",
         SOURCE,
-        f"{COMPONENT.split('/')[-1]}__{bt}",
-        bt,
-        _findings_blocks,
-    )
+        "mastr_einheiten_wind",
+    ),
+    RID,
+)
 
+_df_wind = attach_ags_prefix(_df_wind, "municipality_key_ags")
+_df_wind = _df_wind.withColumn("_srid", F.col("unit_id").cast("string"))
+_df_wind = add_provenance(_df_wind, SOURCE, "_srid", RID)
 
-for _bt in UNIT_TABLES:
-    process(_bt)
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_einheiten_wind
+write_silver(
+    _df_wind, "mastr_einheiten_wind", source=SOURCE, component=COMPONENT, rid=RID
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- mastr_einheiten_wind
+_findings_blocks = inspect_table(
+    _df_wind,
+    "mastr_einheiten_wind",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["unit_id"],
+    df_before=_bronze_wind,
+    extra_checks={
+        "structural_constants_dropped": ",".join(
+            c
+            for c in STRUCTURAL_CONSTANT_COLS
+            if NAME_MAP.get(c, c) not in _df_wind.columns and c not in _df_wind.columns
+        )
+    },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_einheiten_wind",
+    "mastr_einheiten_wind",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_einheiten_biomasse
+_df_biomasse = mastr_standardise(_bronze_biomasse, NAME_MAP, CODED, source=SOURCE)
+_df_biomasse = _drop_structural_constants(_df_biomasse)
+
+_bad_biomasse = _df_biomasse.filter(bbox_outside_de("latitude", "longitude"))
+write_quarantine(
+    _q_rows(
+        _bad_biomasse,
+        "coord_outside_de_bbox",
+        "unit coordinate outside the Germany bounding box",
+        "latitude,longitude",
+        "latitude",
+        "unit_id",
+        SOURCE,
+        "mastr_einheiten_biomasse",
+    ),
+    RID,
+)
+
+_df_biomasse = attach_ags_prefix(_df_biomasse, "municipality_key_ags")
+_df_biomasse = _df_biomasse.withColumn("_srid", F.col("unit_id").cast("string"))
+_df_biomasse = add_provenance(_df_biomasse, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_einheiten_biomasse
+write_silver(
+    _df_biomasse,
+    "mastr_einheiten_biomasse",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- mastr_einheiten_biomasse
+_findings_blocks = inspect_table(
+    _df_biomasse,
+    "mastr_einheiten_biomasse",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["unit_id"],
+    df_before=_bronze_biomasse,
+    extra_checks={
+        "structural_constants_dropped": ",".join(
+            c
+            for c in STRUCTURAL_CONSTANT_COLS
+            if NAME_MAP.get(c, c) not in _df_biomasse.columns
+            and c not in _df_biomasse.columns
+        )
+    },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_einheiten_biomasse",
+    "mastr_einheiten_biomasse",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_einheiten_wasser
+_df_wasser = mastr_standardise(_bronze_wasser, NAME_MAP, CODED, source=SOURCE)
+_df_wasser = _drop_structural_constants(_df_wasser)
+
+_bad_wasser = _df_wasser.filter(bbox_outside_de("latitude", "longitude"))
+write_quarantine(
+    _q_rows(
+        _bad_wasser,
+        "coord_outside_de_bbox",
+        "unit coordinate outside the Germany bounding box",
+        "latitude,longitude",
+        "latitude",
+        "unit_id",
+        SOURCE,
+        "mastr_einheiten_wasser",
+    ),
+    RID,
+)
+
+_df_wasser = attach_ags_prefix(_df_wasser, "municipality_key_ags")
+_df_wasser = _df_wasser.withColumn("_srid", F.col("unit_id").cast("string"))
+_df_wasser = add_provenance(_df_wasser, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_einheiten_wasser
+write_silver(
+    _df_wasser, "mastr_einheiten_wasser", source=SOURCE, component=COMPONENT, rid=RID
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- mastr_einheiten_wasser
+_findings_blocks = inspect_table(
+    _df_wasser,
+    "mastr_einheiten_wasser",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["unit_id"],
+    df_before=_bronze_wasser,
+    extra_checks={
+        "structural_constants_dropped": ",".join(
+            c
+            for c in STRUCTURAL_CONSTANT_COLS
+            if NAME_MAP.get(c, c) not in _df_wasser.columns
+            and c not in _df_wasser.columns
+        )
+    },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_einheiten_wasser",
+    "mastr_einheiten_wasser",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_einheiten_verbrennung
+_df_verbrennung = mastr_standardise(_bronze_verbrennung, NAME_MAP, CODED, source=SOURCE)
+_df_verbrennung = _drop_structural_constants(_df_verbrennung)
+
+_bad_verbrennung = _df_verbrennung.filter(bbox_outside_de("latitude", "longitude"))
+write_quarantine(
+    _q_rows(
+        _bad_verbrennung,
+        "coord_outside_de_bbox",
+        "unit coordinate outside the Germany bounding box",
+        "latitude,longitude",
+        "latitude",
+        "unit_id",
+        SOURCE,
+        "mastr_einheiten_verbrennung",
+    ),
+    RID,
+)
+
+_df_verbrennung = attach_ags_prefix(_df_verbrennung, "municipality_key_ags")
+_df_verbrennung = _df_verbrennung.withColumn("_srid", F.col("unit_id").cast("string"))
+_df_verbrennung = add_provenance(_df_verbrennung, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_einheiten_verbrennung
+write_silver(
+    _df_verbrennung,
+    "mastr_einheiten_verbrennung",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- mastr_einheiten_verbrennung
+_findings_blocks = inspect_table(
+    _df_verbrennung,
+    "mastr_einheiten_verbrennung",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["unit_id"],
+    df_before=_bronze_verbrennung,
+    extra_checks={
+        "structural_constants_dropped": ",".join(
+            c
+            for c in STRUCTURAL_CONSTANT_COLS
+            if NAME_MAP.get(c, c) not in _df_verbrennung.columns
+            and c not in _df_verbrennung.columns
+        )
+    },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_einheiten_verbrennung",
+    "mastr_einheiten_verbrennung",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_einheiten_kernkraft
+_df_kernkraft = mastr_standardise(_bronze_kernkraft, NAME_MAP, CODED, source=SOURCE)
+_df_kernkraft = _drop_structural_constants(_df_kernkraft)
+
+_bad_kernkraft = _df_kernkraft.filter(bbox_outside_de("latitude", "longitude"))
+write_quarantine(
+    _q_rows(
+        _bad_kernkraft,
+        "coord_outside_de_bbox",
+        "unit coordinate outside the Germany bounding box",
+        "latitude,longitude",
+        "latitude",
+        "unit_id",
+        SOURCE,
+        "mastr_einheiten_kernkraft",
+    ),
+    RID,
+)
+
+_df_kernkraft = attach_ags_prefix(_df_kernkraft, "municipality_key_ags")
+_df_kernkraft = _df_kernkraft.withColumn("_srid", F.col("unit_id").cast("string"))
+_df_kernkraft = add_provenance(_df_kernkraft, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_einheiten_kernkraft
+write_silver(
+    _df_kernkraft,
+    "mastr_einheiten_kernkraft",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- mastr_einheiten_kernkraft
+_findings_blocks = inspect_table(
+    _df_kernkraft,
+    "mastr_einheiten_kernkraft",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["unit_id"],
+    df_before=_bronze_kernkraft,
+    extra_checks={
+        "structural_constants_dropped": ",".join(
+            c
+            for c in STRUCTURAL_CONSTANT_COLS
+            if NAME_MAP.get(c, c) not in _df_kernkraft.columns
+            and c not in _df_kernkraft.columns
+        )
+    },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_einheiten_kernkraft",
+    "mastr_einheiten_kernkraft",
+    _findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_einheiten_geothermie_gsgk
+_df_geothermie_gsgk = mastr_standardise(
+    _bronze_geothermie_gsgk, NAME_MAP, CODED, source=SOURCE
+)
+_df_geothermie_gsgk = _drop_structural_constants(_df_geothermie_gsgk)
+
+_bad_geothermie_gsgk = _df_geothermie_gsgk.filter(
+    bbox_outside_de("latitude", "longitude")
+)
+write_quarantine(
+    _q_rows(
+        _bad_geothermie_gsgk,
+        "coord_outside_de_bbox",
+        "unit coordinate outside the Germany bounding box",
+        "latitude,longitude",
+        "latitude",
+        "unit_id",
+        SOURCE,
+        "mastr_einheiten_geothermie_gsgk",
+    ),
+    RID,
+)
+
+_df_geothermie_gsgk = attach_ags_prefix(_df_geothermie_gsgk, "municipality_key_ags")
+_df_geothermie_gsgk = _df_geothermie_gsgk.withColumn(
+    "_srid", F.col("unit_id").cast("string")
+)
+_df_geothermie_gsgk = add_provenance(_df_geothermie_gsgk, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_einheiten_geothermie_gsgk
+write_silver(
+    _df_geothermie_gsgk,
+    "mastr_einheiten_geothermie_gsgk",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- mastr_einheiten_geothermie_gsgk
+_findings_blocks = inspect_table(
+    _df_geothermie_gsgk,
+    "mastr_einheiten_geothermie_gsgk",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["unit_id"],
+    df_before=_bronze_geothermie_gsgk,
+    extra_checks={
+        "structural_constants_dropped": ",".join(
+            c
+            for c in STRUCTURAL_CONSTANT_COLS
+            if NAME_MAP.get(c, c) not in _df_geothermie_gsgk.columns
+            and c not in _df_geothermie_gsgk.columns
+        )
+    },
+)
+write_silver_findings(
+    SOURCE,
+    f"{COMPONENT.split('/')[-1]}__mastr_einheiten_geothermie_gsgk",
+    "mastr_einheiten_geothermie_gsgk",
+    _findings_blocks,
+)
 
 # COMMAND ----------
 
@@ -130,7 +481,7 @@ audit(
     COMPONENT,
     SOURCE,
     "unit_tables_written",
-    float(len(UNIT_TABLES)),
+    6.0,
     status="PASS",
     rid=RID,
 )

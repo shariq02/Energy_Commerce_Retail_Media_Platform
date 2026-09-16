@@ -30,9 +30,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "smard"
 COMPONENT = "silver/energy/market/01_smard_energy_timeseries"
 RID = run_id()
@@ -48,6 +51,10 @@ UNIT_QH_MAP = {k: v["unit_quarterhour"] for k, v in METRICS.items()}
 DISPUTED_METRIC = "forecast_generation_photovoltaic"
 SEMANTIC_ISSUE_REF = "smard.quality_rules.forecast_pv_sign_mirror"
 
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- literal-dict lookup map (definition only)
+
 
 def _map(d: dict):
     return F.create_map([F.lit(x) for kv in d.items() for x in kv])
@@ -55,9 +62,13 @@ def _map(d: dict):
 
 # COMMAND ----------
 
-# DBTITLE 1,smard_energy_timeseries -> Silver
-src = read_bronze(BT).dropDuplicates()
-src = src.withColumn(
+# DBTITLE 1,Read Bronze -- smard_energy_timeseries
+_bronze_df = read_bronze(BT).dropDuplicates()
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- smard_energy_timeseries (renames + provenance key)
+src = _bronze_df.withColumn(
     "_srid",
     sha_key("metric", "filter_id", "region", "resolution", "timestamp_utc"),
 )
@@ -67,6 +78,9 @@ for s, t in COLUMN_RENAMES.items():
     if s != t:
         df = df.withColumnRenamed(s, t)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- smard_energy_timeseries (typing, units, semantic status)
 df = (
     df.withColumn("value", F.col("value").cast("double"))
     .withColumn(
@@ -95,8 +109,11 @@ df = (
     )
 )
 
-# 5-sigma flag per metric's own mean/sd (scales differ wildly by metric).
-# Independent of metric_semantic_status -- never suppresses/replaces it.
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- smard_energy_timeseries (5-sigma outlier flag)
+# Per metric's own mean/sd (scales differ wildly by metric). Independent of
+# metric_semantic_status -- never suppresses/replaces it.
 _metric_stats = df.groupBy("metric").agg(
     F.mean("value").alias("_mean"), F.stddev("value").alias("_sd")
 )
@@ -109,15 +126,26 @@ df = df.withColumn(
     ).otherwise(F.lit(False)),
 ).drop("_mean", "_sd")
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- smard_energy_timeseries (provenance)
 df = add_provenance(df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- smard_energy_timeseries
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect smard_energy_timeseries + export findings
 _findings_blocks = inspect_table(
     df,
     BT,
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    df_before=read_bronze(BT),
+    df_before=_bronze_df,
 )
 write_silver_findings(
     SOURCE,

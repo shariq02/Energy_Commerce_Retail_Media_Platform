@@ -33,9 +33,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "ga4"
 COMPONENT = "silver/commerce/journey/02_ga4_events"
 RID = run_id()
@@ -48,11 +51,16 @@ UNSET = ("(not set)", "(none)", "")
 
 # COMMAND ----------
 
-# DBTITLE 1,Sentinel normalisation (nested fields)
+# DBTITLE 1,Helper -- clean a scalar string sentinel (definition only)
 
 
 def _clean_str(col: F.Column) -> F.Column:
     return F.when(col.isin(*UNSET), F.lit(None)).otherwise(col)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- clean the items array (definition only)
 
 
 def _clean_items(items_col: F.Column) -> F.Column:
@@ -69,6 +77,11 @@ def _clean_items(items_col: F.Column) -> F.Column:
     )
 
 
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- clean the ecommerce struct (definition only)
+
+
 def _clean_ecommerce(ecommerce_col: F.Column) -> F.Column:
     return F.when(
         ecommerce_col.isNotNull(),
@@ -83,17 +96,29 @@ def _clean_ecommerce(ecommerce_col: F.Column) -> F.Column:
 
 # COMMAND ----------
 
-# DBTITLE 1,ga4_events -> Silver
+# DBTITLE 1,Read Bronze -- ga4_events
 bronze_df = read_bronze(BT)
-df = bronze_df
 
-df, q = resolve_conflicts(df, KEY_COLS, CONTENT_COLS, bronze_table=BT)
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_events (conflict resolution)
+df, q = resolve_conflicts(bronze_df, KEY_COLS, CONTENT_COLS, bronze_table=BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- ga4_events residual key collisions
 write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_events (sentinel normalisation)
 df = df.withColumn("items", _clean_items(F.col("items"))).withColumn(
     "ecommerce", _clean_ecommerce(F.col("ecommerce"))
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_events (event_params key map)
 # Pivot the closed, 100%-populated event_params vocabulary (6 keys) to
 # named columns -- exposes ga_session_id, needed for GA4's session grain.
 _PARAM_KEYS = {
@@ -104,16 +129,46 @@ _PARAM_KEYS = {
     "search_term": ("search_term", "string_value"),
     "unique_search_term": ("unique_search_term", "string_value"),
 }
-for _out_col, (_key_name, _value_field) in _PARAM_KEYS.items():
-    _matched = F.filter(
-        F.col("event_params"), lambda x, _k=_key_name: x["key"] == F.lit(_k)
-    )
-    _first = F.get(_matched, 0)
-    df = df.withColumn(_out_col, _first.getField("value").getField(_value_field))
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_events (event_params value maps)
+# map_from_entries (not filter+lambda-per-key) -- one map built per value
+# type, key lookup on a MapType never raises on a missing key.
+_params_int_map = F.map_from_entries(
+    F.transform(
+        F.col("event_params"),
+        lambda x: F.struct(x["key"].alias("k"), x["value"]["int_value"].alias("v")),
+    )
+)
+_params_str_map = F.map_from_entries(
+    F.transform(
+        F.col("event_params"),
+        lambda x: F.struct(x["key"].alias("k"), x["value"]["string_value"].alias("v")),
+    )
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_events (event_params pivot)
+for _out_col, (_key_name, _value_field) in _PARAM_KEYS.items():
+    _src_map = _params_int_map if _value_field == "int_value" else _params_str_map
+    df = df.withColumn(_out_col, _src_map[F.lit(_key_name)])
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_events (provenance)
 df = df.withColumn("_srid", sha_key(*KEY_COLS))
 df = add_provenance(df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- ga4_events
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect ga4_events + export findings
 _findings_blocks = inspect_table(
     df,
     BT,

@@ -32,9 +32,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "redispatch"
 COMPONENT = "silver/energy/grid/04_redispatch_measures"
 RID = run_id()
@@ -64,8 +67,12 @@ DE_TS_FORMATS = ("dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy HH:mm", "dd.MM.yyyy H:mm")
 
 # COMMAND ----------
 
-# DBTITLE 1,redispatch_measures -> Silver
+# DBTITLE 1,Read Bronze -- redispatch_measures
 bronze_df = read_bronze(BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- redispatch_measures (typing + decode)
 df = bronze_df.dropDuplicates()
 df = df.withColumn("_srid_base", F.concat_ws("|", *[F.col(c) for c in KEY_COLS]))
 
@@ -86,9 +93,12 @@ for _raw in _drop_cols:
     elif _raw in df.columns:
         df = df.drop(_raw)
 
-# R1 resolved: profiling reports unexpected=none for RICHTUNG -- decode
+# Redispatch profiling reports unexpected=none for RICHTUNG -- decode
 # coverage is already complete, no transformation needed.
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- redispatch_measures (timestamps + TSO split)
 df = (
     df.withColumn(
         "measure_start_ts",
@@ -115,19 +125,25 @@ df = (
 )
 
 inv = df.filter(F.col("measure_start_ts") > F.col("measure_end_ts"))
-write_quarantine(
-    _q_rows(
-        inv,
-        "inverted_measure_window",
-        "measure_start_ts is after measure_end_ts",
-        "measure_start_ts,measure_end_ts",
-        "measure_start_ts",
-        "_srid_base",
-        SOURCE,
-        BT,
-    ),
-    RID,
+_inv_quarantine_rows = _q_rows(
+    inv,
+    "inverted_measure_window",
+    "measure_start_ts is after measure_end_ts",
+    "measure_start_ts,measure_end_ts",
+    "measure_start_ts",
+    "_srid_base",
+    SOURCE,
+    BT,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- redispatch_measures inverted time windows
+write_quarantine(_inv_quarantine_rows, RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- normalised-name match key (definition only)
 
 
 # First pass: exact match on a normalised name only, additive. Match rate
@@ -136,6 +152,9 @@ def _normalise_name(col):
     return F.upper(F.trim(F.regexp_replace(F.col(col), r"\s+", " ")))
 
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- redispatch_measures (affected-unit name match)
 try:
     _plant_names = (
         read_silver("power_plant_list")
@@ -166,11 +185,22 @@ except Exception as exc:
         "affected_unit_match_name", F.lit(None).cast("string")
     ).withColumn("affected_unit_match_confidence", F.lit("unmatched"))
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- redispatch_measures (provenance)
 content = [c for c in df.columns if c not in ("_srid_base",)]
 df = within_group_ordinal(df, ["_srid_base"], content)
 df = df.withColumn("_srid", sha_key("_srid_base", "_src_id_ord")).drop("_srid_base")
 df = add_provenance(df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- redispatch_measures
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect redispatch_measures + export findings
 _findings_blocks = inspect_table(
     df,
     BT,

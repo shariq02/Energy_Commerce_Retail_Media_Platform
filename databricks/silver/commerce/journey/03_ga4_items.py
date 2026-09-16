@@ -30,9 +30,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "ga4"
 COMPONENT = "silver/commerce/journey/03_ga4_items"
 RID = run_id()
@@ -51,7 +54,7 @@ _PROMOTION_EVENTS = ("view_promotion", "select_promotion")
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers
+# DBTITLE 1,Helper -- clean a scalar string sentinel (definition only)
 
 
 def _clean_str(col: F.Column) -> F.Column:
@@ -60,9 +63,12 @@ def _clean_str(col: F.Column) -> F.Column:
 
 # COMMAND ----------
 
-# DBTITLE 1,ga4_events.items -> ga4_items (exploded, additive)
+# DBTITLE 1,Read Bronze -- ga4_events
 bronze_df = read_bronze(BT)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_items (explode + select)
 items_df = (
     bronze_df.select(
         "event_date",
@@ -87,6 +93,9 @@ items_df = (
     )
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_items (sentinel normalisation)
 # GA4's own "(not set)"/"(none)" sentinel normalised to NULL, same rule as
 # 02_ga4_events.py -- Bronze intentionally keeps it raw.
 items_df = (
@@ -95,6 +104,9 @@ items_df = (
     .withColumn("item_category", _clean_str(F.col("item_category")))
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_items (promotion/product disambiguation)
 # Core disambiguation: item_id means a campaign id on promotion events,
 # a product id everywhere else (ga4.md EDA Findings) -- these are different
 # entity types sharing one physical field.
@@ -105,12 +117,23 @@ items_df = items_df.withColumn(
     ),
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ga4_items (provenance)
 items_df = items_df.withColumn(
     "_srid",
     sha_key(*KEY_COLS),
 )
 items_df = add_provenance(items_df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- ga4_items
 write_silver(items_df, "ga4_items", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect ga4_items + export findings
 _findings_blocks = inspect_table(
     items_df,
     "ga4_items",

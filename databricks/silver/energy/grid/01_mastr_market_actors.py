@@ -18,6 +18,7 @@
 # MAGIC actors keep their row with name / address suppressed at source. Runs
 # MAGIC after `02_mastr_reference_catalogs`.
 
+
 # COMMAND ----------
 
 # DBTITLE 1,Shared library
@@ -30,9 +31,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "mastr"
 COMPONENT = "silver/energy/grid/01_mastr_market_actors"
 RID = run_id()
@@ -43,12 +47,34 @@ CODED = coded_columns(MAPPING, SOURCE)
 
 # COMMAND ----------
 
-# DBTITLE 1,mastr_marktakteure -> Silver
+# DBTITLE 1,Read Bronze -- mastr_marktakteure
 _act_bronze = read_bronze("mastr_marktakteure")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_marktakteure_und_rollen
+_rol_bronze = read_bronze("mastr_marktakteure_und_rollen")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- mastr_marktakteure_und_rollen (for the role bridge)
+_role_bridge_bronze = read_bronze("mastr_marktakteure_und_rollen")
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- mastr_marktakteure
 act = mastr_standardise(_act_bronze, NAME_MAP, CODED, source=SOURCE)
 act = act.withColumn("_srid", F.col("MastrNummer").cast("string"))
 act = add_provenance(act, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_marktakteure
 write_silver(act, "mastr_marktakteure", source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_marktakteure + export findings
 _findings_blocks = inspect_table(
     act,
     "mastr_marktakteure",
@@ -67,14 +93,21 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,mastr_marktakteure_und_rollen -> Silver
-_rol_bronze = read_bronze("mastr_marktakteure_und_rollen")
+# DBTITLE 1,Transform -- mastr_marktakteure_und_rollen
 rol = mastr_standardise(_rol_bronze, NAME_MAP, CODED, source=SOURCE)
 rol = rol.withColumn("_srid", F.col("MastrNummer").cast("string"))
 rol = add_provenance(rol, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_marktakteure_und_rollen
 write_silver(
     rol, "mastr_marktakteure_und_rollen", source=SOURCE, component=COMPONENT, rid=RID
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_marktakteure_und_rollen + export findings
 _findings_blocks = inspect_table(
     rol,
     "mastr_marktakteure_und_rollen",
@@ -93,10 +126,9 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,mastr_actor_role_bridge (additive)
+# DBTITLE 1,Transform -- mastr_actor_role_bridge (additive)
 brg = (
-    read_bronze("mastr_marktakteure_und_rollen")
-    .select(
+    _role_bridge_bronze.select(
         F.col("MarktakteurMastrNummer").cast("string").alias("parent_id"),
         F.col("Marktrolle").cast("string").alias("linked_id"),
     )
@@ -105,9 +137,17 @@ brg = (
     .withColumn("_srid", sha_key("parent_id", "linked_id"))
 )
 brg = add_provenance(brg, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- mastr_actor_role_bridge
 write_silver(
     brg, "mastr_actor_role_bridge", source=SOURCE, component=COMPONENT, rid=RID
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect mastr_actor_role_bridge + export findings
 _findings_blocks = inspect_table(
     brg,
     "mastr_actor_role_bridge",

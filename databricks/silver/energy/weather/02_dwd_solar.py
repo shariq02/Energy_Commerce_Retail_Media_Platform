@@ -31,9 +31,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "dwd"
 COMPONENT = "silver/energy/weather/02_dwd_solar"
 RID = run_id()
@@ -55,25 +58,48 @@ VALUE_COLS = [
 
 # COMMAND ----------
 
-# DBTITLE 1,dwd_solar -> Silver
+# DBTITLE 1,Read Bronze -- dwd_solar
 bronze_df = read_bronze(BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_solar (sentinels + conflict resolution)
 df = strip_sentinels(bronze_df, [*VALUE_COLS, QN_COL])
 df, q = resolve_conflicts(
     df, ["STATIONS_ID", "MESS_DATUM"], VALUE_COLS, qn_col=QN_COL, bronze_table=BT
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- dwd_solar residual key collisions
 write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_solar (typing + decode + renames)
 df = cast_logical(df, TABLES[BT]["columns"])
 df = decode_qn(df, QN_COL)
 df = apply_renames(df, NAME_MAP)
 df = df.withColumn("_srid", sha_key(F.lit(BT), "STATIONS_ID", "MESS_DATUM"))
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dwd_solar (timestamps + station AGS + provenance)
 df = df.withColumn("observation_ts", parse_mess_datum_10min("MESS_DATUM")).drop(
     "MESS_DATUM"
 )
 df = df.withColumn("observation_woz", parse_mess_datum_10min("MESS_DATUM_WOZ", "UTC"))
 df = attach_city_ags(df, "city")
 df = add_provenance(df, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- dwd_solar
 write_silver(df, BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect dwd_solar + export findings
 _findings_blocks = inspect_table(
     df,
     BT,

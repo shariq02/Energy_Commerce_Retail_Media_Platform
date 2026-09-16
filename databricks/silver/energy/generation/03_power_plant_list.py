@@ -19,6 +19,7 @@
 # MAGIC footnote / section-header rows are row-quarantined. The MaStR unit id is
 # MAGIC a reconciliation key, never an identity join.
 
+
 # COMMAND ----------
 
 # DBTITLE 1,Shared library
@@ -31,9 +32,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports + config
+# DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
 SOURCE = "power_plant_list"
 COMPONENT = "silver/energy/generation/03_power_plant_list"
 RID = run_id()
@@ -101,8 +105,18 @@ def _bundesland_ags(colname: str):
 
 # COMMAND ----------
 
-# DBTITLE 1,power_plant_list -> Silver
-p = read_bronze(PLANT_BT)
+# DBTITLE 1,Read Bronze -- power_plant_list
+_p_bronze = read_bronze(PLANT_BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Bronze -- power_plant_capacity_additions
+_a_bronze = read_bronze(ADD_BT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant_list (typing + decode)
+p = _p_bronze
 for c in GERMAN_DECIMALS:
     p = p.withColumn(c, german_decimal(c))
 for c in YEAR_COLS:
@@ -119,6 +133,9 @@ for raw, (pref, en_map) in CODED.items():
 
 p = apply_renames(p, NAME_MAP)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant_list (capacity quarantine)
 p, q = value_quarantine(
     p,
     F.col("capacity_net_mw").isNull() & F.col("border_plant_net_capacity_mw").isNull(),
@@ -131,8 +148,15 @@ p, q = value_quarantine(
     source_system=SOURCE,
     bronze_table=PLANT_BT,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- power_plant_list capacity-null rows
 write_quarantine(q, RID)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant_list (Bundesland to AGS)
 p = (
     p.withColumn(
         "ags_code",
@@ -150,6 +174,9 @@ p = p.withColumn(
     & _bundesland_ags("federal_state").isNull(),
 )
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant_list (MaStR carrier cross-check)
 # Additive cross-check of energy_carrier_code against MaStR's own fuel
 # katalog. MaStR has no "Energietraeger" category (confirmed against
 # mappings/mastr.yml and mastr.md's category list) -- the correct category
@@ -176,6 +203,9 @@ except Exception as exc:
     print(f"SKIP MaStR carrier cross-check: {exc}")
     p = p.withColumn("energy_carrier_mastr_matched", F.lit(None).cast("boolean"))
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant_list (provenance)
 p = p.withColumn(
     "_ppl_key",
     F.concat_ws(
@@ -191,7 +221,15 @@ p = p.withColumn("_srid", sha_key("_ppl_key", "_src_id_ord")).drop(
     "_ppl_key", "_capacity_all_null"
 )
 p = add_provenance(p, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- power_plant_list
 write_silver(p, PLANT_BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect power_plant_list + export findings
 _findings_blocks = inspect_table(
     p,
     PLANT_BT,
@@ -217,10 +255,9 @@ write_silver_findings(
 
 # COMMAND ----------
 
-# DBTITLE 1,power_plant_capacity_additions -> Silver (wide; footnote rows quarantined)
-a = read_bronze(ADD_BT)
+# DBTITLE 1,Transform -- power_plant_capacity_additions (footnote-row quarantine)
 a, q = row_quarantine(
-    a,
+    _a_bronze,
     ~F.col("energietraeger").isin(list(REAL_CARRIERS)),
     rule_id="capacity_additions_footnote_rows",
     reason="energietraeger is a section header / sub-total / legal footnote, not a carrier",
@@ -230,8 +267,15 @@ a, q = row_quarantine(
     source_system=SOURCE,
     bronze_table=ADD_BT,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Quarantine -- power_plant_capacity_additions footnote rows
 write_quarantine(q, RID)
 
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant_capacity_additions (typing + provenance)
 for c in ("2026", "2027", "2028", "2029", "2026_2029_total"):
     a = a.withColumn(c, german_decimal(c))
 a = a.withColumnRenamed("energietraeger", "energy_carrier").withColumnRenamed(
@@ -240,7 +284,15 @@ a = a.withColumnRenamed("energietraeger", "energy_carrier").withColumnRenamed(
 a = within_group_ordinal(a, ["energy_carrier"], ["2026", "2027", "2028", "2029"])
 a = a.withColumn("_srid", sha_key("energy_carrier", "_src_id_ord"))
 a = add_provenance(a, SOURCE, "_srid", RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write Silver -- power_plant_capacity_additions
 write_silver(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect power_plant_capacity_additions + export findings
 _findings_blocks = inspect_table(a, ADD_BT, source=SOURCE, component=COMPONENT, rid=RID)
 write_silver_findings(
     SOURCE,
