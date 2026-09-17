@@ -82,20 +82,10 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/gold/energy/**/*.py" = ["F821"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
 
-[tool.pytest.ini_options]
-markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "regression: Regression tests",
-    "performance: Performance tests",
-    "schema: Schema validation tests",
-    "databricks: Databricks processing tests",
-    "bigquery: BigQuery acquisition tests",
-    "api: FastAPI endpoint tests",
-    "ai: AI agent, tool, and RAG evaluation tests",
-    "data_quality: Data quality tests",
-    "data_flow: Data flow tests",
-]
+# Pytest config lives in pytest.ini only -- when both pytest.ini and
+# [tool.pytest.ini_options] exist, pytest uses pytest.ini and silently
+# ignores this section, so a duplicate copy here would drift unnoticed
+# (as this one already had). Do not re-add it.
 
 [tool.databricks.environment]
 environment_version = '5'
