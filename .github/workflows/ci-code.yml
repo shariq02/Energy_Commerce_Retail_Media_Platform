@@ -10,9 +10,37 @@ on:
     paths-ignore:
       - "databricks/**"
 
+concurrency:
+  group: ci-code-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   lint:
-    name: Lint (ruff)
+    name: Lint (ruff check + format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install ruff
+        run: python -m pip install ruff==0.15.8
+
+      - name: Run ruff check
+        run: ruff check . --exclude data/ --exclude docs/ --exclude .terraform/
+
+      - name: Run ruff format --check
+        run: ruff format . --exclude data/ --exclude docs/ --exclude .terraform/ --check
+
+  doc-reference-scan:
+    name: Design-doc / ADR / UC / Phase reference scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,11 +50,18 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install ruff
-        run: python -m pip install ruff==0.15.8
-
-      - name: Run ruff
-        run: ruff check . --exclude data/ --exclude docs/ --exclude .terraform/
+      # Code must never cite planning docs, ADR-NN, UC-NN, "Phase N" or the
+      # sub-phase shorthand -- reuses the same check scripts/utilities/lint.py
+      # runs locally, read-only (no auto-fix, no pre-commit) so it is safe to
+      # run standalone in CI.
+      - name: Scan for disallowed doc/ADR/UC/phase references in code
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from scripts.utilities.lint import check_doc_references
+          sys.exit(check_doc_references())
+          "
 
   test:
     name: Unit tests
@@ -39,6 +74,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: python -m pip install -e .[dev]
@@ -46,7 +82,11 @@ jobs:
       - name: Run unit tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-        # Exit code 5 = "no tests collected" -- tolerated until real unit
-        # tests exist under tests/unit/. Any other non-zero exit (actual
-        # test failures, errors) still fails the job.
-        run: pytest tests/unit/ -v -m unit || [ $? -eq 5 ]
+        # Marker-based selection across the whole tests/ tree (tests/schemas/,
+        # tests/silver/, and tests/unit/ itself once populated) rather than a
+        # single hardcoded path -- a test collects here because it carries
+        # @pytest.mark.unit, not because of which directory it lives in.
+        # Exit code 5 = "no tests collected" -- tolerated only as a genuine
+        # empty-suite signal; any other non-zero exit (actual test failures,
+        # errors) still fails the job.
+        run: pytest tests/ -v -m unit || [ $? -eq 5 ]

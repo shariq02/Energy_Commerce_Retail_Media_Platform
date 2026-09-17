@@ -14,6 +14,13 @@ on:
     paths:
       - "databricks/**"
 
+concurrency:
+  group: ci-notebooks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   structure:
     name: Notebook structure & lint (no execution)
@@ -25,12 +32,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install ruff
         run: python -m pip install ruff==0.15.8
 
       - name: Run ruff (syntax + lint only)
         run: ruff check databricks/
+
+      - name: Run ruff format --check
+        run: ruff format databricks/ --check
 
       - name: Verify Databricks notebook header
         run: |
@@ -43,3 +54,61 @@ jobs:
             fi
           done < <(find databricks -name "*.py" -print0)
           exit "$fail"
+
+      - name: Verify every notebook has at least one cell delimiter
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            if ! grep -q "^# COMMAND ----------" "$f"; then
+              echo "No '# COMMAND ----------' cell delimiter found: $f"
+              fail=1
+            fi
+          done < <(find databricks -name "*.py" -print0)
+          exit "$fail"
+
+      # The 20-cell split threshold only ever applied to Silver/Gold
+      # notebooks (source-of-truth transform layers) -- eda/, setup/ and
+      # utility/ notebooks were never subject to it, so this stays scoped
+      # to avoid failing the build on files the convention never covered.
+      - name: Verify Silver/Gold notebooks stay under the 20-cell split threshold
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            n=$(grep -c "^# COMMAND ----------" "$f")
+            cells=$((n + 1))
+            if [ "$cells" -gt 20 ]; then
+              echo "Exceeds the 20-cell split threshold ($cells cells): $f"
+              fail=1
+            fi
+          done < <(find databricks/silver databricks/gold -name "*.py" -print0)
+          exit "$fail"
+
+      - name: Verify %run relative paths resolve
+        run: |
+          python3 - <<'PYEOF'
+          import re
+          import sys
+          from pathlib import Path
+
+          root = Path("databricks")
+          run_re = re.compile(r"^\s*#\s*MAGIC\s+%run\s+(\S+)")
+          fail = False
+          for nb in root.rglob("*.py"):
+              for lineno, line in enumerate(
+                  nb.read_text(encoding="utf-8").splitlines(), start=1
+              ):
+                  m = run_re.match(line)
+                  if not m:
+                      continue
+                  target = m.group(1)
+                  resolved = (nb.parent / target).resolve()
+                  candidate = (
+                      resolved
+                      if resolved.suffix == ".py"
+                      else resolved.with_suffix(".py")
+                  )
+                  if not candidate.is_file():
+                      print(f"{nb}:{lineno}: %run target does not resolve: {target}")
+                      fail = True
+          sys.exit(1 if fail else 0)
+          PYEOF
