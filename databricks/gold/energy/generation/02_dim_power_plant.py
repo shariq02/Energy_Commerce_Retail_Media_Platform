@@ -63,26 +63,26 @@ _plant_silver = read_silver("power_plant_list")
 # COMMAND ----------
 
 # DBTITLE 1,Read Gold -- dim_generation_unit
-_gen_unit = read_gold("dim_generation_unit", source="mastr").select(
-    F.col("unit_id").alias("_gu_unit_id"),
-    F.col("generation_unit_key").alias("_gu_key"),
-)
+_gen_unit = read_gold("dim_generation_unit", source="mastr")
 
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- resolve the MaStR reconciliation link (soft match)
-dim = _plant_silver.join(
-    _gen_unit, _plant_silver["mastr_unit_id"] == F.col("_gu_unit_id"), "left"
+dim = resolve_fk(
+    _plant_silver,
+    _gen_unit,
+    fact_key_cols=["mastr_unit_id"],
+    dim_key_cols=["unit_id"],
+    dim_surrogate_col="generation_unit_key",
+    output_col="matched_generation_unit_key",
 )
-dim = (
-    dim.withColumn("matched_generation_unit_key", F.col("_gu_key"))
-    .withColumn(
-        "generation_unit_match_type",
-        F.when(F.col("mastr_unit_id").isNull(), F.lit("no_mastr_unit_id"))
-        .when(F.col("_gu_key").isNotNull(), F.lit("mastr_unit_id_matched"))
-        .otherwise(F.lit("mastr_unit_id_unmatched")),
+dim = dim.withColumn(
+    "generation_unit_match_type",
+    F.when(F.col("mastr_unit_id").isNull(), F.lit("no_mastr_unit_id"))
+    .when(
+        F.col("matched_generation_unit_key").isNotNull(), F.lit("mastr_unit_id_matched")
     )
-    .drop("_gu_unit_id", "_gu_key")
+    .otherwise(F.lit("mastr_unit_id_unmatched")),
 )
 
 # COMMAND ----------

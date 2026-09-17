@@ -46,11 +46,6 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
-from pyspark.sql import functions as F
-
-# COMMAND ----------
-
 # DBTITLE 1,Configuration
 SOURCE = "mastr"
 COMPONENT = "gold/energy/grid/03_dim_market_actor"
@@ -117,27 +112,34 @@ write_gold_findings(
 # COMMAND ----------
 
 # DBTITLE 1,Read Gold -- dim_market_actor
-_market_actor_keys = read_gold("dim_market_actor", source="mastr").select(
-    F.col("market_actor_id").alias("_ma_id"),
-    F.col("market_actor_key").alias("_ma_key"),
-)
+_market_actor = read_gold("dim_market_actor", source="mastr")
 
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- bridge_actor_role
-bridge_actor_role = (
-    _actor_role_bridge_silver.join(
-        _market_actor_keys,
-        _actor_role_bridge_silver["parent_id"] == F.col("_ma_id"),
-        "left",
-    )
-    .withColumn("market_actor_key", F.col("_ma_key"))
-    .drop("_ma_id", "_ma_key")
+bridge_actor_role = resolve_fk(
+    _actor_role_bridge_silver,
+    _market_actor,
+    fact_key_cols=["parent_id"],
+    dim_key_cols=["market_actor_id"],
+    dim_surrogate_col="market_actor_key",
+    output_col="market_actor_key",
 )
 bridge_actor_role = bridge_actor_role.withColumn(
     "bridge_actor_role_key", surrogate_key("parent_id", "linked_id")
 )
 bridge_actor_role = add_gold_provenance(bridge_actor_role, SOURCE, RID)
+
+# COMMAND ----------
+
+# DBTITLE 1,Grain assertion -- bridge_actor_role, one row per (parent_id, linked_id)
+assert_unique_grain(
+    bridge_actor_role,
+    ["parent_id", "linked_id"],
+    component=COMPONENT,
+    source=SOURCE,
+    rid=RID,
+)
 
 # COMMAND ----------
 

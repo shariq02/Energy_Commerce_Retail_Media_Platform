@@ -41,8 +41,8 @@ from pyspark.sql import functions as F
 # DBTITLE 1,Configuration constants
 GOLD_STAGE = "gold"
 
-# The two Gold schema families (ADR-029): one per ecosystem, plus the
-# cross-ecosystem conformed schema created separately by
+# The two Gold schema families: one per ecosystem, plus the cross-ecosystem
+# conformed schema created separately by
 # databricks/setup/03_create_shared_conformed.py.
 SHARED_CONFORMED_SCHEMA = "shared_conformed"
 
@@ -50,7 +50,7 @@ SHARED_CONFORMED_SCHEMA = "shared_conformed"
 def gold_schema_for(source: str) -> str:
     """source_system -> its `{ecosystem}_gold` schema. Gold has no per-table
     registry like Silver's field_class_registry -- one schema per ecosystem is
-    the whole rule (ADR-029)."""
+    the whole rule."""
     return f"{ecosystem_for(source)}_gold"
 
 
@@ -195,6 +195,42 @@ def pit_join(
         )
     )
     return fact_df.join(d, cond, "left").drop("_pit_dim_key")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Generic FK resolution
+
+
+def resolve_fk(
+    fact_df: DataFrame,
+    dim_df: DataFrame,
+    *,
+    fact_key_cols: list[str],
+    dim_key_cols: list[str],
+    dim_surrogate_col: str,
+    output_col: str,
+) -> DataFrame:
+    """Left-join `dim_df`'s surrogate key onto `fact_df` on a natural key
+    (single- or multi-column) and add it as `output_col` -- the
+    join+alias+drop-temp-columns pattern repeated across most Gold fact/
+    bridge notebooks (dim_power_plant's MaStR reconciliation,
+    fact_redispatch_measure, the location/actor/generation-unit bridges,
+    fact_ecommerce_item's parent-event link, fact_search_visibility's
+    repository link, ...). `fact_key_cols` and `dim_key_cols` must be the
+    same length and in matching order; an unmatched fact row gets NULL in
+    `output_col`, never a fabricated identity."""
+    tmp_names = [f"_rfk_{i}" for i in range(len(dim_key_cols))]
+    dim_slim = dim_df.select(
+        *[F.col(dc).alias(tn) for dc, tn in zip(dim_key_cols, tmp_names)],
+        F.col(dim_surrogate_col).alias("_rfk_key"),
+    )
+    cond = None
+    for fc, tn in zip(fact_key_cols, tmp_names):
+        c = fact_df[fc] == dim_slim[tn]
+        cond = c if cond is None else (cond & c)
+    out = fact_df.join(dim_slim, cond, "left").withColumn(output_col, F.col("_rfk_key"))
+    return out.drop(*tmp_names, "_rfk_key")
 
 
 # COMMAND ----------

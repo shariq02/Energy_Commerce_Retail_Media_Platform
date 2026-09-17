@@ -62,23 +62,18 @@ _items_silver = read_silver("ga4_items")
 # COMMAND ----------
 
 # DBTITLE 1,Read Gold -- fact_web_event
-_web_event_keys = read_gold("fact_web_event", source="ga4").select(
-    *[F.col(c).alias(f"_we_{c}") for c in EVENT_NATURAL_KEY],
-    F.col("web_event_key").alias("_we_key"),
-)
+_web_event = read_gold("fact_web_event", source="ga4")
 
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- resolve the parent web-event key
-_join_cond = None
-for c in EVENT_NATURAL_KEY:
-    cond = _items_silver[c] == F.col(f"_we_{c}")
-    _join_cond = cond if _join_cond is None else (_join_cond & cond)
-
-fact = (
-    _items_silver.join(_web_event_keys, _join_cond, "left")
-    .withColumn("web_event_key", F.col("_we_key"))
-    .drop(*[f"_we_{c}" for c in EVENT_NATURAL_KEY], "_we_key")
+fact = resolve_fk(
+    _items_silver,
+    _web_event,
+    fact_key_cols=EVENT_NATURAL_KEY,
+    dim_key_cols=EVENT_NATURAL_KEY,
+    dim_surrogate_col="web_event_key",
+    output_col="web_event_key",
 )
 
 # COMMAND ----------

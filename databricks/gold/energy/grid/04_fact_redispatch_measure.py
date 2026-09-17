@@ -62,22 +62,18 @@ _redispatch_silver = read_silver("redispatch_measures")
 # COMMAND ----------
 
 # DBTITLE 1,Read Gold -- dim_power_plant
-_power_plant_keys = read_gold("dim_power_plant", source="power_plant_list").select(
-    F.col("plant_name").alias("_pp_name"),
-    F.col("power_plant_key").alias("_pp_key"),
-)
+_power_plant = read_gold("dim_power_plant", source="power_plant_list")
 
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- resolve the matched power plant (soft match, unchanged confidence)
-fact = (
-    _redispatch_silver.join(
-        _power_plant_keys,
-        _redispatch_silver["affected_unit_match_name"] == F.col("_pp_name"),
-        "left",
-    )
-    .withColumn("matched_power_plant_key", F.col("_pp_key"))
-    .drop("_pp_name", "_pp_key")
+fact = resolve_fk(
+    _redispatch_silver,
+    _power_plant,
+    fact_key_cols=["affected_unit_match_name"],
+    dim_key_cols=["plant_name"],
+    dim_surrogate_col="power_plant_key",
+    output_col="matched_power_plant_key",
 )
 
 # COMMAND ----------

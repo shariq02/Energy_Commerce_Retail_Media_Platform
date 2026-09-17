@@ -59,22 +59,18 @@ _events_silver = read_silver("search_visibility_events")
 # COMMAND ----------
 
 # DBTITLE 1,Read Gold -- dim_repository
-_repository_keys = read_gold(
-    "dim_repository", source="search_visibility_ramp_dryad"
-).select(
-    F.col("repository_id").alias("_repo_id"),
-    F.col("repository_key").alias("_repo_key"),
-)
+_repository = read_gold("dim_repository", source="search_visibility_ramp_dryad")
 
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- resolve the repository key
-fact = (
-    _events_silver.join(
-        _repository_keys, _events_silver["repository_id"] == F.col("_repo_id"), "left"
-    )
-    .withColumn("repository_key", F.col("_repo_key"))
-    .drop("_repo_id", "_repo_key")
+fact = resolve_fk(
+    _events_silver,
+    _repository,
+    fact_key_cols=["repository_id"],
+    dim_key_cols=["repository_id"],
+    dim_surrogate_col="repository_key",
+    output_col="repository_key",
 )
 
 # COMMAND ----------

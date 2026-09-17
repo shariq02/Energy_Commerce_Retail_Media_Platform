@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** create the two Gold schemas (`energy_gold`, `commerce_gold`).
 # MAGIC Gold has no per-table registry like Silver's field_class_registry -- one
-# MAGIC schema per ecosystem is the whole rule (ADR-029). `shared_conformed` is
+# MAGIC schema per ecosystem is the whole rule. `shared_conformed` is
 # MAGIC created separately by `databricks/setup/03_create_shared_conformed.py`.
 # MAGIC Idempotent -- safe to re-run.
 # MAGIC

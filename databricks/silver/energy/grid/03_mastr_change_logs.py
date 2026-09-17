@@ -16,7 +16,7 @@
 # MAGIC append-only source-scoped Silver event tables -- unit deletions, actor
 # MAGIC departures and grid-operator reassignments. These carry the survivorship
 # MAGIC record the live tables omit and are NEVER merged back into the
-# MAGIC current-state dimensions. Runs after `02_mastr_reference_catalogs`.
+# MAGIC current-state dimensions. Runs after `../_reference/mastr_reference_catalogs/`.
 
 
 # COMMAND ----------
@@ -139,7 +139,7 @@ g = g.withColumn("_srid", sha_key(*_key, "_src_id_ord"))
 # DBTITLE 1,Date-order flag -- registered before effective (additive)
 # Two date-order flags, additive, never drop/correct rows --
 # (1) registration before effective date; (2) commissioning after the change
-# (needs 01_mastr_generation_units.py to have run first).
+# (needs ../generation/mastr_generation_units/ to have run first).
 g = g.withColumn(
     "_date_order_violation_registered_before_effective",
     F.when(

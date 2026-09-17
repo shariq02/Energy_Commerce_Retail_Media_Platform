@@ -50,7 +50,7 @@ RENAMES = {
 
 # Stuck-reading lookback per frequency, scaled to the same ~10-hour window
 # profiling measured at 1h (9 steps back = 10 readings = 10h) -- same as
-# 01_honda_energy.py.
+# ../iot/honda_energy/'s notebooks.
 STUCK_LOOKBACK_STEPS_BY_FREQ = {"1h": 9, "15min": 39, "1min": 599}
 
 # COMMAND ----------
@@ -75,7 +75,7 @@ df = (
 
 # DBTITLE 1,Transform -- honda_weather (stuck-reading flags)
 # Frequency-scaled lookback (see STUCK_LOOKBACK_STEPS_BY_FREQ) -- same fix as
-# 01_honda_energy.py.
+# ../iot/honda_energy/'s notebooks.
 _w = Window.partitionBy("frequency").orderBy("datetime_utc")
 for _c in ("air_temperature_2m", "global_irradiance"):
     _stuck_expr = F.lit(False)

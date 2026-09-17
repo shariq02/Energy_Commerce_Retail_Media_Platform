@@ -16,7 +16,7 @@
 # MAGIC into source-scoped Silver at their own grain, plus an additive
 # MAGIC `mastr_actor_role_bridge` (one row per actor x role). Natural-person
 # MAGIC actors keep their row with name / address suppressed at source. Runs
-# MAGIC after `02_mastr_reference_catalogs`.
+# MAGIC after `../_reference/mastr_reference_catalogs/`.
 
 
 # COMMAND ----------
