@@ -414,6 +414,23 @@ ga4_events,items,source_provided,typed cast (+ rename where localised),ga4 contr
 ga4_events,source_record_id,derived,natural key or deterministic composite,silver governance,commerce_silver
 ga4_events,source_system,derived,constant per source,silver governance,commerce_silver
 ga4_events,user_pseudo_id,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,_silver_loaded_at,derived,current_timestamp() at write,silver governance,commerce_silver
+ga4_items,_silver_run_id,derived,the Silver run id,silver governance,commerce_silver
+ga4_items,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,commerce_silver
+ga4_items,event_date,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,event_name,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,event_timestamp,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,item_category,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,item_context,derived,"'promotion' for view_promotion/select_promotion events, else 'product'",ga4 contract / business rule,commerce_silver
+ga4_items,item_id,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,item_name,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,item_ordinal,derived,posexplode_outer position within the items array,explode ordinal,commerce_silver
+ga4_items,item_revenue,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,price,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,quantity,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_items,source_record_id,derived,natural key or deterministic composite,silver governance,commerce_silver
+ga4_items,source_system,derived,constant per source,silver governance,commerce_silver
+ga4_items,user_pseudo_id,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
 honda_cooling_p,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver
 honda_cooling_p,_silver_run_id,derived,the Silver run id,silver governance,energy_silver
 honda_cooling_p,cool_elec,source_provided,typed cast (+ rename where localised),honda_iot contract,energy_silver
@@ -1219,6 +1236,9 @@ mastr_location_connection_bridge,linked_id,source_provided,one exploded id from 
 mastr_location_connection_bridge,parent_id,source_provided,the owning record's MaStR id,mastr contract,energy_silver
 mastr_location_connection_bridge,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver
 mastr_location_connection_bridge,source_system,derived,constant per source,silver governance,energy_silver
+mastr_location_coordinate_conflict,_coordinate_conflict,derived,distinct_coords > 1,cross-table coordinate-agreement check,energy_silver
+mastr_location_coordinate_conflict,distinct_coords,derived,"countDistinct(lat, lon) rounded to 2dp across linked units",cross-table coordinate-agreement check,energy_silver
+mastr_location_coordinate_conflict,location_id,derived,gathered from the 6 mastr_einheiten_* Silver tables,cross-table coordinate-agreement check,energy_silver
 mastr_location_unit_bridge,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver
 mastr_location_unit_bridge,_silver_run_id,derived,the Silver run id,silver governance,energy_silver
 mastr_location_unit_bridge,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver

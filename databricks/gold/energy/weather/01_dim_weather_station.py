@@ -13,6 +13,11 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Grain:** one row per (`station_id`, `valid_from`) -- time-varying (SCD).
+# MAGIC Silver may carry more than one relocation-record variant per key
+# MAGIC (`_src_id_ord`, both source tables' key is documented `unique: false` in
+# MAGIC the Bronze contract); Gold keeps exactly the `_src_id_ord == 1` row so
+# MAGIC `pit_join()` never has more than one candidate to match. Excluded
+# MAGIC variants are not lost -- they stay in Silver, just not promoted here.
 # MAGIC `dim_weather_station_name_history` is a separate small SCD at the same
 # MAGIC grain, kept apart because its own `valid_from`/`valid_to` windows are not
 # MAGIC guaranteed to align with `dim_weather_station`'s.
@@ -61,8 +66,22 @@ _station_name_history_silver = read_silver("dwd_station_name_history")
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- dim_weather_station (canonical row per key)
+# Silver keeps every relocation-record variant (_src_id_ord, see
+# dwd_station_geography) -- Gold keeps exactly one canonical row per
+# (station_id, valid_from) so pit_join() against fact_weather never fans out
+# on a fact whose timestamp falls inside a shared, ambiguous window.
+_station_geography_canonical = _station_geography_silver.filter(
+    F.col("_src_id_ord") == 1
+)
+_station_geography_alt_count = _station_geography_silver.filter(
+    F.col("_src_id_ord") > 1
+).count()
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- dim_weather_station
-dim_weather_station = _station_geography_silver.withColumn(
+dim_weather_station = _station_geography_canonical.withColumn(
     "weather_station_key", surrogate_key("station_id", "valid_from")
 )
 dim_weather_station = add_gold_provenance(dim_weather_station, SOURCE, RID)
@@ -100,6 +119,9 @@ _findings_blocks = inspect_gold_table(
     rid=RID,
     key_cols=["station_id", "valid_from"],
     df_before=_station_geography_silver,
+    extra_checks={
+        "relocation_variant_rows_excluded": _station_geography_alt_count,
+    },
 )
 write_gold_findings(
     SOURCE,
@@ -110,8 +132,20 @@ write_gold_findings(
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- dim_weather_station_name_history (canonical row per key)
+# Same relocation-style overlap as dwd_station_geography (_src_id_ord, see
+# Silver) -- keep exactly one canonical row per (station_id, valid_from).
+_station_name_history_canonical = _station_name_history_silver.filter(
+    F.col("_src_id_ord") == 1
+)
+_station_name_history_alt_count = _station_name_history_silver.filter(
+    F.col("_src_id_ord") > 1
+).count()
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- dim_weather_station_name_history
-dim_weather_station_name_history = _station_name_history_silver.withColumn(
+dim_weather_station_name_history = _station_name_history_canonical.withColumn(
     "weather_station_name_history_key", surrogate_key("station_id", "valid_from")
 )
 dim_weather_station_name_history = add_gold_provenance(
@@ -151,6 +185,9 @@ _findings_blocks = inspect_gold_table(
     rid=RID,
     key_cols=["station_id", "valid_from"],
     df_before=_station_name_history_silver,
+    extra_checks={
+        "relocation_variant_rows_excluded": _station_name_history_alt_count,
+    },
 )
 write_gold_findings(
     SOURCE,

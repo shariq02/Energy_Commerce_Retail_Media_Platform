@@ -12,7 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** `dwd_station_geography` into source-scoped Silver, SCD (station, valid_from) grain. One of 7 sibling notebooks in this folder, split
+# MAGIC **Purpose:** `dwd_station_geography` into source-scoped Silver, SCD
+# MAGIC (station, valid_from, `_src_id_ord`) grain -- the Bronze contract
+# MAGIC documents (station_id, valid_from) alone as not unique (relocations).
+# MAGIC One of 7 sibling notebooks in this folder, split
 # MAGIC from a single `01_dwd_reference.py` -- see the folder's other files for
 # MAGIC the rest. Runs before the DWD measurement notebooks.
 
@@ -89,7 +92,15 @@ write_quarantine(q, RID)
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- dwd_station_geography (provenance)
-sg = sg.withColumn("_srid", sha_key("station_id", "valid_from"))
+# Bronze contract documents (station_id, valid_from) as unique: false --
+# relocations can share a start date across 2-17 rows per station. The ordinal
+# disambiguates rather than dropping real location history.
+sg = within_group_ordinal(
+    sg,
+    ["station_id", "valid_from"],
+    ["latitude", "longitude", "station_elevation_m", "valid_to", "station_name"],
+)
+sg = sg.withColumn("_srid", sha_key("station_id", "valid_from", "_src_id_ord"))
 sg = add_provenance(sg, SOURCE, "_srid", RID)
 
 # COMMAND ----------
@@ -106,7 +117,7 @@ _findings_blocks = inspect_table(
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    key_cols=["station_id", "valid_from"],
+    key_cols=["station_id", "valid_from", "_src_id_ord"],
     df_before=_bronze,
 )
 write_silver_findings(

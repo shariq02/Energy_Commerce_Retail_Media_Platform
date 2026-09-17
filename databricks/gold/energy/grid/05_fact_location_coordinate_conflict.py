@@ -15,7 +15,8 @@
 # MAGIC **Grain:** one row per `location_id`.
 # MAGIC
 # MAGIC **Sources:** `mastr_location_coordinate_conflict` (Silver,
-# MAGIC energy_silver_reference); `dim_location` (Gold,
+# MAGIC energy_silver -- written outside `_reference/`, so it takes the plain
+# MAGIC ecosystem-default schema, not `_reference`); `dim_location` (Gold,
 # MAGIC `dim_location/01_dim_location.py`).
 # MAGIC
 # MAGIC **Serves use case:** any Energy use case needing the coordinate-

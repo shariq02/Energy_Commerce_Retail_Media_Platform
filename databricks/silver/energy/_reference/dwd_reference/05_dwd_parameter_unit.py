@@ -12,7 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** `dwd_parameter_unit` into source-scoped Silver, source grain. One of 7 sibling notebooks in this folder, split
+# MAGIC **Purpose:** `dwd_parameter_unit` into source-scoped Silver, source
+# MAGIC (station, parameter_source_code, valid_from, `_src_id_ord`) grain --
+# MAGIC the Bronze contract documents (station_id, Parameter, valid_from) alone
+# MAGIC as not unique. One of 7 sibling notebooks in this folder, split
 # MAGIC from a single `01_dwd_reference.py` -- see the folder's other files for
 # MAGIC the rest. Runs before the DWD measurement notebooks.
 
@@ -56,8 +59,26 @@ pu = keep_real_stations(_bronze, "Stations_ID", "dwd_parameter_unit")
 pu = rename_meta(pu, "dwd_parameter_unit")
 pu = pu.withColumn("valid_from", parse_ts("valid_from", ("yyyyMMdd",), "UTC"))
 pu = pu.withColumn("valid_to", parse_ts("valid_to", ("yyyyMMdd",), "UTC"))
+# Bronze contract documents (station_id, Parameter, valid_from) as unique:
+# false -- 5418 rows, more than one parameter-unit record can share the same
+# parameter code and start date.
+pu = within_group_ordinal(
+    pu,
+    ["station_id", "parameter_source_code", "valid_from"],
+    [
+        "valid_to",
+        "station_name",
+        "parameter_description_de",
+        "parameter_unit",
+        "parameter_data_source",
+        "parameter_extra_info",
+        "parameter_special_notes",
+        "parameter_reference",
+    ],
+)
 pu = pu.withColumn(
-    "_srid", sha_key("station_id", "parameter_source_code", "valid_from")
+    "_srid",
+    sha_key("station_id", "parameter_source_code", "valid_from", "_src_id_ord"),
 )
 pu = add_provenance(pu, SOURCE, "_srid", RID)
 
@@ -75,7 +96,7 @@ _findings_blocks = inspect_table(
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    key_cols=["station_id", "parameter_source_code", "valid_from"],
+    key_cols=["station_id", "parameter_source_code", "valid_from", "_src_id_ord"],
     df_before=_bronze,
 )
 write_silver_findings(

@@ -221,7 +221,25 @@ TOPOLOGY: dict[str, dict] = {
         "value_flags": ["metric_semantic_status"],
     },
     "mastr": {
-        "extra_tables": {},
+        "extra_tables": {
+            "mastr_location_coordinate_conflict": {
+                "location_id": (
+                    "derived",
+                    "gathered from the 6 mastr_einheiten_* Silver tables",
+                    "cross-table coordinate-agreement check",
+                ),
+                "distinct_coords": (
+                    "derived",
+                    "countDistinct(lat, lon) rounded to 2dp across linked units",
+                    "cross-table coordinate-agreement check",
+                ),
+                "_coordinate_conflict": (
+                    "derived",
+                    "distinct_coords > 1",
+                    "cross-table coordinate-agreement check",
+                ),
+            },
+        },
         "geo_tables": {
             "mastr_einheiten_wind",
             "mastr_einheiten_biomasse",
@@ -366,6 +384,37 @@ FOUNDATION_SOURCES = {
                 "ecommerce",
                 "items",
             ],
+            # ga4_items: ga4_events.items exploded to item grain -- item_id is
+            # overloaded (campaign id on promotion events, product id
+            # otherwise), only separable once exploded (03_ga4_items.py).
+            "ga4_items": [
+                "event_date",
+                "event_timestamp",
+                "user_pseudo_id",
+                "event_name",
+                "item_ordinal",
+                "item_id",
+                "item_name",
+                "item_category",
+                "price",
+                "quantity",
+                "item_revenue",
+                "item_context",
+            ],
+        },
+        "synthetic": {
+            "ga4_items": {
+                "item_ordinal": (
+                    "derived",
+                    "posexplode_outer position within the items array",
+                    "explode ordinal",
+                ),
+                "item_context": (
+                    "derived",
+                    "'promotion' for view_promotion/select_promotion events, else 'product'",
+                    "ga4 contract / business rule",
+                ),
+            }
         },
     },
 }
