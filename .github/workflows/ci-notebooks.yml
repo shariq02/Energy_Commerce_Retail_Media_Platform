@@ -1,0 +1,45 @@
+name: CI Notebooks
+
+# Repository-level structure/syntax/convention checks on databricks/** only.
+# Never executes against a live Databricks workspace or cluster -- notebook
+# execution stays an operator action, not a CI action.
+
+on:
+  push:
+    branches: [main, development]
+    paths:
+      - "databricks/**"
+  pull_request:
+    branches: [main, development]
+    paths:
+      - "databricks/**"
+
+jobs:
+  structure:
+    name: Notebook structure & lint (no execution)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: python -m pip install ruff==0.15.8
+
+      - name: Run ruff (syntax + lint only)
+        run: ruff check databricks/
+
+      - name: Verify Databricks notebook header
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            first_line=$(head -n 1 "$f")
+            if [ "$first_line" != "# Databricks notebook source" ]; then
+              echo "Missing/invalid Databricks header: $f"
+              fail=1
+            fi
+          done < <(find databricks -name "*.py" -print0)
+          exit "$fail"

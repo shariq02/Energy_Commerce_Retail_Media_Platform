@@ -1,10 +1,14 @@
-name: CI
+name: CI Code
 
 on:
   push:
     branches: [main, development]
+    paths-ignore:
+      - "databricks/**"
   pull_request:
     branches: [main, development]
+    paths-ignore:
+      - "databricks/**"
 
 jobs:
   lint:
