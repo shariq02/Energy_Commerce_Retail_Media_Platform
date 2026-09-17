@@ -42,6 +42,7 @@ jobs:
   doc-reference-scan:
     name: Design-doc / ADR / UC / Phase reference scan
     runs-on: ubuntu-latest
+    needs: lint
     steps:
       - uses: actions/checkout@v4
 
@@ -53,15 +54,14 @@ jobs:
       # Code must never cite planning docs, ADR-NN, UC-NN, "Phase N" or the
       # sub-phase shorthand -- reuses the same check scripts/utilities/lint.py
       # runs locally, read-only (no auto-fix, no pre-commit) so it is safe to
-      # run standalone in CI.
+      # run standalone in CI. Single-line + explicit PYTHONPATH (same pattern
+      # the test job below already relies on) rather than a multi-line
+      # python -c string, which failed to resolve the scripts.utilities
+      # namespace package in the actual runner.
       - name: Scan for disallowed doc/ADR/UC/phase references in code
-        run: |
-          python3 -c "
-          import sys
-          sys.path.insert(0, '.')
-          from scripts.utilities.lint import check_doc_references
-          sys.exit(check_doc_references())
-          "
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python3 -c "from scripts.utilities.lint import check_doc_references; import sys; sys.exit(check_doc_references())"
 
   test:
     name: Unit tests
