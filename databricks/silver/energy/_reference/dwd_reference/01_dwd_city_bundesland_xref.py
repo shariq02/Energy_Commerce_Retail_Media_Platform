@@ -29,7 +29,6 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-from pyspark.sql import functions as F
 
 # COMMAND ----------
 

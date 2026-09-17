@@ -87,13 +87,13 @@ _temp_daily = (
 # DBTITLE 1,Transform -- daily total precipitation by ags_code
 _precip_daily = (
     _precipitation.filter(
-        F.col("ags_code").isNotNull() & F.col("precipitation_height_mm").isNotNull()
+        F.col("ags_code").isNotNull() & F.col("precipitation_hourly_total").isNotNull()
     )
     .withColumn(
         "date_key", F.date_format(F.col("observation_ts"), "yyyyMMdd").cast("int")
     )
     .groupBy("ags_code", "date_key")
-    .agg(F.sum("precipitation_height_mm").alias("total_precipitation_mm"))
+    .agg(F.sum("precipitation_hourly_total").alias("total_precipitation_mm"))
 )
 
 # COMMAND ----------
