@@ -72,6 +72,15 @@ extend-ignore = ["E402", "BLE001"]
 # target_schema_for), same as every numbered notebook above.
 "databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
+# Gold notebooks pull `%run ../silver/_silver_common` then `%run ../../_gold_common`
+# (Databricks runtime magic). _gold_common.py itself is the second link in that
+# chain (like _silver_inspect.py) and legitimately depends on _silver_common's
+# names (CATALOG, ecosystem_for, sha_key, AUDIT_TABLE, WATERMARK_TABLE, now_utc).
+"databricks/gold/_gold_common.py" = ["F821"]
+"databricks/gold/_gold_inspect.py" = ["F821"]
+"databricks/gold/[0-9]*_*.py" = ["F821"]
+"databricks/gold/energy/**/*.py" = ["F821"]
+"databricks/gold/commerce/**/*.py" = ["F821"]
 
 [tool.pytest.ini_options]
 markers = [
