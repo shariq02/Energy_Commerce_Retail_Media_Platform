@@ -20,6 +20,9 @@ from pathlib import Path
 
 import pytest
 
+from src.schemas._generate_field_classes import build_rows
+from src.schemas._silver_notebook_scan import all_read_silver_tables
+
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -67,3 +70,23 @@ def test_every_notebook_that_writes_gold_also_calls_the_hard_fail_gate(path):
         "assert_unique_grain() -- a Gold table would be written with no "
         "Silver->Gold hard-fail gate exercised at all"
     )
+
+
+def test_every_gold_read_silver_target_is_registered() -> None:
+    """Static emulation of 00_gold_setup.py's preflight -- every table a Gold
+    notebook's read_silver() names must be produced by the field-class
+    generator, or the real preflight would (correctly) hard-fail before any
+    Gold processing starts."""
+    produced = {r["table_name"] for r in build_rows()}
+    required = all_read_silver_tables(_GOLD)
+    missing = sorted(required - produced)
+    assert not missing, f"Gold reads unregistered Silver table(s): {missing}"
+
+
+def test_gold_preflight_would_reject_an_unregistered_dependency() -> None:
+    """Proves the preflight's own comparison logic, not just today's repo
+    state -- an unregistered Gold dependency must be detectable as a gap."""
+    produced = {r["table_name"] for r in build_rows()}
+    required = all_read_silver_tables(_GOLD) | {"a_table_nobody_registered"}
+    missing = sorted(required - produced)
+    assert missing == ["a_table_nobody_registered"]

@@ -12,7 +12,7 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Grain:** one row per (`user_pseudo_id`, `ga_session_id`), grouping
+# MAGIC **Grain:** one row per (`user_pseudo_id`, `session_id`), grouping
 # MAGIC existing event rows by GA4's own session boundary.
 # MAGIC
 # MAGIC **Sources:** `ga4_events` (Silver, commerce_silver).
@@ -57,10 +57,10 @@ _events_silver = read_silver("ga4_events")
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- session boundary + event count per (user_pseudo_id, ga_session_id)
+# DBTITLE 1,Transform -- session boundary + event count per (user_pseudo_id, session_id)
 fact = (
-    _events_silver.filter(F.col("ga_session_id").isNotNull())
-    .groupBy("user_pseudo_id", "ga_session_id")
+    _events_silver.filter(F.col("session_id").isNotNull())
+    .groupBy("user_pseudo_id", "session_id")
     .agg(
         F.min("event_timestamp").alias("session_start_ts"),
         F.max("event_timestamp").alias("session_end_ts"),
@@ -72,16 +72,16 @@ fact = (
 
 # DBTITLE 1,Transform -- surrogate key + Gold provenance
 fact = fact.withColumn(
-    "customer_session_ga4_key", surrogate_key("user_pseudo_id", "ga_session_id")
+    "customer_session_ga4_key", surrogate_key("user_pseudo_id", "session_id")
 )
 fact = add_gold_provenance(fact, SOURCE, RID)
 
 # COMMAND ----------
 
-# DBTITLE 1,Grain assertion -- one row per (user_pseudo_id, ga_session_id)
+# DBTITLE 1,Grain assertion -- one row per (user_pseudo_id, session_id)
 assert_unique_grain(
     fact,
-    ["user_pseudo_id", "ga_session_id"],
+    ["user_pseudo_id", "session_id"],
     component=COMPONENT,
     source=SOURCE,
     rid=RID,
@@ -101,7 +101,7 @@ _findings_blocks = inspect_gold_table(
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    key_cols=["user_pseudo_id", "ga_session_id"],
+    key_cols=["user_pseudo_id", "session_id"],
 )
 write_gold_findings(
     SOURCE,

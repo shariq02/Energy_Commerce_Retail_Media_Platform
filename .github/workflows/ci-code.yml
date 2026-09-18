@@ -151,11 +151,12 @@ jobs:
     # and scripts/ transform logic), but 2 known, tracked, pre-existing gaps
     # unrelated to those tests still fail collection -- 5 missing generated
     # JSON schemas (src/schemas/_generate_jsonschema.py output never
-    # committed for dwd/smard/power_plant_list/redispatch/mastr) and 1 stale
-    # field-class seed (ga4_items, mastr_location_coordinate_conflict,
-    # dwd_missingness_reconciliation missing from the registry). Both are
-    # open, owner-run register items. Re-enable (remove continue-on-error)
-    # once both are fixed.
+    # committed for dwd/smard/power_plant_list/redispatch/mastr; PROJECT_PLAN
+    # register id generated-jsonschema-drift) and 1 stale field-class seed
+    # (PROJECT_PLAN register id field-class-seed-drift -- the generator itself
+    # is now fixed, Entry 058, but the CSV still needs an owner-run
+    # regeneration). Re-enable (remove continue-on-error) once both register
+    # rows close.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

@@ -15,11 +15,12 @@
 # MAGIC **Purpose:** create the four Silver schemas (`energy_silver`,
 # MAGIC `energy_silver_reference`, `commerce_silver`,
 # MAGIC `commerce_silver_reference`), the shared `quality.quarantine` table, and
-# MAGIC load the shared `quality.field_class_registry` from its seed file
-# MAGIC (`src/schemas/field_classes/energy_silver_field_classes.csv`, produced by
-# MAGIC `src/schemas/_generate_field_classes.py` -- one seed covering every
-# MAGIC ecosystem, disambiguated by its `target_schema` column). Idempotent --
-# MAGIC safe to re-run.
+# MAGIC compute + load the shared `quality.field_class_registry` directly from
+# MAGIC `src/schemas/_generate_field_classes.py`'s `build_rows()` -- no committed
+# MAGIC CSV is read or required; a newly added Silver table is picked up the next
+# MAGIC time this notebook runs, and setup hard-fails immediately (before any
+# MAGIC Silver notebook runs) if a real `write_silver()` call has no declared
+# MAGIC classification anywhere. Idempotent -- safe to re-run.
 # MAGIC
 # MAGIC The `quality.pipeline_watermarks` and `quality.quality_audit_log` tables
 # MAGIC already exist (`databricks/setup/00_create_schemas.py`); this notebook
@@ -33,8 +34,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import csv as _csv
-import os as _os
+import sys as _sys
 
 # COMMAND ----------
 
@@ -93,37 +93,40 @@ print(f"OK  table ready: {FIELD_CLASS_TABLE}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load the field-class registry from its seed
-SEED = _os.path.join(
-    repo_root(), "src", "schemas", "field_classes", "energy_silver_field_classes.csv"
-)
-if not _os.path.exists(SEED):
-    raise RuntimeError(
-        f"seed not found: {SEED} -- run `python src/schemas/_generate_field_classes.py`"
-    )
+# DBTITLE 1,Generate the field-class registry (no committed CSV required)
+if repo_root() not in _sys.path:
+    _sys.path.insert(0, repo_root())
+from src.schemas._generate_field_classes import assert_registry_complete, build_rows
 
-with open(SEED, encoding="utf-8", newline="") as fh:
-    rows = [
-        (
-            r["table_name"],
-            r["column_name"],
-            r["field_class"],
-            r.get("derivation_rule") or None,
-            r.get("source_reference") or None,
-            r["target_schema"],
-        )
-        for r in _csv.DictReader(fh)
-    ]
+_generated_rows = build_rows()
+# Hard-fails here, before any Silver notebook runs, if a real write_silver()
+# target has no declared classification anywhere -- never guessed, never
+# silently defaulted.
+assert_registry_complete(_generated_rows)
+
+rows = [
+    (
+        r["table_name"],
+        r["column_name"],
+        r["field_class"],
+        r.get("derivation_rule") or None,
+        r.get("source_reference") or None,
+        r["target_schema"],
+    )
+    for r in _generated_rows
+]
 
 bad_class = sorted(
     {c for _, _, c, _, _, _ in rows} - {"source_provided", "derived", "synthetic"}
 )
 if bad_class:
-    raise RuntimeError(f"seed carries unknown field_class value(s): {bad_class}")
+    raise RuntimeError(f"generator produced unknown field_class value(s): {bad_class}")
 
 bad_schema = sorted({s for *_, s in rows} - VALID_TARGET_SCHEMAS)
 if bad_schema:
-    raise RuntimeError(f"seed carries unknown target_schema value(s): {bad_schema}")
+    raise RuntimeError(
+        f"generator produced unknown target_schema value(s): {bad_schema}"
+    )
 
 seed_df = spark.createDataFrame(
     rows,
@@ -133,7 +136,7 @@ seed_df = spark.createDataFrame(
 seed_df.write.format("delta").mode("overwrite").option(
     "overwriteSchema", "true"
 ).saveAsTable(FIELD_CLASS_TABLE)
-print(f"OK  {FIELD_CLASS_TABLE}: loaded {len(rows)} rows from the seed")
+print(f"OK  {FIELD_CLASS_TABLE}: loaded {len(rows)} rows (generated in-process)")
 
 # COMMAND ----------
 

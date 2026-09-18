@@ -13,9 +13,13 @@ notebooks validate against this; they never author it.
 
 Reads: src/schemas/contracts/*.yml + src/schemas/mappings/*.yml +
 src/schemas/reference/source_ecosystem_map.yml.
-Writes: src/schemas/field_classes/energy_silver_field_classes.csv -- one
-seed covering every ecosystem, disambiguated by its target_schema column
-(loaded into quality.field_class_registry by databricks/silver/00_silver_setup.py).
+
+`build_rows()` + `assert_registry_complete()` are imported directly by
+`databricks/silver/00_silver_setup.py`, which computes and loads
+`quality.field_class_registry` from them at Silver-setup time -- no committed
+CSV is required for normal execution. `render()`/`main()` below still write
+src/schemas/field_classes/energy_silver_field_classes.csv as an optional,
+human-readable artifact for local/CI diffing, kept in sync by the tests.
 
 Usage:
     python3 src/schemas/_generate_field_classes.py
@@ -30,12 +34,17 @@ import io
 import sys
 from pathlib import Path
 
+try:  # imported as src.schemas._generate_field_classes (e.g. 00_silver_setup.py)
+    from . import _silver_notebook_scan
+except ImportError:  # run as a standalone script -- its own dir is on sys.path[0]
+    import _silver_notebook_scan
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS = ROOT / "src" / "schemas" / "contracts"
 MAPPINGS = ROOT / "src" / "schemas" / "mappings"
 OUT = ROOT / "src" / "schemas" / "field_classes" / "energy_silver_field_classes.csv"
+SILVER_ROOT = ROOT / "databricks" / "silver"
 
 # Governance / provenance columns present on every primary Silver table.
 GOVERNANCE = {
@@ -193,6 +202,23 @@ TOPOLOGY: dict[str, dict] = {
                 ),
                 "ags_level": ("derived", "'bundesland'", "geography attribution limit"),
             },
+            "dwd_missingness_reconciliation": {
+                "station_id": (
+                    "derived",
+                    "STATIONS_ID from each dwd_hourly measurement table",
+                    "cross-table missingness check",
+                ),
+                "parameter_source_code": (
+                    "derived",
+                    "exploded from each measurement table's own value columns",
+                    "cross-table missingness check",
+                ),
+                "_missingness_reconciliation_status": (
+                    "derived",
+                    "'matched' / 'observed_only' / 'reported_only' from a full outer join",
+                    "cross-table missingness check",
+                ),
+            },
         },
         "geo_tables": {
             "dwd_air_temperature",
@@ -309,6 +335,13 @@ FOUNDATION_SOURCES = {
                 "global_irradiance",
                 "weather_location",
             ],
+            "honda_channel_catalog": [
+                "site_name",
+                "subsystem",
+                "measurement_type",
+                "channel_code",
+                "description",
+            ],
         },
         "synthetic": {
             "honda_weather": {
@@ -317,7 +350,21 @@ FOUNDATION_SOURCES = {
                     "constant 'honda_site' -- single fixed site",
                     "synthetic field",
                 )
-            }
+            },
+            "honda_channel_catalog": {
+                c: (
+                    "synthetic",
+                    "curated -- Honda ships no device master file",
+                    "01_honda_channel_catalog.py",
+                )
+                for c in (
+                    "site_name",
+                    "subsystem",
+                    "measurement_type",
+                    "channel_code",
+                    "description",
+                )
+            },
         },
     },
     "rees46": {
@@ -401,6 +448,18 @@ FOUNDATION_SOURCES = {
                 "item_revenue",
                 "item_context",
             ],
+            # ga4_transactions: ga4_events.ecommerce filtered + flattened to
+            # transaction-bearing event grain (04_ga4_transactions.py).
+            "ga4_transactions": [
+                "event_date",
+                "event_timestamp",
+                "user_pseudo_id",
+                "event_name",
+                "transaction_id",
+                "purchase_revenue",
+                "unique_items",
+                "total_item_quantity",
+            ],
         },
         "synthetic": {
             "ga4_items": {
@@ -439,6 +498,7 @@ REFERENCE_TABLES = {
     "mastr_marktfunktionen",
     "mastr_marktrollen",
     "search_visibility_repository",
+    "honda_channel_catalog",
 }
 
 # Per-table column-rename override for a bespoke rename that diverges from
@@ -788,6 +848,29 @@ def render(rows: list[dict]) -> str:
     return buf.getvalue()
 
 
+def assert_registry_complete(rows: list[dict]) -> None:
+    """Hard-fail if a table some Silver notebook actually writes has no row
+    here -- this is the generator's own knowledge falling behind real code,
+    distinct from `--check`'s concern (the committed seed falling behind the
+    generator). Never silently emit an incomplete registry, and never guess a
+    classification for an undeclared table -- raises so both the CLI and a
+    library caller (e.g. `00_silver_setup.py`) get a catchable, clear error
+    naming exactly which table(s) and notebook(s) are missing."""
+    produced = {r["table_name"] for r in rows}
+    missing = {
+        nb: gap
+        for nb, targets in _silver_notebook_scan.tables_by_notebook(SILVER_ROOT).items()
+        if (gap := targets - produced)
+    }
+    if missing:
+        message = (
+            f"field-class registry has no entry for tables real Silver notebooks "
+            f"write: {missing} -- add each to TOPOLOGY / FOUNDATION_SOURCES in "
+            "_generate_field_classes.py; this is never auto-guessed"
+        )
+        raise RuntimeError(message)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -795,7 +878,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    text = render(build_rows())
+    rows = build_rows()
+    try:
+        assert_registry_complete(rows)
+    except RuntimeError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    text = render(rows)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if args.check:
         current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""

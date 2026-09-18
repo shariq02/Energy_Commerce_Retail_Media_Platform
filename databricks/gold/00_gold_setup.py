@@ -21,6 +21,12 @@
 # MAGIC The `quality.pipeline_watermarks` and `quality.quality_audit_log` tables
 # MAGIC already exist (`databricks/setup/00_create_schemas.py`); this notebook
 # MAGIC only asserts them, same as `databricks/silver/00_silver_setup.py`.
+# MAGIC
+# MAGIC Also runs a fast preflight: every Silver table any Gold notebook's
+# MAGIC `read_silver()` call names must already be registered (schema-routable)
+# MAGIC in `quality.field_class_registry` -- a metadata-only check, so a missing
+# MAGIC registration fails here, before any actual Gold processing, not deep into
+# MAGIC an expensive run.
 
 # COMMAND ----------
 
@@ -66,6 +72,38 @@ for t in (AUDIT_TABLE, WATERMARK_TABLE):
             f"{t} missing -- run databricks/setup/00_create_schemas.py first"
         )
     print(f"OK  present: {t}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Imports
+import sys as _sys
+from pathlib import Path as _Path
+
+# COMMAND ----------
+
+# DBTITLE 1,Fast preflight -- every Gold-required Silver table is registered
+if repo_root() not in _sys.path:
+    _sys.path.insert(0, repo_root())
+from src.schemas._silver_notebook_scan import all_read_silver_tables
+
+_gold_root = _Path(repo_root()) / "databricks" / "gold"
+_required = all_read_silver_tables(_gold_root)
+if not spark.catalog.tableExists(FIELD_CLASS_TABLE):
+    raise RuntimeError(
+        f"{FIELD_CLASS_TABLE} missing -- run databricks/silver/00_silver_setup.py first"
+    )
+_registered_rows = (
+    spark.table(FIELD_CLASS_TABLE).select("table_name").distinct().collect()
+)
+_registered = {r["table_name"] for r in _registered_rows}
+_unregistered = sorted(_required - _registered)
+if _unregistered:
+    raise RuntimeError(
+        f"Gold reads Silver table(s) not registered in {FIELD_CLASS_TABLE}: "
+        f"{_unregistered} -- run databricks/silver/00_silver_setup.py (and the "
+        "Silver notebook that writes each one) before any Gold notebook"
+    )
+print(f"OK  {len(_required)} Gold-required Silver table(s) all registered")
 
 # COMMAND ----------
 

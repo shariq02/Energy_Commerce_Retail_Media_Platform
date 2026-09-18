@@ -224,8 +224,10 @@ def target_schema_for(silver_table: str, *, source: str | None = None) -> str:
     print(
         f"NEW TABLE  {silver_table} has no field_class_registry entry -- "
         f"defaulting to {schema} (ecosystem default for source={source!r}); "
-        "classify via the seed generator (src/schemas/_generate_field_classes.py) "
-        "and reload when convenient -- this does not block the write."
+        "this write is NOT blocked, but read_silver() has no such fallback -- "
+        "run `python3 src/schemas/_generate_field_classes.py` (it will refuse "
+        f"to finish if {silver_table} is still missing from its own tables) "
+        "before any other notebook reads this table."
     )
     return schema
 
