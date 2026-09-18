@@ -13,11 +13,17 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Grain:** one row per (`station_id`, `valid_from`) -- time-varying (SCD).
-# MAGIC Silver may carry more than one relocation-record variant per key
-# MAGIC (`_src_id_ord`, both source tables' key is documented `unique: false` in
-# MAGIC the Bronze contract); Gold keeps exactly the `_src_id_ord == 1` row so
-# MAGIC `pit_join()` never has more than one candidate to match. Excluded
-# MAGIC variants are not lost -- they stay in Silver, just not promoted here.
+# MAGIC Silver may carry more than one relocation-record variant per key (both
+# MAGIC source tables' key is documented `unique: false` in the Bronze
+# MAGIC contract); Gold keeps exactly one canonical row per key, picked as the
+# MAGIC one with the shortest (smallest, non-null-first) `valid_to` -- verified
+# MAGIC against real data that the duplicate with the longer/open `valid_to` is
+# MAGIC consistently the stale, coarser record (its end date matches a *later*
+# MAGIC row's, i.e. it spans across a period a subsequent record correctly
+# MAGIC split), never the other way round. An arbitrary (content-hash) tie-break
+# MAGIC picked the wrong one for at least one station and produced a real
+# MAGIC overlapping-window failure -- this replaces that. Excluded variants are
+# MAGIC not lost -- they stay in Silver, just not promoted here.
 # MAGIC `dim_weather_station_name_history` is a separate small SCD at the same
 # MAGIC grain, kept apart because its own `valid_from`/`valid_to` windows are not
 # MAGIC guaranteed to align with `dim_weather_station`'s.
@@ -67,15 +73,21 @@ _station_name_history_silver = read_silver("dwd_station_name_history")
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- dim_weather_station (canonical row per key)
-# Silver keeps every relocation-record variant (_src_id_ord, see
-# dwd_station_geography) -- Gold keeps exactly one canonical row per
-# (station_id, valid_from) so pit_join() against fact_weather never fans out
-# on a fact whose timestamp falls inside a shared, ambiguous window.
-_station_geography_canonical = _station_geography_silver.filter(
-    F.col("_src_id_ord") == 1
+# Silver keeps every relocation-record variant -- Gold keeps exactly one
+# canonical row per (station_id, valid_from), the one with the shortest
+# valid_to, so pit_join() against fact_weather never fans out on a fact whose
+# timestamp falls inside a shared, ambiguous window.
+_w_station_dedup = Window.partitionBy("station_id", "valid_from").orderBy(
+    F.asc_nulls_last("valid_to")
 )
-_station_geography_alt_count = _station_geography_silver.filter(
-    F.col("_src_id_ord") > 1
+_station_geography_ranked = _station_geography_silver.withColumn(
+    "_dedup_rank", F.row_number().over(_w_station_dedup)
+)
+_station_geography_canonical = _station_geography_ranked.filter(
+    F.col("_dedup_rank") == 1
+).drop("_dedup_rank")
+_station_geography_alt_count = _station_geography_ranked.filter(
+    F.col("_dedup_rank") > 1
 ).count()
 
 # COMMAND ----------
@@ -152,13 +164,19 @@ write_gold_findings(
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- dim_weather_station_name_history (canonical row per key)
-# Same relocation-style overlap as dwd_station_geography (_src_id_ord, see
-# Silver) -- keep exactly one canonical row per (station_id, valid_from).
-_station_name_history_canonical = _station_name_history_silver.filter(
-    F.col("_src_id_ord") == 1
+# Same relocation-style overlap and same shortest-valid_to tie-break as
+# dwd_station_geography above.
+_w_name_history_dedup = Window.partitionBy("station_id", "valid_from").orderBy(
+    F.asc_nulls_last("valid_to")
 )
-_station_name_history_alt_count = _station_name_history_silver.filter(
-    F.col("_src_id_ord") > 1
+_station_name_history_ranked = _station_name_history_silver.withColumn(
+    "_dedup_rank", F.row_number().over(_w_name_history_dedup)
+)
+_station_name_history_canonical = _station_name_history_ranked.filter(
+    F.col("_dedup_rank") == 1
+).drop("_dedup_rank")
+_station_name_history_alt_count = _station_name_history_ranked.filter(
+    F.col("_dedup_rank") > 1
 ).count()
 
 # COMMAND ----------
