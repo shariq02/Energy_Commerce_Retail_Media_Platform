@@ -147,6 +147,9 @@ dwd_missing_value_periods,source_record_id,derived,natural key or deterministic 
 dwd_missing_value_periods,source_system,derived,constant per source,silver governance,energy_silver_reference
 dwd_missing_value_periods,station_id,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_missing_value_periods,station_name,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
+dwd_missingness_reconciliation,_missingness_reconciliation_status,derived,'matched' / 'observed_only' / 'reported_only' from a full outer join,cross-table missingness check,energy_silver
+dwd_missingness_reconciliation,parameter_source_code,derived,exploded from each measurement table's own value columns,cross-table missingness check,energy_silver
+dwd_missingness_reconciliation,station_id,derived,STATIONS_ID from each dwd_hourly measurement table,cross-table missingness check,energy_silver
 dwd_moisture,QN_8,source_provided,typed cast,dwd contract / business-name mapping,energy_silver
 dwd_moisture,STATIONS_ID,source_provided,typed cast,dwd contract / business-name mapping,energy_silver
 dwd_moisture,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule,energy_silver
@@ -439,6 +442,29 @@ ga4_items,quantity,source_provided,typed cast (+ rename where localised),ga4 con
 ga4_items,source_record_id,derived,natural key or deterministic composite,silver governance,commerce_silver
 ga4_items,source_system,derived,constant per source,silver governance,commerce_silver
 ga4_items,user_pseudo_id,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,_silver_loaded_at,derived,current_timestamp() at write,silver governance,commerce_silver
+ga4_transactions,_silver_run_id,derived,the Silver run id,silver governance,commerce_silver
+ga4_transactions,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,commerce_silver
+ga4_transactions,event_date,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,event_name,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,event_timestamp,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,purchase_revenue,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,source_record_id,derived,natural key or deterministic composite,silver governance,commerce_silver
+ga4_transactions,source_system,derived,constant per source,silver governance,commerce_silver
+ga4_transactions,total_item_quantity,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,transaction_id,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,unique_items,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+ga4_transactions,user_pseudo_id,source_provided,typed cast (+ rename where localised),ga4 contract,commerce_silver
+honda_channel_catalog,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
+honda_channel_catalog,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
+honda_channel_catalog,channel_code,synthetic,curated -- Honda ships no device master file,01_honda_channel_catalog.py,energy_silver_reference
+honda_channel_catalog,description,synthetic,curated -- Honda ships no device master file,01_honda_channel_catalog.py,energy_silver_reference
+honda_channel_catalog,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver_reference
+honda_channel_catalog,measurement_type,synthetic,curated -- Honda ships no device master file,01_honda_channel_catalog.py,energy_silver_reference
+honda_channel_catalog,site_name,synthetic,curated -- Honda ships no device master file,01_honda_channel_catalog.py,energy_silver_reference
+honda_channel_catalog,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver_reference
+honda_channel_catalog,source_system,derived,constant per source,silver governance,energy_silver_reference
+honda_channel_catalog,subsystem,synthetic,curated -- Honda ships no device master file,01_honda_channel_catalog.py,energy_silver_reference
 honda_cooling_p,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver
 honda_cooling_p,_silver_run_id,derived,the Silver run id,silver governance,energy_silver
 honda_cooling_p,cool_elec,source_provided,typed cast (+ rename where localised),honda_iot contract,energy_silver

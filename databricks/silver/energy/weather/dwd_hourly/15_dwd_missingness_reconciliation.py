@@ -109,7 +109,9 @@ for _t in MEASUREMENT_TABLES:
     )
     _observed = _part if _observed is None else _observed.unionByName(_part)
 
-_observed = _observed.withColumn("observed", F.lit(True))
+# distinct() is per-table above; two different measurement tables can still
+# report the same (station_id, parameter_source_code) pair after the union.
+_observed = _observed.distinct().withColumn("observed", F.lit(True))
 
 # COMMAND ----------
 

@@ -19,7 +19,12 @@
 # MAGIC split from a single `05_fact_unit_lifecycle_event.py` -- see the folder's
 # MAGIC other files for the rest.
 # MAGIC
-# MAGIC **Purpose:** promote `mastr_grid_operator_change_events` to Gold. Grain: one row per (`unit_id`, `grid_operator_change_effective_date`). Per `mappings/mastr.yml`, deletion/change events
+# MAGIC **Purpose:** promote `mastr_grid_operator_change_events` to Gold. Grain:
+# MAGIC one row per `source_record_id` -- Silver's own grain, since
+# MAGIC `(unit_id, grid_operator_change_effective_date)` is documented `unique:
+# MAGIC false` there (`03_mastr_change_logs.py`'s content-hash ordinal), so a
+# MAGIC unit can genuinely log more than one change on the same effective date.
+# MAGIC Per `mappings/mastr.yml`, deletion/change events
 # MAGIC are DISJOINT from the live dimensions by design -- `matched_*_key` is
 # MAGIC expected to be mostly or entirely NULL, resolved only to confirm a
 # MAGIC departure, never to backfill the dimension. Append-only -- NEVER merged
@@ -72,20 +77,15 @@ fact = resolve_fk(
     output_col="matched_generation_unit_key",
 )
 fact = fact.withColumn(
-    "grid_operator_change_event_key",
-    surrogate_key("unit_id", "grid_operator_change_effective_date"),
+    "grid_operator_change_event_key", surrogate_key("source_record_id")
 )
 fact = add_gold_provenance(fact, SOURCE, RID)
 
 # COMMAND ----------
 
-# DBTITLE 1,Grain assertion -- one row per (unit_id, grid_operator_change_effective_date)
+# DBTITLE 1,Grain assertion -- one row per source_record_id
 assert_unique_grain(
-    fact,
-    ["unit_id", "grid_operator_change_effective_date"],
-    component=COMPONENT,
-    source=SOURCE,
-    rid=RID,
+    fact, ["source_record_id"], component=COMPONENT, source=SOURCE, rid=RID
 )
 
 # COMMAND ----------
@@ -102,7 +102,7 @@ _findings_blocks = inspect_gold_table(
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    key_cols=["unit_id", "grid_operator_change_effective_date"],
+    key_cols=["source_record_id"],
     df_before=_silver,
 )
 write_gold_findings(

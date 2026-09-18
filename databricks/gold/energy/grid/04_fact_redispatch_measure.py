@@ -24,7 +24,10 @@
 # MAGIC `affected_unit_match_name` / `affected_unit_match_confidence` (an
 # MAGIC exact-normalised-name match against `power_plant_list`, never an identity
 # MAGIC join); this notebook resolves that match to `matched_power_plant_key`
-# MAGIC (nullable) without upgrading its confidence.
+# MAGIC (nullable) without upgrading its confidence. `plant_name` is not unique
+# MAGIC in `dim_power_plant` (its own grain is `source_record_id`) -- an
+# MAGIC ambiguous name is left unmatched (NULL) rather than fanning the join out
+# MAGIC across every plant sharing that name.
 
 # COMMAND ----------
 
@@ -66,10 +69,22 @@ _power_plant = read_gold("dim_power_plant", source="power_plant_list")
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- unique plant names only (never fan out on a shared name)
+_name_counts = _power_plant.groupBy("plant_name").agg(
+    F.count(F.lit(1)).alias("_plant_name_count")
+)
+_power_plant_unique_name = _power_plant.join(
+    _name_counts.filter(F.col("_plant_name_count") == 1).select("plant_name"),
+    "plant_name",
+    "inner",
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- resolve the matched power plant (soft match, unchanged confidence)
 fact = resolve_fk(
     _redispatch_silver,
-    _power_plant,
+    _power_plant_unique_name,
     fact_key_cols=["affected_unit_match_name"],
     dim_key_cols=["plant_name"],
     dim_surrogate_col="power_plant_key",
@@ -108,6 +123,9 @@ _findings_blocks = inspect_gold_table(
     extra_checks={
         "power_plant_matched_count": fact.filter(
             F.col("matched_power_plant_key").isNotNull()
+        ).count(),
+        "ambiguous_plant_names_excluded": _name_counts.filter(
+            F.col("_plant_name_count") > 1
         ).count(),
     },
 )
