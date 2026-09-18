@@ -162,6 +162,63 @@ def assert_unique_grain(
 
 # COMMAND ----------
 
+# DBTITLE 1,SCD window repair + overlap guard (for a pit_join() dimension)
+
+
+def close_scd_gaps(
+    df: DataFrame,
+    key_col: str,
+    *,
+    valid_from_col: str = "valid_from",
+    valid_to_col: str = "valid_to",
+) -> DataFrame:
+    """Coalesce a NULL/open valid_to with the same key's next valid_from --
+    a source that leaves more than one row "still open" (blank end-date) per
+    key otherwise leaves every one of those rows open at once, so pit_join()
+    matches all of them for any fact timestamp from that point on. Only fills
+    a missing valid_to; an explicit one from the source is left as-is (a bad
+    explicit value is caught by assert_no_overlapping_windows, not silently
+    overwritten here)."""
+    w = Window.partitionBy(key_col).orderBy(valid_from_col)
+    return df.withColumn(
+        valid_to_col,
+        F.coalesce(F.col(valid_to_col), F.lead(valid_from_col).over(w)),
+    )
+
+
+def assert_no_overlapping_windows(
+    df: DataFrame,
+    key_col: str,
+    *,
+    valid_from_col: str = "valid_from",
+    valid_to_col: str = "valid_to",
+    component: str,
+    source: str,
+    rid: str,
+) -> None:
+    """Hard-fail if any key has two windows covering the same instant -- the
+    invariant pit_join() needs to ever resolve to at most one dim row per
+    fact. Run this after close_scd_gaps(), not instead of it."""
+    w = Window.partitionBy(key_col).orderBy(valid_from_col)
+    chk = df.withColumn("_next_valid_from", F.lead(valid_from_col).over(w))
+    overlap_n = chk.filter(
+        F.col("_next_valid_from").isNotNull()
+        & F.col(valid_to_col).isNotNull()
+        & (F.col(valid_to_col) > F.col("_next_valid_from"))
+    ).count()
+    check(
+        component,
+        source,
+        "overlapping_scd_windows",
+        overlap_n == 0,
+        detail=f"key_col={key_col} overlapping_window_count={overlap_n}",
+        metric_value=float(overlap_n),
+        rid=rid,
+    )
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Point-in-time-correct dimension join
 
 

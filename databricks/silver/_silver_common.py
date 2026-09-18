@@ -312,11 +312,17 @@ def parse_ts(colname, formats=GERMAN_TS_FORMATS, src_tz: str = "Europe/Berlin"):
     """Column expr: parse a wall-clock string under the ordered formats, treat
     it as `src_tz`, return a UTC timestamp. The first format that parses wins.
     `colname` is a column name (str) or an already-built Column expression
-    (e.g. `F.concat_ws(...)`)."""
+    (e.g. `F.concat_ws(...)`). Tolerates a trailing `.0` from a column staged
+    through pandas with no dtype=str -- any all-digit column with a blank
+    somewhere in it (e.g. an open-ended Bis_Datum) gets float-inferred and
+    re-serialized with the suffix; a clean value never legitimately ends in
+    `.0`, so stripping it is a no-op everywhere else. Same tolerance
+    parse_mess_datum already applies for MESS_DATUM."""
     src_col = F.col(colname) if isinstance(colname, str) else colname
+    stripped = F.regexp_replace(F.trim(src_col), r"\.0$", "")
     parsed = F.lit(None).cast("timestamp")
     for fmt in formats:
-        parsed = F.coalesce(parsed, F.try_to_timestamp(F.trim(src_col), F.lit(fmt)))
+        parsed = F.coalesce(parsed, F.try_to_timestamp(stripped, F.lit(fmt)))
     if src_tz.upper() == "UTC":
         return parsed
     return F.to_utc_timestamp(parsed, src_tz)

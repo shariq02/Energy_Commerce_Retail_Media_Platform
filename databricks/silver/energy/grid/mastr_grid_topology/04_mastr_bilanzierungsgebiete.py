@@ -12,7 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** `mastr_bilanzierungsgebiete` into source-scoped Silver at its own grain. One of 7 sibling notebooks in this folder, split
+# MAGIC **Purpose:** `mastr_bilanzierungsgebiete` into source-scoped Silver at
+# MAGIC its own (`Id`, `_src_id_ord`) grain -- the Bronze contract documents
+# MAGIC `Id` alone as `unique: false` ("no unique key established by
+# MAGIC profiling"). One of 7 sibling notebooks in this folder, split
 # MAGIC from a single `02_mastr_grid_topology.py` -- see the folder's other
 # MAGIC files for the rest. Runs after `../../_reference/mastr_reference_catalogs/`.
 
@@ -25,11 +28,6 @@
 
 # DBTITLE 1,Inspection library
 # MAGIC %run ../../../_silver_inspect
-
-# COMMAND ----------
-
-# DBTITLE 1,Imports
-from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -50,9 +48,16 @@ _bronze = read_bronze("mastr_bilanzierungsgebiete")
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- mastr_bilanzierungsgebiete
+# Bronze contract documents Id as unique: false ("no unique key established
+# by profiling") -- dropDuplicates() only collapses byte-identical rows, not
+# distinct rows sharing an Id, so the ordinal still disambiguates.
 bil = _bronze.dropDuplicates()
 bil = mastr_standardise(bil, NAME_MAP, CODED, source=SOURCE)
-bil = bil.withColumn("_srid", F.col(NAME_MAP.get("Id", "Id")).cast("string"))
+_ID_COL = NAME_MAP.get("Id", "Id")
+bil = within_group_ordinal(
+    bil, [_ID_COL], ["Yeic", "control_zone", "BilanzierungsgebietNetzanschlusspunkt"]
+)
+bil = bil.withColumn("_srid", sha_key(_ID_COL, "_src_id_ord"))
 bil = add_provenance(bil, SOURCE, "_srid", RID)
 
 # COMMAND ----------
@@ -71,7 +76,7 @@ _findings_blocks = inspect_table(
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    key_cols=[NAME_MAP.get("Id", "Id")],
+    key_cols=[_ID_COL, "_src_id_ord"],
     df_before=_bronze,
 )
 write_silver_findings(

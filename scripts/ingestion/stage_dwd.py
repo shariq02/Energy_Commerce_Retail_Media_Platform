@@ -74,12 +74,18 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _iter_semicolon_chunks(path: Path, chunksize: int = CHUNK_SIZE):
+    # dtype=str: Bronze re-reads everything as string anyway (inferSchema is
+    # off there), and an all-digit column with a blank row (e.g. an
+    # open-ended Bis_Datum) otherwise gets pandas' own float inference,
+    # re-serializing every populated value with a spurious ".0" suffix that
+    # silently fails Silver's date parsing later.
     for chunk in pd.read_csv(
         path,
         sep=";",
         encoding=SOURCE_ENCODING,
         skipinitialspace=True,
         chunksize=chunksize,
+        dtype=str,
     ):
         yield _clean_columns(chunk)
 
@@ -298,7 +304,9 @@ def _iter_fehlwerte_chunks(path: Path, chunksize: int = CHUNK_SIZE):
     del text
     buf = io.StringIO("\n".join(lines))
     del lines
-    for chunk in pd.read_csv(buf, sep=";", skipinitialspace=True, chunksize=chunksize):
+    for chunk in pd.read_csv(
+        buf, sep=";", skipinitialspace=True, chunksize=chunksize, dtype=str
+    ):
         yield _clean_columns(chunk)
     buf.close()
 

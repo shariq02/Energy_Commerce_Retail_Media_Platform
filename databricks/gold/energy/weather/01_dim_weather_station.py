@@ -80,6 +80,25 @@ _station_geography_alt_count = _station_geography_silver.filter(
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- dim_weather_station (close + verify SCD windows)
+# More than one row per station can be "still open" (blank valid_to) in the
+# source -- close_scd_gaps() caps an open row at the next relocation's
+# valid_from so pit_join() never matches more than one row per fact
+# timestamp; assert_no_overlapping_windows() hard-fails if a genuine overlap
+# remains (an explicit valid_to that runs past the next window's start).
+_station_geography_canonical = close_scd_gaps(
+    _station_geography_canonical, "station_id"
+)
+assert_no_overlapping_windows(
+    _station_geography_canonical,
+    "station_id",
+    component=COMPONENT,
+    source=SOURCE,
+    rid=RID,
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- dim_weather_station
 dim_weather_station = _station_geography_canonical.withColumn(
     "weather_station_key", surrogate_key("station_id", "valid_from")
@@ -141,6 +160,22 @@ _station_name_history_canonical = _station_name_history_silver.filter(
 _station_name_history_alt_count = _station_name_history_silver.filter(
     F.col("_src_id_ord") > 1
 ).count()
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- dim_weather_station_name_history (close + verify SCD windows)
+# Same open-ended-window risk as dwd_station_geography -- not currently
+# pit_join()'d by anything, kept correct anyway (see _gold_common.py).
+_station_name_history_canonical = close_scd_gaps(
+    _station_name_history_canonical, "station_id"
+)
+assert_no_overlapping_windows(
+    _station_name_history_canonical,
+    "station_id",
+    component=COMPONENT,
+    source=SOURCE,
+    rid=RID,
+)
 
 # COMMAND ----------
 
