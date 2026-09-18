@@ -339,8 +339,12 @@ def parse_mess_datum(colname: str, src_tz: str = "UTC"):
 
 
 def parse_mess_datum_10min(colname: str, src_tz: str = "UTC"):
-    """DWD solar MESS_DATUM: `yyyyMMddHHmm` (10-minute grid)."""
+    """DWD solar MESS_DATUM: `yyyyMMddHH:mm` (10-minute grid, colon between
+    hour and minute -- confirmed against real Bronze data; the bare 12-digit
+    `yyyyMMddHHmm` this previously assumed silently parsed every row to
+    NULL). Also tolerates a trailing `.0` from a double-inferred column."""
     base = F.regexp_replace(F.trim(F.col(colname)), r"\.0$", "")
+    base = F.regexp_replace(base, ":", "")
     parsed = F.try_to_timestamp(base, F.lit("yyyyMMddHHmm"))
     return parsed if src_tz.upper() == "UTC" else F.to_utc_timestamp(parsed, src_tz)
 
