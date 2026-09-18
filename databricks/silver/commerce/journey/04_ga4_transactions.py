@@ -12,16 +12,11 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** flatten `ga4_events.ecommerce` into a source-scoped, additive
-# MAGIC transaction-grain table, the same decomposition `03_ga4_items.py` already
-# MAGIC applies to `items` -- `ga4_events.ecommerce` itself is untouched; that
-# MAGIC struct stays Silver-correct, building an order fact from it is Gold's
-# MAGIC job. `ecommerce` is a single struct (not an array), so this is a filter +
-# MAGIC flatten, no explode. Both a purchase event and a later refund event can
-# MAGIC carry a populated `ecommerce.transaction_id` for the same transaction --
-# MAGIC this table keeps every such event row (`event_name` disambiguates), never
-# MAGIC collapses them; an order's state over time is Gold's append-only
-# MAGIC `fact_order`, not an in-place update here.
+# MAGIC **Purpose:** flatten `ga4_events.ecommerce` into a source-scoped,
+# MAGIC additive transaction-grain table, mirroring `03_ga4_items.py`'s
+# MAGIC decomposition of `items`. A refund shares `transaction_id` with its
+# MAGIC purchase event but is a separate row (`event_name` disambiguates) --
+# MAGIC collapsing them is Gold's `fact_order`, not this table.
 
 # COMMAND ----------
 
@@ -56,11 +51,8 @@ bronze_df = read_bronze(BT)
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- ga4_transactions (filter + flatten)
-# ecommerce.transaction_id is already normalised (GA4's "(not set)"/"(none)"
-# sentinel -> NULL) by 02_ga4_events.py's read of the same Bronze rows -- this
-# notebook re-applies the same normalisation independently since it reads
-# Bronze directly, not 02's Silver output, to stay a plain filter+flatten of
-# one source table rather than a Silver-to-Silver dependency.
+# Re-applies 02_ga4_events.py's sentinel normalisation independently -- reads
+# Bronze directly, not 02's Silver output, no Silver-to-Silver dependency.
 _UNSET = ("(not set)", "(none)", "")
 transactions_df = (
     bronze_df.select(

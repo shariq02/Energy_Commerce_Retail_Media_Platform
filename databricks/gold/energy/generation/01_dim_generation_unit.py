@@ -28,6 +28,12 @@
 # MAGIC across every carrier table in MaStR's own numbering, so this is a union,
 # MAGIC never a reconciliation join. Carrier-specific columns that only one
 # MAGIC source table carries stay nullable on the conformed dimension.
+# MAGIC
+# MAGIC **Lifecycle attributes.** `mastr_standardise()` already renames every
+# MAGIC carrier's lifecycle dates and decodes `operating_status`/`system_status`/
+# MAGIC `support_status` -- these already ride through the union unchanged, just
+# MAGIC never asserted as governed. No SCD2 -- MaStR exposes lifecycle as named
+# MAGIC point-in-time dates per unit, not a transition-history table.
 
 # COMMAND ----------
 
@@ -125,6 +131,30 @@ assert_unique_grain(dim, ["unit_id"], component=COMPONENT, source=SOURCE, rid=RI
 
 # COMMAND ----------
 
+# DBTITLE 1,Governance check -- lifecycle attributes present
+_LIFECYCLE_COLS = [
+    "registration_date",
+    "commissioning_date",
+    "planned_commissioning_date",
+    "final_decommissioning_date",
+    "provisional_shutdown_start_date",
+    "recommissioning_date",
+    "operating_status",
+    "system_status",
+]
+_missing_lifecycle_cols = [c for c in _LIFECYCLE_COLS if c not in dim.columns]
+check(
+    COMPONENT,
+    SOURCE,
+    "lifecycle_columns_present",
+    len(_missing_lifecycle_cols) == 0,
+    detail=f"missing={_missing_lifecycle_cols}",
+    metric_value=float(len(_missing_lifecycle_cols)),
+    rid=RID,
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Write Gold -- dim_generation_unit
 write_gold(dim, GOLD_TABLE, source=SOURCE, component=COMPONENT, rid=RID)
 
@@ -140,6 +170,9 @@ _findings_blocks = inspect_gold_table(
     key_cols=["unit_id"],
     extra_checks={
         "unit_count_by_type": dim.groupBy("generation_unit_type").count().collect(),
+        "units_with_final_decommissioning_date": dim.filter(
+            F.col("final_decommissioning_date").isNotNull()
+        ).count(),
     },
 )
 write_gold_findings(

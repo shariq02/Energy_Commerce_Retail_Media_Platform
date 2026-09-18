@@ -186,6 +186,32 @@ def close_scd_gaps(
     )
 
 
+def cap_scd_overlaps(
+    df: DataFrame,
+    key_col: str,
+    *,
+    valid_from_col: str = "valid_from",
+    valid_to_col: str = "valid_to",
+    capped_flag_col: str = "_scd_overlap_capped",
+) -> DataFrame:
+    """Cap each row's valid_to at the next row's valid_from, for the same
+    key, whenever a stale explicit valid_to runs past it -- close_scd_gaps()
+    only fills a NULL valid_to, not this case. One-sided: a valid_to that
+    already ends at or before the next valid_from (a genuine gap) is left
+    untouched. Adds `capped_flag_col` for reporting; run before
+    assert_no_overlapping_windows(), after close_scd_gaps()."""
+    w = Window.partitionBy(key_col).orderBy(valid_from_col)
+    next_start = F.lead(valid_from_col).over(w)
+    needs_cap = (
+        next_start.isNotNull()
+        & F.col(valid_to_col).isNotNull()
+        & (F.col(valid_to_col) > next_start)
+    )
+    return df.withColumn(capped_flag_col, needs_cap).withColumn(
+        valid_to_col, F.when(needs_cap, next_start).otherwise(F.col(valid_to_col))
+    )
+
+
 def assert_no_overlapping_windows(
     df: DataFrame,
     key_col: str,

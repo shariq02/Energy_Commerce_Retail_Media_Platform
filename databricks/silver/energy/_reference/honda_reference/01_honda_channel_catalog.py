@@ -12,17 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** the Honda Research Institute smart-building site's channel
-# MAGIC identity, curated once here rather than left implicit in each
-# MAGIC `honda_*` Silver table's own wide column headers. Honda ships no device
-# MAGIC master file -- there is one fixed physical site with a known, small set
-# MAGIC of measurement channels, so this table is `synthetic` (the platform's
-# MAGIC field-class taxonomy), built from the channel names already present
-# MAGIC across the six `honda_*` Silver tables' own columns, not read from a
-# MAGIC Bronze source. `channel_code` matches the exact column name each channel
-# MAGIC appears under in its Silver table(s) -- `dim_device` (Gold) resolves a
-# MAGIC wide fact column to its device row through this mapping, not a physical
-# MAGIC unpivot of the existing per-subsystem fact tables.
+# MAGIC **Purpose:** curate the Honda site's channel identity -- `synthetic`
+# MAGIC field class, no Bronze source; Honda ships no device master file.
+# MAGIC `channel_code` matches the column name each channel appears under in its
+# MAGIC `honda_*` Silver table, which `dim_device` (Gold) resolves against.
 
 # COMMAND ----------
 
@@ -46,10 +39,8 @@ SITE_NAME = "Honda Research Institute Smart Building"
 # COMMAND ----------
 
 # DBTITLE 1,Curated channel catalog
-# One row per channel actually present in a honda_* Silver table's own
-# columns (excluding frequency/datetime_utc). heating_p/w's own CHP_elec is
-# not listed separately -- it is dropped in Silver as a duplicate of
-# electricity_p/w's CHP (03_honda_heating_p.py, 04_honda_heating_w.py).
+# heating_p/w's own CHP_elec is dropped in Silver as a duplicate of
+# electricity_p/w's CHP, so it is not listed separately here.
 _CHANNELS = [
     # (channel_code, subsystem, measurement_type, description)
     ("total", "electricity", "power", "Total site electricity, power"),
