@@ -604,8 +604,22 @@ def build_rows() -> list[dict]:
             )
             disambig = (
                 source in ("power_plant_list", "redispatch")
-                or (source == "mastr" and st == "mastr_grid_operator_change_events")
-                or st == "dwd_missing_value_periods"
+                or (
+                    source == "mastr"
+                    and st
+                    in (
+                        "mastr_grid_operator_change_events",
+                        "mastr_bilanzierungsgebiete",
+                    )
+                )
+                or st
+                in (
+                    "dwd_missing_value_periods",
+                    "dwd_station_geography",
+                    "dwd_station_name_history",
+                    "dwd_device_instrument",
+                    "dwd_parameter_unit",
+                )
             )
             add_governance(st, conflict=has_conflict, disambig=disambig)
             # value_quarantine flag columns -- the notebook's own flag_col=

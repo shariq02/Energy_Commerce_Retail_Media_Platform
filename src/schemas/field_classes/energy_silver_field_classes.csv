@@ -78,6 +78,8 @@ dwd_cloudiness,source_system,derived,constant per source,silver governance,energ
 dwd_cloudiness,total_cloud_cover,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver
 dwd_device_instrument,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
 dwd_device_instrument,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
+dwd_device_instrument,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver_reference
+dwd_device_instrument,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule,energy_silver_reference
 dwd_device_instrument,device_type,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_device_instrument,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver_reference
 dwd_device_instrument,eor,source_provided,typed cast,dwd contract / business-name mapping,energy_silver_reference
@@ -176,6 +178,8 @@ dwd_parameter_catalog,parameter_source_code,source_provided,dwd_parameter_unit.P
 dwd_parameter_catalog,parameter_unit,derived,dwd_parameter_unit.Einheit,unit registry,energy_silver_reference
 dwd_parameter_unit,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
 dwd_parameter_unit,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
+dwd_parameter_unit,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver_reference
+dwd_parameter_unit,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule,energy_silver_reference
 dwd_parameter_unit,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver_reference
 dwd_parameter_unit,eor,source_provided,typed cast,dwd contract / business-name mapping,energy_silver_reference
 dwd_parameter_unit,parameter_data_source,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
@@ -282,6 +286,8 @@ dwd_solar,sunshine_duration_10min,source_provided,typed cast + English business 
 dwd_station_geography,_coord_outside_de_bbox,derived,station coordinate outside the Germany bounding box,value_quarantine flag column,energy_silver_reference
 dwd_station_geography,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
 dwd_station_geography,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
+dwd_station_geography,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver_reference
+dwd_station_geography,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule,energy_silver_reference
 dwd_station_geography,ags_code,derived,curated / prefix attribution to the Bundesland AGS,"geography attribution, Bundesland level",energy_silver_reference
 dwd_station_geography,ags_level,derived,geography level achieved (bundesland),geography attribution limit,energy_silver_reference
 dwd_station_geography,ags_method,derived,attribution method (city_lookup / ags_prefix / bundesland_code),geography attribution,energy_silver_reference
@@ -297,6 +303,8 @@ dwd_station_geography,valid_from,source_provided,typed cast + English business r
 dwd_station_geography,valid_to,source_provided,typed cast + English business rename,dwd contract / business-name mapping,energy_silver_reference
 dwd_station_name_history,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver_reference
 dwd_station_name_history,_silver_run_id,derived,the Silver run id,silver governance,energy_silver_reference
+dwd_station_name_history,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver_reference
+dwd_station_name_history,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule,energy_silver_reference
 dwd_station_name_history,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver_reference
 dwd_station_name_history,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver_reference
 dwd_station_name_history,source_system,derived,constant per source,silver governance,energy_silver_reference
@@ -639,6 +647,8 @@ mastr_bilanzierungsgebiete,Id,source_provided,typed cast,mastr contract / busine
 mastr_bilanzierungsgebiete,Yeic,source_provided,typed cast,mastr contract / business-name mapping,energy_silver
 mastr_bilanzierungsgebiete,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver
 mastr_bilanzierungsgebiete,_silver_run_id,derived,the Silver run id,silver governance,energy_silver
+mastr_bilanzierungsgebiete,_src_id_disambiguated,derived,the content-hash ordinal disambiguated the composite key,silver source_record_id rule,energy_silver
+mastr_bilanzierungsgebiete,_src_id_ord,derived,1-based content-hash ordinal within a composite-key group,silver source_record_id rule,energy_silver
 mastr_bilanzierungsgebiete,control_zone,source_provided,typed cast + English business rename,mastr contract / business-name mapping,energy_silver
 mastr_bilanzierungsgebiete,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,energy_silver
 mastr_bilanzierungsgebiete,source_record_id,derived,natural key or deterministic composite,silver governance,energy_silver
