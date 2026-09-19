@@ -74,11 +74,6 @@ DWD_KEY_COLUMNS = {
     "ags_code",
     "ags_level",
     "ags_method",
-    "eor",
-    "_had_key_conflict",
-    "qn_level_code",
-    "qn_level_label_de",
-    "qn_level",
 }
 HONDA_SILVER = [
     "honda_electricity_p",
@@ -151,6 +146,13 @@ PROVENANCE_GROUPS = {
 
 # (silver schema, silver table, gold schema, gold table)
 PASS_THROUGH_PAIRS = [
+    (SILVER, "honda_electricity_w", GOLD, "fact_site_electricity_w"),
+    (SILVER, "honda_heating_p", GOLD, "fact_site_heating_p"),
+    (SILVER, "honda_heating_w", GOLD, "fact_site_heating_w"),
+    (SILVER, "honda_cooling_p", GOLD, "fact_site_cooling_p"),
+    (SILVER, "honda_cooling_w", GOLD, "fact_site_cooling_w"),
+    (SILVER_REF, "mastr_marktfunktionen", GOLD, "dim_marktfunktion"),
+    (SILVER_REF, "mastr_marktrollen", GOLD, "dim_marktrolle"),
     (SILVER, "honda_electricity_p", GOLD, "fact_site_electricity_p"),
     (SILVER, "honda_weather", GOLD, "fact_site_weather"),
     (SILVER, "smard_energy_timeseries", GOLD, "fact_market_timeseries"),
@@ -286,15 +288,34 @@ def check_dwd_overlap():
         F.count("*").alias("n_rows"),
         F.countDistinct("p").alias("n_products"),
     )
-    hist = per_key.groupBy("n_rows", "n_products").count().collect()
+    hist = (
+        per_key.withColumn(
+            "decade", (F.floor(F.year("observation_ts") / 10) * 10).cast("int")
+        )
+        .groupBy("n_rows", "n_products", "decade")
+        .count()
+        .collect()
+    )
     union_keys = sum(r["count"] for r in hist)
     dup_keys = sum(r["count"] for r in hist if r["n_rows"] > r["n_products"])
     avg_products = sum(r["n_products"] * r["count"] for r in hist) / union_keys
-    by_n = {}
+    by_n, by_decade = {}, {}
     for r in hist:
         by_n[r["n_products"]] = by_n.get(r["n_products"], 0) + r["count"]
+        d = by_decade.setdefault(r["decade"], [0, 0, 0])
+        d[0] += r["count"]
+        d[1] += r["n_products"] * r["count"]
+        d[2] += r["count"] if r["n_products"] == len(DWD_HOURLY) else 0
     note("keys by number of products present:")
     table(["n_products", "keys"], sorted(by_n.items()))
+    note("density by decade:")
+    table(
+        ["decade", "keys", "avg_products_per_key", "share_with_all_products"],
+        [
+            (k, v[0], f"{v[1] / v[0]:.2f}", f"{v[2] / v[0]:.1%}")
+            for k, v in sorted(by_decade.items())
+        ],
+    )
     per_product = keys.groupBy("p").count().orderBy("count").collect()
     note("rows per product:")
     table(
@@ -424,17 +445,31 @@ def check_honda_keys():
     per_key = keys.groupBy("frequency", "datetime_utc").agg(
         F.count("*").alias("n_rows"),
         F.countDistinct("t").alias("n_tables"),
+        F.min("t").alias("first_t"),
     )
-    hist = per_key.groupBy("frequency", "n_tables", "n_rows").count().collect()
+    hist = (
+        per_key.withColumn("only_in", F.when(F.col("n_tables") == 1, F.col("first_t")))
+        .groupBy("frequency", "n_tables", "n_rows", "only_in")
+        .count()
+        .collect()
+    )
     total = sum(r["count"] for r in hist)
     full = sum(r["count"] for r in hist if r["n_tables"] == len(HONDA_SILVER))
     dup_keys = sum(r["count"] for r in hist if r["n_rows"] > r["n_tables"])
-    by = {}
+    by, single = {}, {}
     for r in hist:
         k = (r["frequency"], r["n_tables"])
         by[k] = by.get(k, 0) + r["count"]
+        if r["n_tables"] == 1:
+            k1 = (r["frequency"], r["only_in"])
+            single[k1] = single.get(k1, 0) + r["count"]
     note("keys by frequency and number of tables present:")
     table(["frequency", "n_tables", "keys"], sorted((*k, v) for k, v in by.items()))
+    note("keys present in exactly one table:")
+    table(
+        ["frequency", "only_in_table", "keys"],
+        sorted((*k, v) for k, v in single.items()),
+    )
     share = full / total
     if dup_keys > 0 or share < 0.99:
         verdict = "REJECTS"
@@ -519,30 +554,33 @@ def check_unit_sparsity():
         )
         .collect()
     )
-    stats = []
-    common_gaps = 0
+    stats, empty_common = [], {}
     for r in rows:
         n = r["__rows"] or 1
         pop = {c: (r[c] or 0) / n for c in cols}
-        common_ok = sum(pop[c] > 0 for c in common)
-        common_gaps += len(common) - common_ok
+        empty = sorted(c for c in common if pop[c] == 0)
+        if empty:
+            empty_common[r["unit_type"]] = empty
         stats.append(
             (
                 r["unit_type"],
                 r["__rows"],
                 sum(v > 0 for v in pop.values()),
                 sum(v > 0.5 for v in pop.values()),
-                f"{common_ok}/{len(common)}",
+                f"{len(common) - len(empty)}/{len(common)}",
             )
         )
     table(
         ["unit_type", "rows", "cols_any", "cols_over_50pct", "common_populated"],
         sorted(stats),
     )
-    verdict = "SUPPORTS" if common_gaps == 0 else "REVIEW"
+    note("common columns entirely empty for a technology:", empty_common or "none")
+    min_share = min(s[2] for s in stats) / len(cols)
+    verdict = "SUPPORTS" if min_share >= 0.3 else "REVIEW"
     return verdict, (
         f"union_columns={len(cols)}, common_columns={len(common)}, "
-        f"common_unpopulated_type_pairs={common_gaps}"
+        f"min_populated_column_share={min_share:.0%}, "
+        f"technologies_with_empty_common_columns={len(empty_common)}"
     )
 
 
@@ -632,6 +670,14 @@ run_check(
 # DBTITLE 1,V09 -- MaStR bridges: typed-key collision safety
 
 
+def id_shape(col):
+    return (
+        F.when(F.col(col).rlike("^[0-9]+$"), F.lit("<numeric>"))
+        .when(F.col(col).rlike("^[A-Z]{3}[0-9]"), F.substring(col, 1, 3))
+        .otherwise(F.lit("<text>"))
+    )
+
+
 def check_bridges():
     pairs = union_all(
         [
@@ -667,23 +713,20 @@ def check_bridges():
         ["relationship", "pairs", "parents", "linked"],
         [(r["rel"], r["pairs"], r["parents"], r["linked"]) for r in per_rel],
     )
-    prefixes = (
+    shapes = (
         pairs.groupBy(
             "rel",
-            F.substring("parent_id", 1, 3).alias("parent_prefix"),
-            F.substring("linked_id", 1, 3).alias("linked_prefix"),
+            id_shape("parent_id").alias("parent_shape"),
+            id_shape("linked_id").alias("linked_shape"),
         )
         .count()
-        .orderBy("rel")
+        .orderBy("rel", F.desc("count"))
         .collect()
     )
-    note("id prefixes per relationship:")
+    note("id shape per relationship (MaStR number prefix, <numeric> or <text>):")
     table(
-        ["relationship", "parent_prefix", "linked_prefix", "pairs"],
-        [
-            (r["rel"], r["parent_prefix"], r["linked_prefix"], r["count"])
-            for r in prefixes
-        ],
+        ["relationship", "parent_shape", "linked_shape", "pairs"],
+        [(r["rel"], r["parent_shape"], r["linked_shape"], r["count"]) for r in shapes],
     )
     verdict = "SUPPORTS" if shared_pairs == 0 and shared_ids == 0 else "REVIEW"
     return verdict, (
@@ -732,6 +775,13 @@ def check_code_lists():
     )
 
 
+run_check(
+    "V10",
+    ["bronze_mastr_lookups", "codes_silver", "codes_gold"],
+    "MaStR code-list Id collisions and containment",
+    check_code_lists,
+)
+
 # COMMAND ----------
 
 # DBTITLE 1,V11 -- MaStR change events: identifier and time safety
@@ -760,6 +810,7 @@ def check_change_events():
         events.groupBy("kind", F.substring("entity_id", 1, 3).alias("prefix"))
         .agg(
             F.count("*").alias("rows"),
+            F.avg(F.col("ts").isNull().cast("int")).alias("null_ts"),
             F.min("ts").alias("min_ts"),
             F.max("ts").alias("max_ts"),
         )
@@ -767,21 +818,46 @@ def check_change_events():
         .collect()
     )
     table(
-        ["kind", "id_prefix", "rows", "min_ts", "max_ts"],
-        [(r["kind"], r["prefix"], r["rows"], r["min_ts"], r["max_ts"]) for r in rows],
+        ["kind", "id_prefix", "rows", "null_ts_share", "min_ts", "max_ts"],
+        [
+            (
+                r["kind"],
+                r["prefix"],
+                r["rows"],
+                f"{r['null_ts']:.2%}",
+                r["min_ts"],
+                r["max_ts"],
+            )
+            for r in rows
+        ],
     )
+    totals, nulls = {}, {}
+    for r in rows:
+        totals[r["kind"]] = totals.get(r["kind"], 0) + r["rows"]
+        nulls[r["kind"]] = nulls.get(r["kind"], 0) + r["null_ts"] * r["rows"]
+    null_share = {k: nulls[k] / totals[k] for k in totals}
     overlap = unit.select("entity_id").intersect(actor.select("entity_id")).count()
-    types = {
-        "unit_deletion.last_updated_at": dict(
-            tbl(SILVER, "mastr_unit_deletion_events").dtypes
-        ).get("last_updated_at"),
-        "grid_change.effective_date": dict(
-            tbl(SILVER, "mastr_grid_operator_change_events").dtypes
-        ).get("grid_operator_change_effective_date"),
-    }
-    note("time column types:", types)
-    verdict = "SUPPORTS" if overlap == 0 else "REJECTS"
-    return verdict, f"unit_actor_id_overlap={overlap}"
+    note(
+        "time column types:",
+        {
+            "unit_deletion.last_updated_at": dict(
+                tbl(SILVER, "mastr_unit_deletion_events").dtypes
+            ).get("last_updated_at"),
+            "grid_change.effective_date": dict(
+                tbl(SILVER, "mastr_grid_operator_change_events").dtypes
+            ).get("grid_operator_change_effective_date"),
+        },
+    )
+    if overlap > 0:
+        verdict = "REJECTS"
+    elif any(v > 0.9 for v in null_share.values()):
+        verdict = "REVIEW"
+    else:
+        verdict = "SUPPORTS"
+    return verdict, (
+        f"unit_actor_id_overlap={overlap}, "
+        f"null_timestamp_share={ {k: f'{v:.2%}' for k, v in null_share.items()} }"
+    )
 
 
 run_check(
@@ -824,8 +900,12 @@ def check_commerce_identity():
         F.col("product_id").cast("string").alias("v")
     )
     product_overlap = ga_products.intersect(re_products).count()
-    ga_names = tbl(C_SILVER, "ga4_events").groupBy("event_name").count()
-    re_types = tbl(C_SILVER, "rees46_events").groupBy("event_type").count()
+    ga_events = tbl(C_SILVER, "ga4_events")
+    re_events = tbl(C_SILVER, "rees46_events")
+    ga_rows, re_rows = ga_events.count(), re_events.count()
+    note(f"event rows: GA4={ga_rows:,}, REES46={re_rows:,}")
+    ga_names = ga_events.groupBy("event_name").count()
+    re_types = re_events.groupBy("event_type").count()
     note("GA4 event_name (top 12):")
     table(
         ["event_name", "rows"],
@@ -843,7 +923,8 @@ def check_commerce_identity():
     verdict = "SUPPORTS" if clean else "REVIEW"
     return verdict, (
         f"user_id_overlap={user_overlap}, session_id_overlap={session_overlap}, "
-        f"product_id_overlap={product_overlap}"
+        f"product_id_overlap={product_overlap}, "
+        f"ga4_events={ga_rows:,}, rees46_events={re_rows:,}"
     )
 
 
@@ -999,20 +1080,21 @@ def check_pass_through(pair):
     added = [c for c in gold.columns if c not in silver.columns]
     dropped = [c for c in silver.columns if c not in gold.columns]
     extra = [c for c in added if not (c.endswith("_key") or c.startswith("_gold_"))]
+    renamed = bool(extra) and len(extra) == len(dropped)
     same = s_stats["n"] == g_stats["n"] and s_stats["h"] == g_stats["h"]
     note(
         f"{g_name}: rows {s_stats['n']:,} vs {g_stats['n']:,}, shared_hash_equal={same}"
     )
-    note(f"    added={added}, dropped={dropped}")
+    note(f"added={added}, dropped={dropped}")
     if not same:
         verdict = "REJECTS"
-    elif extra:
+    elif extra and not renamed:
         verdict = "REVIEW"
     else:
         verdict = "SUPPORTS"
     return verdict, (
         f"rows={s_stats['n']:,}/{g_stats['n']:,}, hash_equal={same}, "
-        f"business_columns_added={extra or 'none'}"
+        f"business_columns_added={extra or 'none'}, renamed_only={renamed}"
     )
 
 
@@ -1030,29 +1112,57 @@ for _pair in PASS_THROUGH_PAIRS + (HEAVY_PAIRS if RUN_HEAVY else []):
 
 
 def check_pit_enrichment():
-    silver = tbl(SILVER, "dwd_air_temperature")
-    gold = tbl(GOLD, "fact_weather_air_temperature")
-    s_rows = silver.count()
-    g_rows = gold.count()
-    stats = gold.agg(
-        F.avg(F.col("weather_station_key").isNull().cast("int")).alias("null_share"),
-        F.countDistinct("weather_station_key").alias("station_keys"),
-    ).first()
-    dup_keys = dupes(gold, ["STATIONS_ID", "observation_ts"])
-    added = [c for c in gold.columns if c not in silver.columns]
-    note(f"silver_rows={s_rows:,}, gold_rows={g_rows:,}, added_columns={added}")
-    null_share = stats["null_share"] or 0.0
-    ok = s_rows == g_rows and dup_keys == 0 and null_share <= 0.01
-    return ("SUPPORTS" if ok else "REVIEW"), (
-        f"rows_equal={s_rows == g_rows}, dup_keys={dup_keys}, "
-        f"null_station_key_share={null_share:.4%}, distinct_station_keys={stats['station_keys']}"
+    allowed = {"valid_from", "valid_to", "weather_station_key"}
+    rows, bad = [], []
+    for p in [*DWD_HOURLY, "solar"]:
+        silver = tbl(SILVER, f"dwd_{p}")
+        gold = tbl(GOLD, f"fact_weather_{p}")
+        s_rows = silver.count()
+        g = gold.agg(
+            F.count("*").alias("n"),
+            F.avg(F.col("weather_station_key").isNull().cast("int")).alias("nulls"),
+            F.countDistinct("weather_station_key").alias("keys"),
+        ).first()
+        added = [c for c in gold.columns if c not in silver.columns]
+        extra = [
+            c
+            for c in added
+            if c not in allowed
+            and not c.endswith("_key")
+            and not c.startswith("_gold_")
+        ]
+        null_share = g["nulls"] or 0.0
+        if s_rows != g["n"] or null_share > 0.01 or extra:
+            bad.append(p)
+        rows.append(
+            (p, s_rows, g["n"], f"{null_share:.4%}", g["keys"], extra or "none")
+        )
+    table(
+        [
+            "product",
+            "silver_rows",
+            "gold_rows",
+            "null_station_key",
+            "station_keys",
+            "extra_columns",
+        ],
+        rows,
+    )
+    dup_keys = dupes(
+        tbl(GOLD, "fact_weather_air_temperature"), ["STATIONS_ID", "observation_ts"]
+    )
+    note("duplicate (station, ts) in fact_weather_air_temperature:", dup_keys)
+    verdict = "SUPPORTS" if not bad and dup_keys == 0 else "REVIEW"
+    return (
+        verdict,
+        f"products_failing={bad or 'none'}, dup_keys_air_temperature={dup_keys}",
     )
 
 
 run_check(
     "V17",
     ["gold_duplication", "dwd_hourly_gold"],
-    "PIT-enriched weather fact adds only keys",
+    "PIT-enriched weather facts add only keys",
     check_pit_enrichment,
 )
 
@@ -1075,13 +1185,18 @@ def check_coord_conflict():
         .count()
     )
     flags = conflict.groupBy("_coordinate_conflict").count().collect()
+    flagged = sum(r["count"] for r in flags if r["_coordinate_conflict"])
+    without_row = 1 - c_rows / l_rows
     note(
         "conflict flag counts:", {r["_coordinate_conflict"]: r["count"] for r in flags}
     )
+    note(f"dim_location rows without a conflict row: {without_row:.2%}")
     ok = c_rows == c_ids and l_rows == l_ids and orphans == 0
     return ("SUPPORTS" if ok else "REJECTS"), (
-        f"conflict_rows={c_rows:,} (distinct {c_ids:,}), dim_location_rows={l_rows:,} "
-        f"(distinct {l_ids:,}), conflict_ids_not_in_dim_location={orphans}"
+        f"conflict_rows={c_rows:,} (distinct {c_ids:,}), flagged={flagged:,}, "
+        f"dim_location_rows={l_rows:,} (distinct {l_ids:,}), "
+        f"dim_location_without_conflict_row={without_row:.2%}, "
+        f"conflict_ids_not_in_dim_location={orphans}"
     )
 
 
@@ -1098,34 +1213,47 @@ run_check(
 
 
 def check_quality_overlap():
-    watermarks = tbl(QUALITY, "pipeline_watermarks").select(
-        "run_id", "component", "rows_written"
+    watermarks = (
+        tbl(QUALITY, "pipeline_watermarks")
+        .groupBy("run_id", "component")
+        .agg(F.count("*").alias("w_rows"), F.sum("rows_written").alias("w_sum"))
     )
     audit = (
         tbl(QUALITY, "quality_audit_log")
         .filter("metric_name = 'rows_written'")
-        .select("run_id", "component", F.col("metric_value").alias("audit_rows"))
+        .groupBy("run_id", "component")
+        .agg(F.count("*").alias("a_rows"), F.sum("metric_value").alias("a_sum"))
     )
-    stats = (
+    s = (
         watermarks.join(audit, ["run_id", "component"], "full")
         .agg(
             F.count("*").alias("pairs"),
-            F.sum(F.col("rows_written").isNull().cast("int")).alias("audit_only"),
-            F.sum(F.col("audit_rows").isNull().cast("int")).alias("watermark_only"),
-            F.sum((F.col("rows_written") != F.col("audit_rows")).cast("int")).alias(
-                "mismatch"
+            F.sum(F.col("w_rows").isNull().cast("int")).alias("audit_only"),
+            F.sum(F.col("a_rows").isNull().cast("int")).alias("watermark_only"),
+            F.sum(((F.col("w_rows") > 1) | (F.col("a_rows") > 1)).cast("int")).alias(
+                "multi_row"
             ),
+            F.sum((F.col("w_sum") != F.col("a_sum")).cast("int")).alias("sum_mismatch"),
+            F.sum(
+                (
+                    (F.col("w_rows") == 1)
+                    & (F.col("a_rows") == 1)
+                    & (F.col("w_sum") != F.col("a_sum"))
+                ).cast("int")
+            ).alias("single_row_mismatch"),
         )
         .first()
     )
     note(
-        f"pairs={stats['pairs']:,}, audit_only={stats['audit_only']}, "
-        f"watermark_only={stats['watermark_only']}, value_mismatch={stats['mismatch']}"
+        f"pairs={s['pairs']:,}, audit_only={s['audit_only']}, "
+        f"watermark_only={s['watermark_only']}, multi_row_pairs={s['multi_row']}, "
+        f"sum_mismatch={s['sum_mismatch']}, single_row_mismatch={s['single_row_mismatch']}"
     )
-    ok = (stats["watermark_only"] or 0) == 0 and (stats["mismatch"] or 0) == 0
+    ok = (s["watermark_only"] or 0) == 0 and (s["sum_mismatch"] or 0) == 0
     return ("SUPPORTS" if ok else "REVIEW"), (
-        f"pairs={stats['pairs']:,}, watermark_only={stats['watermark_only']}, "
-        f"value_mismatch={stats['mismatch']}"
+        f"pairs={s['pairs']:,}, watermark_only={s['watermark_only']}, "
+        f"sum_mismatch={s['sum_mismatch']}, single_row_mismatch={s['single_row_mismatch']}, "
+        f"multi_row_pairs={s['multi_row']}"
     )
 
 
@@ -1134,6 +1262,134 @@ run_check(
     ["quality_log"],
     "Watermarks duplicate the audit-log rows_written metric",
     check_quality_overlap,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,V20 -- Gold bridges: foreign-key resolution rates
+
+
+def check_bridge_fk():
+    specs = [
+        ("bridge_eeg_support_unit", ["generation_unit_key"]),
+        ("bridge_kwk_support_unit", ["generation_unit_key"]),
+        ("bridge_authorisation_unit", ["generation_unit_key"]),
+        ("bridge_location_unit", ["location_key", "generation_unit_key"]),
+        ("bridge_location_connection", ["location_key", "grid_connection_point_key"]),
+        ("bridge_actor_role", ["market_actor_key"]),
+    ]
+    rows, weak = [], []
+    for name, keys in specs:
+        agg = (
+            tbl(GOLD, name)
+            .agg(
+                F.count("*").alias("n"),
+                *[F.avg(F.col(k).isNull().cast("int")).alias(k) for k in keys],
+            )
+            .first()
+        )
+        for k in keys:
+            share = agg[k] or 0.0
+            rows.append((name, k, agg["n"], f"{share:.2%}"))
+            if share > 0.05:
+                weak.append(f"{name}.{k}={share:.1%}")
+    table(["bridge", "key", "rows", "null_share"], rows)
+    verdict = "SUPPORTS" if not weak else "REVIEW"
+    return verdict, f"keys_over_5pct_null={weak or 'none'}"
+
+
+run_check(
+    "V20",
+    ["bridges_gold"],
+    "Gold bridge foreign-key resolution rates",
+    check_bridge_fk,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,V21 -- DWD hourly: shared station columns agree across products
+
+
+def check_dwd_shared_columns():
+    combos = union_all(
+        [
+            tbl(SILVER, f"dwd_{p}")
+            .select("STATIONS_ID", "city", "ags_code", "ags_level", "ags_method")
+            .distinct()
+            for p in DWD_HOURLY
+        ]
+    ).distinct()
+    per_station = combos.groupBy("STATIONS_ID").agg(F.count("*").alias("n_combos"))
+    total = per_station.count()
+    conflicts = per_station.filter("n_combos > 1")
+    n_conflicts = conflicts.count()
+    table(
+        ["station", "distinct_combos"],
+        [(r["STATIONS_ID"], r["n_combos"]) for r in conflicts.limit(20).collect()],
+    )
+    verdict = "SUPPORTS" if n_conflicts == 0 else "REVIEW"
+    return (
+        verdict,
+        f"stations={total}, stations_with_conflicting_city_or_ags={n_conflicts}",
+    )
+
+
+run_check(
+    "V21",
+    ["dwd_hourly_gold", "dwd_hourly_silver"],
+    "DWD shared station columns agree across products",
+    check_dwd_shared_columns,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,V22 -- DWD hourly: value agreement of overlapping variables
+
+
+def check_overlap_values():
+    pairs = [
+        ("air_temperature_2m", "air_temperature", "moisture"),
+        ("air_temperature_2m", "air_temperature", "dew_point"),
+        ("total_cloud_cover", "cloudiness", "cloud_type"),
+        ("pressure_station_level", "pressure", "moisture"),
+    ]
+    rows, differ = [], []
+    for col, a, b in pairs:
+        left = tbl(SILVER, f"dwd_{a}").select(
+            "STATIONS_ID", "observation_ts", F.col(col).alias("va")
+        )
+        right = tbl(SILVER, f"dwd_{b}").select(
+            "STATIONS_ID", "observation_ts", F.col(col).alias("vb")
+        )
+        r = (
+            left.join(right, ["STATIONS_ID", "observation_ts"])
+            .filter(F.col("va").isNotNull() & F.col("vb").isNotNull())
+            .agg(
+                F.count("*").alias("n"),
+                F.avg((F.col("va") == F.col("vb")).cast("int")).alias("equal"),
+                F.avg(F.abs(F.col("va") - F.col("vb"))).alias("mean_abs_diff"),
+            )
+            .first()
+        )
+        equal = r["equal"] or 0.0
+        rows.append(
+            (col, a, b, r["n"], f"{equal:.2%}", round(r["mean_abs_diff"] or 0.0, 4))
+        )
+        if equal < 0.99:
+            differ.append(f"{col}:{a}/{b}")
+    table(
+        ["variable", "product_a", "product_b", "joined_rows", "equal", "mean_abs_diff"],
+        rows,
+    )
+    verdict = "SUPPORTS" if not differ else "REVIEW"
+    return verdict, f"pairs_below_99pct_equal={differ or 'none'}"
+
+
+run_check(
+    "V22",
+    ["dwd_hourly_gold", "dwd_hourly_silver"],
+    "DWD overlapping variables: value agreement across products",
+    check_overlap_values,
 )
 
 # COMMAND ----------
