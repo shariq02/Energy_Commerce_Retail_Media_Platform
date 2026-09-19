@@ -14,21 +14,25 @@
 # MAGIC
 # MAGIC **Purpose:** read-only checks on the live catalog for each table
 # MAGIC consolidation candidate -- grain, keys, schema, timestamps, identifiers,
-# MAGIC sparsity, provenance, Silver/Gold duplication. Each check prints its own
-# MAGIC result; the last cell prints a summary and a per-group verdict.
+# MAGIC sparsity, provenance, Silver/Gold duplication. Output goes to
+# MAGIC `src/schemas/consolidation_findings/table_verification.md` (summary and
+# MAGIC per-group verdicts first, then one section per check).
 # MAGIC
-# MAGIC Run all cells in order. Nothing is written.
+# MAGIC Run all cells in order. Tables are only read; the findings file is the
+# MAGIC only write.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import os
 from functools import reduce
 
 from pyspark.sql import functions as F
 
 # COMMAND ----------
 
-# DBTITLE 1,Config -- schemas
+# DBTITLE 1,Config
+
 CAT = "energy_commerce_retail_media"
 BRONZE = f"{CAT}.bronze"
 SILVER = f"{CAT}.energy_silver"
@@ -44,9 +48,9 @@ RUN_HEAVY = False
 
 VERDICT_ORDER = ["REJECTS", "ERROR", "REVIEW", "SUPPORTS"]
 
-# COMMAND ----------
+FINDINGS_DIR = ("src", "schemas", "consolidation_findings")
+FINDINGS_FILE = "table_verification.md"
 
-# DBTITLE 1,Config -- table lists
 DWD_HOURLY = [
     "air_temperature",
     "cloudiness",
@@ -122,15 +126,27 @@ PROVENANCE = {
     "_silver_run_id",
 }
 
-# COMMAND ----------
-
-# DBTITLE 1,Config -- provenance groups and pass-through pairs
-# (schema, tables, typed): typed groups must be unique across their tables.
+# (schema, tables, typed, roll-up groups): typed groups must be unique across tables.
 PROVENANCE_GROUPS = {
-    "dwd_hourly": (SILVER, [f"dwd_{p}" for p in DWD_HOURLY], False),
-    "honda": (SILVER, HONDA_SILVER, False),
-    "bridges": (SILVER, list(BRIDGES.values()), True),
-    "catalogs": (SILVER_REF, [f"mastr_{n}" for n, _ in CATALOGS], True),
+    "dwd_hourly": (
+        SILVER,
+        [f"dwd_{p}" for p in DWD_HOURLY],
+        False,
+        ["dwd_hourly_gold", "dwd_hourly_silver"],
+    ),
+    "honda": (SILVER, HONDA_SILVER, False, ["honda_silver", "honda_gold"]),
+    "bridges": (
+        SILVER,
+        list(BRIDGES.values()),
+        True,
+        ["bridges_silver", "bridges_gold"],
+    ),
+    "catalogs": (
+        SILVER_REF,
+        [f"mastr_{n}" for n, _ in CATALOGS],
+        True,
+        ["codes_silver", "codes_gold"],
+    ),
 }
 
 # (silver schema, silver table, gold schema, gold table)
@@ -155,65 +171,50 @@ HEAVY_PAIRS = [
     (C_SILVER, "rees46_events", C_GOLD, "fact_customer_activity_event"),
 ]
 
-# COMMAND ----------
-
-# DBTITLE 1,Results store
 RESULTS = []
+CURRENT = []
 
 # COMMAND ----------
 
-# DBTITLE 1,Def -- print_rows
-
-
-def print_rows(header, rows):
-    table = [[str(h) for h in header]] + [[str(v) for v in r] for r in rows]
-    widths = [max(len(r[i]) for r in table) for i in range(len(header))]
-    for r in table:
-        print("  " + " | ".join(v.ljust(w) for v, w in zip(r, widths)))
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- tbl
+# DBTITLE 1,Helpers
 
 
 def tbl(schema, name):
     return spark.table(f"{schema}.{name}")
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Def -- union_all
-
-
 def union_all(dfs, allow_missing=False):
     return reduce(lambda a, b: a.unionByName(b, allowMissingColumns=allow_missing), dfs)
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- dupes
 
 
 def dupes(df, keys):
     return df.groupBy(*keys).count().filter("count > 1").count()
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Def -- worst_verdict
-
-
 def worst_verdict(verdicts):
     return min(verdicts, key=VERDICT_ORDER.index)
 
 
-# COMMAND ----------
+def cell(value):
+    return str(value).replace("|", "\\|").replace("\n", " ")
 
-# DBTITLE 1,Def -- record
+
+def md_table(header, rows):
+    lines = ["| " + " | ".join(cell(h) for h in header) + " |"]
+    lines.append("|" + "---|" * len(header))
+    lines += ["| " + " | ".join(cell(v) for v in r) + " |" for r in rows]
+    return lines
 
 
-def record(check_id, groups, question, verdict, metrics):
+def note(*parts):
+    CURRENT.append("- " + " ".join(str(x) for x in parts))
+
+
+def table(header, rows):
+    CURRENT.extend(["", *md_table(header, rows), ""])
+
+
+def record(check_id, groups, question, verdict, metrics, detail):
     RESULTS.append(
         {
             "id": check_id,
@@ -221,34 +222,55 @@ def record(check_id, groups, question, verdict, metrics):
             "question": question,
             "verdict": verdict,
             "metrics": metrics,
+            "detail": detail,
         }
     )
-    print(f"[{verdict}] {check_id} {question}")
-    print(f"    {metrics}")
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- run_check
 
 
 def run_check(check_id, groups, question, fn):
-    print(f"\n=== {check_id} {question} ===")
+    CURRENT.clear()
     try:
         verdict, metrics = fn()
     except Exception as exc:
         verdict, metrics = "ERROR", f"{type(exc).__name__}: {str(exc)[:240]}"
-    record(check_id, groups, question, verdict, metrics)
+    record(check_id, groups, question, verdict, metrics, list(CURRENT))
+
+
+def repo_root():
+    p = os.path.abspath(os.getcwd())
+    for _ in range(12):
+        if os.path.isdir(os.path.join(p, "src", "schemas")) and os.path.isdir(
+            os.path.join(p, "databricks")
+        ):
+            return p
+        if os.path.dirname(p) == p:
+            break
+        p = os.path.dirname(p)
+    try:
+        nb = (
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .notebookPath()
+            .get()
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "repo root not found -- run from inside the repo's Databricks Git folder"
+        ) from exc
+    i = nb.rfind("/databricks/")
+    if i > 0:
+        for cand in (nb[:i], "/Workspace" + nb[:i]):
+            if os.path.isdir(os.path.join(cand, "src", "schemas")):
+                return cand
+    raise RuntimeError(
+        "repo root not found -- run from inside the repo's Databricks Git folder"
+    )
 
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V01 -- DWD hourly: (station, hour) key overlap
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_dwd_overlap
+# DBTITLE 1,V01 -- DWD hourly: (station, hour) key overlap
 
 
 def check_dwd_overlap():
@@ -271,11 +293,11 @@ def check_dwd_overlap():
     by_n = {}
     for r in hist:
         by_n[r["n_products"]] = by_n.get(r["n_products"], 0) + r["count"]
-    print("keys by number of products present:")
-    print_rows(["n_products", "keys"], sorted(by_n.items()))
+    note("keys by number of products present:")
+    table(["n_products", "keys"], sorted(by_n.items()))
     per_product = keys.groupBy("p").count().orderBy("count").collect()
-    print("rows per product:")
-    print_rows(
+    note("rows per product:")
+    table(
         ["product", "rows", "share_of_union_keys"],
         [(r["p"], r["count"], f"{r['count'] / union_keys:.1%}") for r in per_product],
     )
@@ -291,9 +313,6 @@ def check_dwd_overlap():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V01
 run_check(
     "V01",
     ["dwd_hourly_gold", "dwd_hourly_silver"],
@@ -303,12 +322,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V02 -- DWD hourly: column-name and type collisions
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_dwd_columns
+# DBTITLE 1,V02 -- DWD hourly: column-name and type collisions
 
 
 def check_dwd_columns():
@@ -324,12 +338,12 @@ def check_dwd_columns():
         if len(set(v.values())) > 1
     }
     needs_prefix = sorted(c for c in shared if c not in DWD_KEY_COLUMNS)
-    print("shared non-key columns (need a product prefix):")
-    print_rows(
+    note("shared non-key columns (need a product prefix):")
+    table(
         ["column", "n_products", "types"],
         [(c, len(shared[c]), sorted(set(shared[c].values()))) for c in needs_prefix],
     )
-    print("type conflicts:", conflicts or "none")
+    note("type conflicts:", conflicts or "none")
     verdict = "REJECTS" if conflicts else "SUPPORTS"
     return verdict, (
         f"shared_columns={len(shared)}, need_prefix={len(needs_prefix)}, "
@@ -337,9 +351,6 @@ def check_dwd_columns():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V02
 run_check(
     "V02",
     ["dwd_hourly_gold", "dwd_hourly_silver"],
@@ -349,12 +360,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V03 -- DWD: timestamp grid, range, stations (solar included)
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_dwd_timestamps
+# DBTITLE 1,V03 -- DWD: timestamp grid, range, stations (solar included)
 
 
 def check_dwd_timestamps():
@@ -379,7 +385,7 @@ def check_dwd_timestamps():
         rows.append(
             (p, r["min_ts"], r["max_ts"], r["n"], r["stations"], r["on_hour"] or 0.0)
         )
-    print_rows(
+    table(
         ["product", "min_ts", "max_ts", "rows", "stations", "share_on_the_hour"],
         [(*r[:5], round(r[5], 4)) for r in rows],
     )
@@ -396,9 +402,6 @@ def check_dwd_timestamps():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V03
 run_check(
     "V03",
     ["dwd_hourly_gold", "dwd_hourly_silver"],
@@ -408,12 +411,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V04 -- Honda: key coverage across the seven Silver tables
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_honda_keys
+# DBTITLE 1,V04 -- Honda: key coverage across the seven Silver tables
 
 
 def check_honda_keys():
@@ -435,10 +433,8 @@ def check_honda_keys():
     for r in hist:
         k = (r["frequency"], r["n_tables"])
         by[k] = by.get(k, 0) + r["count"]
-    print("keys by frequency and number of tables present:")
-    print_rows(
-        ["frequency", "n_tables", "keys"], sorted((*k, v) for k, v in by.items())
-    )
+    note("keys by frequency and number of tables present:")
+    table(["frequency", "n_tables", "keys"], sorted((*k, v) for k, v in by.items()))
     share = full / total
     if dup_keys > 0 or share < 0.99:
         verdict = "REJECTS"
@@ -452,9 +448,6 @@ def check_honda_keys():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V04
 run_check(
     "V04",
     ["honda_silver", "honda_gold"],
@@ -464,12 +457,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V05 -- Honda: channel catalog vs Silver value columns
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_honda_catalog
+# DBTITLE 1,V05 -- Honda: channel catalog vs Silver value columns
 
 
 def check_honda_catalog():
@@ -494,18 +482,15 @@ def check_honda_catalog():
                     actual.add((name, c))
     only_silver = sorted(actual - expected)
     only_catalog = sorted(expected - actual)
-    print("in Silver, not in catalog:", only_silver or "none")
-    print("in catalog, not in Silver:", only_catalog or "none")
+    note("in Silver, not in catalog:", only_silver or "none")
+    note("in catalog, not in Silver:", only_catalog or "none")
     verdict = "SUPPORTS" if not only_silver and not only_catalog else "REJECTS"
     return verdict, (
         f"catalog_channels={len(expected)}, silver_value_columns={len(actual)}, "
-        f"only_silver={len(only_silver)}, only_catalog={len(only_catalog)}"
+        f"only_silver={only_silver or 'none'}, only_catalog={only_catalog or 'none'}"
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V05
 run_check(
     "V05",
     ["honda_silver", "honda_gold"],
@@ -515,12 +500,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V06 -- MaStR units: column population per technology
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_unit_sparsity
+# DBTITLE 1,V06 -- MaStR units: column population per technology
 
 
 def check_unit_sparsity():
@@ -555,7 +535,7 @@ def check_unit_sparsity():
                 f"{common_ok}/{len(common)}",
             )
         )
-    print_rows(
+    table(
         ["unit_type", "rows", "cols_any", "cols_over_50pct", "common_populated"],
         sorted(stats),
     )
@@ -566,9 +546,6 @@ def check_unit_sparsity():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V06
 run_check(
     "V06",
     ["mastr_units"],
@@ -578,12 +555,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V07 -- MaStR units: unit_id collisions across technologies
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_unit_ids
+# DBTITLE 1,V07 -- MaStR units: unit_id collisions across technologies
 
 
 def check_unit_ids():
@@ -602,8 +574,8 @@ def check_unit_ids():
         .orderBy("prefix", "t")
         .collect()
     )
-    print("unit_id prefix per technology:")
-    print_rows(
+    note("unit_id prefix per technology:")
+    table(
         ["prefix", "technology", "rows"],
         [(r["prefix"], r["t"], r["count"]) for r in prefixes],
     )
@@ -611,9 +583,6 @@ def check_unit_ids():
     return verdict, f"colliding_unit_ids={colliding}"
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V07
 run_check(
     "V07",
     ["mastr_units"],
@@ -623,12 +592,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V08 -- MaStR EEG / KWK: identifier safety
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_eeg_kwk
+# DBTITLE 1,V08 -- MaStR EEG / KWK: identifier safety
 
 
 def check_eeg_kwk():
@@ -645,8 +609,8 @@ def check_eeg_kwk():
     overlap = eeg.select("id").intersect(kwk).count()
     eeg_prefix = eeg.groupBy(F.substring("id", 1, 3).alias("p")).count().collect()
     kwk_prefix = kwk.groupBy(F.substring("id", 1, 3).alias("p")).count().collect()
-    print("EEG id prefixes:", {r["p"]: r["count"] for r in eeg_prefix})
-    print("KWK id prefixes:", {r["p"]: r["count"] for r in kwk_prefix})
+    note("EEG id prefixes:", {r["p"]: r["count"] for r in eeg_prefix})
+    note("KWK id prefixes:", {r["p"]: r["count"] for r in kwk_prefix})
     if eeg_dupes > 0:
         verdict = "REJECTS"
     elif overlap > 0:
@@ -656,9 +620,6 @@ def check_eeg_kwk():
     return verdict, f"eeg_duplicated_ids={eeg_dupes}, eeg_kwk_id_overlap={overlap}"
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V08
 run_check(
     "V08",
     ["mastr_support"],
@@ -668,12 +629,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V09 -- MaStR bridges: typed-key collision safety
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_bridges
+# DBTITLE 1,V09 -- MaStR bridges: typed-key collision safety
 
 
 def check_bridges():
@@ -707,7 +663,7 @@ def check_bridges():
         .orderBy("rel")
         .collect()
     )
-    print_rows(
+    table(
         ["relationship", "pairs", "parents", "linked"],
         [(r["rel"], r["pairs"], r["parents"], r["linked"]) for r in per_rel],
     )
@@ -721,8 +677,8 @@ def check_bridges():
         .orderBy("rel")
         .collect()
     )
-    print("id prefixes per relationship:")
-    print_rows(
+    note("id prefixes per relationship:")
+    table(
         ["relationship", "parent_prefix", "linked_prefix", "pairs"],
         [
             (r["rel"], r["parent_prefix"], r["linked_prefix"], r["count"])
@@ -736,9 +692,6 @@ def check_bridges():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V09
 run_check(
     "V09",
     ["bridges_silver", "bridges_gold"],
@@ -748,12 +701,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V10 -- MaStR code lists: Id collisions and overlap
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- catalog_rows
+# DBTITLE 1,V10 -- MaStR code lists: Id collisions and overlap
 
 
 def catalog_rows(name, value_col):
@@ -762,11 +710,6 @@ def catalog_rows(name, value_col):
         F.col(value_col).cast("string").alias("Wert"),
         F.lit(name).alias("kind"),
     )
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_code_lists
 
 
 def check_code_lists():
@@ -779,8 +722,8 @@ def check_code_lists():
     for name in SMALL_LISTS:
         small = catalog_rows(name, "Wert").select("Id", "Wert")
         rows.append((name, small.count(), small.join(values, ["Id", "Wert"]).count()))
-    print("small lists already present in katalogwerte (Id, Wert):")
-    print_rows(["list", "rows", "also_in_katalogwerte"], rows)
+    note("small lists already present in katalogwerte (Id, Wert):")
+    table(["list", "rows", "also_in_katalogwerte"], rows)
     contained = [r[0] for r in rows if r[1] > 0 and r[1] == r[2]]
     verdict = "REVIEW" if contained else "SUPPORTS"
     return verdict, (
@@ -791,22 +734,7 @@ def check_code_lists():
 
 # COMMAND ----------
 
-# DBTITLE 1,Run V10
-run_check(
-    "V10",
-    ["bronze_mastr_lookups", "codes_silver", "codes_gold"],
-    "MaStR code-list Id collisions and containment",
-    check_code_lists,
-)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## V11 -- MaStR change events: identifier and time safety
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_change_events
+# DBTITLE 1,V11 -- MaStR change events: identifier and time safety
 
 
 def check_change_events():
@@ -838,7 +766,7 @@ def check_change_events():
         .orderBy("kind", "prefix")
         .collect()
     )
-    print_rows(
+    table(
         ["kind", "id_prefix", "rows", "min_ts", "max_ts"],
         [(r["kind"], r["prefix"], r["rows"], r["min_ts"], r["max_ts"]) for r in rows],
     )
@@ -851,14 +779,11 @@ def check_change_events():
             tbl(SILVER, "mastr_grid_operator_change_events").dtypes
         ).get("grid_operator_change_effective_date"),
     }
-    print("time column types:", types)
+    note("time column types:", types)
     verdict = "SUPPORTS" if overlap == 0 else "REJECTS"
     return verdict, f"unit_actor_id_overlap={overlap}"
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V11
 run_check(
     "V11",
     ["events_silver", "events_gold"],
@@ -868,12 +793,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V12 -- Commerce: identity overlap between GA4 and REES46
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_commerce_identity
+# DBTITLE 1,V12 -- Commerce: identity overlap between GA4 and REES46
 
 
 def check_commerce_identity():
@@ -906,16 +826,16 @@ def check_commerce_identity():
     product_overlap = ga_products.intersect(re_products).count()
     ga_names = tbl(C_SILVER, "ga4_events").groupBy("event_name").count()
     re_types = tbl(C_SILVER, "rees46_events").groupBy("event_type").count()
-    print("GA4 event_name (top 12):")
-    print_rows(
+    note("GA4 event_name (top 12):")
+    table(
         ["event_name", "rows"],
         [
             (r["event_name"], r["count"])
             for r in ga_names.orderBy(F.desc("count")).limit(12).collect()
         ],
     )
-    print("REES46 event_type:")
-    print_rows(
+    note("REES46 event_type:")
+    table(
         ["event_type", "rows"],
         [(r["event_type"], r["count"]) for r in re_types.collect()],
     )
@@ -927,9 +847,6 @@ def check_commerce_identity():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V12
 run_check(
     "V12",
     ["commerce_silver", "commerce_gold"],
@@ -939,54 +856,60 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V13 -- DWD reference: key uniqueness and window alignment
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_dwd_reference
+# DBTITLE 1,V13 -- DWD reference: key uniqueness and window alignment
 
 
 def check_dwd_reference():
-    geo = tbl(SILVER_REF, "dwd_station_geography")
-    names = tbl(SILVER_REF, "dwd_station_name_history")
-    device = tbl(SILVER_REF, "dwd_device_instrument")
-    unit = tbl(SILVER_REF, "dwd_parameter_unit")
-    gaps = tbl(SILVER_REF, "dwd_missing_value_periods")
-    dup = {
-        "geography": dupes(geo, ["station_id", "valid_from"]),
-        "name_history": dupes(names, ["station_id", "valid_from"]),
-        "device_instrument": dupes(
-            device, ["station_id", "parameter_category", "valid_from"]
+    tables = {
+        "geography": (
+            tbl(SILVER_REF, "dwd_station_geography"),
+            ["station_id", "valid_from"],
         ),
-        "parameter_unit": dupes(
-            unit, ["station_id", "parameter_source_code", "valid_from"]
+        "name_history": (
+            tbl(SILVER_REF, "dwd_station_name_history"),
+            ["station_id", "valid_from"],
         ),
-        "missing_value_periods": dupes(
-            gaps, ["station_id", "parameter_source_code", "gap_start_ts"]
+        "device_instrument": (
+            tbl(SILVER_REF, "dwd_device_instrument"),
+            ["station_id", "parameter_category", "valid_from"],
+        ),
+        "parameter_unit": (
+            tbl(SILVER_REF, "dwd_parameter_unit"),
+            ["station_id", "parameter_source_code", "valid_from"],
+        ),
+        "missing_value_periods": (
+            tbl(SILVER_REF, "dwd_missing_value_periods"),
+            ["station_id", "parameter_source_code", "gap_start_ts"],
         ),
     }
-    print("duplicate keys per table:", dup)
-    geo_keys = geo.select("station_id", "valid_from")
-    name_keys = names.select("station_id", "valid_from")
+    natural = {n: dupes(df, keys) for n, (df, keys) in tables.items()}
+    ordinal = {n: dupes(df, [*keys, "_src_id_ord"]) for n, (df, keys) in tables.items()}
+    note("duplicate keys on the natural key:", natural)
+    note("duplicate keys including _src_id_ord:", ordinal)
+    geo_keys = tables["geography"][0].select("station_id", "valid_from")
+    name_keys = tables["name_history"][0].select("station_id", "valid_from")
     only_geo = geo_keys.exceptAll(name_keys).count()
     only_name = name_keys.exceptAll(geo_keys).count()
-    print(f"intervals only in geography: {only_geo}, only in name_history: {only_name}")
+    note(f"intervals only in geography: {only_geo}, only in name_history: {only_name}")
     types = {
-        "valid_from": dict(geo.dtypes).get("valid_from"),
-        "gap_start_ts": dict(gaps.dtypes).get("gap_start_ts"),
+        "valid_from": dict(tables["geography"][0].dtypes).get("valid_from"),
+        "gap_start_ts": dict(tables["missing_value_periods"][0].dtypes).get(
+            "gap_start_ts"
+        ),
     }
-    print("period column types:", types)
-    verdict = "SUPPORTS" if sum(dup.values()) == 0 else "REJECTS"
+    note("period column types:", types)
+    if sum(ordinal.values()) > 0:
+        verdict = "REJECTS"
+    elif sum(natural.values()) > 0:
+        verdict = "REVIEW"
+    else:
+        verdict = "SUPPORTS"
     return verdict, (
-        f"duplicate_keys={sum(dup.values())}, geography_only={only_geo}, "
-        f"name_history_only={only_name}, period_types={types}"
+        f"natural_key_dups={natural}, dups_with_src_id_ord={sum(ordinal.values())}, "
+        f"geography_only={only_geo}, name_history_only={only_name}, period_types={types}"
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V13
 run_check(
     "V13",
     ["dwd_ref_silver", "dwd_ref_gold"],
@@ -996,12 +919,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V14 -- Bronze: identical-schema groups
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_bronze_schemas
+# DBTITLE 1,V14 -- Bronze: identical-schema groups
 
 
 def check_bronze_schemas():
@@ -1011,17 +929,14 @@ def check_bronze_schemas():
         w = tbl(BRONZE, f"honda_iot_{c}_w").schema
         pair_equal[c] = p == w
     lookups = {tbl(BRONZE, f"mastr_{n}").schema.simpleString() for n in SMALL_LISTS}
-    print("honda p/w schema equal:", pair_equal)
-    print("distinct schemas among the four MaStR lookups:", len(lookups))
+    note("honda p/w schema equal:", pair_equal)
+    note("distinct schemas among the four MaStR lookups:", len(lookups))
     ok = all(pair_equal.values()) and len(lookups) == 1
     return ("SUPPORTS" if ok else "REJECTS"), (
         f"honda_pairs_equal={sum(pair_equal.values())}/3, lookup_distinct_schemas={len(lookups)}"
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V14
 run_check(
     "V14",
     ["bronze_honda_pairs", "bronze_mastr_lookups"],
@@ -1031,72 +946,45 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V15 -- source_record_id uniqueness (within and across tables)
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_provenance
+# DBTITLE 1,V15 -- source_record_id uniqueness (within and across tables)
 
 
-def check_provenance():
-    verdicts = []
-    parts = []
-    for label, (schema, names, typed) in PROVENANCE_GROUPS.items():
-        ids = union_all(
-            [
-                tbl(schema, n).select("source_record_id").withColumn("t", F.lit(n))
-                for n in names
-            ]
+def check_provenance(schema, names, typed):
+    ids = union_all(
+        [
+            tbl(schema, n).select("source_record_id").withColumn("t", F.lit(n))
+            for n in names
+        ]
+    )
+    within = ids.groupBy("t", "source_record_id").count().filter("count > 1").count()
+    across = 0
+    if typed:
+        across = (
+            ids.groupBy("source_record_id")
+            .agg(F.countDistinct("t").alias("n"))
+            .filter("n > 1")
+            .count()
         )
-        within = (
-            ids.groupBy("t", "source_record_id").count().filter("count > 1").count()
-        )
-        across = 0
-        if typed:
-            across = (
-                ids.groupBy("source_record_id")
-                .agg(F.countDistinct("t").alias("n"))
-                .filter("n > 1")
-                .count()
-            )
-        print(
-            f"{label}: duplicates_within_table={within}, shared_across_tables={across}"
-        )
-        if within > 0:
-            verdicts.append("REJECTS")
-        elif across > 0:
-            verdicts.append("REVIEW")
-        else:
-            verdicts.append("SUPPORTS")
-        parts.append(f"{label}(within={within}, across={across})")
-    return worst_verdict(verdicts), ", ".join(parts)
+    if within > 0:
+        verdict = "REJECTS"
+    elif across > 0:
+        verdict = "REVIEW"
+    else:
+        verdict = "SUPPORTS"
+    return verdict, f"duplicates_within_table={within}, shared_across_tables={across}"
 
+
+for _label, (_schema, _names, _typed, _groups) in PROVENANCE_GROUPS.items():
+    run_check(
+        f"V15:{_label}",
+        _groups,
+        f"source_record_id uniqueness ({_label})",
+        lambda s=_schema, n=_names, t=_typed: check_provenance(s, n, t),
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Run V15
-run_check(
-    "V15",
-    [
-        "dwd_hourly_gold",
-        "dwd_hourly_silver",
-        "honda_silver",
-        "bridges_silver",
-        "codes_silver",
-    ],
-    "source_record_id uniqueness",
-    check_provenance,
-)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## V16 -- Silver to Gold: pass-through content comparison
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_pass_through
+# DBTITLE 1,V16 -- Silver to Gold: pass-through content comparison
 
 
 def check_pass_through(pair):
@@ -1112,10 +1000,10 @@ def check_pass_through(pair):
     dropped = [c for c in silver.columns if c not in gold.columns]
     extra = [c for c in added if not (c.endswith("_key") or c.startswith("_gold_"))]
     same = s_stats["n"] == g_stats["n"] and s_stats["h"] == g_stats["h"]
-    print(
+    note(
         f"{g_name}: rows {s_stats['n']:,} vs {g_stats['n']:,}, shared_hash_equal={same}"
     )
-    print(f"    added={added}, dropped={dropped}")
+    note(f"    added={added}, dropped={dropped}")
     if not same:
         verdict = "REJECTS"
     elif extra:
@@ -1128,9 +1016,6 @@ def check_pass_through(pair):
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V16 -- pass-through pairs
 for _pair in PASS_THROUGH_PAIRS + (HEAVY_PAIRS if RUN_HEAVY else []):
     run_check(
         f"V16:{_pair[3]}",
@@ -1141,12 +1026,7 @@ for _pair in PASS_THROUGH_PAIRS + (HEAVY_PAIRS if RUN_HEAVY else []):
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V17 -- Silver to Gold: PIT enrichment can be a view
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_pit_enrichment
+# DBTITLE 1,V17 -- Silver to Gold: PIT enrichment can be a view
 
 
 def check_pit_enrichment():
@@ -1160,7 +1040,7 @@ def check_pit_enrichment():
     ).first()
     dup_keys = dupes(gold, ["STATIONS_ID", "observation_ts"])
     added = [c for c in gold.columns if c not in silver.columns]
-    print(f"silver_rows={s_rows:,}, gold_rows={g_rows:,}, added_columns={added}")
+    note(f"silver_rows={s_rows:,}, gold_rows={g_rows:,}, added_columns={added}")
     null_share = stats["null_share"] or 0.0
     ok = s_rows == g_rows and dup_keys == 0 and null_share <= 0.01
     return ("SUPPORTS" if ok else "REVIEW"), (
@@ -1169,9 +1049,6 @@ def check_pit_enrichment():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V17
 run_check(
     "V17",
     ["gold_duplication", "dwd_hourly_gold"],
@@ -1181,12 +1058,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V18 -- Coordinate conflict folds into dim_location
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_coord_conflict
+# DBTITLE 1,V18 -- Coordinate conflict folds into dim_location
 
 
 def check_coord_conflict():
@@ -1203,7 +1075,7 @@ def check_coord_conflict():
         .count()
     )
     flags = conflict.groupBy("_coordinate_conflict").count().collect()
-    print(
+    note(
         "conflict flag counts:", {r["_coordinate_conflict"]: r["count"] for r in flags}
     )
     ok = c_rows == c_ids and l_rows == l_ids and orphans == 0
@@ -1213,9 +1085,6 @@ def check_coord_conflict():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V18
 run_check(
     "V18",
     ["coord_conflict"],
@@ -1225,12 +1094,7 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## V19 -- Quality: watermarks vs audit log overlap
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- check_quality_overlap
+# DBTITLE 1,V19 -- Quality: watermarks vs audit log overlap
 
 
 def check_quality_overlap():
@@ -1254,7 +1118,7 @@ def check_quality_overlap():
         )
         .first()
     )
-    print(
+    note(
         f"pairs={stats['pairs']:,}, audit_only={stats['audit_only']}, "
         f"watermark_only={stats['watermark_only']}, value_mismatch={stats['mismatch']}"
     )
@@ -1265,9 +1129,6 @@ def check_quality_overlap():
     )
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Run V19
 run_check(
     "V19",
     ["quality_log"],
@@ -1277,40 +1138,69 @@ run_check(
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Summary
-
-# COMMAND ----------
-
-# DBTITLE 1,Def -- print_summary
+# DBTITLE 1,Summary
 
 
-def print_summary():
-    print("\n" + "=" * 100)
-    print("SUMMARY")
-    print("=" * 100)
-    for r in RESULTS:
-        print(f"[{r['verdict']:<8}] {r['id']:<40} {r['question']}")
-        print(f"             {r['metrics'][:220]}")
-    counts = {}
-    for r in RESULTS:
-        counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
-    print("\nverdict counts:", {v: counts.get(v, 0) for v in VERDICT_ORDER})
+def build_findings():
+    counts = {v: 0 for v in VERDICT_ORDER}
     by_group = {}
     for r in RESULTS:
+        counts[r["verdict"]] += 1
         for g in r["groups"]:
             by_group.setdefault(g, []).append(r["verdict"])
-    print("\nper-group verdict (worst check wins):")
-    print_rows(
-        ["group", "verdict", "checks"],
-        [(g, worst_verdict(v), len(v)) for g, v in sorted(by_group.items())],
-    )
-    print("\nSUPPORTS = evidence favours consolidation; REVIEW = needs a design")
-    print("decision (e.g. discriminator in key); REJECTS = evidence against;")
-    print("ERROR = check failed to run (see message above).")
+    lines = [
+        "# TABLE CONSOLIDATION VERIFICATION FINDINGS",
+        "",
+        (
+            "_Auto-generated by `databricks/utility/03_consolidation_verification.py`. "
+            "Re-running replaces this file._"
+        ),
+        "",
+        "## Summary",
+        "",
+        *md_table(
+            ["check", "verdict", "question", "metrics"],
+            [(r["id"], r["verdict"], r["question"], r["metrics"]) for r in RESULTS],
+        ),
+        "",
+        "**Verdict counts:** " + ", ".join(f"{v}={n}" for v, n in counts.items()),
+        "",
+        "### Per-group verdict (worst check wins)",
+        "",
+        *md_table(
+            ["group", "verdict", "checks"],
+            [(g, worst_verdict(v), len(v)) for g, v in sorted(by_group.items())],
+        ),
+        "",
+        (
+            "SUPPORTS = evidence favours consolidation; REVIEW = needs a design "
+            "decision (e.g. a discriminator in the key); REJECTS = evidence against; "
+            "ERROR = the check failed to run."
+        ),
+    ]
+    for r in RESULTS:
+        lines += [
+            "",
+            f"## {r['id']} -- {r['question']}",
+            "",
+            f"- verdict: {r['verdict']}",
+            f"- groups: {', '.join(r['groups'])}",
+            f"- metrics: {r['metrics']}",
+            *r["detail"],
+        ]
+    return "\n".join(lines) + "\n", counts
 
 
-# COMMAND ----------
+def write_findings(text):
+    d = os.path.join(repo_root(), *FINDINGS_DIR)
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, FINDINGS_FILE)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
+    return path
 
-# DBTITLE 1,Run summary
-print_summary()
+
+_text, _counts = build_findings()
+print(f"findings export -> {write_findings(_text)}  ({len(RESULTS)} checks, {_counts})")
