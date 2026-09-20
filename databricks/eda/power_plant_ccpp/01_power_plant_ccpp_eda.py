@@ -65,6 +65,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # DBTITLE 1,Discover files
 entries, kinds, frames = load_volume_frames(ROOT)
+require_frames(frames, ROOT, kinds)
 print(f"{ROOT}: {len(entries)} files")
 for e in entries:
     print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
@@ -160,6 +161,38 @@ for k, df in DFS.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Per-file distinct rows and file-set identity
+file_sets = {}
+for k, df in DFS.items():
+    h = df.select("__file", F.xxhash64(*[qcol(c) for c in DATA_COLS[k]]).alias("__h"))
+    per = h.groupBy("__file", "__h").count()
+    by_file = (
+        per.groupBy("__file")
+        .agg(
+            F.count(F.lit(1)).alias("distinct_rows"),
+            F.sum(F.col("count") - 1).alias("repeat_rows"),
+        )
+        .orderBy("__file")
+        .collect()
+    )
+    spread = (
+        per.groupBy("__h")
+        .agg(F.count(F.lit(1)).alias("files"))
+        .groupBy("files")
+        .count()
+        .orderBy("files")
+        .collect()
+    )
+    file_sets[k] = {
+        "by_file": [
+            (r["__file"], r["distinct_rows"], r["repeat_rows"]) for r in by_file
+        ],
+        "rows_by_file_count": [(r["files"], r["count"]) for r in spread],
+    }
+    print(k, file_sets[k])
+
+# COMMAND ----------
+
 # DBTITLE 1,Numeric parse yield + moments
 num = {}
 for k, df in DFS.items():
@@ -187,6 +220,31 @@ for k, df in DFS.items():
             f"{k}.{c} ({label}): {p['min']}..{p['max']} mean={fmt_num(p['mean'])} "
             f"below {lo}={p['below']} above {hi}={p['above']}"
         )
+
+# COMMAND ----------
+
+# DBTITLE 1,Rows beyond the expected bounds, per source file
+beyond = {}
+for k, df in DFS.items():
+    beyond[k] = {}
+    for c, p in plaus[k].items():
+        lo, hi = EXPECTED[c.upper()][1], EXPECTED[c.upper()][2]
+        v = to_double(c)
+        rows = (
+            df.groupBy("__file")
+            .agg(
+                F.sum((v > hi).cast("long")).alias("above"),
+                F.sum((v < lo).cast("long")).alias("below"),
+                F.max(v).alias("max"),
+            )
+            .orderBy("__file")
+            .collect()
+        )
+        if any((r["above"] or 0) or (r["below"] or 0) for r in rows):
+            beyond[k][c] = [
+                (r["__file"], r["above"], r["below"], r["max"]) for r in rows
+            ]
+            print(k, c, beyond[k][c])
 
 # COMMAND ----------
 
@@ -319,7 +377,11 @@ _prov = [
 ]
 for name, lines in support.items():
     _prov.append(f"README-type file `{name}` (first lines):")
-    _prov += [f"  > {ln[:160]}" for ln in lines[:25] if ln.strip()]
+    _prov += [
+        f"  > {ln[:160] if not any(w in ln.lower() for w in ('licen', 'cite', 'citation', 'publish')) else ln}"
+        for ln in lines[:40]
+        if ln.strip()
+    ]
 if not support:
     _prov.append("- No README / licence file found in the directory (LIMITATION).")
 
@@ -344,6 +406,22 @@ for k in DFS:
     _dq.append(
         f"- {k}: full-row duplicates {prof[k]['dups']}; distinct rows {c['distinct_rows']}; "
         f"rows present in more than one file {c['in_many_files']}; surplus duplicate rows {c['surplus']}."
+    )
+for k, fs in file_sets.items():
+    _dq.append(
+        f"- {k}: per file (file, distinct rows, repeated rows within the file): {fs['by_file']}; "
+        f"number of distinct rows by how many files contain them (files, rows): {fs['rows_by_file_count']}."
+    )
+    n_files = len(frames[k]["paths"])
+    full = dict(fs["rows_by_file_count"]).get(n_files, 0)
+    total_distinct = sum(n for _, n in fs["rows_by_file_count"])
+    _dq.append(
+        f"- {k}: {full} of {total_distinct} distinct rows appear in all {n_files} files"
+        + (
+            " -> the files hold the same set of rows."
+            if full == total_distinct
+            else " -> the files hold different row sets."
+        )
     )
 _dq.append("Missingness (rate per column):")
 for k in DFS:
@@ -386,6 +464,11 @@ for k in DFS:
                 f"below {p['below']}, above {p['above']}"
             )
         _unit.append(line + ".")
+for k, cols_ in beyond.items():
+    for c, rows in cols_.items():
+        _unit.append(
+            f"- {k}.`{c}` rows beyond the expected bounds per file (file, above, below, max): {rows}."
+        )
 if not _unit:
     _unit.append("- No numeric column found.")
 
@@ -474,7 +557,8 @@ for k in DFS:
 
 _findings_md = "\n".join(
     f"- {k}: rows={prof[k]['total']}, cols={len(prof[k]['cols'])}, constant={prof[k]['constant']}, "
-    f"dups={prof[k]['dups']}, cross-file duplicates={cross[k]['in_many_files']}"
+    f"dups={prof[k]['dups']}, cross-file duplicates={cross[k]['in_many_files']}, "
+    f"distinct rows={cross[k]['distinct_rows']}, columns beyond expected bounds={sorted(beyond[k]) or 'none'}"
     for k in DFS
 )
 
@@ -486,7 +570,11 @@ _silver = [
 ]
 if any(cross[k]["in_many_files"] for k in DFS):
     _silver.append(
-        "- Rows repeat across files -> decide the de-duplication rule before use."
+        "- Rows repeat across files -> decide the de-duplication rule before use; the per-file identity result in Data Quality shows whether the files are copies of one row set."
+    )
+if any(beyond[k] for k in DFS):
+    _silver.append(
+        "- Values beyond the expected physical bounds exist (see Unit & Semantic Validation) -> decide whether to keep, cap or quarantine them."
     )
 
 _dup_map = {k: prof[k]["dups"] for k in DFS}

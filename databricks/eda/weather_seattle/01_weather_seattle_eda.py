@@ -70,6 +70,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # DBTITLE 1,Discover files
 entries, kinds, frames = load_volume_frames(ROOT)
+require_frames(frames, ROOT, kinds)
 print(f"{ROOT}: {len(entries)} files")
 for e in entries:
     print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
@@ -348,6 +349,109 @@ for k, df in DFS.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Per source file -- rows, dates, temperature
+FMTS = US_FORMATS + GERMAN_TS_FORMATS
+MAX_FILES = 6
+per_file, daily_by_file = {}, {}
+for k, df in DFS.items():
+    dc = ROLE[k]["date"]
+    tcs = [c for c in ROLE[k]["temp"] if num[k][c]["is_numeric"]]
+    if not dc or not tcs or len(frames[k]["paths"]) < 2:
+        continue
+    day = F.to_date(parse_ts_multi(dc, FMTS))
+    t = to_double(tcs[0])
+    base = df.select(F.col("__file").alias("f"), day.alias("d"), t.alias("t"))
+    rows = (
+        base.groupBy("f")
+        .agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.countDistinct("d").alias("dates"),
+            F.min("d").alias("first"),
+            F.max("d").alias("last"),
+            F.avg("t").alias("mean"),
+            F.min("t").alias("lo"),
+            F.max("t").alias("hi"),
+        )
+        .orderBy("f")
+        .limit(MAX_FILES)
+        .collect()
+    )
+    per_file[k] = [r.asDict() for r in rows]
+    daily_by_file[k] = base
+    for r in per_file[k]:
+        print(k, r)
+
+# COMMAND ----------
+
+# DBTITLE 1,Cross-file date alignment and ordering (two files)
+align = {}
+for k, rows in per_file.items():
+    if len(rows) != 2:
+        continue
+    fa, fb = rows[0]["f"], rows[1]["f"]
+    wide = (
+        daily_by_file[k]
+        .groupBy("d")
+        .pivot("f", [fa, fb])
+        .agg(F.avg("t"))
+        .select("d", F.col(f"`{fa}`").alias("a"), F.col(f"`{fb}`").alias("b"))
+    )
+    both = F.col("a").isNotNull() & F.col("b").isNotNull()
+    r = (
+        wide.agg(
+            F.sum(both.cast("long")).alias("both"),
+            F.sum((F.col("a").isNotNull() & F.col("b").isNull()).cast("long")).alias(
+                "only_a"
+            ),
+            F.sum((F.col("a").isNull() & F.col("b").isNotNull()).cast("long")).alias(
+                "only_b"
+            ),
+            F.avg(F.when(both, F.col("a") - F.col("b"))).alias("mean_diff"),
+            F.min(F.when(both, F.col("a") - F.col("b"))).alias("min_diff"),
+            F.max(F.when(both, F.col("a") - F.col("b"))).alias("max_diff"),
+            F.sum((both & (F.col("a") < F.col("b"))).cast("long")).alias("a_lt_b"),
+            F.sum((both & (F.col("a") == F.col("b"))).cast("long")).alias("a_eq_b"),
+        )
+        .first()
+        .asDict()
+    )
+    r["a"], r["b"] = fa, fb
+    align[k] = r
+    print(k, r)
+
+# COMMAND ----------
+
+# DBTITLE 1,Per source file -- day-to-day change and lag-1 autocorrelation
+dyn_file = {}
+for k, rows in per_file.items():
+    dyn_file[k] = {}
+    for fr in rows:
+        daily = (
+            daily_by_file[k]
+            .where((F.col("f") == fr["f"]) & F.col("d").isNotNull())
+            .groupBy("d")
+            .agg(F.avg("t").alias("t"))
+        )
+        lg = daily.withColumn("prev", F.lag("t").over(Window.orderBy("d"))).where(
+            F.col("prev").isNotNull()
+        )
+        r = (
+            lg.agg(
+                F.sum((F.abs(F.col("t") - F.col("prev")) > JUMP_F).cast("long")).alias(
+                    "jumps"
+                ),
+                F.max(F.abs(F.col("t") - F.col("prev"))).alias("max_jump"),
+                F.count(F.lit(1)).alias("pairs"),
+            )
+            .first()
+            .asDict()
+        )
+        r["autocorr"] = lg.stat.corr("t", "prev")
+        dyn_file[k][fr["f"]] = r
+        print(k, fr["f"], r)
+
+# COMMAND ----------
+
 # DBTITLE 1,Histograms (binned in Spark)
 hist = {}
 for k, df in DFS.items():
@@ -481,6 +585,21 @@ if pair_check:
             "The data does not label which row is the maximum and which the minimum."
         )
 
+for k, rows in per_file.items():
+    for fr in rows:
+        _unit.append(
+            f"- {k} / `{fr['f']}`: {fr['rows']} rows, {fr['dates']} distinct dates, temperature range {fmt_num(fr['lo'])}..{fmt_num(fr['hi'])}, mean {fmt_num(fr['mean'])}."
+        )
+for k, r in align.items():
+    _unit.append(
+        para(
+            f"- {k}: `{r['a']}` minus `{r['b']}` on the {r['both']} dates present in both:",
+            f"mean {fmt_num(r['mean_diff'])}, min {fmt_num(r['min_diff'])}, max {fmt_num(r['max_diff'])};",
+            f"`{r['a']}` below `{r['b']}` on {r['a_lt_b']} dates, equal on {r['a_eq_b']}.",
+            "File names carry the only high/low label; if the names say high and low, a below-count above zero is an inversion.",
+        )
+    )
+
 _domain = [
     "No categorical column is expected. Columns with 2..60 approx distinct values:"
 ]
@@ -499,6 +618,15 @@ for k in DFS:
             f"- {k}: {c['first']} .. {c['last']}; {c['distinct_days']} distinct days vs {c['expected_days']} expected; "
             f"{c['missing_days']} missing days (first: {c['missing_sample'][:8]})."
         )
+for k, rows in per_file.items():
+    for fr in rows:
+        _temporal.append(
+            f"- {k} / `{fr['f']}`: {fr['first']} .. {fr['last']}; {fr['dates']} distinct dates."
+        )
+for k, r in align.items():
+    _temporal.append(
+        f"- {k}: dates in both files {r['both']}; only in `{r['a']}` {r['only_a']}; only in `{r['b']}` {r['only_b']}."
+    )
 if not _temporal:
     _temporal.append("- No date column located; temporal semantics not assessed.")
 
@@ -508,6 +636,12 @@ for k, r in dyn.items():
         f"- {k}: day-to-day changes over {JUMP_F} degrees: {r['jumps']} of {r['pairs']}; largest {fmt_num(r['max_jump'])}; "
         f"lag-1 autocorrelation of the daily mean {fmt_num(r['autocorr'])}; values more than 4 sd from the mean: {r['z_gt_4']}."
     )
+for k, files in dyn_file.items():
+    for f, r in files.items():
+        _tcons.append(
+            f"- {k} / `{f}`: day-to-day changes over {JUMP_F} degrees: {r['jumps']} of {r['pairs']}; largest {fmt_num(r['max_jump'])}; "
+            f"lag-1 autocorrelation {fmt_num(r['autocorr'])}."
+        )
 if not _tcons:
     _tcons.append(
         "- Day-to-day consistency not assessed (no parsed date or numeric temperature)."
@@ -566,7 +700,7 @@ _silver = [
 ]
 if any(per_date.get(k) and [n for n, _ in per_date[k]] == [2] for k in DFS):
     _silver.append(
-        "- Two rows per date with no label: a high/low role cannot be assigned from the data alone."
+        "- Two rows per date and no role column: the only high/low label is the source file name, so `__file` must be carried into Silver to keep the role."
     )
 
 _ml = ml_readiness_block(

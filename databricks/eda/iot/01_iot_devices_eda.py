@@ -74,6 +74,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # DBTITLE 1,Discover files
 entries, kinds, frames = load_volume_frames(ROOT)
+require_frames(frames, ROOT, kinds)
 print(f"{ROOT}: {len(entries)} files")
 for e in entries:
     print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
@@ -221,21 +222,36 @@ for c in value_cols:
         .first()
         .asDict()
     )
+    k = num[c]["max"] - num[c]["min"] + 1
+    is_int = dict(df.dtypes).get(c) in ("tinyint", "smallint", "int", "bigint")
+    # Excess kurtosis of a uniform: -1.2 (continuous), -1.2*(k^2+1)/(k^2-1) (k integers).
+    shape[c]["expected_uniform_kurt"] = (
+        round(-1.2 * (k * k + 1) / (k * k - 1), 4) if is_int and k > 1 else -1.2
+    )
     print(c, quant[c], shape[c])
 
 # COMMAND ----------
 
 # DBTITLE 1,Histograms (binned in Spark) + uniformity
-hist, flat = {}, {}
+hist, flat, flat_basis = {}, {}, {}
+MAX_DISTINCT_VALUES = 200
 for c in value_cols:
     s = num[c]
-    if s["is_numeric"]:
-        hist[c] = hist_counts(df, c, s["min"], s["max"])
+    if not s["is_numeric"]:
+        continue
+    hist[c] = hist_counts(df, c, s["min"], s["max"])
+    is_int = dict(df.dtypes).get(c) in ("tinyint", "smallint", "int", "bigint")
+    if is_int and prof["acd"][c] <= MAX_DISTINCT_VALUES:
+        # Integer column: count per distinct value; 40 fixed bins would leave empty bins.
+        counts = [r["count"] for r in df.groupBy(qcol(c)).count().collect()]
+        flat_basis[c] = f"{len(counts)} distinct values"
+    else:
         counts = [n for _, n in hist[c]]
-        mean_n = sum(counts) / len(counts) if counts else 0
-        var = sum((n - mean_n) ** 2 for n in counts) / len(counts) if counts else 0
-        flat[c] = round((var**0.5) / mean_n, 3) if mean_n else None
-        print(c, "bin-count coefficient of variation:", flat[c])
+        flat_basis[c] = "40 bins"
+    mean_n = sum(counts) / len(counts) if counts else 0
+    var = sum((n - mean_n) ** 2 for n in counts) / len(counts) if counts else 0
+    flat[c] = round((var**0.5) / mean_n, 3) if mean_n else None
+    print(c, "count coefficient of variation:", flat[c], f"({flat_basis[c]})")
 
 # COMMAND ----------
 
@@ -257,6 +273,55 @@ for c in cat_cols:
     vc = df.groupBy(qcol(c)).count().orderBy(F.desc("count")).limit(30).collect()
     cat_dist[c] = [(r[0], r["count"]) for r in vc]
     print(c, cat_dist[c][:12])
+
+# COMMAND ----------
+
+# DBTITLE 1,Constant column values
+const_vals = {}
+for c in prof["constant"]:
+    r = d0.select(as_str(c).alias("v")).where(F.col("v").isNotNull()).first()
+    const_vals[c] = r["v"] if r else None
+print(const_vals)
+
+# COMMAND ----------
+
+# DBTITLE 1,Colour label vs sensor values
+lcd_profile = []
+lcd_col = role["lcd"]
+if lcd_col and lcd_col in prof["cols"] and 1 < prof["acd"][lcd_col] <= 12:
+    aggs = [F.count(F.lit(1)).alias("rows")]
+    for c in ncols:
+        v = to_double(c)
+        aggs += [
+            F.min(v).alias(f"{c}__lo"),
+            F.max(v).alias(f"{c}__hi"),
+            F.avg(v).alias(f"{c}__mean"),
+        ]
+    for r in df.groupBy(qcol(lcd_col).alias("g")).agg(*aggs).orderBy("g").collect():
+        lcd_profile.append(r.asDict())
+        print(r.asDict())
+
+# COMMAND ----------
+
+# DBTITLE 1,Missing country name vs country code
+cn_gap = None
+cn_col, code_col = role["country"], role["cca3"] or role["cca2"]
+if cn_col and code_col:
+    miss_cn = is_missing(cn_col)
+    present_code = ~is_missing(code_col)
+    known = (
+        d0.where(~miss_cn & present_code).select(qcol(code_col).alias("k")).distinct()
+    )
+    gap = d0.where(miss_cn & present_code).select(qcol(code_col).alias("k"))
+    rows_missing = gap.count()
+    codes_missing = gap.distinct().count()
+    recoverable = gap.distinct().join(known, "k").count()
+    cn_gap = {
+        "rows_missing_name": rows_missing,
+        "codes_involved": codes_missing,
+        "codes_with_name_elsewhere": recoverable,
+    }
+    print(cn_gap)
 
 # COMMAND ----------
 
@@ -286,7 +351,7 @@ if role["lat"] and role["lon"]:
 
 # DBTITLE 1,Geography -- per-country coordinate spread
 country_col = role["cca3"] or role["cca2"] or role["country"]
-country_spread = []
+country_spread, span_stats = [], None
 if country_col and role["lat"] and role["lon"]:
     la, lo = to_double(role["lat"]), to_double(role["lon"])
     rows = (
@@ -301,8 +366,24 @@ if country_col and role["lat"] and role["lon"]:
         .collect()
     )
     country_spread = [r.asDict() for r in rows]
-    wide = [r for r in country_spread if r["lat_max"] - r["lat_min"] > 60]
-    print(f"countries={len(country_spread)}  with latitude span > 60 deg: {len(wide)}")
+    for r in country_spread:
+        r["lat_span"] = r["lat_max"] - r["lat_min"]
+        r["lon_span"] = r["lon_max"] - r["lon_min"]
+    wide = [r for r in country_spread if r["lat_span"] > 60]
+    lat_spans = sorted(r["lat_span"] for r in country_spread)
+    lon_spans = sorted(r["lon_span"] for r in country_spread)
+    span_stats = {
+        "countries": len(country_spread),
+        "lat_span_median": lat_spans[len(lat_spans) // 2],
+        "lon_span_median": lon_spans[len(lon_spans) // 2],
+        "lat_span_max": lat_spans[-1],
+        "lon_span_max": lon_spans[-1],
+        "wide_lat": [
+            (str(r["c"]), r["n"], round(r["lat_span"], 1))
+            for r in sorted(wide, key=lambda x: -x["lat_span"])[:10]
+        ],
+    }
+    print(span_stats)
 
 # COMMAND ----------
 
@@ -485,6 +566,16 @@ for c, u in uniq.items():
     _entities.append(f"- `{c}`: {u['distinct']} / {u['ratio']} / unique={u['unique']}")
 if not uniq:
     _entities.append("- no device / name / ip column located by name.")
+if dev and num[dev]["is_numeric"]:
+    _span = int(num[dev]["max"] - num[dev]["min"] + 1)
+    _entities.append(
+        f"- `{dev}` runs {num[dev]['min']:.0f}..{num[dev]['max']:.0f}: "
+        + (
+            "contiguous with no gaps, so it is a sequence number, not an external device identity."
+            if _span == uniq.get(dev, {}).get("distinct")
+            else "not contiguous."
+        )
+    )
 if per_device:
     _entities.append(
         f"- readings per device: {per_device['devices']} devices; min {per_device['min']}, "
@@ -502,10 +593,17 @@ for c in DATA_COLS:
         if c in plaus:
             line += f"; below-bound {plaus[c].get('below')}, above-bound {plaus[c].get('above')}"
         _unit.append(line + ".")
-if role["scale"] and role["scale"] in cat_dist:
+if role["scale"] and role["scale"] in const_vals:
+    _unit.append(
+        f"- `{role['scale']}` (temperature unit label) is constant: `{const_vals[role['scale']]}` on every row, so the unit label carries no information beyond that one value."
+    )
+elif role["scale"] and role["scale"] in cat_dist:
     _unit.append(
         f"- `{role['scale']}` (temperature unit label) values: {cat_dist[role['scale']][:6]} -- the temperature column is only comparable within one scale."
     )
+_others = {c: v for c, v in const_vals.items() if c != role["scale"]}
+if _others:
+    _unit.append(f"- other constant columns and their value: {_others}.")
 if ip_check:
     _unit.append(
         f"- `{role['ip']}`: IPv4-format {ip_check['ipv4']}/{ip_check['rows']}, private-range {ip_check['private']}."
@@ -529,13 +627,21 @@ _geo = []
 if geo:
     _geo.append(
         f"- coordinates present {geo['present']}, missing {geo['missing']}, at 0/0 {geo['null_island']}, "
-        f"outside the global box {geo['outside_bbox']}, looks lat/lon-swapped {geo['looks_swapped']}."
+        f"outside the global box {geo['outside_bbox']}. (A lat/lon-swap test is not meaningful against a global box, so it is not reported.)"
     )
-if country_spread:
-    wide = [r for r in country_spread if r["lat_max"] - r["lat_min"] > 60]
+if span_stats:
     _geo.append(
-        f"- {len(country_spread)} distinct `{country_col}` values; {len(wide)} span more than 60 degrees "
-        "of latitude (a real country almost never does -- a sign that coordinates are not tied to the country label)."
+        f"- per `{country_col}` group ({span_stats['countries']} groups): median latitude span {span_stats['lat_span_median']:.1f} deg, "
+        f"median longitude span {span_stats['lon_span_median']:.1f} deg; largest {span_stats['lat_span_max']:.1f} / {span_stats['lon_span_max']:.1f} deg."
+    )
+    _geo.append(
+        f"- groups spanning more than 60 degrees of latitude (group, rows, span): {span_stats['wide_lat'] or 'none'}. "
+        "Coordinates drawn independently of the country label would give large spans in every group; small spans in nearly all groups mean the coordinates follow the label."
+    )
+if cn_gap:
+    _geo.append(
+        f"- country name missing on {cn_gap['rows_missing_name']} rows across {cn_gap['codes_involved']} country codes; "
+        f"{cn_gap['codes_with_name_elsewhere']} of those codes have a name on other rows."
     )
 if stab:
     _geo.append(
@@ -580,22 +686,42 @@ else:
 _value = ["Pairwise Pearson correlation between sensor columns:"]
 _value += [f"- {a} vs {b}: {v:.3f}" for (a, b), v in corr.items() if v is not None]
 _value.append(f"- mirror / duplicate column pairs: {mirrors or 'none'}")
-_value.append("Distribution shape (skewness / excess kurtosis / bin-count CV):")
+_value.append(
+    "Distribution shape (skewness / excess kurtosis vs the value expected for a uniform spread over the same range / count CV):"
+)
 for c in shape:
     _value.append(
-        f"- `{c}`: skew {fmt_num(shape[c]['skew'])}, kurtosis {fmt_num(shape[c]['kurt'])}, bin CV {flat.get(c)}"
+        f"- `{c}`: skew {fmt_num(shape[c]['skew'])}, kurtosis {fmt_num(shape[c]['kurt'])} "
+        f"(uniform: {shape[c]['expected_uniform_kurt']}), count CV {flat.get(c)} over {flat_basis.get(c)}"
+    )
+for r in lcd_profile:
+    _value.append(
+        f"- `{lcd_col}` = {r['g']} ({r['rows']} rows): "
+        + "; ".join(
+            f"{c} {fmt_num(r[f'{c}__lo'])}..{fmt_num(r[f'{c}__hi'])} (mean {fmt_num(r[f'{c}__mean'])})"
+            for c in ncols
+        )
+    )
+if lcd_profile:
+    _value.append(
+        para(
+            f"If the ranges of one sensor column do not overlap between `{lcd_col}` values, the label is derived from that column;",
+            "overlapping ranges mean the label is not a function of the sensors.",
+        )
     )
 
 _regime = [
     para(
         "Indicators that values are generated rather than measured (each is evidence,",
-        "not proof): a low bin-count coefficient of variation means a near-uniform spread;",
+        "not proof): a low count coefficient of variation and an excess kurtosis at the uniform value mean a near-uniform spread;",
         "correlations near zero between physically related sensors; zero autocorrelation;",
         "coordinates unrelated to the country label; a constant or near-constant timestamp.",
     ),
-    f"- bin-count CV per sensor column: {flat}",
+    f"- count CV per sensor column (basis): { {c: (v, flat_basis[c]) for c, v in flat.items()} }",
+    f"- excess kurtosis observed vs uniform: { {c: (round(shape[c]['kurt'], 3), shape[c]['expected_uniform_kurt']) for c in shape} }",
     f"- sensor correlations: { {f'{a}~{b}': round(v, 3) for (a, b), v in corr.items() if v is not None} }",
-    f"- devices whose coordinates fall outside their country's plausible extent: {len([r for r in country_spread if r['lat_max'] - r['lat_min'] > 60])} of {len(country_spread)} country groups",
+    f"- per-country coordinate spread: {span_stats}",
+    f"- timestamp: {ts_info.get('min_ts') if ts_info else None} .. {ts_info.get('max_ts') if ts_info else None} across {prof['total']} rows",
 ]
 
 _coverage = [
@@ -623,6 +749,7 @@ _findings_md = (
 _silver = [
     "- Read from the Samples Volume; no Bronze table exists for this dataset.",
     "- Timestamp needs an explicit unit rule (epoch unit inferred above); sensor columns need typed casts with a quarantine for failures.",
+    "- The colour label `lcd` and the constant unit label need an explicit decision (keep as attribute vs derive) once the Value Consistency evidence is read.",
     "- Whether a device identifier is a stable entity key depends on the readings-per-device finding above.",
     "- Provenance and real/synthetic status are unresolved in the data itself; label the table accordingly.",
 ]
@@ -676,7 +803,7 @@ _ml = ml_readiness_block(
         ),
         (
             "Unit / sign / circular-feature leakage",
-            f"Temperature unit is given by a label column (values: {cat_dist.get(role['scale'], 'n/a')}); mirror pairs: {mirrors or 'none'}.",
+            f"Temperature unit is given by a label column (values: {const_vals.get(role['scale'], cat_dist.get(role['scale'], 'n/a'))}); mirror pairs: {mirrors or 'none'}.",
         ),
         (
             "Data-generation-process leakage",

@@ -303,14 +303,27 @@ def epoch_scan(df, name):
 # DBTITLE 1,Volume directory loader
 
 
+def looks_delimited(path):
+    lines = head_lines(path, 1)
+    return bool(lines) and any(sep in lines[0] for sep in SEP_CHOICES)
+
+
 def load_volume_frames(root, max_depth=3):
     # Lists a Volume directory and returns (entries, kinds, frames). One frame
     # per distinct delimited header (or per JSON / Parquet file set), each with
-    # a `__file` column so multi-file datasets stay separable.
+    # a `__file` column so multi-file datasets stay separable. When no file has
+    # a recognised extension, extensionless / unknown files whose first line
+    # holds a separator are read as delimited text.
     entries = list_tree(root, max_depth)
     kinds = classify_files(entries)
-    frames = {}
     delim = kinds.get("delimited", [])
+    js = [e["path"] for e in kinds.get("json", [])]
+    pq = [e["path"] for e in kinds.get("parquet", [])]
+    if not (delim or js or pq):
+        delim = [e for e in kinds.get("other", []) if looks_delimited(e["path"])]
+        if delim:
+            kinds["delimited"] = delim
+    frames = {}
     for i, (first, paths) in enumerate(group_delimited(delim).items(), start=1):
         sep = sniff_sep(first)
         frames[f"delimited_{i}"] = {
@@ -318,13 +331,21 @@ def load_volume_frames(root, max_depth=3):
             "paths": paths,
             "sep": DELIMITERS.get(sep, sep),
         }
-    js = [e["path"] for e in kinds.get("json", [])]
     if js:
         frames["json"] = {"df": read_json_any(js), "paths": js, "sep": None}
-    pq = [e["path"] for e in kinds.get("parquet", [])]
     if pq:
         frames["parquet"] = {"df": read_parquet_any(pq), "paths": pq, "sep": None}
     return entries, kinds, frames
+
+
+def require_frames(frames, root, kinds):
+    # Fail fast with the file-kind counts instead of letting every later loop
+    # run over nothing.
+    if not frames:
+        counts = {k: len(v) for k, v in kinds.items()}
+        raise RuntimeError(
+            f"No readable data file under {root}; file kinds found: {counts}"
+        )
 
 
 def read_support_text(kinds, n=80):
