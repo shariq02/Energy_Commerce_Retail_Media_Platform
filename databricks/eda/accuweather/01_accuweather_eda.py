@@ -82,8 +82,8 @@ BOUNDS = [
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers
+
 def bounds_for(col, unit):
     c = col.lower()
     for kind, text, imp, met in BOUNDS:
@@ -559,8 +559,8 @@ for a, b in UNIT_PAIRS:
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Key frames and pair alignment
+
 def key_frame(t, subs):
     r = ROLE[t]
     return (
@@ -607,8 +607,8 @@ for a, b in UNIT_PAIRS:
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Compare shared numeric columns on a joined key set
+
 def compare_pair(a, b, max_cols=60):
     info = align_pair_cache[(a, b)]
     names = info["names"]

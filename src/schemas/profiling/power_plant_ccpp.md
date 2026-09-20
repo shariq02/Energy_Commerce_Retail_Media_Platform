@@ -26,7 +26,7 @@ README-type file `README.md` (first lines):
   > The example data is provided by UCI at UCI Machine Learning Repository Combined Cycle Power Plant Data Set
   > You can read the background on the UCI page, but in summary we have collected a number of readings from sensors at a Gas Fired Power Plant (also called a Peaker
   > ## Usage License
-  > If you publish material based on databases obtained from this repository, then, in your acknowledgements, please note the assistance you received by using this 
+  > If you publish material based on databases obtained from this repository, then, in your acknowledgements, please note the assistance you received by using this repository. This will help others to obtain the same data sets and replicate your experiments. We suggest the following reference format for referring to this repository:
   > Pınar Tüfekci, Prediction of full load electrical power output of a base load operated combined cycle power plant using machine learning methods, International 
   > Heysem Kaya, Pınar Tüfekci , Sadık Fikret Gürgen: Local and Global Learning Methods for Predicting Power of a Combined Gas & Steam Turbine, Proceedings of the I
 
@@ -39,6 +39,8 @@ Expected columns come from the dataset's public description (AT, V, AP, RH, PE);
 
 Full-row exact duplicates per frame and duplicates across source files:
 - delimited_1: full-row duplicates 38313; distinct rows 9527; rows present in more than one file 9527; surplus duplicate rows 38313.
+- delimited_1: per file (file, distinct rows, repeated rows within the file): [('Sheet1.tsv', 9527, 41), ('Sheet2.tsv', 9527, 41), ('Sheet3.tsv', 9527, 41), ('Sheet4.tsv', 9527, 41), ('Sheet5.tsv', 9527, 41)]; number of distinct rows by how many files contain them (files, rows): [(5, 9527)].
+- delimited_1: 9527 of 9527 distinct rows appear in all 5 files -> the files hold the same set of rows.
 Missingness (rate per column):
 - delimited_1: AT=0.0000, V=0.0000, AP=0.0000, RH=0.0000, PE=0.0000
 
@@ -54,6 +56,7 @@ No entity or record identifier column is expected in a sensor-reading table; eac
 - delimited_1.`AP`: numeric yield 100.0%, range 992.89..1033.3, mean 1013, sd 5.939, zero 0, negative 0; expected ambient pressure (mbar) bounds 900.0..1100.0: below 0, above 0.
 - delimited_1.`RH`: numeric yield 100.0%, range 25.56..100.16, mean 73.31, sd 14.6, zero 0, negative 0; expected relative humidity (%) bounds 0.0..100.0: below 0, above 275.
 - delimited_1.`PE`: numeric yield 100.0%, range 420.26..495.76, mean 454.4, sd 17.07, zero 0, negative 0; expected net hourly electrical output (MW) bounds 400.0..520.0: below 0, above 0.
+- delimited_1.`RH` rows beyond the expected bounds per file (file, above, below, max): [('Sheet1.tsv', 55, 0, 100.16), ('Sheet2.tsv', 55, 0, 100.16), ('Sheet3.tsv', 55, 0, 100.16), ('Sheet4.tsv', 55, 0, 100.16), ('Sheet5.tsv', 55, 0, 100.16)].
 
 ### Categorical / Domain Validation
 
@@ -113,7 +116,7 @@ One plant, one operating regime is implied; there is no site, unit or load-mode 
 
 ### EDA Findings
 
-- delimited_1: rows=47840, cols=5, constant=[], dups=38313, cross-file duplicates=9527
+- delimited_1: rows=47840, cols=5, constant=[], dups=38313, cross-file duplicates=9527, distinct rows=9527, columns beyond expected bounds=['RH']
 
 ### ML-Readiness Evidence
 
@@ -141,7 +144,8 @@ One plant, one operating regime is implied; there is no site, unit or load-mode 
 - All columns arrive as strings when read as delimited text -- numeric casts need an explicit rule; quarantine values that fail.
 - No natural key: a Silver key would have to be derived (file + row position) and flagged derived, or the table kept keyless.
 - No time axis: any hourly / time-series treatment is unsupported by this data.
-- Rows repeat across files -> decide the de-duplication rule before use.
+- Rows repeat across files -> decide the de-duplication rule before use; the per-file identity result in Data Quality shows whether the files are copies of one row set.
+- Values beyond the expected physical bounds exist (see Unit & Semantic Validation) -> decide whether to keep, cap or quarantine them.
 
 ### Figure -- Power plant -- rows per source file
 
