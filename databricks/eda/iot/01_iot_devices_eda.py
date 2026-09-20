@@ -486,6 +486,175 @@ else:
 
 # COMMAND ----------
 
+# DBTITLE 1,Country concentration
+country_conc = None
+if country_col:
+    top = (
+        df.groupBy(qcol(country_col).alias("c"))
+        .count()
+        .orderBy(F.desc("count"))
+        .limit(10)
+        .collect()
+    )
+    country_conc = [
+        (str(r["c"]), r["count"], round(r["count"] / prof["total"], 4)) for r in top
+    ]
+    print(country_conc)
+
+# COMMAND ----------
+
+# DBTITLE 1,Device name structure
+name_struct = None
+if role["device_name"]:
+    n = as_str(role["device_name"])
+    r = (
+        d0.agg(
+            F.approx_count_distinct(F.regexp_extract(n, r"^([^0-9]*)", 1)).alias(
+                "prefixes"
+            ),
+            F.min(F.length(n)).alias("len_min"),
+            F.max(F.length(n)).alias("len_max"),
+            F.sum(n.rlike(r"[0-9]+$").cast("long")).alias("ends_with_digits"),
+            F.sum(
+                (F.regexp_extract(n, r"([0-9]+)$", 1) == as_str(dev)).cast("long")
+                if dev
+                else F.lit(0)
+            ).alias("suffix_equals_id"),
+        )
+        .first()
+        .asDict()
+    )
+    r["examples"] = [x[0] for x in d0.select(n).limit(3).collect()]
+    name_struct = r
+    print(name_struct)
+
+# COMMAND ----------
+
+# DBTITLE 1,IP address octet spread
+ip_octets = None
+if role["ip"]:
+    parts = F.split(as_str(role["ip"]), r"\.")
+    ip_octets = (
+        d0.agg(
+            *[
+                F.approx_count_distinct(parts.getItem(i).cast("int")).alias(f"o{i}")
+                for i in range(4)
+            ],
+            F.min(parts.getItem(0).cast("int")).alias("first_min"),
+            F.max(parts.getItem(0).cast("int")).alias("first_max"),
+        )
+        .first()
+        .asDict()
+    )
+    print(ip_octets)
+
+# COMMAND ----------
+
+# DBTITLE 1,Coordinate decimal places
+coord_dec = {}
+for c in (role["lat"], role["lon"]):
+    if c:
+        digits = F.length(F.regexp_extract(as_str(c), r"\.([0-9]+)$", 1))
+        rows = (
+            d0.groupBy(digits.alias("dp"))
+            .count()
+            .orderBy(F.desc("count"))
+            .limit(6)
+            .collect()
+        )
+        coord_dec[c] = [(r["dp"], r["count"]) for r in rows]
+print(coord_dec)
+
+# COMMAND ----------
+
+# DBTITLE 1,Readings per timestamp instant
+ts_dist = None
+if role["ts"]:
+    rows = (
+        d0.groupBy(qcol(role["ts"]))
+        .count()
+        .orderBy(qcol(role["ts"]))
+        .limit(20)
+        .collect()
+    )
+    ts_dist = [(r[0], r["count"]) for r in rows]
+    print(ts_dist)
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Indicator helper
+def disjoint_ranges(profile, col):
+    ranges = sorted((r[f"{col}__lo"], r[f"{col}__hi"]) for r in profile)
+    return len(ranges) > 1 and all(a[1] < b[0] for a, b in itertools.pairwise(ranges))
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Generated-data indicators evaluated on the data
+indicators = []
+if shape:
+    near = [
+        c
+        for c in shape
+        if abs(shape[c]["kurt"] - shape[c]["expected_uniform_kurt"]) < 0.05
+    ]
+    indicators.append(
+        (
+            "value spread matches a uniform distribution (excess kurtosis within 0.05 of the uniform value)",
+            f"{near} of {list(shape)}",
+            len(near) == len(shape),
+        )
+    )
+vals = [abs(v) for v in corr.values() if v is not None]
+if vals:
+    indicators.append(
+        (
+            "sensor correlations all below 0.02 in absolute value",
+            f"largest {max(vals):.4f}",
+            max(vals) < 0.02,
+        )
+    )
+if ts_info and ts_info.get("kind") == "epoch" and ts_info.get("n"):
+    span_s = (num[role["ts"]]["max"] - num[role["ts"]]["min"]) / ts_info["div"]
+    indicators.append(
+        (
+            "all timestamps within one minute",
+            f"span {span_s:.1f} s, {ts_info['distinct_ts']} distinct instants",
+            span_s < 60,
+        )
+    )
+if dev and num[dev]["is_numeric"] and uniq.get(dev):
+    contiguous = int(num[dev]["max"] - num[dev]["min"] + 1) == uniq[dev]["distinct"]
+    indicators.append(
+        (
+            "device id is a contiguous sequence",
+            f"{num[dev]['min']:.0f}..{num[dev]['max']:.0f}",
+            contiguous,
+        )
+    )
+if span_stats:
+    indicators.append(
+        (
+            "coordinates cluster by country label (median latitude span under 5 degrees)",
+            f"median {span_stats['lat_span_median']:.1f} deg",
+            span_stats["lat_span_median"] < 5,
+        )
+    )
+if lcd_profile:
+    driven = [c for c in ncols if disjoint_ranges(lcd_profile, c)]
+    indicators.append(
+        (
+            f"the `{lcd_col}` label is a function of one sensor (disjoint ranges per label)",
+            f"{driven or 'none'}",
+            bool(driven),
+        )
+    )
+for i in indicators:
+    print(i)
+
+# COMMAND ----------
+
 # DBTITLE 1,Figures
 figs = []
 _panels = {c: hist[c] for c in hist}
@@ -712,17 +881,88 @@ if lcd_profile:
 
 _regime = [
     para(
-        "Indicators that values are generated rather than measured (each is evidence,",
-        "not proof): a low count coefficient of variation and an excess kurtosis at the uniform value mean a near-uniform spread;",
-        "correlations near zero between physically related sensors; zero autocorrelation;",
-        "coordinates unrelated to the country label; a constant or near-constant timestamp.",
+        "Indicators that values are generated rather than measured, each evaluated on this",
+        "data (evidence, not proof); 'holds' means the indicator is present:",
     ),
+    *[
+        f"- {name}: {evid} -> {'holds' if ok else 'does not hold'}"
+        for name, evid, ok in indicators
+    ],
     f"- count CV per sensor column (basis): { {c: (v, flat_basis[c]) for c, v in flat.items()} }",
     f"- excess kurtosis observed vs uniform: { {c: (round(shape[c]['kurt'], 3), shape[c]['expected_uniform_kurt']) for c in shape} }",
-    f"- sensor correlations: { {f'{a}~{b}': round(v, 3) for (a, b), v in corr.items() if v is not None} }",
     f"- per-country coordinate spread: {span_stats}",
-    f"- timestamp: {ts_info.get('min_ts') if ts_info else None} .. {ts_info.get('max_ts') if ts_info else None} across {prof['total']} rows",
 ]
+
+_entities.append(
+    f"- device names: {name_struct}"
+    if name_struct
+    else "- no device name column located."
+)
+if ip_octets:
+    _entities.append(
+        f"- IP octets distinct values (approx): {[ip_octets[f'o{i}'] for i in range(4)]}; first octet {ip_octets['first_min']}..{ip_octets['first_max']}."
+    )
+if coord_dec:
+    _geo.append(f"- decimal places in coordinates (places, rows): {coord_dec}.")
+if country_conc:
+    _geo.append(f"- rows by country, top 10 (code, rows, share): {country_conc}.")
+if ts_dist:
+    _temporal.append(f"- readings per timestamp instant (instant, rows): {ts_dist}.")
+
+_areas = {
+    "Domain understanding": [
+        f"one record per device with battery, CO2, humidity and temperature sensors, an LCD colour label, a country label (name / 2-letter / 3-letter code), an IP address and coordinates; temperature unit `{const_vals.get(role['scale'], 'unlabelled')}`",
+        f"the colour label is a function of: {[c for c in ncols if lcd_profile and disjoint_ranges(lcd_profile, c)] or 'no single sensor'}",
+        f"device names: {name_struct['examples'] if name_struct else 'n/a'}",
+    ],
+    "Structure and engineering": [
+        f"{len(entries)} file(s) ({ {k: len(v) for k, v in kinds.items()} }), read as {FRAME} with schema {struct['schema'][:120]}",
+        f"device id is a row-number-like sequence: {any(n.startswith('device id is a contiguous') and ok for n, _, ok in indicators)}",
+        f"timestamp stored as epoch {ts_info.get('unit') if ts_info else 'n/a'}; constant columns {prof['constant']}",
+        f"cn missing on {cn_gap['rows_missing_name'] if cn_gap else 'n/a'} rows while the codes are complete",
+    ],
+    "Temporal": [
+        f"{ts_info.get('min_ts')} .. {ts_info.get('max_ts')} ({ts_info.get('distinct_ts')} distinct instants) -- a snapshot, not a series"
+        if ts_info and ts_info.get("n")
+        else ""
+    ],
+    "Spatial": [
+        f"{len(country_spread)} country groups; median coordinate span within a country {span_stats['lat_span_median']:.1f} x {span_stats['lon_span_median']:.1f} deg"
+        if span_stats
+        else "",
+        f"concentration: {country_conc[:3] if country_conc else 'n/a'}",
+        f"coordinates at 0/0: {geo['null_island'] if geo else 'n/a'}",
+    ],
+    "Data quality": [
+        f"full-row duplicates {prof['dups']}; key duplicates {dup_key['dup_groups'] if dup_key else 'n/a'}",
+        f"missing values only in: { {c: round(prof['miss'][c] / prof['total'], 4) for c in prof['cols'] if prof['miss'][c]} }",
+        f"country-name / code inconsistency groups: {[(sp['group_col'], sp['value_col'], sp['inconsistent_groups']) for sp in spread if sp['inconsistent_groups']]}",
+    ],
+    "Statistical patterns": [
+        f"excess kurtosis vs uniform: { {c: (round(shape[c]['kurt'], 3), shape[c]['expected_uniform_kurt']) for c in shape} }",
+        f"indicators that hold: {[n for n, _, ok in indicators if ok] or 'none'}",
+    ],
+    "Relationships": [
+        f"sensor-to-sensor correlations all within +/-{max(vals):.3f}" if vals else "",
+        f"country name / 2-letter / 3-letter code mappings: {[(sp['group_col'], sp['value_col'], sp['groups'], sp['inconsistent_groups']) for sp in spread]}",
+        f"label-to-sensor dependence: {[c for c in ncols if lcd_profile and disjoint_ranges(lcd_profile, c)] or 'none found'}",
+    ],
+    "Analytics use": [
+        f"measures: {value_cols}; dimensions: {[c for c in (role['country'], role['cca3'], lcd_col) if c]}; the geography dimension has {len(country_spread)} members with concentration {country_conc[:2] if country_conc else 'n/a'}",
+    ],
+    "ML use": [
+        f"no target column in the source; candidate label-like column `{lcd_col}` is fully determined by one sensor"
+        if lcd_profile and any(disjoint_ranges(lcd_profile, c) for c in ncols)
+        else "no target column in the source",
+        "sensor columns are uncorrelated with each other, so they carry no information about one another"
+        if vals and max(vals) < 0.02
+        else "",
+    ],
+    "AI / knowledge use": [
+        f"a country reference set can be read from the data: {len(country_spread)} codes with names (name missing for {cn_gap['codes_involved'] if cn_gap else 'n/a'} code)",
+        "no free-text column; no README or licence in the directory, so provenance is undocumented",
+    ],
+}
 
 _coverage = [
     para(
@@ -807,7 +1047,7 @@ _ml = ml_readiness_block(
         ),
         (
             "Data-generation-process leakage",
-            "See Regime / Version Evidence: indicators of generated data (near-uniform values, near-zero correlations, coordinates unrelated to the country label) mean patterns learned here describe the generator, not devices.",
+            f"Indicators that hold (see Regime / Version Evidence): {[n for n, _, ok in indicators if ok] or 'none'}; where they hold, patterns learned here describe the generator, not devices. Indicators that do not hold: {[n for n, _, ok in indicators if not ok] or 'none'}.",
         ),
         (
             "Class / label instability",
@@ -849,6 +1089,7 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

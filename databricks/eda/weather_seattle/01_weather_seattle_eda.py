@@ -384,7 +384,7 @@ for k, df in DFS.items():
 # COMMAND ----------
 
 # DBTITLE 1,Cross-file date alignment and ordering (two files)
-align = {}
+align, wide_frames = {}, {}
 for k, rows in per_file.items():
     if len(rows) != 2:
         continue
@@ -396,6 +396,7 @@ for k, rows in per_file.items():
         .agg(F.avg("t"))
         .select("d", F.col(f"`{fa}`").alias("a"), F.col(f"`{fb}`").alias("b"))
     )
+    wide_frames[k] = wide
     both = F.col("a").isNotNull() & F.col("b").isNotNull()
     r = (
         wide.agg(
@@ -449,6 +450,76 @@ for k, rows in per_file.items():
         r["autocorr"] = lg.stat.corr("t", "prev")
         dyn_file[k][fr["f"]] = r
         print(k, fr["f"], r)
+
+# COMMAND ----------
+
+# DBTITLE 1,Per source file -- seasonality by month
+season_file = {}
+for k, base in daily_by_file.items():
+    rows = (
+        base.where(F.col("d").isNotNull())
+        .groupBy("f", F.month("d").alias("m"))
+        .agg(F.avg("t").alias("mean"))
+        .orderBy("f", "m")
+        .collect()
+    )
+    season_file[k] = {}
+    for r in rows:
+        season_file[k].setdefault(r["f"], []).append((int(r["m"]), r["mean"]))
+    print(k, {f: [(m, round(v, 1)) for m, v in vs] for f, vs in season_file[k].items()})
+
+# COMMAND ----------
+
+# DBTITLE 1,Per source file -- yearly means, record values and monthly outliers
+clim = {}
+for k, base in daily_by_file.items():
+    b = base.where(F.col("d").isNotNull())
+    yearly = (
+        b.groupBy("f", F.year("d").alias("y"))
+        .agg(F.avg("t").alias("mean"), F.count(F.lit(1)).alias("rows"))
+        .orderBy("f", "y")
+        .collect()
+    )
+    mw = Window.partitionBy("f", F.month("d"))
+    z = (F.col("t") - F.avg("t").over(mw)) / F.stddev("t").over(mw)
+    outl = {
+        r["f"]: r["n"]
+        for r in b.select("f", z.alias("z"))
+        .groupBy("f")
+        .agg(F.sum((F.abs("z") > 3).cast("long")).alias("n"))
+        .collect()
+    }
+    clim[k] = {"yearly": {}, "records": {}, "month_outliers": outl}
+    for r in yearly:
+        clim[k]["yearly"].setdefault(r["f"], []).append(
+            (int(r["y"]), round(r["mean"], 2), r["rows"])
+        )
+    for fr in per_file[k]:
+        one = b.where(F.col("f") == fr["f"])
+        hi = [
+            (str(r["d"]), r["t"]) for r in one.orderBy(F.desc("t")).limit(3).collect()
+        ]
+        lo = [(str(r["d"]), r["t"]) for r in one.orderBy("t").limit(3).collect()]
+        clim[k]["records"][fr["f"]] = {"highest": hi, "lowest": lo}
+    print(k, clim[k])
+
+# COMMAND ----------
+
+# DBTITLE 1,Daily high-low range by month and correlation
+diurnal = {}
+for k, wide in wide_frames.items():
+    both = wide.where(F.col("a").isNotNull() & F.col("b").isNotNull())
+    rows = (
+        both.groupBy(F.month("d").alias("m"))
+        .agg(F.avg(F.col("a") - F.col("b")).alias("range"))
+        .orderBy("m")
+        .collect()
+    )
+    diurnal[k] = {
+        "corr": both.stat.corr("a", "b"),
+        "monthly_range": [(int(r["m"]), round(r["range"], 1)) for r in rows],
+    }
+    print(k, diurnal[k])
 
 # COMMAND ----------
 
@@ -582,7 +653,11 @@ if pair_check:
         _unit.append(
             f"- {k}: with two rows per date, per-date high-low range mean {fmt_num(r['mean_range'])}, "
             f"min {r['min_range']}, max {r['max_range']}, dates where both rows are equal {r['equal_pair']}. "
-            "The data does not label which row is the maximum and which the minimum."
+            + (
+                "The two source files name the roles (see the per-file comparison)."
+                if k in align
+                else "The data does not label which row is the maximum and which the minimum."
+            )
         )
 
 for k, rows in per_file.items():
@@ -634,7 +709,7 @@ _tcons = []
 for k, r in dyn.items():
     _tcons.append(
         f"- {k}: day-to-day changes over {JUMP_F} degrees: {r['jumps']} of {r['pairs']}; largest {fmt_num(r['max_jump'])}; "
-        f"lag-1 autocorrelation of the daily mean {fmt_num(r['autocorr'])}; values more than 4 sd from the mean: {r['z_gt_4']}."
+        f"lag-1 autocorrelation of the pooled daily mean (rows sharing a date averaged across files) {fmt_num(r['autocorr'])}; values more than 4 sd from the pooled mean: {r['z_gt_4']}."
     )
 for k, files in dyn_file.items():
     for f, r in files.items():
@@ -654,9 +729,14 @@ _card = [
     )
 ]
 
-_regime = ["Seasonal profile (mean of the first temperature column by calendar month):"]
+_regime = [
+    "Seasonal profile by calendar month; the pooled line averages every row of the frame (both files together), so per-file lines are the ones to read:"
+]
 for k, rows in season.items():
-    _regime.append(f"- {k}: " + ", ".join(f"m{m}={v:.1f}" for m, v, _ in rows))
+    _regime.append(f"- {k} (pooled): " + ", ".join(f"m{m}={v:.1f}" for m, v, _ in rows))
+for k, files in season_file.items():
+    for f, vs in files.items():
+        _regime.append(f"- {k} / `{f}`: " + ", ".join(f"m{m}={v:.1f}" for m, v in vs))
 if not season:
     _regime.append("- not computed.")
 _regime.append(
@@ -666,6 +746,77 @@ _regime.append(
         "for the value column.",
     )
 )
+
+
+def _by_value(pair):
+    return pair[1]
+
+
+_clim = []
+for k, c in clim.items():
+    for f, yrs in c["yearly"].items():
+        _clim.append(f"- {k} / `{f}` mean by year (year, mean, rows): {yrs}.")
+    for f, rec in c["records"].items():
+        _clim.append(f"- {k} / `{f}` highest {rec['highest']}, lowest {rec['lowest']}.")
+    _clim.append(
+        f"- {k} days more than 3 sd from their own month's mean, per file: {c['month_outliers']}."
+    )
+for k, d in diurnal.items():
+    _clim.append(
+        f"- {k} correlation of the two files' values on the same date: {fmt_num(d['corr'])}; mean difference by month (month, degrees): {d['monthly_range']}."
+    )
+if not _clim:
+    _clim.append(
+        "- Not computed (needs two or more source files with a parsed date and numeric temperature)."
+    )
+
+_cycle = {
+    k: {
+        f: (min(vs, key=_by_value)[0], max(vs, key=_by_value)[0]) for f, vs in v.items()
+    }
+    for k, v in season_file.items()
+}
+
+_areas = {
+    "Domain understanding": [
+        f"README-type files: {list(support) or 'none'}; describes daily high and low temperatures for one US city, Fahrenheit, from a national weather service",
+        f"files found: { {k: [f['f'] for f in v] for k, v in per_file.items()} }; high-below-low dates: { {k: a['a_lt_b'] for k, a in align.items()} }",
+        f"yearly means: { {k: c['yearly'] for k, c in clim.items()} }",
+    ],
+    "Structure and engineering": [
+        f"{len(entries)} files ({ {k: len(v) for k, v in kinds.items()} }); the data files carry no extension and are read as delimited text with a header",
+        f"schema: { {k: cols for k, cols in DATA_COLS.items()} }",
+        "no station, city or role column: the file name is the only carrier of the high / low role",
+    ],
+    "Temporal": [
+        f"{ {k: (c['first'], c['last'], c['distinct_days'], c['missing_days']) for k, c in cont.items()} } (first, last, distinct days, missing days)",
+        f"lag-1 autocorrelation per file: { {k: {f: round(r['autocorr'], 3) for f, r in v.items()} for k, v in dyn_file.items()} }",
+    ],
+    "Spatial": [
+        "no coordinate or station column; the location comes only from the README text"
+    ],
+    "Data quality": [
+        f"full-row duplicates { {k: prof[k]['dups'] for k in DFS} }; missing values { {k: sum(prof[k]['miss'].values()) for k in DFS} }",
+        f"days more than 3 sd from their month's mean: { {k: c['month_outliers'] for k, c in clim.items()} }",
+    ],
+    "Statistical patterns": [
+        f"seasonal cycle per file (coldest month, warmest month): {_cycle}",
+        f"quantiles: { {k: q for k, q in quant.items()} }",
+    ],
+    "Relationships": [
+        f"high vs low on the same date: { {k: (round(d['corr'], 3) if d['corr'] is not None else None) for k, d in diurnal.items()} }",
+        f"mean high-low difference by month: { {k: d['monthly_range'] for k, d in diurnal.items()} }",
+    ],
+    "Analytics use": [
+        "one measure (temperature) on one date dimension with a two-valued role given by the file name; no other dimension is available"
+    ],
+    "ML use": [
+        f"a single-series regression target; strong day-to-day persistence: { {k: {f: round(r['autocorr'], 3) for f, r in v.items()} for k, v in dyn_file.items()} }; no covariates in the source"
+    ],
+    "AI / knowledge use": [
+        "the only descriptive text is the README (source, period, attribute definitions); no text or label columns"
+    ],
+}
 
 _coverage = [
     para(
@@ -792,10 +943,12 @@ write_profiling(
         ("Temporal Consistency", "\n".join(_tcons)),
         ("Relationship Cardinality", "\n".join(_card)),
         ("Regime / Version Evidence", "\n".join(_regime)),
+        ("Climatology and Extremes", "\n".join(_clim)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

@@ -193,6 +193,181 @@ for name, df in frames.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Categorical columns -- values and counts
+cat_info = {}
+for name, df in frames.items():
+    skip = set(key_report[name]) | set(temporal[name])
+    cats = [
+        c
+        for c in prof[name]["cols"]
+        if 1 < prof[name]["acd"][c] <= 60 and c not in skip
+    ]
+    cat_info[name] = {
+        c: [
+            (x[0], x["count"])
+            for x in df.groupBy(F.col(c))
+            .count()
+            .orderBy(F.desc("count"))
+            .limit(30)
+            .collect()
+        ]
+        for c in cats
+    }
+    print(name, {c: len(v) for c, v in cat_info[name].items()})
+
+# COMMAND ----------
+
+# DBTITLE 1,Bulk-update concentration -- days, instants and months of each date column
+bulk = {}
+for name, df in frames.items():
+    bulk[name] = {}
+    for c in temporal[name]:
+        ts = parse_ts_multi(c)
+        base = (
+            df.select(ts.alias("ts"))
+            .where(F.col("ts").isNotNull())
+            .withColumn("day", F.to_date("ts"))
+        )
+        per_day = base.groupBy("day").count()
+        top = per_day.orderBy(F.desc("count")).limit(30).collect()
+        total = base.count()
+        month_rows = (
+            base.groupBy(F.date_format("ts", "yyyy-MM").alias("m"))
+            .count()
+            .orderBy(F.desc("m"))
+            .limit(14)
+            .collect()
+        )
+        same_ts = (
+            base.groupBy("ts")
+            .count()
+            .agg(
+                F.max("count").alias("max_same"), F.count(F.lit(1)).alias("distinct_ts")
+            )
+            .first()
+        )
+        top_counts = [x["count"] for x in top]
+        bulk[name][c] = {
+            "rows": total,
+            "distinct_days": per_day.count(),
+            "distinct_instants": same_ts["distinct_ts"],
+            "max_rows_sharing_one_instant": same_ts["max_same"],
+            "top_days": [(str(x["day"]), x["count"]) for x in top[:10]],
+            "share_top1_day": round(sum(top_counts[:1]) / total, 4) if total else None,
+            "share_top5_days": round(sum(top_counts[:5]) / total, 4) if total else None,
+            "share_top30_days": round(sum(top_counts[:30]) / total, 4)
+            if total
+            else None,
+            "latest_months": [(x["m"], x["count"]) for x in month_rows],
+        }
+        print(name, c, bulk[name][c])
+
+# COMMAND ----------
+
+# DBTITLE 1,Change types by year of the first date column
+type_by_year = {}
+for name, df in frames.items():
+    dcols = list(temporal[name])
+    if not dcols or not cat_info[name]:
+        continue
+    yr = F.year(parse_ts_multi(dcols[0]))
+    type_by_year[name] = {"date_column": dcols[0], "columns": {}}
+    for c, vals in cat_info[name].items():
+        if len(vals) > 12:
+            continue
+        rows = (
+            df.groupBy(yr.alias("y"), F.col(c).alias("v"))
+            .count()
+            .where(F.col("y").between(2000, 2030))
+            .orderBy("y", F.desc("count"))
+            .collect()
+        )
+        per = {}
+        for x in rows:
+            per.setdefault(int(x["y"]), []).append((x["v"], x["count"]))
+        type_by_year[name]["columns"][c] = per
+    print(name, list(type_by_year[name]["columns"]))
+
+# COMMAND ----------
+
+# DBTITLE 1,Repeated changes per unit and the lag between registration and effective date
+repeat_info = {}
+for name, df in frames.items():
+    k = own_key[name]
+    if not k or key_report[name][k]["unique"]:
+        continue
+    g = df.groupBy(F.col(k)).agg(F.count(F.lit(1)).alias("n"))
+    sizes = (
+        g.groupBy("n")
+        .agg(F.count(F.lit(1)).alias("keys"))
+        .orderBy("n")
+        .limit(15)
+        .collect()
+    )
+    repeat_info[name] = {"key": k, "rows_per_key": [(x["n"], x["keys"]) for x in sizes]}
+    reg_c = next((c for c in temporal[name] if "registrierung" in c.lower()), None)
+    eff_c = next(
+        (
+            c
+            for c in temporal[name]
+            if "aenderungsdatum" in c.lower() and "registrierung" not in c.lower()
+        ),
+        None,
+    )
+    if reg_c and eff_c:
+        lag = (
+            F.datediff(
+                F.to_date(parse_ts_multi(reg_c)), F.to_date(parse_ts_multi(eff_c))
+            )
+        ).alias("lag")
+        d = df.select(lag).where(F.col("lag").isNotNull())
+        r = (
+            d.agg(
+                F.count(F.lit(1)).alias("n"),
+                F.sum((F.col("lag") < 0).cast("long")).alias(
+                    "registered_before_effective"
+                ),
+                F.sum((F.col("lag") == 0).cast("long")).alias("same_day"),
+                F.sum((F.col("lag") > 365).cast("long")).alias("over_a_year"),
+                F.expr("percentile_approx(lag, array(0.1, 0.5, 0.9, 0.99))").alias(
+                    "p10_50_90_99_days"
+                ),
+                F.max("lag").alias("max_days"),
+            )
+            .first()
+            .asDict()
+        )
+        repeat_info[name].update(
+            {"registration_column": reg_c, "effective_column": eff_c, "lag_days": r}
+        )
+    print(name, repeat_info[name])
+
+# COMMAND ----------
+
+# DBTITLE 1,Overlap of the referenced units between the change tables
+overlap = None
+ku = own_key.get("geloeschte_deaktivierte_einheiten")
+kc = own_key.get("einheiten_aenderung_netzbetreiberzuordnungen")
+if ku and kc and ku == kc:
+    a = (
+        frames["geloeschte_deaktivierte_einheiten"]
+        .select(F.col(ku).alias("k"))
+        .distinct()
+    )
+    b = (
+        frames["einheiten_aenderung_netzbetreiberzuordnungen"]
+        .select(F.col(kc).alias("k"))
+        .distinct()
+    )
+    overlap = {
+        "deleted_units": a.count(),
+        "units_with_operator_change": b.count(),
+        "in_both": a.join(b, "k", "left_semi").count(),
+    }
+    print(overlap)
+
+# COMMAND ----------
+
 # DBTITLE 1,Figure -- rows per table + duplicates
 figs = []
 if facet_bars(
@@ -291,18 +466,69 @@ _temporal_md.append(
     "distinct columns where present -- do not treat them as interchangeable."
 )
 
+_bulk = [
+    "Concentration of each date column (rows sharing days and instants); a value repeated on few days signals a batch operation:"
+]
+for name, cols in bulk.items():
+    for c, b in cols.items():
+        _bulk.append(
+            f"- `{name}.{c}`: {b['rows']} rows on {b['distinct_days']} days and {b['distinct_instants']} distinct instants (most rows sharing one instant: {b['max_rows_sharing_one_instant']}); "
+            f"top day holds {b['share_top1_day']}, top 5 days {b['share_top5_days']}, top 30 days {b['share_top30_days']} of the rows."
+        )
+        _bulk.append(f"  - ten largest days (day, rows): {b['top_days']}")
+        _bulk.append(f"  - latest months (month, rows): {b['latest_months']}")
+_bulk.append(
+    para(
+        "A date that is spread over many instants and days looks like a per-record timestamp; a large share on a",
+        "few days looks like a batch or migration. Which one applies to the year totals is stated by these counts;",
+        "the reason for a batch is not in the data.",
+    )
+)
+
+_types = []
+for name, ci in cat_info.items():
+    for c, vals in ci.items():
+        _types.append(f"- `{name}.{c}` (value, rows): {vals[:15]}")
+for name, tb in type_by_year.items():
+    for c, per in tb["columns"].items():
+        _types.append(
+            f"- `{name}.{c}` by year of `{tb['date_column']}` (year: (value, rows) ...): {per}"
+        )
+if not _types:
+    _types.append("- No low-cardinality category column in these tables.")
+
+_rep = []
+for name, ri in repeat_info.items():
+    _rep.append(
+        f"- `{name}`: rows per `{ri['key']}` (rows, keys): {ri['rows_per_key']}."
+    )
+    if "lag_days" in ri:
+        l_ = ri["lag_days"]
+        _rep.append(
+            f"  - registration (`{ri['registration_column']}`) minus effective date (`{ri['effective_column']}`), days: p10/p50/p90/p99 {l_['p10_50_90_99_days']}, max {l_['max_days']}; "
+            f"registered before the effective date {l_['registered_before_effective']} of {l_['n']}, same day {l_['same_day']}, more than a year late {l_['over_a_year']}."
+        )
+if overlap:
+    _rep.append(
+        f"- units in the deletion table and in the operator-change table (deleted units, units with an operator change, in both): {overlap}."
+    )
+if not _rep:
+    _rep.append("- No table with a repeated entity key.")
+
 _coverage = [
     f"Row counts: { {d: prof[d]['total'] for d in DATASETS} }.",
     (
         "These tables ARE the survivorship record: a unit in geloeschte_deaktivierte_einheiten "
         "(or an actor in geloeschte_deaktivierte_marktakteure) has left the current-state register. "
-        "Any population built only from the current-state tables (01/03) is missing exactly this "
-        "set. The rows-per-year trend is dominated by the most recent export year -- MaStR back-"
-        "loads deregistration records, so the apparent surge is a registration-lag artefact, not a "
-        "real spike in decommissioning."
+        "Any population built only from the current-state tables (01/03) is missing exactly this set."
+    ),
+    (
+        "The date column in the two deletion tables is "
+        f"{ {n: list(temporal[n]) for n in ('geloeschte_deaktivierte_einheiten', 'geloeschte_deaktivierte_marktakteure')} }; "
+        "if that is a last-update date, the year of a row is the year of the record's last edit, not of its "
+        "deletion. How concentrated the dates are is measured in Bulk Updates; the cause is not decided here."
     ),
 ]
-
 _findings_md = "\n".join(f"- {ln}" for ln in findings_lines)
 
 _silver = [
@@ -443,6 +669,40 @@ _ml = ml_readiness_block(
     ]
 )
 
+_areas = {
+    "Domain understanding": [
+        "logs of units and market actors that left the register (deleted or deactivated) and of grid-operator assignment changes for units",
+        f"categorical columns: { {n: list(ci) for n, ci in cat_info.items()} }",
+        f"date columns: { {n: list(temporal[n]) for n in DATASETS} }",
+    ],
+    "Structure and engineering": [
+        f"3 Bronze tables, {sum(prof[d]['total'] for d in DATASETS)} rows; entity keys {own_key}",
+        f"units in both the deletion and the operator-change tables: {overlap}",
+    ],
+    "Temporal": [
+        f"rows per year: { {n: {c: v['by_year'] for c, v in cols.items()} for n, cols in rows_per_year.items()} }",
+        f"concentration on the top 5 days: { {n: {c: b['share_top5_days'] for c, b in cols.items()} for n, cols in bulk.items()} }",
+    ],
+    "Spatial": ["no location columns"],
+    "Data quality": [
+        f"duplicates {dup_counts}; unparsed or implausible dates { {n: {c: v['unparsed_or_implausible'] for c, v in cols.items()} for n, cols in rows_per_year.items()} }"
+    ],
+    "Statistical patterns": [
+        f"latest months by table: { {n: {c: b['latest_months'][:3] for c, b in cols.items()} for n, cols in bulk.items()} }"
+    ],
+    "Relationships": [
+        f"repeated entity keys: { {n: ri['rows_per_key'][:4] for n, ri in repeat_info.items()} }",
+        f"registration lag: { {n: ri.get('lag_days', {}).get('p10_50_90_99_days') for n, ri in repeat_info.items()} }",
+    ],
+    "Analytics use": [
+        "survivorship: units and actors that left the register, and how long an assignment change takes to be registered"
+    ],
+    "ML use": ["no target; the logs are event streams keyed by unit or actor"],
+    "AI / knowledge use": [
+        "catalog codes for change types (see Change Types); no free text"
+    ],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -452,9 +712,13 @@ write_profiling(
         ("Data Quality", "\n".join(_dq)),
         ("Entities / Keys", "\n".join(_entities)),
         ("Temporal Semantics", "\n".join(_temporal_md)),
+        ("Bulk Updates", "\n".join(_bulk)),
+        ("Change Types and Regimes", "\n".join(_types)),
+        ("Repeated Changes and Lags", "\n".join(_rep)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

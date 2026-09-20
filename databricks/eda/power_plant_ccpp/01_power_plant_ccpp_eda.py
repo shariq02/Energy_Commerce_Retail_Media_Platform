@@ -25,6 +25,7 @@
 # DBTITLE 1,Imports
 import itertools
 
+from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 # COMMAND ----------
@@ -301,6 +302,63 @@ for k, df in DFS.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Distribution shape and IQR outliers
+shape, iqr_out = {}, {}
+for k, df in DFS.items():
+    cols = [c for c in DATA_COLS[k] if num[k][c]["is_numeric"] and quant[k].get(c)]
+    aggs = []
+    for i, c in enumerate(cols):
+        v = to_double(c)
+        q1, q3 = quant[k][c][0.25], quant[k][c][0.75]
+        fence = 1.5 * (q3 - q1)
+        aggs += [
+            F.skewness(v).alias(f"s{i}"),
+            F.kurtosis(v).alias(f"k{i}"),
+            F.sum(((v < q1 - fence) | (v > q3 + fence)).cast("long")).alias(f"o{i}"),
+        ]
+    r = df.agg(*aggs).first().asDict() if aggs else {}
+    shape[k] = {c: (r[f"s{i}"], r[f"k{i}"]) for i, c in enumerate(cols)}
+    iqr_out[k] = {c: r[f"o{i}"] for i, c in enumerate(cols)}
+    print(k, shape[k], iqr_out[k])
+
+# COMMAND ----------
+
+# DBTITLE 1,Output vs strongest inputs -- decile trend on distinct rows
+trend = {}
+for k, df in DFS.items():
+    cols = [c for c in DATA_COLS[k] if num[k][c]["is_numeric"]]
+    tgt = next((c for c in cols if c.upper() == "PE"), None)
+    if not tgt:
+        continue
+    pair_r = {
+        c: abs(corr[k].get((c, tgt)) or corr[k].get((tgt, c)) or 0.0)
+        for c in cols
+        if c != tgt
+    }
+    drivers = sorted(pair_r, key=lambda c: -pair_r[c])[:2]
+    base = df.drop("__file").distinct()
+    trend[k] = {}
+    for drv in drivers:
+        d = base.select(
+            to_double(drv).alias("x"), to_double(tgt).alias("y")
+        ).withColumn("q", F.ntile(10).over(Window.orderBy("x")))
+        rows = (
+            d.groupBy("q")
+            .agg(F.avg("x").alias("x"), F.avg("y").alias("y"))
+            .orderBy("q")
+            .collect()
+        )
+        ys = [r["y"] for r in rows]
+        steps = [b - a for a, b in itertools.pairwise(ys)]
+        trend[k][drv] = {
+            "target": tgt,
+            "deciles": [(round(r["x"], 2), round(r["y"], 2)) for r in rows],
+            "monotone": all(x > 0 for x in steps) or all(x < 0 for x in steps),
+        }
+        print(k, drv, trend[k][drv])
+
+# COMMAND ----------
+
 # DBTITLE 1,Temporal semantics -- is there any time axis?
 temporal = {}
 for k, cols in DATA_COLS.items():
@@ -555,6 +613,61 @@ for k in DFS:
             + ", ".join(fmt_num(v) for v in q.values())
         )
 
+for k in DFS:
+    for c, (sk, ku) in shape[k].items():
+        _dist.append(
+            f"- {k}.`{c}`: skewness {fmt_num(sk)}, excess kurtosis {fmt_num(ku)}, rows outside 1.5 x IQR: {iqr_out[k][c]}."
+        )
+for k, drivers in trend.items():
+    for drv, t in drivers.items():
+        _value.append(
+            f"- {k}: mean `{t['target']}` by decile of `{drv}` (decile mean of `{drv}`, mean `{t['target']}`) on distinct rows: {t['deciles']}; "
+            f"monotone across deciles: {t['monotone']}."
+        )
+
+_areas = {
+    "Domain understanding": [
+        f"README-type files: {list(support) or 'none'}; the cited titles concern predicting the electrical output of a combined-cycle plant",
+        f"column names match the expected sensor set {sorted(EXPECTED)} in {sorted(struct)} frames",
+        f"physical plausibility: {sum(1 for k in DFS for c in plaus[k] if plaus[k][c]['below'] or plaus[k][c]['above'])} column(s) with values beyond the expected bounds",
+    ],
+    "Structure and engineering": [
+        f"{len(entries)} files ({ {k: len(v) for k, v in kinds.items()} }), read as {[v['sep'] for v in frames.values()]}-separated text with the header applied",
+        f"rows per file {per_file}",
+        "no key, no time column, no categorical column: every column is a numeric measurement",
+        f"per-file distinct rows and repeats: { {k: fs['by_file'] for k, fs in file_sets.items()} }",
+    ],
+    "Temporal": [
+        "no date / time column"
+        if not any(t["time_like_columns"] for t in temporal.values())
+        else f"time-like columns: {temporal}"
+    ],
+    "Spatial": ["no location or coordinate column"],
+    "Data quality": [
+        f"full-row duplicates {{k: prof[k]['dups'] for k in DFS}}, cross-file identical files {[(k, cross[k]['in_many_files']) for k in DFS]}",
+        f"values beyond expected bounds: { {k: sorted(v) for k, v in beyond.items() if v} or 'none' }",
+        f"IQR outliers: {iqr_out}",
+    ],
+    "Statistical patterns": [
+        f"skewness / excess kurtosis: { {k: {c: (round(a, 2), round(b, 2)) for c, (a, b) in v.items()} for k, v in shape.items()} }",
+        f"strongest correlations: { {k: [(p, round(v, 3)) for p, v in sorted(corr[k].items(), key=lambda kv: -abs(kv[1] or 0))[:3]] for k in DFS} }",
+    ],
+    "Relationships": [
+        f"decile trends of the output against its strongest inputs: { {k: {d: t['monotone'] for d, t in v.items()} for k, v in trend.items()} or 'not computed' }",
+        f"mirror / duplicate column pairs: {mirrors}",
+    ],
+    "Analytics use": [
+        "five continuous measures per row and no dimension to group by, so the data supports distribution and relationship analysis, not slicing by entity or period"
+    ],
+    "ML use": [
+        f"an output-like column ({ {k: v[next(iter(v))]['target'] for k, v in trend.items() if v} or 'none identified' }) and its strongest inputs with monotone decile trend: { {k: [d for d, t in v.items() if t['monotone']] for k, v in trend.items()} }",
+        "repeated rows across files are the main leakage hazard if the files are split apart",
+    ],
+    "AI / knowledge use": [
+        "no text, label or taxonomy column; the only descriptive content is the README and the two cited papers"
+    ],
+}
+
 _findings_md = "\n".join(
     f"- {k}: rows={prof[k]['total']}, cols={len(prof[k]['cols'])}, constant={prof[k]['constant']}, "
     f"dups={prof[k]['dups']}, cross-file duplicates={cross[k]['in_many_files']}, "
@@ -673,6 +786,7 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

@@ -26,6 +26,7 @@
 
 # DBTITLE 1,Imports
 import numpy as np
+import pandas as pd
 from pyspark.sql import functions as F
 
 # COMMAND ----------
@@ -249,6 +250,214 @@ if gsid and geo_von:
 
 # COMMAND ----------
 
+# DBTITLE 1,Cross-variable settings and helpers
+# Joins across measurements use the recent window only (bounded cost); values equal
+# to a candidate special code are set aside so a code never enters a comparison.
+RECENT_FROM = "2016-01-01"
+SPECIAL = [-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9999.0]
+
+
+def clean(colname):
+    v = safe_num(colname)
+    return F.when(~v.isin(SPECIAL), v)
+
+
+def hourly(m, cols, raw=()):
+    df = spark.table(MEASUREMENT_TABLES[m])
+    s_, d_ = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
+    have = [c for c in cols if find_col(df, c)]
+    return (
+        df.select(
+            F.col(s_).cast("string").alias("station"),
+            as_ts(d_).alias("ts"),
+            *[clean(find_col(df, c)).alias(c) for c in have],
+            *[
+                safe_num(find_col(df, c)).alias(f"raw_{c}")
+                for c in raw
+                if find_col(df, c)
+            ],
+        )
+        .where(F.col("ts") >= F.lit(RECENT_FROM).cast("timestamp"))
+        .withColumn("ts", F.col("ts"))
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Temperature and humidity agree between the two tables that carry them; dew point never above air temperature
+xv = {}
+at = hourly("air_temperature", ["TT_TU", "RF_TU"])
+mo = hourly("moisture", ["TT_STD", "RF_STD", "TD_STD"])
+j = at.join(mo, ["station", "ts"], "inner")
+if {"TT_TU", "TT_STD", "RF_TU", "RF_STD", "TD_STD"} <= set(j.columns):
+    xv["temp_humidity"] = (
+        j.agg(
+            F.count(F.lit(1)).alias("joined"),
+            F.sum(
+                (F.col("TT_TU").isNotNull() & F.col("TT_STD").isNotNull()).cast("long")
+            ).alias("temp_pairs"),
+            F.avg(F.abs(F.col("TT_TU") - F.col("TT_STD"))).alias("temp_mean_abs_diff"),
+            F.sum((F.abs(F.col("TT_TU") - F.col("TT_STD")) <= 0.5).cast("long")).alias(
+                "temp_within_half_degree"
+            ),
+            F.corr("TT_TU", "TT_STD").alias("temp_corr"),
+            F.sum(
+                (F.col("RF_TU").isNotNull() & F.col("RF_STD").isNotNull()).cast("long")
+            ).alias("rh_pairs"),
+            F.avg(F.abs(F.col("RF_TU") - F.col("RF_STD"))).alias("rh_mean_abs_diff"),
+            F.corr("RF_TU", "RF_STD").alias("rh_corr"),
+            F.sum(
+                (F.col("TD_STD").isNotNull() & F.col("TT_STD").isNotNull()).cast("long")
+            ).alias("dew_pairs"),
+            F.sum((F.col("TD_STD") > F.col("TT_STD") + 0.1).cast("long")).alias(
+                "dew_above_temp"
+            ),
+            F.avg(F.col("TT_STD") - F.col("TD_STD")).alias("mean_dew_point_depression"),
+        )
+        .first()
+        .asDict()
+    )
+print(xv.get("temp_humidity"))
+
+# COMMAND ----------
+
+# DBTITLE 1,Precipitation amount against the precipitation indicator
+prec = hourly("precipitation", ["R1", "RS_IND"])
+xv["precip"] = None
+if {"R1", "RS_IND"} <= set(prec.columns):
+    xv["precip"] = [
+        x.asDict()
+        for x in prec.where(F.col("R1").isNotNull() & F.col("RS_IND").isNotNull())
+        .groupBy(
+            (F.col("R1") > 0).alias("amount_positive"),
+            F.col("RS_IND").alias("indicator"),
+        )
+        .count()
+        .orderBy("amount_positive", "indicator")
+        .collect()
+    ]
+print(xv["precip"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Sunshine duration by cloud cover
+sun = hourly("sun", ["SD_SO"])
+cl = hourly("cloudiness", ["V_N"], raw=["V_N"])
+j2 = sun.join(cl, ["station", "ts"], "inner")
+xv["sun_cloud"] = None
+if {"SD_SO", "V_N"} <= set(j2.columns):
+    rows = (
+        j2.where(F.col("SD_SO").isNotNull() & F.col("raw_V_N").isNotNull())
+        .groupBy(F.col("raw_V_N").alias("cloud_code"))
+        .agg(F.count(F.lit(1)).alias("hours"), F.avg("SD_SO").alias("mean_sun_minutes"))
+        .orderBy("cloud_code")
+        .collect()
+    )
+    xv["sun_cloud"] = {
+        "by_code": [
+            (x["cloud_code"], x["hours"], round(x["mean_sun_minutes"], 2)) for x in rows
+        ],
+        "corr_clean": j2.stat.corr("SD_SO", "V_N"),
+    }
+print(xv["sun_cloud"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Wind direction codes against wind speed
+wd = hourly("wind", ["F", "D"], raw=["D"])
+xv["wind"] = None
+if {"F", "D"} <= set(wd.columns):
+    xv["wind"] = [
+        x.asDict()
+        for x in wd.where(F.col("F").isNotNull() & F.col("raw_D").isNotNull())
+        .groupBy(
+            F.when(F.col("raw_D") == 990, "D=990")
+            .when(F.col("raw_D") == 0, "D=0")
+            .otherwise("other")
+            .alias("direction_class")
+        )
+        .agg(
+            F.count(F.lit(1)).alias("hours"),
+            F.avg("F").alias("mean_speed"),
+            F.max("F").alias("max_speed"),
+            F.expr("percentile_approx(F, 0.5)").alias("median_speed"),
+        )
+        .orderBy("direction_class")
+        .collect()
+    ]
+print(xv["wind"])
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Station-level means against station elevation and latitude
+def _geo_col(*subs):
+    return next((c for c in geo.columns if any(x in c.lower() for x in subs)), None)
+
+
+g_lat, g_lon, g_elev = (
+    _geo_col("breit", "latit"),
+    _geo_col("laeng", "longit"),
+    _geo_col("hoehe", "elev", "height"),
+)
+st_geo = pd.DataFrame()
+if gsid and g_lat and g_lon:
+    st_geo = (
+        geo.select(
+            F.col(gsid).cast("string").alias("station"),
+            safe_num(g_lat).alias("lat"),
+            safe_num(g_lon).alias("lon"),
+            *([safe_num(g_elev).alias("elev")] if g_elev else []),
+        )
+        .groupBy("station")
+        .agg(
+            *[F.avg(c).alias(c) for c in ("lat", "lon", *(["elev"] if g_elev else []))]
+        )
+        .toPandas()
+        .set_index("station")
+    )
+st_means = None
+parts = []
+for m, cols in (
+    ("air_temperature", ["TT_TU"]),
+    ("pressure", ["P0", "P"]),
+    ("sun", ["SD_SO"]),
+    ("wind", ["F"]),
+    ("moisture", ["RF_STD"]),
+):
+    h = hourly(m, cols)
+    have = [c for c in cols if c in h.columns]
+    if have:
+        parts.append(
+            h.groupBy("station")
+            .agg(*[F.avg(c).alias(c) for c in have])
+            .toPandas()
+            .set_index("station")
+        )
+if parts:
+    st_means = pd.concat(parts, axis=1)
+spatial_stats = {}
+if st_means is not None and not st_geo.empty:
+    tab = st_geo.join(st_means, how="inner")
+    spatial_stats["stations"] = len(tab)
+    spatial_stats["corr"] = {}
+    for v_ in [c for c in st_means.columns]:
+        for g_ in [c for c in st_geo.columns if c != "lon"]:
+            pair = tab[[v_, g_]].dropna()
+            if len(pair) >= 5:
+                spatial_stats["corr"][f"{v_} ~ {g_}"] = round(
+                    float(pair[v_].corr(pair[g_])), 3
+                )
+    if "elev" in tab and "TT_TU" in tab:
+        pair = tab[["TT_TU", "elev"]].dropna()
+        if len(pair) >= 5:
+            slope = np.polyfit(pair["elev"], pair["TT_TU"], 1)[0]
+            spatial_stats["temp_per_100m"] = round(float(slope * 100), 2)
+    spatial_stats["table"] = tab.round(2).reset_index().to_dict("records")
+print({k: v for k, v in spatial_stats.items() if k != "table"})
+
+# COMMAND ----------
+
 # DBTITLE 1,Verdict -- can the 7 measurements be combined downstream?
 max_pair_only = max((max(o[3], o[4]) for o in pair_overlap), default=0)
 schemas = {
@@ -436,6 +645,91 @@ _spatial = [
     ),
 ]
 
+_xvar = [
+    f"Cross-variable checks on the hourly rows from {RECENT_FROM} onward, with candidate special codes {SPECIAL} set aside:"
+]
+th = xv.get("temp_humidity")
+if th:
+    _xvar.append(
+        f"- air_temperature.TT_TU vs moisture.TT_STD: {th['temp_pairs']} hourly pairs, mean absolute difference {th['temp_mean_abs_diff']}, "
+        f"{th['temp_within_half_degree']} within 0.5 degree, correlation {th['temp_corr']}."
+    )
+    _xvar.append(
+        f"- air_temperature.RF_TU vs moisture.RF_STD: {th['rh_pairs']} pairs, mean absolute difference {th['rh_mean_abs_diff']}, correlation {th['rh_corr']}."
+    )
+    _xvar.append(
+        f"- dew point above air temperature (moisture.TD_STD > TT_STD + 0.1): {th['dew_above_temp']} of {th['dew_pairs']} pairs; mean dew-point depression {th['mean_dew_point_depression']}."
+    )
+if xv.get("precip"):
+    _xvar.append(
+        f"- precipitation R1 > 0 against RS_IND (amount positive, indicator, hours): {xv['precip']}."
+    )
+if xv.get("sun_cloud"):
+    _xvar.append(
+        f"- sunshine minutes by cloud-cover code (code, hours, mean minutes): {xv['sun_cloud']['by_code']}; correlation with the codes set aside {xv['sun_cloud']['corr_clean']}."
+    )
+if xv.get("wind"):
+    _xvar.append(f"- wind speed by direction class: {xv['wind']}.")
+if not any(xv.values()):
+    _xvar.append("- no pair had the columns needed.")
+
+_sp = []
+if spatial_stats:
+    _sp.append(
+        f"Station means over the same window against station coordinates and elevation, {spatial_stats.get('stations')} stations (mean of the station's geography rows):"
+    )
+    _sp.append(f"- Pearson correlations: {spatial_stats.get('corr')}")
+    if "temp_per_100m" in spatial_stats:
+        _sp.append(
+            f"- fitted change of mean air temperature per 100 m of elevation: {spatial_stats['temp_per_100m']} degrees."
+        )
+    _sp.append(
+        f"- station table (station, lat, lon, elev, means): {spatial_stats.get('table')}"
+    )
+else:
+    _sp.append(
+        "- Station geography columns for latitude / longitude were not found; spatial patterns not computed."
+    )
+
+_areas = {
+    "Domain understanding": [
+        "seven measurement tables for a station network, with station geography, name history, device and parameter metadata",
+        f"cross-variable agreement: temperature pairs {th['temp_pairs'] if th else 'n/a'} with mean abs diff {th['temp_mean_abs_diff'] if th else 'n/a'}; dew point above temperature in {th['dew_above_temp'] if th else 'n/a'} pairs",
+        f"wind direction classes against speed: {xv.get('wind')}",
+    ],
+    "Structure and engineering": [
+        f"(station, MESS_DATUM) unique in every measurement: {all(key_unique.values())}; largest non-shared timestamp count {max_pair_only}",
+        f"value-column sets disjoint across measurements: {schema_disjoint}",
+        f"stations mapped to more than one city: {len(multi_city)}",
+    ],
+    "Temporal": [
+        f"measurement hours outside the station geography window: { {m: v['outside_pct'] for m, v in pit.items()} }"
+    ],
+    "Spatial": [
+        f"station means against elevation / latitude: {spatial_stats.get('corr')}",
+        f"temperature change per 100 m: {spatial_stats.get('temp_per_100m')}",
+    ],
+    "Data quality": [
+        f"reference integrity (measurement stations not in metadata, metadata stations unused): {ref_integrity}",
+    ],
+    "Statistical patterns": [
+        "seasonal and diurnal profiles are in the measurements notebook; station-to-station spatial gradients above"
+    ],
+    "Relationships": [
+        f"sunshine by cloud code: {xv.get('sun_cloud', {}).get('by_code') if xv.get('sun_cloud') else 'n/a'}",
+        f"precipitation amount vs indicator: {xv.get('precip')}",
+    ],
+    "Analytics use": [
+        "a joinable station network across seven parameters on the shared hourly grid"
+    ],
+    "ML use": [
+        "multi-variable hourly features per station are possible on the overlap; special codes and quality flags need handling first"
+    ],
+    "AI / knowledge use": [
+        "station metadata (names, history, instruments) is a small structured reference, no free text"
+    ],
+}
+
 _verdict = [
     f"- (station, MESS_DATUM) is unique in every measurement: {all(key_unique.values())}  -> pairwise measurement<->measurement joins are 1:1 on the overlap.",
     f"- largest non-shared timestamp count in any measurement pair: {max_pair_only}  -> an inner join to a wide table drops that tail.",
@@ -563,8 +857,11 @@ write_profiling(
         ("Relationships", "\n".join(_rel)),
         ("Temporal Consistency", "\n".join(_tcons)),
         ("Spatial Consistency", "\n".join(_spatial)),
+        ("Cross-variable Checks", "\n".join(_xvar)),
+        ("Spatial Patterns", "\n".join(_sp)),
         ("EDA Findings", "\n".join(_verdict)),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

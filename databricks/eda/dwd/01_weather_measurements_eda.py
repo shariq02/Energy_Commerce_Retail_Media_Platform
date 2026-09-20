@@ -279,6 +279,151 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
+# DBTITLE 1,Special values -- which candidate codes occur, in which columns
+# Candidate codes are values that look like codes rather than measurements (round
+# extremes seen in the value ranges). None is assumed to be a missing-value
+# marker: the checks below record where each one occurs and let the data speak.
+CANDIDATES = (-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9999.0)
+special = {}
+for m in MEASUREMENTS:
+    df = frames[m]
+    cols = value_columns(df)
+    exprs = [F.count(F.lit(1)).alias("rows")]
+    for i, c in enumerate(cols):
+        v = safe_num(c)
+        exprs += [
+            F.sum((v == cand).cast("long")).alias(f"n_{i}_{j}")
+            for j, cand in enumerate(CANDIDATES)
+        ]
+    r = df.agg(*exprs).first().asDict()
+    special[m] = {
+        "rows": r["rows"],
+        "hits": [
+            (c, cand, r[f"n_{i}_{j}"])
+            for i, c in enumerate(cols)
+            for j, cand in enumerate(CANDIDATES)
+            if r[f"n_{i}_{j}"]
+        ],
+    }
+    print(m, special[m]["hits"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Special values -- quality level, decade, station and co-occurrence per hit
+special_detail = {}
+for m in MEASUREMENTS:
+    hits = special[m]["hits"]
+    if not hits:
+        continue
+    df = frames[m]
+    qn, sid, dts = qn_col(df), find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
+    flags = [(safe_num(c) == cand) for c, cand, _ in hits]
+
+    def by(group_col, df=df, flags=flags):
+        return (
+            df.groupBy(group_col.alias("g"))
+            .agg(
+                F.count(F.lit(1)).alias("rows"),
+                *[F.sum(fl.cast("long")).alias(f"h{i}") for i, fl in enumerate(flags)],
+            )
+            .collect()
+        )
+
+    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    by_qn = by(F.col(qn)) if qn else []
+    by_dec = by(decade)
+    by_st = by(F.col(sid))
+    any_special = None
+    for c in value_columns(df):
+        term = safe_num(c).isin(list(CANDIDATES)).cast("int")
+        any_special = term if any_special is None else any_special + term
+    bundle = [
+        (x["k"], x["count"])
+        for x in df.groupBy(any_special.alias("k")).count().orderBy("k").collect()
+    ]
+    special_detail[m] = {"bundle": bundle, "hits": []}
+    for i, (c, cand, n) in enumerate(hits):
+        top_st = sorted(
+            ((x["g"], x[f"h{i}"]) for x in by_st), key=lambda t: -(t[1] or 0)
+        )[:3]
+        special_detail[m]["hits"].append(
+            {
+                "column": c,
+                "code": cand,
+                "rows": n,
+                "share": round(n / special[m]["rows"], 5),
+                "by_qn": [(x["g"], x[f"h{i}"], x["rows"]) for x in by_qn if x[f"h{i}"]],
+                "by_decade": [
+                    (x["g"], x[f"h{i}"])
+                    for x in sorted(by_dec, key=lambda t: (t["g"] is None, t["g"]))
+                    if x[f"h{i}"]
+                ],
+                "top_stations": top_st,
+                "top3_station_share": round(sum(t[1] or 0 for t in top_st) / n, 3)
+                if n
+                else None,
+            }
+        )
+    print(
+        m,
+        special_detail[m]["bundle"],
+        [h["column"] + "=" + str(h["code"]) for h in special_detail[m]["hits"]],
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Value range once every candidate code is set aside
+clean_range = {}
+for m in MEASUREMENTS:
+    df = frames[m]
+    exprs = []
+    cols = value_columns(df)
+    for c in cols:
+        v = F.when(~safe_num(c).isin(list(CANDIDATES)), safe_num(c))
+        exprs += [F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max")]
+    r = df.agg(*exprs).first().asDict()
+    clean_range[m] = {c: (r[c + "_min"], r[c + "_max"]) for c in cols}
+    print(m, clean_range[m])
+
+# COMMAND ----------
+
+# DBTITLE 1,Seasonal (month) and diurnal (hour of day) profiles, as stored
+PROFILE_COLS = {
+    "air_temperature": ["TT_TU", "RF_TU"],
+    "cloudiness": ["V_N"],
+    "precipitation": ["R1"],
+    "pressure": ["P"],
+    "sun": ["SD_SO"],
+    "wind": ["F"],
+}
+profiles = {}
+for m, cols in PROFILE_COLS.items():
+    df = frames[m]
+    cols = [c for c in cols if c in df.columns]
+    if not cols:
+        continue
+    ts = as_ts(find_col(df, "MESS_DATUM"))
+    aggs = [
+        F.avg(F.when(~safe_num(c).isin(list(CANDIDATES)), safe_num(c))).alias(c)
+        for c in cols
+    ]
+    profiles[m] = {}
+    for key, k in (("month", F.month(ts)), ("hour", F.hour(ts))):
+        rows = (
+            df.groupBy(k.alias("k"))
+            .agg(*aggs)
+            .where(F.col("k").isNotNull())
+            .orderBy("k")
+            .collect()
+        )
+        profiles[m][key] = {
+            c: [(int(x["k"]), round(x[c], 2)) for x in rows if x[c] is not None]
+            for c in cols
+        }
+    print(m, {k: {c: len(v) for c, v in d.items()} for k, d in profiles[m].items()})
+
+# COMMAND ----------
+
 # DBTITLE 1,Hourly continuity vs an INDEPENDENT calendar + longest gap per station
 freq_cov = {}
 for m in MEASUREMENTS:
@@ -623,6 +768,47 @@ for m in MEASUREMENTS:
             + (f", out-of-range={vs.get(c + '_oor')}" if c + "_oor" in vs else "")
         )
 
+
+def short_list(items, n=8):
+    items = list(items)
+    return items if len(items) <= n else f"{items[:n]} (+{len(items) - n} more)"
+
+
+_special = [
+    para(
+        f"Candidate special codes searched in every value column: {CANDIDATES}.",
+        "None is assumed to be a missing-value marker; each is characterised by where it occurs.",
+    )
+]
+for m, sd in special_detail.items():
+    _special.append(
+        f"- {m}: rows with k candidate codes per row (k, rows): {sd['bundle']}."
+    )
+    for h in sd["hits"]:
+        _special.append(
+            f"  - `{h['column']}` = {h['code']}: {h['rows']} rows ({h['share']:.3%}); by quality level (level, rows with the code, rows at level) {short_list(h['by_qn'])}; "
+            f"by decade (decade, rows) {short_list(h['by_decade'])}; top stations (station, rows) {h['top_stations']} = {h['top3_station_share']} of the code's rows."
+        )
+_special.append("Value range with every candidate code set aside (column: min, max):")
+for m, cr in clean_range.items():
+    _special.append(f"- {m}: {cr}")
+_special.append(
+    para(
+        "Reading the evidence: a code confined to one quality level, appearing in the same rows across",
+        "several columns, or concentrated in specific decades or stations points to a recording convention;",
+        "a code spread across quality levels and stations with values on both sides points to a real value.",
+        "The role of each code is not decided here -- it needs the source documentation.",
+    )
+)
+
+_patterns = [
+    "Mean by calendar month and by hour of day of MESS_DATUM (as stored, all stations, candidate codes excluded):"
+]
+for m, kinds_ in profiles.items():
+    for key, cols in kinds_.items():
+        for c, vs in cols.items():
+            _patterns.append(f"- {m}.`{c}` by {key}: {vs}")
+
 _qn = ["QN quality flag vs -999 sentinel / out-of-range rows:"]
 for m in MEASUREMENTS:
     if m in qn_quality:
@@ -763,6 +949,45 @@ _ml = ml_readiness_block(
     ]
 )
 
+
+_areas = {
+    "Domain understanding": [
+        "hourly station observations of air temperature, humidity, pressure, wind, precipitation, cloudiness and sunshine",
+        f"candidate special codes found: { {m: sorted({(h['column'], h['code']) for h in sd['hits']}) for m, sd in special_detail.items()} }",
+        f"seasonal and diurnal cycles measured for {list(profiles)}",
+    ],
+    "Structure and engineering": [
+        "7 Bronze tables keyed (station, MESS_DATUM); all columns are strings and are cast with a safe numeric parse",
+        "timestamps arrive as yyyyMMddHH, sometimes with a trailing .0",
+        f"quality-level column per table: { {m: qn_col(frames[m]) for m in MEASUREMENTS} }",
+    ],
+    "Temporal": [
+        f"spans { {m: (str(coverage[m]['min_ts'])[:10], str(coverage[m]['max_ts'])[:10]) for m in MEASUREMENTS} }",
+        f"longest station gap (hours) per measurement { {m: max((r['longest_gap_hours'] or 0 for r in freq_cov[m]), default=0) for m in MEASUREMENTS} }",
+    ],
+    "Spatial": [
+        f"{len(all_stations)} stations; station-level spatial patterns are in the relationships notebook"
+    ],
+    "Data quality": [
+        f"duplicate keys { {m: (dup_breakdown[m]['dup_groups'], dup_breakdown[m]['conflicting']) for m in MEASUREMENTS} } (groups, conflicting)",
+        f"-999 rows { {m: sum(value_stats[m].get(c + '_sentinel', 0) for c in value_columns(frames[m])) for m in MEASUREMENTS} }",
+        "other candidate codes: see Special Values",
+    ],
+    "Statistical patterns": [
+        "month and hour profiles (see Seasonal and Diurnal Profiles); value ranges per column in Distributions"
+    ],
+    "Relationships": ["cross-variable checks are in the relationships notebook"],
+    "Analytics use": [
+        "long hourly history at a small set of stations, with a quality flag per row"
+    ],
+    "ML use": [
+        "continuous targets (temperature, pressure, wind, sunshine) with strong seasonal and diurnal structure; the quality flag and special codes must be handled before use"
+    ],
+    "AI / knowledge use": [
+        "no text; parameter and station metadata form a small reference catalog (see the metadata notebook)"
+    ],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -770,13 +995,16 @@ write_profiling(
     blocks=[
         ("Profile", "\n".join(_profile) + "\n\n" + "\n".join(_miss)),
         ("Data Quality", "\n".join(_dq) + "\n\n" + "\n".join(_qn)),
+        ("Special Values", "\n".join(_special)),
         ("Categorical / Domain Validation", "\n".join(_domain)),
         ("Temporal", "\n".join(_temporal)),
         ("Regime / Version Evidence", "\n".join(_regime)),
         ("Coverage", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
+        ("Seasonal and Diurnal Profiles", "\n".join(_patterns)),
         ("EDA Findings", "\n".join(f"- {ln}" for ln in findings_lines)),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

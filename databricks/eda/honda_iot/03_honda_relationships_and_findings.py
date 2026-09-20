@@ -23,6 +23,7 @@
 
 # DBTITLE 1,Imports
 import numpy as np
+import pandas as pd
 from pyspark.sql import functions as F
 
 # COMMAND ----------
@@ -198,6 +199,90 @@ figs.append(
 
 # COMMAND ----------
 
+# DBTITLE 1,Hourly energy and weather frame (1h, inner join on datetime_utc)
+WCOLS = [
+    c
+    for c in spark.table(TABLES["weather"]).columns
+    if c not in ("frequency", "datetime_utc")
+]
+frame = (
+    spark.table(TABLES["weather"])
+    .where(F.col("frequency") == "1h")
+    .select("datetime_utc", *[safe_num(c).alias(c) for c in WCOLS])
+)
+ENERGY_COLS = []
+for e_ in [d_ for d_ in ENERGY if d_.endswith("_p")]:
+    pt = spark.table(TABLES[e_]).where(F.col("frequency") == "1h")
+    vc = [c for c in pt.columns if c not in ("frequency", "datetime_utc")]
+    fam = e_[: -len("_p")]
+    frame = frame.join(
+        pt.select("datetime_utc", *[safe_num(c).alias(f"{fam}_{c}") for c in vc]),
+        "datetime_utc",
+        "inner",
+    )
+    ENERGY_COLS += [f"{fam}_{c}" for c in vc]
+hourly = frame.toPandas()
+hourly["ts"] = pd.to_datetime(hourly["datetime_utc"])
+hourly = hourly.sort_values("ts").set_index("ts").drop(columns=["datetime_utc"])
+print(hourly.shape, ENERGY_COLS, WCOLS)
+
+# COMMAND ----------
+
+# DBTITLE 1,Energy against weather -- correlation at lag 0 and across +-6 hours
+ew_corr = {"pearson": {}, "spearman": {}, "best_lag": {}}
+for ec in ENERGY_COLS:
+    for wc in WCOLS:
+        pair = hourly[[ec, wc]].dropna()
+        if len(pair) < 100:
+            continue
+        key = f"{ec} ~ {wc.split('_')[-1]}"
+        ew_corr["pearson"][key] = round(float(pair[ec].corr(pair[wc])), 3)
+        ew_corr["spearman"][key] = round(
+            float(pair[ec].corr(pair[wc], method="spearman")), 3
+        )
+        lags = {k: hourly[ec].corr(hourly[wc].shift(k)) for k in range(-6, 7)}
+        lags = {k: v for k, v in lags.items() if pd.notna(v)}
+        if lags:
+            k_best = max(lags, key=lambda k: abs(lags[k]))
+            ew_corr["best_lag"][key] = (k_best, round(float(lags[k_best]), 3))
+print(ew_corr["pearson"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Energy against weather -- by season and by weather bin
+season_of = {
+    12: "winter",
+    1: "winter",
+    2: "winter",
+    6: "summer",
+    7: "summer",
+    8: "summer",
+}
+ew_season, ew_bins = {}, {}
+seasons = hourly.index.month.map(lambda m: season_of.get(m, "other"))
+for ec in ENERGY_COLS:
+    for wc in WCOLS:
+        key = f"{ec} ~ {wc.split('_')[-1]}"
+        for name in ("winter", "summer"):
+            sub = hourly[seasons == name][[ec, wc]].dropna()
+            if len(sub) > 100:
+                ew_season.setdefault(key, {})[name] = round(
+                    float(sub[ec].corr(sub[wc])), 3
+                )
+for ec in ENERGY_COLS:
+    for wc in WCOLS:
+        pair = hourly[[ec, wc]].dropna()
+        if len(pair) < 100 or pair[wc].nunique() < 10:
+            continue
+        bins = pd.cut(pair[wc], 8)
+        g = pair.groupby(bins, observed=True)[ec].mean()
+        ew_bins[f"{ec} by {wc.split('_')[-1]}"] = [
+            (str(k), round(float(v), 1)) for k, v in g.items()
+        ]
+print(list(ew_season)[:4], list(ew_bins)[:4])
+
+# COMMAND ----------
+
 # DBTITLE 1,Findings
 print("key unique per table       :", key_unique)
 print("keys missing vs union      :", grid_missing)
@@ -258,6 +343,31 @@ _rel.append(
         "Because (frequency, datetime_utc) is unique in every table, every join here is 1:1 --",
         "the only cardinality risk is row LOSS on an inner join, quantified by the orphan-keys",
         "column, not row multiplication.",
+    )
+)
+
+_rel.append("")
+_rel.append(
+    para(
+        f"Energy (P tables, 1h) against weather on {hourly.shape[0]} hourly rows where every stream is present;",
+        "Pearson and Spearman correlations at the same hour (energy column ~ weather column):",
+    )
+)
+_rel.append(f"- Pearson: {ew_corr['pearson']}")
+_rel.append(f"- Spearman: {ew_corr['spearman']}")
+_rel.append(
+    f"- Weather lead or lag (hours, corr) with the largest |corr| within +-6 h (positive = weather earlier): {ew_corr['best_lag']}"
+)
+_rel.append(
+    f"- Correlation inside winter (Dec-Feb) and summer (Jun-Aug) only: {ew_season}"
+)
+_rel.append("- Mean of each energy column by weather bin (bin, mean):")
+for k_, v_ in ew_bins.items():
+    _rel.append(f"  - {k_}: {v_}")
+_rel.append(
+    para(
+        "Correlations describe association in this one series; a weak or zero value is reported as found,",
+        "and the sign of an energy column follows the source's sign convention (see 01).",
     )
 )
 
@@ -360,8 +470,9 @@ _ml = ml_readiness_block(
         (
             "Proxy leakage",
             (
-                "P and W of one metric are near-redundant; heat/cool total ~ sum of components -- a wide "
-                "join makes these collinear features trivially available."
+                "P and W of one metric were expected to be related and totals to be sums of their components; "
+                "01 measures how far that holds (the P/W relation is unresolved there). Where they are related, a "
+                "wide join makes collinear features trivially available."
             ),
         ),
         (
@@ -399,8 +510,8 @@ _ml = ml_readiness_block(
         (
             "Target / feature temporal misalignment",
             (
-                "P (instant), W (cumulative, interval-end) and weather (interval-end) use different "
-                "timestamp conventions -- align to one before building a wide row."
+                "P, W and weather may use different timestamp conventions (not established by the data; 01 tests "
+                "the P/W alignment) -- align to one before building a wide row."
             ),
         ),
         (
@@ -439,6 +550,38 @@ _ml = ml_readiness_block(
     ]
 )
 
+_areas = {
+    "Domain understanding": [
+        f"energy streams (electricity, heating, cooling; total and sub-channels) and one weather station (columns {WCOLS}) sharing one timestamp key",
+        f"energy against weather (Pearson, same hour): {ew_corr['pearson']}",
+    ],
+    "Structure and engineering": [
+        f"7 tables, key (frequency, datetime_utc) unique in each: {all(key_unique.values())}; keys in all seven {seven_ct} of {union_ct}",
+        f"energy to weather join yield {_ewr}",
+    ],
+    "Temporal": [
+        f"shared window {overlap_win['common_window']}",
+        f"best weather lead/lag against energy within +-6 h: {ew_corr['best_lag']}",
+    ],
+    "Spatial": ["one site and one weather station; no coordinates"],
+    "Data quality": [f"keys missing per table vs the union: {grid_missing}"],
+    "Statistical patterns": [
+        f"season-specific correlations: {ew_season}",
+        f"energy by weather bin: {list(ew_bins)}",
+    ],
+    "Relationships": [
+        f"Spearman (same hour): {ew_corr['spearman']}",
+        f"pairwise key overlap: {len(overlap)} pairs, all present in the relationships section",
+    ],
+    "Analytics use": [
+        "weather-driven load and PV analysis is possible on the shared window; the weather has two variables only (temperature, global irradiance)"
+    ],
+    "ML use": [
+        f"a wide hourly table of {len(ENERGY_COLS)} energy columns and {len(WCOLS)} weather columns exists on {hourly.shape[0]} common hours"
+    ],
+    "AI / knowledge use": ["no text; column names carry the semantics"],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -449,6 +592,7 @@ write_profiling(
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("EDA Findings", _findings_md + "\n\n" + "\n".join(_verdict)),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

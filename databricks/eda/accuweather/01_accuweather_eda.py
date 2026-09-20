@@ -84,6 +84,7 @@ BOUNDS = [
 
 # DBTITLE 1,Helpers
 
+
 def bounds_for(col, unit):
     c = col.lower()
     for kind, text, imp, met in BOUNDS:
@@ -421,30 +422,64 @@ for t, df in DFS.items():
 
 # COMMAND ----------
 
-# DBTITLE 1,Completeness against the full location x time (x flag) grid
+# DBTITLE 1,Completeness within each location's own time range
 complete = {}
 for t, df in DFS.items():
     key = ROLE[t]["key"]
-    if not key:
+    step = cadence.get(t, {}).get("gap_p50")
+    if not key or not step:
         continue
-    names = ["c", "t", *[f"s{i}" for i in range(len(ROLE[t]["sub"]))]]
-    keys = df.select(
-        qcol(key[0]).alias("c"),
-        qcol(key[1]).cast("timestamp").alias("t"),
-        *[qcol(s).alias(f"s{i}") for i, s in enumerate(ROLE[t]["sub"])],
-    ).distinct()
-    grid = keys.select("c").distinct().crossJoin(keys.select("t").distinct())
-    for n in names[2:]:
-        grid = grid.crossJoin(keys.select(n).distinct())
-    missing = grid.join(keys, on=names, how="left_anti")
-    worst = missing.groupBy("c").count().orderBy(F.desc("count")).limit(5).collect()
-    complete[t] = {
-        "expected": grid.count(),
-        "actual": keys.count(),
-        "missing": missing.count(),
-        "worst": [(r["c"], r["count"]) for r in worst],
-    }
-    print(t, complete[t])
+    names = [key[0], *ROLE[t]["sub"]]
+    part = [qcol(c).alias(f"p{i}") for i, c in enumerate(names)]
+    pn = [f"p{i}" for i in range(len(names))]
+    ts = F.unix_timestamp(qcol(key[1]).cast("timestamp"))
+    g = (
+        df.select(*part, ts.alias("t"))
+        .groupBy(*pn)
+        .agg(
+            F.min("t").alias("lo"), F.max("t").alias("hi"), F.count(F.lit(1)).alias("n")
+        )
+        .withColumn(
+            "expected",
+            ((F.col("hi") - F.col("lo")) / F.lit(float(step))).cast("long") + 1,
+        )
+    )
+    b = g.agg(F.min("lo").alias("glo"), F.max("hi").alias("ghi")).first()
+    late, early = F.col("lo") > F.lit(b["glo"]), F.col("hi") < F.lit(b["ghi"])
+    r = (
+        g.agg(
+            F.count(F.lit(1)).alias("groups"),
+            F.sum("n").alias("actual"),
+            F.sum("expected").alias("expected_own"),
+            F.countDistinct("lo").alias("start_instants"),
+            F.countDistinct("hi").alias("end_instants"),
+            F.min("n").alias("n_min"),
+            F.max("n").alias("n_max"),
+            F.sum(late.cast("long")).alias("late_start"),
+            F.sum(early.cast("long")).alias("early_end"),
+        )
+        .first()
+        .asDict()
+    )
+    r["interior_missing"] = r["expected_own"] - r["actual"]
+    r["range_expected"] = r["groups"] * (int((b["ghi"] - b["glo"]) / step) + 1)
+    r["range_missing"] = r["range_expected"] - r["actual"]
+    edge = (
+        g.where(late | early)
+        .select(
+            *pn,
+            F.to_timestamp(F.from_unixtime("lo")).alias("first"),
+            F.to_timestamp(F.from_unixtime("hi")).alias("last"),
+            "n",
+        )
+        .orderBy(*pn)
+        .limit(6)
+        .collect()
+    )
+    r["edge_sample"] = [tuple(str(x) for x in row) for row in edge]
+    complete[t] = r
+    print(t, r)
+
 
 # COMMAND ----------
 
@@ -561,6 +596,7 @@ for a, b in UNIT_PAIRS:
 
 # DBTITLE 1,Key frames and pair alignment
 
+
 def key_frame(t, subs):
     r = ROLE[t]
     return (
@@ -609,6 +645,7 @@ for a, b in UNIT_PAIRS:
 
 # DBTITLE 1,Compare shared numeric columns on a joined key set
 
+
 def compare_pair(a, b, max_cols=60):
     info = align_pair_cache[(a, b)]
     names = info["names"]
@@ -648,6 +685,8 @@ def compare_pair(a, b, max_cols=60):
             F.avg(F.when(both, F.abs(F.col(f"a_{c}") - F.col(f"b_{c}")))).alias(
                 f"mae{i}"
             ),
+            F.covar_pop(F.col(f"a_{c}"), F.col(f"b_{c}")).alias(f"cv{i}"),
+            F.var_pop(F.col(f"a_{c}")).alias(f"va{i}"),
         ]
     r = j.agg(*aggs).first().asDict()
     return [
@@ -659,6 +698,12 @@ def compare_pair(a, b, max_cols=60):
             "corr": r[f"r{i}"],
             "equal": r[f"e{i}"],
             "mae": r[f"mae{i}"],
+            "slope": (r[f"cv{i}"] / r[f"va{i}"]) if r[f"va{i}"] else None,
+            "intercept": (
+                r[f"mb{i}"] - (r[f"cv{i}"] / r[f"va{i}"]) * r[f"ma{i}"]
+                if r[f"va{i}"] and r[f"mb{i}"] is not None and r[f"ma{i}"] is not None
+                else None
+            ),
         }
         for i, c in enumerate(shared)
     ]
@@ -696,6 +741,269 @@ for pair, info in period_align.items():
             pair,
             f"{info['both']} overlapping keys; {len(period_cols[pair])} shared numeric columns",
         )
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Imperial date column vs metric local time -- hour-shift search
+def shift_search(a, b, shifts=range(-14, 15)):
+    ta = "temperature" if "temperature" in ROLE[a]["numeric"] else None
+    tb = "temperature" if "temperature" in ROLE[b]["numeric"] else None
+    if not (ta and tb):
+        return None
+    has_off = "gmt_offset" in DTYPE[b]
+    imp = DFS[a].select(
+        qcol(ROLE[a]["loc"]).alias("c"),
+        qcol(ROLE[a]["time"]).cast("timestamp").alias("t"),
+        to_double(ta).alias("v"),
+    )
+    met = DFS[b].select(
+        qcol(ROLE[b]["loc"]).alias("c"),
+        qcol(ROLE[b]["time"]).cast("timestamp").alias("t"),
+        to_double(tb).alias("w"),
+        *([to_double("gmt_offset").alias("off")] if has_off else []),
+    )
+    parts = []
+    for h in shifts:
+        j = imp.withColumn("t", F.col("t") + F.expr(f"INTERVAL {h} HOURS")).join(
+            met, ["c", "t"]
+        )
+        match = (F.abs((F.col("v") - 32) * 5 / 9 - F.col("w")) < 0.3).cast("long")
+        parts.append(
+            j.select(
+                "c",
+                F.lit(h).alias("h"),
+                match.alias("m"),
+                *([F.col("off")] if has_off else []),
+            )
+        )
+    allj = reduce(lambda x, y: x.unionByName(y), parts)
+    overall = (
+        allj.groupBy("h")
+        .agg(F.count(F.lit(1)).alias("joined"), F.sum("m").alias("temp_match"))
+        .orderBy(F.desc("temp_match"))
+        .limit(5)
+        .collect()
+    )
+    pc = allj.groupBy("c", "h").agg(
+        F.sum("m").alias("m"), *([F.first("off").alias("off")] if has_off else [])
+    )
+    best = (
+        pc.withColumn(
+            "rk", F.row_number().over(Window.partitionBy("c").orderBy(F.desc("m")))
+        )
+        .where(F.col("rk") == 1)
+        .collect()
+    )
+    return {
+        "top_shifts": [(r["h"], r["joined"], r["temp_match"]) for r in overall],
+        "best_per_city": [
+            (r["c"], r["h"], r["m"], r["off"] if has_off else None) for r in best
+        ],
+    }
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Run the hour-shift search on unit pairs whose time keys differ
+shifts_found = {}
+for a, b in UNIT_PAIRS:
+    differs = ROLE[a]["time"] != ROLE[b]["time"]
+    info = unit_align.get((a, b), {})
+    if differs or info.get("only_a") or info.get("only_b"):
+        res = shift_search(a, b)
+        if res:
+            shifts_found[(a, b)] = res
+            print(a, b, res["top_shifts"])
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Physical consistency rules (ordering of related columns)
+def consistency_rules(cols):
+    have = set(cols)
+    rules = []
+    for c in sorted(have):
+        if c.endswith("_min"):
+            stem = c[:-4]
+            if f"{stem}_max" in have:
+                rules.append((f"{stem}_min <= {stem}_max", c, f"{stem}_max"))
+                if f"{stem}_avg" in have:
+                    rules.append((f"{stem}_min <= {stem}_avg", c, f"{stem}_avg"))
+                    rules.append(
+                        (f"{stem}_avg <= {stem}_max", f"{stem}_avg", f"{stem}_max")
+                    )
+    for sfx in ("", "_avg", "_min", "_max"):
+        for lo, hi in (
+            ("temperature_dew_point", "temperature"),
+            ("wind_speed", "wind_gust"),
+        ):
+            if lo + sfx in have and hi + sfx in have:
+                rules.append((f"{lo}{sfx} <= {hi}{sfx}", lo + sfx, hi + sfx))
+    return rules
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Evaluate the consistency rules per table
+phys = {}
+for t, df in DFS.items():
+    cols = [c for c, s in num[t].items() if s["is_numeric"]]
+    rules = consistency_rules(cols)
+    phys[t] = []
+    if not rules:
+        continue
+    aggs = []
+    for i, (_, lo, hi) in enumerate(rules):
+        both = to_double(lo).isNotNull() & to_double(hi).isNotNull()
+        aggs += [
+            F.sum(both.cast("long")).alias(f"n{i}"),
+            F.sum((both & (to_double(lo) > to_double(hi) + 1e-6)).cast("long")).alias(
+                f"v{i}"
+            ),
+        ]
+    r = df.agg(*aggs).first().asDict()
+    phys[t] = [(name, r[f"n{i}"], r[f"v{i}"]) for i, (name, _, _) in enumerate(rules)]
+    bad = [x for x in phys[t] if x[2]]
+    print(t, f"{len(rules)} rules; violated: {bad}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Temperature by latitude band and hemisphere (metric daily tables)
+lat_bands = {}
+for t, df in DFS.items():
+    s = STRUCT[t]
+    col = "temperature_avg"
+    if (
+        s["unit"] != "metric"
+        or s["grain"] != "daily_calendar"
+        or col not in ROLE[t]["numeric"]
+        or not ROLE[t]["lat"]
+    ):
+        continue
+    la = F.abs(to_double(ROLE[t]["lat"]))
+    band = (
+        F.when(la < 15, "0-15")
+        .when(la < 30, "15-30")
+        .when(la < 45, "30-45")
+        .otherwise("45+")
+    )
+    rows = (
+        df.groupBy(band.alias("band"))
+        .agg(
+            F.countDistinct(qcol(ROLE[t]["loc"])).alias("locations"),
+            F.avg(to_double(col)).alias("mean"),
+            F.sum((to_double(ROLE[t]["lat"]) < 0).cast("long")).alias("south_rows"),
+        )
+        .orderBy("band")
+        .collect()
+    )
+    corr_lat = df.select(
+        to_double(ROLE[t]["lat"]).alias("x"), to_double(col).alias("y")
+    ).stat.corr("x", "y")
+    lat_bands[t] = {
+        "bands": [(r["band"], r["locations"], round(r["mean"], 1)) for r in rows],
+        "corr_lat_temp": corr_lat,
+        "south_rows": sum(r["south_rows"] for r in rows),
+    }
+    print(t, lat_bands[t])
+
+# COMMAND ----------
+
+# DBTITLE 1,Day versus night temperature (daynight tables, metric)
+daynight = {}
+for t, df in DFS.items():
+    s = STRUCT[t]
+    if (
+        s["unit"] != "metric"
+        or not ROLE[t]["sub"]
+        or "temperature_avg" not in ROLE[t]["numeric"]
+    ):
+        continue
+    flag = ROLE[t]["sub"][0]
+    wide = (
+        df.select(
+            qcol(ROLE[t]["loc"]).alias("c"),
+            qcol(ROLE[t]["time"]).alias("dt"),
+            qcol(flag).alias("f"),
+            to_double("temperature_avg").alias("v"),
+        )
+        .groupBy("c", "dt")
+        .pivot("f", ["d", "n"])
+        .agg(F.avg("v"))
+    )
+    both = wide.where(F.col("d").isNotNull() & F.col("n").isNotNull())
+    r = (
+        both.agg(
+            F.count(F.lit(1)).alias("pairs"),
+            F.avg(F.col("d") - F.col("n")).alias("mean_diff"),
+            F.sum((F.col("d") > F.col("n")).cast("long")).alias("day_warmer"),
+        )
+        .first()
+        .asDict()
+    )
+    daynight[t] = r
+    print(t, r)
+
+# COMMAND ----------
+
+# DBTITLE 1,Encoding of unavailable values -- single-value columns
+const_kinds = {}
+for t, df in DFS.items():
+    cols = prof[t]["constant"]
+    if not cols:
+        const_kinds[t] = {}
+        continue
+    r = (
+        df.agg(
+            *[
+                F.first(as_str(c), ignorenulls=True).alias(f"v{i}")
+                for i, c in enumerate(cols)
+            ]
+        )
+        .first()
+        .asDict()
+    )
+    kinds_ = {}
+    for i, c in enumerate(cols):
+        v = r[f"v{i}"]
+        label = (
+            "all null"
+            if v is None
+            else (
+                "zero / false"
+                if str(v).strip().lower() in ("0", "0.0", "false")
+                else f"other value {v}"
+            )
+        )
+        kinds_.setdefault(label, []).append(c)
+    const_kinds[t] = {k: len(v) for k, v in kinds_.items()}
+    print(t, const_kinds[t])
+
+# COMMAND ----------
+
+# DBTITLE 1,Countries per location
+country_mix = None
+first_t = next((t for t in tables if ROLE[t]["loc"] and ROLE[t]["country"]), None)
+if first_t:
+    cc = (
+        DFS[first_t]
+        .select(
+            qcol(ROLE[first_t]["loc"]).alias("c"),
+            qcol(ROLE[first_t]["country"]).alias("cc"),
+        )
+        .distinct()
+        .groupBy("cc")
+        .count()
+        .orderBy(F.desc("count"))
+        .collect()
+    )
+    country_mix = {
+        "countries": len(cc),
+        "locations": sum(r["count"] for r in cc),
+        "top": [(r["cc"], r["count"]) for r in cc[:6]],
+    }
+    print(country_mix)
 
 # COMMAND ----------
 
@@ -738,15 +1046,6 @@ if facet_bars(
     logy=True,
 ):
     figs.append(("AccuWeather -- overview", "accuweather_overview.png"))
-_missing_by_table = [(t, complete[t]["missing"]) for t in tables if t in complete]
-if _missing_by_table and facet_bars(
-    {"missing (location, time) cells vs full grid": _missing_by_table},
-    "AccuWeather -- completeness",
-    "accuweather_completeness.png",
-    rot=60,
-    ncols=1,
-):
-    figs.append(("AccuWeather -- completeness", "accuweather_completeness.png"))
 _first_cat = {t: next(iter(v.values())) for t, v in cat_dist.items() if v}
 if _first_cat and facet_bars(
     dict(list(_first_cat.items())[:6]),
@@ -769,7 +1068,7 @@ for t in tables:
     print(
         f"{t}: rows={prof[t]['total']}, cols={len(prof[t]['cols'])}, constant={len(prof[t]['constant'])}, "
         f"all-missing={len(prof[t]['all_missing'])}, dups={prof[t]['dups']}, key={ROLE[t]['key']}, "
-        f"missing grid cells={complete.get(t, {}).get('missing')}"
+        f"interior gaps={complete.get(t, {}).get('interior_missing')}"
     )
 
 # COMMAND ----------
@@ -869,11 +1168,15 @@ for t in tables:
     _dq.append(
         f"- `{t}`: (column, max, rows at max, share) {short(caps.get(t, []), 8)}"
     )
-_dq.append("Completeness against the full location x time (x day/night flag) grid:")
+_dq.append(
+    "Completeness within each location's (and day/night flag's) own time range; a gap inside the range is a real gap, a group that starts later or ends earlier than the table's overall range is an edge effect:"
+)
 for t, c in complete.items():
     _dq.append(
-        f"- `{t}`: expected {c['expected']}, present {c['actual']}, missing {c['missing']}; "
-        f"locations with most missing (location, count): {c['worst'] or 'none'}."
+        f"- `{t}`: {c['groups']} groups; rows {c['actual']} vs {c['expected_own']} expected inside their own ranges (interior gaps {c['interior_missing']}); "
+        f"distinct start instants {c['start_instants']}, end instants {c['end_instants']}; rows per group {c['n_min']}..{c['n_max']}; "
+        f"groups starting later than the overall range {c['late_start']}, ending earlier {c['early_end']}; "
+        f"missing against the overall range {c['range_missing']}; sample (group, first, last, rows) {c['edge_sample'][:3] or 'none'}."
     )
 
 _entities = [
@@ -999,9 +1302,23 @@ for pair, rows in unit_cols.items():
         )
     if len(differing) > 15:
         _variants.append(f"  - (+{len(differing) - 15} more differing columns)")
+    linear = [
+        (x["col"], round(x["slope"], 4), round(x["intercept"], 3))
+        for x in differing
+        if x["corr"] is not None and x["corr"] > 0.999 and x["slope"] is not None
+    ]
+    _variants.append(
+        f"  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: {short(linear, 30)}"
+    )
+
+
+def _norm_diff(x):
+    level = 0.5 * (abs(x["mean_a"] or 0.0) + abs(x["mean_b"] or 0.0))
+    return (x["mae"] or 0.0) / level if level else 0.0
+
 
 _fh = [
-    "Forecast versus historical tables (same grain and unit): key overlap and value comparison on the overlap:"
+    "Forecast versus historical tables (same grain and unit): key overlap and value comparison on the overlap; columns are ranked by mean absolute difference relative to the mean level so that scale does not decide the order:"
 ]
 for (a, b), r in period_align.items():
     _fh.append(
@@ -1011,13 +1328,72 @@ for pair, rows in period_cols.items():
     _fh.append(
         f"- `{pair[0]}` (forecast) minus `{pair[1]}` (historical) on {period_align[pair]['both']} overlapping keys:"
     )
-    for x in sorted(rows, key=lambda x: -(x["mae"] or 0))[:12]:
+    ranked = sorted(
+        (x for x in rows if x["n"]),
+        key=lambda x: -_norm_diff(x),
+    )
+    shown = (
+        ranked[:12] + [x for x in ranked[12:] if x["col"].startswith("temperature")][:8]
+    )
+    for x in shown:
         _fh.append(
             f"  - `{x['col']}`: n {x['n']}, forecast mean {fmt_num(x['mean_a'])}, historical mean {fmt_num(x['mean_b'])}, "
-            f"corr {fmt_num(x['corr'])}, identical {x['equal']}, mean abs diff {fmt_num(x['mae'])}"
+            f"corr {fmt_num(x['corr'])}, identical {x['equal']}, mean abs diff {fmt_num(x['mae'])} "
+            f"(relative to the mean level: {_norm_diff(x):.2f})"
         )
 if not period_align:
     _fh.append("- No forecast/historical pair with a usable key.")
+
+_tcons.append(
+    "Timestamp alignment of the imperial `date` column to the metric local time (hour shift at which the imperial temperature converted to Celsius matches the metric temperature):"
+)
+for (a, b), res in shifts_found.items():
+    _tcons.append(
+        f"- `{a}` vs `{b}`: best shifts (hours, joined rows, matching rows) {res['top_shifts']}."
+    )
+    counts = {}
+    for _, h, _, _ in res["best_per_city"]:
+        counts[h] = counts.get(h, 0) + 1
+    _tcons.append(f"  best shift per city, number of cities by shift: {counts}.")
+    offs = [(h, off) for _, h, _, off in res["best_per_city"] if off is not None]
+    if offs:
+        scale = 3600.0 if max(abs(o) for _, o in offs) > 100 else 1.0
+        same = sum(1 for h, o in offs if h == round(o / scale))
+        opp = sum(1 for h, o in offs if h == -round(o / scale) and h != 0)
+        zero = sum(1 for h, _ in offs if h == 0)
+        _tcons.append(
+            f"  against the metric table's `gmt_offset` (unit assumed {'seconds' if scale == 3600.0 else 'hours'}): shift equals the offset for {same} cities, its negative for {opp}, is zero for {zero} of {len(offs)}."
+        )
+if not shifts_found:
+    _tcons.append(
+        "- No unit pair needed the check (time keys and row sets already agree)."
+    )
+
+_phys = ["Ordering rules between related columns (rows compared / rows violating):"]
+for t in tables:
+    bad = [x for x in phys.get(t, []) if x[2]]
+    _phys.append(
+        f"- `{t}`: {len(phys.get(t, []))} rules checked; violated: {short(bad, 8)}"
+    )
+_phys.append("Temperature by absolute-latitude band (band, locations, mean):")
+for t, r in lat_bands.items():
+    _phys.append(
+        f"- `{t}`: {r['bands']}; correlation of latitude with temperature {fmt_num(r['corr_lat_temp'])}; rows in the southern hemisphere {r['south_rows']}."
+    )
+_phys.append("Day versus night mean temperature per (location, date):")
+for t, r in daynight.items():
+    _phys.append(
+        f"- `{t}`: {r['pairs']} pairs; day minus night mean {fmt_num(r['mean_diff'])}; day warmer in {r['day_warmer']}."
+    )
+if country_mix:
+    _phys.append(
+        f"Locations per country: {country_mix['locations']} locations in {country_mix['countries']} countries; largest {country_mix['top']}."
+    )
+_phys.append(
+    "How unavailable values are encoded (single-value columns by kind, per table):"
+)
+for t in tables:
+    _phys.append(f"- `{t}`: {const_kinds.get(t) or 'none'}")
 
 _regime = [
     para(
@@ -1046,10 +1422,85 @@ for t in tables:
 
 _findings_md = "\n".join(
     f"- `{t}`: rows={prof[t]['total']}, cols={len(prof[t]['cols'])}, dups={prof[t]['dups']}, key={ROLE[t]['key']}, "
-    f"key duplicates={dupk.get(t, {}).get('dup_groups')}, missing grid cells={complete.get(t, {}).get('missing')}, "
+    f"key duplicates={dupk.get(t, {}).get('dup_groups')}, interior gaps={complete.get(t, {}).get('interior_missing')}, "
     f"cap-like columns={len(caps.get(t, []))}"
     for t in tables
 )
+
+_vocab = []
+for a, b in PERIOD_PAIRS:
+    for c in set(cat_dist[a]) & set(cat_dist[b]):
+        va, vb = {v for v, _ in cat_dist[a][c]}, {v for v, _ in cat_dist[b][c]}
+        if va != vb:
+            _vocab.append((c, sorted(map(str, va)), sorted(map(str, vb))))
+_by_period = {}
+for t in tables:
+    _by_period.setdefault(STRUCT[t]["period"], []).append(t)
+
+_window = (
+    min(v["lo"] for t in tables for v in tinfo[t].values()),
+    max(v["hi"] for t in tables for v in tinfo[t].values()),
+)
+
+_areas = {
+    "Domain understanding": [
+        f"weather variables for {len(next(iter(city_sets.values()), []))} locations over {_window[0]} .. {_window[1]}, as forecasts and as observed history, at {len({s['grain'] for s in STRUCT.values()})} time grains and in {len({s['unit'] for s in STRUCT.values() if s['unit']})} unit systems (from the table names and time columns)",
+        f"ordering rules between related columns: { {t: len(phys.get(t, [])) for t in tables} } checked; violated: { {t: [x[0] for x in phys.get(t, []) if x[2]] for t in tables if any(x[2] for x in phys.get(t, []))} or 'none' }",
+        f"temperature by absolute-latitude band (band, locations, mean): { {t: r['bands'] for t, r in lat_bands.items()} }; correlation with latitude { {t: fmt_num(r['corr_lat_temp']) for t, r in lat_bands.items()} }",
+        f"day versus night: { {t: (r['pairs'], r['day_warmer']) for t, r in daynight.items()} } (pairs, day warmer)",
+    ],
+    "Structure and engineering": [
+        f"{len(tables)} tables in {len({detail.get(t, {}).get('format') for t in tables})} storage format(s) {sorted({str(detail.get(t, {}).get('format')) for t in tables})}; grains {sorted({s['grain'] for s in STRUCT.values()})}, periods {sorted({s['period'] for s in STRUCT.values()})}, unit systems {sorted({str(s['unit']) for s in STRUCT.values()})}",
+        f"imperial and metric variants: identical keys in {sum(1 for r in unit_align.values() if not r['only_a'] and not r['only_b'])} of {len(unit_align)} pairs; column type differences {sum(len(d['dtype_differs']) for d in schema_diff.values())}",
+        f"unavailable values are encoded as: { {t: const_kinds.get(t) for t in tables if STRUCT[t]['unit'] == 'metric'} }",
+        f"time columns are named differently across variants for: {[(a, b) for a, b in UNIT_PAIRS if ROLE[a]['time'] != ROLE[b]['time']] or 'none'}",
+        f"columns holding descriptive text: {sorted({c for t in tables for c in DTYPE[t] if any(h in c for h in ('desc', 'phrase', 'text'))})}",
+    ],
+    "Temporal": [
+        f"forecast span {[horizon.get(t) for t in _by_period.get('forecast', [])][:3]} days, historical span {[horizon.get(t) for t in _by_period.get('historical', [])][:3]} days; one calendar window, no seasonality",
+        f"cadence per group is regular (max gap {sorted({c['gap_max'] for c in cadence.values()})} s); interior gaps {sum(c['interior_missing'] for c in complete.values())} across all tables",
+        f"groups that start late or end early (edge effects): { {t: (c['late_start'], c['early_end']) for t, c in complete.items() if c['late_start'] or c['early_end']} }",
+        "no issue time on any forecast table; local-time keys"
+        + (
+            f"; imperial-date alignment: {shifts_found and {k: v['top_shifts'][:2] for k, v in shifts_found.items()}}"
+            if shifts_found
+            else ""
+        ),
+    ],
+    "Spatial": [
+        f"{loc_attr['locations'] if loc_attr else 'n/a'} locations with fixed coordinates in every table; countries {country_mix['countries'] if country_mix else 'n/a'}",
+        f"latitude bands: { {t: r['bands'] for t, r in lat_bands.items()} }",
+        f"hemisphere: southern-hemisphere rows { {t: r['south_rows'] for t, r in lat_bands.items()} }",
+    ],
+    "Data quality": [
+        f"key duplicates { {t: d['dup_groups'] for t, d in dupk.items() if d['dup_groups']} or 'none' }; full-row duplicates { {t: prof[t]['dups'] for t in tables if prof[t]['dups']} or 'none' }",
+        f"all-missing columns { {t: len(prof[t]['all_missing']) for t in tables if prof[t]['all_missing']} }",
+        f"cap-like columns: { {t: [c[0] for c in caps[t]] for t in tables if caps.get(t)} }",
+        "imperial vs metric completeness differs in shared columns: see Unit-System Variants",
+    ],
+    "Statistical patterns": [
+        f"linear unit relations between variants (corr above 0.999) confirmed in {sum(1 for rows in unit_cols.values() for x in rows if x['corr'] is not None and x['corr'] > 0.999 and x['equal'] != x['n'])} column comparisons",
+        "forecast vs history agreement on the overlap window: see Forecast vs Historical (relative differences)",
+    ],
+    "Relationships": [
+        f"location set identical across tables: {same_cities}",
+        f"forecast/historical key overlap: { {f'{a}|{b}': r['both'] for (a, b), r in period_align.items()} }",
+        f"code vocabularies that differ between forecast and historical: {_vocab or 'none'}",
+    ],
+    "Analytics use": [
+        f"dimensions: location ({loc_stats[next(iter(loc_stats))]['locations'] if loc_stats else 'n/a'}), time (three grains), day/night flag, period, unit system; measures: {len(ROLE[tables[0]]['numeric'])}-{max(len(ROLE[t]['numeric']) for t in tables)} numeric columns per table",
+        "the same measures exist at hourly, day/night and daily grain, so the grains can be compared with each other",
+    ],
+    "ML use": [
+        f"forecast vs historical value pairs exist only on the overlap window ({ {f'{a}|{b}': r['both'] for (a, b), r in period_align.items()} }), which bounds any forecast-error study",
+        f"no target is defined in the source; issue-time columns: {sorted({c for t in tables for c in ROLE[t]['issue']}) or 'none'}, so the moment a forecast value became available cannot be established",
+    ],
+    "AI / knowledge use": [
+        f"catalog comment describes the sample and lists intended uses; column comments: {'none' if not _col_comments else len(_col_comments)}",
+        f"coded columns with numeric codes: { {t: [c for c in cat_dist[t] if c.endswith(CODE_SUFFIXES)] for t in tables if any(c.endswith(CODE_SUFFIXES) for c in cat_dist[t])} }",
+        f"location reference set: {loc_attr['locations'] if loc_attr else 'n/a'} cities with country codes and coordinates",
+    ],
+}
 
 _silver = [
     "- Read from the Samples catalog; no Bronze table exists for these tables.",
@@ -1150,11 +1601,13 @@ write_profiling(
         ("Relationship Cardinality", "\n".join(_card)),
         ("Unit-System Variants", "\n".join(_variants)),
         ("Forecast vs Historical", "\n".join(_fh)),
+        ("Physical Consistency and Spatial Patterns", "\n".join(_phys)),
         ("Regime / Version Evidence", "\n".join(_regime)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

@@ -25,6 +25,7 @@
 
 # DBTITLE 1,Imports
 import numpy as np
+import pandas as pd
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
@@ -377,49 +378,294 @@ for fm in forecast_metrics:
 # COMMAND ----------
 
 
-# DBTITLE 1,Physical consistency -- residual_load ~ load - wind - solar at the same (region, timestamp)
-def _find_metric(*subs, exclude=()):
-    for m in metrics:
-        ml = str(m).lower()
-        if all(s in ml for s in subs) and not any(x in ml for x in exclude):
-            return m
-    return None
+# DBTITLE 1,Physical consistency -- residual_load against load, wind and solar (variants tested)
+def _pick(*names):
+    return next((m for m in names if m in metrics), None)
 
 
-m_resid = _find_metric("residual", "load")
-m_load = _find_metric("load", exclude=("residual", "forecast")) or _find_metric(
-    "consumption", exclude=("forecast",)
+m_resid = _pick("residual_load")
+m_load = _pick("total_power_consumption", "total_load", "grid_load")
+m_on = _pick("generation_onshore_wind")
+m_off = _pick("generation_offshore_wind")
+m_pv = _pick("generation_photovoltaic")
+m_ps = _pick("pumped_storage_consumption")
+print(
+    f"resid={m_resid} load={m_load} onshore={m_on} offshore={m_off} pv={m_pv} pumped={m_ps}"
 )
-m_wind = _find_metric(
-    "generation", "wind", exclude=("forecast", "offshore")
-) or _find_metric("wind", exclude=("forecast",))
-m_pv = _find_metric(
-    "generation", "photovoltaic", exclude=("forecast",)
-) or _find_metric("solar", exclude=("forecast",))
-residual_identity = None
-print(f"residual-load metrics: resid={m_resid} load={m_load} wind={m_wind} pv={m_pv}")
-if all((m_resid, m_load, m_wind, m_pv)):
-    piv = (
-        df.where(F.col("metric").isin([m_resid, m_load, m_wind, m_pv]))
-        .groupBy("region", "resolution", "timestamp_utc")
-        .pivot("metric", [m_resid, m_load, m_wind, m_pv])
+identity_variants, identity_levels = [], []
+if m_resid and m_load and m_pv and (m_on or m_off):
+    wind = [m for m in (m_on, m_off) if m]
+    variants = {
+        "load - wind (on + off) - pv": (
+            [m_load, *wind, m_pv],
+            [1] + [-1] * (len(wind) + 1),
+        ),
+    }
+    if m_on and m_off:
+        variants["load - onshore wind - pv"] = ([m_load, m_on, m_pv], [1, -1, -1])
+    if m_ps:
+        variants["load + pumped-storage consumption - wind - pv"] = (
+            [m_load, m_ps, *wind, m_pv],
+            [1, 1] + [-1] * (len(wind) + 1),
+        )
+    cols_needed = sorted({m_resid, *[c for cs, _ in variants.values() for c in cs]})
+    piv_all = (
+        df.where((F.col("region") == "DE-LU") & F.col("metric").isin(cols_needed))
+        .groupBy("resolution", "timestamp_utc")
+        .pivot("metric", cols_needed)
         .agg(F.first(safe_num("value")))
     )
-    piv = piv.where(
-        F.col(f"`{m_resid}`").isNotNull()
-        & F.col(f"`{m_load}`").isNotNull()
-        & F.col(f"`{m_wind}`").isNotNull()
-        & F.col(f"`{m_pv}`").isNotNull()
+    identity_levels = (
+        piv_all.groupBy("resolution")
+        .agg(*[F.avg(F.col(f"`{c}`")).alias(c) for c in cols_needed])
+        .collect()
     )
-    residual_identity = additive_identity_check(
-        piv,
-        m_resid,
-        [m_load, m_wind, m_pv],
-        signs=[1, -1, -1],
-        rel_tol=0.02,
-        abs_floor=100.0,
+    identity_levels = [x.asDict() for x in identity_levels]
+    for res in [r_ for r_ in resolutions if r_ in metric_res.get(m_resid, [])]:
+        piv_r = piv_all.where(F.col("resolution") == res)
+        for name, (cs, sg) in variants.items():
+            ok = F.lit(True)
+            for c in [m_resid, *cs]:
+                ok = ok & F.col(f"`{c}`").isNotNull()
+            out = additive_identity_check(
+                piv_r.where(ok), m_resid, cs, signs=sg, rel_tol=0.02, abs_floor=100.0
+            )
+            out.update({"variant": name, "resolution": res})
+            identity_variants.append(out)
+            print(res, name, out)
+identity_best = min(
+    (x for x in identity_variants if x["violation_pct"] is not None),
+    key=lambda x: x["violation_pct"],
+    default=None,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Day-resolution timestamps -- hour of day of the stored value
+day_hours = (
+    df.where(F.col("resolution") == "day")
+    .groupBy(F.hour(as_ts("timestamp_utc")).alias("hour"))
+    .count()
+    .orderBy("hour")
+    .limit(30)
+    .collect()
+    if "day" in resolutions
+    else []
+)
+day_hours = [(x["hour"], x["count"]) for x in day_hours]
+print(day_hours)
+
+# COMMAND ----------
+
+# DBTITLE 1,DE-LU daily series -- collected once for pattern analysis
+PATTERN_METRICS = [
+    m
+    for m in (
+        "total_power_consumption",
+        "residual_load",
+        "day_ahead_prices",
+        "generation_onshore_wind",
+        "generation_offshore_wind",
+        "generation_photovoltaic",
+        "generation_biomass",
+        "generation_hydro",
+        "generation_lignite",
+        "generation_hard_coal",
+        "generation_natural_gas",
+        "generation_nuclear",
     )
-    print("residual-load identity:", residual_identity)
+    if m in metrics
+]
+FORECAST_PAIRS = [
+    (f, f[len("forecast_") :])
+    for f in metrics
+    if str(f).startswith("forecast_") and f[len("forecast_") :] in metrics
+]
+day_metrics = sorted({*PATTERN_METRICS, *[m for pair in FORECAST_PAIRS for m in pair]})
+daily = pd.DataFrame()
+if day_metrics and "day" in resolutions:
+    daily = (
+        df.where(
+            (F.col("region") == "DE-LU")
+            & (F.col("resolution") == "day")
+            & F.col("metric").isin(day_metrics)
+        )
+        .select(
+            F.to_date(
+                F.from_utc_timestamp(as_ts("timestamp_utc"), "Europe/Berlin")
+            ).alias("day"),
+            "metric",
+            safe_num("value").alias("value"),
+        )
+        .groupBy("day")
+        .pivot("metric", day_metrics)
+        .agg(F.avg("value"))
+        .orderBy("day")
+        .toPandas()
+        .set_index("day")
+    )
+    daily.index = pd.to_datetime(daily.index)
+print(daily.shape)
+
+# COMMAND ----------
+
+# DBTITLE 1,Seasonal, weekday and annual profiles (DE-LU, day resolution)
+profiles = {"month": {}, "weekday": {}, "year": {}}
+if not daily.empty:
+    for key, grouper in (
+        ("month", daily.index.month),
+        ("weekday", daily.index.dayofweek),
+        ("year", daily.index.year),
+    ):
+        g = daily[PATTERN_METRICS].groupby(grouper).mean()
+        profiles[key] = {
+            m: [(int(i), round(float(v), 1)) for i, v in g[m].items() if pd.notna(v)]
+            for m in PATTERN_METRICS
+        }
+print({k: list(v) for k, v in profiles.items()})
+
+# COMMAND ----------
+
+# DBTITLE 1,Persistence -- lag-1 and lag-7 autocorrelation of the daily series
+autocorr = {}
+for m in PATTERN_METRICS:
+    sr = daily[m].dropna() if m in daily else pd.Series(dtype=float)
+    if len(sr) > 30:
+        autocorr[m] = (round(float(sr.autocorr(1)), 3), round(float(sr.autocorr(7)), 3))
+print(autocorr)
+
+# COMMAND ----------
+
+# DBTITLE 1,Diurnal profile (DE-LU, quarter-hour, Europe/Berlin hour)
+DIURNAL = [
+    m
+    for m in (
+        "total_power_consumption",
+        "residual_load",
+        "day_ahead_prices",
+        "generation_onshore_wind",
+        "generation_offshore_wind",
+        "generation_photovoltaic",
+    )
+    if m in metrics and "quarterhour" in metric_res.get(m, [])
+]
+diurnal, neg_share_by_hour = {}, {}
+if DIURNAL:
+    hh = F.hour(F.from_utc_timestamp(as_ts("timestamp_utc"), "Europe/Berlin"))
+    rows = (
+        df.where(
+            (F.col("region") == "DE-LU")
+            & (F.col("resolution") == "quarterhour")
+            & F.col("metric").isin(DIURNAL)
+        )
+        .groupBy("metric", hh.alias("h"))
+        .agg(
+            F.avg(safe_num("value")).alias("mean"),
+            F.avg((safe_num("value") < 0).cast("double")).alias("neg_share"),
+        )
+        .orderBy("metric", "h")
+        .collect()
+    )
+    for x in rows:
+        diurnal.setdefault(x["metric"], []).append((x["h"], round(x["mean"], 1)))
+        if x["neg_share"]:
+            neg_share_by_hour.setdefault(x["metric"], []).append(
+                (x["h"], round(x["neg_share"], 3))
+            )
+print({m: len(v) for m, v in diurnal.items()})
+
+# COMMAND ----------
+
+# DBTITLE 1,Price against load, wind, solar and residual load (day resolution)
+rel = {"corr": None, "spearman": None, "by_year": {}, "residual_deciles": [], "n": 0}
+if not daily.empty and "day_ahead_prices" in daily and m_load:
+    wind_cols = [c for c in (m_on, m_off) if c]
+    tmp = pd.DataFrame(
+        {
+            "price": daily["day_ahead_prices"],
+            "load": daily[m_load],
+            "wind": daily[wind_cols].sum(axis=1, min_count=len(wind_cols))
+            if wind_cols
+            else np.nan,
+            "solar": daily[m_pv] if m_pv else np.nan,
+            "residual": daily[m_resid] if m_resid else np.nan,
+        }
+    )
+    tmp = tmp.dropna(axis=1, how="all").dropna()
+    rel["n"] = len(tmp)
+    if len(tmp) > 30:
+        rel["corr"] = {
+            c: round(float(tmp["price"].corr(tmp[c])), 3)
+            for c in tmp.columns
+            if c != "price"
+        }
+        rel["spearman"] = {
+            c: round(float(tmp["price"].corr(tmp[c], method="spearman")), 3)
+            for c in tmp.columns
+            if c != "price"
+        }
+        for y, g in tmp.groupby(tmp.index.year):
+            if len(g) > 30:
+                rel["by_year"][int(y)] = {
+                    c: round(float(g["price"].corr(g[c])), 3)
+                    for c in tmp.columns
+                    if c != "price"
+                }
+        q = (
+            pd.qcut(tmp["residual"], 10, duplicates="drop")
+            if "residual" in tmp
+            else None
+        )
+        rel["residual_deciles"] = (
+            [
+                (str(k), round(float(v), 1))
+                for k, v in tmp.groupby(q, observed=True)["price"].mean().items()
+            ]
+            if q is not None
+            else []
+        )
+print(rel)
+
+# COMMAND ----------
+
+# DBTITLE 1,Forecast against realised values (day resolution, DE-LU)
+forecast_acc = []
+for f, rm in FORECAST_PAIRS:
+    if f in daily and rm in daily:
+        pair = daily[[f, rm]].dropna()
+        if len(pair) > 30:
+            err = pair[f] - pair[rm]
+            base = pair[rm].abs().mean()
+            forecast_acc.append(
+                {
+                    "forecast": f,
+                    "realised": rm,
+                    "n": len(pair),
+                    "corr": round(float(pair[f].corr(pair[rm])), 3),
+                    "bias": round(float(err.mean()), 1),
+                    "mae": round(float(err.abs().mean()), 1),
+                    "mae_pct_of_mean": round(float(err.abs().mean() / base * 100), 1)
+                    if base
+                    else None,
+                }
+            )
+print(forecast_acc)
+
+# COMMAND ----------
+
+# DBTITLE 1,Generation mix by year (share of summed realised generation, DE-LU day resolution)
+GEN = [m for m in PATTERN_METRICS if m.startswith("generation_")]
+mix_by_year = {}
+if GEN and not daily.empty:
+    sums = daily[GEN].groupby(daily.index.year).sum(min_count=1)
+    shares = sums.div(sums.sum(axis=1), axis=0)
+    for y, row in shares.iterrows():
+        mix_by_year[int(y)] = {
+            m.replace("generation_", ""): round(float(v), 3)
+            for m, v in row.items()
+            if pd.notna(v) and v > 0
+        }
+print(mix_by_year)
 
 # COMMAND ----------
 
@@ -745,30 +991,91 @@ if not forecast_pairing:
 
 _pcons = [
     para(
-        "Physical identity: residual_load should equal load - wind - solar at the",
-        "same (region, resolution, timestamp).",
+        "residual_load is tested against load minus wind and solar at the same (DE-LU, resolution,",
+        "timestamp), with the load series named explicitly and several candidate definitions compared.",
     ),
+    f"Series used: residual={m_resid}, load={m_load}, onshore wind={m_on}, offshore wind={m_off}, solar={m_pv}, pumped-storage consumption={m_ps}.",
 ]
-if residual_identity:
+for x in identity_variants:
     _pcons.append(
-        f"- identity `{residual_identity['identity']}`: "
-        f"{residual_identity['violations']}/{residual_identity['comparable_rows']} rows exceed "
-        f"{int(residual_identity['rel_tol'] * 100)}% relative residual "
-        f"({residual_identity['violation_pct']}%); residual p01/p50/p99 "
-        f"{residual_identity['residual_p01_p50_p99']}, max abs {residual_identity['max_abs_residual']}."
+        f"- {x['resolution']}: `{x['identity']}`: {x['violations']}/{x['comparable_rows']} rows exceed "
+        f"{int(x['rel_tol'] * 100)}% relative residual ({x['violation_pct']}%); residual p01/p50/p99 "
+        f"{x['residual_p01_p50_p99']}, max abs {x['max_abs_residual']}."
     )
-    _pcons.append(
-        para(
-            "A non-trivial violation share means these published series are not a clean additive",
-            "set (rounding, different vintages, or an extra term such as pumped-storage load) --",
-            "do not derive one from the others without reconciling.",
+if identity_levels:
+    _pcons.append(f"Mean level of each series used, per resolution: {identity_levels}.")
+if identity_best and identity_best["violation_pct"] is not None:
+    if identity_best["violation_pct"] < 5:
+        _pcons.append(
+            f"Best-fitting definition: `{identity_best['identity']}` at {identity_best['resolution']} "
+            f"({identity_best['violation_pct']}% of rows outside 2%)."
         )
+    else:
+        _pcons.append(
+            para(
+                f"No tested combination reproduces residual_load within 2% (best: `{identity_best['identity']}` at",
+                f"{identity_best['resolution']}, {identity_best['violation_pct']}% of rows outside). The cause is not",
+                "established here (candidates: the source's definition of load, series vintages, or a unit /",
+                "aggregation difference between the series); the ambiguity is recorded, not resolved.",
+            )
+        )
+if not identity_variants:
+    _pcons.append(
+        f"- LIMITATION: the required series were not all present (resid={m_resid}, load={m_load}, wind={m_on}/{m_off}, pv={m_pv}) -- identity not tested."
+    )
+
+_patterns = []
+if day_hours:
+    _patterns.append(
+        f"Hour of day (UTC) of the stored day-resolution timestamps (hour, rows): {day_hours}."
+    )
+for key, title in (
+    ("month", "calendar month"),
+    ("weekday", "weekday (0 = Monday)"),
+    ("year", "year"),
+):
+    _patterns.append(f"Mean by {title}, DE-LU day resolution (period, mean):")
+    for m, vs in profiles[key].items():
+        _patterns.append(f"- `{m}`: {vs}")
+_patterns.append(f"Lag-1 / lag-7 autocorrelation of the daily series: {autocorr}.")
+_patterns.append(
+    "Diurnal profile, DE-LU quarter-hour, Europe/Berlin hour (hour, mean):"
+)
+for m, vs in diurnal.items():
+    _patterns.append(f"- `{m}`: {vs}")
+if neg_share_by_hour:
+    _patterns.append(
+        f"Share of negative values by hour (hour, share): {neg_share_by_hour}."
+    )
+if not daily.empty:
+    _patterns.append(
+        f"Daily frame: {daily.shape[0]} days x {daily.shape[1]} series, {daily.index.min().date()} .. {daily.index.max().date()}."
+    )
+
+_rels = []
+if rel["corr"]:
+    _rels.append(
+        f"Day-ahead price against load, wind, solar and residual load on {rel['n']} days (Pearson): {rel['corr']}; (Spearman): {rel['spearman']}."
+    )
+    _rels.append(f"The same correlations by year: {rel['by_year']}.")
+    _rels.append(
+        f"Mean price by decile of residual load (decile, mean price): {rel['residual_deciles']}."
     )
 else:
-    _pcons.append(
-        "- LIMITATION: could not identify all of residual-load / load / wind / solar metrics by "
-        f"name (resid={m_resid}, load={m_load}, wind={m_wind}, pv={m_pv}) -- identity not tested."
+    _rels.append(
+        "- Price / load / generation relationships not computed (series missing or too few common days)."
     )
+for a in forecast_acc:
+    _rels.append(
+        f"- `{a['forecast']}` against `{a['realised']}` on {a['n']} days: corr {a['corr']}, bias {a['bias']}, mean abs error {a['mae']} ({a['mae_pct_of_mean']}% of the mean level)."
+    )
+if not forecast_acc:
+    _rels.append(
+        "- No forecast series with a realised counterpart of the same name and enough common days."
+    )
+_rels.append(
+    f"Share of summed realised generation by year (technology: share): {mix_by_year}."
+)
 
 _regime2 = [
     para(
@@ -989,6 +1296,48 @@ _ml = ml_readiness_block(
     ]
 )
 
+_areas = {
+    "Domain understanding": [
+        f"{len(metrics)} metrics: realised generation by technology, consumption, residual load, day-ahead price and forecasts, for {regions}",
+        f"generation mix by year: {mix_by_year}",
+        f"residual load identity best result: {identity_best['identity'] + ' ' + str(identity_best['violation_pct']) + '% outside 2%' if identity_best else 'not testable'}",
+    ],
+    "Structure and engineering": [
+        "one long-format table (series key metric | filter_id | region | resolution); units are not stored",
+        f"day-resolution timestamps stored at UTC hours {day_hours[:4]}",
+        f"{len(present)} of {len(metrics) * len(regions) * len(resolutions)} metric x region x resolution combinations exist",
+    ],
+    "Temporal": [
+        f"daily frame {daily.shape if not daily.empty else 'not built'}; year profiles show the trend in {list(profiles['year'])[:3]}",
+        f"persistence (lag-1, lag-7): {autocorr}",
+        f"per-series coverage: {sum(1 for c in continuity if c['coverage_pct'] == 100)} of {len(continuity)} series complete",
+    ],
+    "Spatial": [
+        f"regions {regions}; regional series exist only for {[m for m, rg in metric_regions.items() if len(rg) > 1]}"
+    ],
+    "Data quality": [
+        f"exact duplicates {total - distinct_rows}; conflicting (series, ts) duplicates {db['conflicting']}",
+        f"missing values {sum(x['missing'] for x in by_metric.values())}; mirrored metric pairs {[(a, b) for a, b, _ in mirrors] or 'none'}",
+    ],
+    "Statistical patterns": [
+        f"weekday and month profiles for {len(PATTERN_METRICS)} metrics; diurnal profiles for {list(diurnal)}",
+        f"negative-value hours: {list(neg_share_by_hour)}",
+    ],
+    "Relationships": [
+        f"price vs load / wind / solar / residual (Pearson): {rel['corr']}",
+        f"forecast accuracy pairs: {[(a['forecast'], a['corr']) for a in forecast_acc]}",
+    ],
+    "Analytics use": [
+        "measures at two resolutions for one region total, with a few regional breakdowns; supports profile, trend and relationship analysis"
+    ],
+    "ML use": [
+        f"a price series with explanatory series available on the same days ({rel['n']} common days) and forecasts to compare with realised values",
+    ],
+    "AI / knowledge use": [
+        "metric names and filter ids form a small catalog; no free text"
+    ],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -1001,12 +1350,15 @@ write_profiling(
         ("Temporal Semantics", "\n".join(_temporal)),
         ("Temporal Consistency", "\n".join(_tcons)),
         ("Physical Consistency", "\n".join(_pcons)),
+        ("Temporal Patterns", "\n".join(_patterns)),
+        ("Relationships", "\n".join(_rels)),
         ("Regime / Version Evidence", "\n".join(_regime2)),
         ("Entities / Keys", "\n".join(_entities)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

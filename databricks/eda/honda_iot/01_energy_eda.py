@@ -52,7 +52,8 @@ KEY_COLS = ["frequency", "datetime_utc"]
 VALUE_EXCLUDE = {"frequency", "datetime_utc"}
 FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 # The dataset name says datetime_utc is UTC; W tables carry a running energy
-# meter (kWh, monotone up), P tables an instantaneous power / flow (kW, signed).
+# meter, P tables an instantaneous power / flow -- both are assumptions that the
+# checks below test against the values; units are not stated in the data.
 TS_TZ = "UTC"
 
 # COMMAND ----------
@@ -348,6 +349,121 @@ for metric in ("electricity", "heating", "cooling"):
 
 # COMMAND ----------
 
+# DBTITLE 1,W meters -- direction of change, sign-aware
+w_direction = {}
+for e in ENERGY:
+    if not e.endswith("_w"):
+        continue
+    win = Window.partitionBy("frequency").orderBy("datetime_utc")
+    exprs = []
+    for c in VCOLS[e]:
+        v = safe_num(c)
+        prev = F.lag(v).over(win)
+        exprs += [
+            F.sum(((v - prev) > 0).cast("long")).alias(f"{c}__up"),
+            F.sum(((v - prev) < 0).cast("long")).alias(f"{c}__down"),
+            F.sum(((v - prev) == 0).cast("long")).alias(f"{c}__flat"),
+            F.sum((F.abs(v) < F.abs(prev) - 1e-6).cast("long")).alias(f"{c}__mag_down"),
+        ]
+    r = frames[e].agg(*exprs).first().asDict()
+    w_direction[e] = {}
+    for c in VCOLS[e]:
+        lo, hi = value_stats[e][c + "_min"], value_stats[e][c + "_max"]
+        w_direction[e][c] = {
+            "up": r[f"{c}__up"],
+            "down": r[f"{c}__down"],
+            "flat": r[f"{c}__flat"],
+            "magnitude_decreasing": r[f"{c}__mag_down"],
+            "sign": "non-negative"
+            if lo >= 0
+            else ("non-positive" if hi <= 0 else "mixed"),
+        }
+        print(e, c, w_direction[e][c])
+
+# COMMAND ----------
+
+# DBTITLE 1,P against the increments of W -- alignment, scale and sign
+pw_align = []
+for metric in ("electricity", "heating", "cooling"):
+    p, w = frames[f"{metric}_p"], frames[f"{metric}_w"]
+    shared = [c for c in p.columns if c not in VALUE_EXCLUDE and c in w.columns]
+    if not shared:
+        continue
+    for freq, secs in FREQ_SECONDS.items():
+        scale = 3600.0 / secs
+        pf = p.where(F.col("frequency") == freq).select(
+            "datetime_utc", *[safe_num(c).alias(f"p_{c}") for c in shared]
+        )
+        wf = w.where(F.col("frequency") == freq).select(
+            "datetime_utc", *[safe_num(c).alias(f"w_{c}") for c in shared]
+        )
+        win = Window.orderBy("datetime_utc")
+        j = pf.join(wf, "datetime_utc")
+        sel = [F.col(f"p_{c}") for c in shared]
+        for c in shared:
+            wc = F.col(f"w_{c}")
+            sel += [
+                ((wc - F.lag(wc).over(win)) * scale).alias(f"b_{c}"),
+                ((F.lead(wc).over(win) - wc) * scale).alias(f"f_{c}"),
+            ]
+        jj = j.select(*sel)
+        aggs = [F.count(F.lit(1)).alias("n")]
+        for i, c in enumerate(shared):
+            pc, b, f_ = F.col(f"p_{c}"), F.col(f"b_{c}"), F.col(f"f_{c}")
+            aggs += [
+                F.corr(pc, b).alias(f"cb{i}"),
+                F.corr(pc, f_).alias(f"cf{i}"),
+                (F.covar_pop(pc, b) / F.var_pop(b)).alias(f"sb{i}"),
+                (F.covar_pop(pc, f_) / F.var_pop(f_)).alias(f"sf{i}"),
+                F.avg(pc).alias(f"mp{i}"),
+                F.avg(b).alias(f"mb{i}"),
+            ]
+        r = jj.agg(*aggs).first().asDict()
+        for i, c in enumerate(shared):
+            pw_align.append(
+                {
+                    "family": metric,
+                    "column": c,
+                    "frequency": freq,
+                    "n": r["n"],
+                    "corr_back": r[f"cb{i}"],
+                    "corr_forward": r[f"cf{i}"],
+                    "slope_back": r[f"sb{i}"],
+                    "slope_forward": r[f"sf{i}"],
+                    "mean_p": r[f"mp{i}"],
+                    "mean_increment": r[f"mb{i}"],
+                }
+            )
+            print(pw_align[-1])
+
+# COMMAND ----------
+
+# DBTITLE 1,Energy profiles -- hour of day, weekday and month (1h frequency, UTC)
+energy_profiles = {}
+for e in ENERGY:
+    if not e.endswith("_p"):
+        continue
+    d = (
+        frames[e]
+        .where(F.col("frequency") == "1h")
+        .withColumn("ts", F.to_timestamp("datetime_utc"))
+    )
+    aggs = [F.avg(safe_num(c)).alias(c) for c in VCOLS[e]]
+    energy_profiles[e] = {}
+    for key, k in (
+        ("hour", F.hour("ts")),
+        ("weekday", F.dayofweek("ts")),
+        ("month", F.month("ts")),
+    ):
+        rows = d.groupBy(k.alias("k")).agg(*aggs).orderBy("k").collect()
+        energy_profiles[e][key] = {
+            c: [(int(x["k"]), round(x[c], 1)) for x in rows if x[c] is not None]
+            for c in VCOLS[e]
+        }
+    print(e, {k: len(v) for k, v in energy_profiles[e].items()})
+
+# COMMAND ----------
+
 # DBTITLE 1,Regime evidence -- first half vs second half of the series (recalibration / sensor swap)
 spans = [
     (fc["min_ts"], fc["max_ts"])
@@ -541,6 +657,14 @@ print("P<->W relationship:", pw_rel)
 
 # COMMAND ----------
 
+
+# DBTITLE 1,Number formatting helper
+def fmt_c(x):
+    return "-" if x is None else f"{x:.4g}"
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Export profiling findings -> src/schemas/profiling/honda_iot.md
 _profile = [
     "| table | rows | cols | frequencies | constant cols |",
@@ -565,8 +689,8 @@ _dq.append(f"Stuck-run rows (value == value 1 and 9 steps back, 1h): {stuck}")
 
 _unit = [
     (
-        "Value columns cast to double; P tables are instantaneous power/flow (kW, may be "
-        "signed by convention), W tables a cumulative energy meter (kWh, should be monotone):"
+        "Value columns cast to double; P tables are assumed to be instantaneous power/flow and W tables a "
+        "cumulative energy meter, with no unit in the data -- the direction and scale checks below test this:"
     ),
 ]
 for e in ENERGY:
@@ -612,6 +736,14 @@ for metric, a in pw_rel.items():
     _rel.append(f"- {metric}: {a}")
 _rel.append(f"P/W schema parity: {schema_parity}")
 
+_patterns = [
+    "Mean of each P column by UTC hour of day, weekday (1 = Sunday) and month, 1h frequency (period, mean):"
+]
+for e, kinds_ in energy_profiles.items():
+    for key, cols in kinds_.items():
+        for c, vs in cols.items():
+            _patterns.append(f"- {e}.`{c}` by {key}: {vs}")
+
 _coverage = [
     f"Rows per (table, frequency): { {e: {k: v['rows'] for k, v in freq_cov[e].items()} for e in ENERGY} }.",
     (
@@ -637,9 +769,9 @@ if any(freq_domain[e]["unexpected_count"] for e in ENERGY):
 
 _tcons = [
     para(
-        "The W tables are cumulative energy meters -- the value must be",
-        "non-decreasing when ordered by datetime_utc within a frequency. A",
-        "decreasing step is either a meter reset/rollover or a data error.",
+        "The W tables were assumed to be cumulative energy meters that never decrease. That assumption is",
+        "tested here both literally (decreasing steps) and sign-aware (direction of change by sign of the",
+        "column, and whether the magnitude keeps growing):",
     ),
     "",
 ]
@@ -651,12 +783,26 @@ for e, cols in w_monotonic.items():
         )
 if not w_monotonic:
     _tcons.append("- No `*_w` cumulative-meter table in scope.")
+_tcons.append(
+    "Sign-aware direction per W column (steps up / down / flat, steps where the magnitude decreases, sign class):"
+)
+for e, cols in w_direction.items():
+    for c, d in cols.items():
+        _tcons.append(
+            f"- {e}.`{c}`: up {d['up']}, down {d['down']}, flat {d['flat']}, magnitude decreasing {d['magnitude_decreasing']}; values {d['sign']}."
+        )
+_tcons.append(
+    para(
+        "A column whose values are all non-positive and whose steps mostly go down is a meter counted with a",
+        "negative sign (a generation or export convention); it is monotone in magnitude, not in value.",
+    )
+)
 
 _pcons = [
     para(
-        "Physical identity check: the per-step increment of the W meter, converted",
-        "to an average power over the step, should equal the P value at the same",
-        "(frequency, datetime_utc). Residual = implied_power - P.",
+        "First check (first shared column only): the per-step increment of the W meter, converted to an",
+        "average power over the step, compared with the P value at the same (frequency, datetime_utc).",
+        "This assumes W increases with time, P and W share a unit, and the increment ends at the P timestamp.",
     ),
     "",
 ]
@@ -668,6 +814,41 @@ for metric, res in pw_identity.items():
     )
 if not pw_identity:
     _pcons.append("- No P/W column pair shared a name for the check.")
+_pcons.append(
+    "Alignment, scale and sign test for every shared column and frequency (P against the W increment converted to a rate; 'back' = W[t] - W[t-1], 'forward' = W[t+1] - W[t]):"
+)
+for x in pw_align:
+    _pcons.append(
+        f"- {x['family']}.`{x['column']}` at {x['frequency']} (n {x['n']}): corr back {fmt_c(x['corr_back'])}, forward {fmt_c(x['corr_forward'])}; "
+        f"slope of P on the increment back {fmt_c(x['slope_back'])}, forward {fmt_c(x['slope_forward'])}; mean P {fmt_c(x['mean_p'])}, mean increment {fmt_c(x['mean_increment'])}."
+    )
+_best = max(
+    (
+        x
+        for x in pw_align
+        if x["corr_back"] is not None or x["corr_forward"] is not None
+    ),
+    key=lambda x: max(abs(x["corr_back"] or 0), abs(x["corr_forward"] or 0)),
+    default=None,
+)
+_strong = [
+    (x["family"], x["column"], x["frequency"])
+    for x in pw_align
+    if max(abs(x["corr_back"] or 0), abs(x["corr_forward"] or 0)) >= 0.9
+]
+if _best:
+    _pcons.append(
+        f"Strongest alignment found: {_best['family']}.`{_best['column']}` at {_best['frequency']} with |corr| "
+        f"{max(abs(_best['corr_back'] or 0), abs(_best['corr_forward'] or 0)):.3f}; combinations with |corr| >= 0.9: {_strong or 'none'}."
+    )
+    if not _strong:
+        _pcons.append(
+            para(
+                "No alignment reproduces P from the W increments. What P and W measure, their units and their sign",
+                "convention are therefore NOT established by this data; the relationship is recorded as unresolved",
+                "and no interpretation is assumed.",
+            )
+        )
 
 _regime = [
     para(
@@ -752,11 +933,10 @@ _ml = ml_readiness_block(
         (
             "Temporal / post-event leakage",
             (
-                "The W tables are cumulative meters -- W[t] already contains energy that flows after the "
-                "prediction cutoff if the cutoff sits mid-interval; use first-difference (per-interval "
-                "energy), not the raw meter, and only points strictly before the cutoff. Meter "
-                "monotonicity is measured in Temporal Consistency; the dW/dt-vs-P identity in Physical "
-                "Consistency."
+                "If the W tables are running meters (assumed from the table name, not established -- see "
+                "Temporal Consistency and Physical Consistency), W[t] already contains energy that flows after "
+                "the prediction cutoff when the cutoff sits mid-interval; use first-differences, not the raw "
+                "meter, and only points strictly before the cutoff."
             ),
         ),
         (
@@ -805,8 +985,9 @@ _ml = ml_readiness_block(
         (
             "Target / feature temporal misalignment",
             (
-                "P (instantaneous, timestamped at the instant) and W (cumulative, timestamped at interval "
-                "end) are not aligned to the same instant -- align both to one convention before pairing."
+                "P and W may be timestamped at different points of the interval (the alignment test in Physical "
+                "Consistency compares W increments ending at, and starting at, the P timestamp) -- fix one "
+                "convention before pairing."
             ),
         ),
         (
@@ -855,6 +1036,45 @@ _ml = ml_readiness_block(
     ]
 )
 
+_areas = {
+    "Domain understanding": [
+        "one building's electricity, heating and cooling series, each as a P and a W table, at 1min / 15min / 1h; total plus sub-channels (PV, CHP, cooling electricity)",
+        f"sign conventions: { {f'{e}.{c}': d['sign'] for e, cols in w_direction.items() for c, d in cols.items()} }",
+        f"P vs W-increment relationship: {'unresolved -- no alignment with |corr| >= 0.9' if not _strong else _strong}",
+    ],
+    "Structure and engineering": [
+        f"6 Bronze tables with key (frequency, datetime_utc); rows {totals}",
+        "the same signal is stored at three resolutions in one table; no unit column",
+        f"P/W schema parity {schema_parity}; the CHP electricity column appears in two tables (mirror pairs: {[(a, b) for a, b, _ in mirrors] or 'none'})",
+    ],
+    "Temporal": [
+        f"coverage/longest gap per table: { {e: {fq: (continuity[e][fq]['coverage_pct'], continuity[e][fq]['longest_gap_steps']) for fq in continuity[e]} for e in ENERGY} }",
+        f"hour, weekday and month profiles for {list(energy_profiles)}",
+    ],
+    "Spatial": ["single site; no location column"],
+    "Data quality": [
+        f"duplicate key groups {[(e, dup[e]['dup_groups']) for e in ENERGY if dup[e]['dup_groups']] or 'none'}; 5-sigma outliers {outliers}",
+        f"W meters counted with a negative sign or decreasing: { {e: [c for c, d in cols.items() if d['down'] > d['up']] for e, cols in w_direction.items()} }",
+    ],
+    "Statistical patterns": [
+        "diurnal, weekday and seasonal profiles of each P channel (see Energy Profiles)",
+        f"value ranges and negative-value counts per column: {_neg}",
+    ],
+    "Relationships": [
+        f"P vs W (same timestamp) correlation: {pw_rel}",
+        f"P vs W-increment best alignment: {(_best['family'], _best['column'], _best['frequency']) if _best else 'not computed'}",
+    ],
+    "Analytics use": [
+        "load and generation channels for one site at minute resolution; supports profile and balance analysis once the P/W meaning is fixed"
+    ],
+    "ML use": [
+        "candidate targets are the P channels; whether W leaks future energy relative to P depends on the unresolved P/W meaning (see ML-Readiness)"
+    ],
+    "AI / knowledge use": [
+        "no text or label column; channel names carry the only semantics"
+    ],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -870,6 +1090,7 @@ write_profiling(
         ("Regime / Version Evidence", "\n".join(_regime)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Relationships", "\n".join(_rel)),
+        ("Energy Profiles", "\n".join(_patterns)),
         (
             "EDA Findings",
             "\n".join(
@@ -895,6 +1116,7 @@ write_profiling(
             ),
         ),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

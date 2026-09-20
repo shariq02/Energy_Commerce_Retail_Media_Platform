@@ -42,7 +42,19 @@ DATASETS = ["power_plant_list", "power_plant_capacity_additions"]
 TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.{d}" for d in DATASETS}
 ID_COL_HINTS = ("kraftwerksnummer", "blocknummer", "anlagenkennziffer", "mastrnummer")
 CAP_HINTS = ("nettonennleistung", "bruttoleistung", "nennleistung", "leistung", "mw")
-DATE_HINTS = ("datum", "inbetriebnahme", "stilllegung", "date")
+DATE_HINTS = ("datum", "inbetriebnahme", "stilllegung")
+# A record-type / record-set column (e.g. Datensatztyp) is not a date although the
+# name starts with "date".
+NOT_DATE_HINTS = ("typ", "satz")
+
+
+def is_date_col(name):
+    n = name.lower()
+    if any(h in n for h in NOT_DATE_HINTS):
+        return False
+    return any(h in n for h in DATE_HINTS) or "date" in _re.split(r"[^a-z]+", n)
+
+
 STATUS_HINTS = ("status", "kraftwerksstatus")
 FUEL_HINTS = ("energietraeger", "brennstoff", "primaerenergie")
 
@@ -153,7 +165,7 @@ for name, df in frames.items():
         print(
             f"{name}.{cap}: numeric yield={npar['yield']} is_numeric={npar['is_numeric']}"
         )
-    dcols = [c for c in cols if any(h in c.lower() for h in DATE_HINTS)]
+    dcols = [c for c in cols if is_date_col(c)]
     # BNetzA records commissioning / retirement as a YEAR ("2009"), not a date --
     # column name carries "Jahr". Profile those as integer years, the rest as
     # timestamps.
@@ -173,6 +185,207 @@ for name, df in frames.items():
         for ln in ts["lines"]:
             print(f"  {name}.{c}: {ln}")
     sem[name] = entry
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Null / blank helper
+def is_null_or_blank(colname):
+    return _qc(colname).isNull() | (F.trim(_qc(colname).cast("string")) == "")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Record type -- what each Datensatztyp value is
+rec = {}
+for name, df in frames.items():
+    tc = next((c for c in df.columns if "datensatztyp" in c.lower()), None)
+    if not tc:
+        continue
+    cap_c = sem[name].get("capacity", {}).get("column")
+    id_c = next((c for c in df.columns if "mastrnummer" in c.lower()), None)
+    yr_c = next((c for c in df.columns if "inbetriebnahme" in c.lower()), None)
+    bl_c = next((c for c in df.columns if "bundesland" in c.lower()), None)
+    tot_cap = df.agg(F.sum(safe_num(cap_c))).first()[0] if cap_c else None
+    aggs = [F.count(F.lit(1)).alias("rows")]
+    if id_c:
+        aggs += [
+            F.sum(is_null_or_blank(id_c).cast("long")).alias("id_missing"),
+            F.countDistinct(F.col(id_c)).alias("ids"),
+        ]
+    if cap_c:
+        v = safe_num(cap_c)
+        aggs += [
+            F.sum(v).alias("cap_sum"),
+            F.min(v).alias("cap_min"),
+            F.max(v).alias("cap_max"),
+            F.avg(v).alias("cap_mean"),
+        ]
+    if yr_c:
+        aggs += [
+            F.min(safe_num(yr_c)).alias("yr_min"),
+            F.max(safe_num(yr_c)).alias("yr_max"),
+        ]
+    if bl_c:
+        aggs.append(F.sum(is_null_or_blank(bl_c).cast("long")).alias("state_missing"))
+    rows = (
+        df.groupBy(F.col(tc).alias("type")).agg(*aggs).orderBy(F.desc("rows")).collect()
+    )
+    rec[name] = {
+        "column": tc,
+        "capacity_column": cap_c,
+        "total_capacity": tot_cap,
+        "types": [x.asDict() for x in rows],
+    }
+    for x in rec[name]["types"]:
+        print(name, x)
+
+# COMMAND ----------
+
+# DBTITLE 1,Largest capacity rows and total-like rows
+top_rows, total_like = {}, {}
+for name, df in frames.items():
+    cap_c = sem[name].get("capacity", {}).get("column")
+    if not cap_c:
+        continue
+    name_cols = [
+        c
+        for c in df.columns
+        if any(h in c.lower() for h in ("name", "bezeichnung", "kraftwerk"))
+        and "status" not in c.lower()
+        and "nummer" not in c.lower()
+    ][:2]
+    keep = [
+        c
+        for c in df.columns
+        if "datensatztyp" in c.lower() or "mastrnummer" in c.lower()
+    ] + name_cols
+    keep += [c for c in df.columns if "energietraeger" in c.lower()][:1]
+    rows = (
+        df.select(*keep, safe_num(cap_c).alias("__cap"))
+        .orderBy(F.desc("__cap"))
+        .limit(10)
+        .collect()
+    )
+    top_rows[name] = [
+        {k: (str(v)[:60] if v is not None else None) for k, v in x.asDict().items()}
+        for x in rows
+    ]
+    pattern = r"(?i)summe|gesamt|insgesamt|total|kleinanlagen|aggregi"
+    cond = F.lit(False)
+    for c in [c for c in df.columns if c in keep]:
+        cond = cond | F.col(c).cast("string").rlike(pattern)
+    total_like[name] = df.where(cond).count()
+    print(name, total_like[name], top_rows[name][:3])
+
+# COMMAND ----------
+
+# DBTITLE 1,Identifier cardinality -- nulls, repeats and what differs between repeated rows
+id_card = {}
+for name, df in frames.items():
+    id_c = next((c for c in df.columns if "mastrnummer" in c.lower()), None)
+    if not id_c:
+        continue
+    tc = next((c for c in df.columns if "datensatztyp" in c.lower()), None)
+    blank = is_null_or_blank(id_c)
+    present = df.where(~blank)
+    per = present.groupBy(_qc(id_c).alias("id")).agg(
+        F.count(F.lit(1)).alias("n"),
+        *[F.countDistinct(_qc(c)).alias(f"d{i}") for i, c in enumerate(df.columns)],
+    )
+    sizes = per.groupBy("n").count().orderBy("n").collect()
+    rep = per.where(F.col("n") > 1)
+    r = (
+        rep.agg(
+            F.count(F.lit(1)).alias("groups"),
+            *[
+                F.sum((F.col(f"d{i}") > 1).cast("long")).alias(f"v{i}")
+                for i, c in enumerate(df.columns)
+            ],
+        )
+        .first()
+        .asDict()
+    )
+    vary = {c: r[f"v{i}"] for i, c in enumerate(df.columns) if r[f"v{i}"]}
+    show = [c for c in [id_c, tc, *df.columns[:8]] if c]
+    examples = []
+    for x in rep.orderBy(F.desc("n")).limit(2).collect():
+        rows = (
+            present.where(_qc(id_c) == x["id"])
+            .select(*[_qc(c) for c in show])
+            .limit(6)
+            .collect()
+        )
+        examples.append(
+            [
+                {
+                    k: (str(v)[:40] if v is not None else None)
+                    for k, v in y.asDict().items()
+                }
+                for y in rows
+            ]
+        )
+    missing_by_type = (
+        [
+            (x["t"], x["n"])
+            for x in df.where(blank)
+            .groupBy(_qc(tc).alias("t"))
+            .agg(F.count(F.lit(1)).alias("n"))
+            .collect()
+        ]
+        if tc
+        else []
+    )
+    id_card[name] = {
+        "column": id_c,
+        "rows": prof[name]["total"],
+        "missing_or_blank": df.where(blank).count(),
+        "missing_by_type": missing_by_type,
+        "distinct": per.count(),
+        "repeat_sizes": [(x["n"], x["count"]) for x in sizes],
+        "groups_repeated": r["groups"],
+        "columns_varying_within_repeats": vary,
+        "examples": examples,
+    }
+    print(name, {k: v for k, v in id_card[name].items() if k != "examples"})
+
+# COMMAND ----------
+
+# DBTITLE 1,Footnote and free-text values inside data columns
+FOOT_PATTERN = r"(?i)^\s*[\(\*\[]|beachten|unsicherheit|quelle|anmerkung|hinweis|davon"
+foot = {}
+for name, df in frames.items():
+    str_cols = [c for c, t in df.dtypes if t == "string"]
+    exprs = []
+    for i, c in enumerate(str_cols):
+        v = F.col(c).cast("string")
+        exprs.append(
+            F.sum((v.rlike(FOOT_PATTERN) | (F.length(v) > 80)).cast("long")).alias(
+                f"f{i}"
+            )
+        )
+    r = df.agg(*exprs).first().asDict() if exprs else {}
+    foot[name] = {}
+    for i, c in enumerate(str_cols):
+        if r.get(f"f{i}"):
+            ex = (
+                df.where(
+                    F.col(c).cast("string").rlike(FOOT_PATTERN)
+                    | (F.length(F.col(c).cast("string")) > 80)
+                )
+                .select(F.substring(F.col(c).cast("string"), 1, 110).alias("v"))
+                .distinct()
+                .limit(5)
+                .collect()
+            )
+            foot[name][c] = {"rows": r[f"f{i}"], "examples": [x["v"] for x in ex]}
+    print(name, {c: v["rows"] for c, v in foot[name].items()})
+
+add_rows = [
+    [str(v)[:90] if v is not None else None for v in x]
+    for x in frames["power_plant_capacity_additions"].limit(40).collect()
+]
+print(len(add_rows))
 
 # COMMAND ----------
 
@@ -354,6 +567,16 @@ if facet_bars(
 
 # COMMAND ----------
 
+
+# DBTITLE 1,Number formatting helper
+def fmt_val(x):
+    if x is None:
+        return "-"
+    return f"{x:.4g}" if isinstance(x, float) else str(x)
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Findings
 for d in DATASETS:
     print(
@@ -402,6 +625,16 @@ if _broken:
     )
 else:
     _struct.append("-> Header applied correctly in the current Bronze tables.")
+_foot_cols = {
+    d: {c: v["rows"] for c, v in foot[d].items()} for d in DATASETS if foot.get(d)
+}
+if _foot_cols:
+    _struct.append(
+        para(
+            "However, footnote-like or long free-text values sit inside data columns (a header check does not see them):",
+            f"{_foot_cols}. The staging step that skips title and footnote rows did not remove every footnote line.",
+        )
+    )
 
 _dq = ["Full-row exact duplicates per table:"]
 for d in DATASETS:
@@ -470,6 +703,61 @@ for d in DATASETS:
         )
 if not _temporal:
     _temporal.append("- No date/year column located; temporal semantics not assessed.")
+
+_rec = []
+for name, rc in rec.items():
+    _rec.append(
+        f"{name}.`{rc['column']}` -- rows, ids (missing / distinct), capacity `{rc['capacity_column']}` (sum / min / max / mean, MW), commissioning year range, rows without state, per value:"
+    )
+    for x in rc["types"]:
+        share = (
+            (x.get("cap_sum") or 0) / rc["total_capacity"]
+            if rc["total_capacity"]
+            else None
+        )
+        _rec.append(
+            f"- `{x['type']}`: {x['rows']} rows; ids {x.get('id_missing')} missing / {x.get('ids')} distinct; capacity sum {fmt_val(x.get('cap_sum'))} "
+            f"({fmt_val(share)} of the table total), min {fmt_val(x.get('cap_min'))}, max {fmt_val(x.get('cap_max'))}, mean {fmt_val(x.get('cap_mean'))}; "
+            f"years {fmt_val(x.get('yr_min'))}..{fmt_val(x.get('yr_max'))}; rows without state {x.get('state_missing')}."
+        )
+for name, rows in top_rows.items():
+    _rec.append(f"Ten largest capacity rows of {name}: {rows}")
+    _rec.append(
+        f"Rows whose text columns contain a total- or aggregate-like word: {total_like[name]}."
+    )
+_rec.append(
+    para(
+        "Rows of an aggregated record type describe groups of small plants, not plants: their capacity must not be",
+        "counted as plant capacity or joined to unit-level tables as if they were single units.",
+    )
+)
+
+_idc = []
+for name, ic in id_card.items():
+    _idc.append(
+        f"{name}.`{ic['column']}`: {ic['rows']} rows, {ic['missing_or_blank']} missing or blank (by record type: {ic['missing_by_type']}), {ic['distinct']} distinct values."
+    )
+    _idc.append(
+        f"- ids by number of rows they appear on (rows per id, ids): {ic['repeat_sizes']}."
+    )
+    _idc.append(
+        f"- columns whose values differ between the rows of a repeated id (column, ids affected): {ic['columns_varying_within_repeats'] or 'none'}."
+    )
+    for ex in ic["examples"]:
+        _idc.append(f"- example rows of one repeated id: {ex}")
+
+_footnotes = []
+for name, cols_ in foot.items():
+    for c, v in cols_.items():
+        _footnotes.append(
+            f"- {name}.`{c}`: {v['rows']} rows match; examples {v['examples']}"
+        )
+if not _footnotes:
+    _footnotes.append("- No footnote-like or over-long values found in string columns.")
+_footnotes.append(
+    f"power_plant_capacity_additions in full ({len(add_rows)} rows, each row is a list of cell values):"
+)
+_footnotes += [f"  - {r_}" for r_ in add_rows]
 
 _domain = []
 for k, v in domain_checks.items():
@@ -718,6 +1006,51 @@ _ml = ml_readiness_block(
     ]
 )
 
+_agg_types = {
+    n: [
+        x
+        for x in rc["types"]
+        if any(h in str(x["type"]).lower() for h in ("aggreg", "klein"))
+    ]
+    for n, rc in rec.items()
+}
+_areas = {
+    "Domain understanding": [
+        "the register of German power plants above the reporting threshold plus aggregated small plants, with status, technology, fuel, feed-in type and commissioning / decommissioning years; a second table gives expected capacity changes",
+        f"record types: { {n: [(x['type'], x['rows']) for x in rc['types']] for n, rc in rec.items()} }",
+        f"aggregated-type rows: { {n: [(x['type'], x['rows'], fmt_val(x.get('cap_sum'))) for x in v] for n, v in _agg_types.items()} }",
+    ],
+    "Structure and engineering": [
+        f"header applied: { {d: not struct[d]['broken'] for d in DATASETS} }; footnote-like values inside data columns: {_foot_cols or 'none'}",
+        f"identifier: { {n: (ic['column'], ic['missing_or_blank'], ic['distinct']) for n, ic in id_card.items()} } (column, missing, distinct)",
+        "no shared key with the second table or with MaStR",
+    ],
+    "Temporal": [
+        "years (not dates) for commissioning and decommissioning; a snapshot without an edition axis",
+        f"order check: { {k: (v['violations'], v.get('comparable_rows')) for k, v in date_order.items()} }",
+    ],
+    "Spatial": [
+        f"state and country columns only; foreign plants present: {[x for x in categorical_dist['power_plant_list'].get('Land', [])[1:]]}",
+    ],
+    "Data quality": [
+        f"footnote text in values: {_foot_cols or 'none'}",
+        f"ids repeated on several rows: { {n: ic['repeat_sizes'] for n, ic in id_card.items()} }; columns that differ between repeats: { {n: ic['columns_varying_within_repeats'] for n, ic in id_card.items()} }",
+    ],
+    "Statistical patterns": [
+        f"capacity by record type: { {n: [(x['type'], fmt_val(x.get('cap_mean')), fmt_val(x.get('cap_max'))) for x in rc['types']] for n, rc in rec.items()} } (type, mean, max)"
+    ],
+    "Relationships": [
+        f"additions to plant list: {ppl_add_card if ppl_add_card else 'no shared identifier'}"
+    ],
+    "Analytics use": [
+        "capacity and status by technology, fuel and state; the aggregated small-plant rows must be separated from plant rows"
+    ],
+    "ML use": ["no target; plant-level identifiers and status are near-unique"],
+    "AI / knowledge use": [
+        "technology, fuel and status vocabularies (see Categorical); no free text except footnote lines that leaked into the data"
+    ],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -729,6 +1062,9 @@ write_profiling(
         ("Entities / Keys", "\n".join(_entities)),
         ("Unit & Semantic Validation", "\n".join(_unit)),
         ("Categorical / Domain Validation", "\n".join(_domain)),
+        ("Record Types and Aggregate Rows", "\n".join(_rec)),
+        ("Identifier Cardinality", "\n".join(_idc)),
+        ("Footnote and Free-text Values", "\n".join(_footnotes)),
         ("Temporal Semantics", "\n".join(_temporal)),
         ("Temporal Consistency", "\n".join(_tcons)),
         ("Relationship Cardinality", "\n".join(_card)),
@@ -737,6 +1073,7 @@ write_profiling(
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

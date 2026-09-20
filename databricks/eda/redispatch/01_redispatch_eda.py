@@ -198,30 +198,220 @@ if mean_c:
 for res in value_order:
     print(res)
 
-# energy ~ mean power x duration, only if begin/end timestamps can be built from
-# date + time columns.
+
+# energy ~ mean power x duration. Start / end are built from the date column
+# (multi-format parse) plus the clock time (HH:MM read with a pattern), so the
+# check is evaluated on every row whose two instants can be built.
+def clock_seconds(colname):
+    s_ = F.col(colname).cast("string")
+    hh = F.regexp_extract(s_, r"^\s*(\d{1,2}):(\d{2})", 1)
+    mm = F.regexp_extract(s_, r"^\s*(\d{1,2}):(\d{2})", 2)
+    return F.when(F.length(hh) > 0, hh.cast("int") * 3600 + mm.cast("int") * 60)
+
+
 begin_uhr = next(
     (c for c in COLS if "beginn" in c.lower() and "uhr" in c.lower()), None
 )
 end_uhr = next((c for c in COLS if "ende" in c.lower() and "uhr" in c.lower()), None)
-work_identity = None
-if mean_c and work_c and begin_c and end_c and begin_uhr and end_uhr:
-    bt = F.try_to_timestamp(
-        F.concat_ws(" ", F.col(begin_c).cast("string"), F.col(begin_uhr).cast("string"))
+work_identity, duration_stats = None, None
+if mean_c and work_c and begin_c and end_c:
+    b_ts = parse_ts_multi(begin_c).cast("long") + (
+        F.coalesce(clock_seconds(begin_uhr), F.lit(0)) if begin_uhr else F.lit(0)
     )
-    et = F.try_to_timestamp(
-        F.concat_ws(" ", F.col(end_c).cast("string"), F.col(end_uhr).cast("string"))
+    e_ts = parse_ts_multi(end_c).cast("long") + (
+        F.coalesce(clock_seconds(end_uhr), F.lit(0)) if end_uhr else F.lit(0)
     )
-    j = df.select(
+    base = df.select(
         safe_num(mean_c).alias("mean_mw"),
         safe_num(work_c).alias("work_mwh"),
-        ((et.cast("long") - bt.cast("long")) / 3600.0).alias("dur_h"),
-    ).where(F.col("dur_h").isNotNull() & (F.col("dur_h") > 0))
-    j = j.withColumn("implied_mwh", F.col("mean_mw") * F.col("dur_h"))
+        ((e_ts - b_ts) / 3600.0).alias("dur_h"),
+    )
+    duration_stats = (
+        base.agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.sum(F.col("dur_h").isNotNull().cast("long")).alias("with_duration"),
+            F.sum((F.col("dur_h") > 0).cast("long")).alias("positive"),
+            F.sum((F.col("dur_h") == 0).cast("long")).alias("zero"),
+            F.sum((F.col("dur_h") < 0).cast("long")).alias("negative"),
+            F.expr("percentile_approx(dur_h, array(0.5, 0.9, 0.99))").alias(
+                "p50_90_99_h"
+            ),
+            F.max("dur_h").alias("max_h"),
+        )
+        .first()
+        .asDict()
+    )
+    duration_stats["basis"] = (
+        "date + clock time" if begin_uhr and end_uhr else "date only"
+    )
+    j = base.where(
+        F.col("dur_h").isNotNull()
+        & (F.col("dur_h") > 0)
+        & F.col("mean_mw").isNotNull()
+        & F.col("work_mwh").isNotNull()
+    ).withColumn("implied_mwh", F.col("mean_mw") * F.col("dur_h"))
     work_identity = additive_identity_check(
         j, "work_mwh", ["implied_mwh"], rel_tol=0.05, abs_floor=1.0
     )
+    print("duration:", duration_stats)
     print("energy vs mean-power x duration:", work_identity)
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Volume by time -- year, month, weekday and hour of the start
+def _sum_work():
+    return (
+        F.sum(safe_num(work_c)).alias("total_mwh")
+        if work_c
+        else F.lit(None).alias("total_mwh")
+    )
+
+
+time_volume = {}
+if begin_c:
+    bts = parse_ts_multi(begin_c)
+    hh = clock_seconds(begin_uhr) / 3600 if begin_uhr else None
+    for key, k in (
+        ("year", F.year(bts)),
+        ("month", F.month(bts)),
+        ("weekday", F.dayofweek(bts)),
+        *((("hour", F.floor(hh).cast("int")),) if hh is not None else ()),
+    ):
+        rows = (
+            df.groupBy(k.alias("k"))
+            .agg(F.count(F.lit(1)).alias("measures"), _sum_work())
+            .where(F.col("k").isNotNull())
+            .orderBy("k")
+            .collect()
+        )
+        time_volume[key] = [
+            (
+                int(x["k"]),
+                x["measures"],
+                round(x["total_mwh"], 0) if x["total_mwh"] is not None else None,
+            )
+            for x in rows
+        ]
+        print(key, time_volume[key])
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Volume by reason, direction, fuel type and grid operator
+def _by_column(name, top=15):
+    rows = (
+        df.groupBy(F.col(name).alias("k"))
+        .agg(
+            F.count(F.lit(1)).alias("measures"),
+            _sum_work(),
+            F.avg(safe_num(mean_c)).alias("mean_mw")
+            if mean_c
+            else F.lit(None).alias("mean_mw"),
+        )
+        .orderBy(F.desc("measures"))
+        .limit(top)
+        .collect()
+    )
+    return [
+        (
+            x["k"],
+            x["measures"],
+            round(x["total_mwh"], 0) if x["total_mwh"] is not None else None,
+            round(x["mean_mw"], 1) if x["mean_mw"] is not None else None,
+        )
+        for x in rows
+    ]
+
+
+group_cols = [
+    c
+    for c in COLS
+    if any(h in c.lower() for h in ("grund", "richtung", "primaer", "uenb"))
+]
+volume_by = {c: _by_column(c) for c in group_cols}
+reason_c = next((c for c in group_cols if "grund" in c.lower()), None)
+dir_c2 = next((c for c in group_cols if "richtung" in c.lower()), None)
+reason_direction = (
+    [
+        (x["r"], x["d"], x["n"])
+        for x in df.groupBy(F.col(reason_c).alias("r"), F.col(dir_c2).alias("d"))
+        .agg(F.count(F.lit(1)).alias("n"))
+        .orderBy(F.desc("n"))
+        .limit(20)
+        .collect()
+    ]
+    if reason_c and dir_c2
+    else []
+)
+print({c: len(v) for c, v in volume_by.items()}, reason_direction[:3])
+
+# COMMAND ----------
+
+# DBTITLE 1,Affected-plant name -- structure, spelling variants and repetition
+plant_c = next((c for c in COLS if "anlage" in c.lower()), None)
+plant_text = None
+if plant_c:
+    raw = F.trim(F.col(plant_c).cast("string"))
+    norm = F.trim(
+        F.regexp_replace(F.lower(raw), r"[^a-z0-9\u00e4\u00f6\u00fc\u00df ]", " ")
+    )
+    norm = F.trim(F.regexp_replace(norm, r"\s+", " "))
+    base = df.select(
+        raw.alias("raw"),
+        norm.alias("norm"),
+        *([F.col(f).alias("fuel") for f in COLS if "primaer" in f.lower()][:1]),
+    )
+    r = (
+        base.where(F.col("raw").isNotNull() & (F.col("raw") != ""))
+        .agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.countDistinct("raw").alias("distinct_raw"),
+            F.countDistinct("norm").alias("distinct_normalised"),
+            F.min(F.length("raw")).alias("len_min"),
+            F.max(F.length("raw")).alias("len_max"),
+            F.avg(F.length("raw")).alias("len_mean"),
+            F.sum(F.col("raw").rlike(r"[0-9]").cast("long")).alias("with_digit"),
+            F.sum(F.col("raw").rlike(r"[/,;()]").cast("long")).alias("with_separator"),
+        )
+        .first()
+        .asDict()
+    )
+    top = (
+        base.where(F.col("raw").isNotNull() & (F.col("raw") != ""))
+        .groupBy("norm")
+        .count()
+        .orderBy(F.desc("count"))
+        .limit(15)
+        .collect()
+    )
+    tokens = (
+        base.where(F.col("norm").isNotNull())
+        .select(F.explode(F.split("norm", " ")).alias("t"))
+        .where(F.length("t") > 2)
+        .groupBy("t")
+        .count()
+        .orderBy(F.desc("count"))
+        .limit(20)
+        .collect()
+    )
+    multi_fuel = (
+        base.where(F.col("raw").isNotNull() & F.col("fuel").isNotNull())
+        .groupBy("norm")
+        .agg(F.countDistinct("fuel").alias("fuels"))
+        .where(F.col("fuels") > 1)
+        .count()
+        if "fuel" in base.columns
+        else None
+    )
+    plant_text = {
+        **r,
+        "top_names": [(x["norm"], x["count"]) for x in top],
+        "top_tokens": [(x["t"], x["count"]) for x in tokens],
+        "names_with_several_fuel_types": multi_fuel,
+    }
+    print(plant_text)
+
 
 # COMMAND ----------
 
@@ -393,11 +583,47 @@ if work_identity:
     )
 else:
     _vcons.append(
-        "- energy vs mean-power x duration: NOT tested -- needs BEGINN/ENDE date + time combined "
-        "into a timestamp (a Silver step); Bronze keeps date and time in separate columns."
+        "- energy vs mean-power x duration: NOT tested -- the mean-power, energy, start or end columns were not all located."
+    )
+if duration_stats:
+    _vcons.append(
+        f"- duration built from {duration_stats['basis']}: {duration_stats['with_duration']} of {duration_stats['rows']} rows have a duration; "
+        f"{duration_stats['positive']} positive, {duration_stats['zero']} zero, {duration_stats['negative']} negative; "
+        f"p50/p90/p99 hours {duration_stats['p50_90_99_h']}, max {duration_stats['max_h']}. The energy check runs on the rows with a positive duration."
     )
 if not value_order and not work_identity:
     _vcons = ["- No power/energy columns located by name for a consistency check."]
+
+_patterns = [
+    "Number of measures and total energy (MWh) by period of the start (period, measures, MWh):"
+]
+for key, vs in time_volume.items():
+    _patterns.append(f"- by {key}: {vs}")
+_patterns.append(
+    "Measures, total energy and mean power by category (value, measures, MWh, mean MW):"
+)
+for c, vs in volume_by.items():
+    _patterns.append(f"- `{c}`: {vs}")
+if reason_direction:
+    _patterns.append(
+        f"- reason x direction (reason, direction, measures): {reason_direction}"
+    )
+
+_plant = []
+if plant_text:
+    pt = plant_text
+    _plant += [
+        para(
+            f"`{plant_c}`: {pt['rows']} non-empty rows, {pt['distinct_raw']} distinct spellings, {pt['distinct_normalised']} after lower-casing and removing punctuation",
+            f"({pt['distinct_raw'] - pt['distinct_normalised']} spelling variants merged); name length {pt['len_min']}..{pt['len_max']} (mean {pt['len_mean']:.1f});",
+            f"{pt['with_digit']} contain a digit, {pt['with_separator']} contain a separator character.",
+        ),
+        f"- most frequent names (normalised, measures): {pt['top_names']}",
+        f"- most frequent words (word, occurrences): {pt['top_tokens']}",
+        f"- names appearing with more than one primary energy type: {pt['names_with_several_fuel_types']}",
+    ]
+else:
+    _plant.append("- No affected-plant column located.")
 
 _regime = [
     para(
@@ -639,6 +865,46 @@ _ml = ml_readiness_block(
     ]
 )
 
+_areas = {
+    "Domain understanding": [
+        "one row per grid measure that changes plant feed-in: reason, direction, start / end, mean and maximum power, total energy, instructing and requesting grid operators, affected plant, primary energy type",
+        f"energy vs mean power x duration: {work_identity['violation_pct'] if work_identity else 'not evaluated'}% of {work_identity['comparable_rows'] if work_identity else 0} rows outside 5%",
+        f"reasons: {[(k, n) for k, n, _, _ in volume_by.get(reason_c, [])[:4]]}",
+    ],
+    "Structure and engineering": [
+        f"{total} rows, {len(COLS)} columns, all strings in Bronze; German comma decimals; date and clock time in separate columns",
+        f"constant columns {constant_cols}",
+        f"duration basis: {duration_stats['basis'] if duration_stats else 'n/a'}",
+    ],
+    "Temporal": [
+        f"volume by year: {time_volume.get('year')}",
+        f"weekday and hour profile of starts: {time_volume.get('weekday')} / {time_volume.get('hour')}",
+        f"measure duration p50/p90/p99 (h): {duration_stats['p50_90_99_h'] if duration_stats else 'n/a'}",
+    ],
+    "Spatial": [
+        "no coordinates; grid operators and plant names are the only location proxies"
+    ],
+    "Data quality": [
+        f"end before start: {inverted}; mean > max power: {[(r_['label'], r_['violations']) for r_ in value_order]}",
+        f"affected-plant spelling variants merged by normalisation: {plant_text['distinct_raw'] - plant_text['distinct_normalised'] if plant_text else 'n/a'}",
+    ],
+    "Statistical patterns": [
+        f"energy and power distributions in Distributions; volume by month {time_volume.get('month')}",
+    ],
+    "Relationships": [
+        f"reason x direction: {reason_direction[:4]}",
+        f"names with several energy types: {plant_text['names_with_several_fuel_types'] if plant_text else 'n/a'}",
+        "no shared key with the plant register or MaStR (name-based only)",
+    ],
+    "Analytics use": [
+        "volumes and energy by reason, operator and plant over 2013-2020; supports operator and cause analysis"
+    ],
+    "ML use": ["no target in the source; measures are events, plants only by name"],
+    "AI / knowledge use": [
+        f"free-text plant names: {plant_text['distinct_normalised'] if plant_text else 'n/a'} distinct normalised names, frequent words {[t for t, _ in plant_text['top_tokens'][:8]] if plant_text else 'n/a'}; a candidate for entity resolution against the plant registers",
+    ],
+}
+
 write_profiling(
     SOURCE,
     NB_KEY,
@@ -650,12 +916,15 @@ write_profiling(
         ("Categorical / Domain Validation", "\n".join(_domain)),
         ("Value Consistency", "\n".join(_vcons)),
         ("Temporal Semantics", "\n".join(_temporal)),
+        ("Volume Patterns", "\n".join(_patterns)),
+        ("Affected-Plant Names", "\n".join(_plant)),
         ("Regime / Version Evidence", "\n".join(_regime)),
         ("Referential Integrity", "\n".join(_ri)),
         ("Coverage & Sampling Bias", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

@@ -428,6 +428,204 @@ print(
 
 # COMMAND ----------
 
+# DBTITLE 1,Geography -- events, users, purchases and revenue by country
+geo_dist = None
+if has_geo:
+    rows = (
+        df.groupBy("geo_country")
+        .agg(
+            F.count(F.lit(1)).alias("events"),
+            F.approx_count_distinct("user_pseudo_id").alias("users"),
+            F.sum((F.col("event_name") == "view_item").cast("long")).alias(
+                "item_views"
+            ),
+            F.sum((F.col("event_name") == "purchase").cast("long")).alias("purchases"),
+            F.sum(
+                F.when(
+                    F.col("event_name") == "purchase",
+                    F.col("ecommerce.purchase_revenue").cast("double"),
+                )
+            ).alias("revenue"),
+        )
+        .orderBy(F.desc("events"))
+        .collect()
+    )
+    ev_total = sum(x["events"] for x in rows)
+    geo_dist = {
+        "countries": len(rows),
+        "top1_share": round(rows[0]["events"] / ev_total, 4) if rows else None,
+        "top5_share": round(sum(x["events"] for x in rows[:5]) / ev_total, 4)
+        if rows
+        else None,
+        "not_set_events": sum(
+            x["events"]
+            for x in rows
+            if x["geo_country"] in UNSET_SENTINELS or x["geo_country"] is None
+        ),
+        "top": [
+            {
+                "country": x["geo_country"],
+                "events": x["events"],
+                "users": x["users"],
+                "events_per_user": round(x["events"] / x["users"], 1)
+                if x["users"]
+                else None,
+                "purchases": x["purchases"],
+                "purchases_per_1000_item_views": round(
+                    1000 * x["purchases"] / x["item_views"], 2
+                )
+                if x["item_views"]
+                else None,
+                "revenue": round(x["revenue"], 0) if x["revenue"] is not None else None,
+            }
+            for x in rows[:15]
+        ],
+        "countries_with_a_purchase": sum(1 for x in rows if x["purchases"]),
+    }
+    print(geo_dist["countries"], geo_dist["top1_share"], geo_dist["top"][:3])
+
+# COMMAND ----------
+
+# DBTITLE 1,Temporal patterns -- weekday, week, hour of day and busiest days
+import datetime as _dtm
+
+
+def _ymd(value):
+    t = str(value)
+    return _dtm.date(int(t[:4]), int(t[4:6]), int(t[6:8]))
+
+
+weekday_events, weekday_purchases, weekday_days = {}, {}, {}
+week_events = {}
+for d, n in by_day:
+    dd = _ymd(d)
+    wd = dd.weekday()
+    weekday_events[wd] = weekday_events.get(wd, 0) + n
+    weekday_days[wd] = weekday_days.get(wd, 0) + 1
+    iso = dd.isocalendar()
+    key = f"{iso[0]}-W{iso[1]:02d}"
+    week_events[key] = week_events.get(key, 0) + n
+purch_by_day = {}
+for x in day_type:
+    if x["event_name"] == "purchase":
+        purch_by_day[x["event_date"]] = x["count"]
+        wd = _ymd(x["event_date"]).weekday()
+        weekday_purchases[wd] = weekday_purchases.get(wd, 0) + x["count"]
+temporal_patterns = {
+    "mean_events_per_weekday": {
+        wd: round(weekday_events[wd] / weekday_days[wd])
+        for wd in sorted(weekday_events)
+    },
+    "purchases_by_weekday": dict(sorted(weekday_purchases.items())),
+    "weekly_events": sorted(week_events.items()),
+    "busiest_days_events": sorted(by_day, key=lambda p: -p[1])[:8],
+    "busiest_days_purchases": sorted(purch_by_day.items(), key=lambda p: -p[1])[:8],
+}
+hour_rows = (
+    df.select(
+        F.hour(
+            (F.col("event_timestamp").cast("long") / 1000000).cast("timestamp")
+        ).alias("h"),
+        "event_name",
+    )
+    .groupBy("h", "event_name")
+    .count()
+    .collect()
+)
+hour_all, hour_purchase, hour_view = {}, {}, {}
+for x in hour_rows:
+    hour_all[x["h"]] = hour_all.get(x["h"], 0) + x["count"]
+    if x["event_name"] == "purchase":
+        hour_purchase[x["h"]] = x["count"]
+    if x["event_name"] == "view_item":
+        hour_view[x["h"]] = x["count"]
+temporal_patterns["hour_events"] = sorted(hour_all.items())
+temporal_patterns["hour_purchases"] = sorted(hour_purchase.items())
+print(
+    {k: (v if k != "weekly_events" else len(v)) for k, v in temporal_patterns.items()}
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Purchases and revenue -- transactions, duplicates and revenue against item revenue
+purch = df.where(F.col("event_name") == "purchase").select(
+    F.col("ecommerce.transaction_id").cast("string").alias("tx"),
+    F.col("ecommerce.purchase_revenue").cast("double").alias("rev"),
+    "event_date",
+    F.aggregate(
+        "items",
+        F.lit(0.0),
+        lambda acc, x: acc + F.coalesce(x["item_revenue"].cast("double"), F.lit(0.0)),
+    ).alias("item_sum"),
+    F.size("items").alias("n_items"),
+)
+real_tx = F.col("tx").isNotNull() & ~F.col("tx").isin(*UNSET_SENTINELS)
+tx_stats = (
+    purch.agg(
+        F.count(F.lit(1)).alias("purchase_events"),
+        F.sum(real_tx.cast("long")).alias("with_real_transaction_id"),
+        F.countDistinct(F.when(real_tx, F.col("tx"))).alias("distinct_transactions"),
+        F.sum(F.col("rev").isNotNull().cast("long")).alias("with_revenue"),
+        F.sum((F.col("rev") > 0).cast("long")).alias("positive_revenue"),
+        F.sum(
+            F.col("rev").isNotNull().cast("long") * (F.col("item_sum") > 0).cast("long")
+        ).alias("with_revenue_and_item_revenue"),
+        F.sum(
+            (
+                F.col("rev").isNotNull()
+                & (F.col("item_sum") > 0)
+                & (F.abs(F.col("rev") - F.col("item_sum")) <= 0.01 * F.col("rev"))
+            ).cast("long")
+        ).alias("revenue_matches_item_sum_within_1pct"),
+        F.avg("n_items").alias("mean_items_per_purchase_event"),
+        F.sum(F.col("rev")).alias("total_revenue"),
+    )
+    .first()
+    .asDict()
+)
+rev_by_day = sorted(
+    [
+        (x["event_date"], round(x["r"], 0))
+        for x in purch.where(F.col("rev").isNotNull())
+        .groupBy("event_date")
+        .agg(F.sum("rev").alias("r"))
+        .collect()
+        if x["r"] is not None
+    ],
+    key=lambda p: -p[1],
+)[:8]
+print(tx_stats, rev_by_day)
+
+# COMMAND ----------
+
+# DBTITLE 1,Item categories -- top-level groups, price and revenue
+cat_items = items_exploded.where(
+    F.col("item_category").isNotNull() & ~F.col("item_category").isin(*UNSET_SENTINELS)
+).withColumn("top", F.split(F.col("item_category"), "/").getItem(0))
+category_groups = [
+    {
+        "group": x["top"],
+        "entries": x["entries"],
+        "items": x["items"],
+        "median_price": x["p50"],
+        "revenue": x["revenue"],
+    }
+    for x in cat_items.groupBy("top")
+    .agg(
+        F.count(F.lit(1)).alias("entries"),
+        F.approx_count_distinct("item_id").alias("items"),
+        F.percentile_approx(F.col("price").cast("double"), 0.5).alias("p50"),
+        F.sum(F.col("item_revenue").cast("double")).alias("revenue"),
+    )
+    .orderBy(F.desc("entries"))
+    .limit(12)
+    .collect()
+]
+distinct_categories = cat_items.select("item_category").distinct().count()
+print(distinct_categories, category_groups[:3])
+
+# COMMAND ----------
+
 # DBTITLE 1,Figures (each gated so a blank result is never referenced)
 figs = []
 _specs = [
@@ -620,6 +818,86 @@ if sc["with_cart"]:
         f"cart->purchase session rate = {sc['cart_and_purchase'] / sc['with_cart']:.4f}."
     )
 
+_geo = []
+if geo_dist:
+    _geo.append(
+        f"`geo_country`: {geo_dist['countries']} values; the largest holds {geo_dist['top1_share']} of the events, the five largest {geo_dist['top5_share']}; "
+        f"events with an unset country {geo_dist['not_set_events']}; countries with at least one purchase event {geo_dist['countries_with_a_purchase']}."
+    )
+    _geo.append(
+        "Largest countries (events, users, events per user, purchase events, purchases per 1000 item views, purchase revenue):"
+    )
+    for x in geo_dist["top"]:
+        _geo.append(
+            f"- {x['country']}: {x['events']}, {x['users']}, {x['events_per_user']}, {x['purchases']}, {x['purchases_per_1000_item_views']}, {x['revenue']}"
+        )
+else:
+    _geo.append("- No geo_country column in this table.")
+
+_tp = [
+    f"Mean events per calendar day by weekday (0 = Monday): {temporal_patterns['mean_events_per_weekday']}.",
+    f"Purchase events by weekday: {temporal_patterns['purchases_by_weekday']}.",
+    f"Events per ISO week: {temporal_patterns['weekly_events']}.",
+    f"Busiest days by events (day, events): {temporal_patterns['busiest_days_events']}.",
+    f"Busiest days by purchase events (day, purchases): {temporal_patterns['busiest_days_purchases']}.",
+    f"Events by hour of day, UTC (hour, events): {temporal_patterns['hour_events']}.",
+    f"Purchase events by hour of day, UTC (hour, purchases): {temporal_patterns['hour_purchases']}.",
+    f"Highest purchase-revenue days (day, revenue): {rev_by_day}.",
+]
+
+_txn = [
+    para(
+        f"Purchase events {tx_stats['purchase_events']}: {tx_stats['with_real_transaction_id']} carry a real transaction id, {tx_stats['distinct_transactions']} distinct transactions",
+        f"({tx_stats['with_real_transaction_id'] - tx_stats['distinct_transactions']} repeated ids); {tx_stats['with_revenue']} carry a revenue value ({tx_stats['positive_revenue']} above zero), total {tx_stats['total_revenue']}.",
+    ),
+    f"Purchase revenue against the sum of item revenue of the same event: {tx_stats['revenue_matches_item_sum_within_1pct']} of {tx_stats['with_revenue_and_item_revenue']} events with both agree within 1%; mean items per purchase event {tx_stats['mean_items_per_purchase_event']}.",
+    f"Item categories: {distinct_categories} distinct values; top-level groups (group, entries, distinct items, median price, item revenue): {category_groups}.",
+    "Category paths use '/' as a separator, and some labels contain '/' themselves, so the first segment is a group label, not a strict hierarchy level.",
+]
+
+_areas = {
+    "Domain understanding": [
+        "retail web-shop events (item views, promotions, search, cart, checkout, purchase) for one store, with user, session, item and transaction fields",
+        f"events by type: {funnel}",
+        f"top-level item groups: {[(g['group'], g['entries']) for g in category_groups[:5]]}",
+    ],
+    "Structure and engineering": [
+        "one Bronze table with nested arrays (event_params, items) and a struct (ecommerce); already filtered to a retained event set",
+        f"GA4's '(not set)' string is kept as a value: transaction id real in {tx_stats['with_real_transaction_id']} of {tx_stats['purchase_events']} purchase events",
+        f"scalar key duplicates: {db['dup_groups']}",
+    ],
+    "Temporal": [
+        f"{days[0] if days else None} .. {days[-1] if days else None} ({len(days)} days)",
+        f"weekday means {temporal_patterns['mean_events_per_weekday']}; busiest days {temporal_patterns['busiest_days_events'][:3]}",
+        f"purchase hours {temporal_patterns['hour_purchases'][:6]} ...",
+    ],
+    "Spatial": [
+        f"country only: {geo_dist['countries'] if geo_dist else 'n/a'} values, top 5 hold {geo_dist['top5_share'] if geo_dist else 'n/a'}; purchases in {geo_dist['countries_with_a_purchase'] if geo_dist else 'n/a'} countries",
+    ],
+    "Data quality": [
+        f"repeated transaction ids among purchase events: {tx_stats['with_real_transaction_id'] - tx_stats['distinct_transactions']}",
+        f"item id/name/category real population: {sentinel_pop}",
+        f"item entries from promotion events: {promo_entries} of {items_total}",
+    ],
+    "Statistical patterns": [
+        f"user concentration: {concentration['user_pseudo_id']}",
+        f"price / revenue / quantity percentiles: {qty_rev_stats}",
+    ],
+    "Relationships": [
+        f"session funnel: {session_funnel}",
+        f"purchase revenue vs item revenue agreement: {tx_stats['revenue_matches_item_sum_within_1pct']} of {tx_stats['with_revenue_and_item_revenue']}",
+    ],
+    "Analytics use": [
+        "funnel, product, category, country and time analysis of shop behaviour and revenue"
+    ],
+    "ML use": [
+        "session-level conversion is a natural label (purchase in session); the sample window is one holiday season"
+    ],
+    "AI / knowledge use": [
+        f"item names and category paths are a small product taxonomy ({distinct_categories} categories); search terms exist as an event parameter",
+    ],
+}
+
 _findings = []
 if key_check:
     _findings.append(
@@ -753,8 +1031,12 @@ write_profiling(
         ("Entities / Keys", "\n".join(_entities)),
         ("Distributions", "\n".join(_dist)),
         ("Relationships", "\n".join(_rel)),
+        ("Geography", "\n".join(_geo)),
+        ("Temporal Patterns", "\n".join(_tp)),
+        ("Purchases and Revenue", "\n".join(_txn)),
         ("EDA Findings", _findings_md),
         ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
     figures=figs,

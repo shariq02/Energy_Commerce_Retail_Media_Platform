@@ -1495,3 +1495,37 @@ def cross_source_overlap(spans):
         ),
         "pairwise_days": pair,
     }
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Observations by area
+AREAS = (
+    "Domain understanding",
+    "Structure and engineering",
+    "Temporal",
+    "Spatial",
+    "Data quality",
+    "Statistical patterns",
+    "Relationships",
+    "Analytics use",
+    "ML use",
+    "AI / knowledge use",
+)
+
+
+def area_block(evidence):
+    # One line per area. Each entry lists only what the data showed; an area
+    # with nothing to report says so instead of being left out or assumed.
+    lines = []
+    for a in AREAS:
+        items = [str(e) for e in evidence.get(a, []) if e]
+        lines.append(
+            f"- **{a}:** "
+            + (
+                "; ".join(items)
+                if items
+                else "no supporting evidence in the data read here."
+            )
+        )
+    return "\n".join(lines)
