@@ -44,13 +44,13 @@ Value columns cast to double; P tables are assumed to be instantaneous power/flo
 - heating_p.`total`: range 0.0..2193300.0, mean 245947.95250695854, sd 203773.06045464557, negative rows 0, zero 567358, non-numeric 20
 - heating_p.`CHP_heat`: range 0.0..459285.1413232855, mean 106099.61714698598, sd 128533.62655661607, negative rows 0, zero 1837745, non-numeric 13
 - heating_p.`CHP_elec`: range -282561.8727453294..27705.3, mean -64429.82433945399, sd 80113.58047093102, negative rows 1424715, zero 2269, non-numeric 1
-- heating_w.`total`: range 0.0..12975100.000000002, mean 6690127.6042457605, sd 3900559.891992281, negative rows 0, zero 20, non-numeric 0
-- heating_w.`CHP_heat`: range 0.0..5583000.0, mean 2765359.1359086484, sd 1613442.8019178223, negative rows 0, zero 9, non-numeric 0
+- heating_w.`total`: range 0.0..12975100.000000002, mean 6690127.604245759, sd 3900559.891992282, negative rows 0, zero 20, non-numeric 0
+- heating_w.`CHP_heat`: range 0.0..5583000.0, mean 2765359.135908648, sd 1613442.8019178219, negative rows 0, zero 9, non-numeric 0
 - heating_w.`CHP_elec`: range -3390184.498498443..0.0, mean -1695255.4217999058, sd 974522.2229910549, negative rows 3417892, zero 55, non-numeric 0
 - cooling_p.`total`: range 0.0..3717000.0, mean 43054.7894697851, sd 54535.94502971595, negative rows 0, zero 167258, non-numeric 92
 - cooling_p.`cool_elec`: range 0.0..332024.7807491248, mean 19460.582344276118, sd 27250.084640577727, negative rows 0, zero 3, non-numeric 0
-- cooling_w.`total`: range 0.0..2270133.4562972225, mean 1154458.3248297796, sd 664635.5387939217, negative rows 0, zero 3960, non-numeric 0
-- cooling_w.`cool_elec`: range 0.0..1024963.8347382598, mean 516459.98544157285, sd 302073.95176798734, negative rows 0, zero 3, non-numeric 0
+- cooling_w.`total`: range 0.0..2270133.4562972225, mean 1154458.3248297796, sd 664635.5387939214, negative rows 0, zero 3960, non-numeric 0
+- cooling_w.`cool_elec`: range 0.0..1024963.8347382598, mean 516459.9854415728, sd 302073.95176798716, negative rows 0, zero 3, non-numeric 0
 
 Exact-copy / sign-mirror column pairs (circular-feature risk):
 - `electricity_p.CHP` <-> `heating_p.CHP_elec`: identical distribution -- one column duplicates the other
@@ -115,11 +115,8 @@ A column whose values are all non-positive and whose steps mostly go down is a m
 
 ### Physical Consistency
 
-First check (first shared column only): the per-step increment of the W meter, converted to an average power over the step, compared with the P value at the same (frequency, datetime_utc). This assumes W increases with time, P and W share a unit, and the increment ends at the P timestamp.
+P is compared with the increment of the W meter converted to a rate. Two alignments are tested ('back' = W[t] - W[t-1], 'forward' = W[t+1] - W[t]) and the scale between P and the increment is measured from the data, so no unit or timestamp convention is assumed in advance.
 
-- electricity (`total`): 3417758/3417769 rows exceed 10% relative residual (99.9997%); residual p01/p50/p99 [-506199.77118357766, -181477.77362218132, 212965.7468897206], max abs 787812.7553131251.
-- heating (`total`): 2839028/3405097 rows exceed 10% relative residual (83.3758%); residual p01/p50/p99 [-789982.2555717126, -228100.0, 0.0], max abs 2193300.0.
-- cooling (`total`): 3250694/3415548 rows exceed 10% relative residual (95.1734%); residual p01/p50/p99 [-228900.0, -23000.0, 0.0], max abs 3714999.9999999627.
 Alignment, scale and sign test for every shared column and frequency (P against the W increment converted to a rate; 'back' = W[t] - W[t-1], 'forward' = W[t+1] - W[t]):
 - electricity.`total` at 1min (n 3155038): corr back 0.6424, forward 0.6423; slope of P on the increment back 418.7, forward 418.6; mean P 1.698e+05, mean increment 169.6.
 - electricity.`PV` at 1min (n 3155038): corr back 0.9239, forward 0.9235; slope of P on the increment back 858.5, forward 858.1; mean P -6.24e+04, mean increment -62.34.
@@ -145,6 +142,19 @@ Alignment, scale and sign test for every shared column and frequency (P against 
 - cooling.`cool_elec` at 15min (n 210332): corr back 0.7844, forward 0.8826; slope of P on the increment back 693.1, forward 779.9; mean P 1.946e+04, mean increment 19.49.
 - cooling.`total` at 1h (n 52583): corr back 0.6149, forward 0.6747; slope of P on the increment back 418.9, forward 459.7; mean P 4.305e+04, mean increment 43.17.
 - cooling.`cool_elec` at 1h (n 52583): corr back 0.9048, forward 0.9631; slope of P on the increment back 870, forward 926.1; mean P 1.946e+04, mean increment 19.49.
+Re-test after applying the measured scale (nearest power of ten of the slope) for the combinations with |corr| >= 0.9 at 15min and 1h; residual = P - scaled increment, tolerance 10%:
+- electricity.`total` at 15min (forward, scale 1000): 9945/210333 rows outside 10% (4.7282%); residual p01/p50/p99 [-11171.539971961174, 70.88236075942405, 11535.168134414882].
+- electricity.`PV` at 15min (forward, scale 1000): 4217/158103 rows outside 10% (2.6672%); residual p01/p50/p99 [-8664.184516562236, 0.7299496426378711, 6543.862820513881].
+- electricity.`CHP` at 15min (forward, scale 1000): 6671/210331 rows outside 10% (3.1717%); residual p01/p50/p99 [-5378.765595623758, 1.9339999254941915, 6082.852666699269].
+- electricity.`total` at 1h (forward, scale 1000): 1117/52582 rows outside 10% (2.1243%); residual p01/p50/p99 [-6172.892528664335, 102.14448836933298, 7122.0316562491935].
+- electricity.`PV` at 1h (forward, scale 1000): 268/39521 rows outside 10% (0.6781%); residual p01/p50/p99 [-3428.288938027341, 0.7778271522855648, 2364.646822007722].
+- electricity.`CHP` at 1h (forward, scale 1000): 927/52582 rows outside 10% (1.763%); residual p01/p50/p99 [-1849.6106666596752, 0.16566658284764912, 1824.867999990689].
+- heating.`CHP_heat` at 15min (forward, scale 1000): 25986/210333 rows outside 10% (12.3547%); residual p01/p50/p99 [-35834.0, 0.0, 33303.33333317813].
+- heating.`CHP_elec` at 15min (forward, scale 1000): 6674/210334 rows outside 10% (3.173%); residual p01/p50/p99 [-5378.765595623758, 1.9339999254941915, 6082.852666699269].
+- heating.`total` at 1h (forward, scale 1000): 28330/52581 rows outside 10% (53.8788%); residual p01/p50/p99 [-86556.66666666667, 0.0, 83990.0].
+- heating.`CHP_heat` at 1h (forward, scale 1000): 1950/52582 rows outside 10% (3.7085%); residual p01/p50/p99 [-9803.666666666686, 0.0, 9203.916666666672].
+- heating.`CHP_elec` at 1h (forward, scale 1000): 927/52582 rows outside 10% (1.763%); residual p01/p50/p99 [-1849.6106666596752, 0.16566658284764912, 1824.867999990689].
+- cooling.`cool_elec` at 1h (forward, scale 1000): 3103/52582 rows outside 10% (5.9013%); residual p01/p50/p99 [-1916.850244222981, 4.798552577549572, 2013.3754166620129].
 Strongest alignment found: electricity.`PV` at 1h with |corr| 1.000; combinations with |corr| >= 0.9: [('electricity', 'PV', '1min'), ('electricity', 'total', '15min'), ('electricity', 'PV', '15min'), ('electricity', 'CHP', '15min'), ('electricity', 'total', '1h'), ('electricity', 'PV', '1h'), ('electricity', 'CHP', '1h'), ('heating', 'CHP_heat', '15min'), ('heating', 'CHP_elec', '15min'), ('heating', 'total', '1h'), ('heating', 'CHP_heat', '1h'), ('heating', 'CHP_elec', '1h'), ('cooling', 'cool_elec', '1h')].
 
 ### Regime / Version Evidence
@@ -168,7 +178,7 @@ Single building, single sensor set -- no entity dimension; the only split axis i
 
 P<->W value relationship per metric (inner join on (frequency, datetime_utc), Pearson corr):
 - electricity: {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}
-- heating: {'matched': 3417946, 'corr_total': -0.06094743283120637, 'corr_CHP_heat': 0.012585981650604856, 'corr_CHP_elec': -0.0011251212780558674}
+- heating: {'matched': 3417946, 'corr_total': -0.0609474328312038, 'corr_CHP_heat': 0.012585981650599671, 'corr_CHP_elec': -0.0011251212780575815}
 - cooling: {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}
 P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 
@@ -206,7 +216,7 @@ Mean of each P column by UTC hour of day, weekday (1 = Sunday) and month, 1h fre
 - continuity (coverage % / longest gap steps): {'electricity_p': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'electricity_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'heating_p': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'heating_w': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'cooling_p': {'15min': (100.0, 0.0), '1h': (100.0, 0.0), '1min': (100.0, 0.0)}, 'cooling_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}}
 - 5-sigma outliers: {'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}
 - mirror/duplicate columns: [('electricity_p.CHP', 'heating_p.CHP_elec', 'identical distribution -- one column duplicates the other')]
-- P<->W relationship: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}, 'heating': {'matched': 3417946, 'corr_total': -0.06094743283120637, 'corr_CHP_heat': 0.012585981650604856, 'corr_CHP_elec': -0.0011251212780558674}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}
+- P<->W relationship: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}, 'heating': {'matched': 3417946, 'corr_total': -0.0609474328312038, 'corr_CHP_heat': 0.012585981650599671, 'corr_CHP_elec': -0.0011251212780575815}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}
 
 ### ML-Readiness Evidence
 
@@ -236,7 +246,7 @@ Mean of each P column by UTC hour of day, weekday (1 = Sunday) and month, 1h fre
 - **Spatial:** single site; no location column
 - **Data quality:** duplicate key groups none; 5-sigma outliers {'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}; W meters counted with a negative sign or decreasing: {'electricity_w': ['PV', 'CHP'], 'heating_w': ['CHP_elec'], 'cooling_w': []}
 - **Statistical patterns:** diurnal, weekday and seasonal profiles of each P channel (see Energy Profiles); value ranges and negative-value counts per column: {'electricity_p.total': 251753, 'electricity_p.PV': 2123870, 'electricity_p.CHP': 1424715, 'electricity_w.total': 225, 'electricity_w.PV': 2569378, 'electricity_w.CHP': 3417892, 'heating_p.CHP_elec': 1424715, 'heating_w.CHP_elec': 3417892}
-- **Relationships:** P vs W (same timestamp) correlation: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}, 'heating': {'matched': 3417946, 'corr_total': -0.06094743283120637, 'corr_CHP_heat': 0.012585981650604856, 'corr_CHP_elec': -0.0011251212780558674}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}; P vs W-increment best alignment: ('electricity', 'PV', '1h')
+- **Relationships:** P vs W (same timestamp) correlation: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}, 'heating': {'matched': 3417946, 'corr_total': -0.0609474328312038, 'corr_CHP_heat': 0.012585981650599671, 'corr_CHP_elec': -0.0011251212780575815}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}; P vs W-increment best alignment: ('electricity', 'PV', '1h')
 - **Analytics use:** load and generation channels for one site at minute resolution; supports profile and balance analysis once the P/W meaning is fixed
 - **ML use:** candidate targets are the P channels; whether W leaks future energy relative to P depends on the unresolved P/W meaning (see ML-Readiness)
 - **AI / knowledge use:** no text or label column; channel names carry the only semantics
