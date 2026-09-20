@@ -260,6 +260,7 @@ if mean_c and work_c and begin_c and end_c:
 
 # DBTITLE 1,Volume by time -- year, month, weekday and hour of the start
 
+
 def _sum_work():
     return (
         F.sum(safe_num(work_c)).alias("total_mwh")
@@ -298,6 +299,7 @@ if begin_c:
 # COMMAND ----------
 
 # DBTITLE 1,Volume by reason, direction, fuel type and grid operator
+
 
 def _by_column(name, top=15):
     rows = (

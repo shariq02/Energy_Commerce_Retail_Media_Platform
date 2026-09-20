@@ -284,6 +284,43 @@ for m in MEASUREMENTS:
 # extremes seen in the value ranges). None is assumed to be a missing-value
 # marker: the checks below record where each one occurs and let the data speak.
 CANDIDATES = (-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9999.0)
+# Plausible physical range per value column. A candidate inside the range is an
+# ordinary value there (-1 degC, 990 hPa) and is not searched; only candidates
+# outside the range are. Columns without a known range keep every candidate.
+PLAUSIBLE_RANGE = {
+    "TT_TU": (-70.0, 60.0),
+    "TT_STD": (-70.0, 60.0),
+    "TF_STD": (-70.0, 60.0),
+    "TD_STD": (-70.0, 60.0),
+    "RF_TU": (0.0, 101.0),
+    "RF_STD": (0.0, 101.0),
+    "P": (300.0, 1100.0),
+    "P0": (200.0, 1100.0),
+    "P_STD": (200.0, 1100.0),
+    "V_N": (0.0, 8.0),
+    "N": (0.0, 8.0),
+    "R1": (0.0, 300.0),
+    "RS_IND": (0.0, 1.0),
+    "WRTR": (0.0, 9.0),
+    "SD_SO": (0.0, 60.0),
+    "F": (0.0, 100.0),
+    "D": (0.0, 360.0),
+    "ABSF_STD": (0.0, 60.0),
+    "VP_STD": (0.0, 100.0),
+}
+
+
+def codes_for(col):
+    rng = PLAUSIBLE_RANGE.get(col.upper())
+    return [x for x in CANDIDATES if rng is None or x < rng[0] or x > rng[1]]
+
+
+def clean_value(col):
+    v = safe_num(col)
+    codes = codes_for(col)
+    return F.when(~v.isin(codes), v) if codes else v
+
+
 special = {}
 for m in MEASUREMENTS:
     df = frames[m]
@@ -293,7 +330,7 @@ for m in MEASUREMENTS:
         v = safe_num(c)
         exprs += [
             F.sum((v == cand).cast("long")).alias(f"n_{i}_{j}")
-            for j, cand in enumerate(CANDIDATES)
+            for j, cand in enumerate(codes_for(c))
         ]
     r = df.agg(*exprs).first().asDict()
     special[m] = {
@@ -301,7 +338,7 @@ for m in MEASUREMENTS:
         "hits": [
             (c, cand, r[f"n_{i}_{j}"])
             for i, c in enumerate(cols)
-            for j, cand in enumerate(CANDIDATES)
+            for j, cand in enumerate(codes_for(c))
             if r[f"n_{i}_{j}"]
         ],
     }
@@ -335,7 +372,8 @@ for m in MEASUREMENTS:
     by_st = by(F.col(sid))
     any_special = None
     for c in value_columns(df):
-        term = safe_num(c).isin(list(CANDIDATES)).cast("int")
+        codes = codes_for(c)
+        term = safe_num(c).isin(codes).cast("int") if codes else F.lit(0)
         any_special = term if any_special is None else any_special + term
     bundle = [
         (x["k"], x["count"])
@@ -379,7 +417,7 @@ for m in MEASUREMENTS:
     exprs = []
     cols = value_columns(df)
     for c in cols:
-        v = F.when(~safe_num(c).isin(list(CANDIDATES)), safe_num(c))
+        v = clean_value(c)
         exprs += [F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max")]
     r = df.agg(*exprs).first().asDict()
     clean_range[m] = {c: (r[c + "_min"], r[c + "_max"]) for c in cols}
@@ -403,10 +441,7 @@ for m, cols in PROFILE_COLS.items():
     if not cols:
         continue
     ts = as_ts(find_col(df, "MESS_DATUM"))
-    aggs = [
-        F.avg(F.when(~safe_num(c).isin(list(CANDIDATES)), safe_num(c))).alias(c)
-        for c in cols
-    ]
+    aggs = [F.avg(clean_value(c)).alias(c) for c in cols]
     profiles[m] = {}
     for key, k in (("month", F.month(ts)), ("hour", F.hour(ts))):
         rows = (
@@ -776,7 +811,8 @@ def short_list(items, n=8):
 
 _special = [
     para(
-        f"Candidate special codes searched in every value column: {CANDIDATES}.",
+        f"Candidate special codes {CANDIDATES}, searched in each value column only where the code lies outside that column's plausible range {PLAUSIBLE_RANGE}",
+        "(a code inside the range, such as -1 degC or 990 hPa, is an ordinary value there).",
         "None is assumed to be a missing-value marker; each is characterised by where it occurs.",
     )
 ]
@@ -789,7 +825,9 @@ for m, sd in special_detail.items():
             f"  - `{h['column']}` = {h['code']}: {h['rows']} rows ({h['share']:.3%}); by quality level (level, rows with the code, rows at level) {short_list(h['by_qn'])}; "
             f"by decade (decade, rows) {short_list(h['by_decade'])}; top stations (station, rows) {h['top_stations']} = {h['top3_station_share']} of the code's rows."
         )
-_special.append("Value range with every candidate code set aside (column: min, max):")
+_special.append(
+    "Value range with the out-of-range candidate codes of each column set aside (column: min, max):"
+)
 for m, cr in clean_range.items():
     _special.append(f"- {m}: {cr}")
 _special.append(

@@ -255,30 +255,51 @@ if gsid and geo_von:
 # to a candidate special code are set aside so a code never enters a comparison.
 RECENT_FROM = "2016-01-01"
 SPECIAL = [-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9999.0]
+# A candidate code inside a column's plausible range (-1 degC, 990 hPa) is an
+# ordinary value there and is kept; only out-of-range candidates are set aside.
+PLAUSIBLE_RANGE = {
+    "TT_TU": (-70.0, 60.0),
+    "TT_STD": (-70.0, 60.0),
+    "TF_STD": (-70.0, 60.0),
+    "TD_STD": (-70.0, 60.0),
+    "RF_TU": (0.0, 101.0),
+    "RF_STD": (0.0, 101.0),
+    "P": (300.0, 1100.0),
+    "P0": (200.0, 1100.0),
+    "P_STD": (200.0, 1100.0),
+    "V_N": (0.0, 8.0),
+    "R1": (0.0, 300.0),
+    "RS_IND": (0.0, 1.0),
+    "SD_SO": (0.0, 60.0),
+    "F": (0.0, 100.0),
+    "D": (0.0, 360.0),
+}
+
+
+def codes_for(colname):
+    rng = PLAUSIBLE_RANGE.get(colname.upper())
+    return [x for x in SPECIAL if rng is None or x < rng[0] or x > rng[1]]
 
 
 def clean(colname):
     v = safe_num(colname)
-    return F.when(~v.isin(SPECIAL), v)
+    codes = codes_for(colname)
+    return F.when(~v.isin(codes), v) if codes else v
 
 
-def hourly(m, cols, raw=()):
+def hourly(m, cols, raw=(), since=RECENT_FROM):
     df = spark.table(MEASUREMENT_TABLES[m])
     s_, d_ = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     have = [c for c in cols if find_col(df, c)]
-    return (
-        df.select(
-            F.col(s_).cast("string").alias("station"),
-            as_ts(d_).alias("ts"),
-            *[clean(find_col(df, c)).alias(c) for c in have],
-            *[
-                safe_num(find_col(df, c)).alias(f"raw_{c}")
-                for c in raw
-                if find_col(df, c)
-            ],
-        )
-        .where(F.col("ts") >= F.lit(RECENT_FROM).cast("timestamp"))
-        .withColumn("ts", F.col("ts"))
+    return df.select(
+        F.col(s_).cast("string").alias("station"),
+        as_ts(d_).alias("ts"),
+        *[clean(find_col(df, c)).alias(c) for c in have],
+        *[safe_num(find_col(df, c)).alias(f"raw_{c}") for c in raw if find_col(df, c)],
+    ).where(
+        (F.col("ts") >= F.lit(since).cast("timestamp"))
+        if since
+        else F.col("ts").isNotNull()
     )
 
 
@@ -364,18 +385,20 @@ print(xv["sun_cloud"])
 # COMMAND ----------
 
 # DBTITLE 1,Wind direction codes against wind speed
-wd = hourly("wind", ["F", "D"], raw=["D"])
-xv["wind"] = None
+# Full history: 990 occurs only in the 1970s to 2000s, outside the recent window.
+wd = hourly("wind", ["F", "D"], raw=["D"], since=None)
+xv["wind"], xv["wind_by_decade"] = None, None
 if {"F", "D"} <= set(wd.columns):
+    cls = (
+        F.when(F.col("raw_D") == 990, "D=990")
+        .when(F.col("raw_D") == 0, "D=0")
+        .when(F.col("raw_D") == -999, "D=-999")
+        .otherwise("other")
+    )
+    base = wd.where(F.col("F").isNotNull() & F.col("raw_D").isNotNull())
     xv["wind"] = [
         x.asDict()
-        for x in wd.where(F.col("F").isNotNull() & F.col("raw_D").isNotNull())
-        .groupBy(
-            F.when(F.col("raw_D") == 990, "D=990")
-            .when(F.col("raw_D") == 0, "D=0")
-            .otherwise("other")
-            .alias("direction_class")
-        )
+        for x in base.groupBy(cls.alias("direction_class"))
         .agg(
             F.count(F.lit(1)).alias("hours"),
             F.avg("F").alias("mean_speed"),
@@ -385,11 +408,22 @@ if {"F", "D"} <= set(wd.columns):
         .orderBy("direction_class")
         .collect()
     ]
+    xv["wind_by_decade"] = [
+        (int(x["dec"]), x["direction_class"], x["hours"])
+        for x in base.where(F.col("raw_D").isin(990.0, 0.0))
+        .groupBy(
+            (F.floor(F.year("ts") / 10) * 10).alias("dec"), cls.alias("direction_class")
+        )
+        .agg(F.count(F.lit(1)).alias("hours"))
+        .orderBy("dec", "direction_class")
+        .collect()
+    ]
 print(xv["wind"])
 
 # COMMAND ----------
 
 # DBTITLE 1,Station-level means against station elevation and latitude
+
 
 def _geo_col(*subs):
     return next((c for c in geo.columns if any(x in c.lower() for x in subs)), None)
@@ -646,7 +680,10 @@ _spatial = [
 ]
 
 _xvar = [
-    f"Cross-variable checks on the hourly rows from {RECENT_FROM} onward, with candidate special codes {SPECIAL} set aside:"
+    para(
+        f"Cross-variable checks on the hourly rows from {RECENT_FROM} onward (the wind direction check uses the full history).",
+        f"Candidate special codes {SPECIAL} are set aside per column only where they lie outside the column's plausible range {PLAUSIBLE_RANGE}.",
+    )
 ]
 th = xv.get("temp_humidity")
 if th:
@@ -669,7 +706,12 @@ if xv.get("sun_cloud"):
         f"- sunshine minutes by cloud-cover code (code, hours, mean minutes): {xv['sun_cloud']['by_code']}; correlation with the codes set aside {xv['sun_cloud']['corr_clean']}."
     )
 if xv.get("wind"):
-    _xvar.append(f"- wind speed by direction class: {xv['wind']}.")
+    _xvar.append(
+        f"- wind speed by direction class over the full history (990 and -999 only occur outside the recent window): {xv['wind']}."
+    )
+    _xvar.append(
+        f"- hours with direction 990 or 0 by decade (decade, class, hours): {xv['wind_by_decade']}."
+    )
 if not any(xv.values()):
     _xvar.append("- no pair had the columns needed.")
 

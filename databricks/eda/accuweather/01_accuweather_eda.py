@@ -749,6 +749,7 @@ for pair, info in period_align.items():
 
 # DBTITLE 1,Imperial date column vs metric local time -- hour-shift search
 
+
 def shift_search(a, b, shifts=range(-14, 15)):
     ta = "temperature" if "temperature" in ROLE[a]["numeric"] else None
     tb = "temperature" if "temperature" in ROLE[b]["numeric"] else None
@@ -822,6 +823,7 @@ for a, b in UNIT_PAIRS:
 # COMMAND ----------
 
 # DBTITLE 1,Physical consistency rules (ordering of related columns)
+
 
 def consistency_rules(cols):
     have = set(cols)
@@ -1491,7 +1493,7 @@ _areas = {
         f"code vocabularies that differ between forecast and historical: {_vocab or 'none'}",
     ],
     "Analytics use": [
-        f"dimensions: location ({loc_stats[next(iter(loc_stats))]['locations'] if loc_stats else 'n/a'}), time (three grains), day/night flag, period, unit system; measures: {len(ROLE[tables[0]]['numeric'])}-{max(len(ROLE[t]['numeric']) for t in tables)} numeric columns per table",
+        f"dimensions: location ({loc_stats[next(iter(loc_stats))]['locations'] if loc_stats else 'n/a'}), time (three grains), day/night flag, period, unit system; measures: {min(len(ROLE[t]['numeric']) for t in tables)}-{max(len(ROLE[t]['numeric']) for t in tables)} numeric columns per table",
         "the same measures exist at hourly, day/night and daily grain, so the grains can be compared with each other",
     ],
     "ML use": [

@@ -584,6 +584,7 @@ if role["ts"]:
 
 # DBTITLE 1,Indicator helper
 
+
 def disjoint_ranges(profile, col):
     ranges = sorted((r[f"{col}__lo"], r[f"{col}__hi"]) for r in profile)
     return len(ranges) > 1 and all(a[1] < b[0] for a, b in itertools.pairwise(ranges))

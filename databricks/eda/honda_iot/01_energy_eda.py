@@ -313,42 +313,6 @@ for e in ENERGY:
 
 # COMMAND ----------
 
-# DBTITLE 1,Physical consistency -- implied power from dW/dt should match the P table
-# For each metric, take the per-step increment of the cumulative W meter, convert
-# to an average power over the step, and compare it row-for-row with the P value
-# at the same (frequency, datetime_utc). A large residual share means P and W do
-# not describe the same physical quantity (a unit or labelling error).
-pw_identity = {}
-for metric in ("electricity", "heating", "cooling"):
-    p, w = frames[f"{metric}_p"], frames[f"{metric}_w"]
-    shared = [c for c in p.columns if c not in VALUE_EXCLUDE and c in w.columns]
-    if not shared:
-        continue
-    c0 = shared[0]
-    win = Window.partitionBy("frequency").orderBy("datetime_utc")
-    step_s = F.lit(None).cast("double")
-    for lbl, secs in FREQ_SECONDS.items():
-        step_s = F.when(F.col("frequency") == lbl, F.lit(float(secs))).otherwise(step_s)
-    wc = safe_num(c0)
-    wd = w.select(
-        *KEY_COLS,
-        ((wc - F.lag(wc).over(win)) * 3600.0 / step_s).alias("implied_power"),
-    )
-    j = wd.join(
-        p.select(*KEY_COLS, safe_num(c0).alias("p_val")),
-        on=KEY_COLS,
-        how="inner",
-    ).where(F.col("implied_power").isNotNull() & F.col("p_val").isNotNull())
-    pw_identity[metric] = {
-        "column": c0,
-        **additive_identity_check(
-            j, "implied_power", ["p_val"], rel_tol=0.1, abs_floor=0.1
-        ),
-    }
-    print(f"{metric}: dW/dt vs P -- {pw_identity[metric]}")
-
-# COMMAND ----------
-
 # DBTITLE 1,W meters -- direction of change, sign-aware
 w_direction = {}
 for e in ENERGY:
@@ -370,7 +334,9 @@ for e in ENERGY:
             F.sum(((cur - prev) > 0).cast("long")).alias(f"{c}__up"),
             F.sum(((cur - prev) < 0).cast("long")).alias(f"{c}__down"),
             F.sum(((cur - prev) == 0).cast("long")).alias(f"{c}__flat"),
-            F.sum((F.abs(cur) < F.abs(prev) - 1e-6).cast("long")).alias(f"{c}__mag_down"),
+            F.sum((F.abs(cur) < F.abs(prev) - 1e-6).cast("long")).alias(
+                f"{c}__mag_down"
+            ),
         ]
     r = frames[e].select(*sel).agg(*exprs).first().asDict()
     w_direction[e] = {}
@@ -442,6 +408,60 @@ for metric in ("electricity", "heating", "cooling"):
                 }
             )
             print(pw_align[-1])
+
+# COMMAND ----------
+
+# DBTITLE 1,P against the W increment after applying the measured scale (15min and 1h)
+# The scale is read from the alignment test (nearest power of ten of the measured
+# slope), never assumed; only combinations with |corr| >= 0.9 are re-tested.
+pw_scaled = []
+for x in pw_align:
+    if x["frequency"] not in ("15min", "1h"):
+        continue
+    forward = abs(x["corr_forward"] or 0) >= abs(x["corr_back"] or 0)
+    corr = x["corr_forward"] if forward else x["corr_back"]
+    slope = x["slope_forward"] if forward else x["slope_back"]
+    if corr is None or abs(corr) < 0.9 or not slope:
+        continue
+    scale = float(np.sign(slope) * 10 ** round(float(np.log10(abs(slope)))))
+    secs = FREQ_SECONDS[x["frequency"]]
+    fam, c = x["family"], x["column"]
+    pf = (
+        frames[f"{fam}_p"]
+        .where(F.col("frequency") == x["frequency"])
+        .select("datetime_utc", safe_num(c).alias("p_val"))
+    )
+    wf = (
+        frames[f"{fam}_w"]
+        .where(F.col("frequency") == x["frequency"])
+        .select("datetime_utc", safe_num(c).alias("w_val"))
+    )
+    win = Window.orderBy("datetime_utc")
+    wv = F.col("w_val")
+    inc = (F.lead(wv).over(win) - wv) if forward else (wv - F.lag(wv).over(win))
+    j = (
+        pf.join(wf, "datetime_utc")
+        .select("p_val", (inc * (3600.0 / secs) * scale).alias("implied"))
+        .where(F.col("implied").isNotNull() & F.col("p_val").isNotNull())
+    )
+    res = additive_identity_check(
+        j,
+        "p_val",
+        ["implied"],
+        rel_tol=0.1,
+        abs_floor=max(1.0, 0.02 * abs(x["mean_p"] or 0)),
+    )
+    pw_scaled.append(
+        {
+            "family": fam,
+            "column": c,
+            "frequency": x["frequency"],
+            "direction": "forward" if forward else "back",
+            "scale": scale,
+            **res,
+        }
+    )
+    print(pw_scaled[-1])
 
 # COMMAND ----------
 
@@ -666,6 +686,7 @@ print("P<->W relationship:", pw_rel)
 
 # DBTITLE 1,Number formatting helper
 
+
 def fmt_c(x):
     return "-" if x is None else f"{x:.4g}"
 
@@ -807,20 +828,12 @@ _tcons.append(
 
 _pcons = [
     para(
-        "First check (first shared column only): the per-step increment of the W meter, converted to an",
-        "average power over the step, compared with the P value at the same (frequency, datetime_utc).",
-        "This assumes W increases with time, P and W share a unit, and the increment ends at the P timestamp.",
+        "P is compared with the increment of the W meter converted to a rate. Two alignments are tested",
+        "('back' = W[t] - W[t-1], 'forward' = W[t+1] - W[t]) and the scale between P and the increment is",
+        "measured from the data, so no unit or timestamp convention is assumed in advance.",
     ),
     "",
 ]
-for metric, res in pw_identity.items():
-    _pcons.append(
-        f"- {metric} (`{res['column']}`): {res['violations']}/{res['comparable_rows']} rows "
-        f"exceed {int(res['rel_tol'] * 100)}% relative residual ({res['violation_pct']}%); "
-        f"residual p01/p50/p99 {res['residual_p01_p50_p99']}, max abs {res['max_abs_residual']}."
-    )
-if not pw_identity:
-    _pcons.append("- No P/W column pair shared a name for the check.")
 _pcons.append(
     "Alignment, scale and sign test for every shared column and frequency (P against the W increment converted to a rate; 'back' = W[t] - W[t-1], 'forward' = W[t+1] - W[t]):"
 )
@@ -829,6 +842,16 @@ for x in pw_align:
         f"- {x['family']}.`{x['column']}` at {x['frequency']} (n {x['n']}): corr back {fmt_c(x['corr_back'])}, forward {fmt_c(x['corr_forward'])}; "
         f"slope of P on the increment back {fmt_c(x['slope_back'])}, forward {fmt_c(x['slope_forward'])}; mean P {fmt_c(x['mean_p'])}, mean increment {fmt_c(x['mean_increment'])}."
     )
+_pcons.append(
+    "Re-test after applying the measured scale (nearest power of ten of the slope) for the combinations with |corr| >= 0.9 at 15min and 1h; residual = P - scaled increment, tolerance 10%:"
+)
+for x in pw_scaled:
+    _pcons.append(
+        f"- {x['family']}.`{x['column']}` at {x['frequency']} ({x['direction']}, scale {x['scale']:g}): {x['violations']}/{x['comparable_rows']} rows outside 10% ({x['violation_pct']}%); "
+        f"residual p01/p50/p99 {x['residual_p01_p50_p99']}."
+    )
+if not pw_scaled:
+    _pcons.append("- No combination reached |corr| >= 0.9.")
 _best = max(
     (
         x
