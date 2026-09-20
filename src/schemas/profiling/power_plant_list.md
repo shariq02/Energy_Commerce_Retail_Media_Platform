@@ -18,6 +18,7 @@ The BNetzA Kraftwerksliste CSV carries several title / disclaimer rows above the
 - power_plant_list: 0 unnamed columns, 0 footnote-named columns ([]) -> header applied.
 - power_plant_capacity_additions: 0 unnamed columns, 0 footnote-named columns ([]) -> header applied.
 -> Header applied correctly in the current Bronze tables.
+However, footnote-like or long free-text values sit inside data columns (a header check does not see them): {'power_plant_capacity_additions': {'energietraeger': 6}}. The staging step that skips title and footnote rows did not remove every footnote line.
 
 ### Data Quality
 
@@ -34,7 +35,6 @@ Plant-identifier key candidates (column: distinct / ratio-to-rows / unique):
 ### Unit & Semantic Validation
 
 - power_plant_list.`Bruttoleistung_MW` (capacity, MW): parse yield 100.0%, range 0.0..33196.83, zero 16, negative 0 -- confirm MW vs kW and the German-comma decimal on the Silver cast.
-- power_plant_list.`Datensatztyp` (date): parse yield 0.0%, range None..None, pre-1900=None, future-dated=None, formats={}.
 - power_plant_list.`Jahr_Inbetriebnahme` (year, not a date): numeric yield 100.0%, range 1901.0..2026.0, below 1850=0, above 2035=0 -- cast to an integer year, not a timestamp.
 - power_plant_list.`Jahr_Stilllegung` (year, not a date): numeric yield 100.0%, range 2011.0..2026.0, below 1850=0, above 2035=0 -- cast to an integer year, not a timestamp.
 
@@ -44,9 +44,46 @@ Plant-identifier key candidates (column: distinct / ratio-to-rows / unique):
 - `power_plant_list.Energietraeger` (fuel type -- no authoritative reference list): 18 distinct values, e.g. ['Abfall', 'Batteriespeicher', 'Biomasse', 'Braunkohle', 'Erdgas', 'Geothermie', 'Grubengas', 'Kernenergie', 'Mineraloelprodukte', 'Pumpspeicher', 'SolareStrahlungsenergie', 'Sonstige Energietraeger (nicht erneuerbar)', 'Steinkohle', 'Waerme', 'Wasser']. Reconcile against the MaStR energy carrier catalog at Silver.
 - `power_plant_capacity_additions.energietraeger` (fuel type -- no authoritative reference list): 16 distinct values, e.g. ['   davon gesetzlicher Reduktionspfad für Braunkohleanlagen', '(1) Es ist zu beachten, dass die Werte und Stilllegungsdaten Unsicherheiten unterliegen. U.a. bedeutet die Beendigung der Kohleverfeuerung in einer Anlage nicht zwingend, dass die Leistung der Anlage in vollem Umfang aus dem Markt geht, da die Anlagenbetreiber ihre Anlagen auf andere Energieträger umrüsten können oder dies teilweise schon getan haben. Desweiteren wäre auch eine Systemrelevanzausweisung oder zeitlich gestreckte Stilllegung möglich.', 'Abfall', 'Anzeigen zur endgültigen Stilllegung gem. § 13b EnWG', 'Batteriespeicher', 'Erdgas', 'Erwartete ausscheidende konventionelle Kraftwerksleistung in MW 2026 bis 2029', 'Insgesamt', 'Kohleausstieg gem. KVBG(1)', 'Pumpspeicher', '[2] Der zuständige Übertragungsnetzbetreiber hat die Möglichkeit vor Ablauf des genehmigten Zeitraums der Ausweisung der Systemrelevanz einen Antrag auf Verlängerung dieser zu stellen', '[3] Die Inbetriebnahme eines Ersatzneubaus kann sich verzögern, sodass die stillzulegende Anlage zuerst in die Netzreserve überführt wird', 'davon aus 1. Ausschreibungsrunde', 'sonstige Energieträger (nicht erneuerbar)', 'voraussichtliche Stilllegungen nach Beendigung der Ausweisung der Systemrelevanz(2) oder nach Inbetriebnahme eines Ersatzneubaus(3)']. Reconcile against the MaStR energy carrier catalog at Silver.
 
+### Record Types and Aggregate Rows
+
+power_plant_list.`Datensatztyp` -- rows, ids (missing / distinct), capacity `Bruttoleistung_MW` (sum / min / max / mean, MW), commissioning year range, rows without state, per value:
+- `Einzelanlage`: 1903 rows; ids 0 missing / 1903 distinct; capacity sum 9.185e+04 (0.2504 of the table total), min 1, max 1110, mean 48.27; years 1901..2026; rows without state 55.
+- `stillgelegte Anlagen`: 420 rows; ids 154 missing / 266 distinct; capacity sum 5.482e+04 (0.1494 of the table total), min 0, max 1485, mean 130.5; years 1930..2019; rows without state 3.
+- `Kleinanlagen_aggregiert`: 290 rows; ids 290 missing / 0 distinct; capacity sum 2.202e+05 (0.6002 of the table total), min 0, max 3.32e+04, mean 759.3; years -..-; rows without state 5.
+Ten largest capacity rows of power_plant_list: [{'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'SolareStrahlungsenergie', '__cap': '33196.83'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'SolareStrahlungsenergie', '__cap': '15499.19'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'SolareStrahlungsenergie', '__cap': '15157.39'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'Wind (onshore)', '__cap': '14335.72'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'SolareStrahlungsenergie', '__cap': '11059.28'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'Wind (onshore)', '__cap': '9949.55'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'Wind (onshore)', '__cap': '9646.51'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'SolareStrahlungsenergie', '__cap': '9583.57'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'Wind (onshore)', '__cap': '9538.83'}, {'Datensatztyp': 'Kleinanlagen_aggregiert', 'EinheitMastrNummer': None, 'Anzeigename': None, 'Bestandteil_Grenzkraftwerk': 'Nein', 'Energietraeger': 'Wind (offshore)', '__cap': '8548.32'}]
+Rows whose text columns contain a total- or aggregate-like word: 291.
+Rows of an aggregated record type describe groups of small plants, not plants: their capacity must not be counted as plant capacity or joined to unit-level tables as if they were single units.
+
+### Identifier Cardinality
+
+power_plant_list.`EinheitMastrNummer`: 2613 rows, 444 missing or blank (by record type: [('Kleinanlagen_aggregiert', 290), ('stillgelegte Anlagen', 154)]), 2169 distinct values.
+- ids by number of rows they appear on (rows per id, ids): [(1, 2169)].
+- columns whose values differ between the rows of a repeated id (column, ids affected): none.
+
+### Footnote and Free-text Values
+
+- power_plant_capacity_additions.`energietraeger`: 6 rows match; examples ['   davon gesetzlicher Reduktionspfad für Braunkohleanlagen', 'davon aus 1. Ausschreibungsrunde', 'voraussichtliche Stilllegungen nach Beendigung der Ausweisung der Systemrelevanz(2) oder nach Inbetriebnahme e', '(1) Es ist zu beachten, dass die Werte und Stilllegungsdaten Unsicherheiten unterliegen. U.a. bedeutet die Bee', '[2] Der zuständige Übertragungsnetzbetreiber hat die Möglichkeit vor Ablauf des genehmigten Zeitraums der Ausw']
+power_plant_capacity_additions in full (17 rows, each row is a list of cell values):
+  - ['Abfall', '11.7', '25.5', None, None, '37.2']
+  - ['Erdgas', '1889.9', '12.8', None, None, '1902.7']
+  - ['Pumpspeicher', '190.0', '78.0', None, None, '268.0']
+  - ['Batteriespeicher', '990.3', '1880.4', '515.0', None, '3385.7']
+  - ['sonstige Energieträger (nicht erneuerbar)', '8.0', '33.7', None, None, '41.7']
+  - ['Insgesamt', '3089.9000000000005', '2030.4', '515.0', '0.0', '5635.3']
+  - ['Erwartete ausscheidende konventionelle Kraftwerksleistung in MW 2026 bis 2029', None, None, None, None, None]
+  - ['Kohleausstieg gem. KVBG(1)', None, None, None, None, '4737.0']
+  - ['   davon gesetzlicher Reduktionspfad für Braunkohleanlagen', None, None, '2523.0', '2214.0', '4737.0']
+  - ['davon aus 1. Ausschreibungsrunde', None, None, None, None, '0.0']
+  - ['Anzeigen zur endgültigen Stilllegung gem. § 13b EnWG', None, None, None, None, '0.0']
+  - ['voraussichtliche Stilllegungen nach Beendigung der Ausweisung der Systemrelevanz(2) oder n', '1216.5', '821.0', '51.9', '30.8', '2120.2000000000003']
+  - ['weitere geplante Stilllegungen', '247.8', '501.8', '89.0', '334.0', '1172.6']
+  - ['Insgesamt', '1464.3', '1322.8', '2663.9', '2578.8', '8029.8']
+  - ['(1) Es ist zu beachten, dass die Werte und Stilllegungsdaten Unsicherheiten unterliegen. U', None, None, None, None, None]
+  - ['[2] Der zuständige Übertragungsnetzbetreiber hat die Möglichkeit vor Ablauf des genehmigte', None, None, None, None, None]
+  - ['[3] Die Inbetriebnahme eines Ersatzneubaus kann sich verzögern, sodass die stillzulegende ', None, None, None, None, None]
+
 ### Temporal Semantics
 
-- power_plant_list.`Datensatztyp`: None..None (Europe/Berlin). Planned future dates are recorded ahead of time, so the column is only 'known' up to its own value.
 - power_plant_list.`Jahr_Inbetriebnahme`: year granularity only (no month/day) -- a within-year ordering cannot be established; the commissioning<=decommissioning check runs on the year.
 - power_plant_list.`Jahr_Stilllegung`: year granularity only (no month/day) -- a within-year ordering cannot be established; the commissioning<=decommissioning check runs on the year.
 
@@ -300,6 +337,19 @@ power_plant_capacity_additions is a forward-looking planning summary (2026-2029)
 - **Label availability lag:** A retirement is reflected in the list a quarter or more after the decision -- a real-time model cannot assume the status is current.
 - **Source / version / regime change:** The coal-exit law (KVBG 2020) and its auction rounds reshaped the status taxonomy and the planned-shutdown pipeline -- do not pool editions from before and after without an edition indicator.
 - **Sample-vs-full divergence:** Every statistic here is a full Spark aggregation or `.distinct().count()` -- no sampling. Numeric parse yield is reported per column; check it before building a regression target.
+
+### Observations by Area
+
+- **Domain understanding:** the register of German power plants above the reporting threshold plus aggregated small plants, with status, technology, fuel, feed-in type and commissioning / decommissioning years; a second table gives expected capacity changes; record types: {'power_plant_list': [('Einzelanlage', 1903), ('stillgelegte Anlagen', 420), ('Kleinanlagen_aggregiert', 290)]}; aggregated-type rows: {'power_plant_list': [('Kleinanlagen_aggregiert', 290, '2.202e+05')]}
+- **Structure and engineering:** header applied: {'power_plant_list': True, 'power_plant_capacity_additions': True}; footnote-like values inside data columns: {'power_plant_capacity_additions': {'energietraeger': 6}}; identifier: {'power_plant_list': ('EinheitMastrNummer', 444, 2169)} (column, missing, distinct); no shared key with the second table or with MaStR
+- **Temporal:** years (not dates) for commissioning and decommissioning; a snapshot without an edition axis; order check: {'power_plant_list': (0, 265)}
+- **Spatial:** state and country columns only; foreign plants present: [('Oesterreich', 34), ('Schweiz', 17), ('Luxemburg', 11), ('Daenemark', 1)]
+- **Data quality:** footnote text in values: {'power_plant_capacity_additions': {'energietraeger': 6}}; ids repeated on several rows: {'power_plant_list': [(1, 2169)]}; columns that differ between repeats: {'power_plant_list': {}}
+- **Statistical patterns:** capacity by record type: {'power_plant_list': [('Einzelanlage', '48.27', '1110'), ('stillgelegte Anlagen', '130.5', '1485'), ('Kleinanlagen_aggregiert', '759.3', '3.32e+04')]} (type, mean, max)
+- **Relationships:** additions to plant list: no shared identifier
+- **Analytics use:** capacity and status by technology, fuel and state; the aggregated small-plant rows must be separated from plant rows
+- **ML use:** no target; plant-level identifiers and status are near-unique
+- **AI / knowledge use:** technology, fuel and status vocabularies (see Categorical); no free text except footnote lines that leaked into the data
 
 ### Silver Implications
 

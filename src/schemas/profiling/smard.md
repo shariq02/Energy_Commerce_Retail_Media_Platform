@@ -45,57 +45,57 @@ Per-series continuity (fixed-step resolutions; expected = span / step + 1, indep
 
 | series | resolution | observed | expected | coverage % | longest gap (steps) | missing steps |
 |---|---|---|---|---|---|---|
-| day_ahead_prices|4169|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| forecast_generation_offshore_wind|3791|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| forecast_generation_photovoltaic|126|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| forecast_generation_total|122|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| generation_biomass|4066|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
-| generation_hard_coal|4069|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| generation_hard_coal|4069|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| generation_lignite|1223|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| generation_lignite|1223|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| generation_natural_gas|4071|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
 | generation_natural_gas|4071|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| generation_nuclear|1224|DE-LU|day | day | 2557 | 2557 | 100.0 | 0 | 0 |
 | generation_nuclear|1224|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| generation_offshore_wind|1225|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
 | generation_offshore_wind|1225|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
+| forecast_generation_offshore_wind|3791|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_total|122|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_hard_coal|4069|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_lignite|1223|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_offshore_wind|1225|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
 | generation_onshore_wind|4067|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
-| generation_onshore_wind|4067|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
-| generation_other_conventional|1227|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_pumped_storage|4070|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| total_power_consumption|410|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| day_ahead_prices|4169|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| forecast_generation_photovoltaic|126|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_biomass|4066|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_hard_coal|4069|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| residual_load|4359|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| total_power_consumption|410|TenneT|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_lignite|1223|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_nuclear|1224|DE-LU|day | day | 2557 | 2557 | 100.0 | 0 | 0 |
 | generation_other_conventional|1227|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | generation_other_renewable|1228|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_natural_gas|4071|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_other_conventional|1227|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | generation_photovoltaic|4068|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
 | generation_photovoltaic|4068|Amprion|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
-| generation_photovoltaic|4068|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
 | generation_photovoltaic|4068|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
 | generation_photovoltaic|4068|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
-| generation_pumped_storage|4070|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | pumped_storage_consumption|4387|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | pumped_storage_consumption|4387|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| residual_load|4359|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | total_power_consumption|410|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| total_power_consumption|410|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| total_power_consumption|410|TenneT|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
 | total_power_consumption|410|TransnetBW|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
-| day_ahead_prices|4169|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | forecast_generation_onshore_wind|123|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| forecast_generation_other|715|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | forecast_generation_wind_and_photovoltaic|5097|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | generation_hydro|1226|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_photovoltaic|4068|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| residual_load|4359|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| day_ahead_prices|4169|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | generation_hydro|1226|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | generation_offshore_wind|1225|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
-| generation_offshore_wind|1225|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | generation_onshore_wind|4067|Amprion|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
-| generation_onshore_wind|4067|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| generation_onshore_wind|4067|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
-| generation_other_renewable|1228|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| generation_photovoltaic|4068|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | generation_pumped_storage|4070|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
-| residual_load|4359|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | total_power_consumption|410|Amprion|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_other_renewable|1228|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| forecast_generation_other|715|DE-LU|day | day | 3287 | 3287 | 100.0 | 0 | 0 |
 | generation_biomass|4066|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
+| generation_offshore_wind|1225|DE-LU|quarterhour | quarterhour | 69888 | 69888 | 100.0 | 0 | 0 |
 | generation_onshore_wind|4067|DE-LU|day | day | 4018 | 4018 | 100.0 | 0 | 0 |
+| generation_onshore_wind|4067|TenneT|day | day | 4748 | 4748 | 100.0 | 0 | 0 |
 | total_power_consumption|410|50Hertz|day | day | 4383 | 4383 | 100.0 | 0 | 0 |
 
 Rows per year: [(2013, 3), (2014, 1106), (2015, 5115), (2016, 6954), (2017, 6952), (2018, 13140), (2019, 13140), (2020, 13176), (2021, 13140), (2022, 44632), (2023, 48180), (2024, 180811), (2025, 538375), (2026, 371180)] -- heavily back-loaded: series added in later years are dense from their own start, older series are short. A per-series min/max is the right span, NOT the table-wide 2013..now.
@@ -113,9 +113,79 @@ Does every forecast_* metric have a realised counterpart on the same (region, re
 
 ### Physical Consistency
 
-Physical identity: residual_load should equal load - wind - solar at the same (region, resolution, timestamp).
-- identity `residual_load = pumped_storage_consumption - generation_onshore_wind - generation_photovoltaic`: 72571/72571 rows exceed 2% relative residual (100.0%); residual p01/p50/p99 [7929.0, 12440.46, 1348460.75], max abs 1600885.75.
-A non-trivial violation share means these published series are not a clean additive set (rounding, different vintages, or an extra term such as pumped-storage load) -- do not derive one from the others without reconciling.
+residual_load is tested against load minus wind and solar at the same (DE-LU, resolution, timestamp), with the load series named explicitly and several candidate definitions compared.
+Series used: residual=residual_load, load=total_power_consumption, onshore wind=generation_onshore_wind, offshore wind=generation_offshore_wind, solar=generation_photovoltaic, pumped-storage consumption=pumped_storage_consumption.
+- day: `residual_load = total_power_consumption - generation_onshore_wind - generation_offshore_wind - generation_photovoltaic`: 0/2894 rows exceed 2% relative residual (0.0%); residual p01/p50/p99 [-0.010000000067520887, 0.0, 0.010000000125728548], max abs 607.6499999999069.
+- day: `residual_load = total_power_consumption - generation_onshore_wind - generation_photovoltaic`: 2541/2894 rows exceed 2% relative residual (87.8023%); residual p01/p50/p99 [-156696.75, -66983.63000000012, -2941.25], max abs 190655.5.
+- day: `residual_load = total_power_consumption + pumped_storage_consumption - generation_onshore_wind - generation_offshore_wind - generation_photovoltaic`: 2618/2894 rows exceed 2% relative residual (90.463%); residual p01/p50/p99 [-63772.75, -33201.0, -11426.5], max abs 70895.25.
+- quarterhour: `residual_load = total_power_consumption - generation_onshore_wind - generation_offshore_wind - generation_photovoltaic`: 0/69678 rows exceed 2% relative residual (0.0%); residual p01/p50/p99 [-0.010000000002037268, 0.0, 0.010000000002037268], max abs 0.6899999999995998.
+- quarterhour: `residual_load = total_power_consumption - generation_onshore_wind - generation_photovoltaic`: 59647/69678 rows exceed 2% relative residual (85.6038%); residual p01/p50/p99 [-1943.8599999999988, -676.25, -10.999999999999432], max abs 2121.6000000000004.
+- quarterhour: `residual_load = total_power_consumption + pumped_storage_consumption - generation_onshore_wind - generation_offshore_wind - generation_photovoltaic`: 31843/69677 rows exceed 2% relative residual (45.7009%); residual p01/p50/p99 [-1446.68, -100.33999999999833, -0.22999999999774445], max abs 1774.25.
+Mean level of each series used, per resolution: [{'resolution': 'day', 'generation_offshore_wind': 69272.72751640761, 'generation_onshore_wind': 235882.89221844936, 'generation_photovoltaic': 129255.68258064517, 'pumped_storage_consumption': 33903.66831088083, 'residual_load': 812376.5095093295, 'total_power_consumption': 1327208.0578438146}, {'resolution': 'quarterhour', 'generation_offshore_wind': 766.1587679568321, 'generation_onshore_wind': 3123.4090206799574, 'generation_photovoltaic': 2198.525480977606, 'pumped_storage_consumption': 365.0338901247152, 'residual_load': 7384.415769826909, 'total_power_consumption': 13472.348712381037}].
+Best-fitting definition: `residual_load = total_power_consumption - generation_onshore_wind - generation_offshore_wind - generation_photovoltaic` at day (0.0% of rows outside 2%).
+
+### Temporal Patterns
+
+Hour of day (UTC) of the stored day-resolution timestamps (hour, rows): [(22, 80444), (23, 57252)].
+Mean by calendar month, DE-LU day resolution (period, mean):
+- `total_power_consumption`: [(1, 1468059.5), (2, 1464127.8), (3, 1374897.5), (4, 1280708.1), (5, 1230587.5), (6, 1240654.1), (7, 1248799.0), (8, 1217466.0), (9, 1269662.3), (10, 1334821.6), (11, 1417198.9), (12, 1382180.6)]
+- `residual_load`: [(1, 920190.7), (2, 868196.9), (3, 824441.8), (4, 732744.8), (5, 705045.7), (6, 733237.8), (7, 738876.2), (8, 753697.2), (9, 805917.6), (10, 822443.8), (11, 966048.0), (12, 881594.0)]
+- `day_ahead_prices`: [(1, 90.4), (2, 81.8), (3, 89.1), (4, 74.1), (5, 75.0), (6, 86.5), (7, 100.6), (8, 125.0), (9, 116.6), (10, 84.3), (11, 99.1), (12, 108.3)]
+- `generation_onshore_wind`: [(1, 335833.6), (2, 338539.9), (3, 253015.9), (4, 211652.9), (5, 175253.7), (6, 145331.1), (7, 157248.8), (8, 140126.8), (9, 174607.5), (10, 293206.5), (11, 286278.6), (12, 340073.5)]
+- `generation_offshore_wind`: [(1, 92427.5), (2, 93060.3), (3, 73825.7), (4, 58625.6), (5, 50937.9), (6, 46688.8), (7, 53519.2), (8, 48653.0), (9, 60563.9), (10, 82919.2), (11, 80802.2), (12, 89430.5)]
+- `generation_photovoltaic`: [(1, 28720.6), (2, 64662.8), (3, 128509.1), (4, 180023.5), (5, 204624.2), (6, 223453.3), (7, 208068.8), (8, 192137.3), (9, 140160.2), (10, 88237.0), (11, 43011.2), (12, 24207.7)]
+- `generation_biomass`: [(1, 87055.3), (2, 87353.1), (3, 86103.5), (4, 84472.7), (5, 82513.4), (6, 79017.7), (7, 77923.9), (8, 77612.7), (9, 76892.4), (10, 92464.1), (11, 95729.2), (12, 96101.4)]
+- `generation_hydro`: [(1, 29409.3), (2, 30035.5), (3, 29598.0), (4, 30250.6), (5, 37002.5), (6, 41454.1), (7, 38732.6), (8, 37101.8), (9, 33253.8), (10, 34293.1), (11, 32640.9), (12, 31665.5)]
+- `generation_lignite`: [(1, 263712.2), (2, 250298.1), (3, 239647.4), (4, 205917.5), (5, 183600.1), (6, 203096.3), (7, 207747.6), (8, 210157.7), (9, 234925.3), (10, 263702.3), (11, 292623.9), (12, 254100.3)]
+- `generation_hard_coal`: [(1, 168992.0), (2, 142828.5), (3, 118149.7), (4, 89509.5), (5, 65829.4), (6, 67742.5), (7, 77006.8), (8, 84818.1), (9, 119782.3), (10, 124505.4), (11, 176418.0), (12, 149626.0)]
+- `generation_natural_gas`: [(1, 178116.9), (2, 165290.0), (3, 134809.4), (4, 108464.4), (5, 89621.3), (6, 97600.6), (7, 103504.9), (8, 94099.2), (9, 99207.1), (10, 122555.8), (11, 172369.0), (12, 169884.3)]
+- `generation_nuclear`: [(1, 126058.8), (2, 151091.9), (3, 146632.7), (4, 129321.0), (5, 105876.2), (6, 108991.9), (7, 116842.9), (8, 127772.4), (9, 129548.1), (10, 137631.8), (11, 144482.6), (12, 147531.7)]
+Mean by weekday (0 = Monday), DE-LU day resolution (period, mean):
+- `total_power_consumption`: [(0, 1368157.5), (1, 1408183.2), (2, 1410878.8), (3, 1402645.4), (4, 1375922.4), (5, 1198868.7), (6, 1125219.1)]
+- `residual_load`: [(0, 851475.3), (1, 896203.6), (2, 904174.2), (3, 885080.6), (4, 856763.1), (5, 685220.4), (6, 607117.0)]
+- `day_ahead_prices`: [(0, 99.6), (1, 105.5), (2, 105.3), (3, 102.7), (4, 97.8), (5, 79.7), (6, 68.4)]
+- `generation_onshore_wind`: [(0, 238817.5), (1, 234849.4), (2, 229708.8), (3, 238068.0), (4, 240731.3), (5, 232483.0), (6, 236532.0)]
+- `generation_offshore_wind`: [(0, 68989.8), (1, 67580.9), (2, 68033.2), (3, 69900.8), (4, 70442.0), (5, 68912.8), (6, 71055.9)]
+- `generation_photovoltaic`: [(0, 128144.5), (1, 129631.5), (2, 130100.1), (3, 129116.7), (4, 127139.0), (5, 131402.9), (6, 129250.8)]
+- `generation_biomass`: [(0, 85016.4), (1, 84982.2), (2, 85076.7), (3, 85242.1), (4, 85581.0), (5, 85175.6), (6, 84540.7)]
+- `generation_hydro`: [(0, 33630.9), (1, 34659.7), (2, 34853.4), (3, 34800.8), (4, 34503.8), (5, 32899.6), (6, 31541.6)]
+- `generation_lignite`: [(0, 240150.0), (1, 253140.6), (2, 255208.9), (3, 249871.8), (4, 242646.1), (5, 205216.0), (6, 191594.0)]
+- `generation_hard_coal`: [(0, 121807.0), (1, 135757.3), (2, 135768.6), (3, 131930.1), (4, 120559.3), (5, 85596.5), (6, 74882.2)]
+- `generation_natural_gas`: [(0, 133430.8), (1, 144847.2), (2, 146113.8), (3, 142910.6), (4, 135207.5), (5, 100281.3), (6, 88292.4)]
+- `generation_nuclear`: [(0, 130926.6), (1, 132213.6), (2, 132898.8), (3, 133245.0), (4, 132533.7), (5, 129971.9), (6, 127809.5)]
+Mean by year, DE-LU day resolution (period, mean):
+- `total_power_consumption`: [(2018, 1425423.4), (2019, 1376774.5), (2020, 1339611.8), (2021, 1396554.7), (2022, 1335054.6), (2023, 1268708.5), (2024, 1285240.3), (2025, 1289482.6), (2026, 1289556.4)]
+- `residual_load`: [(2018, 993974.2), (2019, 921360.3), (2020, 858078.5), (2021, 957367.4), (2022, 836346.1), (2023, 724013.1), (2024, 732949.9), (2025, 720586.9), (2026, 650279.1)]
+- `day_ahead_prices`: [(2018, 52.6), (2019, 37.7), (2020, 30.5), (2021, 96.8), (2022, 235.5), (2023, 95.2), (2024, 78.5), (2025, 89.3), (2026, 103.4)]
+- `generation_onshore_wind`: [(2016, 184.2), (2017, 642.6), (2018, 79477.3), (2019, 274000.3), (2020, 282570.6), (2021, 246228.7), (2022, 277515.5), (2023, 327383.9), (2024, 308816.1), (2025, 293791.0), (2026, 284606.3)]
+- `generation_offshore_wind`: [(2018, 69501.4), (2019, 66804.5), (2020, 73451.3), (2021, 65781.0), (2022, 67802.3), (2023, 64438.2), (2024, 70129.7), (2025, 71765.9), (2026, 76194.0)]
+- `generation_photovoltaic`: [(2016, 81.0), (2017, 300.7), (2018, 12427.3), (2019, 114609.3), (2020, 125511.5), (2021, 127177.3), (2022, 153390.8), (2023, 152873.4), (2024, 173344.5), (2025, 203338.7), (2026, 278477.1)]
+- `generation_biomass`: [(2016, 199.0), (2017, 247.4), (2018, 28345.6), (2019, 108643.9), (2020, 109941.3), (2021, 105575.7), (2022, 104182.4), (2023, 102651.7), (2024, 99602.4), (2025, 98917.5), (2026, 96669.5)]
+- `generation_hydro`: [(2016, 95.2), (2017, 202.9), (2018, 8834.1), (2019, 45381.8), (2020, 43783.7), (2021, 41041.6), (2022, 35237.9), (2023, 41363.7), (2024, 48239.4), (2025, 39028.7), (2026, 36079.5)]
+- `generation_lignite`: [(2018, 330862.7), (2019, 281448.4), (2020, 227797.8), (2021, 269047.2), (2022, 283631.7), (2023, 213271.4), (2024, 193951.8), (2025, 184017.4), (2026, 175424.7)]
+- `generation_hard_coal`: [(2018, 219673.1), (2019, 131000.8), (2020, 95278.6), (2021, 142032.2), (2022, 172301.0), (2023, 108904.1), (2024, 74689.4), (2025, 77143.6), (2026, 83963.8)]
+- `generation_natural_gas`: [(2016, 954.8), (2017, 669.0), (2018, 37487.7), (2019, 150308.1), (2020, 185357.9), (2021, 165288.0), (2022, 125790.4), (2023, 140198.8), (2024, 155687.7), (2025, 166050.0), (2026, 155383.5)]
+- `generation_nuclear`: [(2018, 204806.7), (2019, 194636.1), (2020, 166458.7), (2021, 179194.5), (2022, 89930.1), (2023, 18467.8), (2024, 0.0)]
+Lag-1 / lag-7 autocorrelation of the daily series: {'total_power_consumption': (0.685, 0.852), 'residual_load': (0.677, 0.433), 'day_ahead_prices': (0.915, 0.817), 'generation_onshore_wind': (0.756, 0.412), 'generation_offshore_wind': (0.583, 0.209), 'generation_photovoltaic': (0.942, 0.86), 'generation_biomass': (0.998, 0.99), 'generation_hydro': (0.987, 0.959), 'generation_lignite': (0.826, 0.574), 'generation_hard_coal': (0.851, 0.665), 'generation_natural_gas': (0.895, 0.804), 'generation_nuclear': (0.994, 0.975)}.
+Diurnal profile, DE-LU quarter-hour, Europe/Berlin hour (hour, mean):
+- `day_ahead_prices`: [(0, 96.9), (1, 91.4), (2, 88.3), (3, 86.8), (4, 87.9), (5, 93.7), (6, 107.3), (7, 119.4), (8, 115.3), (9, 95.4), (10, 76.0), (11, 62.5), (12, 52.7), (13, 47.7), (14, 51.7), (15, 65.6), (16, 84.0), (17, 110.5), (18, 131.6), (19, 143.5), (20, 138.8), (21, 125.1), (22, 114.0), (23, 101.2)]
+- `generation_offshore_wind`: [(0, 812.0), (1, 809.9), (2, 804.8), (3, 801.1), (4, 797.5), (5, 794.3), (6, 789.9), (7, 780.8), (8, 774.9), (9, 753.0), (10, 719.7), (11, 688.1), (12, 675.2), (13, 670.9), (14, 677.6), (15, 697.0), (16, 720.5), (17, 769.0), (18, 796.6), (19, 806.3), (20, 810.7), (21, 812.4), (22, 818.2), (23, 807.6)]
+- `generation_onshore_wind`: [(0, 3385.5), (1, 3342.3), (2, 3295.1), (3, 3247.6), (4, 3226.8), (5, 3242.5), (6, 3310.6), (7, 3194.9), (8, 2993.1), (9, 2802.8), (10, 2707.9), (11, 2695.1), (12, 2709.6), (13, 2724.7), (14, 2772.2), (15, 2886.2), (16, 3049.6), (17, 3215.4), (18, 3308.3), (19, 3323.3), (20, 3340.3), (21, 3406.2), (22, 3374.0), (23, 3409.1)]
+- `generation_photovoltaic`: [(0, 3.0), (1, 2.6), (2, 2.5), (3, 2.5), (4, 3.1), (5, 26.2), (6, 238.5), (7, 950.1), (8, 2337.5), (9, 4034.8), (10, 5494.5), (11, 6439.4), (12, 6809.6), (13, 6656.8), (14, 6067.7), (15, 5090.0), (16, 3879.8), (17, 2613.2), (18, 1413.3), (19, 543.3), (20, 125.6), (21, 12.3), (22, 4.0), (23, 3.0)]
+- `residual_load`: [(0, 7328.6), (1, 6967.5), (2, 6803.1), (3, 6859.0), (4, 7100.6), (5, 7663.1), (6, 8649.2), (7, 9068.6), (8, 8578.1), (9, 7345.3), (10, 6110.7), (11, 5246.9), (12, 4689.3), (13, 4516.3), (14, 4722.4), (15, 5451.4), (16, 6562.6), (17, 8020.9), (18, 9355.8), (19, 10102.6), (20, 9975.1), (21, 9395.0), (22, 8768.5), (23, 7956.3)]
+- `total_power_consumption`: [(0, 11529.0), (1, 11122.3), (2, 10905.6), (3, 10910.3), (4, 11128.1), (5, 11726.1), (6, 12988.2), (7, 13994.4), (8, 14683.6), (9, 14935.9), (10, 15032.8), (11, 15069.5), (12, 14883.7), (13, 14568.7), (14, 14239.9), (15, 14124.5), (16, 14212.5), (17, 14618.5), (18, 14874.0), (19, 14773.6), (20, 14247.8), (21, 13625.9), (22, 12964.8), (23, 12176.0)]
+Share of negative values by hour (hour, share): {'day_ahead_prices': [(0, 0.008), (1, 0.01), (2, 0.013), (3, 0.017), (4, 0.019), (5, 0.014), (6, 0.01), (7, 0.011), (8, 0.014), (9, 0.036), (10, 0.092), (11, 0.161), (12, 0.224), (13, 0.263), (14, 0.241), (15, 0.197), (16, 0.126), (17, 0.032), (18, 0.006), (20, 0.0), (21, 0.001), (22, 0.001), (23, 0.001)], 'residual_load': [(0, 0.001), (1, 0.003), (2, 0.003), (3, 0.003), (4, 0.002), (5, 0.002), (6, 0.006), (7, 0.007), (8, 0.008), (9, 0.02), (10, 0.057), (11, 0.111), (12, 0.158), (13, 0.191), (14, 0.183), (15, 0.127), (16, 0.055), (17, 0.016), (18, 0.003), (19, 0.001)]}.
+Daily frame: 4018 days x 15 series, 2016-01-01 .. 2026-12-31.
+
+### Relationships
+
+Day-ahead price against load, wind, solar and residual load on 2894 days (Pearson): {'load': 0.098, 'wind': -0.282, 'solar': 0.039, 'residual': 0.291}; (Spearman): {'load': 0.125, 'wind': -0.289, 'solar': 0.066, 'residual': 0.294}.
+The same correlations by year: {2018: {'load': 0.392, 'wind': -0.793, 'solar': 0.178, 'residual': 0.92}, 2019: {'load': 0.521, 'wind': -0.517, 'solar': -0.132, 'residual': 0.86}, 2020: {'load': 0.432, 'wind': -0.466, 'solar': -0.321, 'residual': 0.86}, 2021: {'load': 0.238, 'wind': -0.233, 'solar': -0.352, 'residual': 0.489}, 2022: {'load': -0.023, 'wind': -0.632, 'solar': 0.247, 'residual': 0.534}, 2023: {'load': 0.487, 'wind': -0.564, 'solar': -0.116, 'residual': 0.887}, 2024: {'load': 0.391, 'wind': -0.465, 'solar': -0.243, 'residual': 0.812}, 2025: {'load': 0.598, 'wind': -0.458, 'solar': -0.393, 'residual': 0.914}, 2026: {'load': 0.332, 'wind': -0.508, 'solar': 0.002, 'residual': 0.637}}.
+Mean price by decile of residual load (decile, mean price): [('(26994.409, 446889.181]', 40.3), ('(446889.181, 574018.518]', 68.1), ('(574018.518, 669739.72]', 77.3), ('(669739.72, 745926.558]', 85.1), ('(745926.558, 814135.07]', 101.5), ('(814135.07, 884000.8]', 109.1), ('(884000.8, 963818.125]', 120.9), ('(963818.125, 1053379.85]', 106.0), ('(1053379.85, 1160173.1]', 106.9), ('(1160173.1, 1585773.0]', 126.6)].
+- `forecast_generation_offshore_wind` against `generation_offshore_wind` on 2895 days: corr 0.961, bias -276.3, mean abs error 8007.3 (11.6% of the mean level).
+- `forecast_generation_onshore_wind` against `generation_onshore_wind` on 2895 days: corr 0.992, bias -2191.7, mean abs error 18738.0 (6.5% of the mean level).
+- `forecast_generation_photovoltaic` against `generation_photovoltaic` on 2895 days: corr -0.079, bias -670132.7, mean abs error 670132.7 (424.9% of the mean level).
+Share of summed realised generation by year (technology: share): {2016: {'onshore_wind': 0.122, 'photovoltaic': 0.053, 'biomass': 0.131, 'hydro': 0.063, 'natural_gas': 0.631}, 2017: {'onshore_wind': 0.312, 'photovoltaic': 0.146, 'biomass': 0.12, 'hydro': 0.098, 'natural_gas': 0.324}, 2018: {'onshore_wind': 0.212, 'offshore_wind': 0.047, 'photovoltaic': 0.033, 'biomass': 0.076, 'hydro': 0.024, 'lignite': 0.223, 'hard_coal': 0.148, 'natural_gas': 0.1, 'nuclear': 0.138}, 2019: {'onshore_wind': 0.2, 'offshore_wind': 0.049, 'photovoltaic': 0.084, 'biomass': 0.079, 'hydro': 0.033, 'lignite': 0.206, 'hard_coal': 0.096, 'natural_gas': 0.11, 'nuclear': 0.142}, 2020: {'onshore_wind': 0.216, 'offshore_wind': 0.056, 'photovoltaic': 0.096, 'biomass': 0.084, 'hydro': 0.033, 'lignite': 0.174, 'hard_coal': 0.073, 'natural_gas': 0.141, 'nuclear': 0.127}, 2021: {'onshore_wind': 0.184, 'offshore_wind': 0.049, 'photovoltaic': 0.095, 'biomass': 0.079, 'hydro': 0.031, 'lignite': 0.201, 'hard_coal': 0.106, 'natural_gas': 0.123, 'nuclear': 0.134}, 2022: {'onshore_wind': 0.212, 'offshore_wind': 0.052, 'photovoltaic': 0.117, 'biomass': 0.08, 'hydro': 0.027, 'lignite': 0.217, 'hard_coal': 0.132, 'natural_gas': 0.096, 'nuclear': 0.069}, 2023: {'onshore_wind': 0.28, 'offshore_wind': 0.055, 'photovoltaic': 0.131, 'biomass': 0.088, 'hydro': 0.035, 'lignite': 0.182, 'hard_coal': 0.093, 'natural_gas': 0.12, 'nuclear': 0.016}, 2024: {'onshore_wind': 0.275, 'offshore_wind': 0.062, 'photovoltaic': 0.154, 'biomass': 0.089, 'hydro': 0.043, 'lignite': 0.172, 'hard_coal': 0.066, 'natural_gas': 0.138}, 2025: {'onshore_wind': 0.259, 'offshore_wind': 0.063, 'photovoltaic': 0.179, 'biomass': 0.087, 'hydro': 0.034, 'lignite': 0.162, 'hard_coal': 0.068, 'natural_gas': 0.146}, 2026: {'onshore_wind': 0.24, 'offshore_wind': 0.064, 'photovoltaic': 0.235, 'biomass': 0.081, 'hydro': 0.03, 'lignite': 0.148, 'hard_coal': 0.071, 'natural_gas': 0.131}}.
 
 ### Regime / Version Evidence
 
@@ -196,6 +266,19 @@ A model must not pool a metric's regional breakdowns with its DE-LU total, nor i
 - **Label availability lag:** Realised generation/load is published with a lag (preliminary then final); a nowcast cannot use a value that is not yet published at prediction time.
 - **Source / version / regime change:** SMARD's methodology and the German generation mix both changed materially over 2013-2026 (nuclear phase-out, coal exit, PV growth). Regime / Version Evidence above gives the per-metric first-seen year and annual volume -- a regime/era indicator and per-metric availability window are warranted.
 - **Sample-vs-full divergence:** value_pdf is a 10% sample capped at 200k rows and the time-series figure shows the first 4000 points of ONE representative series per metric -- neither represents later history; use the full-table by_metric aggregates for any feature-quality decision.
+
+### Observations by Area
+
+- **Domain understanding:** 22 metrics: realised generation by technology, consumption, residual load, day-ahead price and forecasts, for ['50Hertz', 'Amprion', 'DE-LU', 'TenneT', 'TransnetBW']; generation mix by year: {2016: {'onshore_wind': 0.122, 'photovoltaic': 0.053, 'biomass': 0.131, 'hydro': 0.063, 'natural_gas': 0.631}, 2017: {'onshore_wind': 0.312, 'photovoltaic': 0.146, 'biomass': 0.12, 'hydro': 0.098, 'natural_gas': 0.324}, 2018: {'onshore_wind': 0.212, 'offshore_wind': 0.047, 'photovoltaic': 0.033, 'biomass': 0.076, 'hydro': 0.024, 'lignite': 0.223, 'hard_coal': 0.148, 'natural_gas': 0.1, 'nuclear': 0.138}, 2019: {'onshore_wind': 0.2, 'offshore_wind': 0.049, 'photovoltaic': 0.084, 'biomass': 0.079, 'hydro': 0.033, 'lignite': 0.206, 'hard_coal': 0.096, 'natural_gas': 0.11, 'nuclear': 0.142}, 2020: {'onshore_wind': 0.216, 'offshore_wind': 0.056, 'photovoltaic': 0.096, 'biomass': 0.084, 'hydro': 0.033, 'lignite': 0.174, 'hard_coal': 0.073, 'natural_gas': 0.141, 'nuclear': 0.127}, 2021: {'onshore_wind': 0.184, 'offshore_wind': 0.049, 'photovoltaic': 0.095, 'biomass': 0.079, 'hydro': 0.031, 'lignite': 0.201, 'hard_coal': 0.106, 'natural_gas': 0.123, 'nuclear': 0.134}, 2022: {'onshore_wind': 0.212, 'offshore_wind': 0.052, 'photovoltaic': 0.117, 'biomass': 0.08, 'hydro': 0.027, 'lignite': 0.217, 'hard_coal': 0.132, 'natural_gas': 0.096, 'nuclear': 0.069}, 2023: {'onshore_wind': 0.28, 'offshore_wind': 0.055, 'photovoltaic': 0.131, 'biomass': 0.088, 'hydro': 0.035, 'lignite': 0.182, 'hard_coal': 0.093, 'natural_gas': 0.12, 'nuclear': 0.016}, 2024: {'onshore_wind': 0.275, 'offshore_wind': 0.062, 'photovoltaic': 0.154, 'biomass': 0.089, 'hydro': 0.043, 'lignite': 0.172, 'hard_coal': 0.066, 'natural_gas': 0.138}, 2025: {'onshore_wind': 0.259, 'offshore_wind': 0.063, 'photovoltaic': 0.179, 'biomass': 0.087, 'hydro': 0.034, 'lignite': 0.162, 'hard_coal': 0.068, 'natural_gas': 0.146}, 2026: {'onshore_wind': 0.24, 'offshore_wind': 0.064, 'photovoltaic': 0.235, 'biomass': 0.081, 'hydro': 0.03, 'lignite': 0.148, 'hard_coal': 0.071, 'natural_gas': 0.131}}; residual load identity best result: residual_load = total_power_consumption - generation_onshore_wind - generation_offshore_wind - generation_photovoltaic 0.0% outside 2%
+- **Structure and engineering:** one long-format table (series key metric | filter_id | region | resolution); units are not stored; day-resolution timestamps stored at UTC hours [(22, 80444), (23, 57252)]; 52 of 220 metric x region x resolution combinations exist
+- **Temporal:** daily frame (4018, 15); year profiles show the trend in ['total_power_consumption', 'residual_load', 'day_ahead_prices']; persistence (lag-1, lag-7): {'total_power_consumption': (0.685, 0.852), 'residual_load': (0.677, 0.433), 'day_ahead_prices': (0.915, 0.817), 'generation_onshore_wind': (0.756, 0.412), 'generation_offshore_wind': (0.583, 0.209), 'generation_photovoltaic': (0.942, 0.86), 'generation_biomass': (0.998, 0.99), 'generation_hydro': (0.987, 0.959), 'generation_lignite': (0.826, 0.574), 'generation_hard_coal': (0.851, 0.665), 'generation_natural_gas': (0.895, 0.804), 'generation_nuclear': (0.994, 0.975)}; per-series coverage: 52 of 52 series complete
+- **Spatial:** regions ['50Hertz', 'Amprion', 'DE-LU', 'TenneT', 'TransnetBW']; regional series exist only for ['generation_offshore_wind', 'generation_onshore_wind', 'generation_photovoltaic', 'total_power_consumption']
+- **Data quality:** exact duplicates 0; conflicting (series, ts) duplicates 0; missing values 15983; mirrored metric pairs [('forecast_generation_wind_and_photovoltaic', 'forecast_generation_photovoltaic')]
+- **Statistical patterns:** weekday and month profiles for 12 metrics; diurnal profiles for ['day_ahead_prices', 'generation_offshore_wind', 'generation_onshore_wind', 'generation_photovoltaic', 'residual_load', 'total_power_consumption']; negative-value hours: ['day_ahead_prices', 'residual_load']
+- **Relationships:** price vs load / wind / solar / residual (Pearson): {'load': 0.098, 'wind': -0.282, 'solar': 0.039, 'residual': 0.291}; forecast accuracy pairs: [('forecast_generation_offshore_wind', 0.961), ('forecast_generation_onshore_wind', 0.992), ('forecast_generation_photovoltaic', -0.079)]
+- **Analytics use:** measures at two resolutions for one region total, with a few regional breakdowns; supports profile, trend and relationship analysis
+- **ML use:** a price series with explanatory series available on the same days (2894 common days) and forecasts to compare with realised values
+- **AI / knowledge use:** metric names and filter ids form a small catalog; no free text
 
 ### Silver Implications
 

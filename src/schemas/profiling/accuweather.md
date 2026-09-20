@@ -100,19 +100,19 @@ Cap / sentinel-like values (columns with at least 5% of rows at the column maxim
 - `historical_daynight_metric`: (column, max, rows at max, share) [('cloud_cover_max', 1.0, 446, 0.2885), ('cloud_cover_perc_max', 100.0, 446, 0.2885), ('humidity_relative_max', 100.0, 153, 0.099), ('precipitation_type_predominant', 1.0, 183, 0.1184), ('visibility_avg', 16.0, 699, 0.4521), ('visibility_max', 16.0, 1235, 0.7988), ('visibility_min', 16.0, 699, 0.4521)]
 - `historical_hourly_imperial`: (column, max, rows at max, share) [('cloud_base_height', 40100.0, 183, 0.0626), ('cloud_cover_total', 1.0, 712, 0.1087), ('minutes_of_precipitation', 60.0, 703, 0.1073), ('minutes_of_sun', 60.0, 593, 0.0905), ('precipitation_type', 1.0, 944, 0.1441), ('visibility', 9.942, 4217, 0.6438)]
 - `historical_hourly_metric`: (column, max, rows at max, share) [('cloud_base_height', 12210.0, 185, 0.0616), ('cloud_cover_total', 1.0, 718, 0.1077), ('minutes_of_precipitation', 60.0, 739, 0.1108), ('minutes_of_sun', 60.0, 594, 0.0891), ('precipitation_type', 1.0, 983, 0.1474), ('visibility', 16.0, 4283, 0.6422)]
-Completeness against the full location x time (x day/night flag) grid:
-- `forecast_daily_calendar_imperial`: expected 750, present 750, missing 0; locations with most missing (location, count): none.
-- `forecast_daily_calendar_metric`: expected 750, present 750, missing 0; locations with most missing (location, count): none.
-- `forecast_daynight_imperial`: expected 1500, present 1500, missing 0; locations with most missing (location, count): none.
-- `forecast_daynight_metric`: expected 1500, present 1500, missing 0; locations with most missing (location, count): none.
-- `forecast_hourly_imperial`: expected 6850, present 6850, missing 0; locations with most missing (location, count): none.
-- `forecast_hourly_metric`: expected 6850, present 6850, missing 0; locations with most missing (location, count): none.
-- `historical_daily_calendar_imperial`: expected 800, present 800, missing 0; locations with most missing (location, count): none.
-- `historical_daily_calendar_metric`: expected 800, present 800, missing 0; locations with most missing (location, count): none.
-- `historical_daynight_imperial`: expected 1600, present 1546, missing 54; locations with most missing (location, count): [('toronto', 2), ('honolulu', 2), ('bogota', 2), ('new york', 2), ('lima', 2)].
-- `historical_daynight_metric`: expected 1600, present 1546, missing 54; locations with most missing (location, count): [('toronto', 2), ('honolulu', 2), ('bogota', 2), ('new york', 2), ('lima', 2)].
-- `historical_hourly_imperial`: expected 7550, present 6550, missing 1000; locations with most missing (location, count): [('karachi', 20), ('são paulo', 20), ('berlin', 20), ('bogota', 20), ('athens', 20)].
-- `historical_hourly_metric`: expected 7050, present 6669, missing 381; locations with most missing (location, count): [('honolulu', 20), ('los angeles', 18), ('mexico city', 16), ('havana', 15), ('toronto', 15)].
+Completeness within each location's (and day/night flag's) own time range; a gap inside the range is a real gap, a group that starts later or ends earlier than the table's overall range is an edge effect:
+- `forecast_daily_calendar_imperial`: 50 groups; rows 750 vs 750 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 15..15; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `forecast_daily_calendar_metric`: 50 groups; rows 750 vs 750 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 15..15; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `forecast_daynight_imperial`: 100 groups; rows 1500 vs 1500 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 15..15; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `forecast_daynight_metric`: 100 groups; rows 1500 vs 1500 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 15..15; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `forecast_hourly_imperial`: 50 groups; rows 6850 vs 6850 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 137..137; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `forecast_hourly_metric`: 50 groups; rows 6850 vs 6850 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 137..137; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `historical_daily_calendar_imperial`: 50 groups; rows 800 vs 800 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 16..16; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `historical_daily_calendar_metric`: 50 groups; rows 800 vs 800 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 1; rows per group 16..16; groups starting later than the overall range 0, ending earlier 0; missing against the overall range 0; sample (group, first, last, rows) none.
+- `historical_daynight_imperial`: 100 groups; rows 1546 vs 1546 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 2; rows per group 15..16; groups starting later than the overall range 0, ending earlier 54; missing against the overall range 54; sample (group, first, last, rows) [('amsterdam', 'n', '2024-06-27 00:00:00', '2024-07-11 00:00:00', '15'), ('athens', 'n', '2024-06-27 00:00:00', '2024-07-11 00:00:00', '15'), ('baghdad', 'n', '2024-06-27 00:00:00', '2024-07-11 00:00:00', '15')].
+- `historical_daynight_metric`: 100 groups; rows 1546 vs 1546 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 2; rows per group 15..16; groups starting later than the overall range 0, ending earlier 54; missing against the overall range 54; sample (group, first, last, rows) [('amsterdam', 'n', '2024-06-27 00:00:00', '2024-07-11 00:00:00', '15'), ('athens', 'n', '2024-06-27 00:00:00', '2024-07-11 00:00:00', '15'), ('baghdad', 'n', '2024-06-27 00:00:00', '2024-07-11 00:00:00', '15')].
+- `historical_hourly_imperial`: 50 groups; rows 6550 vs 6550 expected inside their own ranges (interior gaps 0); distinct start instants 16, end instants 16; rows per group 131..131; groups starting later than the overall range 49, ending earlier 49; missing against the overall range 1000; sample (group, first, last, rows) [('amsterdam', '2024-07-07 01:00:00', '2024-07-12 11:00:00', '131'), ('athens', '2024-07-07 02:00:00', '2024-07-12 12:00:00', '131'), ('baghdad', '2024-07-07 03:00:00', '2024-07-12 13:00:00', '131')].
+- `historical_hourly_metric`: 50 groups; rows 6669 vs 6669 expected inside their own ranges (interior gaps 0); distinct start instants 1, end instants 16; rows per group 121..141; groups starting later than the overall range 0, ending earlier 49; missing against the overall range 381; sample (group, first, last, rows) [('amsterdam', '2024-07-07 00:00:00', '2024-07-12 11:00:00', '132'), ('athens', '2024-07-07 00:00:00', '2024-07-12 12:00:00', '133'), ('baghdad', '2024-07-07 00:00:00', '2024-07-12 13:00:00', '134')].
 
 ### Entities / Keys
 
@@ -807,6 +807,10 @@ A latitude/longitude-swap test is not meaningful against a global box and is not
 - `historical_daynight_metric` per ['city_name', 'day_flag'] over `date`: gap p50 86400 s, p99 86400 s, max 86400 s; zero-second gaps 0.
 - `historical_hourly_imperial` per ['city_name'] over `date`: gap p50 3600 s, p99 3600 s, max 3600 s; zero-second gaps 0.
 - `historical_hourly_metric` per ['city_name'] over `datetime_valid_local`: gap p50 3600 s, p99 3600 s, max 3600 s; zero-second gaps 0.
+Timestamp alignment of the imperial `date` column to the metric local time (hour shift at which the imperial temperature converted to Celsius matches the metric temperature):
+- `historical_hourly_imperial` vs `historical_hourly_metric`: best shifts (hours, joined rows, matching rows) [(0, 6492, 6492), (-1, 6478, 1956), (1, 6453, 1938), (-2, 6457, 1182), (2, 6414, 1171)].
+  best shift per city, number of cities by shift: {0: 50}.
+  against the metric table's `gmt_offset` (unit assumed hours): shift equals the offset for 3 cities, its negative for 0, is zero for 50 of 50.
 
 ### Relationship Cardinality
 
@@ -846,13 +850,14 @@ Agreement of shared numeric columns on the joined keys (column: n, mean imperial
   - `solar_irradiance_avg`: n 750, 209.8 vs 661.7, corr 1, identical 0, mean abs diff 452
   - `solar_irradiance_max`: n 750, 651.1 vs 2054, corr 1, identical 0, mean abs diff 1403
   - (+12 more differing columns)
+  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: [('degree_days_cooling', 0.5557, 0.001), ('degree_days_growing', 0.5555, 0.0), ('degree_days_heating', 0.5552, -0.0), ('humidity_relative_avg', 1.0, -0.0), ('humidity_relative_max', 1.0, -0.0), ('precipitation_lwe_rate_avg', 25.4001, -0.0), ('precipitation_lwe_rate_max', 25.4001, -0.0), ('precipitation_lwe_rate_min', 25.4, -0.0), ('precipitation_lwe_total', 25.4001, -0.0), ('rain_lwe_rate_avg', 25.4001, -0.0), ('rain_lwe_rate_max', 25.4001, -0.0), ('rain_lwe_rate_min', 25.4, -0.0), ('rain_lwe_total', 25.4001, -0.0), ('solar_irradiance_avg', 3.1546, 0.0), ('solar_irradiance_max', 3.1546, -0.0), ('solar_irradiance_total', 3.1546, 0.0), ('temperature_avg', 0.5555, -17.776), ('temperature_max', 0.5555, -17.776), ('temperature_min', 0.5556, -17.778), ('temperature_dew_point_avg', 0.5555, -17.778), ('temperature_dew_point_max', 0.5556, -17.779), ('temperature_dew_point_min', 0.5555, -17.778), ('temperature_heat_index_avg', 0.5556, -17.777), ('temperature_heat_index_max', 0.5555, -17.776), ('temperature_heat_index_min', 0.5556, -17.778), ('temperature_realfeel_avg', 0.5555, -17.776), ('temperature_realfeel_max', 0.5556, -17.779)]
 - `forecast_daynight_imperial` vs `forecast_daynight_metric`: 54 shared numeric columns; identical in every joined row: ['cloud_cover_perc_avg', 'degree_days_freezing', 'humidity_relative_avg', 'humidity_relative_max', 'humidity_relative_min', 'index_air_quality_24hr_max', 'index_uv_avg', 'minutes_of_ice_total', 'minutes_of_precipitation_total', 'minutes_of_sun_total', 'minutes_of_rain_total', 'minutes_of_snow_total', 'ice_lwe_total', 'ice_probability', 'precipitation_probability', 'rain_probability', 'snow_liquid_ratio_accuweather_avg', 'snow_total', 'snow_lwe_total', 'snow_probability'] (+4 more).
   - `degree_days_cooling`: n 1500, 13.57 vs 7.542, corr 1, identical 305, mean abs diff 6.028
   - `degree_days_growing`: n 1500, 26.97 vs 14.99, corr 1, identical 41, mean abs diff 11.99
   - `degree_days_heating`: n 1500, 1.666 vs 0.9251, corr 1, identical 1195, mean abs diff 0.7413
   - `precipitation_lwe_total`: n 1500, 0.0882 vs 2.24, corr 1, identical 922, mean abs diff 2.152
   - `rain_lwe_total`: n 1500, 0.0882 vs 2.24, corr 1, identical 922, mean abs diff 2.152
-  - `solar_irradiance_total`: n 909, 2725 vs 1509, corr 1, identical 120, mean abs diff 1031
+  - `solar_irradiance_total`: n 909, 2725 vs 1509, corr 0.2037, identical 120, mean abs diff 1031
   - `temperature_avg`: n 1500, 76.9 vs 24.95, corr 1, identical 0, mean abs diff 51.96
   - `temperature_max`: n 1500, 82.77 vs 28.2, corr 1, identical 0, mean abs diff 54.56
   - `temperature_min`: n 1500, 70.7 vs 21.5, corr 1, identical 0, mean abs diff 49.2
@@ -863,6 +868,7 @@ Agreement of shared numeric columns on the joined keys (column: n, mean imperial
   - `temperature_heat_index_max`: n 1500, 86.78 vs 30.43, corr 1, identical 0, mean abs diff 56.35
   - `temperature_heat_index_min`: n 1500, 72.57 vs 22.54, corr 1, identical 0, mean abs diff 50.03
   - (+15 more differing columns)
+  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: [('degree_days_cooling', 0.5557, 0.001), ('degree_days_growing', 0.5556, -0.0), ('degree_days_heating', 0.5553, -0.0), ('precipitation_lwe_total', 25.4001, -0.0), ('rain_lwe_total', 25.4001, -0.0), ('temperature_avg', 0.5556, -17.778), ('temperature_max', 0.5555, -17.777), ('temperature_min', 0.5556, -17.778), ('temperature_dew_point_avg', 0.5556, -17.778), ('temperature_dew_point_max', 0.5556, -17.778), ('temperature_dew_point_min', 0.5555, -17.778), ('temperature_heat_index_avg', 0.5556, -17.777), ('temperature_heat_index_max', 0.5555, -17.777), ('temperature_heat_index_min', 0.5556, -17.778), ('temperature_realfeel_avg', 0.5556, -17.778), ('temperature_realfeel_max', 0.5556, -17.779), ('temperature_realfeel_min', 0.5556, -17.778), ('temperature_realfeel_shade_avg', 0.5556, -17.778), ('temperature_realfeel_shade_max', 0.5556, -17.778), ('temperature_realfeel_shade_min', 0.5556, -17.778), ('temperature_wind_chill_avg', 0.5556, -17.778), ('temperature_wind_chill_max', 0.5555, -17.777), ('temperature_wind_chill_min', 0.5556, -17.778), ('wind_gust_avg', 0.447, 0.0), ('wind_gust_max', 0.447, 0.0), ('wind_gust_min', 0.447, 0.001), ('wind_speed_avg', 0.447, 0.001), ('wind_speed_max', 0.4469, 0.001), ('wind_speed_min', 0.447, 0.001)]
 - `forecast_hourly_imperial` vs `forecast_hourly_metric`: 29 shared numeric columns; identical in every joined row: ['gmt_offset', 'cloud_cover_perc_total', 'index_uv', 'ice_lwe', 'ice_probability', 'minutes_of_sun', 'precipitation_probability', 'rain_probability', 'snow_liquid_ratio_accuweather', 'snow', 'snow_lwe', 'snow_probability', 'thunderstorm_probability', 'weather_code'].
   - `cloud_base_height`: n 6850, 2.351e+04 vs 7165, corr 1, identical 10, mean abs diff 1.635e+04
   - `humidity_relative`: n 6850, 66.72 vs 66.72, corr 1, identical 6843, mean abs diff 0.001022
@@ -879,6 +885,7 @@ Agreement of shared numeric columns on the joined keys (column: n, mean imperial
   - `wind_direction`: n 6850, 181.6 vs 181.6, corr 1, identical 6839, mean abs diff 0.003358
   - `wind_gust`: n 6850, 12.66 vs 5.661, corr 1, identical 27, mean abs diff 7.002
   - `wind_speed`: n 6850, 6.835 vs 3.056, corr 1, identical 39, mean abs diff 3.779
+  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: [('cloud_base_height', 0.3048, -0.46), ('humidity_relative', 1.0, -0.001), ('precipitation_lwe', 25.4001, -0.0), ('rain_lwe', 25.4001, -0.0), ('solar_irradiance', 3.1546, -0.0), ('temperature', 0.5556, -17.778), ('temperature_dew_point', 0.5556, -17.778), ('temperature_heat_index', 0.5556, -17.777), ('temperature_realfeel', 0.5556, -17.778), ('temperature_realfeel_shade', 0.5556, -17.778), ('temperature_wind_chill', 0.5556, -17.778), ('wind_direction', 1.0, -0.009), ('wind_gust', 0.447, 0.001), ('wind_speed', 0.447, 0.001)]
 - `historical_daily_calendar_imperial` vs `historical_daily_calendar_metric`: 60 shared numeric columns; identical in every joined row: ['cloud_cover_avg', 'cloud_cover_max', 'cloud_cover_min', 'cloud_cover_perc_avg', 'cloud_cover_perc_max', 'cloud_cover_perc_min', 'degree_days_freezing', 'humidity_relative_avg', 'humidity_relative_max', 'humidity_relative_min', 'index_uv_avg', 'index_uv_max', 'index_uv_min', 'minutes_of_precipitation_total', 'minutes_of_sun_total', 'minutes_of_snow_total', 'precipitation_type_predominant', 'snow_liquid_ratio_accuweather_avg', 'snow_liquid_ratio_accuweather_max', 'snow_liquid_ratio_accuweather_min'] (+4 more).
   - `cloud_base_height_avg`: n 618, 1.897e+04 vs 5783, corr 1, identical 0, mean abs diff 1.319e+04
   - `cloud_base_height_max`: n 618, 2.923e+04 vs 8908, corr 1, identical 0, mean abs diff 2.032e+04
@@ -896,6 +903,7 @@ Agreement of shared numeric columns on the joined keys (column: n, mean imperial
   - `pressure_msl_avg`: n 800, 29.84 vs 1.01e+05, corr 0.9999, identical 0, mean abs diff 1.01e+05
   - `pressure_msl_max`: n 800, 29.9 vs 1.012e+05, corr 0.9999, identical 0, mean abs diff 1.012e+05
   - (+21 more differing columns)
+  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: [('cloud_base_height_avg', 0.3048, -0.325), ('cloud_base_height_max', 0.3048, 0.13), ('cloud_base_height_min', 0.3048, 0.136), ('degree_days_cooling', 0.5557, 0.001), ('degree_days_growing', 0.5555, 0.0), ('degree_days_heating', 0.5553, -0.0), ('precipitation_lwe_rate_avg', 25.4, 0.0), ('precipitation_lwe_rate_max', 25.4001, -0.0), ('precipitation_lwe_rate_min', 25.4001, -0.0), ('precipitation_lwe_total', 25.4001, -0.0), ('pressure_avg', 3386.4705, -12.77), ('pressure_max', 3385.6567, 9.477), ('pressure_min', 3385.2124, 21.449), ('pressure_msl_avg', 3382.4355, 105.468), ('pressure_msl_max', 3380.2055, 174.756), ('pressure_msl_min', 3378.3651, 231.55), ('solar_irradiance_avg', 3.1546, 0.001), ('solar_irradiance_max', 3.1546, 0.001), ('solar_irradiance_total', 3.1546, -0.001), ('solar_radiation_net_avg', 3.1546, 0.001), ('solar_radiation_net_max', 3.1546, -0.0), ('solar_radiation_net_total', 3.1546, 0.0), ('temperature_avg', 0.5555, -17.777), ('temperature_max', 0.5556, -17.778), ('temperature_min', 0.5556, -17.778), ('temperature_dew_point_avg', 0.5555, -17.776), ('temperature_dew_point_max', 0.5556, -17.778), ('temperature_dew_point_min', 0.5556, -17.778), ('temperature_heat_index_avg', 0.5555, -17.777), ('temperature_heat_index_max', 0.5556, -17.779)] (+6 more)
 - `historical_daynight_imperial` vs `historical_daynight_metric`: 60 shared numeric columns; identical in every joined row: ['cloud_cover_avg', 'cloud_cover_max', 'cloud_cover_min', 'cloud_cover_perc_avg', 'cloud_cover_perc_max', 'cloud_cover_perc_min', 'humidity_relative_avg', 'humidity_relative_max', 'humidity_relative_min', 'index_uv_avg', 'index_uv_max', 'index_uv_min', 'minutes_of_precipitation_total', 'minutes_of_sun_total', 'minutes_of_snow_total', 'precipitation_type_predominant', 'snow_liquid_ratio_accuweather_avg', 'snow_liquid_ratio_accuweather_max', 'snow_liquid_ratio_accuweather_min', 'snow_lwe_rate_avg'] (+3 more).
   - `cloud_base_height_avg`: n 1072, 1.888e+04 vs 5753, corr 1, identical 0, mean abs diff 1.312e+04
   - `cloud_base_height_max`: n 1072, 2.665e+04 vs 8123, corr 1, identical 0, mean abs diff 1.853e+04
@@ -913,6 +921,7 @@ Agreement of shared numeric columns on the joined keys (column: n, mean imperial
   - `pressure_min`: n 1546, 28.92 vs 9.792e+04, corr 1, identical 0, mean abs diff 9.789e+04
   - `pressure_msl_avg`: n 1546, 29.84 vs 1.01e+05, corr 0.9999, identical 0, mean abs diff 1.01e+05
   - (+22 more differing columns)
+  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: [('cloud_base_height_avg', 0.3048, -0.289), ('cloud_base_height_max', 0.3048, 0.142), ('cloud_base_height_min', 0.3048, 0.137), ('degree_days_cooling', 0.5557, 0.001), ('degree_days_freezing', 0.5556, 0.0), ('degree_days_growing', 0.5556, -0.0), ('degree_days_heating', 0.5553, -0.0), ('precipitation_lwe_rate_avg', 25.4001, 0.0), ('precipitation_lwe_rate_max', 25.4001, -0.0), ('precipitation_lwe_rate_min', 25.4001, -0.0), ('precipitation_lwe_total', 25.4001, -0.0), ('pressure_avg', 3385.9881, 0.446), ('pressure_max', 3385.6328, 9.749), ('pressure_min', 3385.5404, 12.448), ('pressure_msl_avg', 3386.4317, -13.191), ('pressure_msl_max', 3378.5433, 224.572), ('pressure_msl_min', 3378.3826, 230.657), ('solar_irradiance_avg', 3.1546, 0.0), ('solar_irradiance_max', 3.1546, 0.0), ('solar_irradiance_total', 3.1546, -0.0), ('solar_radiation_net_avg', 3.1546, -0.0), ('solar_radiation_net_max', 3.1546, 0.0), ('solar_radiation_net_total', 3.1546, -0.0), ('temperature_avg', 0.5556, -17.778), ('temperature_max', 0.5556, -17.778), ('temperature_min', 0.5556, -17.778), ('temperature_dew_point_avg', 0.5556, -17.777), ('temperature_dew_point_max', 0.5556, -17.778), ('temperature_dew_point_min', 0.5556, -17.778), ('temperature_heat_index_avg', 0.5556, -17.779)] (+7 more)
 - `historical_hourly_imperial` vs `historical_hourly_metric`: 26 shared numeric columns; identical in every joined row: ['cloud_cover_total', 'humidity_relative', 'index_uv', 'minutes_of_precipitation', 'minutes_of_sun', 'minutes_of_snow', 'precipitation_type', 'snow_lwe', 'snow_lwe_rate', 'wind_direction'].
   - `cloud_base_height`: n 2911, 1.772e+04 vs 5386, corr 1, identical 1, mean abs diff 1.233e+04
   - `precipitation_lwe`: n 6492, 0.00746 vs 0.1895, corr 1, identical 5790, mean abs diff 0.182
@@ -930,10 +939,11 @@ Agreement of shared numeric columns on the joined keys (column: n, mean imperial
   - `visibility`: n 6492, 8.202 vs 13.2, corr 1, identical 0, mean abs diff 4.998
   - `wind_gust`: n 6492, 11.75 vs 5.252, corr 1, identical 134, mean abs diff 6.497
   - (+1 more differing columns)
+  - columns that are a linear function of the imperial value, as (column, slope, intercept) of metric on imperial: [('cloud_base_height', 0.3045, -8.453), ('precipitation_lwe', 25.4001, -0.0), ('precipitation_lwe_rate', 25.4001, -0.0), ('pressure', 3385.4884, 13.682), ('pressure_msl', 3378.1296, 237.461), ('solar_irradiance', 3.1546, -0.0), ('solar_radiation_net', 3.1546, -0.0), ('temperature', 0.5556, -17.778), ('temperature_dew_point', 0.5556, -17.778), ('temperature_heat_index', 0.5556, -17.779), ('temperature_realfeel', 0.5556, -17.778), ('temperature_realfeel_shade', 0.5556, -17.778), ('temperature_wind_chill', 0.5558, -17.783), ('visibility', 1.6093, -0.0), ('wind_gust', 0.447, -0.0), ('wind_speed', 0.4471, -0.0)]
 
 ### Forecast vs Historical
 
-Forecast versus historical tables (same grain and unit): key overlap and value comparison on the overlap:
+Forecast versus historical tables (same grain and unit): key overlap and value comparison on the overlap; columns are ranked by mean absolute difference relative to the mean level so that scale does not decide the order:
 - `forecast_daily_calendar_imperial` vs `historical_daily_calendar_imperial`: keys 750 / 800; overlapping 50; only forecast 700; only historical 750.
 - `forecast_daily_calendar_metric` vs `historical_daily_calendar_metric`: keys 750 / 800; overlapping 50; only forecast 700; only historical 750.
 - `forecast_daynight_imperial` vs `historical_daynight_imperial`: keys 1500 / 1546; overlapping 46; only forecast 1454; only historical 1500.
@@ -941,83 +951,142 @@ Forecast versus historical tables (same grain and unit): key overlap and value c
 - `forecast_hourly_imperial` vs `historical_hourly_imperial`: keys 6850 / 6550; overlapping 1519; only forecast 5331; only historical 5031.
 - `forecast_hourly_metric` vs `historical_hourly_metric`: keys 6850 / 6669; overlapping 1519; only forecast 5331; only historical 5150.
 - `forecast_daily_calendar_imperial` (forecast) minus `historical_daily_calendar_imperial` (historical) on 50 overlapping keys:
-  - `solar_irradiance_total`: n 50, forecast mean 4945, historical mean 913.3, corr 0.5619, identical 0, mean abs diff 4091
-  - `solar_irradiance_max`: n 50, forecast mean 673.7, historical mean 169.9, corr 0.4863, identical 0, mean abs diff 524.9
-  - `minutes_of_sun_total`: n 50, forecast mean 309, historical mean 169.7, corr 0.6601, identical 1, mean abs diff 181.1
-  - `solar_irradiance_avg`: n 50, forecast mean 206, historical mean 59.36, corr 0.6495, identical 0, mean abs diff 151.9
-  - `minutes_of_precipitation_total`: n 50, forecast mean 157.2, historical mean 118.8, corr 0.8664, identical 23, mean abs diff 64.8
-  - `cloud_cover_perc_min`: n 50, forecast mean 29.18, historical mean 38.62, corr 0.7055, identical 18, mean abs diff 17.6
-  - `cloud_cover_perc_avg`: n 50, forecast mean 57.32, historical mean 59.22, corr 0.9239, identical 7, mean abs diff 10.14
-  - `humidity_relative_min`: n 50, forecast mean 52.47, historical mean 58.72, corr 0.8084, identical 0, mean abs diff 9.494
-  - `cloud_cover_perc_max`: n 50, forecast mean 78.1, historical mean 72.56, corr 0.8877, identical 23, mean abs diff 8.98
-  - `humidity_relative_avg`: n 50, forecast mean 68.48, historical mean 71.28, corr 0.9352, identical 0, mean abs diff 5.895
-  - `humidity_relative_max`: n 50, forecast mean 83.64, historical mean 81.76, corr 0.9589, identical 3, mean abs diff 3.667
-  - `index_uv_max`: n 50, forecast mean 7.099, historical mean 5.513, corr 0.5963, identical 2, mean abs diff 2.316
+  - `precipitation_lwe_rate_min`: n 50, forecast mean 0.0062, historical mean 0, corr -, identical 33, mean abs diff 0.0062 (relative to the mean level: 2.00)
+  - `precipitation_lwe_rate_avg`: n 50, forecast mean 0.2332, historical mean 0.008632, corr 0.8071, identical 22, mean abs diff 0.2247 (relative to the mean level: 1.86)
+  - `solar_irradiance_total`: n 50, forecast mean 4945, historical mean 913.3, corr 0.5619, identical 0, mean abs diff 4091 (relative to the mean level: 1.40)
+  - `solar_irradiance_max`: n 50, forecast mean 673.7, historical mean 169.9, corr 0.4863, identical 0, mean abs diff 524.9 (relative to the mean level: 1.24)
+  - `solar_irradiance_avg`: n 50, forecast mean 206, historical mean 59.36, corr 0.6495, identical 0, mean abs diff 151.9 (relative to the mean level: 1.14)
+  - `minutes_of_sun_total`: n 50, forecast mean 309, historical mean 169.7, corr 0.6601, identical 1, mean abs diff 181.1 (relative to the mean level: 0.76)
+  - `precipitation_lwe_total`: n 50, forecast mean 0.2332, historical mean 0.1454, corr 0.8285, identical 22, mean abs diff 0.1094 (relative to the mean level: 0.58)
+  - `cloud_cover_perc_min`: n 50, forecast mean 29.18, historical mean 38.62, corr 0.7055, identical 18, mean abs diff 17.6 (relative to the mean level: 0.52)
+  - `minutes_of_precipitation_total`: n 50, forecast mean 157.2, historical mean 118.8, corr 0.8664, identical 23, mean abs diff 64.8 (relative to the mean level: 0.47)
+  - `index_uv_avg`: n 50, forecast mean 1.72, historical mean 1.593, corr 0.6157, identical 0, mean abs diff 0.765 (relative to the mean level: 0.46)
+  - `precipitation_lwe_rate_max`: n 50, forecast mean 0.0772, historical mean 0.05554, corr 0.7778, identical 26, mean abs diff 0.02886 (relative to the mean level: 0.43)
+  - `index_uv_max`: n 50, forecast mean 7.099, historical mean 5.513, corr 0.5963, identical 2, mean abs diff 2.316 (relative to the mean level: 0.37)
 - `forecast_daily_calendar_metric` (forecast) minus `historical_daily_calendar_metric` (historical) on 50 overlapping keys:
-  - `solar_irradiance_total`: n 50, forecast mean 1.56e+04, historical mean 2881, corr 0.5619, identical 0, mean abs diff 1.291e+04
-  - `solar_irradiance_max`: n 50, forecast mean 2125, historical mean 536, corr 0.4863, identical 0, mean abs diff 1656
-  - `solar_irradiance_avg`: n 50, forecast mean 650, historical mean 187.3, corr 0.6495, identical 0, mean abs diff 479.1
-  - `minutes_of_sun_total`: n 50, forecast mean 309, historical mean 169.7, corr 0.6601, identical 1, mean abs diff 181.1
-  - `minutes_of_precipitation_total`: n 50, forecast mean 157.2, historical mean 118.8, corr 0.8664, identical 23, mean abs diff 64.8
-  - `cloud_cover_perc_min`: n 50, forecast mean 29.18, historical mean 38.62, corr 0.7055, identical 18, mean abs diff 17.6
-  - `cloud_cover_perc_avg`: n 50, forecast mean 57.32, historical mean 59.22, corr 0.9239, identical 7, mean abs diff 10.14
-  - `humidity_relative_min`: n 50, forecast mean 52.47, historical mean 58.72, corr 0.8084, identical 0, mean abs diff 9.494
-  - `cloud_cover_perc_max`: n 50, forecast mean 78.1, historical mean 72.56, corr 0.8877, identical 23, mean abs diff 8.98
-  - `humidity_relative_avg`: n 50, forecast mean 68.48, historical mean 71.28, corr 0.9352, identical 0, mean abs diff 5.895
-  - `precipitation_lwe_rate_avg`: n 50, forecast mean 5.923, historical mean 0.2193, corr 0.8071, identical 22, mean abs diff 5.707
-  - `humidity_relative_max`: n 50, forecast mean 83.64, historical mean 81.76, corr 0.9589, identical 3, mean abs diff 3.667
+  - `precipitation_lwe_rate_min`: n 50, forecast mean 0.1575, historical mean 0, corr -, identical 33, mean abs diff 0.1575 (relative to the mean level: 2.00)
+  - `precipitation_lwe_rate_avg`: n 50, forecast mean 5.923, historical mean 0.2193, corr 0.8071, identical 22, mean abs diff 5.707 (relative to the mean level: 1.86)
+  - `solar_irradiance_total`: n 50, forecast mean 1.56e+04, historical mean 2881, corr 0.5619, identical 0, mean abs diff 1.291e+04 (relative to the mean level: 1.40)
+  - `solar_irradiance_max`: n 50, forecast mean 2125, historical mean 536, corr 0.4863, identical 0, mean abs diff 1656 (relative to the mean level: 1.24)
+  - `solar_irradiance_avg`: n 50, forecast mean 650, historical mean 187.3, corr 0.6495, identical 0, mean abs diff 479.1 (relative to the mean level: 1.14)
+  - `minutes_of_sun_total`: n 50, forecast mean 309, historical mean 169.7, corr 0.6601, identical 1, mean abs diff 181.1 (relative to the mean level: 0.76)
+  - `precipitation_lwe_total`: n 50, forecast mean 5.923, historical mean 3.693, corr 0.8285, identical 22, mean abs diff 2.779 (relative to the mean level: 0.58)
+  - `cloud_cover_perc_min`: n 50, forecast mean 29.18, historical mean 38.62, corr 0.7055, identical 18, mean abs diff 17.6 (relative to the mean level: 0.52)
+  - `minutes_of_precipitation_total`: n 50, forecast mean 157.2, historical mean 118.8, corr 0.8664, identical 23, mean abs diff 64.8 (relative to the mean level: 0.47)
+  - `index_uv_avg`: n 50, forecast mean 1.72, historical mean 1.593, corr 0.6157, identical 0, mean abs diff 0.765 (relative to the mean level: 0.46)
+  - `precipitation_lwe_rate_max`: n 50, forecast mean 1.961, historical mean 1.411, corr 0.7778, identical 26, mean abs diff 0.733 (relative to the mean level: 0.43)
+  - `index_uv_max`: n 50, forecast mean 7.099, historical mean 5.513, corr 0.5963, identical 2, mean abs diff 2.316 (relative to the mean level: 0.37)
 - `forecast_daynight_imperial` (forecast) minus `historical_daynight_imperial` (historical) on 46 overlapping keys:
-  - `solar_irradiance_total`: n 46, forecast mean 4251, historical mean 958.1, corr 0.7433, identical 1, mean abs diff 3367
-  - `minutes_of_sun_total`: n 46, forecast mean 253.3, historical mean 157.5, corr 0.6732, identical 2, mean abs diff 145.3
-  - `minutes_of_precipitation_total`: n 46, forecast mean 97.17, historical mean 90, corr 0.8616, identical 26, mean abs diff 37.17
-  - `cloud_cover_perc_avg`: n 46, forecast mean 59.87, historical mean 57.22, corr 0.8564, identical 10, mean abs diff 12.52
-  - `humidity_relative_min`: n 46, forecast mean 55.29, historical mean 59.72, corr 0.8767, identical 0, mean abs diff 6.606
-  - `temperature_dew_point_avg`: n 46, forecast mean 68.18, historical mean 62.52, corr 0.9691, identical 0, mean abs diff 5.677
-  - `humidity_relative_avg`: n 46, forecast mean 64.52, historical mean 66.83, corr 0.9354, identical 0, mean abs diff 5.512
-  - `temperature_realfeel_shade_max`: n 46, forecast mean 85.46, historical mean 81.6, corr 0.9392, identical 0, mean abs diff 5.162
-  - `temperature_heat_index_min`: n 32, forecast mean 73.86, historical mean 86.06, corr 0.8439, identical 0, mean abs diff 4.76
-  - `temperature_realfeel_max`: n 46, forecast mean 88.75, historical mean 86.78, corr 0.9506, identical 1, mean abs diff 4.487
-  - `temperature_realfeel_min`: n 46, forecast mean 74.68, historical mean 75.09, corr 0.9582, identical 0, mean abs diff 4.427
-  - `temperature_realfeel_shade_avg`: n 46, forecast mean 80.37, historical mean 77.47, corr 0.9628, identical 0, mean abs diff 4.275
+  - `degree_days_freezing`: n 46, forecast mean 0, historical mean 0.01957, corr -, identical 45, mean abs diff 0.01957 (relative to the mean level: 2.00)
+  - `index_uv_avg`: n 46, forecast mean 0, historical mean 3.227, corr -, identical 3, mean abs diff 3.227 (relative to the mean level: 2.00)
+  - `solar_irradiance_total`: n 46, forecast mean 4251, historical mean 958.1, corr 0.7433, identical 1, mean abs diff 3367 (relative to the mean level: 1.29)
+  - `minutes_of_sun_total`: n 46, forecast mean 253.3, historical mean 157.5, corr 0.6732, identical 2, mean abs diff 145.3 (relative to the mean level: 0.71)
+  - `precipitation_lwe_total`: n 46, forecast mean 0.1524, historical mean 0.116, corr 0.7929, identical 24, mean abs diff 0.06591 (relative to the mean level: 0.49)
+  - `degree_days_heating`: n 46, forecast mean 1.776, historical mean 2.46, corr 0.9328, identical 36, mean abs diff 0.89 (relative to the mean level: 0.42)
+  - `minutes_of_precipitation_total`: n 46, forecast mean 97.17, historical mean 90, corr 0.8616, identical 26, mean abs diff 37.17 (relative to the mean level: 0.40)
+  - `cloud_cover_perc_avg`: n 46, forecast mean 59.87, historical mean 57.22, corr 0.8564, identical 10, mean abs diff 12.52 (relative to the mean level: 0.21)
+  - `humidity_relative_min`: n 46, forecast mean 55.29, historical mean 59.72, corr 0.8767, identical 0, mean abs diff 6.606 (relative to the mean level: 0.11)
+  - `degree_days_cooling`: n 46, forecast mean 15.81, historical mean 15.16, corr 0.9739, identical 10, mean abs diff 1.665 (relative to the mean level: 0.11)
+  - `temperature_dew_point_avg`: n 46, forecast mean 68.18, historical mean 62.52, corr 0.9691, identical 0, mean abs diff 5.677 (relative to the mean level: 0.09)
+  - `humidity_relative_avg`: n 46, forecast mean 64.52, historical mean 66.83, corr 0.9354, identical 0, mean abs diff 5.512 (relative to the mean level: 0.08)
+  - `temperature_realfeel_shade_max`: n 46, forecast mean 85.46, historical mean 81.6, corr 0.9392, identical 0, mean abs diff 5.162 (relative to the mean level: 0.06)
+  - `temperature_heat_index_min`: n 32, forecast mean 73.86, historical mean 86.06, corr 0.5173, identical 0, mean abs diff 4.76 (relative to the mean level: 0.06)
+  - `temperature_realfeel_min`: n 46, forecast mean 74.68, historical mean 75.09, corr 0.9582, identical 0, mean abs diff 4.427 (relative to the mean level: 0.06)
+  - `temperature_realfeel_shade_avg`: n 46, forecast mean 80.37, historical mean 77.47, corr 0.9628, identical 0, mean abs diff 4.275 (relative to the mean level: 0.05)
+  - `temperature_realfeel_max`: n 46, forecast mean 88.75, historical mean 86.78, corr 0.9506, identical 1, mean abs diff 4.487 (relative to the mean level: 0.05)
+  - `temperature_realfeel_avg`: n 46, forecast mean 83.2, historical mean 81.59, corr 0.967, identical 0, mean abs diff 3.776 (relative to the mean level: 0.05)
+  - `temperature_max`: n 46, forecast mean 83.72, historical mean 81.45, corr 0.9426, identical 7, mean abs diff 3.398 (relative to the mean level: 0.04)
+  - `temperature_dew_point_min`: n 46, forecast mean 60.27, historical mean 61.01, corr 0.965, identical 9, mean abs diff 2.16 (relative to the mean level: 0.04)
 - `forecast_daynight_metric` (forecast) minus `historical_daynight_metric` (historical) on 46 overlapping keys:
-  - `solar_irradiance_total`: n 21, forecast mean 2527, historical mean 3023, corr 0.394, identical 1, mean abs diff 1715
-  - `minutes_of_sun_total`: n 46, forecast mean 253.3, historical mean 157.5, corr 0.6732, identical 2, mean abs diff 145.3
-  - `minutes_of_precipitation_total`: n 46, forecast mean 97.17, historical mean 90, corr 0.8616, identical 26, mean abs diff 37.17
-  - `cloud_cover_perc_avg`: n 46, forecast mean 59.87, historical mean 57.22, corr 0.8564, identical 10, mean abs diff 12.52
-  - `humidity_relative_min`: n 46, forecast mean 55.29, historical mean 59.72, corr 0.8767, identical 0, mean abs diff 6.606
-  - `humidity_relative_avg`: n 46, forecast mean 64.52, historical mean 66.83, corr 0.9354, identical 0, mean abs diff 5.512
-  - `humidity_relative_max`: n 46, forecast mean 77.95, historical mean 75.72, corr 0.9721, identical 1, mean abs diff 4.091
-  - `index_uv_avg`: n 46, forecast mean 0, historical mean 3.227, corr -, identical 3, mean abs diff 3.227
-  - `temperature_dew_point_avg`: n 46, forecast mean 20.1, historical mean 16.95, corr 0.9691, identical 0, mean abs diff 3.153
-  - `temperature_realfeel_shade_max`: n 46, forecast mean 29.7, historical mean 27.55, corr 0.9392, identical 0, mean abs diff 2.867
-  - `temperature_heat_index_min`: n 32, forecast mean 23.26, historical mean 30.03, corr 0.8438, identical 0, mean abs diff 2.645
-  - `temperature_realfeel_max`: n 46, forecast mean 31.53, historical mean 30.43, corr 0.9506, identical 1, mean abs diff 2.492
+  - `degree_days_freezing`: n 46, forecast mean 0, historical mean 0.01087, corr -, identical 45, mean abs diff 0.01087 (relative to the mean level: 2.00)
+  - `index_uv_avg`: n 46, forecast mean 0, historical mean 3.227, corr -, identical 3, mean abs diff 3.227 (relative to the mean level: 2.00)
+  - `minutes_of_sun_total`: n 46, forecast mean 253.3, historical mean 157.5, corr 0.6732, identical 2, mean abs diff 145.3 (relative to the mean level: 0.71)
+  - `solar_irradiance_total`: n 21, forecast mean 2527, historical mean 3023, corr 0.2586, identical 1, mean abs diff 1715 (relative to the mean level: 0.62)
+  - `precipitation_lwe_total`: n 46, forecast mean 3.871, historical mean 2.946, corr 0.7929, identical 24, mean abs diff 1.674 (relative to the mean level: 0.49)
+  - `degree_days_heating`: n 46, forecast mean 0.9857, historical mean 1.366, corr 0.9328, identical 36, mean abs diff 0.4948 (relative to the mean level: 0.42)
+  - `minutes_of_precipitation_total`: n 46, forecast mean 97.17, historical mean 90, corr 0.8616, identical 26, mean abs diff 37.17 (relative to the mean level: 0.40)
+  - `cloud_cover_perc_avg`: n 46, forecast mean 59.87, historical mean 57.22, corr 0.8564, identical 10, mean abs diff 12.52 (relative to the mean level: 0.21)
+  - `temperature_dew_point_avg`: n 46, forecast mean 20.1, historical mean 16.95, corr 0.9691, identical 0, mean abs diff 3.153 (relative to the mean level: 0.17)
+  - `humidity_relative_min`: n 46, forecast mean 55.29, historical mean 59.72, corr 0.8767, identical 0, mean abs diff 6.606 (relative to the mean level: 0.11)
+  - `degree_days_cooling`: n 46, forecast mean 8.787, historical mean 8.423, corr 0.9739, identical 10, mean abs diff 0.9257 (relative to the mean level: 0.11)
+  - `temperature_realfeel_min`: n 46, forecast mean 23.71, historical mean 23.94, corr 0.9583, identical 0, mean abs diff 2.459 (relative to the mean level: 0.10)
+  - `temperature_realfeel_shade_max`: n 46, forecast mean 29.7, historical mean 27.55, corr 0.9392, identical 0, mean abs diff 2.867 (relative to the mean level: 0.10)
+  - `temperature_heat_index_min`: n 32, forecast mean 23.26, historical mean 30.03, corr 0.5172, identical 0, mean abs diff 2.645 (relative to the mean level: 0.10)
+  - `temperature_realfeel_shade_avg`: n 46, forecast mean 26.87, historical mean 25.26, corr 0.9628, identical 0, mean abs diff 2.374 (relative to the mean level: 0.09)
+  - `temperature_realfeel_max`: n 46, forecast mean 31.53, historical mean 30.43, corr 0.9506, identical 1, mean abs diff 2.492 (relative to the mean level: 0.08)
+  - `temperature_dew_point_min`: n 46, forecast mean 15.71, historical mean 16.12, corr 0.9651, identical 9, mean abs diff 1.2 (relative to the mean level: 0.08)
+  - `temperature_realfeel_avg`: n 46, forecast mean 28.45, historical mean 27.55, corr 0.967, identical 0, mean abs diff 2.098 (relative to the mean level: 0.07)
+  - `temperature_max`: n 46, forecast mean 28.73, historical mean 27.47, corr 0.9426, identical 7, mean abs diff 1.887 (relative to the mean level: 0.07)
+  - `temperature_heat_index_avg`: n 32, forecast mean 27.78, historical mean 33.22, corr 0.5643, identical 0, mean abs diff 1.687 (relative to the mean level: 0.06)
 - `forecast_hourly_imperial` (forecast) minus `historical_hourly_imperial` (historical) on 1519 overlapping keys:
-  - `cloud_base_height`: n 769, forecast mean 2.407e+04, historical mean 1.607e+04, corr 0.7027, identical 8, mean abs diff 4955
-  - `solar_irradiance`: n 1519, forecast mean 247.9, historical mean 86.98, corr 0.8575, identical 517, mean abs diff 175.6
-  - `wind_direction`: n 1519, forecast mean 189.2, historical mean 169.6, corr 0.534, identical 97, mean abs diff 51.62
-  - `temperature_wind_chill`: n 47, forecast mean 78.12, historical mean 22.94, corr 0.6027, identical 0, mean abs diff 20.4
-  - `minutes_of_sun`: n 1519, forecast mean 14.11, historical mean 16.39, corr 0.7765, identical 797, mean abs diff 7.344
-  - `temperature_realfeel_shade`: n 1519, forecast mean 79.97, historical mean 78.39, corr 0.9448, identical 7, mean abs diff 4.57
-  - `temperature_realfeel`: n 1519, forecast mean 82.02, historical mean 81.57, corr 0.9524, identical 3, mean abs diff 4.277
-  - `humidity_relative`: n 1519, forecast mean 66.65, historical mean 66.12, corr 0.9649, identical 293, mean abs diff 4.032
-  - `wind_gust`: n 1519, forecast mean 10.97, historical mean 12.09, corr 0.7435, identical 14, mean abs diff 3.805
-  - `temperature_heat_index`: n 919, forecast mean 81.37, historical mean 93.07, corr 0.9034, identical 9, mean abs diff 2.446
-  - `wind_speed`: n 1519, forecast mean 6.647, historical mean 8.055, corr 0.836, identical 17, mean abs diff 2.328
-  - `temperature_dew_point`: n 1519, forecast mean 63.26, historical mean 63.08, corr 0.9685, identical 314, mean abs diff 1.668
+  - `precipitation_lwe`: n 1519, forecast mean 0.009318, historical mean 0.00821, corr 0.2726, identical 1208, mean abs diff 0.01227 (relative to the mean level: 1.40)
+  - `solar_irradiance`: n 1519, forecast mean 247.9, historical mean 86.98, corr 0.8575, identical 517, mean abs diff 175.6 (relative to the mean level: 1.05)
+  - `minutes_of_sun`: n 1519, forecast mean 14.11, historical mean 16.39, corr 0.7765, identical 797, mean abs diff 7.344 (relative to the mean level: 0.48)
+  - `temperature_wind_chill`: n 47, forecast mean 78.12, historical mean 22.94, corr 0.2655, identical 0, mean abs diff 20.4 (relative to the mean level: 0.40)
+  - `wind_gust`: n 1519, forecast mean 10.97, historical mean 12.09, corr 0.7435, identical 14, mean abs diff 3.805 (relative to the mean level: 0.33)
+  - `wind_speed`: n 1519, forecast mean 6.647, historical mean 8.055, corr 0.836, identical 17, mean abs diff 2.328 (relative to the mean level: 0.32)
+  - `wind_direction`: n 1519, forecast mean 189.2, historical mean 169.6, corr 0.534, identical 97, mean abs diff 51.62 (relative to the mean level: 0.29)
+  - `cloud_base_height`: n 769, forecast mean 2.407e+04, historical mean 1.607e+04, corr 0.6694, identical 8, mean abs diff 4955 (relative to the mean level: 0.25)
+  - `index_uv`: n 1519, forecast mean 2.089, historical mean 2.249, corr 0.9286, identical 534, mean abs diff 0.4999 (relative to the mean level: 0.23)
+  - `visibility`: n 1519, forecast mean 8.017, historical mean 7.807, corr 0.6437, identical 224, mean abs diff 1.459 (relative to the mean level: 0.18)
+  - `humidity_relative`: n 1519, forecast mean 66.65, historical mean 66.12, corr 0.9649, identical 293, mean abs diff 4.032 (relative to the mean level: 0.06)
+  - `temperature_realfeel_shade`: n 1519, forecast mean 79.97, historical mean 78.39, corr 0.9448, identical 7, mean abs diff 4.57 (relative to the mean level: 0.06)
+  - `temperature_realfeel`: n 1519, forecast mean 82.02, historical mean 81.57, corr 0.9524, identical 3, mean abs diff 4.277 (relative to the mean level: 0.05)
+  - `temperature_heat_index`: n 919, forecast mean 81.37, historical mean 93.07, corr 0.5049, identical 9, mean abs diff 2.446 (relative to the mean level: 0.03)
+  - `temperature_dew_point`: n 1519, forecast mean 63.26, historical mean 63.08, corr 0.9685, identical 314, mean abs diff 1.668 (relative to the mean level: 0.03)
+  - `temperature`: n 1519, forecast mean 78.15, historical mean 78.34, corr 0.9857, identical 663, mean abs diff 1.247 (relative to the mean level: 0.02)
 - `forecast_hourly_metric` (forecast) minus `historical_hourly_metric` (historical) on 1519 overlapping keys:
-  - `cloud_base_height`: n 769, forecast mean 7336, historical mean 4885, corr 0.7026, identical 2, mean abs diff 1502
-  - `solar_irradiance`: n 1519, forecast mean 782, historical mean 274.4, corr 0.8575, identical 517, mean abs diff 554
-  - `visibility`: n 1, forecast mean 402.3, historical mean 12.56, corr -, identical 0, mean abs diff 387.9
-  - `wind_direction`: n 1519, forecast mean 189.2, historical mean 169.6, corr 0.534, identical 97, mean abs diff 51.62
-  - `temperature_wind_chill`: n 47, forecast mean 25.62, historical mean -5.031, corr 0.6026, identical 0, mean abs diff 11.33
-  - `minutes_of_sun`: n 1519, forecast mean 14.11, historical mean 16.39, corr 0.7765, identical 797, mean abs diff 7.344
-  - `humidity_relative`: n 1519, forecast mean 66.65, historical mean 66.12, corr 0.9649, identical 293, mean abs diff 4.032
-  - `temperature_realfeel_shade`: n 1519, forecast mean 26.65, historical mean 25.77, corr 0.9448, identical 7, mean abs diff 2.539
-  - `temperature_realfeel`: n 1519, forecast mean 27.79, historical mean 27.54, corr 0.9524, identical 4, mean abs diff 2.376
-  - `wind_gust`: n 1519, forecast mean 4.905, historical mean 5.406, corr 0.7435, identical 17, mean abs diff 1.701
-  - `temperature_heat_index`: n 919, forecast mean 27.43, historical mean 33.93, corr 0.9034, identical 15, mean abs diff 1.359
-  - `wind_speed`: n 1519, forecast mean 2.972, historical mean 3.601, corr 0.8359, identical 17, mean abs diff 1.041
+  - `visibility`: n 1, forecast mean 402.3, historical mean 12.56, corr -, identical 0, mean abs diff 387.9 (relative to the mean level: 1.87)
+  - `precipitation_lwe`: n 1519, forecast mean 0.2367, historical mean 0.2085, corr 0.2726, identical 1208, mean abs diff 0.3115 (relative to the mean level: 1.40)
+  - `solar_irradiance`: n 1519, forecast mean 782, historical mean 274.4, corr 0.8575, identical 517, mean abs diff 554 (relative to the mean level: 1.05)
+  - `temperature_wind_chill`: n 47, forecast mean 25.62, historical mean -5.031, corr 0.2655, identical 0, mean abs diff 11.33 (relative to the mean level: 0.74)
+  - `minutes_of_sun`: n 1519, forecast mean 14.11, historical mean 16.39, corr 0.7765, identical 797, mean abs diff 7.344 (relative to the mean level: 0.48)
+  - `wind_gust`: n 1519, forecast mean 4.905, historical mean 5.406, corr 0.7435, identical 17, mean abs diff 1.701 (relative to the mean level: 0.33)
+  - `wind_speed`: n 1519, forecast mean 2.972, historical mean 3.601, corr 0.8359, identical 17, mean abs diff 1.041 (relative to the mean level: 0.32)
+  - `wind_direction`: n 1519, forecast mean 189.2, historical mean 169.6, corr 0.534, identical 97, mean abs diff 51.62 (relative to the mean level: 0.29)
+  - `cloud_base_height`: n 769, forecast mean 7336, historical mean 4885, corr 0.6694, identical 2, mean abs diff 1502 (relative to the mean level: 0.25)
+  - `index_uv`: n 1519, forecast mean 2.089, historical mean 2.249, corr 0.9286, identical 534, mean abs diff 0.4999 (relative to the mean level: 0.23)
+  - `temperature_realfeel_shade`: n 1519, forecast mean 26.65, historical mean 25.77, corr 0.9448, identical 7, mean abs diff 2.539 (relative to the mean level: 0.10)
+  - `temperature_realfeel`: n 1519, forecast mean 27.79, historical mean 27.54, corr 0.9524, identical 4, mean abs diff 2.376 (relative to the mean level: 0.09)
+  - `temperature_dew_point`: n 1519, forecast mean 17.37, historical mean 17.27, corr 0.9685, identical 315, mean abs diff 0.9264 (relative to the mean level: 0.05)
+  - `temperature_heat_index`: n 919, forecast mean 27.43, historical mean 33.93, corr 0.5049, identical 15, mean abs diff 1.359 (relative to the mean level: 0.04)
+  - `temperature`: n 1519, forecast mean 25.64, historical mean 25.75, corr 0.9857, identical 667, mean abs diff 0.6929 (relative to the mean level: 0.03)
+
+### Physical Consistency and Spatial Patterns
+
+Ordering rules between related columns (rows compared / rows violating):
+- `forecast_daily_calendar_imperial`: 60 rules checked; violated: [('precipitation_lwe_rate_avg <= precipitation_lwe_rate_max', 750, 342), ('rain_lwe_rate_avg <= rain_lwe_rate_max', 750, 342)]
+- `forecast_daily_calendar_metric`: 57 rules checked; violated: [('precipitation_lwe_rate_avg <= precipitation_lwe_rate_max', 750, 342), ('rain_lwe_rate_avg <= rain_lwe_rate_max', 750, 342)]
+- `forecast_daynight_imperial`: 33 rules checked; violated: [('temperature_dew_point_avg <= temperature_dew_point_max', 1500, 1345), ('wind_gust_min <= wind_gust_max', 1500, 6), ('wind_gust_avg <= wind_gust_max', 1500, 1497), ('temperature_dew_point_avg <= temperature_avg', 1500, 363), ('wind_speed_max <= wind_gust_max', 1500, 145)]
+- `forecast_daynight_metric`: 33 rules checked; violated: [('temperature_dew_point_avg <= temperature_dew_point_max', 1500, 1345), ('wind_gust_min <= wind_gust_max', 1500, 6), ('wind_gust_avg <= wind_gust_max', 1500, 1497), ('temperature_dew_point_avg <= temperature_avg', 1500, 363), ('wind_speed_max <= wind_gust_max', 1500, 141)]
+- `forecast_hourly_imperial`: 2 rules checked; violated: none
+- `forecast_hourly_metric`: 2 rules checked; violated: none
+- `historical_daily_calendar_imperial`: 63 rules checked; violated: [('wind_speed_avg <= wind_gust_avg', 800, 2), ('wind_speed_min <= wind_gust_min', 800, 6), ('wind_speed_max <= wind_gust_max', 800, 1)]
+- `historical_daily_calendar_metric`: 63 rules checked; violated: [('wind_speed_avg <= wind_gust_avg', 800, 2), ('wind_speed_min <= wind_gust_min', 800, 6), ('wind_speed_max <= wind_gust_max', 800, 1)]
+- `historical_daynight_imperial`: 63 rules checked; violated: [('wind_speed_avg <= wind_gust_avg', 1546, 3), ('wind_speed_min <= wind_gust_min', 1546, 11), ('wind_speed_max <= wind_gust_max', 1546, 2)]
+- `historical_daynight_metric`: 63 rules checked; violated: [('wind_speed_avg <= wind_gust_avg', 1546, 3), ('wind_speed_min <= wind_gust_min', 1546, 11), ('wind_speed_max <= wind_gust_max', 1546, 2)]
+- `historical_hourly_imperial`: 2 rules checked; violated: [('wind_speed <= wind_gust', 6550, 65)]
+- `historical_hourly_metric`: 2 rules checked; violated: [('wind_speed <= wind_gust', 6669, 67)]
+Temperature by absolute-latitude band (band, locations, mean):
+- `forecast_daily_calendar_metric`: [('0-15', 9, 24.5), ('15-30', 13, 28.4), ('30-45', 21, 25.1), ('45+', 7, 18.8)]; correlation of latitude with temperature 0.3691; rows in the southern hemisphere 120.
+- `historical_daily_calendar_metric`: [('0-15', 9, 24.6), ('15-30', 13, 28.4), ('30-45', 21, 24.2), ('45+', 7, 18.0)]; correlation of latitude with temperature 0.3137; rows in the southern hemisphere 128.
+Day versus night mean temperature per (location, date):
+- `forecast_daynight_metric`: 750 pairs; day minus night mean 3.097; day warmer in 744.
+- `historical_daynight_metric`: 754 pairs; day minus night mean 3.369; day warmer in 738.
+Locations per country: 50 locations in 43 countries; largest [('in', 4), ('us', 3), ('jp', 2), ('cn', 2), ('hk', 1), ('ca', 1)].
+How unavailable values are encoded (single-value columns by kind, per table):
+- `forecast_daily_calendar_imperial`: {'zero / false': 24}
+- `forecast_daily_calendar_metric`: {'zero / false': 24, 'all null': 2}
+- `forecast_daynight_imperial`: {'zero / false': 13, 'other value rain': 1}
+- `forecast_daynight_metric`: {'zero / false': 13, 'other value rain': 1}
+- `forecast_hourly_imperial`: {'zero / false': 6, 'other value rain': 1}
+- `forecast_hourly_metric`: {'zero / false': 6, 'other value rain': 1, 'other value 402.335': 1}
+- `historical_daily_calendar_imperial`: {'zero / false': 11, 'all null': 25}
+- `historical_daily_calendar_metric`: {'zero / false': 11, 'all null': 25}
+- `historical_daynight_imperial`: {'all null': 25, 'zero / false': 9}
+- `historical_daynight_metric`: {'all null': 25, 'zero / false': 9}
+- `historical_hourly_imperial`: {'all null': 15, 'zero / false': 4}
+- `historical_hourly_metric`: {'all null': 15, 'zero / false': 4}
 
 ### Regime / Version Evidence
 
@@ -1072,18 +1141,18 @@ The catalog comment (see Provenance) states the scope of the sample; the data it
 
 ### EDA Findings
 
-- `forecast_daily_calendar_imperial`: rows=750, cols=88, dups=0, key=['city_name', 'date'], key duplicates=0, missing grid cells=0, cap-like columns=3
-- `forecast_daily_calendar_metric`: rows=750, cols=88, dups=0, key=['city_name', 'date'], key duplicates=0, missing grid cells=0, cap-like columns=3
-- `forecast_daynight_imperial`: rows=1500, cols=67, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, missing grid cells=0, cap-like columns=2
-- `forecast_daynight_metric`: rows=1500, cols=67, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, missing grid cells=0, cap-like columns=2
-- `forecast_hourly_imperial`: rows=6850, cols=39, dups=0, key=['city_name', 'datetime_valid_local'], key duplicates=0, missing grid cells=0, cap-like columns=3
-- `forecast_hourly_metric`: rows=6850, cols=39, dups=0, key=['city_name', 'datetime_valid_local'], key duplicates=0, missing grid cells=0, cap-like columns=3
-- `historical_daily_calendar_imperial`: rows=800, cols=108, dups=0, key=['city_name', 'date'], key duplicates=0, missing grid cells=0, cap-like columns=7
-- `historical_daily_calendar_metric`: rows=800, cols=108, dups=0, key=['city_name', 'date'], key duplicates=0, missing grid cells=0, cap-like columns=7
-- `historical_daynight_imperial`: rows=1546, cols=109, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, missing grid cells=54, cap-like columns=7
-- `historical_daynight_metric`: rows=1546, cols=109, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, missing grid cells=54, cap-like columns=7
-- `historical_hourly_imperial`: rows=6550, cols=49, dups=0, key=['city_name', 'date'], key duplicates=0, missing grid cells=1000, cap-like columns=6
-- `historical_hourly_metric`: rows=6669, cols=50, dups=0, key=['city_name', 'datetime_valid_local'], key duplicates=0, missing grid cells=381, cap-like columns=6
+- `forecast_daily_calendar_imperial`: rows=750, cols=88, dups=0, key=['city_name', 'date'], key duplicates=0, interior gaps=0, cap-like columns=3
+- `forecast_daily_calendar_metric`: rows=750, cols=88, dups=0, key=['city_name', 'date'], key duplicates=0, interior gaps=0, cap-like columns=3
+- `forecast_daynight_imperial`: rows=1500, cols=67, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, interior gaps=0, cap-like columns=2
+- `forecast_daynight_metric`: rows=1500, cols=67, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, interior gaps=0, cap-like columns=2
+- `forecast_hourly_imperial`: rows=6850, cols=39, dups=0, key=['city_name', 'datetime_valid_local'], key duplicates=0, interior gaps=0, cap-like columns=3
+- `forecast_hourly_metric`: rows=6850, cols=39, dups=0, key=['city_name', 'datetime_valid_local'], key duplicates=0, interior gaps=0, cap-like columns=3
+- `historical_daily_calendar_imperial`: rows=800, cols=108, dups=0, key=['city_name', 'date'], key duplicates=0, interior gaps=0, cap-like columns=7
+- `historical_daily_calendar_metric`: rows=800, cols=108, dups=0, key=['city_name', 'date'], key duplicates=0, interior gaps=0, cap-like columns=7
+- `historical_daynight_imperial`: rows=1546, cols=109, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, interior gaps=0, cap-like columns=7
+- `historical_daynight_metric`: rows=1546, cols=109, dups=0, key=['city_name', 'date', 'day_flag'], key duplicates=0, interior gaps=0, cap-like columns=7
+- `historical_hourly_imperial`: rows=6550, cols=49, dups=0, key=['city_name', 'date'], key duplicates=0, interior gaps=0, cap-like columns=6
+- `historical_hourly_metric`: rows=6669, cols=50, dups=0, key=['city_name', 'datetime_valid_local'], key duplicates=0, interior gaps=0, cap-like columns=6
 
 ### ML-Readiness Evidence
 
@@ -1105,6 +1174,19 @@ The catalog comment (see Provenance) states the scope of the sample; the data it
 - **Source / version / regime change:** No provider version field is assumed; look for constant version-like columns in the constant-column list.
 - **Sample-vs-full divergence:** Every statistic is a full Spark aggregation over the table read, except approximate distinct counts and percentiles, which are labelled; the catalog comment states these tables are a reduced portion of the provider's data.
 
+### Observations by Area
+
+- **Domain understanding:** weather variables for 50 locations over 2024-06-27 .. 2024-07-26, as forecasts and as observed history, at 3 time grains and in 2 unit systems (from the table names and time columns); ordering rules between related columns: {'forecast_daily_calendar_imperial': 60, 'forecast_daily_calendar_metric': 57, 'forecast_daynight_imperial': 33, 'forecast_daynight_metric': 33, 'forecast_hourly_imperial': 2, 'forecast_hourly_metric': 2, 'historical_daily_calendar_imperial': 63, 'historical_daily_calendar_metric': 63, 'historical_daynight_imperial': 63, 'historical_daynight_metric': 63, 'historical_hourly_imperial': 2, 'historical_hourly_metric': 2} checked; violated: {'forecast_daily_calendar_imperial': ['precipitation_lwe_rate_avg <= precipitation_lwe_rate_max', 'rain_lwe_rate_avg <= rain_lwe_rate_max'], 'forecast_daily_calendar_metric': ['precipitation_lwe_rate_avg <= precipitation_lwe_rate_max', 'rain_lwe_rate_avg <= rain_lwe_rate_max'], 'forecast_daynight_imperial': ['temperature_dew_point_avg <= temperature_dew_point_max', 'wind_gust_min <= wind_gust_max', 'wind_gust_avg <= wind_gust_max', 'temperature_dew_point_avg <= temperature_avg', 'wind_speed_max <= wind_gust_max'], 'forecast_daynight_metric': ['temperature_dew_point_avg <= temperature_dew_point_max', 'wind_gust_min <= wind_gust_max', 'wind_gust_avg <= wind_gust_max', 'temperature_dew_point_avg <= temperature_avg', 'wind_speed_max <= wind_gust_max'], 'historical_daily_calendar_imperial': ['wind_speed_avg <= wind_gust_avg', 'wind_speed_min <= wind_gust_min', 'wind_speed_max <= wind_gust_max'], 'historical_daily_calendar_metric': ['wind_speed_avg <= wind_gust_avg', 'wind_speed_min <= wind_gust_min', 'wind_speed_max <= wind_gust_max'], 'historical_daynight_imperial': ['wind_speed_avg <= wind_gust_avg', 'wind_speed_min <= wind_gust_min', 'wind_speed_max <= wind_gust_max'], 'historical_daynight_metric': ['wind_speed_avg <= wind_gust_avg', 'wind_speed_min <= wind_gust_min', 'wind_speed_max <= wind_gust_max'], 'historical_hourly_imperial': ['wind_speed <= wind_gust'], 'historical_hourly_metric': ['wind_speed <= wind_gust']}; temperature by absolute-latitude band (band, locations, mean): {'forecast_daily_calendar_metric': [('0-15', 9, 24.5), ('15-30', 13, 28.4), ('30-45', 21, 25.1), ('45+', 7, 18.8)], 'historical_daily_calendar_metric': [('0-15', 9, 24.6), ('15-30', 13, 28.4), ('30-45', 21, 24.2), ('45+', 7, 18.0)]}; correlation with latitude {'forecast_daily_calendar_metric': '0.3691', 'historical_daily_calendar_metric': '0.3137'}; day versus night: {'forecast_daynight_metric': (750, 744), 'historical_daynight_metric': (754, 738)} (pairs, day warmer)
+- **Structure and engineering:** 12 tables in 1 storage format(s) ['delta']; grains ['daily_calendar', 'daynight', 'hourly'], periods ['forecast', 'historical'], unit systems ['imperial', 'metric']; imperial and metric variants: identical keys in 5 of 6 pairs; column type differences 22; unavailable values are encoded as: {'forecast_daily_calendar_metric': {'zero / false': 24, 'all null': 2}, 'forecast_daynight_metric': {'zero / false': 13, 'other value rain': 1}, 'forecast_hourly_metric': {'zero / false': 6, 'other value rain': 1, 'other value 402.335': 1}, 'historical_daily_calendar_metric': {'zero / false': 11, 'all null': 25}, 'historical_daynight_metric': {'all null': 25, 'zero / false': 9}, 'historical_hourly_metric': {'all null': 15, 'zero / false': 4}}; time columns are named differently across variants for: [('historical_hourly_imperial', 'historical_hourly_metric')]; columns holding descriptive text: ['phrase_long', 'phrase_short', 'precipitation_type_desc', 'precipitation_type_desc_predominant']
+- **Temporal:** forecast span [14, 14, 14] days, historical span [15, 15, 15] days; one calendar window, no seasonality; cadence per group is regular (max gap [3600, 86400] s); interior gaps 0 across all tables; groups that start late or end early (edge effects): {'historical_daynight_imperial': (0, 54), 'historical_daynight_metric': (0, 54), 'historical_hourly_imperial': (49, 49), 'historical_hourly_metric': (0, 49)}; no issue time on any forecast table; local-time keys; imperial-date alignment: {('historical_hourly_imperial', 'historical_hourly_metric'): [(0, 6492, 6492), (-1, 6478, 1956)]}
+- **Spatial:** 50 locations with fixed coordinates in every table; countries 43; latitude bands: {'forecast_daily_calendar_metric': [('0-15', 9, 24.5), ('15-30', 13, 28.4), ('30-45', 21, 25.1), ('45+', 7, 18.8)], 'historical_daily_calendar_metric': [('0-15', 9, 24.6), ('15-30', 13, 28.4), ('30-45', 21, 24.2), ('45+', 7, 18.0)]}; hemisphere: southern-hemisphere rows {'forecast_daily_calendar_metric': 120, 'historical_daily_calendar_metric': 128}
+- **Data quality:** key duplicates none; full-row duplicates none; all-missing columns {'forecast_daily_calendar_metric': 2, 'historical_daily_calendar_imperial': 25, 'historical_daily_calendar_metric': 25, 'historical_daynight_imperial': 25, 'historical_daynight_metric': 25, 'historical_hourly_imperial': 15, 'historical_hourly_metric': 15}; cap-like columns: {'forecast_daily_calendar_imperial': ['cloud_cover_perc_max', 'humidity_relative_max', 'visibility_min'], 'forecast_daily_calendar_metric': ['cloud_cover_perc_max', 'humidity_relative_max', 'visibility_min'], 'forecast_daynight_imperial': ['cloud_cover_perc_avg', 'humidity_relative_max'], 'forecast_daynight_metric': ['cloud_cover_perc_avg', 'humidity_relative_max'], 'forecast_hourly_imperial': ['cloud_base_height', 'cloud_cover_perc_total', 'minutes_of_sun'], 'forecast_hourly_metric': ['cloud_base_height', 'cloud_cover_perc_total', 'minutes_of_sun'], 'historical_daily_calendar_imperial': ['cloud_cover_max', 'cloud_cover_perc_max', 'humidity_relative_max', 'precipitation_type_predominant', 'visibility_avg', 'visibility_max', 'visibility_min'], 'historical_daily_calendar_metric': ['cloud_cover_max', 'cloud_cover_perc_max', 'humidity_relative_max', 'precipitation_type_predominant', 'visibility_avg', 'visibility_max', 'visibility_min'], 'historical_daynight_imperial': ['cloud_cover_max', 'cloud_cover_perc_max', 'humidity_relative_max', 'precipitation_type_predominant', 'visibility_avg', 'visibility_max', 'visibility_min'], 'historical_daynight_metric': ['cloud_cover_max', 'cloud_cover_perc_max', 'humidity_relative_max', 'precipitation_type_predominant', 'visibility_avg', 'visibility_max', 'visibility_min'], 'historical_hourly_imperial': ['cloud_base_height', 'cloud_cover_total', 'minutes_of_precipitation', 'minutes_of_sun', 'precipitation_type', 'visibility'], 'historical_hourly_metric': ['cloud_base_height', 'cloud_cover_total', 'minutes_of_precipitation', 'minutes_of_sun', 'precipitation_type', 'visibility']}; imperial vs metric completeness differs in shared columns: see Unit-System Variants
+- **Statistical patterns:** linear unit relations between variants (corr above 0.999) confirmed in 159 column comparisons; forecast vs history agreement on the overlap window: see Forecast vs Historical (relative differences)
+- **Relationships:** location set identical across tables: True; forecast/historical key overlap: {'forecast_daily_calendar_imperial|historical_daily_calendar_imperial': 50, 'forecast_daily_calendar_metric|historical_daily_calendar_metric': 50, 'forecast_daynight_imperial|historical_daynight_imperial': 46, 'forecast_daynight_metric|historical_daynight_metric': 46, 'forecast_hourly_imperial|historical_hourly_imperial': 1519, 'forecast_hourly_metric|historical_hourly_metric': 1519}; code vocabularies that differ between forecast and historical: [('precipitation_type_desc_predominant', ['none', 'rain'], ['no precipitation', 'rain']), ('precipitation_type_desc_predominant', ['none', 'rain'], ['no precipitation', 'rain'])]
+- **Analytics use:** dimensions: location (50), time (three grains), day/night flag, period, unit system; measures: 80-80 numeric columns per table; the same measures exist at hourly, day/night and daily grain, so the grains can be compared with each other
+- **ML use:** forecast vs historical value pairs exist only on the overlap window ({'forecast_daily_calendar_imperial|historical_daily_calendar_imperial': 50, 'forecast_daily_calendar_metric|historical_daily_calendar_metric': 50, 'forecast_daynight_imperial|historical_daynight_imperial': 46, 'forecast_daynight_metric|historical_daynight_metric': 46, 'forecast_hourly_imperial|historical_hourly_imperial': 1519, 'forecast_hourly_metric|historical_hourly_metric': 1519}), which bounds any forecast-error study; no target is defined in the source; issue-time columns: none, so the moment a forecast value became available cannot be established
+- **AI / knowledge use:** catalog comment describes the sample and lists intended uses; column comments: none; coded columns with numeric codes: {'forecast_daynight_imperial': ['day_flag', 'weather_icon'], 'forecast_daynight_metric': ['day_flag', 'weather_icon'], 'forecast_hourly_imperial': ['weather_code'], 'forecast_hourly_metric': ['weather_code'], 'historical_daynight_imperial': ['day_flag'], 'historical_daynight_metric': ['day_flag']}; location reference set: 50 cities with country codes and coordinates
+
 ### Silver Implications
 
 - Read from the Samples catalog; no Bronze table exists for these tables.
@@ -1116,10 +1198,6 @@ The catalog comment (see Provenance) states the scope of the sample; the data it
 ### Figure -- AccuWeather -- overview
 
 ![AccuWeather -- overview](figures/accuweather_overview.png)
-
-### Figure -- AccuWeather -- completeness
-
-![AccuWeather -- completeness](figures/accuweather_completeness.png)
 
 ### Figure -- AccuWeather -- first categorical column per table
 

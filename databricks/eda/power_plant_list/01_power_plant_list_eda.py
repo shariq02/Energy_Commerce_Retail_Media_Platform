@@ -188,8 +188,8 @@ for name, df in frames.items():
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Null / blank helper
+
 def is_null_or_blank(colname):
     return _qc(colname).isNull() | (F.trim(_qc(colname).cast("string")) == "")
 
@@ -567,8 +567,8 @@ if facet_bars(
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Number formatting helper
+
 def fmt_val(x):
     if x is None:
         return "-"

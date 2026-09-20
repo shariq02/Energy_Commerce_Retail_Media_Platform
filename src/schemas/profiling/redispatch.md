@@ -53,7 +53,8 @@ The known-direction list is best-effort (BNetzA wording varies with umlaut encod
 Value-consistency checks across the power / energy columns:
 - MITTLERE_LEISTUNG_MW <= MAXIMALE_LEISTUNG_MW: 7/40118 violations (0.0174%).
 - MITTLERE_LEISTUNG_MW >= 0: 0 violations.
-- `work_mwh = implied_mwh` (implied = mean power x duration): 0/0 rows exceed 5% relative residual (None%); residual p01/p50/p99 None.
+- `work_mwh = implied_mwh` (implied = mean power x duration): 1628/40000 rows exceed 5% relative residual (4.07%); residual p01/p50/p99 [-1111.5, 0.0, 7.0].
+- duration built from date + clock time: 40118 of 40118 rows have a duration; 40000 positive, 9 zero, 109 negative; p50/p90/p99 hours [4.0, 17.0, 24.0], max 33.5. The energy check runs on the rows with a positive duration.
 
 ### Temporal Semantics
 
@@ -62,6 +63,28 @@ Measure start / end date columns (multi-format parse):
 - `ENDE_DATUM`: parse yield 100.0% of 40118, range 2013-04-02 00:00:00..2020-12-31 00:00:00, before 2010=0, future-dated=0, formats={'dd.MM.yyyy': 40118}.
 - `ENDE_DATUM` < `BEGINN_DATUM` in 109 rows -> a validity-window check is needed at Silver.
 Source timezone is Europe/Berlin wall-clock; start/end date and time are separate columns (BEGINN_DATUM + BEGINN_UHRZEIT) -- combine and convert to UTC on a documented rule before any join to an hourly grid.
+
+### Volume Patterns
+
+Number of measures and total energy (MWh) by period of the start (period, measures, MWh):
+- by year: [(2013, 2688, 2969648.0), (2014, 3461, 4269177.0), (2015, 6462, 11254264.0), (2016, 4058, 7769858.0), (2017, 5810, 11558276.0), (2018, 5526, 9305703.0), (2019, 5321, 8887585.0), (2020, 6792, 11196858.0)]
+- by month: [(1, 4781, 9521056.0), (2, 3825, 6609132.0), (3, 3242, 5505458.0), (4, 2725, 4785123.0), (5, 2425, 3562890.0), (6, 2148, 3159621.0), (7, 2510, 3660303.0), (8, 2164, 3053151.0), (9, 2878, 4053527.0), (10, 3584, 4911849.0), (11, 4693, 8338190.0), (12, 5143, 10051069.0)]
+- by weekday: [(1, 3981, 6397599.0), (2, 5960, 10474063.0), (3, 6718, 11078352.0), (4, 6541, 10494540.0), (5, 6204, 10216940.0), (6, 5596, 9656389.0), (7, 5118, 8893486.0)]
+- by hour: [(0, 745, 1389268.0), (1, 660, 1095080.0), (2, 660, 1309897.0), (3, 978, 2184053.0), (4, 1691, 3719547.0), (5, 2255, 4696883.0), (6, 2232, 3608809.0), (7, 2039, 3447125.0), (8, 1966, 3221879.0), (9, 1817, 2313606.0), (10, 1696, 1815372.0), (11, 1644, 1651573.0), (12, 1160, 1084692.0), (13, 1181, 1099271.0), (14, 1267, 1132206.0), (15, 1372, 1289119.0), (16, 1408, 1320656.0), (17, 1186, 876965.0), (18, 1179, 769055.0), (19, 1272, 772159.0), (20, 1330, 546981.0), (21, 1180, 313054.0), (22, 4059, 10031737.0), (23, 5141, 17522384.0)]
+Measures, total energy and mean power by category (value, measures, MWh, mean MW):
+- `GRUND_DER_MASSNAHME`: [('Strombedingter Redispatch', 34618, 55487373.0, 230.8), ('Spannungsbedingter Redispatch', 3726, 6814030.0, 171.6), ('Strombedingter Countertrade DE-DK1', 1078, 4138641.0, 418.2), ('Probestart (NetzRes)', 262, 329454.0, 118.8), ('Gezielter Leistungsausgleich bei Einspeisemanagement', 131, 27156.0, 69.9), ('Strom- und Spannungsbedingter RD', 84, 151892.0, 228.7), ('Strombedingter Countertrade DE-DK2', 77, 17677.0, 97.4), ('Strombedingter Countertrade DE-NO2', 74, 43849.0, 122.0), ('Testfahrt (KapRes)', 31, 21332.0, 92.5), (None, 27, 169466.0, 421.0), ('Funktionstest (KapRes)', 10, 10500.0, 85.0)]
+- `RICHTUNG`: [('Wirkleistungseinspeisung erhöhen', 21884, 29343566.0, 177.1), ('Wirkleistungseinspeisung reduzieren', 18234, 37867803.0, 290.3)]
+- `ANWEISENDER_UENB`: [('TenneT DE', 17148, 24710591.0, 180.8), ('TransnetBW', 9926, 12885741.0, 179.3), ('50Hertz', 6949, 22074178.0, 483.2), ('Amprion', 6093, 7539060.0, 153.1), ('PSE', 2, 1800.0, 271.0)]
+- `ANFORDERNDER_UENB`: [('TenneT DE', 17967, 25548582.0, 199.4), ('50Hertz & Amprion & TenneT DE & TransnetBW', 6196, 11839816.0, 181.9), ('50Hertz & TenneT DE', 4905, 13284314.0, 352.0), ('50Hertz', 1993, 3824400.0, 342.8), ('TenneT DE & Amprion', 1931, 2654794.0, 181.7), ('Amprion', 1762, 2287903.0, 158.1), ('50Hertz & PSE', 1427, 3039138.0, 497.7), ('TransnetBW', 1262, 2026127.0, 156.5), ('TenneT DE & APG', 936, 958225.0, 177.8), ('Amprion & TransnetBW', 460, 387595.0, 149.7), ('APG', 408, 256260.0, 166.5), ('swissgrid', 178, 111490.0, 197.1), ('Ausland', 152, 124993.0, 168.3), ('PSE', 120, 261768.0, 490.8), ('TenneT DE & TransnetBW', 79, 125803.0, 209.5)]
+- `PRIMAERENERGIEART`: [('Konventionell', 31335, 56857606.0, 239.7), ('Sonstiges', 8684, 10041035.0, 187.5), (None, 73, 306964.0, 380.4), ('Erneuerbar', 26, 5764.0, 124.5)]
+- reason x direction (reason, direction, measures): [('Strombedingter Redispatch', 'Wirkleistungseinspeisung erhöhen', 18168), ('Strombedingter Redispatch', 'Wirkleistungseinspeisung reduzieren', 16450), ('Spannungsbedingter Redispatch', 'Wirkleistungseinspeisung erhöhen', 2398), ('Spannungsbedingter Redispatch', 'Wirkleistungseinspeisung reduzieren', 1328), ('Strombedingter Countertrade DE-DK1', 'Wirkleistungseinspeisung erhöhen', 880), ('Strombedingter Countertrade DE-DK1', 'Wirkleistungseinspeisung reduzieren', 198), ('Probestart (NetzRes)', 'Wirkleistungseinspeisung erhöhen', 141), ('Gezielter Leistungsausgleich bei Einspeisemanagement', 'Wirkleistungseinspeisung erhöhen', 129), ('Probestart (NetzRes)', 'Wirkleistungseinspeisung reduzieren', 121), ('Strom- und Spannungsbedingter RD', 'Wirkleistungseinspeisung erhöhen', 62), ('Strombedingter Countertrade DE-DK2', 'Wirkleistungseinspeisung erhöhen', 51), ('Strombedingter Countertrade DE-NO2', 'Wirkleistungseinspeisung reduzieren', 41), ('Strombedingter Countertrade DE-NO2', 'Wirkleistungseinspeisung erhöhen', 33), (None, 'Wirkleistungseinspeisung reduzieren', 27), ('Strombedingter Countertrade DE-DK2', 'Wirkleistungseinspeisung reduzieren', 26), ('Strom- und Spannungsbedingter RD', 'Wirkleistungseinspeisung reduzieren', 22), ('Testfahrt (KapRes)', 'Wirkleistungseinspeisung erhöhen', 16), ('Testfahrt (KapRes)', 'Wirkleistungseinspeisung reduzieren', 15), ('Funktionstest (KapRes)', 'Wirkleistungseinspeisung erhöhen', 6), ('Funktionstest (KapRes)', 'Wirkleistungseinspeisung reduzieren', 4)]
+
+### Affected-Plant Names
+
+`BETROFFENE_ANLAGE`: 40047 non-empty rows, 718 distinct spellings, 670 after lower-casing and removing punctuation (48 spelling variants merged); name length 1..117 (mean 18.6); 10004 contain a digit, 9012 contain a separator character.
+- most frequent names (normalised, measures): [('börse', 3468), ('vorarlberger illwerke ag', 2788), ('staudinger 5', 1583), ('mehrum', 1107), ('heyden', 1065), ('zolling 5', 1027), ('brokdorf', 997), ('boxberg jänschwalde schwarze pumpe', 987), ('grosskraftwerk mannheim ag', 838), ('wilhelmshaven engie', 805), ('rheinhafen dampfkraftwerk karlsruhe block 7', 701), ('gebersdorf 2', 699), ('heizkraftwerk altbach deizisau', 683), ('rheinhafen dampfkraftwerk karlsruhe block 8', 680), ('heizkraftwerk heilbronn block 7', 605)]
+- most frequent words (word, occurrences): [('jänschwalde', 4462), ('boxberg', 4014), ('börse', 3473), ('lippendorf', 3421), ('schwarze', 3340), ('pumpe', 3340), ('vorarlberger', 2996), ('illwerke', 2788), ('block', 2760), ('heizkraftwerk', 2718), ('wilhelmshaven', 1821), ('staudinger', 1814), ('dampfkraftwerk', 1760), ('karlsruhe', 1760), ('rheinhafen', 1760), ('schkopau', 1699), ('altbach', 1545), ('deizisau', 1545), ('brokdorf', 1220), ('heilbronn', 1184)]
+- names appearing with more than one primary energy type: 0
 
 ### Regime / Version Evidence
 
@@ -155,6 +178,19 @@ Redispatch reporting moved to the 'NABEG 2.0 / Redispatch 2.0' regime in Oct 202
 - **Label availability lag:** Redispatch measures are reported to BNetzA with a lag (weeks to months); a real-time model cannot assume the measure record exists at the measure time.
 - **Source / version / regime change:** PRIMARY concern: the Oct-2021 Redispatch 2.0 switch changed reporting scope, thresholds and the actor model. Regime / Version Evidence above measures the null-rate and category-vocabulary shift across the 2021-10-01 cut -- do not pool pre- and post-2021 data without a regime indicator.
 - **Sample-vs-full divergence:** Every statistic here is a full Spark aggregation or `.distinct().count()` -- no sampling.
+
+### Observations by Area
+
+- **Domain understanding:** one row per grid measure that changes plant feed-in: reason, direction, start / end, mean and maximum power, total energy, instructing and requesting grid operators, affected plant, primary energy type; energy vs mean power x duration: 4.07% of 40000 rows outside 5%; reasons: [('Strombedingter Redispatch', 34618), ('Spannungsbedingter Redispatch', 3726), ('Strombedingter Countertrade DE-DK1', 1078), ('Probestart (NetzRes)', 262)]
+- **Structure and engineering:** 40118 rows, 16 columns, all strings in Bronze; German comma decimals; date and clock time in separate columns; constant columns ['ZEITZONE_BIS', 'ZEITZONE_VON', 'coverage_regime']; duration basis: date + clock time
+- **Temporal:** volume by year: [(2013, 2688, 2969648.0), (2014, 3461, 4269177.0), (2015, 6462, 11254264.0), (2016, 4058, 7769858.0), (2017, 5810, 11558276.0), (2018, 5526, 9305703.0), (2019, 5321, 8887585.0), (2020, 6792, 11196858.0)]; weekday and hour profile of starts: [(1, 3981, 6397599.0), (2, 5960, 10474063.0), (3, 6718, 11078352.0), (4, 6541, 10494540.0), (5, 6204, 10216940.0), (6, 5596, 9656389.0), (7, 5118, 8893486.0)] / [(0, 745, 1389268.0), (1, 660, 1095080.0), (2, 660, 1309897.0), (3, 978, 2184053.0), (4, 1691, 3719547.0), (5, 2255, 4696883.0), (6, 2232, 3608809.0), (7, 2039, 3447125.0), (8, 1966, 3221879.0), (9, 1817, 2313606.0), (10, 1696, 1815372.0), (11, 1644, 1651573.0), (12, 1160, 1084692.0), (13, 1181, 1099271.0), (14, 1267, 1132206.0), (15, 1372, 1289119.0), (16, 1408, 1320656.0), (17, 1186, 876965.0), (18, 1179, 769055.0), (19, 1272, 772159.0), (20, 1330, 546981.0), (21, 1180, 313054.0), (22, 4059, 10031737.0), (23, 5141, 17522384.0)]; measure duration p50/p90/p99 (h): [4.0, 17.0, 24.0]
+- **Spatial:** no coordinates; grid operators and plant names are the only location proxies
+- **Data quality:** end before start: 109; mean > max power: [('MITTLERE_LEISTUNG_MW <= MAXIMALE_LEISTUNG_MW', 7), ('MITTLERE_LEISTUNG_MW >= 0', 0)]; affected-plant spelling variants merged by normalisation: 48
+- **Statistical patterns:** energy and power distributions in Distributions; volume by month [(1, 4781, 9521056.0), (2, 3825, 6609132.0), (3, 3242, 5505458.0), (4, 2725, 4785123.0), (5, 2425, 3562890.0), (6, 2148, 3159621.0), (7, 2510, 3660303.0), (8, 2164, 3053151.0), (9, 2878, 4053527.0), (10, 3584, 4911849.0), (11, 4693, 8338190.0), (12, 5143, 10051069.0)]
+- **Relationships:** reason x direction: [('Strombedingter Redispatch', 'Wirkleistungseinspeisung erhöhen', 18168), ('Strombedingter Redispatch', 'Wirkleistungseinspeisung reduzieren', 16450), ('Spannungsbedingter Redispatch', 'Wirkleistungseinspeisung erhöhen', 2398), ('Spannungsbedingter Redispatch', 'Wirkleistungseinspeisung reduzieren', 1328)]; names with several energy types: 0; no shared key with the plant register or MaStR (name-based only)
+- **Analytics use:** volumes and energy by reason, operator and plant over 2013-2020; supports operator and cause analysis
+- **ML use:** no target in the source; measures are events, plants only by name
+- **AI / knowledge use:** free-text plant names: 670 distinct normalised names, frequent words ['jänschwalde', 'boxberg', 'börse', 'lippendorf', 'schwarze', 'pumpe', 'vorarlberger', 'illwerke']; a candidate for entity resolution against the plant registers
 
 ### Silver Implications
 

@@ -49,7 +49,7 @@ The grain is one temperature observation per date (a daily series); there is no 
 
 - delimited_1.`temp`: numeric yield 100.0%, range 20.0..96.0, mean 55.08, sd 13.87; outside (-40.0, 130.0) (Fahrenheit assumption): below 0, above 0.
 The unit is not in the data. The README (if any) states it; a range consistent with Fahrenheit is a plausibility check, not proof.
-- delimited_1: with two rows per date, per-date high-low range mean 15.47, min 2.0, max 35.0, dates where both rows are equal 0. The data does not label which row is the maximum and which the minimum.
+- delimited_1: with two rows per date, per-date high-low range mean 15.47, min 2.0, max 35.0, dates where both rows are equal 0. The two source files name the roles (see the per-file comparison).
 - delimited_1 / `high_temps`: 1369 rows, 1369 distinct dates, temperature range 33..96, mean 62.82.
 - delimited_1 / `low_temps`: 1369 rows, 1369 distinct dates, temperature range 20..69, mean 47.35.
 - delimited_1: `high_temps` minus `low_temps` on the 1369 dates present in both: mean 15.47, min 2, max 35; `high_temps` below `low_temps` on 0 dates, equal on 0. File names carry the only high/low label; if the names say high and low, a below-count above zero is an inversion.
@@ -71,7 +71,7 @@ No categorical column is expected. Columns with 2..60 approx distinct values:
 
 ### Temporal Consistency
 
-- delimited_1: day-to-day changes over 25.0 degrees: 0 of 1368; largest 16.5; lag-1 autocorrelation of the daily mean 0.9476; values more than 4 sd from the mean: 0.
+- delimited_1: day-to-day changes over 25.0 degrees: 0 of 1368; largest 16.5; lag-1 autocorrelation of the pooled daily mean (rows sharing a date averaged across files) 0.9476; values more than 4 sd from the pooled mean: 0.
 - delimited_1 / `high_temps`: day-to-day changes over 25.0 degrees: 1 of 1368; largest 26; lag-1 autocorrelation 0.9198.
 - delimited_1 / `low_temps`: day-to-day changes over 25.0 degrees: 0 of 1368; largest 18; lag-1 autocorrelation 0.928.
 
@@ -81,9 +81,20 @@ Single-entity daily series: there is no second table and no key to relate to. Th
 
 ### Regime / Version Evidence
 
-Seasonal profile (mean of the first temperature column by calendar month):
-- delimited_1: m1=42.9, m2=44.7, m3=48.1, m4=52.5, m5=59.5, m6=64.2, m7=69.0, m8=69.1, m9=62.2, m10=55.1, m11=47.1, m12=40.3
+Seasonal profile by calendar month; the pooled line averages every row of the frame (both files together), so per-file lines are the ones to read:
+- delimited_1 (pooled): m1=42.9, m2=44.7, m3=48.1, m4=52.5, m5=59.5, m6=64.2, m7=69.0, m8=69.1, m9=62.2, m10=55.1, m11=47.1, m12=40.3
+- delimited_1 / `high_temps`: m1=48.2, m2=50.2, m3=55.0, m4=60.4, m5=68.7, m6=74.0, m7=79.9, m8=79.8, m9=70.6, m10=61.7, m11=52.3, m12=44.8
+- delimited_1 / `low_temps`: m1=37.6, m2=39.2, m3=41.2, m4=44.6, m5=50.2, m6=54.4, m7=58.1, m8=58.5, m9=53.8, m10=48.4, m11=42.0, m12=35.8
 A physically plausible temperate-climate series shows a single summer maximum and winter minimum; a flat or multi-peaked profile would indicate a different meaning for the value column.
+
+### Climatology and Extremes
+
+- delimited_1 / `high_temps` mean by year (year, mean, rows): [(2015, 63.37, 365), (2016, 62.55, 366), (2017, 60.91, 365), (2018, 64.99, 273)].
+- delimited_1 / `low_temps` mean by year (year, mean, rows): [(2015, 47.9, 365), (2016, 47.61, 366), (2017, 45.7, 365), (2018, 48.47, 273)].
+- delimited_1 / `high_temps` highest [('2017-06-25', 96.0), ('2015-07-19', 95.0), ('2016-08-19', 95.0)], lowest [('2016-12-17', 33.0), ('2017-01-03', 33.0), ('2016-12-16', 34.0)].
+- delimited_1 / `low_temps` highest [('2016-08-19', 69.0), ('2017-08-02', 69.0), ('2017-08-03', 68.0)], lowest [('2017-01-06', 20.0), ('2017-01-03', 21.0), ('2017-01-05', 21.0)].
+- delimited_1 days more than 3 sd from their own month's mean, per file: {'high_temps': 3, 'low_temps': 5}.
+- delimited_1 correlation of the two files' values on the same date: 0.8928; mean difference by month (month, degrees): [(1, 10.5), (2, 11.0), (3, 13.8), (4, 15.8), (5, 18.4), (6, 19.6), (7, 21.8), (8, 21.3), (9, 16.9), (10, 13.3), (11, 10.3), (12, 9.0)].
 
 ### Coverage & Sampling Bias
 
@@ -117,6 +128,19 @@ One site, one short window; the data does not carry the site name, the station i
 - **Label availability lag:** Not applicable -- observations are historical.
 - **Source / version / regime change:** Single static extract; no version indicator; station moves or instrument changes are not recorded.
 - **Sample-vs-full divergence:** Every statistic is a full Spark aggregation over the files read; the extract's own selection rule is undocumented in the data.
+
+### Observations by Area
+
+- **Domain understanding:** README-type files: ['README.weather_history.md']; describes daily high and low temperatures for one US city, Fahrenheit, from a national weather service; files found: {'delimited_1': ['high_temps', 'low_temps']}; high-below-low dates: {'delimited_1': 0}; yearly means: {'delimited_1': {'high_temps': [(2015, 63.37, 365), (2016, 62.55, 366), (2017, 60.91, 365), (2018, 64.99, 273)], 'low_temps': [(2015, 47.9, 365), (2016, 47.61, 366), (2017, 45.7, 365), (2018, 48.47, 273)]}}
+- **Structure and engineering:** 3 files ({'support': 1, 'other': 2, 'delimited': 2}); the data files carry no extension and are read as delimited text with a header; schema: {'delimited_1': ['date', 'temp']}; no station, city or role column: the file name is the only carrier of the high / low role
+- **Temporal:** {'delimited_1': ('2015-01-01', '2018-09-30', 1369, 0)} (first, last, distinct days, missing days); lag-1 autocorrelation per file: {'delimited_1': {'high_temps': 0.92, 'low_temps': 0.928}}
+- **Spatial:** no coordinate or station column; the location comes only from the README text
+- **Data quality:** full-row duplicates {'delimited_1': 0}; missing values {'delimited_1': 0}; days more than 3 sd from their month's mean: {'delimited_1': {'high_temps': 3, 'low_temps': 5}}
+- **Statistical patterns:** seasonal cycle per file (coldest month, warmest month): {'delimited_1': {'high_temps': (12, 7), 'low_temps': (12, 8)}}; quantiles: {'delimited_1': {'temp': {0.01: 29.0, 0.25: 45.0, 0.5: 53.0, 0.75: 63.0, 0.99: 91.0}}}
+- **Relationships:** high vs low on the same date: {'delimited_1': 0.893}; mean high-low difference by month: {'delimited_1': [(1, 10.5), (2, 11.0), (3, 13.8), (4, 15.8), (5, 18.4), (6, 19.6), (7, 21.8), (8, 21.3), (9, 16.9), (10, 13.3), (11, 10.3), (12, 9.0)]}
+- **Analytics use:** one measure (temperature) on one date dimension with a two-valued role given by the file name; no other dimension is available
+- **ML use:** a single-series regression target; strong day-to-day persistence: {'delimited_1': {'high_temps': 0.92, 'low_temps': 0.928}}; no covariates in the source
+- **AI / knowledge use:** the only descriptive text is the README (source, period, attribute definitions); no text or label columns
 
 ### Silver Implications
 

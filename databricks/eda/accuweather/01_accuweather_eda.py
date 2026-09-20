@@ -678,7 +678,10 @@ def compare_pair(a, b, max_cols=60):
             F.sum(both.cast("long")).alias(f"n{i}"),
             F.avg(F.col(f"a_{c}")).alias(f"ma{i}"),
             F.avg(F.col(f"b_{c}")).alias(f"mb{i}"),
-            F.corr(F.col(f"a_{c}"), F.col(f"b_{c}")).alias(f"r{i}"),
+            F.try_divide(
+                F.covar_pop(F.col(f"a_{c}"), F.col(f"b_{c}")),
+                F.sqrt(F.var_pop(F.col(f"a_{c}")) * F.var_pop(F.col(f"b_{c}"))),
+            ).alias(f"r{i}"),
             F.sum((both & (F.col(f"a_{c}") == F.col(f"b_{c}"))).cast("long")).alias(
                 f"e{i}"
             ),
@@ -744,8 +747,8 @@ for pair, info in period_align.items():
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Imperial date column vs metric local time -- hour-shift search
+
 def shift_search(a, b, shifts=range(-14, 15)):
     ta = "temperature" if "temperature" in ROLE[a]["numeric"] else None
     tb = "temperature" if "temperature" in ROLE[b]["numeric"] else None
@@ -818,8 +821,8 @@ for a, b in UNIT_PAIRS:
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Physical consistency rules (ordering of related columns)
+
 def consistency_rules(cols):
     have = set(cols)
     rules = []

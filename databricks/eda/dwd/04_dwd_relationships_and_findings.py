@@ -389,8 +389,8 @@ print(xv["wind"])
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Station-level means against station elevation and latitude
+
 def _geo_col(*subs):
     return next((c for c in geo.columns if any(x in c.lower() for x in subs)), None)
 

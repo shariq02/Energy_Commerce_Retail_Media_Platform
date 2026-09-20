@@ -355,17 +355,24 @@ for e in ENERGY:
     if not e.endswith("_w"):
         continue
     win = Window.partitionBy("frequency").orderBy("datetime_utc")
-    exprs = []
+    sel = []
     for c in VCOLS[e]:
         v = safe_num(c)
-        prev = F.lag(v).over(win)
-        exprs += [
-            F.sum(((v - prev) > 0).cast("long")).alias(f"{c}__up"),
-            F.sum(((v - prev) < 0).cast("long")).alias(f"{c}__down"),
-            F.sum(((v - prev) == 0).cast("long")).alias(f"{c}__flat"),
-            F.sum((F.abs(v) < F.abs(prev) - 1e-6).cast("long")).alias(f"{c}__mag_down"),
+        sel += [
+            v.alias(f"_cur_{c}"),
+            F.lag(v).over(win).alias(f"_prev_{c}"),
         ]
-    r = frames[e].agg(*exprs).first().asDict()
+    exprs = []
+    for c in VCOLS[e]:
+        cur = F.col(f"_cur_{c}")
+        prev = F.col(f"_prev_{c}")
+        exprs += [
+            F.sum(((cur - prev) > 0).cast("long")).alias(f"{c}__up"),
+            F.sum(((cur - prev) < 0).cast("long")).alias(f"{c}__down"),
+            F.sum(((cur - prev) == 0).cast("long")).alias(f"{c}__flat"),
+            F.sum((F.abs(cur) < F.abs(prev) - 1e-6).cast("long")).alias(f"{c}__mag_down"),
+        ]
+    r = frames[e].select(*sel).agg(*exprs).first().asDict()
     w_direction[e] = {}
     for c in VCOLS[e]:
         lo, hi = value_stats[e][c + "_min"], value_stats[e][c + "_max"]
@@ -657,8 +664,8 @@ print("P<->W relationship:", pw_rel)
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Number formatting helper
+
 def fmt_c(x):
     return "-" if x is None else f"{x:.4g}"
 

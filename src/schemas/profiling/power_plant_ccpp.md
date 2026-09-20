@@ -91,6 +91,8 @@ Pairwise Pearson correlation (all numeric columns):
 - delimited_1: V vs RH: -0.312
 - delimited_1: AP vs RH: 0.100
 - delimited_1: mirror / duplicate column pairs: none
+- delimited_1: mean `PE` by decile of `AT` (decile mean of `AT`, mean `PE`) on distinct rows: [(7.21, 482.78), (10.78, 474.75), (13.47, 468.17), (15.9, 462.34), (18.96, 454.68), (21.64, 447.92), (23.79, 443.03), (25.75, 439.75), (27.97, 436.46), (31.14, 433.42)]; monotone across deciles: True.
+- delimited_1: mean `PE` by decile of `V` (decile mean of `V`, mean `PE`) on distinct rows: [(38.1, 475.33), (40.52, 474.26), (41.88, 471.37), (44.22, 464.9), (48.91, 452.76), (56.96, 449.12), (61.86, 444.9), (66.51, 439.79), (69.92, 436.57), (74.11, 434.31)]; monotone across deciles: True.
 
 ### Regime / Version Evidence
 
@@ -113,6 +115,11 @@ One plant, one operating regime is implied; there is no site, unit or load-mode 
 - delimited_1.`AP` quantiles (p1/p25/p50/p75/p99): 1001, 1009, 1013, 1017, 1028
 - delimited_1.`RH` quantiles (p1/p25/p50/p75/p99): 38.35, 63.29, 74.94, 84.79, 99.1
 - delimited_1.`PE` quantiles (p1/p25/p50/p75/p99): 427.1, 439.7, 451.5, 468.4, 489.4
+- delimited_1.`AT`: skewness -0.1364, excess kurtosis -1.038, rows outside 1.5 x IQR: 0.
+- delimited_1.`V`: skewness 0.1985, excess kurtosis -1.444, rows outside 1.5 x IQR: 0.
+- delimited_1.`AP`: skewness 0.2654, excess kurtosis 0.09356, rows outside 1.5 x IQR: 440.
+- delimited_1.`RH`: skewness -0.4318, excess kurtosis -0.4449, rows outside 1.5 x IQR: 60.
+- delimited_1.`PE`: skewness 0.3065, excess kurtosis -1.049, rows outside 1.5 x IQR: 0.
 
 ### EDA Findings
 
@@ -137,6 +144,19 @@ One plant, one operating regime is implied; there is no site, unit or load-mode 
 - **Label availability lag:** Not applicable -- the output is measured at the same instant as the inputs.
 - **Source / version / regime change:** Single static extract; no version or regime indicator, and no evidence in the data of a change in operating regime.
 - **Sample-vs-full divergence:** Every statistic is a full Spark aggregation over the files read; whether the files themselves are a sample of a longer record is not stated in the data.
+
+### Observations by Area
+
+- **Domain understanding:** README-type files: ['README.md']; the cited titles concern predicting the electrical output of a combined-cycle plant; column names match the expected sensor set ['AP', 'AT', 'PE', 'RH', 'V'] in ['delimited_1'] frames; physical plausibility: 1 column(s) with values beyond the expected bounds
+- **Structure and engineering:** 6 files ({'support': 1, 'delimited': 5}), read as ['tab']-separated text with the header applied; rows per file {'delimited_1': [('Sheet1.tsv', 9568), ('Sheet2.tsv', 9568), ('Sheet3.tsv', 9568), ('Sheet4.tsv', 9568), ('Sheet5.tsv', 9568)]}; no key, no time column, no categorical column: every column is a numeric measurement; per-file distinct rows and repeats: {'delimited_1': [('Sheet1.tsv', 9527, 41), ('Sheet2.tsv', 9527, 41), ('Sheet3.tsv', 9527, 41), ('Sheet4.tsv', 9527, 41), ('Sheet5.tsv', 9527, 41)]}
+- **Temporal:** no date / time column
+- **Spatial:** no location or coordinate column
+- **Data quality:** full-row duplicates {k: prof[k]['dups'] for k in DFS}, cross-file identical files [('delimited_1', 9527)]; values beyond expected bounds: {'delimited_1': ['RH']}; IQR outliers: {'delimited_1': {'AT': 0, 'V': 0, 'AP': 440, 'RH': 60, 'PE': 0}}
+- **Statistical patterns:** skewness / excess kurtosis: {'delimited_1': {'AT': (-0.14, -1.04), 'V': (0.2, -1.44), 'AP': (0.27, 0.09), 'RH': (-0.43, -0.44), 'PE': (0.31, -1.05)}}; strongest correlations: {'delimited_1': [(('AT', 'PE'), -0.948), (('V', 'PE'), -0.87), (('AT', 'V'), 0.844)]}
+- **Relationships:** decile trends of the output against its strongest inputs: {'delimited_1': {'AT': True, 'V': True}}; mirror / duplicate column pairs: {'delimited_1': []}
+- **Analytics use:** five continuous measures per row and no dimension to group by, so the data supports distribution and relationship analysis, not slicing by entity or period
+- **ML use:** an output-like column ({'delimited_1': 'PE'}) and its strongest inputs with monotone decile trend: {'delimited_1': ['AT', 'V']}; repeated rows across files are the main leakage hazard if the files are split apart
+- **AI / knowledge use:** no text, label or taxonomy column; the only descriptive content is the README and the two cited papers
 
 ### Silver Implications
 

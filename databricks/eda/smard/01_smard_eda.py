@@ -61,8 +61,8 @@ RESOLUTION_SECONDS = {
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Helpers -- SMARD timestamp (epoch-ms / epoch-s / ISO) + resolution step
+
 def as_ts(col):
     # SMARD timestamps arrive as ISO, epoch-ms or epoch-s. coalesce evaluates
     # every branch, so the numeric branches use safe_num (an ANSI-safe .cast
@@ -377,8 +377,8 @@ for fm in forecast_metrics:
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Physical consistency -- residual_load against load, wind and solar (variants tested)
+
 def _pick(*names):
     return next((m for m in names if m in metrics), None)
 

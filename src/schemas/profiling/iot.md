@@ -37,6 +37,8 @@ Key candidates (column: distinct / ratio-to-rows / unique):
 - `ip`: 198164 / 1.0 / unique=True
 - `device_id` runs 1..198164: contiguous with no gaps, so it is a sequence number, not an external device identity.
 - readings per device: 198164 devices; min 1, p50 1, p99 1, max 1.
+- device names: {'prefixes': 4, 'len_min': 17, 'len_max': 28, 'ends_with_digits': 32037, 'suffix_equals_id': 0, 'examples': ['meter-gauge-1xbYRYcj', 'sensor-pad-2n2Pea', 'device-mac-36TWSKiT']}
+- IP octets distinct values (approx): [169, 259, 259, 259]; first octet 2..222.
 
 ### Unit & Semantic Validation
 
@@ -67,10 +69,13 @@ Key candidates (column: distinct / ratio-to-rows / unique):
 - groups spanning more than 60 degrees of latitude (group, rows, span): [('USA', 70405, 71.3)]. Coordinates drawn independently of the country label would give large spans in every group; small spans in nearly all groups mean the coordinates follow the label.
 - country name missing on 1810 rows across 1 country codes; 1 of those codes have a name on other rows.
 - devices with more than one reading: 0; of those, None report more than one coordinate.
+- decimal places in coordinates (places, rows): {'latitude': [(2, 137174), (1, 60990)], 'longitude': [(2, 142411), (1, 55753)]}.
+- rows by country, top 10 (code, rows, share): [('USA', 70405, 0.3553), ('CHN', 14455, 0.0729), ('JPN', 12100, 0.0611), ('KOR', 11879, 0.0599), ('DEU', 7942, 0.0401), ('GBR', 6486, 0.0327), ('CAN', 6041, 0.0305), ('RUS', 5989, 0.0302), ('FRA', 5305, 0.0268), ('BRA', 3224, 0.0163)].
 
 ### Temporal Semantics
 
 - `timestamp`: numeric epoch in milliseconds; range 2016-03-20 03:20:54 .. 2016-03-20 03:21:01 (UTC); 1 distinct days, 8 distinct instants.
+- readings per timestamp instant (instant, rows): [(1458444054093, 1), (1458444054119, 1), (1458444054120, 1), (1458444054121, 1), (1458444054122, 2), (1458444054123, 2), (1458444054124, 1), (1458444054125, 2), (1458444054126, 1), (1458444054127, 2), (1458444054128, 2), (1458444054129, 1), (1458444054130, 2), (1458444054131, 2), (1458444054132, 1), (1458444054133, 2), (1458444054134, 1), (1458444054135, 2), (1458444054136, 1), (1458444054137, 2)].
 
 ### Temporal Consistency
 
@@ -98,12 +103,16 @@ If the ranges of one sensor column do not overlap between `lcd` values, the labe
 
 ### Regime / Version Evidence
 
-Indicators that values are generated rather than measured (each is evidence, not proof): a low count coefficient of variation and an excess kurtosis at the uniform value mean a near-uniform spread; correlations near zero between physically related sensors; zero autocorrelation; coordinates unrelated to the country label; a constant or near-constant timestamp.
+Indicators that values are generated rather than measured, each evaluated on this data (evidence, not proof); 'holds' means the indicator is present:
+- value spread matches a uniform distribution (excess kurtosis within 0.05 of the uniform value): ['battery_level', 'c02_level', 'humidity', 'temp'] of ['battery_level', 'c02_level', 'humidity', 'temp'] -> holds
+- sensor correlations all below 0.02 in absolute value: largest 0.0032 -> holds
+- all timestamps within one minute: span 7.0 s, 8 distinct instants -> holds
+- device id is a contiguous sequence: 1..198164 -> holds
+- coordinates cluster by country label (median latitude span under 5 degrees): median 0.8 deg -> holds
+- the `lcd` label is a function of one sensor (disjoint ranges per label): ['c02_level'] -> holds
 - count CV per sensor column (basis): {'battery_level': (0.003, '10 distinct values'), 'c02_level': (0.014, '40 bins'), 'humidity': (0.019, '75 distinct values'), 'temp': (0.01, '25 distinct values')}
 - excess kurtosis observed vs uniform: {'battery_level': (-1.226, -1.2242), 'c02_level': (-1.202, -1.2), 'humidity': (-1.202, -1.2004), 'temp': (-1.203, -1.2038)}
-- sensor correlations: {'battery_level~c02_level': -0.001, 'battery_level~humidity': 0.002, 'battery_level~temp': -0.003, 'c02_level~humidity': 0.003, 'c02_level~temp': 0.003, 'humidity~temp': -0.001}
 - per-country coordinate spread: {'countries': 205, 'lat_span_median': 0.7699999999999996, 'lon_span_median': 1.1400000000000006, 'lat_span_max': 71.28, 'lon_span_max': 273.02, 'wide_lat': [('USA', 70405, 71.3)]}
-- timestamp: 2016-03-20 03:20:54 .. 2016-03-20 03:21:01 across 198164 rows
 
 ### Coverage & Sampling Bias
 
@@ -138,11 +147,24 @@ Coverage of the file cannot be checked against an external reference: the README
 - **Duplicate-event leakage:** Duplicates: {'full_row': 0, 'device_ts': {'distinct_keys': 198164, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}}.
 - **Target / feature temporal misalignment:** Sensor columns share one timestamp per row; no lag structure is represented.
 - **Unit / sign / circular-feature leakage:** Temperature unit is given by a label column (values: Celsius); mirror pairs: none.
-- **Data-generation-process leakage:** See Regime / Version Evidence: indicators of generated data (near-uniform values, near-zero correlations, coordinates unrelated to the country label) mean patterns learned here describe the generator, not devices.
+- **Data-generation-process leakage:** Indicators that hold (see Regime / Version Evidence): ['value spread matches a uniform distribution (excess kurtosis within 0.05 of the uniform value)', 'sensor correlations all below 0.02 in absolute value', 'all timestamps within one minute', 'device id is a contiguous sequence', 'coordinates cluster by country label (median latitude span under 5 degrees)', 'the `lcd` label is a function of one sensor (disjoint ranges per label)']; where they hold, patterns learned here describe the generator, not devices. Indicators that do not hold: none.
 - **Class / label instability:** No target label; categorical columns (colour / scale) are static attributes.
 - **Label availability lag:** Not applicable -- no delayed label.
 - **Source / version / regime change:** Single static file; no version indicator.
 - **Sample-vs-full divergence:** Every statistic is a full Spark aggregation over the file read; whether the file is a sample of a larger set is not stated in the data.
+
+### Observations by Area
+
+- **Domain understanding:** one record per device with battery, CO2, humidity and temperature sensors, an LCD colour label, a country label (name / 2-letter / 3-letter code), an IP address and coordinates; temperature unit `Celsius`; the colour label is a function of: ['c02_level']; device names: ['meter-gauge-1xbYRYcj', 'sensor-pad-2n2Pea', 'device-mac-36TWSKiT']
+- **Structure and engineering:** 1 file(s) ({'json': 1}), read as json with schema struct<battery_level:bigint,c02_level:bigint,cca2:string,cca3:string,cn:string,device_id:bigint,device_name:string,humid; device id is a row-number-like sequence: True; timestamp stored as epoch milliseconds; constant columns ['scale']; cn missing on 1810 rows while the codes are complete
+- **Temporal:** 2016-03-20 03:20:54 .. 2016-03-20 03:21:01 (8 distinct instants) -- a snapshot, not a series
+- **Spatial:** 205 country groups; median coordinate span within a country 0.8 x 1.1 deg; concentration: [('USA', 70405, 0.3553), ('CHN', 14455, 0.0729), ('JPN', 12100, 0.0611)]; coordinates at 0/0: 360
+- **Data quality:** full-row duplicates 0; key duplicates 0; missing values only in: {'cn': 0.0091}; country-name / code inconsistency groups: [('cca3', 'cn', 1), ('cca2', 'cn', 1)]
+- **Statistical patterns:** excess kurtosis vs uniform: {'battery_level': (-1.226, -1.2242), 'c02_level': (-1.202, -1.2), 'humidity': (-1.202, -1.2004), 'temp': (-1.203, -1.2038)}; indicators that hold: ['value spread matches a uniform distribution (excess kurtosis within 0.05 of the uniform value)', 'sensor correlations all below 0.02 in absolute value', 'all timestamps within one minute', 'device id is a contiguous sequence', 'coordinates cluster by country label (median latitude span under 5 degrees)', 'the `lcd` label is a function of one sensor (disjoint ranges per label)']
+- **Relationships:** sensor-to-sensor correlations all within +/-0.003; country name / 2-letter / 3-letter code mappings: [('cca3', 'cca2', 205, 0), ('cca3', 'cn', 205, 1), ('cca2', 'cn', 205, 1)]; label-to-sensor dependence: ['c02_level']
+- **Analytics use:** measures: ['battery_level', 'c02_level', 'humidity', 'temp']; dimensions: ['cn', 'cca3', 'lcd']; the geography dimension has 205 members with concentration [('USA', 70405, 0.3553), ('CHN', 14455, 0.0729)]
+- **ML use:** no target column in the source; candidate label-like column `lcd` is fully determined by one sensor; sensor columns are uncorrelated with each other, so they carry no information about one another
+- **AI / knowledge use:** a country reference set can be read from the data: 205 codes with names (name missing for 1 code); no free-text column; no README or licence in the directory, so provenance is undocumented
 
 ### Silver Implications
 
