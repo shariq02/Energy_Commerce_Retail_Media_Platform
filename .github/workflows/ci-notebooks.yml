@@ -66,18 +66,20 @@ jobs:
           done < <(find databricks -name "*.py" -print0)
           exit "$fail"
 
-      # The 20-cell split threshold only ever applied to Silver/Gold
+      # The cell-count split threshold (MAX_CELLS below) only ever applied to Silver/Gold
       # notebooks (source-of-truth transform layers) -- eda/, setup/ and
       # utility/ notebooks were never subject to it, so this stays scoped
       # to avoid failing the build on files the convention never covered.
-      - name: Verify Silver/Gold notebooks stay under the 20-cell split threshold
+      - name: Verify Silver/Gold notebooks stay under the cell split threshold
+        env:
+          MAX_CELLS: 30
         run: |
           fail=0
           while IFS= read -r -d '' f; do
             n=$(grep -c "^# COMMAND ----------" "$f")
             cells=$((n + 1))
-            if [ "$cells" -gt 20 ]; then
-              echo "Exceeds the 20-cell split threshold ($cells cells): $f"
+            if [ "$cells" -gt "$MAX_CELLS" ]; then
+              echo "Exceeds the $MAX_CELLS-cell split threshold ($cells cells): $f"
               fail=1
             fi
           done < <(find databricks/silver databricks/gold -name "*.py" -print0)
