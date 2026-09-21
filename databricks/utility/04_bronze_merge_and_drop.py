@@ -92,10 +92,10 @@ LEFTOVER_VOLUMES = [
 ]
 
 # Destructive steps stay off until the validation output has been read.
-DROP_MERGED_SOURCES = True #False
+DROP_MERGED_SOURCES = True  # False
 # Set True only after confirming the external raw copy of the Search Visibility data.
-DROP_SEARCH_VISIBILITY = True #False
-DROP_LEFTOVER_VOLUMES = True #False
+DROP_SEARCH_VISIBILITY = True  # False
+DROP_LEFTOVER_VOLUMES = True  # False
 
 print(f"Catalog / schema : {BRONZE}")
 print(f"Merged tables    : {list(MERGES)}")
@@ -106,6 +106,7 @@ print(f"Drop leftover Volumes : {DROP_LEFTOVER_VOLUMES}")
 # COMMAND ----------
 
 # DBTITLE 1,Helper -- fingerprint a table (row count and order-independent hash)
+
 
 def fingerprint(df, cols):
     row = df.agg(
@@ -118,6 +119,7 @@ def fingerprint(df, cols):
 # COMMAND ----------
 
 # DBTITLE 1,Helper -- merged frame for one group
+
 
 def merged_frame(disc_col, sources):
     parts = [

@@ -84,8 +84,6 @@ VOLUME_UNITS = [
     "dwd_metadata",
     "smard_analytical",
     "honda_iot_analytical",
-    "search_visibility_events",
-    "search_visibility_reference",
     "rees46_events",
 ]
 

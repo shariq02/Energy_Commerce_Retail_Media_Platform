@@ -30,16 +30,22 @@ _SCHEMAS = _ROOT / "src" / "schemas"
 _CONTRACTS = _SCHEMAS / "contracts"
 _MAPPINGS = _SCHEMAS / "mappings"
 _GENERATED = _CONTRACTS / "generated"
-_REGISTRY = _SCHEMAS / "bronze_registry" / "bronze_schema_v001.md"
+_REGISTRY_DIR = _SCHEMAS / "bronze_registry"
 
 ENERGY_WEATHER_SOURCES = ("dwd", "smard", "power_plant_list", "redispatch", "mastr")
+# Sources whose logical datasets are stored, in Bronze, as slices of a shared table.
+BRONZE_LAYOUT_SOURCES = ("honda_iot", "mastr")
+
+
+def _latest_registry() -> Path:
+    return max(_REGISTRY_DIR.glob("bronze_schema_v*.md"))
 
 
 def _registry() -> dict[str, list[str]]:
-    """table name -> ordered column list, parsed from the Bronze schema snapshot."""
+    """table name -> ordered column list, parsed from the latest Bronze snapshot."""
     row = re.compile(r"\|\s*([a-z0-9_]+)\s*\|\s*(\d+)\s*\|\s*([^\s|]+)\s*\|")
     acc: dict[str, list[tuple[int, str]]] = {}
-    for line in _REGISTRY.read_text(encoding="utf-8").splitlines():
+    for line in _latest_registry().read_text(encoding="utf-8").splitlines():
         m = row.match(line)
         if m:
             acc.setdefault(m.group(1), []).append((int(m.group(2)), m.group(3)))
@@ -59,6 +65,12 @@ def _contract_tables(contract: dict) -> list[dict]:
     return []
 
 
+def _physical(table: dict) -> tuple[str, str | None]:
+    """(Bronze table, discriminator column) a contract table is stored in."""
+    bronze = table.get("bronze", {})
+    return bronze.get("table", table["name"]), bronze.get("discriminator")
+
+
 @pytest.fixture(scope="module")
 def registry() -> dict[str, list[str]]:
     return _registry()
@@ -75,15 +87,56 @@ def test_contract_parses_and_names_the_source(source):
 @pytest.mark.parametrize("source", ENERGY_WEATHER_SOURCES)
 def test_contract_tables_exist_in_bronze_registry(source, registry):
     for table in _contract_tables(_contract(source)):
-        assert table["name"] in registry, f"{table['name']} not in the Bronze snapshot"
+        physical, _ = _physical(table)
+        assert physical in registry, f"{physical} not in the Bronze snapshot"
 
 
 @pytest.mark.parametrize("source", ENERGY_WEATHER_SOURCES)
 def test_contract_columns_match_bronze_registry_order(source, registry):
     for table in _contract_tables(_contract(source)):
+        physical, discriminator = _physical(table)
         got = [c["name"] for c in table["columns"]]
-        assert got == registry[table["name"]], (
+        stored = registry[physical]
+        if discriminator:
+            assert stored[0] == discriminator, (
+                f"{physical}: {discriminator} is not the first Bronze column"
+            )
+            stored = stored[1:]
+        assert got == stored, (
             f"{table['name']}: contract columns diverge from the Bronze snapshot"
+        )
+
+
+@pytest.mark.parametrize("source", BRONZE_LAYOUT_SOURCES)
+def test_shared_bronze_tables_have_one_value_per_dataset(source, registry):
+    """Every logical dataset stored in a shared Bronze table has its own value."""
+    seen: dict[str, dict[str, str]] = {}
+    for table in _contract_tables(_contract(source)):
+        physical, discriminator = _physical(table)
+        assert physical in registry, f"{physical} not in the Bronze snapshot"
+        if not discriminator:
+            continue
+        value = table["bronze"]["value"]
+        values = seen.setdefault(physical, {})
+        assert value not in values, f"{physical}: value {value!r} used twice"
+        values[value] = table["name"]
+        assert registry[physical][0] == discriminator
+    assert seen, f"{source} declares no shared Bronze table"
+
+
+@pytest.mark.parametrize("source", BRONZE_LAYOUT_SOURCES)
+def test_shared_bronze_datasets_have_identical_columns(source):
+    """Datasets stored in one Bronze table must have the same columns."""
+    by_table: dict[str, list[list[str]]] = {}
+    for table in _contract_tables(_contract(source)):
+        physical, discriminator = _physical(table)
+        if discriminator:
+            by_table.setdefault(physical, []).append(
+                [c["name"] for c in table["columns"]]
+            )
+    for physical, column_lists in by_table.items():
+        assert all(cols == column_lists[0] for cols in column_lists), (
+            f"{physical}: datasets stored together have different columns"
         )
 
 

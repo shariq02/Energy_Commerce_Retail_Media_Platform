@@ -4,7 +4,8 @@
 # Date: September 2026
 #
 # Purpose: formal contract for the German Marktstammdatenregister source -- 28
-# Bronze tables covering generation units, EEG / KWK support & authorisation,
+# logical datasets (25 Bronze tables: the four small code lookups share one)
+# covering generation units, EEG / KWK support & authorisation,
 # market actors, grid connection points / grids / locations / balancing zones,
 # change-history logs, and the MaStR reference catalogs. Every *_observed value
 # and every quality-rule bound is traceable to src/schemas/profiling/mastr.md.
@@ -33,6 +34,14 @@ description: >
   this wave (they explain several 'partial-scope' orphan rates below).
 profiling_evidence: src/schemas/profiling/mastr.md
 bronze_physical_types: string
+bronze_layout: >
+  The four small code lookups (mastr_einheitentypen, mastr_lokationstypen,
+  mastr_marktfunktionen, mastr_marktrollen; each Id / Wert) share one Bronze
+  table, mastr_code_lookup, told apart by a leading catalog_kind column (the
+  lookup's name without the mastr_ prefix) added at load. Each of those entries
+  below is one logical dataset; its bronze: block names the physical table and
+  the catalog_kind value. catalog_kind is not one of the source columns listed
+  here. Every other table below is its own Bronze table.
 
 acquisition:
   method: scripted_download
@@ -962,6 +971,7 @@ tables:
       - { name: NetzanschlusspunktMastrNummer, type: string,   required: false, nullable: true }
 
   - name: mastr_einheitentypen
+    bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: einheitentypen }
     kind: light
     role: "code catalog -- unit type"
     grain: { key: [Id], unique: true }
@@ -1000,6 +1010,7 @@ tables:
       - { name: KatalogKategorieId, type: string, required: true, nullable: false, notes: "FK -> mastr_katalogkategorien" }
 
   - name: mastr_lokationstypen
+    bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: lokationstypen }
     kind: light
     role: "code catalog -- location type"
     grain: { key: [Id], unique: true }
@@ -1009,6 +1020,7 @@ tables:
       - { name: Wert, type: string, required: true, nullable: false }
 
   - name: mastr_marktfunktionen
+    bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: marktfunktionen }
     kind: light
     role: "code catalog -- market function"
     grain: { key: [Id], unique: true }
@@ -1018,6 +1030,7 @@ tables:
       - { name: Wert, type: string, required: true, nullable: false }
 
   - name: mastr_marktrollen
+    bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: marktrollen }
     kind: light
     role: "code catalog -- market role"
     grain: { key: [Id], unique: true }

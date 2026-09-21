@@ -20,8 +20,10 @@
 
 # DBTITLE 1,Imports
 import re
+from functools import reduce
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 from pyspark.sql.utils import AnalysisException
 
 # COMMAND ----------
@@ -34,40 +36,52 @@ SOURCE_PREFIX = "honda_iot"
 
 # (staging dataset name, source Volume, fully-qualified Bronze table name)
 # Staging dataset names keep the source's P/W casing; Bronze table names are
-# lower-case.
+# lower-case. The P and W datasets of a metric share one Bronze table.
 DATASETS: list[tuple[str, str, str]] = [
     (
         "electricity_P",
         "honda_iot_analytical",
-        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_electricity_p",
+        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_electricity",
     ),
     (
         "electricity_W",
         "honda_iot_analytical",
-        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_electricity_w",
+        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_electricity",
     ),
     (
         "heating_P",
         "honda_iot_analytical",
-        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_heating_p",
+        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_heating",
     ),
     (
         "heating_W",
         "honda_iot_analytical",
-        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_heating_w",
+        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_heating",
     ),
     (
         "cooling_P",
         "honda_iot_analytical",
-        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_cooling_p",
+        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_cooling",
     ),
     (
         "cooling_W",
         "honda_iot_analytical",
-        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_cooling_w",
+        f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_cooling",
     ),
     ("weather", "honda_iot_analytical", f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_weather"),
 ]
+
+# Column added, as the first column, to a table that holds several datasets,
+# and the value each dataset gets in it.
+DISCRIMINATOR_COLUMN = "measurement_type"
+DISCRIMINATOR_VALUE = {
+    "electricity_P": "p",
+    "electricity_W": "w",
+    "heating_P": "p",
+    "heating_W": "w",
+    "cooling_P": "p",
+    "cooling_W": "w",
+}
 
 VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
@@ -196,34 +210,64 @@ print(f"OK  all {len(DATASETS)} dataset(s) have at least one source file")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load each dataset into its Bronze table
+# DBTITLE 1,Group the staged datasets by Bronze table
+table_groups: dict[str, list[tuple[str, str]]] = {}
+for dataset, volume, table in DATASETS:
+    table_groups.setdefault(table, []).append((dataset, volume))
+
+print(f"{len(DATASETS)} dataset(s) -> {len(table_groups)} Bronze table(s)")
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Helper -- read and normalise one staged dataset
+def prepare_frame(dataset: str, files: list[str]) -> DataFrame:
+    df = read_dataset(files)
+
+    explicit = COLUMN_RENAME_MAP.get(dataset, {})
+    applied = {old: new for old, new in explicit.items() if old in df.columns}
+    for old, new in applied.items():
+        df = df.withColumnRenamed(old, new)
+
+    df, sanitized = sanitize_columns(df)
+    if applied or sanitized:
+        print(
+            f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}"
+        )
+
+    value = DISCRIMINATOR_VALUE.get(dataset)
+    if value is not None:
+        cols = df.columns
+        df = df.withColumn(DISCRIMINATOR_COLUMN, F.lit(value)).select(
+            DISCRIMINATOR_COLUMN, *cols
+        )
+    return df
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Load each Bronze table from its staged dataset(s)
 load_results: list[dict] = []
 
-for dataset, volume, table in DATASETS:
-    files = dataset_files[dataset]
+for table, members in table_groups.items():
+    datasets = [dataset for dataset, _volume in members]
+    files_total = sum(len(dataset_files[d]) for d in datasets)
     result = {
-        "dataset": dataset,
-        "volume": volume,
+        "dataset": table.rsplit(".", 1)[-1],
+        "volume": members[0][1],
         "table": table,
-        "files": len(files),
+        "files": files_total,
         "rows": None,
         "columns": None,
+        "discriminator_values": {
+            DISCRIMINATOR_VALUE[d] for d in datasets if d in DISCRIMINATOR_VALUE
+        },
         "status": "FAILED",
         "error": None,
     }
     try:
-        df = read_dataset(files)
-
-        explicit = COLUMN_RENAME_MAP.get(dataset, {})
-        applied = {old: new for old, new in explicit.items() if old in df.columns}
-        for old, new in applied.items():
-            df = df.withColumnRenamed(old, new)
-
-        df, sanitized = sanitize_columns(df)
-        if applied or sanitized:
-            print(
-                f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}"
-            )
+        frames = [prepare_frame(d, dataset_files[d]) for d in datasets]
+        df = reduce(lambda a, b: a.unionByName(b), frames)
 
         (
             df.write.format("delta")
@@ -235,10 +279,10 @@ for dataset, volume, table in DATASETS:
         result["rows"] = row_count
         result["columns"] = len(df.columns)
         result["status"] = "LOADED"
-        print(f"OK  {dataset}: {row_count} rows from {len(files)} file(s) -> {table}")
+        print(f"OK  {datasets}: {row_count} rows from {files_total} file(s) -> {table}")
     except Exception as exc:
         result["error"] = str(exc)
-        print(f"FAIL  {dataset}: could not load into {table} -- {exc}")
+        print(f"FAIL  {datasets}: could not load into {table} -- {exc}")
     load_results.append(result)
 
 # COMMAND ----------
@@ -257,6 +301,19 @@ for result in load_results:
         actual_rows = spark.table(table).count()
         if actual_rows == 0:
             raise RuntimeError("table has zero rows after load")
+        expected = result["discriminator_values"]
+        if expected:
+            found = {
+                r[0]
+                for r in spark.table(table)
+                .select(DISCRIMINATOR_COLUMN)
+                .distinct()
+                .collect()
+            }
+            if found != expected:
+                raise RuntimeError(
+                    f"{DISCRIMINATOR_COLUMN} values {sorted(found)} != expected {sorted(expected)}"
+                )
         result["validated"] = True
         result["validation_error"] = None
         print(
@@ -290,10 +347,10 @@ for result in load_results:
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
 print(
-    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DATASETS)}"
+    f"Tables loaded      : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(table_groups)}"
 )
 print(
-    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DATASETS)}"
+    f"Tables validated   : {sum(1 for r in load_results if r.get('validated'))}/{len(table_groups)}"
 )
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)

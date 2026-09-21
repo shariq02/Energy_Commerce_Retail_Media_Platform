@@ -13,10 +13,9 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Create the Bronze upload-unit Volume(s) needed for this
-# MAGIC acquisition wave. REES46 and Search Visibility already have Volumes
-# MAGIC from the first wave (`00_create_schemas.py`); only GA4 (`ga4_events`)
-# MAGIC is net-new here, and it receives the scoped staged output, not the
-# MAGIC raw archive.
+# MAGIC acquisition wave. REES46 already has a Volume from the first wave
+# MAGIC (`00_create_schemas.py`); only GA4 (`ga4_events`) is net-new here, and
+# MAGIC it receives the scoped staged output, not the raw archive.
 # MAGIC
 # MAGIC Structure only, no Bronze table. Safe to run repeatedly -- every
 # MAGIC statement uses `IF NOT EXISTS`, never drops a Volume.

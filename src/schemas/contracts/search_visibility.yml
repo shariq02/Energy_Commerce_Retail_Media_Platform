@@ -3,8 +3,11 @@
 # Author: Sharique Mohammad
 # Date: August 2026
 #
-# Purpose: formal contract for the Search Visibility source (2 Bronze tables --
-# an events table and a repository reference table). Every *_observed value is
+# Purpose: formal contract for the Search Visibility source (2 tables -- an events
+# table and a repository reference table). The Bronze tables have been dropped
+# (Search Visibility is out of the current scope); this contract is kept as the
+# record of the source, and because the Silver field-class registry generator
+# still reads it. Every *_observed value is
 # traceable to src/schemas/profiling/search_visibility.md. Authored;
 # generated/search_visibility_*.schema.json is produced by
 # src/schemas/_generate_jsonschema.py -- do not edit those by hand.
@@ -20,6 +23,7 @@ description: >
   Console connection to any property this project owns.
 profiling_evidence: src/schemas/profiling/search_visibility.md
 bronze_physical_types: string
+bronze_status: dropped
 
 acquisition:
   method: manual_download

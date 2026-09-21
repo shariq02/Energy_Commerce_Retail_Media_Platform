@@ -178,7 +178,10 @@ targets:
     from_tables: [mastr_katalogkategorien, mastr_katalogwerte, mastr_einheitentypen,
                   mastr_lokationstypen, mastr_marktfunktionen, mastr_marktrollen]
     note: >
-      the authoritative MaStR code sets. mastr_katalogwerte (Id -> Wert, keyed
+      the authoritative MaStR code sets. In Bronze the four small lookups
+      (mastr_einheitentypen, mastr_lokationstypen, mastr_marktfunktionen,
+      mastr_marktrollen) are one table, mastr_code_lookup, with a catalog_kind
+      column; the names listed here are the logical datasets of the contract. mastr_katalogwerte (Id -> Wert, keyed
       by KatalogKategorieId -> mastr_katalogkategorien) is the decode table for
       every coded column. Silver reference dimensions, SCD type 1. Pin the
       catalog vintage -- meanings change between MaStR releases.

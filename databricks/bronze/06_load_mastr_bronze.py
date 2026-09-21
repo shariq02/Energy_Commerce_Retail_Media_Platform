@@ -19,6 +19,7 @@
 
 # DBTITLE 1,Imports
 import re
+from functools import reduce
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
@@ -69,14 +70,30 @@ REFERENCE_DATASETS = [
     "marktrollen",
 ]
 
+# The four small code lookups (same Id / Wert shape) share one Bronze table.
+CODE_LOOKUP_DATASETS = [
+    "einheitentypen",
+    "lokationstypen",
+    "marktfunktionen",
+    "marktrollen",
+]
+CODE_LOOKUP_TABLE = "mastr_code_lookup"
+
+# Column added, as the first column, to the shared table, and the value each
+# lookup dataset gets in it.
+DISCRIMINATOR_COLUMN = "catalog_kind"
+DISCRIMINATOR_VALUE = {d: d for d in CODE_LOOKUP_DATASETS}
+
+
+def bronze_table(dataset: str) -> str:
+    name = CODE_LOOKUP_TABLE if dataset in CODE_LOOKUP_DATASETS else f"mastr_{dataset}"
+    return f"{CATALOG}.{BRONZE_SCHEMA}.{name}"
+
+
 # (dataset_name, source_volume, fully-qualified Bronze table name)
 DATASETS: list[tuple[str, str, str]] = [
-    (d, MASTR_ANALYTICAL_VOLUME, f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}")
-    for d in ANALYTICAL_DATASETS
-] + [
-    (d, MASTR_REFERENCE_VOLUME, f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}")
-    for d in REFERENCE_DATASETS
-]
+    (d, MASTR_ANALYTICAL_VOLUME, bronze_table(d)) for d in ANALYTICAL_DATASETS
+] + [(d, MASTR_REFERENCE_VOLUME, bronze_table(d)) for d in REFERENCE_DATASETS]
 
 VOLUMES = sorted({volume for _, volume, _ in DATASETS})
 
@@ -285,43 +302,73 @@ print(f"OK  all {len(DATASETS)} dataset(s) have at least one source file")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load each dataset into its Bronze table
+# DBTITLE 1,Group the staged datasets by Bronze table
+table_groups: dict[str, list[tuple[str, str]]] = {}
+for dataset, volume, table in DATASETS:
+    table_groups.setdefault(table, []).append((dataset, volume))
+
+print(f"{len(DATASETS)} dataset(s) -> {len(table_groups)} Bronze table(s)")
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Helper -- read and normalise one staged dataset
+def prepare_frame(dataset: str, files: list[str]) -> DataFrame:
+    df = read_dataset(files, dataset)
+
+    alignment_error = id_column_error(dataset, df) or structural_alignment_error(
+        dataset, df
+    )
+    if alignment_error:
+        raise RuntimeError(
+            f"structural check failed -- CSV field alignment is wrong: {alignment_error}. "
+            "Adjust the read options for this dataset and re-stage the raw export."
+        )
+
+    explicit = COLUMN_RENAME_MAP.get(dataset, {})
+    applied = {old: new for old, new in explicit.items() if old in df.columns}
+    for old, new in applied.items():
+        df = df.withColumnRenamed(old, new)
+
+    df, sanitized = sanitize_columns(df)
+    if applied or sanitized:
+        print(
+            f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}"
+        )
+
+    value = DISCRIMINATOR_VALUE.get(dataset)
+    if value is not None:
+        cols = df.columns
+        df = df.withColumn(DISCRIMINATOR_COLUMN, F.lit(value)).select(
+            DISCRIMINATOR_COLUMN, *cols
+        )
+    return df
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Load each Bronze table from its staged dataset(s)
 load_results: list[dict] = []
 
-for dataset, volume, table in DATASETS:
-    files = dataset_files[dataset]
+for table, members in table_groups.items():
+    datasets = [dataset for dataset, _volume in members]
+    files_total = sum(len(dataset_files[d]) for d in datasets)
     result = {
-        "dataset": dataset,
-        "volume": volume,
+        "dataset": table.rsplit(".", 1)[-1],
+        "volume": members[0][1],
         "table": table,
-        "files": len(files),
+        "files": files_total,
         "rows": None,
         "columns": None,
+        "discriminator_values": {
+            DISCRIMINATOR_VALUE[d] for d in datasets if d in DISCRIMINATOR_VALUE
+        },
         "status": "FAILED",
         "error": None,
     }
     try:
-        df = read_dataset(files, dataset)
-
-        alignment_error = id_column_error(dataset, df) or structural_alignment_error(
-            dataset, df
-        )
-        if alignment_error:
-            raise RuntimeError(
-                f"structural check failed -- CSV field alignment is wrong: {alignment_error}. "
-                "Adjust the read options for this dataset and re-stage the raw export."
-            )
-
-        explicit = COLUMN_RENAME_MAP.get(dataset, {})
-        applied = {old: new for old, new in explicit.items() if old in df.columns}
-        for old, new in applied.items():
-            df = df.withColumnRenamed(old, new)
-
-        df, sanitized = sanitize_columns(df)
-        if applied or sanitized:
-            print(
-                f"OK  {dataset}: normalized column name(s) -- explicit={applied} sanitized={sanitized}"
-            )
+        frames = [prepare_frame(d, dataset_files[d]) for d in datasets]
+        df = reduce(lambda a, b: a.unionByName(b), frames)
 
         (
             df.write.format("delta")
@@ -333,10 +380,10 @@ for dataset, volume, table in DATASETS:
         result["rows"] = row_count
         result["columns"] = len(df.columns)
         result["status"] = "LOADED"
-        print(f"OK  {dataset}: {row_count} rows from {len(files)} file(s) -> {table}")
+        print(f"OK  {datasets}: {row_count} rows from {files_total} file(s) -> {table}")
     except Exception as exc:
         result["error"] = str(exc)
-        print(f"FAIL  {dataset}: could not load into {table} -- {exc}")
+        print(f"FAIL  {datasets}: could not load into {table} -- {exc}")
     load_results.append(result)
 
 # COMMAND ----------
@@ -355,6 +402,19 @@ for result in load_results:
         actual_rows = spark.table(table).count()
         if actual_rows == 0:
             raise RuntimeError("table has zero rows after load")
+        expected = result["discriminator_values"]
+        if expected:
+            found = {
+                r[0]
+                for r in spark.table(table)
+                .select(DISCRIMINATOR_COLUMN)
+                .distinct()
+                .collect()
+            }
+            if found != expected:
+                raise RuntimeError(
+                    f"{DISCRIMINATOR_COLUMN} values {sorted(found)} != expected {sorted(expected)}"
+                )
         result["validated"] = True
         result["validation_error"] = None
         print(
@@ -388,10 +448,10 @@ for result in load_results:
         print(f"    validation error:  {result['validation_error']}")
 print("-" * 70)
 print(
-    f"Datasets loaded    : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(DATASETS)}"
+    f"Tables loaded      : {sum(1 for r in load_results if r['status'] == 'LOADED')}/{len(table_groups)}"
 )
 print(
-    f"Datasets validated : {sum(1 for r in load_results if r.get('validated'))}/{len(DATASETS)}"
+    f"Tables validated   : {sum(1 for r in load_results if r.get('validated'))}/{len(table_groups)}"
 )
 print(f"Overall result     : {'PASS' if overall_success else 'FAIL'}")
 print("=" * 70)
