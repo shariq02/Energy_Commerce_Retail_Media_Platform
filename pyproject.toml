@@ -72,6 +72,7 @@ extend-ignore = ["E402", "BLE001"]
 # target_schema_for), same as every numbered notebook above.
 "databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
+"databricks/silver/semantic/**/*.py" = ["F821"]
 # Gold notebooks pull `%run ../silver/_silver_common` then `%run ../../_gold_common`
 # (Databricks runtime magic). _gold_common.py itself is the second link in that
 # chain (like _silver_inspect.py) and legitimately depends on _silver_common's
