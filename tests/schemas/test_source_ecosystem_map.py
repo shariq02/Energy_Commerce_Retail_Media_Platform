@@ -63,7 +63,6 @@ def test_expected_current_scope_sources_present(doc):
         "redispatch",
         "honda_iot",
         "rees46",
-        "search_visibility_ramp_dryad",
         "ga4",
     }
     assert sources == expected
@@ -78,7 +77,6 @@ def test_current_scope_sources_map_to_the_expected_ecosystem(doc):
         "redispatch": "energy",
         "honda_iot": "energy",
         "rees46": "commerce",
-        "search_visibility_ramp_dryad": "commerce",
         "ga4": "commerce",
     }
     for entry in doc["mappings"]:

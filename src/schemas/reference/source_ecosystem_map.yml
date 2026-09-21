@@ -58,17 +58,15 @@ mappings:
   - source_system: rees46
     ecosystem: commerce
     first_mapped: "first wave (re-mapped from energy to commerce, Commerce wave)"
-  - source_system: search_visibility_ramp_dryad
-    ecosystem: commerce
-    first_mapped: "first wave (re-mapped from energy to commerce, Commerce wave)"
   - source_system: ga4
     ecosystem: commerce
     first_mapped: "Commerce wave"
 
-# `rees46` and `search_visibility_ramp_dryad` were provisionally mapped to
-# `energy` before `commerce` existed as an ecosystem; corrected above now
-# that Commerce Bronze (ga4) has landed. `synthetic_operational` was removed
-# with the operational/CDC system (see archive/historical/).
+# `rees46` was provisionally mapped to `energy` before `commerce` existed as an
+# ecosystem; corrected above now that Commerce Bronze (ga4) has landed.
+# `synthetic_operational` was removed with the operational/CDC system, and
+# `search_visibility_ramp_dryad` with the Search Visibility source (see
+# archive/historical/).
 
 # Historical, out-of-scope entries -- listed here ONLY as a documented
 # negative record, so this file itself is traceable evidence that they were

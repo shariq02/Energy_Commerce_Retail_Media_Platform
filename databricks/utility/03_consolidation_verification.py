@@ -166,7 +166,6 @@ PASS_THROUGH_PAIRS = [
     (SILVER_REF, "mastr_lokationstypen", GOLD, "dim_lokationstyp"),
     (SILVER_REF, "dwd_parameter_catalog", GOLD, "dim_dwd_parameter_catalog"),
     (SILVER_REF, "honda_channel_catalog", GOLD, "dim_device"),
-    (C_SILVER_REF, "search_visibility_repository", C_GOLD, "dim_repository"),
 ]
 HEAVY_PAIRS = [
     (C_SILVER, "ga4_events", C_GOLD, "fact_web_event"),

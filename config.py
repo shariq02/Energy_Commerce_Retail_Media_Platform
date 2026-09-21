@@ -290,7 +290,7 @@ DOMAINS = {
     },
     "commerce": {
         "name": "Commerce",
-        "source": "GA4 (primary), REES46, Search Visibility",
+        "source": "GA4 (primary), REES46",
         "is_german_source": False,
     },
 }

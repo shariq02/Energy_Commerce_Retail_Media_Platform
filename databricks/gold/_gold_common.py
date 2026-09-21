@@ -299,8 +299,7 @@ def resolve_fk(
     join+alias+drop-temp-columns pattern repeated across most Gold fact/
     bridge notebooks (dim_power_plant's MaStR reconciliation,
     fact_redispatch_measure, the location/actor/generation-unit bridges,
-    fact_ecommerce_item's parent-event link, fact_search_visibility's
-    repository link, ...). `fact_key_cols` and `dim_key_cols` must be the
+    fact_ecommerce_item's parent-event link, ...). `fact_key_cols` and `dim_key_cols` must be the
     same length and in matching order; an unmatched fact row gets NULL in
     `output_col`, never a fabricated identity."""
     tmp_names = [f"_rfk_{i}" for i in range(len(dim_key_cols))]

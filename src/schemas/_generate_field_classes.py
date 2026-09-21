@@ -392,29 +392,6 @@ FOUNDATION_SOURCES = {
             }
         },
     },
-    "search_visibility": {
-        "silver": {
-            "search_visibility_events": [
-                "citableContent",
-                "click_through",
-                "clicks",
-                "country",
-                "period",
-                "device",
-                "impressions",
-                "index",
-                "position",
-                "url",
-                "repository_id",
-            ],
-            "search_visibility_repository": [
-                "repository_id",
-                "country",
-                "ir_platform",
-                "name",
-            ],
-        },
-    },
     "ga4": {
         "silver": {
             # The 8 top-level Bronze columns -- event_params/ecommerce/items
@@ -497,7 +474,6 @@ REFERENCE_TABLES = {
     "mastr_lokationstypen",
     "mastr_marktfunktionen",
     "mastr_marktrollen",
-    "search_visibility_repository",
     "honda_channel_catalog",
 }
 
@@ -533,10 +509,9 @@ VALUE_QUARANTINE_FLAGS = {
 }
 
 # table_name prefix -> the contract's source_system (the source_ecosystem_map.yml
-# key), longest/most-specific prefix first so "search_visibility_" is checked
-# before any shorter prefix could apply.
+# key), longest/most-specific prefix first so "power_plant_" is checked before
+# any shorter prefix could apply.
 _PREFIX_TO_SOURCE_SYSTEM = (
-    ("search_visibility_", "search_visibility_ramp_dryad"),
     ("power_plant_", "power_plant_list"),
     ("redispatch_", "redispatch"),
     ("mastr_", "mastr"),
@@ -793,11 +768,7 @@ def build_rows() -> list[dict]:
                     add(st, c, cls, rule, ref)
                     continue
                 add(st, c, cls, rule, f"{src} contract")
-            has_conflict = st in (
-                "rees46_events",
-                "search_visibility_events",
-                "ga4_events",
-            )
+            has_conflict = st in ("rees46_events", "ga4_events")
             add_governance(st, conflict=has_conflict)
         for st, cols in spec.get("deferred", {}).items():
             for c, (cls, rule, ref) in cols.items():

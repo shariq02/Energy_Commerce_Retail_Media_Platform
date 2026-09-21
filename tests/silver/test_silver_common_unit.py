@@ -56,7 +56,6 @@ def test_load_contract_and_load_mapping_resolve_the_conventional_path(silver):
         ("mastr", "energy"),
         ("honda_iot", "energy"),
         ("rees46", "commerce"),
-        ("search_visibility_ramp_dryad", "commerce"),
         ("ga4", "commerce"),
     ],
 )

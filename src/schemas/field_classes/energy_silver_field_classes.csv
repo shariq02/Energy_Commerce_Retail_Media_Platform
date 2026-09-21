@@ -1564,32 +1564,6 @@ rees46_events,source_system,derived,constant per source,silver governance,commer
 rees46_events,user_id,source_provided,typed cast (+ rename where localised),rees46 contract,commerce_silver
 rees46_events,user_session,source_provided,typed cast (+ rename where localised),rees46 contract,commerce_silver
 rees46_user_country_synthetic,country_synthetic,synthetic,DEFERRED -- no defensible generation rule; not built in the silver layer,localisation design,commerce_silver
-search_visibility_events,_had_key_conflict,derived,a resolved same-key conflict existed,silver conflict rule,commerce_silver
-search_visibility_events,_silver_loaded_at,derived,current_timestamp() at write,silver governance,commerce_silver
-search_visibility_events,_silver_run_id,derived,the Silver run id,silver governance,commerce_silver
-search_visibility_events,citableContent,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,click_through,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,clicks,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,country,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,device,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,commerce_silver
-search_visibility_events,impressions,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,index,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,period,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,position,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,repository_id,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_events,source_record_id,derived,natural key or deterministic composite,silver governance,commerce_silver
-search_visibility_events,source_system,derived,constant per source,silver governance,commerce_silver
-search_visibility_events,url,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver
-search_visibility_repository,_silver_loaded_at,derived,current_timestamp() at write,silver governance,commerce_silver_reference
-search_visibility_repository,_silver_run_id,derived,the Silver run id,silver governance,commerce_silver_reference
-search_visibility_repository,country,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver_reference
-search_visibility_repository,ecosystem,derived,source_ecosystem_map.yml at the Silver boundary,provenance standard,commerce_silver_reference
-search_visibility_repository,ir_platform,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver_reference
-search_visibility_repository,name,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver_reference
-search_visibility_repository,repository_id,source_provided,typed cast (+ rename where localised),search_visibility contract,commerce_silver_reference
-search_visibility_repository,source_record_id,derived,natural key or deterministic composite,silver governance,commerce_silver_reference
-search_visibility_repository,source_system,derived,constant per source,silver governance,commerce_silver_reference
 smard_energy_timeseries,_silver_loaded_at,derived,current_timestamp() at write,silver governance,energy_silver
 smard_energy_timeseries,_silver_run_id,derived,the Silver run id,silver governance,energy_silver
 smard_energy_timeseries,aggregation_resolution,source_provided,typed cast + English business rename,smard contract / business-name mapping,energy_silver

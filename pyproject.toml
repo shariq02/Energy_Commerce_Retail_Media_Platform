@@ -42,7 +42,7 @@ where = ["."]
 include = ["src*", "fastapi*", "ai*"]
 
 [tool.ruff]
-exclude = ["data/", "docs/", ".terraform/"]
+exclude = ["data/", "docs/", "archive/", ".terraform/"]
 # Keep the ruff cache out of the repo tree.
 cache-dir = "~/.cache/ruff/ecrmap"
 # spark/dbutils/display are Databricks-runtime-injected globals (databricks/*),
