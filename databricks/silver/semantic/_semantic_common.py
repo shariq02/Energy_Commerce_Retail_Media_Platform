@@ -23,11 +23,11 @@
 SEMANTIC_SCHEMA = "energy_silver"
 PROJECT_TZ = "Europe/Berlin"
 
-# Provenance columns shared by every semantic structure.
-_PROVENANCE = [
-    ("source_system", "string"),
-    ("source_dataset", "string"),
-    ("source_column", "string"),
+# Provenance columns shared by every semantic structure; `source_column` only
+# where a row comes from one named source column.
+_PROVENANCE_HEAD = [("source_system", "string"), ("source_dataset", "string")]
+_PROVENANCE_COLUMN = [("source_column", "string")]
+_PROVENANCE_TAIL = [
     ("source_record_id", "string"),
     ("_silver_loaded_at", "timestamp"),
     ("_silver_run_id", "string"),
@@ -62,7 +62,9 @@ WEATHER_OBSERVATION_COLUMNS = [
     ("quality_flag", "string"),
     ("observation_method", "string"),
     ("measurement_basis", "string"),
-    *_PROVENANCE,
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_COLUMN,
+    *_PROVENANCE_TAIL,
 ]
 
 WEATHER_DAILY_COLUMNS = [
@@ -84,7 +86,9 @@ WEATHER_DAILY_COLUMNS = [
     ("derivation_rule", "string"),
     ("n_observations", "int"),
     ("measurement_basis", "string"),
-    *_PROVENANCE,
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_COLUMN,
+    *_PROVENANCE_TAIL,
 ]
 
 WEATHER_LOCATION_COLUMNS = [
@@ -100,7 +104,8 @@ WEATHER_LOCATION_COLUMNS = [
     ("region", "string"),
     ("city", "string"),
     ("geography_basis", "string"),
-    *_PROVENANCE,
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
 ]
 
 WEATHER_LOCATION_VALIDITY_COLUMNS = [
@@ -112,7 +117,8 @@ WEATHER_LOCATION_VALIDITY_COLUMNS = [
     ("latitude", "double"),
     ("longitude", "double"),
     ("elevation_m", "double"),
-    *_PROVENANCE,
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
 ]
 
 # Continent by ISO 3166-1 alpha-2 (UN geoscheme; Russia -> Europe, Turkey and

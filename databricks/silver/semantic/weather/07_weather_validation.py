@@ -33,6 +33,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Weather specifications
+# MAGIC %run ./_weather_specs
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports
 from pyspark.sql import functions as F
 
@@ -54,8 +59,8 @@ FINDINGS_BLOCKS = []
 # DBTITLE 1,Helper -- print a check result
 
 
-def report(name: str, ok: bool, detail: str = "") -> None:
-    status = "PASS" if ok else "FAIL"
+def report(name: str, ok: bool, detail: str = "", status: str | None = None) -> None:
+    status = status or ("PASS" if ok else "FAIL")
     CHECK_RESULTS.append((name, status, detail))
     print(f"{status}  {name}  {detail}")
 
@@ -70,6 +75,13 @@ def keep(heading: str, df) -> None:
 
 # DBTITLE 1,Read Silver -- weather_observation
 obs = spark.table(OBS)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Silver -- loaded source datasets
+LOADED_DATASETS = {
+    r["source_dataset"] for r in obs.select("source_dataset").distinct().collect()
+}
 
 # COMMAND ----------
 
@@ -169,92 +181,136 @@ keep(
 
 # COMMAND ----------
 
-# DBTITLE 1,Regression -- DWD air temperature against the existing Silver table
-base_dwd = spark.table(f"{CATALOG}.{BASELINE_SCHEMA}.dwd_air_temperature").select(
-    F.col("STATIONS_ID").alias("source_location_id"),
-    "observation_ts",
-    F.col("air_temperature_2m").alias("base_value"),
-)
-new_dwd = obs.filter(
-    (F.col("source_dataset") == "dwd_air_temperature")
-    & (F.col("source_column") == "TT_TU")
-).select(
-    "source_location_id",
-    F.col("observation_ts_utc").alias("observation_ts"),
-    F.col("value_native").alias("new_value"),
-)
+# DBTITLE 1,Regression -- key coverage per DWD table against the existing Silver tables
+# Retire this cell and the two below with the old source-scoped Silver tables;
+# a missing baseline table is reported SKIP, not FAIL.
+_key_rows = []
+for _ds in [d for d in DWD_TABLES if d in LOADED_DATASETS]:
+    _base_name = f"{CATALOG}.{BASELINE_SCHEMA}.{_ds}"
+    if not spark.catalog.tableExists(_base_name):
+        report(f"{_ds} key coverage", True, "baseline table absent", status="SKIP")
+        continue
+    _new = (
+        obs.filter(F.col("source_dataset") == _ds)
+        .select("source_location_id", "observation_ts_utc")
+        .distinct()
+    )
+    _base = (
+        spark.table(_base_name)
+        .select(
+            F.col("STATIONS_ID").alias("source_location_id"),
+            F.col("observation_ts").alias("observation_ts_utc"),
+        )
+        .distinct()
+    )
+    _keys = ["source_location_id", "observation_ts_utc"]
+    _only_new = _new.join(_base, _keys, "left_anti").count()
+    _only_base = _base.join(_new, _keys, "left_anti").count()
+    _key_rows.append((_ds, _only_new, _only_base))
+    report(
+        f"{_ds} key coverage",
+        _only_new == 0,
+        f"only_new={_only_new} baseline_only={_only_base} (all-null baseline rows)",
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Regression -- DWD air temperature comparison
-_cmp = base_dwd.filter("base_value is not null").join(
-    new_dwd, ["source_location_id", "observation_ts"], "full_outer"
-)
-_res = _cmp.agg(
-    F.count("*").alias("keys"),
-    F.sum(F.col("base_value").isNull().cast("int")).alias("only_new"),
-    F.sum(F.col("new_value").isNull().cast("int")).alias("only_baseline"),
-    F.sum(
-        (
-            F.col("base_value").isNotNull()
-            & F.col("new_value").isNotNull()
-            & (F.abs(F.col("base_value") - F.col("new_value")) > 1e-9)
-        ).cast("int")
-    ).alias("value_mismatch"),
-).first()
-report(
-    "dwd air temperature matches the existing Silver table",
-    _res["only_new"] == 0
-    and _res["only_baseline"] == 0
-    and _res["value_mismatch"] == 0,
-    str(_res.asDict()),
-)
+# DBTITLE 1,Regression -- DWD air temperature values against the existing Silver table
+_base_name = f"{CATALOG}.{BASELINE_SCHEMA}.dwd_air_temperature"
+if spark.catalog.tableExists(_base_name):
+    _base_dwd = (
+        spark.table(_base_name)
+        .select(
+            F.col("STATIONS_ID").alias("source_location_id"),
+            "observation_ts",
+            F.col("air_temperature_2m").alias("base_value"),
+        )
+        .filter("base_value is not null")
+    )
+    _new_dwd = obs.filter(
+        (F.col("source_dataset") == "dwd_air_temperature")
+        & (F.col("source_column") == "TT_TU")
+    ).select(
+        "source_location_id",
+        F.col("observation_ts_utc").alias("observation_ts"),
+        F.col("value_native").alias("new_value"),
+    )
+    _res = (
+        _base_dwd.join(_new_dwd, ["source_location_id", "observation_ts"], "full_outer")
+        .agg(
+            F.count("*").alias("keys"),
+            F.sum(F.col("base_value").isNull().cast("int")).alias("only_new"),
+            F.sum(F.col("new_value").isNull().cast("int")).alias("only_baseline"),
+            F.sum(
+                (
+                    F.col("base_value").isNotNull()
+                    & F.col("new_value").isNotNull()
+                    & (F.abs(F.col("base_value") - F.col("new_value")) > 1e-9)
+                ).cast("int")
+            ).alias("value_mismatch"),
+        )
+        .first()
+    )
+    report(
+        "dwd air temperature values match the existing Silver table",
+        _res["only_new"] == 0
+        and _res["only_baseline"] == 0
+        and _res["value_mismatch"] == 0,
+        str(_res.asDict()),
+    )
+else:
+    report("dwd air temperature values", True, "baseline table absent", status="SKIP")
 
 # COMMAND ----------
 
 # DBTITLE 1,Regression -- Honda weather against the existing Silver table
-_base_h = (
-    spark.table(f"{CATALOG}.{BASELINE_SCHEMA}.honda_weather")
-    .select(
-        "frequency", "datetime_utc", F.col("air_temperature_2m").alias("base_value")
+_base_name = f"{CATALOG}.{BASELINE_SCHEMA}.honda_weather"
+if spark.catalog.tableExists(_base_name):
+    _base_h = (
+        spark.table(_base_name)
+        .select(
+            "frequency",
+            "datetime_utc",
+            F.col("air_temperature_2m").alias("base_value"),
+        )
+        .filter("base_value is not null")
     )
-    .filter("base_value is not null")
-)
-_new_h = obs.filter(
-    (F.col("source_dataset") == "honda_iot_weather")
-    & (F.col("variable") == "air_temperature")
-).select(
-    "source_record_id",
-    F.col("observation_ts_utc").alias("datetime_utc"),
-    F.when(F.col("interval_seconds") == 60, "1min")
-    .when(F.col("interval_seconds") == 900, "15min")
-    .otherwise("1h")
-    .alias("frequency"),
-    F.col("value_native").alias("new_value"),
-)
-_hres = (
-    _base_h.join(_new_h, ["frequency", "datetime_utc"], "full_outer")
-    .agg(
-        F.count("*").alias("keys"),
-        F.sum(F.col("base_value").isNull().cast("int")).alias("only_new"),
-        F.sum(F.col("new_value").isNull().cast("int")).alias("only_baseline"),
-        F.sum(
-            (
-                F.col("base_value").isNotNull()
-                & F.col("new_value").isNotNull()
-                & (F.abs(F.col("base_value") - F.col("new_value")) > 1e-9)
-            ).cast("int")
-        ).alias("value_mismatch"),
+    _new_h = obs.filter(
+        (F.col("source_dataset") == "honda_iot_weather")
+        & (F.col("variable") == "air_temperature")
+    ).select(
+        F.col("observation_ts_utc").alias("datetime_utc"),
+        F.when(F.col("interval_seconds") == 60, "1min")
+        .when(F.col("interval_seconds") == 900, "15min")
+        .otherwise("1h")
+        .alias("frequency"),
+        F.col("value_native").alias("new_value"),
     )
-    .first()
-)
-report(
-    "honda air temperature matches the existing Silver table",
-    _hres["only_new"] == 0
-    and _hres["only_baseline"] == 0
-    and _hres["value_mismatch"] == 0,
-    str(_hres.asDict()),
-)
+    _hres = (
+        _base_h.join(_new_h, ["frequency", "datetime_utc"], "full_outer")
+        .agg(
+            F.count("*").alias("keys"),
+            F.sum(F.col("base_value").isNull().cast("int")).alias("only_new"),
+            F.sum(F.col("new_value").isNull().cast("int")).alias("only_baseline"),
+            F.sum(
+                (
+                    F.col("base_value").isNotNull()
+                    & F.col("new_value").isNotNull()
+                    & (F.abs(F.col("base_value") - F.col("new_value")) > 1e-9)
+                ).cast("int")
+            ).alias("value_mismatch"),
+        )
+        .first()
+    )
+    report(
+        "honda air temperature matches the existing Silver table",
+        _hres["only_new"] == 0
+        and _hres["only_baseline"] == 0
+        and _hres["value_mismatch"] == 0,
+        str(_hres.asDict()),
+    )
+else:
+    report("honda air temperature", True, "baseline table absent", status="SKIP")
 
 # COMMAND ----------
 

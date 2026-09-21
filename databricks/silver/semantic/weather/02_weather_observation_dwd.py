@@ -48,8 +48,8 @@ SOURCE = "dwd"
 COMPONENT = "silver/semantic/weather/02_weather_observation_dwd"
 RID = run_id()
 
-# Pilot load; list further keys of DWD_TABLES to extend.
-LOAD_TABLES = ["dwd_air_temperature"]
+# All DWD measurement tables; narrow the list to load a subset.
+LOAD_TABLES = list(DWD_TABLES)
 
 STATION_IDS = [
     str(s) for s in load_contract(SOURCE)["conventions"]["station_set"]["ids"]

@@ -50,6 +50,40 @@ STATION_CITY = dict(zip(STATION_IDS, _stations["cities"], strict=True))
 
 # COMMAND ----------
 
+# DBTITLE 1,Configuration -- DWD station city to Bundesland
+CITY_REGION = {
+    "berlin": "Berlin",
+    "hamburg": "Hamburg",
+    "munich": "Bayern",
+    "cologne_bonn": "Nordrhein-Westfalen",
+    "frankfurt_am_main": "Hessen",
+    "stuttgart": "Baden-Wuerttemberg",
+    "essen": "Nordrhein-Westfalen",
+    "leipzig": "Sachsen",
+    "dresden": "Sachsen",
+    "nuremberg": "Bayern",
+    "hannover": "Niedersachsen",
+    "bremen": "Bremen",
+    "potsdam": "Brandenburg",
+    "magdeburg": "Sachsen-Anhalt",
+    "erfurt": "Thueringen",
+    "trier": "Rheinland-Pfalz",
+    "saarbruecken": "Saarland",
+    "kiel": "Schleswig-Holstein",
+    "rostock_warnemuende": "Mecklenburg-Vorpommern",
+    "norderney": "Niedersachsen",
+    "sylt": "Schleswig-Holstein",
+    "garmisch_partenkirchen": "Bayern",
+    "zugspitze": "Bayern",
+    "hohenpeissenberg": "Bayern",
+    "feldberg_schwarzwald": "Baden-Wuerttemberg",
+    "cottbus": "Brandenburg",
+    "goerlitz": "Sachsen",
+    "braunschweig": "Niedersachsen",
+}
+
+# COMMAND ----------
+
 # DBTITLE 1,Session time zone
 ensure_utc_session()
 
@@ -87,18 +121,15 @@ _latest = Window.partitionBy("source_location_id").orderBy(
     F.col("valid_from").desc(),
     F.col("name").asc(),
 )
-_city_xref = read_silver("dwd_city_bundesland_xref").select(
-    "city", F.col("bundesland_name").alias("region")
-)
 _city_lookup = spark.createDataFrame(
-    list(STATION_CITY.items()), "source_location_id string, city_slug string"
+    [(sid, slug, CITY_REGION[slug]) for sid, slug in STATION_CITY.items()],
+    "source_location_id string, city_slug string, region string",
 )
 dwd_locations = (
     dwd_validity.withColumn("_rn", F.row_number().over(_latest))
     .filter(F.col("_rn") == 1)
     .drop("_rn", "valid_from", "valid_to")
     .join(F.broadcast(_city_lookup), "source_location_id", "left")
-    .join(F.broadcast(_city_xref), F.col("city_slug") == F.col("city"), "left")
     .withColumn("city", F.initcap(F.regexp_replace("city_slug", "_", " ")))
     .withColumn("location_role", F.lit("station"))
     .withColumn("country_code", F.lit("DE"))
@@ -193,9 +224,9 @@ write_semantic(
 
 # DBTITLE 1,Transform -- weather_location_validity
 weather_location_validity = conform(
-    add_semantic_provenance(dwd_validity, "dwd", "dwd_station_geography", RID)
-    .withColumn("source_column", F.lit(None).cast("string"))
-    .withColumn(
+    add_semantic_provenance(
+        dwd_validity, "dwd", "dwd_station_geography", RID
+    ).withColumn(
         "source_record_id",
         sha_key(
             "source_location_id", "valid_from", "valid_to", "latitude", "longitude"
