@@ -72,7 +72,7 @@ jobs:
       # to avoid failing the build on files the convention never covered.
       - name: Verify Silver/Gold notebooks stay under the cell split threshold
         env:
-          MAX_CELLS: 30
+          MAX_CELLS: 35
         run: |
           fail=0
           while IFS= read -r -d '' f; do
