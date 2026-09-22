@@ -12,10 +12,9 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** building blocks for the cross-source Silver structures (time
-# MAGIC columns, unit standardisation, place keys, column conformance, per-source
-# MAGIC replace writes). Pulled in with `%run ../_semantic_common` after
-# MAGIC `_silver_common`. Definitions only -- no side effects at import.
+# MAGIC **Purpose:** building blocks for the cross-source Silver structures --
+# MAGIC time columns, place keys, column conformance, per-source replace writes.
+# MAGIC Pulled in with `%run ../_semantic_common` after `_silver_common`.
 
 # COMMAND ----------
 
@@ -23,9 +22,7 @@
 SEMANTIC_SCHEMA = "energy_silver"
 PROJECT_TZ = "Europe/Berlin"
 
-# Provenance columns shared by every semantic structure. Field-level source
-# attribution isn't tracked separately -- source_dataset already identifies
-# exactly which product a row came from.
+# Provenance columns shared by every semantic structure.
 _PROVENANCE_HEAD = [("source_system", "string"), ("source_dataset", "string")]
 _PROVENANCE_TAIL = [
     ("source_record_id", "string"),
@@ -33,9 +30,8 @@ _PROVENANCE_TAIL = [
     ("_silver_run_id", "string"),
 ]
 
-# Every weather structure needs place and time; this is genuinely universal
-# scaffolding, not a measurement-shape decision -- the measurement columns
-# below are designed per family, not shared.
+# Place/time scaffolding shared by every family; measurement columns below
+# are designed per family, not shared.
 _PLACE_HEAD = [
     ("observation_key", "string"),
     ("location_key", "string"),
@@ -59,21 +55,11 @@ _QUALITY_COLUMNS = [
 ]
 _TAIL = [("measurement_basis", "string"), *_PROVENANCE_HEAD, *_PROVENANCE_TAIL]
 
-# One coherent semantic weather family = one Silver structure, designed
-# around what that family's data actually is -- not a shared measurement
-# shape partitioned by a label. The record's grain is (source_system,
-# location, instant) -- ONE row per family per instant, never one row per
-# Bronze source product: where several products report the same field for
-# the same instant, that is a deliberate primary/alternate relationship
-# (an `_alt` array), not extra rows, and where several products report
-# genuinely different, non-competing facts for the same instant (DWD's three
-# wind products), those become entries of a repeated `readings` array on one
-# row, not a `statistic`-tagged row each.
+# One family = one structure, designed per family, not a shared shape.
+# Grain: one row per family per (source_system, location, instant).
 
-# One alternate estimate of a field the primary column already holds:
-# its value, its native form (only populated if the alternate's source needs
-# converting), which product it came from, and that product's own quality
-# code.
+# One alternate estimate of a field's primary value, with its own native
+# form, source and quality code.
 _ALT_READING = (
     "array<struct<value:double,native_value:double,native_unit:string,"
     "source_dataset:string,quality_code:string>>"
@@ -102,8 +88,7 @@ WEATHER_HUMIDITY_COLUMNS = [
     *_TAIL,
 ]
 
-# Native value/unit kept only for AccuWeather (Pa -> hPa); DWD is already
-# hPa, so its native columns stay NULL (no unnecessary conversion recorded).
+# Native value/unit populated only where a source converts (AccuWeather Pa).
 WEATHER_PRESSURE_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -118,11 +103,8 @@ WEATHER_PRESSURE_COLUMNS = [
     *_TAIL,
 ]
 
-# DWD reports wind three genuinely different, non-competing ways at the same
-# station-hour (hourly mean, synoptic instant, hourly max gust); AccuWeather
-# reports one undocumented-statistic reading. One row per instant, one
-# `readings` array entry per statistic actually present -- not one row per
-# product. Already m/s and degrees everywhere, so no native pair is needed.
+# One `readings` array entry per statistic present (mean/instant/max/
+# unspecified), not one row per product. Already m/s and degrees.
 WEATHER_WIND_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -138,8 +120,7 @@ WEATHER_WIND_COLUMNS = [
     *_TAIL,
 ]
 
-# Amount, occurred-flag and form describe one precipitation event (DWD
-# already reports all three in one Bronze row); both sources are already mm.
+# Amount, occurred-flag and form describe one precipitation event.
 WEATHER_PRECIPITATION_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -151,12 +132,7 @@ WEATHER_PRECIPITATION_COLUMNS = [
     *_TAIL,
 ]
 
-# Cloud layers are a genuinely repeated, variably-populated structure (0-4
-# layers depending on sky conditions) -- kept as an array of structs, not
-# flattened into fixed layer_1..layer_4 columns or exploded into long rows.
-# Total cover needs a native pair on both sources (DWD eighths, AccuWeather
-# fraction -- neither is already percent); base height is already metres
-# everywhere.
+# Layers: array of structs (0-4, variably populated), not flat columns.
 WEATHER_CLOUD_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -178,9 +154,7 @@ WEATHER_CLOUD_COLUMNS = [
     *_TAIL,
 ]
 
-# Kept separate from cloud: different physical basis (optical extinction
-# distance vs. okta sky-cover fraction), and DWD keeps them as separate
-# products. Native pair needed for AccuWeather (km -> m); DWD is already m.
+# Separate from cloud: different physical basis (extinction distance).
 WEATHER_VISIBILITY_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -192,8 +166,7 @@ WEATHER_VISIBILITY_COLUMNS = [
     *_TAIL,
 ]
 
-# Purely categorical -- no numeric value/unit columns at all, unlike every
-# other family. DWD only; no other source reports coded weather phenomena.
+# Purely categorical -- no numeric value/unit columns. DWD only.
 WEATHER_PRESENT_WEATHER_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -203,10 +176,8 @@ WEATHER_PRESENT_WEATHER_COLUMNS = [
     *_TAIL,
 ]
 
-# Six depths, always reported together in one DWD row -- a small, fixed,
-# always-jointly-measured set, so flat columns fit better than an array
-# (unlike cloud layers, which vary in how many are populated). DWD only,
-# already degC.
+# Six depths, always reported together -- a fixed set, so flat columns
+# (unlike cloud's variably-populated layers). DWD only.
 WEATHER_SOIL_TEMPERATURE_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -220,14 +191,10 @@ WEATHER_SOIL_TEMPERATURE_COLUMNS = [
     *_TAIL,
 ]
 
-# What was one "solar_radiation" bucket split into five: shortwave radiative
-# flux, longwave radiative flux, sunshine duration, solar geometry and UV
-# index are different physical meanings (a flux, a duration, an angle, an
-# index) that happened to share one DWD product's row, not one family.
+# dwd_solar's one row split by meaning into five families below: flux,
+# longwave flux, duration, geometry and index.
 
-# Shortwave (solar) radiative flux only -- global and diffuse are both
-# sunlight received at the surface. Native pair on both DWD sums (J/cm2 over
-# the interval -> mean W/m2); Honda and AccuWeather are already W/m2.
+# Shortwave flux only (global + diffuse). Native pair on DWD's two sums.
 WEATHER_SOLAR_RADIATION_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -241,10 +208,7 @@ WEATHER_SOLAR_RADIATION_COLUMNS = [
     *_TAIL,
 ]
 
-# Longwave downward radiation is atmospheric/thermal infrared emission, not
-# sunlight -- a different physical process from weather_solar_radiation
-# (occurs at night too), so it stays out of the shortwave-flux structure
-# despite sharing DWD's `dwd_solar` product row. DWD only.
+# Atmospheric infrared, not sunlight -- a different physical process. DWD only.
 WEATHER_LONGWAVE_RADIATION_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -255,11 +219,8 @@ WEATHER_LONGWAVE_RADIATION_COLUMNS = [
     *_TAIL,
 ]
 
-# A duration, not a flux -- genuinely different meaning from radiation.
-# dwd_sun (hourly) and dwd_solar (10-minute) are on different native time
-# grids, so they stay separate rows/instants rather than being forced into
-# one row; that is not source-product fragmentation, it is two genuinely
-# different instants. Already minutes everywhere.
+# A duration, not a flux. dwd_sun (hourly) and dwd_solar (10-min) are
+# different grids, so genuinely separate instants, not fragmentation.
 WEATHER_SUNSHINE_DURATION_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -268,8 +229,7 @@ WEATHER_SUNSHINE_DURATION_COLUMNS = [
     *_TAIL,
 ]
 
-# An astronomical position, not a measurement of atmospheric state -- DWD
-# only.
+# An astronomical position, not an atmospheric measurement. DWD only.
 WEATHER_SOLAR_GEOMETRY_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -287,9 +247,7 @@ WEATHER_UV_INDEX_COLUMNS = [
     *_TAIL,
 ]
 
-# name -> column list, one entry per Silver structure; not a fixed list by
-# design -- these are the families the actual source parameters resolved
-# into (see weather/_weather_specs.py for the per-source mapping).
+# name -> column list, one entry per Silver structure.
 WEATHER_FAMILY_COLUMNS = {
     "weather_temperature": WEATHER_TEMPERATURE_COLUMNS,
     "weather_humidity": WEATHER_HUMIDITY_COLUMNS,
@@ -498,19 +456,11 @@ def _schema_signature(schema) -> set:
 def write_semantic(
     df, table: str, *, source: str, component: str, rid: str, replace_where=None
 ) -> int | None:
-    """Overwrite the table, or with `replace_where` (a SQL predicate on the
-    table's own columns) replace only those rows and leave the rest.
-
-    Delta rejects combining `replaceWhere` with a schema change (it can't
-    both scope the write and migrate the schema at once). When the table's
-    on-disk schema no longer matches `df`'s (an intentional Silver structure
-    change, e.g. a column added/removed/retyped), the rows `replace_where`
-    would leave untouched are read back, conformed onto the new schema, and
-    committed together with the incoming rows in one `overwriteSchema` write
-    -- a single atomic Delta operation, so a failure can't leave the table
-    half migrated. Once the table's schema matches again, later calls take
-    the plain `replaceWhere` path -- this only triggers on an actual
-    structure change, and is a no-op cost otherwise."""
+    """Overwrite the table, or with `replace_where` replace only those rows.
+    On a schema change, rows `replace_where` would leave untouched are
+    conformed onto the new schema and committed with the incoming rows in
+    one atomic write (Delta forbids combining `replaceWhere` with a schema
+    change)."""
     started = now_utc()
     full = semantic_table(table)
     exists = spark.catalog.tableExists(full)
@@ -631,13 +581,10 @@ def dict_to_markdown_row(stats: dict) -> str:
 def reconciliation_stats(
     source_df, kept_df, quarantine_df, *, raw_bronze_df=None
 ) -> dict:
-    """The required proof for the collapse-identical / quarantine-conflicting
-    rule: Bronze input -> exact duplicates collapsed -> conflicts quarantined
-    -> kept rows. `source_df` is the input to `resolve_conflicts()`;
-    `kept_df`/`quarantine_df` are its two outputs. Pass `raw_bronze_df` (the
-    unmodified Bronze read) when `source_df` isn't it -- e.g. DWD filters to
-    a known station set before dedup, so `source_df` alone would
-    understate the true Bronze row count."""
+    """Proof of the collapse-identical / quarantine-conflicting rule: Bronze
+    -> exact duplicates collapsed -> conflicts quarantined -> kept. Pass
+    `raw_bronze_df` when `source_df` (resolve_conflicts' input) is already
+    filtered, so `bronze_rows` reflects the true Bronze count."""
     dedup_input_rows = source_df.count()
     kept_rows = kept_df.count()
     quarantined_rows = quarantine_df.count()

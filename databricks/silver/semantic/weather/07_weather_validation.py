@@ -12,14 +12,9 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** read-only checks of the weather structures: key uniqueness,
-# MAGIC grain uniqueness per instant (the join-based DWD builders must produce
-# MAGIC exactly one row per family per instant, never one per Bronze product),
-# MAGIC place coverage, time-basis consistency (including the DWD legacy-local
-# MAGIC regime), per-family value ranges, and regression against the existing
-# MAGIC source-scoped Silver tables. Cross-family checks run on the shared place/
-# MAGIC time/provenance scaffolding, unioned across every family table written so
-# MAGIC far; per-family checks run against each family's own columns.
+# MAGIC **Purpose:** read-only checks of the weather structures: key and grain
+# MAGIC uniqueness, place coverage, time-basis consistency, per-family value
+# MAGIC ranges, and regression against the existing source-scoped Silver tables.
 
 # COMMAND ----------
 
@@ -73,9 +68,8 @@ COMMON_COLS = [
     "source_record_id",
 ]
 
-# Which family(ies) now cover each DWD raw table's contribution -- used for
-# the key-coverage regression against the old per-table baseline tables. A
-# table can feed more than one family (dwd_moisture feeds three).
+# Which family(ies) cover each DWD raw table's contribution, for the
+# key-coverage regression against the old per-table baseline tables.
 DWD_TABLE_TO_FAMILIES = {
     "dwd_air_temperature": ["weather_temperature", "weather_humidity"],
     "dwd_moisture": ["weather_temperature", "weather_humidity", "weather_pressure"],
@@ -191,9 +185,8 @@ for _fam, _fdf in FAMILY_FRAMES.items():
 # COMMAND ----------
 
 # DBTITLE 1,Check -- one row per (source_system, location, instant) per family (grain, not product)
-# The join-based DWD builders must collapse every contributing product onto
-# one row per instant; a violation here means a product accidentally
-# fragmented the grain instead of landing in an _alt/readings array.
+# A violation means a product fragmented the grain instead of landing in
+# an _alt/readings array.
 for _fam, _fdf in FAMILY_FRAMES.items():
     _dup_grain = (
         _fdf.groupBy("source_system", "location_key", "observation_ts_utc")
@@ -300,9 +293,7 @@ if "weather_wind" in FAMILY_FRAMES:
 
 # DBTITLE 1,Regression -- key coverage per DWD table against the existing Silver tables
 # Retire this cell and the two below with the old source-scoped Silver
-# tables. A raw table's coverage is checked against the union of the
-# family/families it now feeds (it may populate only some of them per row);
-# a missing baseline table is reported SKIP, not FAIL.
+# tables. Missing baseline table -> SKIP, not FAIL.
 for _ds, _families in DWD_TABLE_TO_FAMILIES.items():
     _base_name = f"{CATALOG}.{BASELINE_SCHEMA}.{_ds}"
     if not spark.catalog.tableExists(_base_name):

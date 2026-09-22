@@ -13,26 +13,10 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** one AccuWeather hourly observation per (city, instant) split
-# MAGIC across the family structures its columns belong to, alongside DWD/Honda's
-# MAGIC own rows in each. The metric and imperial hourly tables are two unit
-# MAGIC systems for the *same* underlying observations, not two sources: matched
-# MAGIC (city, instant) pairs are consolidated to one row (the metric side, needing
-# MAGIC no conversion for most fields); the `historical_hourly_imperial`-only
-# MAGIC pairs (58 of 6,550, confirmed by EDA) are not dropped -- they survive as
-# MAGIC their own rows, converted from imperial units. Column names match between
-# MAGIC the two tables except imperial's time column (`date`, here treated as the
-# MAGIC same local instant as metric's `datetime_valid_local` -- EDA found a
-# MAGIC 0-hour alignment shift is the best match) and its missing `gmt_offset`
-# MAGIC (looked up from metric by city, which is per-city constant).
-# MAGIC
-# MAGIC Unit handling is per field, independently: humidity, wind direction,
-# MAGIC cloud cover (fraction in both tables), sunshine minutes and UV index need
-# MAGIC no conversion from either table; temperature/pressure/wind speed-gust/
-# MAGIC precipitation/solar irradiance/cloud base height/visibility are already
-# MAGIC standard from the metric table and converted from the imperial table
-# MAGIC (degF, inHg, mph, in, BTU/(h*ft2), ft, mi respectively -- factors
-# MAGIC confirmed against `src/schemas/profiling/accuweather.md`'s measured
-# MAGIC imperial/metric ratios).
+# MAGIC across its family structures. Metric and imperial are two unit systems
+# MAGIC for the same observations: matched pairs consolidate to the metric row;
+# MAGIC imperial-only pairs survive, converted (factors in `AW_CONVERSION`,
+# MAGIC confirmed against `src/schemas/profiling/accuweather.md`).
 
 # COMMAND ----------
 
@@ -90,10 +74,7 @@ AW_FIELDS = [
 ]
 # field -> (metric_factor, metric_offset, metric_native_unit_or_None,
 #           imperial_factor, imperial_offset, imperial_native_unit_or_None).
-# standard = raw * factor + offset; native tracked only where that source's
-# raw value differs from the standard unit (factors/offsets confirmed
-# against src/schemas/profiling/accuweather.md's measured imperial/metric
-# ratios, or the exact physical constant where the ratio is a round one).
+# standard = raw * factor + offset.
 AW_CONVERSION = {
     "temperature": (1.0, 0.0, None, 5 / 9, -160 / 9, "degF"),
     "temperature_dew_point": (1.0, 0.0, None, 5 / 9, -160 / 9, "degF"),
@@ -128,9 +109,7 @@ imperial_src = spark.table(IMPERIAL_TABLE).withColumnRenamed(
 # COMMAND ----------
 
 # DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts (per table)
-# Every non-key column each table actually has, not just the AW_FIELDS this
-# notebook happens to consume -- a conflict in an unused column (e.g.
-# temperature_realfeel) must still be detected, not silently ignored.
+# Every non-key column each table has, not just the AW_FIELDS consumed below.
 _metric_content_cols = [c for c in metric_src.columns if c not in AW_KEY]
 _imperial_content_cols = [c for c in imperial_src.columns if c not in AW_KEY]
 

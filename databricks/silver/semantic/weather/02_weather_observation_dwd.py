@@ -12,29 +12,11 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** every DWD product built into the family-specific Silver
-# MAGIC structures its columns belong to, one row per (station, instant) per
-# MAGIC family -- never one row per Bronze product. Where several DWD products
-# MAGIC report the same field for the same instant (e.g. three air-temperature
-# MAGIC products), that is a deliberate primary/alternate relationship, kept as
-# MAGIC an `_alt` array on one row, not extra rows; where several products
-# MAGIC report different, non-competing facts for the same instant (DWD's three
-# MAGIC wind products), those become entries of one `readings` array. Products on
-# MAGIC different native time grids (dwd_sun hourly vs dwd_solar 10-minute) stay
-# MAGIC separate rows, since those are genuinely different instants, not
-# MAGIC fragmentation.
-# MAGIC
-# MAGIC `dwd_solar`'s row (longwave/diffuse/global/sunshine/zenith together) is
-# MAGIC split across weather_solar_radiation (shortwave flux only), the separate
-# MAGIC weather_longwave_radiation (atmospheric infrared, not sunlight),
-# MAGIC weather_sunshine_duration and weather_solar_geometry -- different
-# MAGIC physical meanings that happened to share one product's row.
-# MAGIC
-# MAGIC DWD's native time convention is not a blanket UTC: IANA's own
-# MAGIC Europe/Berlin table encodes the pre-1893 local-mean-time era and the 1945
-# MAGIC Hochsommerzeit as well as ordinary CET/CEST, so `_dwd_time()` derives
-# MAGIC `observation_ts_utc`/`observation_ts_project` per the regime each instant
-# MAGIC actually falls in, not a fixed assumption for the whole history.
+# MAGIC **Purpose:** each DWD product built into its family-specific Silver
+# MAGIC structures, one row per (station, instant) per family. Same-instant
+# MAGIC products become an `_alt` array (competing) or a `readings` array
+# MAGIC (non-competing), never extra rows. `dwd_solar` splits by meaning across
+# MAGIC four families. `_dwd_time()` handles DWD's non-blanket-UTC history.
 
 # COMMAND ----------
 
@@ -77,9 +59,7 @@ _KEY_COLS = ("STATIONS_ID", "city", "MESS_DATUM", "eor")
 # (fog etc, no cover reading possible). Neither is a real eighths value.
 _CLOUD_COVER_SENTINELS = (-1.0, 9.0)
 
-# table -> reconciliation_stats(), filled in by _prep(); exported as findings
-# proof of the dedup/conflict rule (Bronze -> exact dupes collapsed ->
-# conflicts quarantined -> kept), not just a final duplicate_keys=0 check.
+# table -> reconciliation_stats(), filled in by _prep(); exported as findings.
 RECONCILIATION = {}
 
 # COMMAND ----------
@@ -93,18 +73,22 @@ ensure_utc_session()
 
 
 def _prep(table: str):
-    """Bronze -> cleaned rows for one DWD product: sentinel stripping, then
-    the standard collapse-identical / quarantine-conflicting rule on the
-    product's own (STATIONS_ID, MESS_DATUM) key, scoped to this one source
-    table (never compared across products)."""
+    """Bronze -> cleaned rows: sentinels stripped, then collapse-identical /
+    quarantine-conflicting on (STATIONS_ID, MESS_DATUM), per product."""
     meta = DWD_TABLES[table]
     qn = meta["qn"]
     bronze_df = read_bronze(table)
     data_cols = [c for c in bronze_df.columns if c not in _KEY_COLS and c != qn]
 
-    df = bronze_df.withColumn(
-        "STATIONS_ID", F.regexp_replace(F.trim(F.col("STATIONS_ID")), r"\.0$", "")
-    ).filter(F.col("STATIONS_ID").isin(STATION_IDS))
+    df = (
+        bronze_df.withColumn(
+            "STATIONS_ID", F.regexp_replace(F.trim(F.col("STATIONS_ID")), r"\.0$", "")
+        )
+        .withColumn(
+            "MESS_DATUM", F.regexp_replace(F.trim(F.col("MESS_DATUM")), r"\.0$", "")
+        )
+        .filter(F.col("STATIONS_ID").isin(STATION_IDS))
+    )
     df = strip_sentinels(df, [*data_cols, qn])
     kept, q = resolve_conflicts(
         df, ["STATIONS_ID", "MESS_DATUM"], data_cols, qn_col=qn, bronze_table=table
@@ -120,14 +104,10 @@ def _prep(table: str):
 
 
 def _dwd_time(native_ts_col):
-    """`native_ts_col` naively parsed as UTC holds for ordinary CET/CEST
-    (offset +1/+2 vs IANA Europe/Berlin, ~99.99% of rows). Era classification
-    from that naive parse is still date-accurate (regime boundaries are
-    calendar dates, not intra-day), so for any other IANA-derived offset
-    (pre-1893 local mean time ~+0.891h, 1945 Hochsommerzeit +3h) the native
-    value is re-interpreted as the local/project reading it actually is, and
-    true UTC is backed out by that same offset. Returns
-    (observation_ts_utc, observation_ts_project, time_basis)."""
+    """As-UTC holds for CET/CEST (offset +1/+2, ~99.99% of rows). Other IANA
+    offsets (pre-1893 LMT ~0.891h, 1945 Hochsommerzeit 3h) mean the native
+    value is local time, not UTC; true UTC = native - that offset.
+    Returns (observation_ts_utc, observation_ts_project, time_basis)."""
     utc_naive = native_ts_col
     project_naive = F.from_utc_timestamp(utc_naive, PROJECT_TZ)
     offset_h = (project_naive.cast("long") - utc_naive.cast("long")) / 3600.0
@@ -182,11 +162,8 @@ def _scaffold(df, *, family: str, parse, qn_col: str, had_conflict_col: str):
 
 
 def _join_on_instant(prepped: dict):
-    """Full outer join hourly DWD products sharing the (STATIONS_ID,
-    MESS_DATUM) grid into one row per instant; each table's non-key columns
-    are prefixed with its table name so multiple products' fields coexist
-    without collision. The family record's grain is the instant, not the
-    Bronze product -- fixes source-product-driven row fragmentation."""
+    """Full outer join on (STATIONS_ID, MESS_DATUM); non-key columns
+    prefixed by table name to avoid collisions."""
     joined = None
     for table, df in prepped.items():
         prefixed = df.select(
@@ -212,10 +189,8 @@ def _join_on_instant(prepped: dict):
 
 
 def _alt_array(*entries):
-    """One `_ALT_READING`-shaped array entry per populated alternate.
-    `entries` items are (value, source_dataset, quality_code) or, where the
-    alternate needs a unit conversion, (value, source_dataset, quality_code,
-    native_value, native_unit)."""
+    """One array entry per populated alternate: (value, source_dataset,
+    quality_code[, native_value, native_unit])."""
     structs = []
     for e in entries:
         value, source_dataset, quality_code = e[0], e[1], e[2]
@@ -793,10 +768,8 @@ for fam_dict in built:
 # COMMAND ----------
 
 # DBTITLE 1,Write Silver -- one write per family, unioning every contributing builder
-# Each contribution still carries its own raw source columns (e.g. dwd_sun's
-# QN_7 vs dwd_solar's QN_592) -- conform to the family's own schema per
-# contribution before unioning, not after, or unionByName fails on the
-# mismatched raw columns.
+# Conform each contribution to the family schema before unioning -- each
+# still carries its own raw source columns (e.g. QN_7 vs QN_592).
 for fam, frames in per_family.items():
     conformed = [conform(f, WEATHER_FAMILY_COLUMNS[fam]) for f in frames]
     combined = conformed[0]

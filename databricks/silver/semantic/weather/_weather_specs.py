@@ -13,11 +13,8 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** shared constants for the DWD/Honda/AccuWeather notebooks --
-# MAGIC per-table read metadata, code/label maps, and the unit-conversion factors
-# MAGIC used by more than one family builder. The family record shape and the
-# MAGIC source-column -> family-column mapping live in each notebook, next to the
-# MAGIC read of that source, not here. Pulled in with `%run ./_weather_specs`
-# MAGIC after `_semantic_common`. Definitions only.
+# MAGIC per-table read metadata, code/label maps, unit-conversion factors used by
+# MAGIC more than one builder. Pulled in with `%run ./_weather_specs`.
 
 # COMMAND ----------
 
@@ -53,10 +50,5 @@ HONDA_INTERVAL_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 # COMMAND ----------
 
 # DBTITLE 1,Unit-conversion factors used by more than one family builder
-# eighths (okta) -> percent; used by weather_cloud for both total cover and
-# per-layer cover (DWD is the only eighths-native source).
-EIGHTHS_TO_PERCENT = 12.5
-# J/cm2 summed over an interval -> mean W/m2: 10000 J/m2 per J/cm2, divided by
-# the interval in seconds; used by weather_solar_radiation for DWD's three
-# radiation sums.
-J_CM2_TO_W_M2 = 10000.0
+EIGHTHS_TO_PERCENT = 12.5  # eighths (okta) -> percent
+J_CM2_TO_W_M2 = 10000.0  # J/cm2 summed over an interval -> mean W/m2, / seconds
