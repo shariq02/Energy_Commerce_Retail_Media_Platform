@@ -13,14 +13,13 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** read-only checks of the weather structures: key uniqueness,
-# MAGIC place coverage, time consistency, per-family value ranges, and regression
-# MAGIC against the existing source-scoped Silver tables. Family tables have their
-# MAGIC own designed measurement columns, but all share the same place/time/
-# MAGIC provenance scaffolding -- cross-family checks (key uniqueness, location
-# MAGIC coverage, row counts, the UTC offset check) run on that common projection,
-# MAGIC unioned across every family table written so far; per-family checks
-# MAGIC (value ranges, primary-field agreement) run against each family's own
-# MAGIC columns.
+# MAGIC grain uniqueness per instant (the join-based DWD builders must produce
+# MAGIC exactly one row per family per instant, never one per Bronze product),
+# MAGIC place coverage, time-basis consistency (including the DWD legacy-local
+# MAGIC regime), per-family value ranges, and regression against the existing
+# MAGIC source-scoped Silver tables. Cross-family checks run on the shared place/
+# MAGIC time/provenance scaffolding, unioned across every family table written so
+# MAGIC far; per-family checks run against each family's own columns.
 
 # COMMAND ----------
 
@@ -73,6 +72,32 @@ COMMON_COLS = [
     "source_dataset",
     "source_record_id",
 ]
+
+# Which family(ies) now cover each DWD raw table's contribution -- used for
+# the key-coverage regression against the old per-table baseline tables. A
+# table can feed more than one family (dwd_moisture feeds three).
+DWD_TABLE_TO_FAMILIES = {
+    "dwd_air_temperature": ["weather_temperature", "weather_humidity"],
+    "dwd_moisture": ["weather_temperature", "weather_humidity", "weather_pressure"],
+    "dwd_dew_point": ["weather_temperature"],
+    "dwd_pressure": ["weather_pressure"],
+    "dwd_precipitation": ["weather_precipitation"],
+    "dwd_sun": ["weather_sunshine_duration"],
+    "dwd_wind": ["weather_wind"],
+    "dwd_wind_synop": ["weather_wind"],
+    "dwd_extreme_wind": ["weather_wind"],
+    "dwd_visibility": ["weather_visibility"],
+    "dwd_cloudiness": ["weather_cloud"],
+    "dwd_cloud_type": ["weather_cloud"],
+    "dwd_weather_phenomena": ["weather_present_weather"],
+    "dwd_soil_temperature": ["weather_soil_temperature"],
+    "dwd_solar": [
+        "weather_solar_radiation",
+        "weather_longwave_radiation",
+        "weather_solar_geometry",
+        "weather_sunshine_duration",
+    ],
+}
 
 # Check results and result tables, exported to the findings file at the end.
 CHECK_RESULTS = []
@@ -145,10 +170,16 @@ keep(
     )
     .orderBy("source_system", "source_dataset"),
 )
-LOADED_DATASETS = {
-    r["source_dataset"]
-    for r in obs_common.select("source_dataset").distinct().collect()
-}
+
+# COMMAND ----------
+
+# DBTITLE 1,Check -- rows by time_basis (DWD legacy-local regime visible, not hidden as 'utc')
+keep(
+    "rows by time_basis",
+    obs_common.groupBy("source_system", "time_basis")
+    .agg(F.count("*").alias("rows"))
+    .orderBy("source_system", "time_basis"),
+)
 
 # COMMAND ----------
 
@@ -156,6 +187,25 @@ LOADED_DATASETS = {
 for _fam, _fdf in FAMILY_FRAMES.items():
     _dup = _fdf.groupBy("observation_key").count().filter("count > 1").count()
     report(f"{_fam} observation_key unique", _dup == 0, f"duplicate keys: {_dup}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Check -- one row per (source_system, location, instant) per family (grain, not product)
+# The join-based DWD builders must collapse every contributing product onto
+# one row per instant; a violation here means a product accidentally
+# fragmented the grain instead of landing in an _alt/readings array.
+for _fam, _fdf in FAMILY_FRAMES.items():
+    _dup_grain = (
+        _fdf.groupBy("source_system", "location_key", "observation_ts_utc")
+        .count()
+        .filter("count > 1")
+        .count()
+    )
+    report(
+        f"{_fam} one row per (source, location, instant)",
+        _dup_grain == 0,
+        f"groups with >1 row: {_dup_grain}",
+    )
 
 # COMMAND ----------
 
@@ -174,25 +224,7 @@ report(
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- each family's primary-flagged fields are unique on their natural grain
-_PRIMARY_GRAIN = ["source_system", "location_key", "observation_ts_utc"]
-for _fam, _fdf in FAMILY_FRAMES.items():
-    _flag_cols = [c for c in _fdf.columns if c.endswith("_is_primary")]
-    for _flag in _flag_cols:
-        _dups = (
-            _fdf.filter(F.col(_flag))
-            .groupBy(*_PRIMARY_GRAIN)
-            .count()
-            .filter("count > 1")
-            .count()
-        )
-        report(
-            f"{_fam}.{_flag} unique on natural grain", _dups == 0, f"groups: {_dups}"
-        )
-
-# COMMAND ----------
-
-# DBTITLE 1,Check -- project time offset from UTC is +1 or +2 hours (Europe/Berlin)
+# DBTITLE 1,Check -- project time offset from UTC, by time_basis (Europe/Berlin)
 offsets = (
     obs_common.filter(
         F.col("observation_ts_utc").isNotNull() & (F.col("source_system") == "dwd")
@@ -205,10 +237,10 @@ offsets = (
         )
         / 3600,
     )
-    .groupBy("offset_h")
+    .groupBy("time_basis", "offset_h")
     .count()
 )
-keep("project time offset from UTC (DWD, hours)", offsets)
+keep("project time offset from UTC by time_basis (DWD, hours)", offsets)
 
 # COMMAND ----------
 
@@ -241,19 +273,56 @@ for _fam, _fdf in FAMILY_FRAMES.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,Check -- weather_wind readings (array, not a scalar column -- own check)
+if "weather_wind" in FAMILY_FRAMES:
+    _wind_readings = (
+        FAMILY_FRAMES["weather_wind"]
+        .select("source_system", F.explode("readings").alias("r"))
+        .select(
+            "source_system",
+            F.col("r.statistic").alias("statistic"),
+            F.col("r.wind_speed_m_per_s").alias("wind_speed_m_per_s"),
+            F.col("r.wind_gust_m_per_s").alias("wind_gust_m_per_s"),
+        )
+    )
+    keep(
+        "weather_wind readings by statistic and source",
+        _wind_readings.groupBy("source_system", "statistic").agg(
+            F.count("*").alias("rows"),
+            F.min("wind_speed_m_per_s").alias("min_speed"),
+            F.max("wind_speed_m_per_s").alias("max_speed"),
+            F.min("wind_gust_m_per_s").alias("min_gust"),
+            F.max("wind_gust_m_per_s").alias("max_gust"),
+        ),
+    )
+
+# COMMAND ----------
+
 # DBTITLE 1,Regression -- key coverage per DWD table against the existing Silver tables
-# Retire this cell and the two below with the old source-scoped Silver tables;
+# Retire this cell and the two below with the old source-scoped Silver
+# tables. A raw table's coverage is checked against the union of the
+# family/families it now feeds (it may populate only some of them per row);
 # a missing baseline table is reported SKIP, not FAIL.
-for _ds in [d for d in DWD_TABLES if d in LOADED_DATASETS]:
+for _ds, _families in DWD_TABLE_TO_FAMILIES.items():
     _base_name = f"{CATALOG}.{BASELINE_SCHEMA}.{_ds}"
     if not spark.catalog.tableExists(_base_name):
         report(f"{_ds} key coverage", True, "baseline table absent", status="SKIP")
         continue
-    _new = (
-        obs_common.filter(F.col("source_dataset") == _ds)
+    _present_families = [f for f in _families if f in FAMILY_FRAMES]
+    if not _present_families:
+        report(f"{_ds} key coverage", True, "not written yet", status="SKIP")
+        continue
+    _new_frames = [
+        FAMILY_FRAMES[f]
+        .filter(F.col("source_system") == "dwd")
         .select("source_location_id", "observation_ts_utc")
         .distinct()
-    )
+        for f in _present_families
+    ]
+    _new = _new_frames[0]
+    for _extra in _new_frames[1:]:
+        _new = _new.union(_extra)
+    _new = _new.distinct()
     _base = (
         spark.table(_base_name)
         .select(
@@ -266,7 +335,7 @@ for _ds in [d for d in DWD_TABLES if d in LOADED_DATASETS]:
     _only_new = _new.join(_base, _keys, "left_anti").count()
     _only_base = _base.join(_new, _keys, "left_anti").count()
     report(
-        f"{_ds} key coverage",
+        f"{_ds} key coverage (via {', '.join(_present_families)})",
         _only_new == 0,
         f"only_new={_only_new} baseline_only={_only_base} (all-null baseline rows)",
     )
@@ -287,10 +356,7 @@ if spark.catalog.tableExists(_base_name) and "weather_temperature" in FAMILY_FRA
     )
     _new_dwd = (
         FAMILY_FRAMES["weather_temperature"]
-        .filter(
-            (F.col("source_dataset") == "dwd_air_temperature")
-            & F.col("air_temperature_is_primary")
-        )
+        .filter(F.col("source_system") == "dwd")
         .select(
             "source_location_id",
             F.col("observation_ts_utc").alias("observation_ts"),
@@ -377,22 +443,26 @@ else:
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- primary vs alternate DWD air temperature agreement
+# DBTITLE 1,Check -- primary vs alternate DWD air temperature agreement (array-based)
 if "weather_temperature" in FAMILY_FRAMES:
     _t = FAMILY_FRAMES["weather_temperature"].filter(F.col("source_system") == "dwd")
-    _p = _t.filter("air_temperature_is_primary").select(
+    _alt = _t.select(
+        "location_key",
+        "observation_ts_utc",
+        F.explode("air_temperature_alt").alias("a"),
+    ).select(
+        "location_key",
+        "observation_ts_utc",
+        F.col("a.value").alias("alt_value"),
+    )
+    _p = _t.filter(F.col("air_temperature_degc").isNotNull()).select(
         "location_key",
         "observation_ts_utc",
         F.col("air_temperature_degc").alias("primary_value"),
     )
-    _a = _t.filter("air_temperature_is_primary = false").select(
-        "location_key",
-        "observation_ts_utc",
-        F.col("air_temperature_degc").alias("alt_value"),
-    )
     keep(
         "primary vs alternate DWD air temperature agreement",
-        _p.join(_a, ["location_key", "observation_ts_utc"]).agg(
+        _p.join(_alt, ["location_key", "observation_ts_utc"]).agg(
             F.count("*").alias("pairs"),
             F.avg(
                 (F.abs(F.col("primary_value") - F.col("alt_value")) < 1e-9).cast("int")

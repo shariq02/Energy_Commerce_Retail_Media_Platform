@@ -53,12 +53,27 @@ ensure_utc_session()
 
 # COMMAND ----------
 
+# DBTITLE 1,One-time cleanup -- stale rows from before DERIVED_FROM was renamed
+# This notebook wrote weather_daily rows labelled source_dataset =
+# 'weather_observation' before that table was split by family; the rename to
+# 'weather_temperature' left those rows behind (replaceWhere only touches the
+# current label). No-op once the stale rows are gone.
+_stale_table = semantic_table("weather_daily")
+if spark.catalog.tableExists(_stale_table):
+    spark.sql(
+        f"DELETE FROM {_stale_table} "
+        f"WHERE source_system = '{SOURCE}' AND source_dataset = 'weather_observation'"
+    )
+
+# COMMAND ----------
+
 # DBTITLE 1,Read Silver -- primary hourly air temperature
+# air_temperature_degc is already the unambiguous primary value (alternates
+# live in air_temperature_alt, not extra rows), so no is_primary filter.
 hourly_temperature = (
     spark.table(semantic_table(DERIVED_FROM))
     .filter(
         (F.col("source_system") == SOURCE)
-        & F.col("air_temperature_is_primary")
         & F.col("air_temperature_degc").isNotNull()
         & F.col("local_date").isNotNull()
     )

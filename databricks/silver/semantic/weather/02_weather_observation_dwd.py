@@ -12,19 +12,29 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** each DWD measurement table built into the family-specific
-# MAGIC Silver structures its columns actually belong to (a table may feed more
-# MAGIC than one family, e.g. `dwd_moisture` feeds temperature, humidity and
-# MAGIC pressure). Each family builder produces that family's own designed
-# MAGIC record shape directly -- no shared generic row model. Loads the tables
-# MAGIC listed in `LOAD_TABLES`.
+# MAGIC **Purpose:** every DWD product built into the family-specific Silver
+# MAGIC structures its columns belong to, one row per (station, instant) per
+# MAGIC family -- never one row per Bronze product. Where several DWD products
+# MAGIC report the same field for the same instant (e.g. three air-temperature
+# MAGIC products), that is a deliberate primary/alternate relationship, kept as
+# MAGIC an `_alt` array on one row, not extra rows; where several products
+# MAGIC report different, non-competing facts for the same instant (DWD's three
+# MAGIC wind products), those become entries of one `readings` array. Products on
+# MAGIC different native time grids (dwd_sun hourly vs dwd_solar 10-minute) stay
+# MAGIC separate rows, since those are genuinely different instants, not
+# MAGIC fragmentation.
 # MAGIC
-# MAGIC Folds in two corrections identified during the first run: the DWD solar
-# MAGIC product's radiation components are hourly sums (3600 s, not 600 s -- the
-# MAGIC 600 s conversion put peak global radiation at 8167 W/m2, implausible for
-# MAGIC this latitude; 3600 s gives 1361 W/m2, at the solar constant); and cloud
-# MAGIC cover codes -1 and 9 are both non-measurement sentinels (sky obscured /
-# MAGIC not observable), for the total and every layer.
+# MAGIC `dwd_solar`'s row (longwave/diffuse/global/sunshine/zenith together) is
+# MAGIC split across weather_solar_radiation (shortwave flux only), the separate
+# MAGIC weather_longwave_radiation (atmospheric infrared, not sunlight),
+# MAGIC weather_sunshine_duration and weather_solar_geometry -- different
+# MAGIC physical meanings that happened to share one product's row.
+# MAGIC
+# MAGIC DWD's native time convention is not a blanket UTC: IANA's own
+# MAGIC Europe/Berlin table encodes the pre-1893 local-mean-time era and the 1945
+# MAGIC Hochsommerzeit as well as ordinary CET/CEST, so `_dwd_time()` derives
+# MAGIC `observation_ts_utc`/`observation_ts_project` per the regime each instant
+# MAGIC actually falls in, not a fixed assumption for the whole history.
 
 # COMMAND ----------
 
@@ -58,9 +68,6 @@ SOURCE = "dwd"
 COMPONENT = "silver/semantic/weather/02_weather_observation_dwd"
 RID = run_id()
 
-# All DWD measurement tables; narrow the list to load a subset.
-LOAD_TABLES = list(DWD_TABLES)
-
 STATION_IDS = [
     str(s) for s in load_contract(SOURCE)["conventions"]["station_set"]["ids"]
 ]
@@ -77,10 +84,14 @@ ensure_utc_session()
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- read and clean one DWD table (shared by every family builder)
+# DBTITLE 1,Helper -- read, dedupe and conflict-resolve one DWD table (per-source rule)
 
 
 def _prep(table: str):
+    """Bronze -> cleaned rows for one DWD product: sentinel stripping, then
+    the standard collapse-identical / quarantine-conflicting rule on the
+    product's own (STATIONS_ID, MESS_DATUM) key, scoped to this one source
+    table (never compared across products)."""
     meta = DWD_TABLES[table]
     qn = meta["qn"]
     bronze_df = read_bronze(table)
@@ -90,375 +101,540 @@ def _prep(table: str):
         "STATIONS_ID", F.regexp_replace(F.trim(F.col("STATIONS_ID")), r"\.0$", "")
     ).filter(F.col("STATIONS_ID").isin(STATION_IDS))
     df = strip_sentinels(df, [*data_cols, qn])
-    df, _conflicts = resolve_conflicts(
+    df, q = resolve_conflicts(
         df, ["STATIONS_ID", "MESS_DATUM"], data_cols, qn_col=qn, bronze_table=table
     )
+    write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
     return df, meta
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- place, time, quality and provenance (shared by every family builder)
+# DBTITLE 1,Helper -- DWD time: not a blanket UTC assumption
 
 
-def _scaffold(df, table: str, meta: dict):
-    qn = meta["qn"]
-    parse = parse_mess_datum if meta["time"] == "hourly" else parse_mess_datum_10min
-    qn_code = F.regexp_replace(F.trim(F.col(qn)), r"\.0$", "")
+def _dwd_time(native_ts_col):
+    """`native_ts_col` naively parsed as UTC holds for ordinary CET/CEST
+    (offset +1/+2 vs IANA Europe/Berlin, ~99.99% of rows). Era classification
+    from that naive parse is still date-accurate (regime boundaries are
+    calendar dates, not intra-day), so for any other IANA-derived offset
+    (pre-1893 local mean time ~+0.891h, 1945 Hochsommerzeit +3h) the native
+    value is re-interpreted as the local/project reading it actually is, and
+    true UTC is backed out by that same offset. Returns
+    (observation_ts_utc, observation_ts_project, time_basis)."""
+    utc_naive = native_ts_col
+    project_naive = F.from_utc_timestamp(utc_naive, PROJECT_TZ)
+    offset_h = (project_naive.cast("long") - utc_naive.cast("long")) / 3600.0
+    standard = offset_h.isin(1.0, 2.0)
+    utc = F.when(standard, utc_naive).otherwise(
+        (utc_naive.cast("long") - (offset_h * 3600).cast("long")).cast("timestamp")
+    )
+    project = F.when(standard, project_naive).otherwise(utc_naive)
+    time_basis = F.when(standard, F.lit("utc")).otherwise(F.lit("dwd_legacy_local"))
+    return utc, project, time_basis
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- place, time, quality (shared shape; source_dataset/provenance is per family)
+
+
+def _scaffold(df, *, family: str, parse, qn_col: str, had_conflict_col: str):
+    qn_code = F.regexp_replace(F.trim(F.col(qn_col)), r"\.0$", "")
     qn_labels = F.create_map([F.lit(x) for kv in DWD_QN_LABELS.items() for x in kv])
+    utc, project, time_basis = _dwd_time(parse("MESS_DATUM"))
 
-    out = (
+    return (
         df.withColumn("source_location_id", F.col("STATIONS_ID"))
         .withColumn("location_key", location_key(SOURCE, "source_location_id"))
         .withColumn("observation_ts_native", F.trim(F.col("MESS_DATUM")))
-        .withColumn("time_basis", F.lit("utc"))
-        .withColumn("observation_ts_utc", parse("MESS_DATUM"))
+        .withColumn("time_basis", time_basis)
+        .withColumn("observation_ts_utc", utc)
+        .withColumn("observation_ts_project", project)
+        .withColumn("local_date", F.to_date(project))
         .withColumn("quality_code", qn_code)
         .withColumn("quality_label", qn_labels[qn_code])
         .withColumn(
             "quality_flag",
-            F.when(F.col("_had_key_conflict"), "key_conflict_resolved").when(
+            F.when(F.col(had_conflict_col), "key_conflict_resolved").when(
                 qn_code.isNull(), "qn_missing"
             ),
         )
         .withColumn("measurement_basis", F.lit("station_observation"))
         .withColumn(
-            "source_record_id", sha_key(F.lit(table), "STATIONS_ID", "MESS_DATUM")
+            "source_record_id", sha_key(F.lit(family), "STATIONS_ID", "MESS_DATUM")
         )
         .withColumn(
-            "observation_key", sha_key(F.lit(table), "STATIONS_ID", "MESS_DATUM")
+            "observation_key", sha_key(F.lit(family), "STATIONS_ID", "MESS_DATUM")
         )
     )
-    out = add_project_time(out)
-    return add_semantic_provenance(out, SOURCE, table, RID)
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_air_temperature (TT_TU, RF_TU: both primary)
+# DBTITLE 1,Helper -- full outer join several DWD products onto one instant
 
 
-def build_air_temperature():
-    df, meta = _prep("dwd_air_temperature")
-    df = _scaffold(df, "dwd_air_temperature", meta)
-    temperature = any_present(
-        df.withColumn("air_temperature_degc", F.col("TT_TU").cast("double")).withColumn(
-            "air_temperature_is_primary", F.lit(True)
-        ),
-        ["air_temperature_degc"],
-    )
-    humidity = any_present(
-        df.withColumn(
-            "relative_humidity_percent", F.col("RF_TU").cast("double")
-        ).withColumn("relative_humidity_is_primary", F.lit(True)),
-        ["relative_humidity_percent"],
-    )
-    return {"weather_temperature": temperature, "weather_humidity": humidity}
+def _join_on_instant(prepped: dict):
+    """Full outer join hourly DWD products sharing the (STATIONS_ID,
+    MESS_DATUM) grid into one row per instant; each table's non-key columns
+    are prefixed with its table name so multiple products' fields coexist
+    without collision. The family record's grain is the instant, not the
+    Bronze product -- fixes source-product-driven row fragmentation."""
+    joined = None
+    for table, df in prepped.items():
+        prefixed = df.select(
+            "STATIONS_ID",
+            "MESS_DATUM",
+            *[
+                F.col(c).alias(f"{table}__{c}")
+                for c in df.columns
+                if c not in ("STATIONS_ID", "MESS_DATUM")
+            ],
+        )
+        joined = (
+            prefixed
+            if joined is None
+            else joined.join(prefixed, ["STATIONS_ID", "MESS_DATUM"], "full_outer")
+        )
+    return joined
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_moisture (temperature/humidity alts + pressure alt)
+# DBTITLE 1,Helper -- alternate-reading array (primary/alt is a deliberate relationship, not a row)
 
 
-def build_moisture():
-    df, meta = _prep("dwd_moisture")
-    df = _scaffold(df, "dwd_moisture", meta)
-    temperature = any_present(
-        df.withColumn("air_temperature_degc", F.col("TT_STD").cast("double"))
-        .withColumn("air_temperature_is_primary", F.lit(False))
-        .withColumn("dew_point_temperature_degc", F.col("TD_STD").cast("double"))
-        .withColumn("dew_point_temperature_is_primary", F.lit(False))
-        .withColumn("wet_bulb_temperature_degc", F.col("TF_STD").cast("double")),
+def _alt_array(*entries):
+    """One `_ALT_READING`-shaped array entry per populated alternate.
+    `entries` items are (value, source_dataset, quality_code) or, where the
+    alternate needs a unit conversion, (value, source_dataset, quality_code,
+    native_value, native_unit)."""
+    structs = []
+    for e in entries:
+        value, source_dataset, quality_code = e[0], e[1], e[2]
+        native_value = e[3] if len(e) > 3 else F.lit(None).cast("double")
+        native_unit = e[4] if len(e) > 4 else F.lit(None).cast("string")
+        s = F.struct(
+            value.alias("value"),
+            native_value.alias("native_value"),
+            native_unit.alias("native_unit"),
+            source_dataset.alias("source_dataset"),
+            quality_code.alias("quality_code"),
+        )
+        structs.append(F.when(value.isNotNull(), s))
+    return F.filter(F.array(*structs), lambda x: x.isNotNull())
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- keep a row if any of its scalar or array fields is populated
+
+
+def _keep_if_populated(df, fields: list):
+    cond = F.lit(False)
+    for name in fields:
+        col = F.col(name)
+        cond = cond | (
+            (F.size(col) > 0)
+            if name.endswith(("_alt", "layers", "readings"))
+            else col.isNotNull()
+        )
+    return df.filter(cond)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Family builder -- weather_temperature (join: air_temperature, moisture, dew_point)
+
+
+def build_temperature():
+    at_df, at_meta = _prep("dwd_air_temperature")
+    mo_df, mo_meta = _prep("dwd_moisture")
+    dp_df, dp_meta = _prep("dwd_dew_point")
+    joined = _join_on_instant(
+        {"dwd_air_temperature": at_df, "dwd_moisture": mo_df, "dwd_dew_point": dp_df}
+    )
+    row = _scaffold(
+        joined,
+        family="weather_temperature",
+        parse=parse_mess_datum,
+        qn_col=f"dwd_air_temperature__{at_meta['qn']}",
+        had_conflict_col="dwd_air_temperature___had_key_conflict",
+    )
+
+    mo_q = F.col(f"dwd_moisture__{mo_meta['qn']}")
+    dp_q = F.col(f"dwd_dew_point__{dp_meta['qn']}")
+    row = (
+        row.withColumn(
+            "air_temperature_degc", F.col("dwd_air_temperature__TT_TU").cast("double")
+        )
+        .withColumn(
+            "air_temperature_alt",
+            _alt_array(
+                (
+                    F.col("dwd_moisture__TT_STD").cast("double"),
+                    F.lit("dwd_moisture"),
+                    mo_q,
+                ),
+                (
+                    F.col("dwd_dew_point__TT").cast("double"),
+                    F.lit("dwd_dew_point"),
+                    dp_q,
+                ),
+            ),
+        )
+        .withColumn(
+            "dew_point_temperature_degc", F.col("dwd_dew_point__TD").cast("double")
+        )
+        .withColumn(
+            "dew_point_temperature_alt",
+            _alt_array(
+                (
+                    F.col("dwd_moisture__TD_STD").cast("double"),
+                    F.lit("dwd_moisture"),
+                    mo_q,
+                ),
+            ),
+        )
+        .withColumn(
+            "wet_bulb_temperature_degc", F.col("dwd_moisture__TF_STD").cast("double")
+        )
+    )
+    row = _keep_if_populated(
+        row,
         [
             "air_temperature_degc",
+            "air_temperature_alt",
             "dew_point_temperature_degc",
+            "dew_point_temperature_alt",
             "wet_bulb_temperature_degc",
         ],
     )
-    humidity = any_present(
-        df.withColumn("absolute_humidity_g_per_m3", F.col("ABSF_STD").cast("double"))
-        .withColumn("vapour_pressure_hpa", F.col("VP_STD").cast("double"))
-        .withColumn("relative_humidity_percent", F.col("RF_STD").cast("double"))
-        .withColumn("relative_humidity_is_primary", F.lit(False)),
+    row = add_semantic_provenance(row, SOURCE, "dwd_temperature", RID)
+    return {"weather_temperature": row}
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Family builder -- weather_humidity (join: air_temperature, moisture)
+
+
+def build_humidity():
+    at_df, at_meta = _prep("dwd_air_temperature")
+    mo_df, mo_meta = _prep("dwd_moisture")
+    joined = _join_on_instant({"dwd_air_temperature": at_df, "dwd_moisture": mo_df})
+    row = _scaffold(
+        joined,
+        family="weather_humidity",
+        parse=parse_mess_datum,
+        qn_col=f"dwd_air_temperature__{at_meta['qn']}",
+        had_conflict_col="dwd_air_temperature___had_key_conflict",
+    )
+    mo_q = F.col(f"dwd_moisture__{mo_meta['qn']}")
+    row = (
+        row.withColumn(
+            "relative_humidity_percent",
+            F.col("dwd_air_temperature__RF_TU").cast("double"),
+        )
+        .withColumn(
+            "relative_humidity_alt",
+            _alt_array(
+                (
+                    F.col("dwd_moisture__RF_STD").cast("double"),
+                    F.lit("dwd_moisture"),
+                    mo_q,
+                ),
+            ),
+        )
+        .withColumn(
+            "absolute_humidity_g_per_m3", F.col("dwd_moisture__ABSF_STD").cast("double")
+        )
+        .withColumn("vapour_pressure_hpa", F.col("dwd_moisture__VP_STD").cast("double"))
+    )
+    row = _keep_if_populated(
+        row,
         [
+            "relative_humidity_percent",
+            "relative_humidity_alt",
             "absolute_humidity_g_per_m3",
             "vapour_pressure_hpa",
-            "relative_humidity_percent",
         ],
     )
-    pressure = any_present(
-        df.withColumn("pressure_station_hpa", F.col("P_STD").cast("double")).withColumn(
-            "pressure_station_is_primary", F.lit(False)
-        ),
-        ["pressure_station_hpa"],
-    )
-    return {
-        "weather_temperature": temperature,
-        "weather_humidity": humidity,
-        "weather_pressure": pressure,
-    }
+    row = add_semantic_provenance(row, SOURCE, "dwd_humidity", RID)
+    return {"weather_humidity": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_dew_point (TT alt, TD primary)
-
-
-def build_dew_point():
-    df, meta = _prep("dwd_dew_point")
-    df = _scaffold(df, "dwd_dew_point", meta)
-    temperature = any_present(
-        df.withColumn("air_temperature_degc", F.col("TT").cast("double"))
-        .withColumn("air_temperature_is_primary", F.lit(False))
-        .withColumn("dew_point_temperature_degc", F.col("TD").cast("double"))
-        .withColumn("dew_point_temperature_is_primary", F.lit(True)),
-        ["air_temperature_degc", "dew_point_temperature_degc"],
-    )
-    return {"weather_temperature": temperature}
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Family builder -- dwd_pressure (P0 station primary, P sea level)
+# DBTITLE 1,Family builder -- weather_pressure (join: pressure, moisture)
 
 
 def build_pressure():
-    df, meta = _prep("dwd_pressure")
-    df = _scaffold(df, "dwd_pressure", meta)
-    pressure = any_present(
-        df.withColumn("pressure_station_hpa", F.col("P0").cast("double"))
-        .withColumn("pressure_station_is_primary", F.lit(True))
-        .withColumn("pressure_sea_level_hpa", F.col("P").cast("double")),
-        ["pressure_station_hpa", "pressure_sea_level_hpa"],
+    pr_df, pr_meta = _prep("dwd_pressure")
+    mo_df, mo_meta = _prep("dwd_moisture")
+    joined = _join_on_instant({"dwd_pressure": pr_df, "dwd_moisture": mo_df})
+    row = _scaffold(
+        joined,
+        family="weather_pressure",
+        parse=parse_mess_datum,
+        qn_col=f"dwd_pressure__{pr_meta['qn']}",
+        had_conflict_col="dwd_pressure___had_key_conflict",
     )
-    return {"weather_pressure": pressure}
+    mo_q = F.col(f"dwd_moisture__{mo_meta['qn']}")
+    row = (
+        row.withColumn("pressure_station_hpa", F.col("dwd_pressure__P0").cast("double"))
+        .withColumn(
+            "pressure_station_alt",
+            _alt_array(
+                (
+                    F.col("dwd_moisture__P_STD").cast("double"),
+                    F.lit("dwd_moisture"),
+                    mo_q,
+                ),
+            ),
+        )
+        .withColumn("pressure_sea_level_hpa", F.col("dwd_pressure__P").cast("double"))
+    )
+    row = _keep_if_populated(
+        row, ["pressure_station_hpa", "pressure_station_alt", "pressure_sea_level_hpa"]
+    )
+    row = add_semantic_provenance(row, SOURCE, "dwd_pressure", RID)
+    return {"weather_pressure": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_precipitation (amount + occurred + form, one event)
+# DBTITLE 1,Family builder -- weather_wind (join: wind, wind_synop, extreme_wind -> readings array)
+
+
+def build_wind():
+    w_df, w_meta = _prep("dwd_wind")
+    s_df, _s_meta = _prep("dwd_wind_synop")
+    x_df, _x_meta = _prep("dwd_extreme_wind")
+    joined = _join_on_instant(
+        {"dwd_wind": w_df, "dwd_wind_synop": s_df, "dwd_extreme_wind": x_df}
+    )
+    row = _scaffold(
+        joined,
+        family="weather_wind",
+        parse=parse_mess_datum,
+        qn_col=f"dwd_wind__{w_meta['qn']}",
+        had_conflict_col="dwd_wind___had_key_conflict",
+    )
+
+    d_mean = F.col("dwd_wind__D").cast("double")
+    mean_variable = d_mean == 990.0
+    mean_reading = F.struct(
+        F.lit("mean").alias("statistic"),
+        F.col("dwd_wind__F").cast("double").alias("wind_speed_m_per_s"),
+        F.when(mean_variable, F.lit(None))
+        .otherwise(d_mean)
+        .alias("wind_direction_degrees"),
+        mean_variable.alias("wind_direction_variable"),
+        F.lit(None).cast("double").alias("wind_gust_m_per_s"),
+        F.lit("dwd_wind").alias("source_dataset"),
+    )
+    instant_reading = F.struct(
+        F.lit("instant").alias("statistic"),
+        F.col("dwd_wind_synop__FF").cast("double").alias("wind_speed_m_per_s"),
+        F.col("dwd_wind_synop__DD").cast("double").alias("wind_direction_degrees"),
+        F.lit(None).cast("boolean").alias("wind_direction_variable"),
+        F.lit(None).cast("double").alias("wind_gust_m_per_s"),
+        F.lit("dwd_wind_synop").alias("source_dataset"),
+    )
+    max_reading = F.struct(
+        F.lit("max").alias("statistic"),
+        F.lit(None).cast("double").alias("wind_speed_m_per_s"),
+        F.lit(None).cast("double").alias("wind_direction_degrees"),
+        F.lit(None).cast("boolean").alias("wind_direction_variable"),
+        F.col("dwd_extreme_wind__FX_911").cast("double").alias("wind_gust_m_per_s"),
+        F.lit("dwd_extreme_wind").alias("source_dataset"),
+    )
+    row = row.withColumn(
+        "readings",
+        F.filter(
+            F.array(
+                F.when(
+                    F.col("dwd_wind__F").isNotNull() | d_mean.isNotNull(), mean_reading
+                ),
+                F.when(
+                    F.col("dwd_wind_synop__FF").isNotNull()
+                    | F.col("dwd_wind_synop__DD").isNotNull(),
+                    instant_reading,
+                ),
+                F.when(F.col("dwd_extreme_wind__FX_911").isNotNull(), max_reading),
+            ),
+            lambda x: x.isNotNull(),
+        ),
+    )
+    row = row.filter(F.size("readings") > 0)
+    row = add_semantic_provenance(row, SOURCE, "dwd_wind", RID)
+    return {"weather_wind": row}
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Family builder -- weather_precipitation (single product)
 
 
 def build_precipitation():
     df, meta = _prep("dwd_precipitation")
-    df = _scaffold(df, "dwd_precipitation", meta)
-    precipitation = any_present(
-        df.withColumn("precipitation_mm", F.col("R1").cast("double"))
+    row = _scaffold(
+        df,
+        family="weather_precipitation",
+        parse=parse_mess_datum,
+        qn_col=meta["qn"],
+        had_conflict_col="_had_key_conflict",
+    )
+    row = _keep_if_populated(
+        row.withColumn("precipitation_mm", F.col("R1").cast("double"))
         .withColumn("precipitation_occurred", F.col("RS_IND").cast("int") == 1)
         .withColumn("precipitation_form_code", F.col("WRTR")),
         ["precipitation_mm", "precipitation_occurred", "precipitation_form_code"],
     )
-    return {"weather_precipitation": precipitation}
+    row = add_semantic_provenance(row, SOURCE, "dwd_precipitation", RID)
+    return {"weather_precipitation": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_sun (sunshine duration, already minutes)
-
-
-def build_sun():
-    df, meta = _prep("dwd_sun")
-    df = _scaffold(df, "dwd_sun", meta)
-    solar = any_present(
-        df.withColumn("sunshine_duration_minutes", F.col("SD_SO").cast("double")),
-        ["sunshine_duration_minutes"],
-    )
-    return {"weather_solar_radiation": solar}
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Family builder -- dwd_wind (hourly mean; statistic is a real distinguishing fact)
-
-
-def build_wind():
-    df, meta = _prep("dwd_wind")
-    df = _scaffold(df, "dwd_wind", meta)
-    d_raw = F.col("D").cast("double")
-    variable = d_raw == 990.0
-    wind = any_present(
-        df.withColumn("statistic", F.lit("mean"))
-        .withColumn("wind_speed_m_per_s", F.col("F").cast("double"))
-        .withColumn("wind_direction_variable", variable)
-        .withColumn(
-            "wind_direction_degrees", F.when(variable, F.lit(None)).otherwise(d_raw)
-        ),
-        ["wind_speed_m_per_s", "wind_direction_degrees"],
-    )
-    return {"weather_wind": wind}
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Family builder -- dwd_wind_synop (instantaneous synoptic reading)
-
-
-def build_wind_synop():
-    df, meta = _prep("dwd_wind_synop")
-    df = _scaffold(df, "dwd_wind_synop", meta)
-    wind = any_present(
-        df.withColumn("statistic", F.lit("instant"))
-        .withColumn("wind_speed_m_per_s", F.col("FF").cast("double"))
-        .withColumn("wind_direction_degrees", F.col("DD").cast("double")),
-        ["wind_speed_m_per_s", "wind_direction_degrees"],
-    )
-    return {"weather_wind": wind}
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Family builder -- dwd_extreme_wind (hourly max gust)
-
-
-def build_extreme_wind():
-    df, meta = _prep("dwd_extreme_wind")
-    df = _scaffold(df, "dwd_extreme_wind", meta)
-    wind = any_present(
-        df.withColumn("statistic", F.lit("max")).withColumn(
-            "wind_gust_m_per_s", F.col("FX_911").cast("double")
-        ),
-        ["wind_gust_m_per_s"],
-    )
-    return {"weather_wind": wind}
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Family builder -- dwd_visibility (already metres)
+# DBTITLE 1,Family builder -- weather_visibility (single product)
 
 
 def build_visibility():
     df, meta = _prep("dwd_visibility")
-    df = _scaffold(df, "dwd_visibility", meta)
+    row = _scaffold(
+        df,
+        family="weather_visibility",
+        parse=parse_mess_datum,
+        qn_col=meta["qn"],
+        had_conflict_col="_had_key_conflict",
+    )
     methods = F.create_map([F.lit(x) for kv in METHOD_LABELS.items() for x in kv])
-    visibility = any_present(
-        df.withColumn("visibility_m", F.col("V_VV").cast("double")).withColumn(
-            "observation_method",
-            F.coalesce(methods[F.col("V_VV_I")], F.col("V_VV_I")),
+    row = _keep_if_populated(
+        row.withColumn("visibility_m", F.col("V_VV").cast("double")).withColumn(
+            "observation_method", F.coalesce(methods[F.col("V_VV_I")], F.col("V_VV_I"))
         ),
         ["visibility_m"],
     )
-    return {"weather_visibility": visibility}
+    row = add_semantic_provenance(row, SOURCE, "dwd_visibility", RID)
+    return {"weather_visibility": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_cloudiness (total cover, primary)
+# DBTITLE 1,Family builder -- weather_cloud (join: cloudiness, cloud_type -> alt + layers)
 
 
-def build_cloudiness():
-    df, meta = _prep("dwd_cloudiness")
-    df = _scaffold(df, "dwd_cloudiness", meta)
+def build_cloud():
+    ci_df, ci_meta = _prep("dwd_cloudiness")
+    ct_df, ct_meta = _prep("dwd_cloud_type")
+    joined = _join_on_instant({"dwd_cloudiness": ci_df, "dwd_cloud_type": ct_df})
+    row = _scaffold(
+        joined,
+        family="weather_cloud",
+        parse=parse_mess_datum,
+        qn_col=f"dwd_cloudiness__{ci_meta['qn']}",
+        had_conflict_col="dwd_cloudiness___had_key_conflict",
+    )
     methods = F.create_map([F.lit(x) for kv in METHOD_LABELS.items() for x in kv])
-    v_n = F.col("V_N").cast("double")
-    special = v_n.isin(*_CLOUD_COVER_SENTINELS)
-    cloud = any_present(
-        df.withColumn(
-            "cloud_cover_total_percent",
-            F.when(special, F.lit(None)).otherwise(v_n * EIGHTHS_TO_PERCENT),
+
+    v_n_primary = F.col("dwd_cloudiness__V_N").cast("double")
+    primary_special = v_n_primary.isin(*_CLOUD_COVER_SENTINELS)
+    v_n_alt = F.col("dwd_cloud_type__V_N").cast("double")
+    alt_special = v_n_alt.isin(*_CLOUD_COVER_SENTINELS)
+    ct_q = F.col(f"dwd_cloud_type__{ct_meta['qn']}")
+
+    def layer(n: int):
+        genus = F.col(f"dwd_cloud_type__V_S{n}_CS")
+        genus_text = F.col(f"dwd_cloud_type__V_S{n}_CSA")
+        height = F.col(f"dwd_cloud_type__V_S{n}_HHS").cast("double")
+        cover_raw = F.col(f"dwd_cloud_type__V_S{n}_NS").cast("double")
+        cover_special = cover_raw.isin(*_CLOUD_COVER_SENTINELS)
+        populated = genus.isNotNull() | height.isNotNull() | cover_raw.isNotNull()
+        entry = F.struct(
+            F.lit(n).alias("layer_number"),
+            genus.alias("genus_code"),
+            genus_text.alias("genus_text"),
+            height.alias("base_height_m"),
+            F.when(cover_special, F.lit(None))
+            .otherwise(cover_raw * EIGHTHS_TO_PERCENT)
+            .alias("cover_percent"),
+            F.when(cover_special, F.lit(None))
+            .otherwise(cover_raw)
+            .alias("cover_native_value"),
+            F.when(cover_raw.isNotNull(), F.lit("eighths")).alias("cover_native_unit"),
         )
-        .withColumn("cloud_cover_total_is_primary", F.lit(True))
+        return F.when(populated, entry)
+
+    row = (
+        row.withColumn(
+            "cloud_cover_total_percent",
+            F.when(primary_special, F.lit(None)).otherwise(
+                v_n_primary * EIGHTHS_TO_PERCENT
+            ),
+        )
         .withColumn(
             "cloud_cover_total_native_value",
-            F.when(special, F.lit(None)).otherwise(v_n),
+            F.when(primary_special, F.lit(None)).otherwise(v_n_primary),
         )
         .withColumn(
             "cloud_cover_total_native_unit",
-            F.when(v_n.isNotNull(), F.lit("eighths")),
+            F.when(v_n_primary.isNotNull(), F.lit("eighths")),
+        )
+        .withColumn(
+            "cloud_cover_total_alt",
+            _alt_array(
+                (
+                    F.when(alt_special, F.lit(None)).otherwise(
+                        v_n_alt * EIGHTHS_TO_PERCENT
+                    ),
+                    F.lit("dwd_cloud_type"),
+                    ct_q,
+                    F.when(alt_special, F.lit(None)).otherwise(v_n_alt),
+                    F.when(v_n_alt.isNotNull(), F.lit("eighths")),
+                ),
+            ),
         )
         .withColumn(
             "observation_method",
-            F.coalesce(methods[F.col("V_N_I")], F.col("V_N_I")),
-        ),
-        ["cloud_cover_total_percent"],
-    )
-    return {"weather_cloud": cloud}
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Helper -- one cloud layer's struct, NULL when the layer has no reading
-
-
-def _cloud_layer(n: int):
-    genus = F.col(f"V_S{n}_CS")
-    genus_text = F.col(f"V_S{n}_CSA")
-    height = F.col(f"V_S{n}_HHS").cast("double")
-    cover_raw = F.col(f"V_S{n}_NS").cast("double")
-    cover_special = cover_raw.isin(*_CLOUD_COVER_SENTINELS)
-    populated = genus.isNotNull() | height.isNotNull() | cover_raw.isNotNull()
-    layer = F.struct(
-        F.lit(n).alias("layer_number"),
-        genus.alias("genus_code"),
-        genus_text.alias("genus_text"),
-        height.alias("base_height_m"),
-        F.when(cover_special, F.lit(None))
-        .otherwise(cover_raw * EIGHTHS_TO_PERCENT)
-        .alias("cover_percent"),
-        F.when(cover_special, F.lit(None))
-        .otherwise(cover_raw)
-        .alias("cover_native_value"),
-        F.when(cover_raw.isNotNull(), F.lit("eighths")).alias("cover_native_unit"),
-    )
-    return F.when(populated, layer)
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Family builder -- dwd_cloud_type (total cover alt + the 4 layers)
-
-
-def build_cloud_type():
-    df, meta = _prep("dwd_cloud_type")
-    df = _scaffold(df, "dwd_cloud_type", meta)
-    methods = F.create_map([F.lit(x) for kv in METHOD_LABELS.items() for x in kv])
-    v_n = F.col("V_N").cast("double")
-    special = v_n.isin(*_CLOUD_COVER_SENTINELS)
-    cloud = (
-        df.withColumn(
-            "cloud_cover_total_percent",
-            F.when(special, F.lit(None)).otherwise(v_n * EIGHTHS_TO_PERCENT),
-        )
-        .withColumn("cloud_cover_total_is_primary", F.lit(False))
-        .withColumn(
-            "cloud_cover_total_native_value",
-            F.when(special, F.lit(None)).otherwise(v_n),
-        )
-        .withColumn(
-            "cloud_cover_total_native_unit",
-            F.when(v_n.isNotNull(), F.lit("eighths")),
-        )
-        .withColumn(
-            "observation_method",
-            F.coalesce(methods[F.col("V_N_I")], F.col("V_N_I")),
+            F.coalesce(
+                methods[F.col("dwd_cloudiness__V_N_I")], F.col("dwd_cloudiness__V_N_I")
+            ),
         )
         .withColumn(
             "layers",
             F.filter(
-                F.array(*[_cloud_layer(n) for n in (1, 2, 3, 4)]),
-                lambda x: x.isNotNull(),
+                F.array(*[layer(n) for n in (1, 2, 3, 4)]), lambda x: x.isNotNull()
             ),
         )
     )
-    cloud = cloud.filter(
-        F.col("cloud_cover_total_percent").isNotNull() | (F.size("layers") > 0)
+    row = _keep_if_populated(
+        row, ["cloud_cover_total_percent", "cloud_cover_total_alt", "layers"]
     )
-    return {"weather_cloud": cloud}
+    row = add_semantic_provenance(row, SOURCE, "dwd_cloud", RID)
+    return {"weather_cloud": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_weather_phenomena (categorical code + text only)
+# DBTITLE 1,Family builder -- weather_present_weather (single product, categorical only)
 
 
-def build_weather_phenomena():
+def build_present_weather():
     df, meta = _prep("dwd_weather_phenomena")
-    df = _scaffold(df, "dwd_weather_phenomena", meta)
+    row = _scaffold(
+        df,
+        family="weather_present_weather",
+        parse=parse_mess_datum,
+        qn_col=meta["qn"],
+        had_conflict_col="_had_key_conflict",
+    )
     ww = F.col("WW").cast("double")
     special = ww == -1.0
-    present_weather = any_present(
-        df.withColumn(
+    row = _keep_if_populated(
+        row.withColumn(
             "present_weather_code", F.when(special, F.lit(None)).otherwise(F.col("WW"))
         ).withColumn(
             "present_weather_text",
@@ -466,30 +642,62 @@ def build_weather_phenomena():
         ),
         ["present_weather_code"],
     )
-    return {"weather_present_weather": present_weather}
+    row = add_semantic_provenance(row, SOURCE, "dwd_weather_phenomena", RID)
+    return {"weather_present_weather": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_soil_temperature (6 depths, always reported together)
+# DBTITLE 1,Family builder -- weather_soil_temperature (single product, 6 depths together)
 
 _SOIL_DEPTHS_CM = (2, 5, 10, 20, 50, 100)
 
 
 def build_soil_temperature():
     df, meta = _prep("dwd_soil_temperature")
-    df = _scaffold(df, "dwd_soil_temperature", meta)
+    row = _scaffold(
+        df,
+        family="weather_soil_temperature",
+        parse=parse_mess_datum,
+        qn_col=meta["qn"],
+        had_conflict_col="_had_key_conflict",
+    )
     for d in _SOIL_DEPTHS_CM:
-        df = df.withColumn(
+        row = row.withColumn(
             f"soil_temperature_{d}cm_degc", F.col(f"V_TE{d:03d}").cast("double")
         )
-    soil = any_present(df, [f"soil_temperature_{d}cm_degc" for d in _SOIL_DEPTHS_CM])
-    return {"weather_soil_temperature": soil}
+    row = _keep_if_populated(
+        row, [f"soil_temperature_{d}cm_degc" for d in _SOIL_DEPTHS_CM]
+    )
+    row = add_semantic_provenance(row, SOURCE, "dwd_soil_temperature", RID)
+    return {"weather_soil_temperature": row}
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Family builder -- dwd_solar (longwave/diffuse/global/sunshine/zenith, one row)
+# DBTITLE 1,Family builder -- dwd_sun (sunshine duration only, hourly grid)
+
+
+def build_sun():
+    df, meta = _prep("dwd_sun")
+    row = _scaffold(
+        df,
+        family="weather_sunshine_duration",
+        parse=parse_mess_datum,
+        qn_col=meta["qn"],
+        had_conflict_col="_had_key_conflict",
+    )
+    row = _keep_if_populated(
+        row.withColumn("sunshine_duration_minutes", F.col("SD_SO").cast("double")),
+        ["sunshine_duration_minutes"],
+    )
+    row = add_semantic_provenance(row, SOURCE, "dwd_sun", RID)
+    return {"weather_sunshine_duration": row}
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Family builder -- dwd_solar (single product, 10-min grid; split by meaning)
 
 
 def _add_radiation_columns(df, native_col: str, field: str):
@@ -510,106 +718,111 @@ def _add_radiation_columns(df, native_col: str, field: str):
 
 def build_solar():
     df, meta = _prep("dwd_solar")
-    df = _scaffold(df, "dwd_solar", meta)
-    df = _add_radiation_columns(df, "ATMO_LBERG", "longwave_downward_radiation")
-    df = _add_radiation_columns(df, "FD_LBERG", "diffuse_radiation")
-    df = _add_radiation_columns(df, "FG_LBERG", "global_radiation")
-    solar = any_present(
-        df.withColumn(
-            "sunshine_duration_minutes", F.col("SD_LBERG").cast("double")
-        ).withColumn("solar_zenith_angle_degrees", F.col("ZENIT").cast("double")),
-        [
-            "longwave_downward_radiation_w_per_m2",
-            "diffuse_radiation_w_per_m2",
-            "global_radiation_w_per_m2",
-            "sunshine_duration_minutes",
-            "solar_zenith_angle_degrees",
-        ],
+    row = _scaffold(
+        df,
+        family="dwd_solar",
+        parse=parse_mess_datum_10min,
+        qn_col=meta["qn"],
+        had_conflict_col="_had_key_conflict",
     )
-    return {"weather_solar_radiation": solar}
+    row = _add_radiation_columns(row, "ATMO_LBERG", "longwave_downward_radiation")
+    row = _add_radiation_columns(row, "FD_LBERG", "diffuse_radiation")
+    row = _add_radiation_columns(row, "FG_LBERG", "global_radiation")
+    row = row.withColumn(
+        "sunshine_duration_minutes", F.col("SD_LBERG").cast("double")
+    ).withColumn("solar_zenith_angle_degrees", F.col("ZENIT").cast("double"))
+
+    radiation = _keep_if_populated(
+        row, ["global_radiation_w_per_m2", "diffuse_radiation_w_per_m2"]
+    )
+    radiation = add_semantic_provenance(radiation, SOURCE, "dwd_solar", RID)
+
+    longwave = _keep_if_populated(row, ["longwave_downward_radiation_w_per_m2"])
+    longwave = add_semantic_provenance(longwave, SOURCE, "dwd_solar", RID)
+
+    geometry = _keep_if_populated(row, ["solar_zenith_angle_degrees"])
+    geometry = add_semantic_provenance(geometry, SOURCE, "dwd_solar", RID)
+
+    sunshine = _keep_if_populated(row, ["sunshine_duration_minutes"])
+    sunshine = add_semantic_provenance(sunshine, SOURCE, "dwd_solar", RID)
+
+    return {
+        "weather_solar_radiation": radiation,
+        "weather_longwave_radiation": longwave,
+        "weather_solar_geometry": geometry,
+        "weather_sunshine_duration": sunshine,
+    }
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration -- table -> builder function
-BUILDERS = {
-    "dwd_air_temperature": build_air_temperature,
-    "dwd_moisture": build_moisture,
-    "dwd_dew_point": build_dew_point,
-    "dwd_pressure": build_pressure,
-    "dwd_precipitation": build_precipitation,
-    "dwd_sun": build_sun,
-    "dwd_wind": build_wind,
-    "dwd_wind_synop": build_wind_synop,
-    "dwd_extreme_wind": build_extreme_wind,
-    "dwd_visibility": build_visibility,
-    "dwd_cloudiness": build_cloudiness,
-    "dwd_cloud_type": build_cloud_type,
-    "dwd_weather_phenomena": build_weather_phenomena,
-    "dwd_soil_temperature": build_soil_temperature,
-    "dwd_solar": build_solar,
-}
+# DBTITLE 1,Configuration -- builders producing this run's families
+BUILDERS = [
+    build_temperature,
+    build_humidity,
+    build_pressure,
+    build_wind,
+    build_precipitation,
+    build_visibility,
+    build_cloud,
+    build_present_weather,
+    build_soil_temperature,
+    build_sun,
+    build_solar,
+]
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- each loaded table's contribution to its families
-table_family_frames = {table: BUILDERS[table]() for table in LOAD_TABLES}
+# DBTITLE 1,Transform -- run every builder
+built = [b() for b in BUILDERS]
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- group contributions by target family
-per_family: dict[str, list[tuple[str, object]]] = {}
-for table, fam_dict in table_family_frames.items():
-    for fam, fdf in fam_dict.items():
-        per_family.setdefault(fam, []).append((table, fdf))
+# DBTITLE 1,Transform -- group contributions by family (more than one builder can feed a family)
+per_family: dict[str, list] = {}
+for fam_dict in built:
+    for fam, df in fam_dict.items():
+        per_family.setdefault(fam, []).append(df)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- one family table at a time, unioning its contributing tables
-for fam, contributions in per_family.items():
-    frames = [
-        conform(fdf, WEATHER_FAMILY_COLUMNS[fam]) for _table, fdf in contributions
-    ]
+# DBTITLE 1,Write Silver -- one write per family, unioning every contributing builder
+for fam, frames in per_family.items():
     combined = frames[0]
     for extra in frames[1:]:
         combined = combined.unionByName(extra)
-    tables_in = sorted({table for table, _fdf in contributions})
-    in_list = ", ".join(f"'{t}'" for t in tables_in)
     write_semantic(
-        combined,
+        conform(combined, WEATHER_FAMILY_COLUMNS[fam]),
         fam,
         source=SOURCE,
         component=COMPONENT,
         rid=RID,
-        replace_where=f"source_system = '{SOURCE}' AND source_dataset IN ({in_list})",
+        replace_where=f"source_system = '{SOURCE}'",
     )
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect -- each family structure per loaded table
+# DBTITLE 1,Inspect -- each family structure written this run
 findings_blocks = {}
-for table, fam_dict in table_family_frames.items():
-    for fam in fam_dict:
-        written = spark.table(semantic_table(fam)).filter(
-            F.col("source_dataset") == table
-        )
-        findings_blocks[(table, fam)] = inspect_table(
-            written,
-            fam,
-            source=FINDINGS_SOURCE,
-            component=COMPONENT,
-            rid=RID,
-            key_cols=["observation_key"],
-            extra_checks=structure_extra_checks(written),
-        )
+for fam in per_family:
+    written = spark.table(semantic_table(fam)).filter(F.col("source_system") == SOURCE)
+    findings_blocks[fam] = inspect_table(
+        written,
+        fam,
+        source=FINDINGS_SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=["observation_key"],
+        extra_checks=structure_extra_checks(written),
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Export findings -- each family structure per loaded table
-for (table, fam), blocks in findings_blocks.items():
+# DBTITLE 1,Export findings -- each family structure written this run
+for fam, blocks in findings_blocks.items():
     write_silver_findings(
         FINDINGS_SOURCE,
-        f"{COMPONENT.split('/')[-1]}__{table}__{fam}",
-        f"{fam} -- {table}",
+        f"{COMPONENT.split('/')[-1]}__{fam}",
+        fam,
         blocks,
     )

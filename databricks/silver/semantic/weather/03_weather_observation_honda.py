@@ -63,6 +63,18 @@ bronze_honda_weather = read_bronze(BRONZE_TABLE)
 
 # COMMAND ----------
 
+# DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts
+HONDA_CONTENT_COLS = ["WeatherStation_Weather_Ta", "WeatherStation_Weather_Igm"]
+bronze_honda_weather, _honda_q = resolve_conflicts(
+    bronze_honda_weather,
+    ["frequency", "datetime_utc"],
+    HONDA_CONTENT_COLS,
+    bronze_table=BRONZE_TABLE,
+)
+write_quarantine(_honda_q.withColumn("source_system", F.lit(SOURCE)), RID)
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- place, time, provenance (shared by both families)
 _interval = F.create_map(
     [F.lit(x) for kv in HONDA_INTERVAL_SECONDS.items() for x in kv]

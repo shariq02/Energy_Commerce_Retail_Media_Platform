@@ -61,17 +61,31 @@ _TAIL = [("measurement_basis", "string"), *_PROVENANCE_HEAD, *_PROVENANCE_TAIL]
 
 # One coherent semantic weather family = one Silver structure, designed
 # around what that family's data actually is -- not a shared measurement
-# shape partitioned by a label. `_is_primary` flags are per measurement
-# field, only where a source genuinely has a competing alternate product for
-# that specific field (not a blanket row-level flag).
+# shape partitioned by a label. The record's grain is (source_system,
+# location, instant) -- ONE row per family per instant, never one row per
+# Bronze source product: where several products report the same field for
+# the same instant, that is a deliberate primary/alternate relationship
+# (an `_alt` array), not extra rows, and where several products report
+# genuinely different, non-competing facts for the same instant (DWD's three
+# wind products), those become entries of a repeated `readings` array on one
+# row, not a `statistic`-tagged row each.
+
+# One alternate estimate of a field the primary column already holds:
+# its value, its native form (only populated if the alternate's source needs
+# converting), which product it came from, and that product's own quality
+# code.
+_ALT_READING = (
+    "array<struct<value:double,native_value:double,native_unit:string,"
+    "source_dataset:string,quality_code:string>>"
+)
 
 WEATHER_TEMPERATURE_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
     ("air_temperature_degc", "double"),
-    ("air_temperature_is_primary", "boolean"),
+    ("air_temperature_alt", _ALT_READING),
     ("dew_point_temperature_degc", "double"),
-    ("dew_point_temperature_is_primary", "boolean"),
+    ("dew_point_temperature_alt", _ALT_READING),
     ("wet_bulb_temperature_degc", "double"),
     *_QUALITY_COLUMNS,
     *_TAIL,
@@ -81,7 +95,7 @@ WEATHER_HUMIDITY_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
     ("relative_humidity_percent", "double"),
-    ("relative_humidity_is_primary", "boolean"),
+    ("relative_humidity_alt", _ALT_READING),
     ("absolute_humidity_g_per_m3", "double"),
     ("vapour_pressure_hpa", "double"),
     *_QUALITY_COLUMNS,
@@ -94,9 +108,9 @@ WEATHER_PRESSURE_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
     ("pressure_station_hpa", "double"),
-    ("pressure_station_is_primary", "boolean"),
     ("pressure_station_native_value", "double"),
     ("pressure_station_native_unit", "string"),
+    ("pressure_station_alt", _ALT_READING),
     ("pressure_sea_level_hpa", "double"),
     ("pressure_sea_level_native_value", "double"),
     ("pressure_sea_level_native_unit", "string"),
@@ -104,18 +118,22 @@ WEATHER_PRESSURE_COLUMNS = [
     *_TAIL,
 ]
 
-# `statistic` is a real distinguishing fact here (mean/instant/max are three
-# different DWD products reading the same station-hour), not a leftover
-# generic column -- wind speed/direction/gust are already m/s and degrees
-# everywhere, so no native pair is needed.
+# DWD reports wind three genuinely different, non-competing ways at the same
+# station-hour (hourly mean, synoptic instant, hourly max gust); AccuWeather
+# reports one undocumented-statistic reading. One row per instant, one
+# `readings` array entry per statistic actually present -- not one row per
+# product. Already m/s and degrees everywhere, so no native pair is needed.
 WEATHER_WIND_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
-    ("statistic", "string"),
-    ("wind_speed_m_per_s", "double"),
-    ("wind_direction_degrees", "double"),
-    ("wind_direction_variable", "boolean"),
-    ("wind_gust_m_per_s", "double"),
+    (
+        "readings",
+        (
+            "array<struct<statistic:string,wind_speed_m_per_s:double,"
+            "wind_direction_degrees:double,wind_direction_variable:boolean,"
+            "wind_gust_m_per_s:double,source_dataset:string>>"
+        ),
+    ),
     *_QUALITY_COLUMNS,
     *_TAIL,
 ]
@@ -143,9 +161,9 @@ WEATHER_CLOUD_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
     ("cloud_cover_total_percent", "double"),
-    ("cloud_cover_total_is_primary", "boolean"),
     ("cloud_cover_total_native_value", "double"),
     ("cloud_cover_total_native_unit", "string"),
+    ("cloud_cover_total_alt", _ALT_READING),
     ("cloud_base_height_m", "double"),
     ("observation_method", "string"),
     (
@@ -202,11 +220,14 @@ WEATHER_SOIL_TEMPERATURE_COLUMNS = [
     *_TAIL,
 ]
 
-# Components a product reports together become columns of the same row
-# (DWD's solar product gives all of longwave/diffuse/global/sunshine/zenith
-# in one row). Native pair only on the three DWD radiation sums (J/cm2 over
-# an interval -> mean W/m2, per interval_seconds); sunshine duration, zenith
-# angle and UV index are never converted anywhere, so no native pair there.
+# What was one "solar_radiation" bucket split into five: shortwave radiative
+# flux, longwave radiative flux, sunshine duration, solar geometry and UV
+# index are different physical meanings (a flux, a duration, an angle, an
+# index) that happened to share one DWD product's row, not one family.
+
+# Shortwave (solar) radiative flux only -- global and diffuse are both
+# sunlight received at the surface. Native pair on both DWD sums (J/cm2 over
+# the interval -> mean W/m2); Honda and AccuWeather are already W/m2.
 WEATHER_SOLAR_RADIATION_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -216,11 +237,51 @@ WEATHER_SOLAR_RADIATION_COLUMNS = [
     ("diffuse_radiation_w_per_m2", "double"),
     ("diffuse_radiation_native_value", "double"),
     ("diffuse_radiation_native_unit", "string"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Longwave downward radiation is atmospheric/thermal infrared emission, not
+# sunlight -- a different physical process from weather_solar_radiation
+# (occurs at night too), so it stays out of the shortwave-flux structure
+# despite sharing DWD's `dwd_solar` product row. DWD only.
+WEATHER_LONGWAVE_RADIATION_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
     ("longwave_downward_radiation_w_per_m2", "double"),
     ("longwave_downward_radiation_native_value", "double"),
     ("longwave_downward_radiation_native_unit", "string"),
-    ("solar_zenith_angle_degrees", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# A duration, not a flux -- genuinely different meaning from radiation.
+# dwd_sun (hourly) and dwd_solar (10-minute) are on different native time
+# grids, so they stay separate rows/instants rather than being forced into
+# one row; that is not source-product fragmentation, it is two genuinely
+# different instants. Already minutes everywhere.
+WEATHER_SUNSHINE_DURATION_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
     ("sunshine_duration_minutes", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# An astronomical position, not a measurement of atmospheric state -- DWD
+# only.
+WEATHER_SOLAR_GEOMETRY_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("solar_zenith_angle_degrees", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# An index, not a physical flux measurement -- AccuWeather only.
+WEATHER_UV_INDEX_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
     ("uv_index", "double"),
     *_QUALITY_COLUMNS,
     *_TAIL,
@@ -240,6 +301,10 @@ WEATHER_FAMILY_COLUMNS = {
     "weather_present_weather": WEATHER_PRESENT_WEATHER_COLUMNS,
     "weather_soil_temperature": WEATHER_SOIL_TEMPERATURE_COLUMNS,
     "weather_solar_radiation": WEATHER_SOLAR_RADIATION_COLUMNS,
+    "weather_longwave_radiation": WEATHER_LONGWAVE_RADIATION_COLUMNS,
+    "weather_sunshine_duration": WEATHER_SUNSHINE_DURATION_COLUMNS,
+    "weather_solar_geometry": WEATHER_SOLAR_GEOMETRY_COLUMNS,
+    "weather_uv_index": WEATHER_UV_INDEX_COLUMNS,
 }
 WEATHER_FAMILIES = list(WEATHER_FAMILY_COLUMNS)
 
