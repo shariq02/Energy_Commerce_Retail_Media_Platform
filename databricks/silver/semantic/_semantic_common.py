@@ -628,18 +628,25 @@ def dict_to_markdown_row(stats: dict) -> str:
 # DBTITLE 1,Helper -- dedup/conflict reconciliation proof (Genomics-style rule)
 
 
-def reconciliation_stats(source_df, kept_df, quarantine_df) -> dict:
+def reconciliation_stats(
+    source_df, kept_df, quarantine_df, *, raw_bronze_df=None
+) -> dict:
     """The required proof for the collapse-identical / quarantine-conflicting
     rule: Bronze input -> exact duplicates collapsed -> conflicts quarantined
-    -> kept rows. `source_df` is the input to `resolve_conflicts()` (post
-    sentinel-stripping, same row count as Bronze); `kept_df`/`quarantine_df`
-    are its two outputs."""
-    bronze_rows = source_df.count()
+    -> kept rows. `source_df` is the input to `resolve_conflicts()`;
+    `kept_df`/`quarantine_df` are its two outputs. Pass `raw_bronze_df` (the
+    unmodified Bronze read) when `source_df` isn't it -- e.g. DWD filters to
+    a known station set before dedup, so `source_df` alone would
+    understate the true Bronze row count."""
+    dedup_input_rows = source_df.count()
     kept_rows = kept_df.count()
     quarantined_rows = quarantine_df.count()
     return {
-        "bronze_rows": bronze_rows,
-        "exact_duplicates_collapsed": bronze_rows - kept_rows - quarantined_rows,
+        "bronze_rows": raw_bronze_df.count()
+        if raw_bronze_df is not None
+        else dedup_input_rows,
+        "dedup_input_rows": dedup_input_rows,
+        "exact_duplicates_collapsed": dedup_input_rows - kept_rows - quarantined_rows,
         "conflicts_quarantined": quarantined_rows,
         "kept_rows": kept_rows,
     }

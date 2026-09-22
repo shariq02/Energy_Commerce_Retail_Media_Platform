@@ -128,13 +128,19 @@ imperial_src = spark.table(IMPERIAL_TABLE).withColumnRenamed(
 # COMMAND ----------
 
 # DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts (per table)
+# Every non-key column each table actually has, not just the AW_FIELDS this
+# notebook happens to consume -- a conflict in an unused column (e.g.
+# temperature_realfeel) must still be detected, not silently ignored.
+_metric_content_cols = [c for c in metric_src.columns if c not in AW_KEY]
+_imperial_content_cols = [c for c in imperial_src.columns if c not in AW_KEY]
+
 _metric_kept, _metric_q = resolve_conflicts(
-    metric_src, AW_KEY, AW_FIELDS, bronze_table=METRIC_DATASET
+    metric_src, AW_KEY, _metric_content_cols, bronze_table=METRIC_DATASET
 )
 write_quarantine(_metric_q.withColumn("source_system", F.lit(SOURCE)), RID)
 
 _imperial_kept, _imperial_q = resolve_conflicts(
-    imperial_src, AW_KEY, AW_FIELDS, bronze_table=IMPERIAL_DATASET
+    imperial_src, AW_KEY, _imperial_content_cols, bronze_table=IMPERIAL_DATASET
 )
 write_quarantine(_imperial_q.withColumn("source_system", F.lit(SOURCE)), RID)
 

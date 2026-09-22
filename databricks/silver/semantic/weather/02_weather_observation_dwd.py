@@ -110,7 +110,7 @@ def _prep(table: str):
         df, ["STATIONS_ID", "MESS_DATUM"], data_cols, qn_col=qn, bronze_table=table
     )
     write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
-    RECONCILIATION[table] = reconciliation_stats(df, kept, q)
+    RECONCILIATION[table] = reconciliation_stats(df, kept, q, raw_bronze_df=bronze_df)
     return kept, meta
 
 
@@ -793,12 +793,17 @@ for fam_dict in built:
 # COMMAND ----------
 
 # DBTITLE 1,Write Silver -- one write per family, unioning every contributing builder
+# Each contribution still carries its own raw source columns (e.g. dwd_sun's
+# QN_7 vs dwd_solar's QN_592) -- conform to the family's own schema per
+# contribution before unioning, not after, or unionByName fails on the
+# mismatched raw columns.
 for fam, frames in per_family.items():
-    combined = frames[0]
-    for extra in frames[1:]:
+    conformed = [conform(f, WEATHER_FAMILY_COLUMNS[fam]) for f in frames]
+    combined = conformed[0]
+    for extra in conformed[1:]:
         combined = combined.unionByName(extra)
     write_semantic(
-        conform(combined, WEATHER_FAMILY_COLUMNS[fam]),
+        combined,
         fam,
         source=SOURCE,
         component=COMPONENT,

@@ -57,6 +57,18 @@ seattle_src = (
 
 # COMMAND ----------
 
+# DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts
+_seattle_kept, _seattle_q = resolve_conflicts(
+    seattle_src, ["_file", "date"], ["temp"], bronze_table="weather_seattle"
+)
+write_quarantine(_seattle_q.withColumn("source_system", F.lit(SOURCE)), RID)
+RECONCILIATION = {
+    "weather_seattle": reconciliation_stats(seattle_src, _seattle_kept, _seattle_q)
+}
+seattle_src = _seattle_kept
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- rows with role, unit and standardised value
 _stat = F.create_map([F.lit(x) for kv in FILE_STATISTIC.items() for x in kv])
 seattle_daily = (
@@ -118,4 +130,19 @@ write_silver_findings(
     f"{COMPONENT.split('/')[-1]}__weather_daily_{SOURCE}",
     f"weather_daily -- {SOURCE}",
     findings_blocks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Export findings -- dedup/conflict reconciliation proof
+write_silver_findings(
+    FINDINGS_SOURCE,
+    f"{COMPONENT.split('/')[-1]}__weather_seattle__reconciliation",
+    "dedup/conflict reconciliation -- weather_seattle",
+    [
+        (
+            "Bronze -> exact duplicates collapsed -> conflicts quarantined -> kept",
+            dict_to_markdown_row(RECONCILIATION["weather_seattle"]),
+        )
+    ],
 )
