@@ -128,15 +128,21 @@ imperial_src = spark.table(IMPERIAL_TABLE).withColumnRenamed(
 # COMMAND ----------
 
 # DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts (per table)
-metric_src, _metric_q = resolve_conflicts(
+_metric_kept, _metric_q = resolve_conflicts(
     metric_src, AW_KEY, AW_FIELDS, bronze_table=METRIC_DATASET
 )
 write_quarantine(_metric_q.withColumn("source_system", F.lit(SOURCE)), RID)
 
-imperial_src, _imperial_q = resolve_conflicts(
+_imperial_kept, _imperial_q = resolve_conflicts(
     imperial_src, AW_KEY, AW_FIELDS, bronze_table=IMPERIAL_DATASET
 )
 write_quarantine(_imperial_q.withColumn("source_system", F.lit(SOURCE)), RID)
+
+RECONCILIATION = {
+    METRIC_DATASET: reconciliation_stats(metric_src, _metric_kept, _metric_q),
+    IMPERIAL_DATASET: reconciliation_stats(imperial_src, _imperial_kept, _imperial_q),
+}
+metric_src, imperial_src = _metric_kept, _imperial_kept
 
 # COMMAND ----------
 
@@ -349,4 +355,20 @@ for fam, blocks in findings_blocks.items():
         f"{COMPONENT.split('/')[-1]}__{fam}",
         fam,
         blocks,
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Export findings -- dedup/conflict reconciliation proof, per table
+for dataset, stats in RECONCILIATION.items():
+    write_silver_findings(
+        FINDINGS_SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{dataset}__reconciliation",
+        f"dedup/conflict reconciliation -- {dataset}",
+        [
+            (
+                "Bronze -> exact duplicates collapsed -> conflicts quarantined -> kept",
+                dict_to_markdown_row(stats),
+            )
+        ],
     )

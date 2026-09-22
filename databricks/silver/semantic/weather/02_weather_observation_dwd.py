@@ -77,6 +77,11 @@ _KEY_COLS = ("STATIONS_ID", "city", "MESS_DATUM", "eor")
 # (fog etc, no cover reading possible). Neither is a real eighths value.
 _CLOUD_COVER_SENTINELS = (-1.0, 9.0)
 
+# table -> reconciliation_stats(), filled in by _prep(); exported as findings
+# proof of the dedup/conflict rule (Bronze -> exact dupes collapsed ->
+# conflicts quarantined -> kept), not just a final duplicate_keys=0 check.
+RECONCILIATION = {}
+
 # COMMAND ----------
 
 # DBTITLE 1,Session time zone
@@ -101,11 +106,12 @@ def _prep(table: str):
         "STATIONS_ID", F.regexp_replace(F.trim(F.col("STATIONS_ID")), r"\.0$", "")
     ).filter(F.col("STATIONS_ID").isin(STATION_IDS))
     df = strip_sentinels(df, [*data_cols, qn])
-    df, q = resolve_conflicts(
+    kept, q = resolve_conflicts(
         df, ["STATIONS_ID", "MESS_DATUM"], data_cols, qn_col=qn, bronze_table=table
     )
     write_quarantine(q.withColumn("source_system", F.lit(SOURCE)), RID)
-    return df, meta
+    RECONCILIATION[table] = reconciliation_stats(df, kept, q)
+    return kept, meta
 
 
 # COMMAND ----------
@@ -825,4 +831,20 @@ for fam, blocks in findings_blocks.items():
         f"{COMPONENT.split('/')[-1]}__{fam}",
         fam,
         blocks,
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Export findings -- dedup/conflict reconciliation proof, per DWD table
+for table, stats in RECONCILIATION.items():
+    write_silver_findings(
+        FINDINGS_SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{table}__reconciliation",
+        f"dedup/conflict reconciliation -- {table}",
+        [
+            (
+                "Bronze -> exact duplicates collapsed -> conflicts quarantined -> kept",
+                dict_to_markdown_row(stats),
+            )
+        ],
     )

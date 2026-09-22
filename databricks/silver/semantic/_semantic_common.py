@@ -489,18 +489,50 @@ def conform(df, columns: list):
 # DBTITLE 1,Helper -- write (full overwrite or replace one source's rows)
 
 
+def _schema_signature(schema) -> set:
+    """(name, type) pairs, ignoring field order and nullability -- the things
+    that make a replaceWhere genuinely incompatible with the existing table."""
+    return {(f.name, f.dataType.simpleString()) for f in schema.fields}
+
+
 def write_semantic(
     df, table: str, *, source: str, component: str, rid: str, replace_where=None
 ) -> int | None:
     """Overwrite the table, or with `replace_where` (a SQL predicate on the
-    table's own columns) replace only those rows and leave the rest. A schema
-    change to an existing table needs the table dropped first."""
+    table's own columns) replace only those rows and leave the rest.
+
+    Delta rejects combining `replaceWhere` with a schema change (it can't
+    both scope the write and migrate the schema at once). When the table's
+    on-disk schema no longer matches `df`'s (an intentional Silver structure
+    change, e.g. a column added/removed/retyped), the rows `replace_where`
+    would leave untouched are read back, conformed onto the new schema, and
+    committed together with the incoming rows in one `overwriteSchema` write
+    -- a single atomic Delta operation, so a failure can't leave the table
+    half migrated. Once the table's schema matches again, later calls take
+    the plain `replaceWhere` path -- this only triggers on an actual
+    structure change, and is a no-op cost otherwise."""
     started = now_utc()
     full = semantic_table(table)
     exists = spark.catalog.tableExists(full)
     if exists:
         v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
         print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
+
+    if exists and replace_where:
+        existing_schema = spark.table(full).schema
+        if _schema_signature(existing_schema) != _schema_signature(df.schema):
+            target_columns = [
+                (f.name, f.dataType.simpleString()) for f in df.schema.fields
+            ]
+            kept = conform(
+                spark.table(full).filter(f"NOT ({replace_where})"), target_columns
+            )
+            df = kept.unionByName(df)
+            replace_where = None
+            print(
+                f"SCHEMA MIGRATION  {full}: pre-existing rows carried forward onto the new schema"
+            )
+
     writer = df.write.format("delta").mode("overwrite")
     if replace_where and exists:
         writer = writer.option("replaceWhere", replace_where)
@@ -580,3 +612,34 @@ def rows_to_markdown(df, limit: int = 200) -> str:
         "| " + " | ".join("" if v is None else str(v) for v in r) + " |" for r in rows
     ]
     return "\n".join([header, rule, *body])
+
+
+def dict_to_markdown_row(stats: dict) -> str:
+    """A single-row markdown table from a plain dict -- for a small numeric
+    summary that doesn't need a Spark round-trip."""
+    header = "| " + " | ".join(stats.keys()) + " |"
+    rule = "|" + "|".join("---" for _ in stats) + "|"
+    row = "| " + " | ".join(str(v) for v in stats.values()) + " |"
+    return f"{header}\n{rule}\n{row}"
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- dedup/conflict reconciliation proof (Genomics-style rule)
+
+
+def reconciliation_stats(source_df, kept_df, quarantine_df) -> dict:
+    """The required proof for the collapse-identical / quarantine-conflicting
+    rule: Bronze input -> exact duplicates collapsed -> conflicts quarantined
+    -> kept rows. `source_df` is the input to `resolve_conflicts()` (post
+    sentinel-stripping, same row count as Bronze); `kept_df`/`quarantine_df`
+    are its two outputs."""
+    bronze_rows = source_df.count()
+    kept_rows = kept_df.count()
+    quarantined_rows = quarantine_df.count()
+    return {
+        "bronze_rows": bronze_rows,
+        "exact_duplicates_collapsed": bronze_rows - kept_rows - quarantined_rows,
+        "conflicts_quarantined": quarantined_rows,
+        "kept_rows": kept_rows,
+    }

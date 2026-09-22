@@ -65,13 +65,17 @@ bronze_honda_weather = read_bronze(BRONZE_TABLE)
 
 # DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts
 HONDA_CONTENT_COLS = ["WeatherStation_Weather_Ta", "WeatherStation_Weather_Igm"]
-bronze_honda_weather, _honda_q = resolve_conflicts(
+_honda_kept, _honda_q = resolve_conflicts(
     bronze_honda_weather,
     ["frequency", "datetime_utc"],
     HONDA_CONTENT_COLS,
     bronze_table=BRONZE_TABLE,
 )
 write_quarantine(_honda_q.withColumn("source_system", F.lit(SOURCE)), RID)
+RECONCILIATION = {
+    BRONZE_TABLE: reconciliation_stats(bronze_honda_weather, _honda_kept, _honda_q)
+}
+bronze_honda_weather = _honda_kept
 
 # COMMAND ----------
 
@@ -160,3 +164,18 @@ for fam, blocks in findings_blocks.items():
         f"{fam} -- {BRONZE_TABLE}",
         blocks,
     )
+
+# COMMAND ----------
+
+# DBTITLE 1,Export findings -- dedup/conflict reconciliation proof
+write_silver_findings(
+    FINDINGS_SOURCE,
+    f"{COMPONENT.split('/')[-1]}__{BRONZE_TABLE}__reconciliation",
+    f"dedup/conflict reconciliation -- {BRONZE_TABLE}",
+    [
+        (
+            "Bronze -> exact duplicates collapsed -> conflicts quarantined -> kept",
+            dict_to_markdown_row(RECONCILIATION[BRONZE_TABLE]),
+        )
+    ],
+)
