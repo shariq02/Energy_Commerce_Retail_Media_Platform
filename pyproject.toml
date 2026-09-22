@@ -43,6 +43,9 @@ include = ["src*", "fastapi*", "ai*"]
 
 [tool.ruff]
 exclude = ["data/", "docs/", "archive/", ".terraform/"]
+# Without this, `exclude` is skipped for explicitly-named paths -- which is
+# how pre-commit invokes ruff (it passes the changed files, not a directory).
+force-exclude = true
 # Keep the ruff cache out of the repo tree.
 cache-dir = "~/.cache/ruff/ecrmap"
 # spark/dbutils/display are Databricks-runtime-injected globals (databricks/*),

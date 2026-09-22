@@ -12,10 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** AccuWeather historical hourly (metric) into
-# MAGIC `weather_observation`; the imperial variant is the same record in other
-# MAGIC units and is not loaded. Provider values, so `measurement_basis` differs
-# MAGIC from station sources.
+# MAGIC **Purpose:** AccuWeather historical hourly (metric) into the shared
+# MAGIC per-parameter weather structures alongside DWD and Honda; the imperial
+# MAGIC variant is the same record in other units and is not loaded. Provider
+# MAGIC values, so `measurement_basis` differs from station sources.
 
 # COMMAND ----------
 
@@ -92,42 +92,45 @@ aw_obs = (
 )
 aw_obs = add_project_time(aw_obs)
 aw_obs = add_semantic_provenance(aw_obs, SOURCE, DATASET, RID)
-aw_obs = conform(aw_obs, WEATHER_OBSERVATION_COLUMNS)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- weather_observation (accuweather)
-write_semantic(
+# DBTITLE 1,Write Silver -- family structures (accuweather)
+AW_FAMILIES = sorted({s["family"] for s in AW_SPECS})
+write_semantic_families(
     aw_obs,
-    "weather_observation",
+    AW_FAMILIES,
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    replace_where=f"source_dataset = '{DATASET}'",
+    replace_where_fn=lambda _fam: f"source_dataset = '{DATASET}'",
 )
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect -- weather_observation (aw)
-written = spark.table(semantic_table("weather_observation")).filter(
-    F.col("source_dataset") == DATASET
-)
-findings_blocks = inspect_table(
-    written,
-    "weather_observation",
-    source=FINDINGS_SOURCE,
-    component=COMPONENT,
-    rid=RID,
-    key_cols=["observation_key"],
-    extra_checks=structure_extra_checks(written),
-)
+# DBTITLE 1,Inspect -- each family structure (aw)
+findings_blocks = {}
+for fam in AW_FAMILIES:
+    written = spark.table(semantic_table(fam)).filter(
+        F.col("source_dataset") == DATASET
+    )
+    findings_blocks[fam] = inspect_table(
+        written,
+        fam,
+        source=FINDINGS_SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=["observation_key"],
+        extra_checks=structure_extra_checks(written),
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Export findings -- weather_observation (aw)
-write_silver_findings(
-    FINDINGS_SOURCE,
-    f"{COMPONENT.split('/')[-1]}__{DATASET}",
-    f"weather_observation -- {DATASET}",
-    findings_blocks,
-)
+# DBTITLE 1,Export findings -- each family structure (aw)
+for fam, blocks in findings_blocks.items():
+    write_silver_findings(
+        FINDINGS_SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{DATASET}__{fam}",
+        f"{fam} -- {DATASET}",
+        blocks,
+    )

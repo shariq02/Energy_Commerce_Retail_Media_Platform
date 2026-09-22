@@ -13,7 +13,7 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** daily min, max and mean air temperature per DWD station over
-# MAGIC the Europe/Berlin local day, derived from `weather_observation` and marked
+# MAGIC the Europe/Berlin local day, derived from `weather_temperature` and marked
 # MAGIC `derived` in `weather_daily`.
 
 # COMMAND ----------
@@ -42,7 +42,7 @@ from pyspark.sql import functions as F
 SOURCE = "dwd"
 COMPONENT = "silver/semantic/weather/06_weather_daily_derived"
 RID = run_id()
-DERIVED_FROM = "weather_observation"
+DERIVED_FROM = "weather_temperature"
 VARIABLE = "air_temperature"
 STATISTICS = {"min": F.min, "max": F.max, "mean": F.avg}
 
@@ -55,7 +55,7 @@ ensure_utc_session()
 
 # DBTITLE 1,Read Silver -- primary hourly air temperature
 hourly_temperature = (
-    spark.table(semantic_table("weather_observation"))
+    spark.table(semantic_table(DERIVED_FROM))
     .filter(
         (F.col("source_system") == SOURCE)
         & (F.col("variable") == VARIABLE)

@@ -12,9 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** per-source column -> variable specifications for the weather
-# MAGIC structures. Pulled in with `%run ./_weather_specs` after `_semantic_common`.
-# MAGIC Definitions only.
+# MAGIC **Purpose:** per-source column -> variable -> family specifications for
+# MAGIC the weather structures. `family` routes a column to the shared structure
+# MAGIC (WEATHER_FAMILIES) it belongs in by meaning, not by source. Pulled in
+# MAGIC with `%run ./_weather_specs` after `_semantic_common`. Definitions only.
 
 # COMMAND ----------
 
@@ -31,6 +32,7 @@ def _radiation(col, variable, seconds):
         variable,
         "sum",
         "J_per_cm2",
+        family="weather_solar_radiation",
         unit="W_per_m2",
         factor=_J_CM2_TO_W_M2 / seconds,
         interval_seconds=seconds,
@@ -44,6 +46,7 @@ def _eighths_to_percent(col, variable, level=None, primary=True, method_col=None
         variable,
         "instant",
         "eighths",
+        family="weather_cloud",
         unit="percent",
         factor=12.5,
         level=level,
@@ -68,6 +71,7 @@ for _n in (1, 2, 3, 4):
             "cloud_genus",
             "instant",
             "code",
+            family="weather_cloud",
             categorical=True,
             level=_lv,
             text_col=f"V_S{_n}_CSA",
@@ -78,6 +82,7 @@ for _n in (1, 2, 3, 4):
             "cloud_base_height",
             "instant",
             "metres",
+            family="weather_cloud",
             level=_lv,
             interval_seconds=3600,
         ),
@@ -88,18 +93,27 @@ for _n in (1, 2, 3, 4):
 
 # DBTITLE 1,DWD -- table specifications
 # `primary=False` marks a variable that a dedicated product also carries; the
-# alternate is kept, not dropped, so agreement can be measured.
+# alternate is kept, not dropped, so agreement can be measured. `family`
+# groups by meaning (temperature, humidity, ...), not by this source table.
 DWD_TABLES = {
     "dwd_air_temperature": {
         "qn": "QN_9",
         "time": "hourly",
         "specs": [
-            spec("TT_TU", "air_temperature", "instant", "degC", interval_seconds=3600),
+            spec(
+                "TT_TU",
+                "air_temperature",
+                "instant",
+                "degC",
+                family="weather_temperature",
+                interval_seconds=3600,
+            ),
             spec(
                 "RF_TU",
                 "relative_humidity",
                 "instant",
                 "percent",
+                family="weather_humidity",
                 interval_seconds=3600,
             ),
         ],
@@ -113,14 +127,23 @@ DWD_TABLES = {
                 "absolute_humidity",
                 "instant",
                 "g_per_m3",
+                family="weather_humidity",
                 interval_seconds=3600,
             ),
-            spec("VP_STD", "vapour_pressure", "instant", "hPa", interval_seconds=3600),
+            spec(
+                "VP_STD",
+                "vapour_pressure",
+                "instant",
+                "hPa",
+                family="weather_humidity",
+                interval_seconds=3600,
+            ),
             spec(
                 "TF_STD",
                 "wet_bulb_temperature",
                 "instant",
                 "degC",
+                family="weather_temperature",
                 interval_seconds=3600,
             ),
             spec(
@@ -128,6 +151,7 @@ DWD_TABLES = {
                 "pressure_station",
                 "instant",
                 "hPa",
+                family="weather_pressure",
                 primary=False,
                 interval_seconds=3600,
             ),
@@ -136,6 +160,7 @@ DWD_TABLES = {
                 "air_temperature",
                 "instant",
                 "degC",
+                family="weather_temperature",
                 primary=False,
                 interval_seconds=3600,
             ),
@@ -144,6 +169,7 @@ DWD_TABLES = {
                 "relative_humidity",
                 "instant",
                 "percent",
+                family="weather_humidity",
                 primary=False,
                 interval_seconds=3600,
             ),
@@ -152,6 +178,7 @@ DWD_TABLES = {
                 "dew_point_temperature",
                 "instant",
                 "degC",
+                family="weather_temperature",
                 primary=False,
                 interval_seconds=3600,
             ),
@@ -166,6 +193,7 @@ DWD_TABLES = {
                 "air_temperature",
                 "instant",
                 "degC",
+                family="weather_temperature",
                 primary=False,
                 interval_seconds=3600,
             ),
@@ -174,6 +202,7 @@ DWD_TABLES = {
                 "dew_point_temperature",
                 "instant",
                 "degC",
+                family="weather_temperature",
                 interval_seconds=3600,
             ),
         ],
@@ -182,20 +211,42 @@ DWD_TABLES = {
         "qn": "QN_8",
         "time": "hourly",
         "specs": [
-            spec("P", "pressure_sea_level", "instant", "hPa", interval_seconds=3600),
-            spec("P0", "pressure_station", "instant", "hPa", interval_seconds=3600),
+            spec(
+                "P",
+                "pressure_sea_level",
+                "instant",
+                "hPa",
+                family="weather_pressure",
+                interval_seconds=3600,
+            ),
+            spec(
+                "P0",
+                "pressure_station",
+                "instant",
+                "hPa",
+                family="weather_pressure",
+                interval_seconds=3600,
+            ),
         ],
     },
     "dwd_precipitation": {
         "qn": "QN_8",
         "time": "hourly",
         "specs": [
-            spec("R1", "precipitation", "sum", "mm", interval_seconds=3600),
+            spec(
+                "R1",
+                "precipitation",
+                "sum",
+                "mm",
+                family="weather_precipitation",
+                interval_seconds=3600,
+            ),
             spec(
                 "RS_IND",
                 "precipitation_occurred",
                 "instant",
                 "flag",
+                family="weather_precipitation",
                 interval_seconds=3600,
             ),
             spec(
@@ -203,6 +254,7 @@ DWD_TABLES = {
                 "precipitation_form",
                 "instant",
                 "code",
+                family="weather_precipitation",
                 categorical=True,
                 interval_seconds=3600,
             ),
@@ -212,19 +264,34 @@ DWD_TABLES = {
         "qn": "QN_7",
         "time": "hourly",
         "specs": [
-            spec("SD_SO", "sunshine_duration", "sum", "minutes", interval_seconds=3600),
+            spec(
+                "SD_SO",
+                "sunshine_duration",
+                "sum",
+                "minutes",
+                family="weather_solar_radiation",
+                interval_seconds=3600,
+            ),
         ],
     },
     "dwd_wind": {
         "qn": "QN_3",
         "time": "hourly",
         "specs": [
-            spec("F", "wind_speed", "mean", "m_per_s", interval_seconds=3600),
+            spec(
+                "F",
+                "wind_speed",
+                "mean",
+                "m_per_s",
+                family="weather_wind",
+                interval_seconds=3600,
+            ),
             spec(
                 "D",
                 "wind_direction",
                 "mean",
                 "degrees",
+                family="weather_wind",
                 interval_seconds=3600,
                 null_value=990.0,
                 null_reason="variable_direction",
@@ -235,15 +302,36 @@ DWD_TABLES = {
         "qn": "QN_8",
         "time": "hourly",
         "specs": [
-            spec("FF", "wind_speed", "instant", "m_per_s", interval_seconds=3600),
-            spec("DD", "wind_direction", "instant", "degrees", interval_seconds=3600),
+            spec(
+                "FF",
+                "wind_speed",
+                "instant",
+                "m_per_s",
+                family="weather_wind",
+                interval_seconds=3600,
+            ),
+            spec(
+                "DD",
+                "wind_direction",
+                "instant",
+                "degrees",
+                family="weather_wind",
+                interval_seconds=3600,
+            ),
         ],
     },
     "dwd_extreme_wind": {
         "qn": "QN_8",
         "time": "hourly",
         "specs": [
-            spec("FX_911", "wind_gust", "max", "m_per_s", interval_seconds=3600),
+            spec(
+                "FX_911",
+                "wind_gust",
+                "max",
+                "m_per_s",
+                family="weather_wind",
+                interval_seconds=3600,
+            ),
         ],
     },
     "dwd_visibility": {
@@ -255,6 +343,7 @@ DWD_TABLES = {
                 "visibility",
                 "instant",
                 "metres",
+                family="weather_visibility",
                 interval_seconds=3600,
                 method_col="V_VV_I",
             ),
@@ -284,6 +373,7 @@ DWD_TABLES = {
                 "present_weather",
                 "instant",
                 "code",
+                family="weather_present_weather",
                 categorical=True,
                 text_col="WW_Text",
                 interval_seconds=3600,
@@ -301,6 +391,7 @@ DWD_TABLES = {
                 "soil_temperature",
                 "instant",
                 "degC",
+                family="weather_soil_temperature",
                 level=f"depth_{d}cm",
                 interval_seconds=3600,
             )
@@ -315,13 +406,19 @@ DWD_TABLES = {
             _radiation("FD_LBERG", "diffuse_radiation", 600),
             _radiation("FG_LBERG", "global_radiation", 600),
             spec(
-                "SD_LBERG", "sunshine_duration", "sum", "minutes", interval_seconds=600
+                "SD_LBERG",
+                "sunshine_duration",
+                "sum",
+                "minutes",
+                family="weather_solar_radiation",
+                interval_seconds=600,
             ),
             spec(
                 "ZENIT",
                 "solar_zenith_angle",
                 "instant",
                 "degrees",
+                family="weather_solar_radiation",
                 interval_seconds=600,
             ),
         ],
@@ -335,8 +432,22 @@ DWD_TABLES = {
 # not documented.
 HONDA_INTERVAL_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
 HONDA_SPECS = [
-    spec("WeatherStation_Weather_Ta", "air_temperature", "unspecified", "degC"),
-    spec("WeatherStation_Weather_Igm", "global_radiation", "unspecified", "W_per_m2"),
+    spec(
+        "WeatherStation_Weather_Ta",
+        "air_temperature",
+        "unspecified",
+        "degC",
+        family="weather_temperature",
+    ),
+    # Same underlying meaning as DWD's global_radiation (surface global solar
+    # irradiance); labelled the same so all sources land in one comparable row.
+    spec(
+        "WeatherStation_Weather_Igm",
+        "global_radiation",
+        "unspecified",
+        "W_per_m2",
+        family="weather_solar_radiation",
+    ),
 ]
 
 # COMMAND ----------
@@ -345,13 +456,19 @@ HONDA_SPECS = [
 # Statistic is not documented for the provider's hourly values.
 AW_SPECS = [
     spec(
-        "temperature", "air_temperature", "unspecified", "degC", interval_seconds=3600
+        "temperature",
+        "air_temperature",
+        "unspecified",
+        "degC",
+        family="weather_temperature",
+        interval_seconds=3600,
     ),
     spec(
         "temperature_dew_point",
         "dew_point_temperature",
         "unspecified",
         "degC",
+        family="weather_temperature",
         interval_seconds=3600,
     ),
     spec(
@@ -359,6 +476,7 @@ AW_SPECS = [
         "relative_humidity",
         "unspecified",
         "percent",
+        family="weather_humidity",
         interval_seconds=3600,
     ),
     spec(
@@ -366,6 +484,7 @@ AW_SPECS = [
         "pressure_station",
         "unspecified",
         "Pa",
+        family="weather_pressure",
         unit="hPa",
         factor=0.01,
         interval_seconds=3600,
@@ -376,28 +495,51 @@ AW_SPECS = [
         "pressure_sea_level",
         "unspecified",
         "Pa",
+        family="weather_pressure",
         unit="hPa",
         factor=0.01,
         interval_seconds=3600,
         rule="Pa -> hPa (x0.01)",
     ),
-    spec("wind_speed", "wind_speed", "unspecified", "m_per_s", interval_seconds=3600),
-    spec("wind_gust", "wind_gust", "unspecified", "m_per_s", interval_seconds=3600),
+    spec(
+        "wind_speed",
+        "wind_speed",
+        "unspecified",
+        "m_per_s",
+        family="weather_wind",
+        interval_seconds=3600,
+    ),
+    spec(
+        "wind_gust",
+        "wind_gust",
+        "unspecified",
+        "m_per_s",
+        family="weather_wind",
+        interval_seconds=3600,
+    ),
     spec(
         "wind_direction",
         "wind_direction",
         "unspecified",
         "degrees",
+        family="weather_wind",
         interval_seconds=3600,
     ),
     spec(
-        "precipitation_lwe", "precipitation", "unspecified", "mm", interval_seconds=3600
+        "precipitation_lwe",
+        "precipitation",
+        "unspecified",
+        "mm",
+        family="weather_precipitation",
+        interval_seconds=3600,
     ),
+    # Same underlying meaning as DWD's global_radiation; labelled the same.
     spec(
         "solar_irradiance",
-        "solar_irradiance",
+        "global_radiation",
         "unspecified",
         "W_per_m2",
+        family="weather_solar_radiation",
         interval_seconds=3600,
     ),
     spec(
@@ -405,6 +547,7 @@ AW_SPECS = [
         "cloud_cover",
         "unspecified",
         "fraction",
+        family="weather_cloud",
         unit="percent",
         factor=100.0,
         interval_seconds=3600,
@@ -415,6 +558,7 @@ AW_SPECS = [
         "cloud_base_height",
         "unspecified",
         "metres",
+        family="weather_cloud",
         interval_seconds=3600,
     ),
     spec(
@@ -422,6 +566,7 @@ AW_SPECS = [
         "visibility",
         "unspecified",
         "km",
+        family="weather_visibility",
         unit="metres",
         factor=1000.0,
         interval_seconds=3600,
@@ -432,7 +577,15 @@ AW_SPECS = [
         "sunshine_duration",
         "unspecified",
         "minutes",
+        family="weather_solar_radiation",
         interval_seconds=3600,
     ),
-    spec("index_uv", "uv_index", "unspecified", "index", interval_seconds=3600),
+    spec(
+        "index_uv",
+        "uv_index",
+        "unspecified",
+        "index",
+        family="weather_solar_radiation",
+        interval_seconds=3600,
+    ),
 ]

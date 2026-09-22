@@ -33,7 +33,24 @@ _PROVENANCE_TAIL = [
     ("_silver_run_id", "string"),
 ]
 
-WEATHER_OBSERVATION_COLUMNS = [
+# One weather parameter/measurement family = one Silver structure; every
+# genuinely compatible source contributes rows to it. Not a fixed list by
+# design -- see the per-family assignment in weather/_weather_specs.py.
+WEATHER_FAMILIES = [
+    "weather_temperature",
+    "weather_soil_temperature",
+    "weather_humidity",
+    "weather_pressure",
+    "weather_wind",
+    "weather_precipitation",
+    "weather_cloud",
+    "weather_visibility",
+    "weather_present_weather",
+    "weather_solar_radiation",
+]
+
+# Column shape shared by every table in WEATHER_FAMILIES.
+WEATHER_MEASUREMENT_COLUMNS = [
     ("observation_key", "string"),
     ("location_key", "string"),
     ("source_location_id", "string"),
@@ -212,7 +229,7 @@ _SPEC_SCHEMA = (
     "source_column string, variable string, statistic string, level string, "
     "unit_native string, unit string, factor double, offset double, rule string, "
     "is_primary boolean, interval_seconds int, categorical boolean, "
-    "null_value double, null_reason string"
+    "null_value double, null_reason string, family string"
 )
 
 
@@ -222,6 +239,7 @@ def spec(
     statistic,
     unit_native,
     *,
+    family,
     unit=None,
     factor=1.0,
     offset=0.0,
@@ -235,9 +253,11 @@ def spec(
     text_col=None,
     method_col=None,
 ):
-    """One source column -> one variable. `factor`/`offset` give the standardised
-    value (value_native * factor + offset); anything other than 1/0 marks the row
-    `converted` and needs a `rule`."""
+    """One source column -> one variable, routed to one `family` (the shared
+    weather structure in WEATHER_FAMILIES it belongs in by meaning, regardless
+    of which source it comes from). `factor`/`offset` give the standardised
+    value (value_native * factor + offset); anything other than 1/0 marks the
+    row `converted` and needs a `rule`."""
     return {
         "source_column": source_column,
         "variable": variable,
@@ -255,6 +275,7 @@ def spec(
         "null_reason": null_reason,
         "text_col": text_col,
         "method_col": method_col,
+        "family": family,
     }
 
 
@@ -389,6 +410,32 @@ def write_semantic(
     audit(component, source, "rows_written", n, status="PASS", rid=rid)
     print(f"OK  {full}: {n if n is not None else '?'} rows written")
     return n
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- split a long frame across its family structures
+
+
+def write_semantic_families(
+    df, families: list, *, source: str, component: str, rid: str, replace_where_fn
+) -> dict:
+    """Write one write_semantic() call per family present in `df`'s `family`
+    column, each to its own WEATHER_FAMILIES table. `families` is the closed
+    set of families the caller's specs can produce (known from the spec list,
+    not discovered by scanning `df`). `replace_where_fn(family)` builds that
+    family table's replaceWhere predicate."""
+    return {
+        fam: write_semantic(
+            conform(df.filter(F.col("family") == fam), WEATHER_MEASUREMENT_COLUMNS),
+            fam,
+            source=source,
+            component=component,
+            rid=rid,
+            replace_where=replace_where_fn(fam),
+        )
+        for fam in families
+    }
 
 
 # COMMAND ----------

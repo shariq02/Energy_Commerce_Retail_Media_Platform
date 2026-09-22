@@ -12,9 +12,10 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** DWD measurement tables into long `weather_observation` rows
-# MAGIC (one per station, instant, variable), native value/unit kept beside the
-# MAGIC standardised value. Loads the tables listed in `LOAD_TABLES`.
+# MAGIC **Purpose:** DWD measurement tables into long rows (one per station,
+# MAGIC instant, variable), native value/unit kept beside the standardised value,
+# MAGIC split across the shared per-parameter weather structures (WEATHER_FAMILIES)
+# MAGIC by each column's `family`. Loads the tables listed in `LOAD_TABLES`.
 
 # COMMAND ----------
 
@@ -63,7 +64,7 @@ ensure_utc_session()
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- Bronze measurement table to long weather_observation rows
+# DBTITLE 1,Helper -- Bronze measurement table to long rows (family column intact)
 
 
 def build_dwd_observations(bronze_df, table: str):
@@ -119,7 +120,7 @@ def build_dwd_observations(bronze_df, table: str):
     )
     long = add_project_time(long)
     long = add_semantic_provenance(long, SOURCE, table, RID)
-    return conform(long, WEATHER_OBSERVATION_COLUMNS)
+    return long
 
 
 # COMMAND ----------
@@ -129,49 +130,54 @@ bronze_frames = {table: read_bronze(table) for table in LOAD_TABLES}
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- long weather_observation frames
+# DBTITLE 1,Transform -- long rows per source table (family column intact)
 observation_frames = {
     table: build_dwd_observations(df, table) for table, df in bronze_frames.items()
 }
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- weather_observation (one table at a time)
+# DBTITLE 1,Write Silver -- family structures (one source table at a time)
+_table_families = {
+    table: sorted({s["family"] for s in DWD_TABLES[table]["specs"]})
+    for table in LOAD_TABLES
+}
 for table, df in observation_frames.items():
-    write_semantic(
+    write_semantic_families(
         df,
-        "weather_observation",
+        _table_families[table],
         source=SOURCE,
         component=COMPONENT,
         rid=RID,
-        replace_where=f"source_dataset = '{table}'",
+        replace_where_fn=lambda _fam, _t=table: f"source_dataset = '{_t}'",
     )
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect -- weather_observation per loaded table
+# DBTITLE 1,Inspect -- each family structure per loaded table
 findings_blocks = {}
 for table in LOAD_TABLES:
-    written = spark.table(semantic_table("weather_observation")).filter(
-        F.col("source_dataset") == table
-    )
-    findings_blocks[table] = inspect_table(
-        written,
-        "weather_observation",
-        source=FINDINGS_SOURCE,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["observation_key"],
-        extra_checks=structure_extra_checks(written),
-    )
+    for fam in _table_families[table]:
+        written = spark.table(semantic_table(fam)).filter(
+            F.col("source_dataset") == table
+        )
+        findings_blocks[(table, fam)] = inspect_table(
+            written,
+            fam,
+            source=FINDINGS_SOURCE,
+            component=COMPONENT,
+            rid=RID,
+            key_cols=["observation_key"],
+            extra_checks=structure_extra_checks(written),
+        )
 
 # COMMAND ----------
 
-# DBTITLE 1,Export findings -- weather_observation per loaded table
-for table, blocks in findings_blocks.items():
+# DBTITLE 1,Export findings -- each family structure per loaded table
+for (table, fam), blocks in findings_blocks.items():
     write_silver_findings(
         FINDINGS_SOURCE,
-        f"{COMPONENT.split('/')[-1]}__{table}",
-        f"weather_observation -- {table}",
+        f"{COMPONENT.split('/')[-1]}__{table}__{fam}",
+        f"{fam} -- {table}",
         blocks,
     )

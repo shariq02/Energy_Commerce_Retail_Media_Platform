@@ -14,7 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** read-only checks of the weather structures: key uniqueness,
 # MAGIC place coverage, time consistency, and regression against the existing
-# MAGIC source-scoped Silver tables.
+# MAGIC source-scoped Silver tables. Checks run against the union of every
+# MAGIC WEATHER_FAMILIES table that has been written so far.
 
 # COMMAND ----------
 
@@ -44,7 +45,6 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-OBS = semantic_table("weather_observation")
 DAILY = semantic_table("weather_daily")
 LOC = semantic_table("weather_location")
 BASELINE_SCHEMA = "energy_silver"
@@ -73,8 +73,31 @@ def keep(heading: str, df) -> None:
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- weather_observation
-obs = spark.table(OBS)
+# DBTITLE 1,Read Silver -- every family structure written so far, unioned
+WRITTEN_FAMILIES = [
+    f for f in WEATHER_FAMILIES if spark.catalog.tableExists(semantic_table(f))
+]
+for _f in WEATHER_FAMILIES:
+    if _f not in WRITTEN_FAMILIES:
+        report(f"{_f} table exists", True, "not written yet", status="SKIP")
+
+_family_frames = [
+    spark.table(semantic_table(f)).withColumn("family", F.lit(f))
+    for f in WRITTEN_FAMILIES
+]
+obs = _family_frames[0]
+for _fdf in _family_frames[1:]:
+    obs = obs.unionByName(_fdf)
+
+# COMMAND ----------
+
+# DBTITLE 1,Check -- rows per family structure
+keep(
+    "rows per family structure",
+    obs.groupBy("family")
+    .agg(F.count("*").alias("rows"), F.countDistinct("variable").alias("variables"))
+    .orderBy("family"),
+)
 
 # COMMAND ----------
 

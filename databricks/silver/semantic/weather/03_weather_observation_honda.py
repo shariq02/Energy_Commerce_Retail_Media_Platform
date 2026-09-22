@@ -12,8 +12,9 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** Honda on-site air temperature and irradiance into
-# MAGIC `weather_observation`, all three sampling frequencies kept.
+# MAGIC **Purpose:** Honda on-site air temperature and irradiance into the shared
+# MAGIC `weather_temperature` and `weather_solar_radiation` structures alongside
+# MAGIC the other sources, all three sampling frequencies kept.
 
 # COMMAND ----------
 
@@ -90,42 +91,45 @@ honda_obs = (
 )
 honda_obs = add_project_time(honda_obs)
 honda_obs = add_semantic_provenance(honda_obs, SOURCE, BRONZE_TABLE, RID)
-honda_obs = conform(honda_obs, WEATHER_OBSERVATION_COLUMNS)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- weather_observation (honda_iot_weather)
-write_semantic(
+# DBTITLE 1,Write Silver -- family structures (honda_iot_weather)
+HONDA_FAMILIES = sorted({s["family"] for s in HONDA_SPECS})
+write_semantic_families(
     honda_obs,
-    "weather_observation",
+    HONDA_FAMILIES,
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-    replace_where=f"source_dataset = '{BRONZE_TABLE}'",
+    replace_where_fn=lambda _fam: f"source_dataset = '{BRONZE_TABLE}'",
 )
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect -- weather_observation (honda)
-written = spark.table(semantic_table("weather_observation")).filter(
-    F.col("source_dataset") == BRONZE_TABLE
-)
-findings_blocks = inspect_table(
-    written,
-    "weather_observation",
-    source=FINDINGS_SOURCE,
-    component=COMPONENT,
-    rid=RID,
-    key_cols=["observation_key"],
-    extra_checks=structure_extra_checks(written),
-)
+# DBTITLE 1,Inspect -- each family structure (honda)
+findings_blocks = {}
+for fam in HONDA_FAMILIES:
+    written = spark.table(semantic_table(fam)).filter(
+        F.col("source_dataset") == BRONZE_TABLE
+    )
+    findings_blocks[fam] = inspect_table(
+        written,
+        fam,
+        source=FINDINGS_SOURCE,
+        component=COMPONENT,
+        rid=RID,
+        key_cols=["observation_key"],
+        extra_checks=structure_extra_checks(written),
+    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Export findings -- weather_observation (honda)
-write_silver_findings(
-    FINDINGS_SOURCE,
-    f"{COMPONENT.split('/')[-1]}__{BRONZE_TABLE}",
-    f"weather_observation -- {BRONZE_TABLE}",
-    findings_blocks,
-)
+# DBTITLE 1,Export findings -- each family structure (honda)
+for fam, blocks in findings_blocks.items():
+    write_silver_findings(
+        FINDINGS_SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{BRONZE_TABLE}__{fam}",
+        f"{fam} -- {BRONZE_TABLE}",
+        blocks,
+    )
