@@ -58,12 +58,16 @@ hourly_temperature = (
     spark.table(semantic_table(DERIVED_FROM))
     .filter(
         (F.col("source_system") == SOURCE)
-        & (F.col("variable") == VARIABLE)
-        & F.col("is_primary")
-        & F.col("value").isNotNull()
+        & F.col("air_temperature_is_primary")
+        & F.col("air_temperature_degc").isNotNull()
         & F.col("local_date").isNotNull()
     )
-    .select("location_key", "source_location_id", "local_date", "value")
+    .select(
+        "location_key",
+        "source_location_id",
+        "local_date",
+        F.col("air_temperature_degc").alias("value"),
+    )
 )
 
 # COMMAND ----------

@@ -23,41 +23,25 @@
 SEMANTIC_SCHEMA = "energy_silver"
 PROJECT_TZ = "Europe/Berlin"
 
-# Provenance columns shared by every semantic structure; `source_column` only
-# where a row comes from one named source column.
+# Provenance columns shared by every semantic structure. Field-level source
+# attribution isn't tracked separately -- source_dataset already identifies
+# exactly which product a row came from.
 _PROVENANCE_HEAD = [("source_system", "string"), ("source_dataset", "string")]
-_PROVENANCE_COLUMN = [("source_column", "string")]
 _PROVENANCE_TAIL = [
     ("source_record_id", "string"),
     ("_silver_loaded_at", "timestamp"),
     ("_silver_run_id", "string"),
 ]
 
-# One weather parameter/measurement family = one Silver structure; every
-# genuinely compatible source contributes rows to it. Not a fixed list by
-# design -- see the per-family assignment in weather/_weather_specs.py.
-WEATHER_FAMILIES = [
-    "weather_temperature",
-    "weather_soil_temperature",
-    "weather_humidity",
-    "weather_pressure",
-    "weather_wind",
-    "weather_precipitation",
-    "weather_cloud",
-    "weather_visibility",
-    "weather_present_weather",
-    "weather_solar_radiation",
-]
-
-# Column shape shared by every table in WEATHER_FAMILIES.
-WEATHER_MEASUREMENT_COLUMNS = [
+# Every weather structure needs place and time; this is genuinely universal
+# scaffolding, not a measurement-shape decision -- the measurement columns
+# below are designed per family, not shared.
+_PLACE_HEAD = [
     ("observation_key", "string"),
     ("location_key", "string"),
     ("source_location_id", "string"),
-    ("variable", "string"),
-    ("statistic", "string"),
-    ("level", "string"),
-    ("is_primary", "boolean"),
+]
+_TIME_COLUMNS = [
     ("observation_ts_native", "string"),
     ("time_basis", "string"),
     ("utc_offset_hours", "double"),
@@ -65,24 +49,199 @@ WEATHER_MEASUREMENT_COLUMNS = [
     ("observation_ts_project", "timestamp"),
     ("local_date", "date"),
     ("interval_seconds", "int"),
-    ("value_native", "double"),
-    ("unit_native", "string"),
-    ("value", "double"),
-    ("unit", "string"),
-    ("value_code", "string"),
-    ("value_text", "string"),
-    ("value_origin", "string"),
-    ("derivation_rule", "string"),
-    ("missing_reason", "string"),
+]
+# DWD's per-product quality classification (QN_*); NULL for sources that
+# don't carry one (Honda, AccuWeather).
+_QUALITY_COLUMNS = [
     ("quality_code", "string"),
     ("quality_label", "string"),
     ("quality_flag", "string"),
-    ("observation_method", "string"),
-    ("measurement_basis", "string"),
-    *_PROVENANCE_HEAD,
-    *_PROVENANCE_COLUMN,
-    *_PROVENANCE_TAIL,
 ]
+_TAIL = [("measurement_basis", "string"), *_PROVENANCE_HEAD, *_PROVENANCE_TAIL]
+
+# One coherent semantic weather family = one Silver structure, designed
+# around what that family's data actually is -- not a shared measurement
+# shape partitioned by a label. `_is_primary` flags are per measurement
+# field, only where a source genuinely has a competing alternate product for
+# that specific field (not a blanket row-level flag).
+
+WEATHER_TEMPERATURE_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("air_temperature_degc", "double"),
+    ("air_temperature_is_primary", "boolean"),
+    ("dew_point_temperature_degc", "double"),
+    ("dew_point_temperature_is_primary", "boolean"),
+    ("wet_bulb_temperature_degc", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+WEATHER_HUMIDITY_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("relative_humidity_percent", "double"),
+    ("relative_humidity_is_primary", "boolean"),
+    ("absolute_humidity_g_per_m3", "double"),
+    ("vapour_pressure_hpa", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Native value/unit kept only for AccuWeather (Pa -> hPa); DWD is already
+# hPa, so its native columns stay NULL (no unnecessary conversion recorded).
+WEATHER_PRESSURE_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("pressure_station_hpa", "double"),
+    ("pressure_station_is_primary", "boolean"),
+    ("pressure_station_native_value", "double"),
+    ("pressure_station_native_unit", "string"),
+    ("pressure_sea_level_hpa", "double"),
+    ("pressure_sea_level_native_value", "double"),
+    ("pressure_sea_level_native_unit", "string"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# `statistic` is a real distinguishing fact here (mean/instant/max are three
+# different DWD products reading the same station-hour), not a leftover
+# generic column -- wind speed/direction/gust are already m/s and degrees
+# everywhere, so no native pair is needed.
+WEATHER_WIND_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("statistic", "string"),
+    ("wind_speed_m_per_s", "double"),
+    ("wind_direction_degrees", "double"),
+    ("wind_direction_variable", "boolean"),
+    ("wind_gust_m_per_s", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Amount, occurred-flag and form describe one precipitation event (DWD
+# already reports all three in one Bronze row); both sources are already mm.
+WEATHER_PRECIPITATION_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("precipitation_mm", "double"),
+    ("precipitation_occurred", "boolean"),
+    ("precipitation_form_code", "string"),
+    ("precipitation_form_text", "string"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Cloud layers are a genuinely repeated, variably-populated structure (0-4
+# layers depending on sky conditions) -- kept as an array of structs, not
+# flattened into fixed layer_1..layer_4 columns or exploded into long rows.
+# Total cover needs a native pair on both sources (DWD eighths, AccuWeather
+# fraction -- neither is already percent); base height is already metres
+# everywhere.
+WEATHER_CLOUD_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("cloud_cover_total_percent", "double"),
+    ("cloud_cover_total_is_primary", "boolean"),
+    ("cloud_cover_total_native_value", "double"),
+    ("cloud_cover_total_native_unit", "string"),
+    ("cloud_base_height_m", "double"),
+    ("observation_method", "string"),
+    (
+        "layers",
+        (
+            "array<struct<layer_number:int,genus_code:string,genus_text:string,"
+            "base_height_m:double,cover_percent:double,cover_native_value:double,"
+            "cover_native_unit:string>>"
+        ),
+    ),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Kept separate from cloud: different physical basis (optical extinction
+# distance vs. okta sky-cover fraction), and DWD keeps them as separate
+# products. Native pair needed for AccuWeather (km -> m); DWD is already m.
+WEATHER_VISIBILITY_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("visibility_m", "double"),
+    ("visibility_native_value", "double"),
+    ("visibility_native_unit", "string"),
+    ("observation_method", "string"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Purely categorical -- no numeric value/unit columns at all, unlike every
+# other family. DWD only; no other source reports coded weather phenomena.
+WEATHER_PRESENT_WEATHER_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("present_weather_code", "string"),
+    ("present_weather_text", "string"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Six depths, always reported together in one DWD row -- a small, fixed,
+# always-jointly-measured set, so flat columns fit better than an array
+# (unlike cloud layers, which vary in how many are populated). DWD only,
+# already degC.
+WEATHER_SOIL_TEMPERATURE_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("soil_temperature_2cm_degc", "double"),
+    ("soil_temperature_5cm_degc", "double"),
+    ("soil_temperature_10cm_degc", "double"),
+    ("soil_temperature_20cm_degc", "double"),
+    ("soil_temperature_50cm_degc", "double"),
+    ("soil_temperature_100cm_degc", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# Components a product reports together become columns of the same row
+# (DWD's solar product gives all of longwave/diffuse/global/sunshine/zenith
+# in one row). Native pair only on the three DWD radiation sums (J/cm2 over
+# an interval -> mean W/m2, per interval_seconds); sunshine duration, zenith
+# angle and UV index are never converted anywhere, so no native pair there.
+WEATHER_SOLAR_RADIATION_COLUMNS = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("global_radiation_w_per_m2", "double"),
+    ("global_radiation_native_value", "double"),
+    ("global_radiation_native_unit", "string"),
+    ("diffuse_radiation_w_per_m2", "double"),
+    ("diffuse_radiation_native_value", "double"),
+    ("diffuse_radiation_native_unit", "string"),
+    ("longwave_downward_radiation_w_per_m2", "double"),
+    ("longwave_downward_radiation_native_value", "double"),
+    ("longwave_downward_radiation_native_unit", "string"),
+    ("solar_zenith_angle_degrees", "double"),
+    ("sunshine_duration_minutes", "double"),
+    ("uv_index", "double"),
+    *_QUALITY_COLUMNS,
+    *_TAIL,
+]
+
+# name -> column list, one entry per Silver structure; not a fixed list by
+# design -- these are the families the actual source parameters resolved
+# into (see weather/_weather_specs.py for the per-source mapping).
+WEATHER_FAMILY_COLUMNS = {
+    "weather_temperature": WEATHER_TEMPERATURE_COLUMNS,
+    "weather_humidity": WEATHER_HUMIDITY_COLUMNS,
+    "weather_pressure": WEATHER_PRESSURE_COLUMNS,
+    "weather_wind": WEATHER_WIND_COLUMNS,
+    "weather_precipitation": WEATHER_PRECIPITATION_COLUMNS,
+    "weather_cloud": WEATHER_CLOUD_COLUMNS,
+    "weather_visibility": WEATHER_VISIBILITY_COLUMNS,
+    "weather_present_weather": WEATHER_PRESENT_WEATHER_COLUMNS,
+    "weather_soil_temperature": WEATHER_SOIL_TEMPERATURE_COLUMNS,
+    "weather_solar_radiation": WEATHER_SOLAR_RADIATION_COLUMNS,
+}
+WEATHER_FAMILIES = list(WEATHER_FAMILY_COLUMNS)
 
 WEATHER_DAILY_COLUMNS = [
     ("daily_key", "string"),
@@ -104,7 +263,7 @@ WEATHER_DAILY_COLUMNS = [
     ("n_observations", "int"),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
-    *_PROVENANCE_COLUMN,
+    ("source_column", "string"),
     *_PROVENANCE_TAIL,
 ]
 
@@ -223,138 +382,16 @@ def continent_of(country_code_col: str):
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- wide source columns to standardised long rows
-
-_SPEC_SCHEMA = (
-    "source_column string, variable string, statistic string, level string, "
-    "unit_native string, unit string, factor double, offset double, rule string, "
-    "is_primary boolean, interval_seconds int, categorical boolean, "
-    "null_value double, null_reason string, family string"
-)
+# DBTITLE 1,Helper -- keep rows where at least one named column is populated
 
 
-def spec(
-    source_column,
-    variable,
-    statistic,
-    unit_native,
-    *,
-    family,
-    unit=None,
-    factor=1.0,
-    offset=0.0,
-    level=None,
-    interval_seconds=None,
-    primary=True,
-    rule=None,
-    categorical=False,
-    null_value=None,
-    null_reason=None,
-    text_col=None,
-    method_col=None,
-):
-    """One source column -> one variable, routed to one `family` (the shared
-    weather structure in WEATHER_FAMILIES it belongs in by meaning, regardless
-    of which source it comes from). `factor`/`offset` give the standardised
-    value (value_native * factor + offset); anything other than 1/0 marks the
-    row `converted` and needs a `rule`."""
-    return {
-        "source_column": source_column,
-        "variable": variable,
-        "statistic": statistic,
-        "level": level,
-        "unit_native": unit_native,
-        "unit": unit or unit_native,
-        "factor": float(factor),
-        "offset": float(offset),
-        "rule": rule,
-        "is_primary": primary,
-        "interval_seconds": interval_seconds,
-        "categorical": categorical,
-        "null_value": null_value,
-        "null_reason": null_reason,
-        "text_col": text_col,
-        "method_col": method_col,
-        "family": family,
-    }
-
-
-def long_from_spec(df, specs: list, keep_cols: list):
-    """Single-pass stack of the spec'd columns into long rows with native and
-    standardised values. Missing (NULL) source values produce no row; a special
-    value (`null_value`) keeps the row with a NULL standardised value and a
-    `missing_reason`. Text and method columns named in the specs must exist in
-    `df`."""
-    cols = [s["source_column"] for s in specs]
-    aux = sorted(
-        {s[k] for s in specs for k in ("text_col", "method_col") if s[k]}
-        - set(keep_cols)
-    )
-    pairs = ", ".join(f"'{c}', cast(`{c}` as double)" for c in cols)
-    long = df.select(
-        *keep_cols,
-        *aux,
-        F.expr(f"stack({len(cols)}, {pairs}) as (source_column, value_raw)"),
-    ).filter(F.col("value_raw").isNotNull())
-
-    def per_column(key):
-        expr = F.lit(None).cast("string")
-        for s in reversed(specs):
-            if s[key]:
-                expr = F.when(
-                    F.col("source_column") == s["source_column"], F.col(s[key])
-                ).otherwise(expr)
-        return expr
-
-    long = (
-        long.withColumn("_text_raw", per_column("text_col"))
-        .withColumn("observation_method", per_column("method_col"))
-        .drop(*aux)
-    )
-    spec_df = spark.createDataFrame(
-        [tuple(s[f.split()[0]] for f in _SPEC_SCHEMA.split(", ")) for s in specs],
-        _SPEC_SCHEMA,
-    )
-    long = long.join(F.broadcast(spec_df), "source_column", "left")
-    special = F.col("null_value").isNotNull() & (
-        F.col("value_raw") == F.col("null_value")
-    )
-    converted = (F.col("factor") != 1.0) | (F.col("offset") != 0.0)
-    return (
-        long.withColumn("value_native", F.col("value_raw"))
-        .withColumn("missing_reason", F.when(special, F.col("null_reason")))
-        .withColumn(
-            "value",
-            F.when(
-                F.col("categorical") | special, F.lit(None).cast("double")
-            ).otherwise(F.col("value_raw") * F.col("factor") + F.col("offset")),
-        )
-        .withColumn(
-            "value_code",
-            F.when(
-                F.col("categorical") & ~special,
-                F.col("value_raw").cast("long").cast("string"),
-            ),
-        )
-        .withColumn("value_text", F.when(~special, F.col("_text_raw")))
-        .withColumn(
-            "unit", F.when(F.col("categorical"), F.lit(None)).otherwise(F.col("unit"))
-        )
-        .withColumn(
-            "value_origin", F.when(converted, "converted").otherwise("observed")
-        )
-        .withColumn("derivation_rule", F.when(converted, F.col("rule")))
-        .drop(
-            "value_raw",
-            "_text_raw",
-            "factor",
-            "offset",
-            "rule",
-            "categorical",
-            "null_value",
-            "null_reason",
-        )
-    )
+def any_present(df, cols: list):
+    """Filter to rows where at least one of `cols` is non-NULL, so a source
+    row that populates none of a family's fields doesn't produce a junk row."""
+    cond = F.lit(False)
+    for c in cols:
+        cond = cond | F.col(c).isNotNull()
+    return df.filter(cond)
 
 
 # COMMAND ----------
@@ -414,32 +451,6 @@ def write_semantic(
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- split a long frame across its family structures
-
-
-def write_semantic_families(
-    df, families: list, *, source: str, component: str, rid: str, replace_where_fn
-) -> dict:
-    """Write one write_semantic() call per family present in `df`'s `family`
-    column, each to its own WEATHER_FAMILIES table. `families` is the closed
-    set of families the caller's specs can produce (known from the spec list,
-    not discovered by scanning `df`). `replace_where_fn(family)` builds that
-    family table's replaceWhere predicate."""
-    return {
-        fam: write_semantic(
-            conform(df.filter(F.col("family") == fam), WEATHER_MEASUREMENT_COLUMNS),
-            fam,
-            source=source,
-            component=component,
-            rid=rid,
-            replace_where=replace_where_fn(fam),
-        )
-        for fam in families
-    }
-
-
-# COMMAND ----------
-
 # DBTITLE 1,Configuration -- inspection additions
 # Row identifiers and native strings: a distinct count is not diagnostic.
 SEMANTIC_HIGH_CARDINALITY = {
@@ -469,12 +480,7 @@ def structure_extra_checks(df) -> dict:
             "continent",
             "country_code",
             "source_dataset",
-            "variable",
-            "level",
             "statistic",
-            "unit",
-            "value_origin",
-            "missing_reason",
             "time_basis",
             "measurement_basis",
         )

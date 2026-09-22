@@ -13,9 +13,14 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** read-only checks of the weather structures: key uniqueness,
-# MAGIC place coverage, time consistency, and regression against the existing
-# MAGIC source-scoped Silver tables. Checks run against the union of every
-# MAGIC WEATHER_FAMILIES table that has been written so far.
+# MAGIC place coverage, time consistency, per-family value ranges, and regression
+# MAGIC against the existing source-scoped Silver tables. Family tables have their
+# MAGIC own designed measurement columns, but all share the same place/time/
+# MAGIC provenance scaffolding -- cross-family checks (key uniqueness, location
+# MAGIC coverage, row counts, the UTC offset check) run on that common projection,
+# MAGIC unioned across every family table written so far; per-family checks
+# MAGIC (value ranges, primary-field agreement) run against each family's own
+# MAGIC columns.
 
 # COMMAND ----------
 
@@ -50,6 +55,25 @@ LOC = semantic_table("weather_location")
 BASELINE_SCHEMA = "energy_silver"
 COMPONENT = "silver/semantic/weather/07_weather_validation"
 
+# Columns every family table carries identically (the shared scaffolding);
+# cross-family checks run on this projection, unioned across families.
+COMMON_COLS = [
+    "observation_key",
+    "location_key",
+    "source_location_id",
+    "observation_ts_native",
+    "time_basis",
+    "utc_offset_hours",
+    "observation_ts_utc",
+    "observation_ts_project",
+    "local_date",
+    "interval_seconds",
+    "measurement_basis",
+    "source_system",
+    "source_dataset",
+    "source_record_id",
+]
+
 # Check results and result tables, exported to the findings file at the end.
 CHECK_RESULTS = []
 FINDINGS_BLOCKS = []
@@ -73,65 +97,71 @@ def keep(heading: str, df) -> None:
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- every family structure written so far, unioned
+# DBTITLE 1,Read Silver -- every family table written so far
 WRITTEN_FAMILIES = [
     f for f in WEATHER_FAMILIES if spark.catalog.tableExists(semantic_table(f))
 ]
 for _f in WEATHER_FAMILIES:
     if _f not in WRITTEN_FAMILIES:
         report(f"{_f} table exists", True, "not written yet", status="SKIP")
+FAMILY_FRAMES = {f: spark.table(semantic_table(f)) for f in WRITTEN_FAMILIES}
 
-_family_frames = [
-    spark.table(semantic_table(f)).withColumn("family", F.lit(f))
-    for f in WRITTEN_FAMILIES
+# COMMAND ----------
+
+# DBTITLE 1,Read Silver -- common scaffolding, unioned across every family table
+_common_frames = [
+    df.select(*COMMON_COLS).withColumn("family", F.lit(fam))
+    for fam, df in FAMILY_FRAMES.items()
 ]
-obs = _family_frames[0]
-for _fdf in _family_frames[1:]:
-    obs = obs.unionByName(_fdf)
+obs_common = _common_frames[0]
+for _cdf in _common_frames[1:]:
+    obs_common = obs_common.unionByName(_cdf)
 
 # COMMAND ----------
 
 # DBTITLE 1,Check -- rows per family structure
 keep(
     "rows per family structure",
-    obs.groupBy("family")
-    .agg(F.count("*").alias("rows"), F.countDistinct("variable").alias("variables"))
+    obs_common.groupBy("family")
+    .agg(
+        F.count("*").alias("rows"),
+        F.min("observation_ts_utc").alias("first_ts"),
+        F.max("observation_ts_utc").alias("last_ts"),
+    )
     .orderBy("family"),
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Read Silver -- loaded source datasets
-LOADED_DATASETS = {
-    r["source_dataset"] for r in obs.select("source_dataset").distinct().collect()
-}
 
 # COMMAND ----------
 
 # DBTITLE 1,Check -- rows per source dataset
 keep(
     "rows per source dataset",
-    obs.groupBy("source_system", "source_dataset", "measurement_basis")
+    obs_common.groupBy("source_system", "source_dataset", "measurement_basis")
     .agg(
         F.count("*").alias("rows"),
-        F.countDistinct("variable").alias("variables"),
+        F.countDistinct("family").alias("families"),
         F.min("observation_ts_utc").alias("first_ts"),
         F.max("observation_ts_utc").alias("last_ts"),
     )
     .orderBy("source_system", "source_dataset"),
 )
+LOADED_DATASETS = {
+    r["source_dataset"]
+    for r in obs_common.select("source_dataset").distinct().collect()
+}
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- observation_key is unique
-dup_keys = obs.groupBy("observation_key").count().filter("count > 1").count()
-report("observation_key unique", dup_keys == 0, f"duplicate keys: {dup_keys}")
+# DBTITLE 1,Check -- observation_key is unique within each family table
+for _fam, _fdf in FAMILY_FRAMES.items():
+    _dup = _fdf.groupBy("observation_key").count().filter("count > 1").count()
+    report(f"{_fam} observation_key unique", _dup == 0, f"duplicate keys: {_dup}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Check -- every observation has a location
 orphans = (
-    obs.select("location_key")
+    obs_common.select("location_key")
     .distinct()
     .join(spark.table(LOC).select("location_key"), "location_key", "left_anti")
     .count()
@@ -144,33 +174,27 @@ report(
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- primary variables are unique per place, instant, statistic, level
-primary_dups = (
-    obs.filter("is_primary")
-    .groupBy(
-        "source_system",
-        "location_key",
-        "variable",
-        "statistic",
-        "level",
-        "observation_ts_utc",
-        "interval_seconds",
-    )
-    .count()
-    .filter("count > 1")
-    .count()
-)
-report(
-    "primary rows unique on the natural grain",
-    primary_dups == 0,
-    f"groups: {primary_dups}",
-)
+# DBTITLE 1,Check -- each family's primary-flagged fields are unique on their natural grain
+_PRIMARY_GRAIN = ["source_system", "location_key", "observation_ts_utc"]
+for _fam, _fdf in FAMILY_FRAMES.items():
+    _flag_cols = [c for c in _fdf.columns if c.endswith("_is_primary")]
+    for _flag in _flag_cols:
+        _dups = (
+            _fdf.filter(F.col(_flag))
+            .groupBy(*_PRIMARY_GRAIN)
+            .count()
+            .filter("count > 1")
+            .count()
+        )
+        report(
+            f"{_fam}.{_flag} unique on natural grain", _dups == 0, f"groups: {_dups}"
+        )
 
 # COMMAND ----------
 
 # DBTITLE 1,Check -- project time offset from UTC is +1 or +2 hours (Europe/Berlin)
 offsets = (
-    obs.filter(
+    obs_common.filter(
         F.col("observation_ts_utc").isNotNull() & (F.col("source_system") == "dwd")
     )
     .withColumn(
@@ -188,33 +212,45 @@ keep("project time offset from UTC (DWD, hours)", offsets)
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- value ranges by variable, unit and source
-keep(
-    "value ranges by variable, unit and source",
-    obs.filter(F.col("value").isNotNull())
-    .groupBy("variable", "unit", "source_system")
-    .agg(
-        F.count("*").alias("rows"),
-        F.min("value").alias("min"),
-        F.percentile_approx("value", 0.5).alias("median"),
-        F.max("value").alias("max"),
+# DBTITLE 1,Check -- value ranges per family, by measurement column and source
+for _fam, _fdf in FAMILY_FRAMES.items():
+    _numeric_cols = [
+        name
+        for name, dtype in _fdf.dtypes
+        if dtype == "double" and name != "utc_offset_hours"
+    ]
+    if not _numeric_cols:
+        continue
+    _stack = ", ".join(f"'{c}', `{c}`" for c in _numeric_cols)
+    _ranges = (
+        _fdf.select(
+            "source_system",
+            F.expr(f"stack({len(_numeric_cols)}, {_stack}) as (field, value)"),
+        )
+        .filter(F.col("value").isNotNull())
+        .groupBy("field", "source_system")
+        .agg(
+            F.count("*").alias("rows"),
+            F.min("value").alias("min"),
+            F.percentile_approx("value", 0.5).alias("median"),
+            F.max("value").alias("max"),
+        )
+        .orderBy("field", "source_system")
     )
-    .orderBy("variable", "source_system"),
-)
+    keep(f"value ranges -- {_fam}", _ranges)
 
 # COMMAND ----------
 
 # DBTITLE 1,Regression -- key coverage per DWD table against the existing Silver tables
 # Retire this cell and the two below with the old source-scoped Silver tables;
 # a missing baseline table is reported SKIP, not FAIL.
-_key_rows = []
 for _ds in [d for d in DWD_TABLES if d in LOADED_DATASETS]:
     _base_name = f"{CATALOG}.{BASELINE_SCHEMA}.{_ds}"
     if not spark.catalog.tableExists(_base_name):
         report(f"{_ds} key coverage", True, "baseline table absent", status="SKIP")
         continue
     _new = (
-        obs.filter(F.col("source_dataset") == _ds)
+        obs_common.filter(F.col("source_dataset") == _ds)
         .select("source_location_id", "observation_ts_utc")
         .distinct()
     )
@@ -229,7 +265,6 @@ for _ds in [d for d in DWD_TABLES if d in LOADED_DATASETS]:
     _keys = ["source_location_id", "observation_ts_utc"]
     _only_new = _new.join(_base, _keys, "left_anti").count()
     _only_base = _base.join(_new, _keys, "left_anti").count()
-    _key_rows.append((_ds, _only_new, _only_base))
     report(
         f"{_ds} key coverage",
         _only_new == 0,
@@ -240,7 +275,7 @@ for _ds in [d for d in DWD_TABLES if d in LOADED_DATASETS]:
 
 # DBTITLE 1,Regression -- DWD air temperature values against the existing Silver table
 _base_name = f"{CATALOG}.{BASELINE_SCHEMA}.dwd_air_temperature"
-if spark.catalog.tableExists(_base_name):
+if spark.catalog.tableExists(_base_name) and "weather_temperature" in FAMILY_FRAMES:
     _base_dwd = (
         spark.table(_base_name)
         .select(
@@ -250,13 +285,17 @@ if spark.catalog.tableExists(_base_name):
         )
         .filter("base_value is not null")
     )
-    _new_dwd = obs.filter(
-        (F.col("source_dataset") == "dwd_air_temperature")
-        & (F.col("source_column") == "TT_TU")
-    ).select(
-        "source_location_id",
-        F.col("observation_ts_utc").alias("observation_ts"),
-        F.col("value_native").alias("new_value"),
+    _new_dwd = (
+        FAMILY_FRAMES["weather_temperature"]
+        .filter(
+            (F.col("source_dataset") == "dwd_air_temperature")
+            & F.col("air_temperature_is_primary")
+        )
+        .select(
+            "source_location_id",
+            F.col("observation_ts_utc").alias("observation_ts"),
+            F.col("air_temperature_degc").alias("new_value"),
+        )
     )
     _res = (
         _base_dwd.join(_new_dwd, ["source_location_id", "observation_ts"], "full_outer")
@@ -288,7 +327,7 @@ else:
 
 # DBTITLE 1,Regression -- Honda weather against the existing Silver table
 _base_name = f"{CATALOG}.{BASELINE_SCHEMA}.honda_weather"
-if spark.catalog.tableExists(_base_name):
+if spark.catalog.tableExists(_base_name) and "weather_temperature" in FAMILY_FRAMES:
     _base_h = (
         spark.table(_base_name)
         .select(
@@ -298,16 +337,17 @@ if spark.catalog.tableExists(_base_name):
         )
         .filter("base_value is not null")
     )
-    _new_h = obs.filter(
-        (F.col("source_dataset") == "honda_iot_weather")
-        & (F.col("variable") == "air_temperature")
-    ).select(
-        F.col("observation_ts_utc").alias("datetime_utc"),
-        F.when(F.col("interval_seconds") == 60, "1min")
-        .when(F.col("interval_seconds") == 900, "15min")
-        .otherwise("1h")
-        .alias("frequency"),
-        F.col("value_native").alias("new_value"),
+    _new_h = (
+        FAMILY_FRAMES["weather_temperature"]
+        .filter(F.col("source_dataset") == "honda_iot_weather")
+        .select(
+            F.col("observation_ts_utc").alias("datetime_utc"),
+            F.when(F.col("interval_seconds") == 60, "1min")
+            .when(F.col("interval_seconds") == 900, "15min")
+            .otherwise("1h")
+            .alias("frequency"),
+            F.col("air_temperature_degc").alias("new_value"),
+        )
     )
     _hres = (
         _base_h.join(_new_h, ["frequency", "datetime_utc"], "full_outer")
@@ -338,24 +378,27 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,Check -- primary vs alternate DWD air temperature agreement
-_alt = obs.filter(
-    (F.col("source_system") == "dwd") & (F.col("variable") == "air_temperature")
-).select("location_key", "observation_ts_utc", "is_primary", "value_native")
-_p = _alt.filter("is_primary").select(
-    "location_key", "observation_ts_utc", F.col("value_native").alias("primary_value")
-)
-_a = _alt.filter("not is_primary").select(
-    "location_key", "observation_ts_utc", F.col("value_native").alias("alt_value")
-)
-keep(
-    "primary vs alternate DWD air temperature agreement",
-    _p.join(_a, ["location_key", "observation_ts_utc"]).agg(
-        F.count("*").alias("pairs"),
-        F.avg(
-            (F.abs(F.col("primary_value") - F.col("alt_value")) < 1e-9).cast("int")
-        ).alias("share_equal"),
-    ),
-)
+if "weather_temperature" in FAMILY_FRAMES:
+    _t = FAMILY_FRAMES["weather_temperature"].filter(F.col("source_system") == "dwd")
+    _p = _t.filter("air_temperature_is_primary").select(
+        "location_key",
+        "observation_ts_utc",
+        F.col("air_temperature_degc").alias("primary_value"),
+    )
+    _a = _t.filter("air_temperature_is_primary = false").select(
+        "location_key",
+        "observation_ts_utc",
+        F.col("air_temperature_degc").alias("alt_value"),
+    )
+    keep(
+        "primary vs alternate DWD air temperature agreement",
+        _p.join(_a, ["location_key", "observation_ts_utc"]).agg(
+            F.count("*").alias("pairs"),
+            F.avg(
+                (F.abs(F.col("primary_value") - F.col("alt_value")) < 1e-9).cast("int")
+            ).alias("share_equal"),
+        ),
+    )
 
 # COMMAND ----------
 
