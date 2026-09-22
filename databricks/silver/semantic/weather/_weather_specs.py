@@ -47,6 +47,11 @@ METHOD_LABELS = {"P": "human_observation", "I": "instrument"}
 
 # COMMAND ----------
 
+# DBTITLE 1,Honda -- sampling frequency to interval seconds
+HONDA_INTERVAL_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
+
+# COMMAND ----------
+
 # DBTITLE 1,Unit-conversion factors used by more than one family builder
 # eighths (okta) -> percent; used by weather_cloud for both total cover and
 # per-layer cover (DWD is the only eighths-native source).
