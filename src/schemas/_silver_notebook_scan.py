@@ -7,8 +7,9 @@ Date: September 2026
 Purpose: one AST-based scanner, shared by `_generate_field_classes.py`,
 `databricks/silver/00_silver_setup.py`, `databricks/gold/00_gold_setup.py`
 and the test suite -- a table name literal is extracted straight from every
-`write_silver(...)` / `explode_link_bridge(...)` call (Silver side) or
-`read_silver(...)` call (Gold side), never hand-maintained twice.
+`write_silver(...)` / `explode_link_bridge(...)` / `write_semantic(...)` call
+(Silver side) or `read_silver(...)` call (Gold side), never hand-maintained
+twice.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import ast
 from pathlib import Path
 
 # function name -> positional index of the Silver-table-name argument
-TABLE_ARG = {"write_silver": 1, "explode_link_bridge": 3}
+TABLE_ARG = {"write_silver": 1, "explode_link_bridge": 3, "write_semantic": 1}
 
 
 def silver_notebooks(silver_root: Path) -> list[Path]:
@@ -28,7 +29,21 @@ def silver_notebooks(silver_root: Path) -> list[Path]:
     )
 
 
+def _module_str_constants(tree: ast.AST) -> dict[str, str]:
+    """Module-level `NAME = "literal"` assignments (e.g. `TABLE = "..."`)."""
+    return {
+        t.id: node.value.value
+        for node in getattr(tree, "body", [])
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+        for t in node.targets
+        if isinstance(t, ast.Name)
+    }
+
+
 def write_silver_targets(tree: ast.AST) -> set[str]:
+    consts = _module_str_constants(tree)
     out: set[str] = set()
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
@@ -39,6 +54,8 @@ def write_silver_targets(tree: ast.AST) -> set[str]:
         arg = node.args[idx]
         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
             out.add(arg.value)
+        elif isinstance(arg, ast.Name) and arg.id in consts:
+            out.add(consts[arg.id])
     return out
 
 

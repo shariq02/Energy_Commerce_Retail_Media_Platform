@@ -91,7 +91,7 @@ conventions:
 tables:
 
   # -------------------------------------------------------------------------
-  # Measurement tables -- first wave (7)
+  # Measurement tables -- core set (7)
   # -------------------------------------------------------------------------
 
   - name: dwd_air_temperature
@@ -212,7 +212,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   # -------------------------------------------------------------------------
-  # Measurement tables -- deepening wave (8)
+  # Measurement tables -- extended set (8)
   # -------------------------------------------------------------------------
 
   - name: dwd_dew_point

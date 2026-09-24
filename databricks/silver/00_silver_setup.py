@@ -96,12 +96,16 @@ print(f"OK  table ready: {FIELD_CLASS_TABLE}")
 # DBTITLE 1,Generate the field-class registry (no committed CSV required)
 if repo_root() not in _sys.path:
     _sys.path.insert(0, repo_root())
-from src.schemas._generate_field_classes import assert_registry_complete, build_rows
+from src.schemas._generate_field_classes import (
+    _semantic_namespace,
+    assert_registry_complete,
+    build_rows,
+)
 
 _generated_rows = build_rows()
 # Hard-fails here, before any Silver notebook runs, if a real write_silver()
-# target has no declared classification anywhere -- never guessed, never
-# silently defaulted.
+# or write_semantic() target has no declared classification -- never guessed,
+# never silently defaulted. Semantic structures come from _semantic_common.
 assert_registry_complete(_generated_rows)
 
 rows = [
@@ -137,6 +141,24 @@ seed_df.write.format("delta").mode("overwrite").option(
     "overwriteSchema", "true"
 ).saveAsTable(FIELD_CLASS_TABLE)
 print(f"OK  {FIELD_CLASS_TABLE}: loaded {len(rows)} rows (generated in-process)")
+
+# COMMAND ----------
+
+# DBTITLE 1,Check the per-schema table quota (existing plus planned structures)
+# Unity Catalog allows 100 tables per schema; stop here rather than mid-run.
+SCHEMA_TABLE_QUOTA = 100
+_ns = _semantic_namespace()
+_planned = {*_ns["SEMANTIC_STRUCTURES"], *_ns["SEMANTIC_MEMBER_STRUCTURES"]}
+for _schema in SILVER_SCHEMAS:
+    _existing = {t.name for t in spark.catalog.listTables(f"{CATALOG}.{_schema}")}
+    _new = {t for t in _planned if _ns["semantic_target_schema"](t) == _schema}
+    _total = len(_existing | _new)
+    print(f"{_schema}: {_total} tables once every Silver structure exists")
+    if _total > SCHEMA_TABLE_QUOTA:
+        raise RuntimeError(
+            f"{_schema} would hold {_total} tables (quota {SCHEMA_TABLE_QUOTA}) -- "
+            "retire legacy or stale tables in it first"
+        )
 
 # COMMAND ----------
 

@@ -18,7 +18,7 @@
 # MAGIC side effects at import. Every caller still does its own Read Bronze /
 # MAGIC Write Silver / Inspect in its own cells; these helpers are pure
 # MAGIC DataFrame-in, DataFrame-out transform steps, same category as
-# MAGIC `_silver_common.py`'s own `mastr_standardise` / `attach_city_ags`.
+# MAGIC `_silver_common.py`'s own `mastr_standardise`.
 # MAGIC
 # MAGIC References `SOURCE`, `RID` and `STATION_IDS` from the caller's own
 # MAGIC Configuration cell (resolved at call time, not at import time -- the

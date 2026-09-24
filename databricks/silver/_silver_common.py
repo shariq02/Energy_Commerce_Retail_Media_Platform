@@ -225,8 +225,7 @@ def target_schema_for(silver_table: str, *, source: str | None = None) -> str:
         f"NEW TABLE  {silver_table} has no field_class_registry entry -- "
         f"defaulting to {schema} (ecosystem default for source={source!r}); "
         "this write is NOT blocked, but read_silver() has no such fallback -- "
-        "run `python3 src/schemas/_generate_field_classes.py` (it will refuse "
-        f"to finish if {silver_table} is still missing from its own tables) "
+        "declare it in the field-class generator and re-run 00_silver_setup "
         "before any other notebook reads this table."
     )
     return schema
@@ -339,10 +338,8 @@ def parse_mess_datum(colname: str, src_tz: str = "UTC"):
 
 
 def parse_mess_datum_10min(colname: str, src_tz: str = "UTC"):
-    """DWD solar MESS_DATUM: `yyyyMMddHH:mm` (10-minute grid, colon between
-    hour and minute -- confirmed against real Bronze data; the bare 12-digit
-    `yyyyMMddHHmm` this previously assumed silently parsed every row to
-    NULL). Also tolerates a trailing `.0` from a double-inferred column."""
+    """DWD solar MESS_DATUM: `yyyyMMddHH:mm` (hourly sums over true-solar-time
+    hours, so the UTC minute varies). Tolerates a trailing `.0`."""
     base = F.regexp_replace(F.trim(F.col(colname)), r"\.0$", "")
     base = F.regexp_replace(base, ":", "")
     parsed = F.try_to_timestamp(base, F.lit("yyyyMMddHHmm"))
@@ -352,6 +349,12 @@ def parse_mess_datum_10min(colname: str, src_tz: str = "UTC"):
 # COMMAND ----------
 
 # DBTITLE 1,Deterministic keys + within-group ordinal
+
+
+def strip_float_suffix(col):
+    """Trim and drop a trailing `.0` (a numeric id or code staged as double)."""
+    c = F.col(col) if isinstance(col, str) else col
+    return F.regexp_replace(F.trim(c), r"\.0$", "")
 
 
 def sha_key(*cols):
@@ -426,9 +429,8 @@ def validate_field_classes(df: DataFrame, silver_table: str) -> list[str]:
     if missing:
         print(
             f"UNCLASSIFIED  {short}.{{{', '.join(missing)}}} -- not yet in "
-            f"field_class_registry; write proceeds. Classify via the seed "
-            f"generator (src/schemas/_generate_field_classes.py) and reload "
-            "when convenient."
+            "field_class_registry; write proceeds. Classify in the field-class "
+            "generator and re-run 00_silver_setup when convenient."
         )
     return missing
 
@@ -912,22 +914,6 @@ def read_silver(table: str) -> DataFrame:
     return spark.table(f"{CATALOG}.{target_schema_for(table)}.{table}")
 
 
-def attach_city_ags(df: DataFrame, city_col: str = "city") -> DataFrame:
-    """Broadcast-join the curated `dwd_city_bundesland_xref` to add `ags_code`,
-    `ags_level` ('bundesland') and `ags_method` ('city_lookup'). Bundesland level
-    only -- the conformed spine carries no polygon geometry."""
-    xref = read_silver("dwd_city_bundesland_xref").select(
-        F.col("city").alias("_xc"), F.col("ags_code").alias("_xa")
-    )
-    return (
-        df.join(F.broadcast(xref), F.col(city_col) == F.col("_xc"), "left")
-        .withColumn("ags_code", F.col("_xa"))
-        .withColumn("ags_level", F.lit("bundesland"))
-        .withColumn("ags_method", F.lit("city_lookup"))
-        .drop("_xc", "_xa")
-    )
-
-
 def attach_ags_prefix(df: DataFrame, ags_source_col: str) -> DataFrame:
     """AGS attribution from an 8-digit Gemeindeschluessel: keep the 2-digit
     Bundesland prefix. `ags_level` = 'bundesland', `ags_method` = 'ags_prefix'."""
@@ -936,6 +922,20 @@ def attach_ags_prefix(df: DataFrame, ags_source_col: str) -> DataFrame:
         .withColumn("ags_level", F.lit("bundesland"))
         .withColumn("ags_method", F.lit("ags_prefix"))
     )
+
+
+def bundesland_ags(name_col):
+    """Bundesland name -> 2-digit AGS code. Case, hyphens, spaces and the
+    u-umlaut spelling are normalised, so "Nordrhein-Westfalen",
+    "NordrheinWestfalen" and "Thueringen" all resolve; NULL otherwise."""
+    c = F.col(name_col) if isinstance(name_col, str) else name_col
+    key = F.regexp_replace(
+        F.regexp_replace(F.lower(F.trim(c)), "\u00fc", "ue"), "[^a-z]", ""
+    )
+    m = F.create_map(
+        [F.lit(x) for k, v in BUNDESLAND_AGS.items() for x in (k.replace("_", ""), v)]
+    )
+    return m[key]
 
 
 _MASTR_NUM_SUFFIX = ("_kw", "_m", "_km")
@@ -973,6 +973,18 @@ def mastr_standardise(
     return df
 
 
+def link_pairs(df: DataFrame, parent_col: str, link_col: str, sep=r"[,;\s]+"):
+    """Distinct (parent_id, linked_id) pairs from a delimited link column."""
+    return (
+        df.select(
+            F.col(parent_col).cast("string").alias("parent_id"),
+            F.explode(F.split(F.trim(F.col(link_col)), sep)).alias("linked_id"),
+        )
+        .filter((F.col("linked_id") != "") & F.col("linked_id").isNotNull())
+        .dropDuplicates(["parent_id", "linked_id"])
+    )
+
+
 def explode_link_bridge(
     df: DataFrame,
     parent_col: str,
@@ -989,14 +1001,8 @@ def explode_link_bridge(
     bridge -- one row per pair, deterministic `source_record_id`. The bridge
     never replaces the owning source table. Returns the written DataFrame so
     the caller can run inspect_table() on it without re-deriving it."""
-    b = (
-        df.select(
-            F.col(parent_col).cast("string").alias("parent_id"),
-            F.explode(F.split(F.trim(F.col(link_col)), sep)).alias("linked_id"),
-        )
-        .filter((F.col("linked_id") != "") & F.col("linked_id").isNotNull())
-        .dropDuplicates(["parent_id", "linked_id"])
-        .withColumn("_srid", sha_key("parent_id", "linked_id"))
+    b = link_pairs(df, parent_col, link_col, sep).withColumn(
+        "_srid", sha_key("parent_id", "linked_id")
     )
     b = add_provenance(b, source, "_srid", rid)
     write_silver(b, silver_table, source=source, component=component, rid=rid)
@@ -1004,13 +1010,15 @@ def explode_link_bridge(
 
 
 def mastr_catalog_ref(category_name: str) -> DataFrame:
-    """The MaStR katalogwerte rows for one named category, as (cat_id, cat_wert)
+    """The MaStR katalog values of one named category, as (cat_id, cat_wert)
     -- the decode reference for a coded column bound to that category."""
-    kw = read_silver("mastr_katalogwerte")
-    kk = read_silver("mastr_katalogkategorien")
-    cat = kk.filter(F.col("Name") == category_name).select(F.col("Id").alias("_cid"))
-    return kw.join(
-        F.broadcast(cat), F.col("KatalogKategorieId") == F.col("_cid"), "inner"
-    ).select(
-        F.col("Id").cast("string").alias("cat_id"), F.col("Wert").alias("cat_wert")
+    codes = read_silver("mastr_code_list")
+    cat = codes.filter(
+        (F.col("catalog_kind") == "katalogkategorien")
+        & (F.col("label") == category_name)
+    ).select(F.col("code_id").alias("_cid"))
+    return (
+        codes.filter(F.col("catalog_kind") == "katalogwerte")
+        .join(F.broadcast(cat), F.col("parent_id") == F.col("_cid"), "inner")
+        .select(F.col("code_id").alias("cat_id"), F.col("label").alias("cat_wert"))
     )

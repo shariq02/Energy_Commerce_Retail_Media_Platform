@@ -23,6 +23,9 @@ uv.lock
 # public version is prepared near project completion
 docs/
 
+# Retired code (superseded implementations) - kept locally only
+archive/
+
 # Local-only acquisition notes - not tracked
 scripts/download/README.md
 
@@ -35,12 +38,6 @@ data/processed/
 *.parquet
 *.json.gz
 *.json
-
-# ...except the Silver field-class registry seed: a generated build artifact
-# (src/schemas/_generate_field_classes.py) that the setup notebook loads on
-# Databricks, so it must be committed.
-!src/schemas/field_classes/
-!src/schemas/field_classes/*.csv
 
 # Logs
 logs/
@@ -112,3 +109,9 @@ scripts/utilities/verify_energy_weather_deepening_acquisition.py
 .DS_Store
 Thumbs.db
 desktop.ini
+
+#claude
+.claude/
+
+#Graphify
+graphify-out/

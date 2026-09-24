@@ -18,11 +18,50 @@ permissions:
   contents: read
 
 jobs:
+  autofix:
+    # Pushes a follow-up commit for anything ruff can fix by itself
+    # (formatting, safe lint fixes), so a formatting slip doesn't need a
+    # manual round-trip through a red `lint` job -- it self-heals. `lint`
+    # below stays the authoritative gate for whatever isn't auto-fixable.
+    name: Autofix (ruff format + check --fix)
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install ruff
+        run: python -m pip install ruff==0.15.8
+
+      - name: Run ruff check --fix
+        run: ruff check . --exclude data/ --exclude docs/ --exclude archive/ --exclude .terraform/ --fix
+
+      - name: Run ruff format
+        run: ruff format . --exclude data/ --exclude docs/ --exclude archive/ --exclude .terraform/
+
+      - name: Commit fixes if any
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: ruff autofix [skip ci]"
+
   lint:
     name: Lint (ruff check + format)
     runs-on: ubuntu-latest
+    needs: autofix
+    if: always() && needs.autofix.result != 'failure'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -98,6 +137,9 @@ jobs:
                   "design-doc filename",
               ),
               (re.compile(r"\bDATA_MODEL\b"), "design-doc reference"),
+              (re.compile(r"\bPROJECT_PLAN\b"), "design-doc reference"),
+              (re.compile(r"\b(?:CHANGELOG\s+)?Entr(?:y|ies)\s+\d{3}\b"), "CHANGELOG entry reference"),
+              (re.compile(r"\bwave[-\s]?\d+\b", re.IGNORECASE), "build-wave reference"),
               (
                   re.compile(r"\b(?:D\d{1,2}|H[1-4]|S[1-2]|P1|MASTR-\d|DWD-\d)\b"),
                   "design-record candidate-ID reference",
@@ -147,16 +189,10 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     needs: lint
-    # PAUSED (non-blocking): a real unit-test suite now exists (Silver, Gold,
-    # and scripts/ transform logic), but 2 known, tracked, pre-existing gaps
-    # unrelated to those tests still fail collection -- 5 missing generated
-    # JSON schemas (src/schemas/_generate_jsonschema.py output never
-    # committed for dwd/smard/power_plant_list/redispatch/mastr; PROJECT_PLAN
-    # register id generated-jsonschema-drift) and 1 stale field-class seed
-    # (PROJECT_PLAN register id field-class-seed-drift -- the generator itself
-    # is now fixed, Entry 058, but the CSV still needs an owner-run
-    # regeneration). Re-enable (remove continue-on-error) once both register
-    # rows close.
+    # PAUSED (non-blocking): 5 generated JSON schemas
+    # (src/schemas/_generate_jsonschema.py output for dwd/smard/
+    # power_plant_list/redispatch/mastr) are not committed, which still fails
+    # collection. Re-enable (remove continue-on-error) once they are.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

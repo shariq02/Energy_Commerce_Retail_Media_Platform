@@ -16,21 +16,15 @@ src/schemas/reference/source_ecosystem_map.yml.
 
 `build_rows()` + `assert_registry_complete()` are imported directly by
 `databricks/silver/00_silver_setup.py`, which computes and loads
-`quality.field_class_registry` from them at Silver-setup time -- no committed
-CSV is required for normal execution. `render()`/`main()` below still write
-src/schemas/field_classes/energy_silver_field_classes.csv as an optional,
-human-readable artifact for local/CI diffing, kept in sync by the tests.
+`quality.field_class_registry` from them at Silver-setup time. There is no
+committed seed file; the registry is always generated from the code.
 
-Usage:
+Usage (local completeness check, writes nothing):
     python3 src/schemas/_generate_field_classes.py
-    python3 src/schemas/_generate_field_classes.py --check   # fail if stale
 """
 
 from __future__ import annotations
 
-import argparse
-import csv
-import io
 import sys
 from pathlib import Path
 
@@ -43,7 +37,6 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS = ROOT / "src" / "schemas" / "contracts"
 MAPPINGS = ROOT / "src" / "schemas" / "mappings"
-OUT = ROOT / "src" / "schemas" / "field_classes" / "energy_silver_field_classes.csv"
 SILVER_ROOT = ROOT / "databricks" / "silver"
 
 # Governance / provenance columns present on every primary Silver table.
@@ -335,13 +328,6 @@ FOUNDATION_SOURCES = {
                 "global_irradiance",
                 "weather_location",
             ],
-            "honda_channel_catalog": [
-                "site_name",
-                "subsystem",
-                "measurement_type",
-                "channel_code",
-                "description",
-            ],
         },
         "synthetic": {
             "honda_weather": {
@@ -349,20 +335,6 @@ FOUNDATION_SOURCES = {
                     "synthetic",
                     "constant 'honda_site' -- single fixed site",
                     "synthetic field",
-                )
-            },
-            "honda_channel_catalog": {
-                c: (
-                    "synthetic",
-                    "curated -- Honda ships no device master file",
-                    "01_honda_channel_catalog.py",
-                )
-                for c in (
-                    "site_name",
-                    "subsystem",
-                    "measurement_type",
-                    "channel_code",
-                    "description",
                 )
             },
         },
@@ -474,7 +446,6 @@ REFERENCE_TABLES = {
     "mastr_lokationstypen",
     "mastr_marktfunktionen",
     "mastr_marktrollen",
-    "honda_channel_catalog",
 }
 
 # Per-table column-rename override for a bespoke rename that diverges from
@@ -489,6 +460,93 @@ TABLE_COLUMN_RENAME_OVERRIDES = {
         "Bis_Datum": "gap_end_ts",
     },
 }
+
+# Semantic Silver structures: tables and columns are declared once in
+# databricks/silver/_semantic_common.py (SEMANTIC_STRUCTURES). A column is
+# derived when the build computes it; otherwise it carries source values.
+SEMANTIC_COMMON = SILVER_ROOT / "_semantic_common.py"
+SEMANTIC_DERIVED = {
+    "observation_key",
+    "location_key",
+    "daily_key",
+    "event_key",
+    "sample_key",
+    "device_key",
+    "source_system",
+    "source_dataset",
+    "source_record_id",
+    "_silver_loaded_at",
+    "_silver_run_id",
+    "time_basis",
+    "observation_ts_utc",
+    "observation_ts_project",
+    "local_date",
+    "interval_seconds",
+    "interval_reference",
+    "market_area_code",
+    "measurement_basis",
+    "sign_convention",
+    "quality_label",
+    "quality_flag",
+    "quality_flags",
+    "variable",
+    "statistic",
+    "is_primary",
+    "value",
+    "unit",
+    "value_origin",
+    "derivation_rule",
+    "n_observations",
+    "location_role",
+    "continent",
+    "ags_code",
+    "geography_basis",
+    "event_start_utc",
+    "event_end_utc",
+    "event_start_project",
+    "event_end_project",
+    "duration_hours",
+    "reason",
+    "direction",
+    "primary_energy_type",
+    "instructing_market_area_code",
+    "requesting_market_area_codes",
+    "affected_unit_match_name",
+    "affected_unit_match_confidence",
+    "forecast_issue_ts",
+    "increment_derivation_rule",
+    "repeat_index",
+    "data_origin",
+    "record_ordinal",
+    "reconciliation_status",
+    "relationship_type",
+    "parent_type",
+    "linked_type",
+    "event_ts_utc",
+    "event_ts_project",
+    "item_ordinal",
+    "item_context",
+    "category_l1",
+    "category_l2",
+    "category_l3",
+    "currency_unknown",
+}
+
+
+def _semantic_namespace() -> dict:
+    """The notebook's module-level names; it holds only constants and function
+    definitions at module level (a fixed repo-local file, so exec is safe)."""
+    ns: dict = {}
+    text = SEMANTIC_COMMON.read_text(encoding="utf-8")
+    exec(compile(text, str(SEMANTIC_COMMON), "exec"), ns)  # noqa: S102
+    return ns
+
+
+def _semantic_structures() -> tuple[dict, str]:
+    """(table -> [(column, type)], default target schema)."""
+    ns = _semantic_namespace()
+    return ns["SEMANTIC_STRUCTURES"], ns["SEMANTIC_SCHEMA"]
+
 
 # flag_col columns value_quarantine() adds on top of the source's own
 # contract columns -- verified against every value_quarantine() call in
@@ -783,6 +841,35 @@ def build_rows() -> list[dict]:
                 "rees46 contract / localisation",
             )
 
+    # --- semantic Silver structures ---
+    ns = _semantic_namespace()
+    semantic = ns["SEMANTIC_STRUCTURES"]
+    members = ns["SEMANTIC_MEMBER_STRUCTURES"]
+    for table, (member_tables, discriminators) in members.items():
+        for r in [r for r in rows if r["table_name"] in member_tables]:
+            if r["column_name"] != "ecosystem":
+                add(
+                    table,
+                    r["column_name"],
+                    r["field_class"],
+                    r["derivation_rule"],
+                    r["source_reference"],
+                )
+        for col in (*discriminators, "source_dataset"):
+            add(table, col, "derived", "discriminator / provenance", "semantic")
+    for table, columns in semantic.items():
+        for col, _ in columns:
+            if col in SEMANTIC_DERIVED or col.endswith("_increment_kwh"):
+                add(table, col, "derived", "derived in Silver", "semantic")
+            else:
+                add(
+                    table,
+                    col,
+                    "source_provided",
+                    "typed; standard unit beside the native value where converted",
+                    "semantic",
+                )
+
     # de-dup (a column can be added twice by overlapping rules)
     seen: set[tuple[str, str]] = set()
     uniq: list[dict] = []
@@ -795,35 +882,19 @@ def build_rows() -> list[dict]:
 
     ecosystem_map = _ecosystem_by_source_system()
     for r in uniq:
-        r["target_schema"] = target_schema_for(r["table_name"], ecosystem_map)
+        r["target_schema"] = (
+            ns["semantic_target_schema"](r["table_name"])
+            if r["table_name"] in semantic or r["table_name"] in members
+            else target_schema_for(r["table_name"], ecosystem_map)
+        )
 
     return sorted(uniq, key=lambda r: (r["table_name"], r["column_name"]))
 
 
-def render(rows: list[dict]) -> str:
-    buf = io.StringIO()
-    w = csv.DictWriter(
-        buf,
-        fieldnames=[
-            "table_name",
-            "column_name",
-            "field_class",
-            "derivation_rule",
-            "source_reference",
-            "target_schema",
-        ],
-        lineterminator="\n",
-    )
-    w.writeheader()
-    w.writerows(rows)
-    return buf.getvalue()
-
-
 def assert_registry_complete(rows: list[dict]) -> None:
     """Hard-fail if a table some Silver notebook actually writes has no row
-    here -- this is the generator's own knowledge falling behind real code,
-    distinct from `--check`'s concern (the committed seed falling behind the
-    generator). Never silently emit an incomplete registry, and never guess a
+    here -- this is the generator's own knowledge falling behind real code.
+    Never silently emit an incomplete registry, and never guess a
     classification for an undeclared table -- raises so both the CLI and a
     library caller (e.g. `00_silver_setup.py`) get a catchable, clear error
     naming exactly which table(s) and notebook(s) are missing."""
@@ -843,32 +914,14 @@ def assert_registry_complete(rows: list[dict]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--check", action="store_true", help="exit non-zero if the seed is stale"
-    )
-    args = parser.parse_args()
-
     rows = build_rows()
     try:
         assert_registry_complete(rows)
     except RuntimeError as exc:
         print(exc, file=sys.stderr)
         return 1
-    text = render(rows)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    if args.check:
-        current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
-        if current != text:
-            print(
-                f"stale: {OUT} -- run `python src/schemas/_generate_field_classes.py`",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"OK  {OUT} is up to date")
-        return 0
-    OUT.write_text(text, encoding="utf-8")
-    print(f"wrote {OUT}  ({text.count(chr(10)) - 1} rows)")
+    tables = {r["table_name"] for r in rows}
+    print(f"OK  registry complete: {len(rows)} rows, {len(tables)} tables")
     return 0
 
 

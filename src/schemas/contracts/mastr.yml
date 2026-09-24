@@ -30,8 +30,8 @@ description: >
   KWK support and its authorisation, the market actors, the grid connection
   topology, and MaStR's own change history and code catalogs. A single
   Gesamtdatenexport snapshot. Static one-time acquisition, public download,
-  no auth. Solar and pure-storage object types are deferred from staging for
-  this wave (they explain several 'partial-scope' orphan rates below).
+  no auth. Solar and pure-storage object types are deferred from staging in
+  this snapshot (they explain several 'partial-scope' orphan rates below).
 profiling_evidence: src/schemas/profiling/mastr.md
 bronze_physical_types: string
 bronze_layout: >
@@ -79,8 +79,8 @@ conventions:
     GeplantesInbetriebnahmedatum and future commissioning dates are legitimately
     forward-dated -- a column is only 'known' up to its own value.
   migration_note: >
-    records with Registrierungsdatum < 2019-06-01 are the 2019 MaStR migration
-    wave and differ in completeness from natively registered ones -- a
+    records with Registrierungsdatum < 2019-06-01 came from the 2019 MaStR
+    migration and differ in completeness from natively registered ones -- a
     pre/post-migration indicator is warranted (not applied here).
   capacity_unit: kilowatts
   capacity_unit_evidence: >
@@ -1089,8 +1089,8 @@ quality_rules:
     expr: >
       high orphan rates on ertuechtigungen.EegMastrNummer (55%) and
       einheiten_aenderung_netzbetreiberzuordnungen.EinheitMastrNummer (96%) are
-      EXPECTED -- solar / storage object types are deferred from staging this
-      wave. Do NOT treat these as key mismatches.
+      EXPECTED -- solar / storage object types are deferred from staging in this
+      snapshot. Do NOT treat these as key mismatches.
     severity: info
   - id: deletion_logs_are_disjoint
     expr: >

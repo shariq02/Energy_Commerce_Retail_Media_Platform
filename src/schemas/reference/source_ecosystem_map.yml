@@ -39,28 +39,28 @@ allowed_ecosystems:
 mappings:
   - source_system: smard
     ecosystem: energy
-    first_mapped: "first wave"
+    first_mapped: "2026-08-30"
   - source_system: dwd
     ecosystem: energy
-    first_mapped: "first wave"
+    first_mapped: "2026-08-30"
   - source_system: mastr
     ecosystem: energy
-    first_mapped: "energy/weather deepening wave"
+    first_mapped: "2026-09-07"
   - source_system: power_plant_list
     ecosystem: energy
-    first_mapped: "energy/weather deepening wave"
+    first_mapped: "2026-09-07"
   - source_system: redispatch
     ecosystem: energy
-    first_mapped: "energy/weather deepening wave"
+    first_mapped: "2026-09-07"
   - source_system: honda_iot
     ecosystem: energy
-    first_mapped: "first wave"
+    first_mapped: "2026-08-30"
   - source_system: rees46
     ecosystem: commerce
-    first_mapped: "first wave (re-mapped from energy to commerce, Commerce wave)"
+    first_mapped: "2026-08-30 (energy; re-mapped to commerce 2026-09-15)"
   - source_system: ga4
     ecosystem: commerce
-    first_mapped: "Commerce wave"
+    first_mapped: "2026-09-15"
 
 # `rees46` was provisionally mapped to `energy` before `commerce` existed as an
 # ecosystem; corrected above now that Commerce Bronze (ga4) has landed.
