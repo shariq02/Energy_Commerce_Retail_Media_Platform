@@ -76,7 +76,6 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
 "databricks/silver/_semantic_common.py" = ["F821"]
-"databricks/utility/05_silver_semantic_parity.py" = ["F821"]
 "databricks/utility/06_silver_legacy_retirement.py" = ["F821"]
 # Gold notebooks pull `%run ../silver/_silver_common` then `%run ../../_gold_common`
 # (Databricks runtime magic). _gold_common.py itself is the second link in that

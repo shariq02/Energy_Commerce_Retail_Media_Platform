@@ -13,8 +13,8 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** list every table in the Silver and quality schemas, mark
-# MAGIC each one active (written by the current Silver) or legacy, show whether
-# MAGIC its parity check passed, and drop the legacy tables that may go.
+# MAGIC each one active (written by the current Silver) or legacy, and drop
+# MAGIC the legacy tables.
 # MAGIC
 # MAGIC Runs before the new Silver: every legacy table is planned for drop.
 # MAGIC Dropping is switched off (`DROP_LEGACY = False`); read the plan table,
@@ -38,18 +38,12 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import os
-import re
-
 from pyspark.sql import functions as F
 
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
 DROP_LEGACY = False
-# Legacy tables are dropped before the new Silver runs (quota), so no parity
-# results exist; True would drop only parity-passed or listed tables.
-REQUIRE_PARITY = False
 
 SCHEMAS = [
     "energy_silver",
@@ -64,8 +58,8 @@ QUALITY_ACTIVE = {
     "pipeline_watermarks",
     "quality_audit_log",
 }
-# Legacy tables with no parity counterpart, and why they can go.
-NO_PARITY_NEEDED = {
+# Why some legacy tables have no successor structure.
+LEGACY_NOTES = {
     "energy_silver.field_class_registry": "pre-relocation copy; live copy in quality",
     "energy_silver.quarantine": "pre-relocation copy; live copy in quality",
     "energy_silver.honda_channel_catalog": "wrong-schema copy",
@@ -77,7 +71,6 @@ NO_PARITY_NEEDED = {
     "energy_silver.weather_location": "wrong-schema copy; weather_location lives in the reference schema",
     "energy_silver.weather_location_validity": "wrong-schema copy; lives in the reference schema",
 }
-PARITY_FILE = os.path.join(_findings_dir(), "parity.md")
 
 # COMMAND ----------
 
@@ -93,32 +86,6 @@ def is_active(schema: str, table: str) -> bool:
 
 # COMMAND ----------
 
-# DBTITLE 1,Read the parity results (check name -> status)
-PARITY = []
-if os.path.exists(PARITY_FILE):
-    with open(PARITY_FILE, encoding="utf-8") as fh:
-        for line in fh:
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if len(cells) == 3 and cells[1] in ("PASS", "FAIL", "SKIP", "INFO"):
-                PARITY.append((cells[0], cells[1]))
-print(f"{len(PARITY)} parity checks read from {PARITY_FILE}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Helper -- parity status of one legacy table
-
-
-def parity_status(table: str) -> str:
-    """'pass' when a check naming the table passed and none failed."""
-    word = re.compile(rf"\b{re.escape(table)}\b")
-    statuses = {s for name, s in PARITY if word.search(name)}
-    if "FAIL" in statuses:
-        return "fail"
-    return "pass" if "PASS" in statuses else "none"
-
-
-# COMMAND ----------
-
 # DBTITLE 1,Inventory -- every table, active or legacy, with its drop decision
 SCHEMAS = [s for s in SCHEMAS if spark.catalog.databaseExists(f"{CATALOG}.{s}")]
 plan = []
@@ -126,20 +93,16 @@ for schema in SCHEMAS:
     for t in spark.catalog.listTables(f"{CATALOG}.{schema}"):
         full = f"{schema}.{t.name}"
         rows = spark.table(f"{CATALOG}.{full}").count()
+        note = LEGACY_NOTES.get(full, "-")
         if is_active(schema, t.name):
-            plan.append((schema, t.name, rows, "active", "-", "keep"))
-            continue
-        reason = NO_PARITY_NEEDED.get(full)
-        parity = "not needed" if reason else parity_status(t.name)
-        may_drop = bool(reason) or parity == "pass" or not REQUIRE_PARITY
-        plan.append(
-            (schema, t.name, rows, "legacy", parity, "drop" if may_drop else "hold")
-        )
+            plan.append((schema, t.name, rows, "active", note, "keep"))
+        else:
+            plan.append((schema, t.name, rows, "legacy", note, "drop"))
 plan_df = spark.createDataFrame(
     plan,
     (
         "schema string, table_name string, rows long, status string, "
-        "parity string, action string"
+        "note string, action string"
     ),
 ).orderBy("action", "schema", "table_name")
 display(plan_df)
