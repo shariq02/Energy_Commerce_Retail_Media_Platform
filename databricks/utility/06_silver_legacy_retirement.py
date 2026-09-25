@@ -43,7 +43,7 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-DROP_LEGACY = False
+DROP_LEGACY = True #False
 
 SCHEMAS = [
     "energy_silver",
