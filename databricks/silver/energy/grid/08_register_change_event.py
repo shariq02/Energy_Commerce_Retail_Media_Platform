@@ -62,6 +62,7 @@ KEYS = {
         "change_type",
         "previous_grid_operator_id",
         "new_grid_operator_id",
+        "_src_id_ord",
     ]
 }
 

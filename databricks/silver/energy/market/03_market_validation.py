@@ -126,7 +126,7 @@ def smard_components(metrics: list):
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- SMARD residual load = load - onshore - offshore - PV (within 2%)
+# DBTITLE 1,Check -- SMARD residual load = load - onshore - offshore - PV (within 2% or 0.05 rounding)
 if "electricity_balance" in T:
     _r = smard_components(
         [
@@ -144,7 +144,8 @@ if "electricity_balance" in T:
         - F.col("generation_photovoltaic")
     )
     _bad = _r.filter(
-        F.abs(F.col("residual_load") - _implied) > 0.02 * F.abs(F.col("residual_load"))
+        F.abs(F.col("residual_load") - _implied)
+        > F.greatest(F.lit(0.05), 0.02 * F.abs(F.col("residual_load")))
     ).withColumn("implied_residual", _implied)
     _viol = _bad.count()
     report(

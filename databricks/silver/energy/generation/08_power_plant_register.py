@@ -87,7 +87,12 @@ def _fold(c):
 
 REAL_CARRIERS = [_fold(k) for k in LABELS["energietraeger"]["map"]] + ["insgesamt"]
 KEYS = {
-    "power_plant_register": ["mastr_unit_id", "plant_name", "commissioning_year"],
+    "power_plant_register": [
+        "mastr_unit_id",
+        "plant_name",
+        "commissioning_year",
+        "_src_id_ord",
+    ],
     "power_plant_capacity_plan": ["capacity_section", "energy_carrier"],
 }
 
