@@ -921,7 +921,7 @@ _Generated: 2026-09-25T17:22Z_
 <!-- BEGIN energy:03_market_validation__validation -->
 ## market validation
 
-_Generated: 2026-09-25T21:03Z_
+_Generated: 2026-09-25T21:21Z_
 
 ### checks
 
