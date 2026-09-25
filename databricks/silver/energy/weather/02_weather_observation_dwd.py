@@ -61,6 +61,8 @@ _CLOUD_COVER_SENTINELS = (-1.0, 9.0)
 
 # table -> reconciliation_stats(), filled in by _prep(); exported as findings.
 RECONCILIATION = {}
+# (family, source_dataset) -> rows before the all-null filter; counted at export.
+PREFILTER = {}
 
 # COMMAND ----------
 
@@ -130,6 +132,7 @@ def _scaffold(
     qn_col: str,
     had_conflict_col: str,
     interval_reference: str = "clock",
+    extra_flags: dict | None = None,
 ):
     qn_code = strip_float_suffix(qn_col)
     qn_labels = F.create_map([F.lit(x) for kv in DWD_QN_LABELS.items() for x in kv])
@@ -153,6 +156,7 @@ def _scaffold(
                 {
                     "key_conflict_resolved": F.col(had_conflict_col),
                     "qn_missing": qn_code.isNull(),
+                    **(extra_flags or {}),
                 }
             ),
         )
@@ -222,7 +226,8 @@ def _alt_array(*entries):
 # DBTITLE 1,Helper -- keep a row if any of its scalar or array fields is populated
 
 
-def _keep_if_populated(df, fields: list):
+def _keep_if_populated(df, fields: list, track: tuple):
+    PREFILTER[track] = df
     cond = F.lit(False)
     for name in fields:
         col = F.col(name)
@@ -252,6 +257,10 @@ def build_temperature():
         parse=parse_mess_datum,
         qn_col=f"dwd_air_temperature__{at_meta['qn']}",
         had_conflict_col="dwd_air_temperature___had_key_conflict",
+        extra_flags={
+            "dew_point_above_air_temperature": F.col("dwd_dew_point__TD").cast("double")
+            > F.col("dwd_air_temperature__TT_TU").cast("double")
+        },
     )
 
     mo_q = F.col(f"dwd_moisture__{mo_meta['qn']}")
@@ -301,6 +310,7 @@ def build_temperature():
             "dew_point_temperature_alt",
             "wet_bulb_temperature_degc",
         ],
+        ("weather_temperature", "dwd_temperature"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_temperature", RID)
     return {"weather_temperature": row}
@@ -321,6 +331,12 @@ def build_humidity():
         parse=parse_mess_datum,
         qn_col=f"dwd_air_temperature__{at_meta['qn']}",
         had_conflict_col="dwd_air_temperature___had_key_conflict",
+        extra_flags={
+            "relative_humidity_above_100": F.col("dwd_air_temperature__RF_TU").cast(
+                "double"
+            )
+            > 100
+        },
     )
     mo_q = F.col(f"dwd_moisture__{mo_meta['qn']}")
     row = (
@@ -351,6 +367,7 @@ def build_humidity():
             "absolute_humidity_g_per_m3",
             "vapour_pressure_hpa",
         ],
+        ("weather_humidity", "dwd_humidity"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_humidity", RID)
     return {"weather_humidity": row}
@@ -388,7 +405,9 @@ def build_pressure():
         .withColumn("pressure_sea_level_hpa", F.col("dwd_pressure__P").cast("double"))
     )
     row = _keep_if_populated(
-        row, ["pressure_station_hpa", "pressure_station_alt", "pressure_sea_level_hpa"]
+        row,
+        ["pressure_station_hpa", "pressure_station_alt", "pressure_sea_level_hpa"],
+        ("weather_pressure", "dwd_pressure"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_pressure", RID)
     return {"weather_pressure": row}
@@ -459,6 +478,7 @@ def build_wind():
             lambda x: x.isNotNull(),
         ),
     )
+    PREFILTER[("weather_wind", "dwd_wind")] = row
     row = row.filter(F.size("readings") > 0)
     row = add_semantic_provenance(row, SOURCE, "dwd_wind", RID)
     return {"weather_wind": row}
@@ -483,6 +503,7 @@ def build_precipitation():
         .withColumn("precipitation_occurred", F.col("RS_IND").cast("int") == 1)
         .withColumn("precipitation_form_code", F.col("WRTR")),
         ["precipitation_mm", "precipitation_occurred", "precipitation_form_code"],
+        ("weather_precipitation", "dwd_precipitation"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_precipitation", RID)
     return {"weather_precipitation": row}
@@ -508,6 +529,7 @@ def build_visibility():
             "observation_method", F.coalesce(methods[F.col("V_VV_I")], F.col("V_VV_I"))
         ),
         ["visibility_m"],
+        ("weather_visibility", "dwd_visibility"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_visibility", RID)
     return {"weather_visibility": row}
@@ -602,7 +624,9 @@ def build_cloud():
         )
     )
     row = _keep_if_populated(
-        row, ["cloud_cover_total_percent", "cloud_cover_total_alt", "layers"]
+        row,
+        ["cloud_cover_total_percent", "cloud_cover_total_alt", "layers"],
+        ("weather_cloud", "dwd_cloud"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_cloud", RID)
     return {"weather_cloud": row}
@@ -632,6 +656,7 @@ def build_present_weather():
             F.when(special, F.lit(None)).otherwise(F.col("WW_Text")),
         ),
         ["present_weather_code"],
+        ("weather_present_weather", "dwd_weather_phenomena"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_weather_phenomena", RID)
     return {"weather_present_weather": row}
@@ -658,7 +683,9 @@ def build_soil_temperature():
             f"soil_temperature_{d}cm_degc", F.col(f"V_TE{d:03d}").cast("double")
         )
     row = _keep_if_populated(
-        row, [f"soil_temperature_{d}cm_degc" for d in _SOIL_DEPTHS_CM]
+        row,
+        [f"soil_temperature_{d}cm_degc" for d in _SOIL_DEPTHS_CM],
+        ("weather_soil_temperature", "dwd_soil_temperature"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_soil_temperature", RID)
     return {"weather_soil_temperature": row}
@@ -681,6 +708,7 @@ def build_sun():
     row = _keep_if_populated(
         row.withColumn("sunshine_duration_minutes", F.col("SD_SO").cast("double")),
         ["sunshine_duration_minutes"],
+        ("weather_sunshine_duration", "dwd_sun"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_sun", RID)
     return {"weather_sunshine_duration": row}
@@ -725,17 +753,31 @@ def build_solar():
     ).withColumn("solar_zenith_angle_degrees", F.col("ZENIT").cast("double"))
 
     radiation = _keep_if_populated(
-        row, ["global_radiation_w_per_m2", "diffuse_radiation_w_per_m2"]
+        row,
+        ["global_radiation_w_per_m2", "diffuse_radiation_w_per_m2"],
+        ("weather_solar_radiation", "dwd_solar"),
     )
     radiation = add_semantic_provenance(radiation, SOURCE, "dwd_solar", RID)
 
-    longwave = _keep_if_populated(row, ["longwave_downward_radiation_w_per_m2"])
+    longwave = _keep_if_populated(
+        row,
+        ["longwave_downward_radiation_w_per_m2"],
+        ("weather_longwave_radiation", "dwd_solar"),
+    )
     longwave = add_semantic_provenance(longwave, SOURCE, "dwd_solar", RID)
 
-    geometry = _keep_if_populated(row, ["solar_zenith_angle_degrees"])
+    geometry = _keep_if_populated(
+        row,
+        ["solar_zenith_angle_degrees"],
+        ("weather_solar_geometry", "dwd_solar"),
+    )
     geometry = add_semantic_provenance(geometry, SOURCE, "dwd_solar", RID)
 
-    sunshine = _keep_if_populated(row, ["sunshine_duration_minutes"])
+    sunshine = _keep_if_populated(
+        row,
+        ["sunshine_duration_minutes"],
+        ("weather_sunshine_duration", "dwd_solar"),
+    )
     sunshine = add_semantic_provenance(sunshine, SOURCE, "dwd_solar", RID)
 
     return {
@@ -832,8 +874,38 @@ for table, stats in RECONCILIATION.items():
         f"dedup/conflict reconciliation -- {table}",
         [
             (
-                "Bronze -> exact duplicates collapsed -> conflicts quarantined -> kept",
+                "Bronze -> duplicates collapsed (exact / QN-only) -> conflicts quarantined -> kept",
                 dict_to_markdown_row(stats),
+            )
+        ],
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Export findings -- all-null rows dropped, per family (kept-side rows -> written)
+for (fam, dataset), pre in PREFILTER.items():
+    pre_rows = pre.count()
+    written_rows = (
+        spark.table(semantic_table(fam))
+        .filter(
+            (F.col("source_system") == SOURCE) & (F.col("source_dataset") == dataset)
+        )
+        .count()
+    )
+    write_silver_findings(
+        FINDINGS_SOURCE,
+        f"{COMPONENT.split('/')[-1]}__{fam}__{dataset}__allnull",
+        f"all-null rows dropped -- {fam} ({dataset})",
+        [
+            (
+                "Rows before the no-measurement filter -> dropped -> written",
+                dict_to_markdown_row(
+                    {
+                        "rows_before_filter": pre_rows,
+                        "all_null_rows_dropped": pre_rows - written_rows,
+                        "written_rows": written_rows,
+                    }
+                ),
             )
         ],
     )

@@ -321,6 +321,8 @@ def parse_ts(colname, formats=GERMAN_TS_FORMATS, src_tz: str = "Europe/Berlin"):
     parse_mess_datum already applies for MESS_DATUM."""
     src_col = F.col(colname) if isinstance(colname, str) else colname
     stripped = F.regexp_replace(F.trim(src_col), r"\.0$", "")
+    # Drop fractional seconds (any digit count) after HH:mm:ss
+    stripped = F.regexp_replace(stripped, r"(\d{2}:\d{2}:\d{2})\.\d+$", "$1")
     parsed = F.lit(None).cast("timestamp")
     for fmt in formats:
         parsed = F.coalesce(parsed, F.try_to_timestamp(stripped, F.lit(fmt)))
@@ -452,10 +454,14 @@ def decode_via_ref(
     """Add `<out_prefix>_code` (source code, verbatim), `<out_prefix>_label_de`
     (German label from the reference table) and `<out_prefix>` (English business
     label from `english_map`, else the German label lowered). Broadcast join."""
-    r = ref_df.select(
-        F.col(ref_code_col).cast("string").alias("_rc"),
-        F.col(ref_label_col).cast("string").alias("_rl"),
-    ).dropDuplicates(["_rc"])
+    r = (
+        ref_df.select(
+            F.col(ref_code_col).cast("string").alias("_rc"),
+            F.col(ref_label_col).cast("string").alias("_rl"),
+        )
+        .groupBy("_rc")
+        .agg(F.min("_rl").alias("_rl"))
+    )
     out = (
         df.withColumn(f"{out_prefix}_code", F.col(code_col).cast("string"))
         .join(F.broadcast(r), F.col(f"{out_prefix}_code") == F.col("_rc"), "left")
@@ -529,7 +535,8 @@ def resolve_conflicts(
 ):
     """Return (kept_df, row_quarantine_df).
 
-    1. byte-identical rows on a key -> collapse to one;
+    1. byte-identical rows on a key -> collapse to one (with `qn_col`: rows
+       differing only in QN collapse deterministically and are flagged);
     2. exactly one row with a valid QN and the rest invalid -> keep the valid one,
        quarantine the invalid (validity distinction, not a quality ranking);
     3. more than one distinct valid-QN row -> quarantine the whole group
@@ -546,7 +553,27 @@ def resolve_conflicts(
     d = df.withColumn("_ch", content_hash)
 
     # 1. collapse byte-identical
-    d = d.dropDuplicates([*key_cols, "_ch"])
+    if qn_col is None:
+        d = d.dropDuplicates([*key_cols, "_ch"])
+    else:
+        # identical data, differing QN: valid QN first, then lowest code wins;
+        # `_qn_only_dropped` = rows lost where the QN differed
+        qn = F.trim(F.col(qn_col))
+        same = Window.partitionBy(*key_cols, "_ch")
+        ranked = same.orderBy(qn.isin(list(valid_qn)).desc(), qn.asc_nulls_last())
+        d = (
+            d.withColumn("_rn", F.row_number().over(ranked))
+            .withColumn("_same_n", F.count(F.lit(1)).over(same))
+            .withColumn(
+                "_qn_n", F.size(F.collect_set(F.coalesce(qn, F.lit(""))).over(same))
+            )
+            .filter(F.col("_rn") == 1)
+            .withColumn(
+                "_qn_only_dropped",
+                F.when(F.col("_qn_n") > 1, F.col("_same_n") - 1).otherwise(0),
+            )
+            .drop("_rn", "_same_n", "_qn_n")
+        )
 
     grp = Window.partitionBy(*key_cols)
     d = d.withColumn("_grp_n", F.count(F.lit(1)).over(grp))
@@ -566,9 +593,9 @@ def resolve_conflicts(
         drop_invalid = multi.filter((F.col("_valid_n") == 1) & ~F.col("_qn_valid"))
         # step 3: >1 distinct valid-QN row -> quarantine the whole group
         contradiction = multi.filter(F.col("_valid_n") != 1)
-        kept = singles.withColumn("_had_key_conflict", F.lit(False)).unionByName(
-            pick_valid.withColumn("_had_key_conflict", F.lit(True))
-        )
+        kept = singles.withColumn(
+            "_had_key_conflict", F.col("_qn_only_dropped") > 0
+        ).unionByName(pick_valid.withColumn("_had_key_conflict", F.lit(True)))
         quarantined = drop_invalid.drop("_qn_valid", "_valid_n").unionByName(
             contradiction.drop("_qn_valid", "_valid_n")
         )
@@ -940,6 +967,7 @@ def bundesland_ags(name_col):
 
 _MASTR_NUM_SUFFIX = ("_kw", "_m", "_km")
 _MASTR_NUM_EXACT = {"capacity_increase"}
+_MASTR_FLAG_COLS = ("FernsteuerbarkeitNb", "FernsteuerbarkeitDv")
 
 
 def _is_mastr_date(col: str) -> bool:
@@ -952,15 +980,48 @@ def mastr_standardise(
     """Decode every present coded column against its katalog category, apply the
     English business renames, then type the date / capacity / geometry /
     coordinate columns. Column names come out aligned with the registry."""
+    decoded = []
     for raw, category in coded_map.items():
         if raw not in df.columns:
             continue
+        if raw in _MASTR_FLAG_COLS:
+            v = strip_float_suffix(raw)
+            df = df.withColumn(
+                raw,
+                F.when(v == "1", F.lit(True))
+                .when(v == "0", F.lit(False))
+                .otherwise(F.lit(None).cast("boolean")),
+            )
+            continue
         pref = name_map.get(raw, raw)
         df = decode_via_ref(
-            df, raw, mastr_catalog_ref(category), "cat_id", "cat_wert", pref
+            df,
+            raw,
+            mastr_catalog_ref(category, fallback_global=True),
+            "cat_id",
+            "cat_wert",
+            pref,
         )
+        decoded.append(pref)
         if raw != pref:
             df = df.drop(raw)
+    df = df.withColumn(
+        "_unmatched_code_columns",
+        F.nullif(
+            F.concat_ws(
+                ",",
+                *[
+                    F.when(
+                        F.col(f"{p}_code").isNotNull()
+                        & F.col(f"{p}_label_de").isNull(),
+                        F.lit(p),
+                    )
+                    for p in decoded
+                ],
+            ),
+            F.lit(""),
+        ),
+    )
     df = apply_renames(df, name_map)
     for c in df.columns:
         if _is_mastr_date(c):
@@ -1009,16 +1070,27 @@ def explode_link_bridge(
     return b
 
 
-def mastr_catalog_ref(category_name: str) -> DataFrame:
+def mastr_catalog_ref(category_name: str, fallback_global: bool = False) -> DataFrame:
     """The MaStR katalog values of one named category, as (cat_id, cat_wert)
-    -- the decode reference for a coded column bound to that category."""
+    -- the decode reference for a coded column bound to that category.
+    `fallback_global` adds every other katalog value id (ids are unique across
+    categories), so a binding to an absent category name still decodes."""
     codes = read_silver("mastr_code_list")
     cat = codes.filter(
         (F.col("catalog_kind") == "katalogkategorien")
         & (F.col("label") == category_name)
     ).select(F.col("code_id").alias("_cid"))
-    return (
-        codes.filter(F.col("catalog_kind") == "katalogwerte")
-        .join(F.broadcast(cat), F.col("parent_id") == F.col("_cid"), "inner")
-        .select(F.col("code_id").alias("cat_id"), F.col("label").alias("cat_wert"))
+    values = codes.filter(F.col("catalog_kind") == "katalogwerte")
+    scoped = values.join(
+        F.broadcast(cat), F.col("parent_id") == F.col("_cid"), "inner"
+    ).select(F.col("code_id").alias("cat_id"), F.col("label").alias("cat_wert"))
+    if not fallback_global:
+        return scoped
+    rest = values.select(
+        F.col("code_id").alias("cat_id"), F.col("label").alias("cat_wert")
+    ).join(
+        scoped.select(F.col("cat_id").alias("_sid")),
+        F.col("cat_id") == F.col("_sid"),
+        "left_anti",
     )
+    return scoped.unionByName(rest)

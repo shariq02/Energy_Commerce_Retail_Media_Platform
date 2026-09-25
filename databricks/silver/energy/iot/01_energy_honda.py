@@ -217,10 +217,21 @@ thermal = _scaffold(
 # Registers are monotone in magnitude (generation counts down); a violation
 # is a drop in |reading|. Increment = next reading minus this one.
 meter = w_wide
+_ts = F.col("datetime_utc").cast("timestamp")
+_next_gap_s = F.unix_timestamp(F.lead(_ts).over(_W)) - F.unix_timestamp(_ts)
+_interval_s = lit_map(HONDA_INTERVAL_SECONDS)[F.col("frequency")]
 for ch, (t, native) in HONDA_METER_CHANNELS.items():
     reading = F.col(f"{t}__{native}")
-    meter = meter.withColumn(f"{ch}_kwh", reading).withColumn(
-        f"{ch}_increment_kwh", F.lead(reading).over(_W) - reading
+    meter = (
+        meter.withColumn(f"{ch}_kwh", reading)
+        .withColumn(f"{ch}_increment_kwh", F.lead(reading).over(_W) - reading)
+        .withColumn(
+            f"_{ch}_increment_gap",
+            F.coalesce(
+                F.col(f"{ch}_increment_kwh").isNotNull() & (_next_gap_s > _interval_s),
+                F.lit(False),
+            ),
+        )
     )
 _meter_cols = [f"{ch}_kwh" for ch in HONDA_METER_CHANNELS]
 _monotone = {
@@ -229,6 +240,12 @@ _monotone = {
     )
     for c in _meter_cols
 }
+_monotone.update(
+    {
+        f"{ch}_increment_kwh:spans_gap": F.col(f"_{ch}_increment_gap")
+        for ch in HONDA_METER_CHANNELS
+    }
+)
 meter = _scaffold(
     any_present(meter.drop(*W_COLS), _meter_cols),
     "energy_meter_reading",

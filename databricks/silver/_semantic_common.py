@@ -1068,21 +1068,35 @@ def reconciliation_stats(
     source_df, kept_df, quarantine_df, *, raw_bronze_df=None
 ) -> dict:
     """Proof of the collapse-identical / quarantine-conflicting rule: Bronze
-    -> exact duplicates collapsed -> conflicts quarantined -> kept. Pass
-    `raw_bronze_df` when `source_df` (resolve_conflicts' input) is already
-    filtered, so `bronze_rows` reflects the true Bronze count."""
+    -> duplicates collapsed -> conflicts quarantined -> kept.
+    Pass `raw_bronze_df` when `source_df` (resolve_conflicts' input) is already
+    filtered, so `bronze_rows` reflects the true Bronze count. `qn_only_collapsed`
+    appears when kept_df carries `_qn_only_dropped`."""
     dedup_input_rows = source_df.count()
-    kept_rows = kept_df.count()
     quarantined_rows = quarantine_df.count()
-    return {
+    if "_qn_only_dropped" in kept_df.columns:
+        agg = kept_df.agg(
+            F.count(F.lit(1)).alias("n"),
+            F.sum("_qn_only_dropped").alias("qn"),
+        ).first()
+        kept_rows, qn_only = agg["n"], int(agg["qn"] or 0)
+    else:
+        kept_rows, qn_only = kept_df.count(), None
+    out = {
         "bronze_rows": raw_bronze_df.count()
         if raw_bronze_df is not None
         else dedup_input_rows,
         "dedup_input_rows": dedup_input_rows,
-        "exact_duplicates_collapsed": dedup_input_rows - kept_rows - quarantined_rows,
-        "conflicts_quarantined": quarantined_rows,
-        "kept_rows": kept_rows,
+        "exact_duplicates_collapsed": dedup_input_rows
+        - kept_rows
+        - quarantined_rows
+        - (qn_only or 0),
     }
+    if qn_only is not None:
+        out["qn_only_collapsed"] = qn_only
+    out["conflicts_quarantined"] = quarantined_rows
+    out["kept_rows"] = kept_rows
+    return out
 
 
 # COMMAND ----------

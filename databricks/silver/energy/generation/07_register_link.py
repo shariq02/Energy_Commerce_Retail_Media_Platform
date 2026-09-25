@@ -120,15 +120,27 @@ for rel, (parent_type, linked_type, tables, parent_col, link_col) in LINKS.items
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- actor -> market role (one role per row, not delimited)
+# DBTITLE 1,Read Silver -- market role labels
+roles = (
+    read_silver("mastr_code_list")
+    .filter(F.col("catalog_kind") == "marktrollen")
+    .select(F.trim("label").alias("_role_label"), F.col("code_id").alias("_role_id"))
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- actor -> market role code (label resolved to its id)
 actor_roles = (
     bronze["mastr_marktakteure_und_rollen"]
     .select(
         F.col("MarktakteurMastrNummer").cast("string").alias("parent_id"),
-        F.col("Marktrolle").cast("string").alias("linked_id"),
+        F.trim(F.col("Marktrolle").cast("string")).alias("_label"),
     )
     .dropna()
     .dropDuplicates()
+    .join(F.broadcast(roles), F.col("_label") == F.col("_role_label"), "left")
+    .withColumn("linked_id", F.coalesce(F.col("_role_id"), F.col("_label")))
+    .drop("_label", "_role_label", "_role_id")
     .withColumn("relationship_type", F.lit("actor_role"))
     .withColumn("parent_type", F.lit("market_actor"))
     .withColumn("linked_type", F.lit("mastr_code_list"))

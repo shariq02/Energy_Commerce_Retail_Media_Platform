@@ -34,6 +34,9 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+from functools import reduce
+from operator import or_
+
 from pyspark.sql import functions as F
 
 # COMMAND ----------
@@ -65,7 +68,28 @@ CODED = {
     "Energietraeger": ("energy_carrier", LABELS["energietraeger"]["map"]),
     "Volleinspeisung_Teileinspeisung": ("feed_in_type", LABELS["feed_in_type"]["map"]),
 }
-REAL_CARRIERS = set(LABELS["energietraeger"]["map"]) | {"Insgesamt", "insgesamt"}
+PLAN_NUM_COLS = ["2026", "2027", "2028", "2029", "2026_2029_total"]
+_FOLDS = (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss"))
+
+
+def _fold(c):
+    """Lower-case, trim and transliterate umlauts (Column or str)."""
+    if isinstance(c, str):
+        c = c.lower().strip()
+        for a, b in _FOLDS:
+            c = c.replace(a, b)
+        return c
+    c = F.lower(F.trim(c))
+    for a, b in _FOLDS:
+        c = F.regexp_replace(c, a, b)
+    return c
+
+
+REAL_CARRIERS = [_fold(k) for k in LABELS["energietraeger"]["map"]] + ["insgesamt"]
+KEYS = {
+    "power_plant_register": ["mastr_unit_id", "plant_name", "commissioning_year"],
+    "power_plant_capacity_plan": ["capacity_section", "energy_carrier"],
+}
 
 # COMMAND ----------
 
@@ -176,25 +200,48 @@ plants = add_semantic_provenance(plants, SOURCE, PLANT_BT, RID, "_srid")
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- power_plant_capacity_plan (footnote rows quarantined)
+# DBTITLE 1,Transform -- power_plant_capacity_plan (section + total flag; title/footnote rows quarantined)
+plan_src = plan_bronze
+_has_number = reduce(or_, [F.col(c).isNotNull() for c in PLAN_NUM_COLS])
 plan, footnote_q = row_quarantine(
-    plan_bronze,
-    ~F.col("energietraeger").isin(list(REAL_CARRIERS)),
+    plan_src,
+    ~(_fold(F.col("energietraeger")).isin(REAL_CARRIERS) | _has_number),
     rule_id="capacity_additions_footnote_rows",
-    reason="energietraeger is a section header / sub-total / legal footnote, not a carrier",
+    reason="energietraeger is a section title / legal footnote with no numbers",
     field_name="energietraeger",
     value_col="energietraeger",
     sr_id_col="energietraeger",
     source_system=SOURCE,
     bronze_table=PLAN_BT,
 )
-for c in ("2026", "2027", "2028", "2029", "2026_2029_total"):
-    plan = plan.withColumn(c, german_decimal(c))
-plan = plan.withColumnRenamed("energietraeger", "energy_carrier").withColumnRenamed(
-    "2026_2029_total", "retiring_capacity_total_2026_2029_mw"
+for c in PLAN_NUM_COLS:
+    plan = plan.withColumn(c, F.col(c).cast("double"))
+# Section derived from content: the source has no row order.
+_fold_col = _fold(F.col("energietraeger"))
+_is_carrier = _fold_col.isin(REAL_CARRIERS) & (_fold_col != "insgesamt")
+_add_total = plan.filter(_is_carrier).agg(F.sum("2026_2029_total")).first()[0] or 0.0
+_section = (
+    F.when(_is_carrier, F.lit("additions"))
+    .when(
+        (_fold_col == "insgesamt")
+        & (F.abs(F.col("2026_2029_total") - F.lit(_add_total)) < 0.05),
+        F.lit("additions"),
+    )
+    .otherwise(F.lit("retirements"))
 )
-plan = within_group_ordinal(plan, ["energy_carrier"], ["2026", "2027", "2028", "2029"])
-plan = plan.withColumn("_srid", sha_key("energy_carrier", "_src_id_ord"))
+plan = (
+    plan.withColumn("capacity_section", _section)
+    .withColumn("energietraeger", F.trim(F.col("energietraeger")))
+    .withColumn("is_total", _fold(F.col("energietraeger")) == "insgesamt")
+    .withColumnRenamed("energietraeger", "energy_carrier")
+    .withColumnRenamed("2026_2029_total", "retiring_capacity_total_2026_2029_mw")
+)
+plan = within_group_ordinal(
+    plan, ["capacity_section", "energy_carrier"], ["2026", "2027", "2028", "2029"]
+)
+plan = plan.withColumn(
+    "_srid", sha_key("capacity_section", "energy_carrier", "_src_id_ord")
+)
 plan = add_semantic_provenance(plan, SOURCE, PLAN_BT, RID, "_srid")
 
 # COMMAND ----------
@@ -224,7 +271,7 @@ findings_blocks = {
         source=FINDINGS,
         component=COMPONENT,
         rid=RID,
-        key_cols=["source_record_id"],
+        key_cols=KEYS[name],
     )
     for name in STRUCTURES
 }

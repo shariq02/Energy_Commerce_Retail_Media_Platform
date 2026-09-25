@@ -143,14 +143,17 @@ if "electricity_balance" in T:
         - F.col("generation_offshore_wind")
         - F.col("generation_photovoltaic")
     )
-    _viol = _r.filter(
+    _bad = _r.filter(
         F.abs(F.col("residual_load") - _implied) > 0.02 * F.abs(F.col("residual_load"))
-    ).count()
+    ).withColumn("implied_residual", _implied)
+    _viol = _bad.count()
     report(
         "smard residual-load identity",
         _viol == 0,
         f"violations {_viol} of {_r.count()}",
     )
+    if _viol:
+        keep("smard residual-load violations", _bad.limit(20))
 
 # COMMAND ----------
 

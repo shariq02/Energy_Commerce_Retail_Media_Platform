@@ -83,7 +83,10 @@ report("support id spaces disjoint", _shared_ids == 0, f"shared ids {_shared_ids
 
 
 def ids_of(name: str):
-    return T[name].select(F.col(ID_COLUMN[name]).cast("string").alias("id")).distinct()
+    df = T[name]
+    if name == "mastr_code_list":
+        df = df.filter(F.col("catalog_kind") == "marktrollen")
+    return df.select(F.col(ID_COLUMN[name]).cast("string").alias("id")).distinct()
 
 
 # COMMAND ----------

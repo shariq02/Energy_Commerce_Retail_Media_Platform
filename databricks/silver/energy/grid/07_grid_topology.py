@@ -57,6 +57,7 @@ ENTITIES = {
 }
 BALANCING_BT = "mastr_bilanzierungsgebiete"
 CONFLICT = "grid_location_coordinate_conflict"
+KEYS = {"balancing_area": [NAME_MAP.get("Id", "Id")]}
 
 # COMMAND ----------
 
@@ -140,7 +141,7 @@ findings_blocks = {
         source=FINDINGS,
         component=COMPONENT,
         rid=RID,
-        key_cols=["source_record_id"],
+        key_cols=KEYS.get(name, ["source_record_id"]),
     )
     for name in [*STRUCTURES, CONFLICT]
 }

@@ -190,7 +190,8 @@ _plants = (
     .select("plant_name")
     .dropna()
     .withColumn("_norm_plant", _normalise("plant_name"))
-    .dropDuplicates(["_norm_plant"])
+    .groupBy("_norm_plant")
+    .agg(F.min("plant_name").alias("plant_name"))
 )
 events = (
     events.withColumn("_norm_affected", _normalise("affected_asset_text"))

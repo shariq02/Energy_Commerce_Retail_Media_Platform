@@ -55,6 +55,15 @@ DELETIONS = {
 }
 CHANGE_BT = "mastr_einheiten_aenderung_netzbetreiberzuordnungen"
 CHANGE_KEY = ["unit_id", "grid_operator_change_effective_date"]
+KEYS = {
+    "grid_operator_change_event": [
+        *CHANGE_KEY,
+        "grid_operator_change_registered_date",
+        "change_type",
+        "previous_grid_operator_id",
+        "new_grid_operator_id",
+    ]
+}
 
 # COMMAND ----------
 
@@ -97,11 +106,11 @@ changes = (
     changes.join(F.broadcast(commissioning), "unit_id", "left")
     .withColumn(
         "_date_order_violation_registered_before_effective",
-        F.coalesce(_registered < _effective, F.lit(False)),
+        _registered < _effective,
     )
     .withColumn(
         "_date_order_violation_commissioning_after_change",
-        F.coalesce(F.col("commissioning_date") > _effective, F.lit(False)),
+        F.col("commissioning_date") > _effective,
     )
     .drop("commissioning_date")
     .withColumn("_srid", sha_key(*CHANGE_KEY, "_src_id_ord"))
@@ -126,7 +135,7 @@ findings_blocks = {
         source=FINDINGS,
         component=COMPONENT,
         rid=RID,
-        key_cols=["source_record_id"],
+        key_cols=KEYS.get(name, ["source_record_id"]),
     )
     for name in STRUCTURES
 }

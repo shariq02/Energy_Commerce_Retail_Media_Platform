@@ -172,7 +172,9 @@ _catalog_units = (
         F.trim("Parameterbeschreibung").alias("parameter_description_de"),
     )
     .filter(F.col("parameter_source_code").isNotNull())
-    .dropDuplicates(["parameter_source_code"])
+    .groupBy("parameter_source_code")
+    .agg(F.min(F.struct("parameter_unit", "parameter_description_de")).alias("_pick"))
+    .select("parameter_source_code", "_pick.*")
 )
 parameter_catalog = (
     _catalog_names.join(_catalog_units, "parameter_source_code", "left")
