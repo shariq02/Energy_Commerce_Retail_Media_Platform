@@ -715,6 +715,14 @@ def build_rows() -> list[dict]:
                 )
             )
             add_governance(st, conflict=has_conflict, disambig=disambig)
+            if source == "mastr":
+                add(
+                    st,
+                    "_unmatched_code_columns",
+                    "derived",
+                    "coded columns whose code has no label in the decode reference",
+                    "coded-value decode triple",
+                )
             # value_quarantine flag columns -- the notebook's own flag_col=
             # argument, not derivable from the contract; verified against every
             # value_quarantine() call in databricks/silver/, not guessed.
