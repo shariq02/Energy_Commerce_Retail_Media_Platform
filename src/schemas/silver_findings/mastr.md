@@ -1399,7 +1399,7 @@ _Generated: 2026-09-25T16:28Z_
 <!-- BEGIN mastr:08_register_change_event__actor_deletion_event -->
 ## actor_deletion_event
 
-_Generated: 2026-09-25T17:21Z_
+_Generated: 2026-09-25T21:03Z_
 
 ### cardinality
 
@@ -1462,7 +1462,7 @@ _Generated: 2026-09-25T17:21Z_
 <!-- BEGIN mastr:08_register_change_event__grid_operator_change_event -->
 ## grid_operator_change_event
 
-_Generated: 2026-09-25T17:21Z_
+_Generated: 2026-09-25T21:03Z_
 
 ### cardinality
 
@@ -1513,7 +1513,7 @@ _Generated: 2026-09-25T17:21Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| duplicate_keys | count | 363.0 | 0.0 | WARN | WARN | key_cols=['unit_id', 'grid_operator_change_effective_date', 'grid_operator_change_registered_date', 'change_type', 'previous_grid_operator_id', 'new_grid_operator_id'] |
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['unit_id', 'grid_operator_change_effective_date', 'grid_operator_change_registered_date', 'change_type', 'previous_grid_operator_id', 'new_grid_operator_id', '_src_id_ord'] |
 
 ### numeric
 
@@ -1542,7 +1542,7 @@ _Generated: 2026-09-25T17:21Z_
 <!-- BEGIN mastr:08_register_change_event__unit_deletion_event -->
 ## unit_deletion_event
 
-_Generated: 2026-09-25T17:21Z_
+_Generated: 2026-09-25T21:03Z_
 
 ### cardinality
 
@@ -1637,4 +1637,3 @@ _Generated: 2026-09-25T17:27Z_
 | authorisation_unit | 59065 | 1.0 | 0.9650554473884704 |
 
 <!-- END mastr:09_register_validation__validation -->
-

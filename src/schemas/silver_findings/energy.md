@@ -921,7 +921,7 @@ _Generated: 2026-09-25T17:22Z_
 <!-- BEGIN energy:03_market_validation__validation -->
 ## market validation
 
-_Generated: 2026-09-25T17:22Z_
+_Generated: 2026-09-25T21:03Z_
 
 ### checks
 
@@ -936,15 +936,9 @@ _Generated: 2026-09-25T17:22Z_
 | electricity_balance places resolve | PASS | unknown codes 0, no place 0, orphans 0 |
 | electricity_price places resolve | PASS | unknown codes 0, no place 0, orphans 0 |
 | electricity_generation_forecast places resolve | PASS | unknown codes 0, no place 0, orphans 0 |
-| smard residual-load identity | FAIL | violations 1 of 72572 |
+| smard residual-load identity | PASS | violations 0 of 72572 |
 | smard quarter-hour unit is MWh per interval | PASS | median day/sum(qh) = 1.0 over 1447 days (MW would give ~4) |
 | smard forecast pv mirror still holds | INFO | share mirrored 1.0 |
-
-### smard residual-load violations
-
-| observation_key | market_area_code | interval_reference | local_date | residual_load | total_power_consumption | generation_onshore_wind | generation_offshore_wind | generation_photovoltaic | implied_residual |
-|---|---|---|---|---|---|---|---|---|---|
-| 982b3dff097ce5360079e320d855d2a89944fcb864396f22d85e3b0beae2e0cc | de_lu | clock | 2026-08-02 | -0.19 | 10039.38 | 483.81 | 16.94 | 9538.81 | -0.18000000000029104 |
 
 <!-- END energy:03_market_validation__validation -->
 
