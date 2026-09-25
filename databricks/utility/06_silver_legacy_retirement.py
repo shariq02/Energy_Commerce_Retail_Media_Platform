@@ -53,10 +53,8 @@ SCHEMAS = [
     "quality",
 ]
 QUALITY_ACTIVE = {
-    "quarantine",
-    "field_class_registry",
-    "pipeline_watermarks",
-    "quality_audit_log",
+    t.rsplit(".", 1)[1]
+    for t in (QUARANTINE_TABLE, FIELD_CLASS_TABLE, AUDIT_TABLE, WATERMARK_TABLE)
 }
 # Why some legacy tables have no successor structure.
 LEGACY_NOTES = {
@@ -92,18 +90,14 @@ plan = []
 for schema in SCHEMAS:
     for t in spark.catalog.listTables(f"{CATALOG}.{schema}"):
         full = f"{schema}.{t.name}"
-        rows = spark.table(f"{CATALOG}.{full}").count()
         note = LEGACY_NOTES.get(full, "-")
         if is_active(schema, t.name):
-            plan.append((schema, t.name, rows, "active", note, "keep"))
+            plan.append((schema, t.name, "active", note, "keep"))
         else:
-            plan.append((schema, t.name, rows, "legacy", note, "drop"))
+            plan.append((schema, t.name, "legacy", note, "drop"))
 plan_df = spark.createDataFrame(
     plan,
-    (
-        "schema string, table_name string, rows long, status string, "
-        "note string, action string"
-    ),
+    ("schema string, table_name string, status string, note string, action string"),
 ).orderBy("action", "schema", "table_name")
 display(plan_df)
 
@@ -128,7 +122,7 @@ write_silver_findings(
 if DROP_LEGACY:
     for r in plan_df.filter(F.col("action") == "drop").collect():
         spark.sql(f"DROP TABLE IF EXISTS {CATALOG}.{r['schema']}.{r['table_name']}")
-        print(f"DROPPED  {r['schema']}.{r['table_name']}  ({r['rows']} rows)")
+        print(f"DROPPED  {r['schema']}.{r['table_name']}")
     print("Managed tables can be restored with UNDROP TABLE within retention.")
 else:
     print("DROP_LEGACY is False -- nothing dropped. Review the plan above first.")
