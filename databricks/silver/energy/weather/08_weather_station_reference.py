@@ -79,7 +79,7 @@ def station_period(df, bronze_table: str, content_cols: list, extra_key=()):
     )
     key = ["source_location_id", *extra_key, "valid_from"]
     df = within_group_ordinal(df, key, content_cols)
-    df = df.withColumnRenamed("_src_id_ord", "record_ordinal")
+    df = df.withColumnRenamed("_source_id_ordinal", "record_ordinal")
     return df.withColumn("_srid", sha_key(*key, "record_ordinal"))
 
 
@@ -198,8 +198,10 @@ missing = rename_meta(
     "dwd_missing_value_periods",
 )
 missing = (
-    missing.withColumn("gap_start_ts", parse_ts("valid_from", _gap_format, "UTC"))
-    .withColumn("gap_end_ts", parse_ts("valid_to", _gap_format, "UTC"))
+    missing.withColumn(
+        "gap_start_timestamp", parse_ts("valid_from", _gap_format, "UTC")
+    )
+    .withColumn("gap_end_timestamp", parse_ts("valid_to", _gap_format, "UTC"))
     .withColumn("missing_value_count", F.col("missing_value_count").cast("bigint"))
     .withColumnRenamed("station_id", "source_location_id")
     .withColumnRenamed("station_name", "name")
@@ -207,10 +209,15 @@ missing = (
     .dropDuplicates()
     .withColumn("location_key", location_key(SOURCE, "source_location_id"))
 )
-_gap_key = ["source_location_id", "parameter_source_code", "gap_start_ts", "gap_end_ts"]
+_gap_key = [
+    "source_location_id",
+    "parameter_source_code",
+    "gap_start_timestamp",
+    "gap_end_timestamp",
+]
 missing = within_group_ordinal(
     missing, _gap_key, ["missing_value_count", "gap_description"]
-).withColumnRenamed("_src_id_ord", "record_ordinal")
+).withColumnRenamed("_source_id_ordinal", "record_ordinal")
 missing = add_semantic_provenance(
     missing.withColumn("_srid", sha_key(*_gap_key, "record_ordinal")),
     SOURCE,

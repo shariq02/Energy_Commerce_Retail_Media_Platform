@@ -69,7 +69,7 @@ if spark.catalog.tableExists(_stale_table):
 
 # DBTITLE 1,Read Silver -- primary hourly air temperature
 # air_temperature_degc is already the unambiguous primary value (alternates
-# live in air_temperature_alt, not extra rows), so no is_primary filter.
+# live in air_temperature_alternate, not extra rows), so no is_primary filter.
 hourly_temperature = (
     spark.table(semantic_table(DERIVED_FROM))
     .filter(
@@ -92,7 +92,7 @@ daily_agg = hourly_temperature.groupBy(
     "location_key", "source_location_id", "local_date"
 ).agg(
     *[fn("value").alias(f"agg_{name}") for name, fn in STATISTICS.items()],
-    F.count("*").alias("n_observations"),
+    F.count("*").alias("observation_count"),
 )
 
 # COMMAND ----------
@@ -104,7 +104,7 @@ derived_daily = (
         "location_key",
         "source_location_id",
         "local_date",
-        "n_observations",
+        "observation_count",
         F.expr(f"stack({len(STATISTICS)}, {_stack}) as (statistic, value)"),
     )
     .withColumn("variable", F.lit(VARIABLE))

@@ -152,9 +152,13 @@ events = (
     .withColumn(
         "direction", lit_map(LABELS["richtung"]["map"])[F.col("direction_native")]
     )
-    .withColumn("instructing_tso_native", F.col("ANWEISENDER_UENB"))
+    .withColumn(
+        "instructing_transmission_system_operator_native", F.col("ANWEISENDER_UENB")
+    )
     .withColumn("instructing_market_area_code", _market[F.trim("ANWEISENDER_UENB")])
-    .withColumn("requesting_tso_native", F.col("ANFORDERNDER_UENB"))
+    .withColumn(
+        "requesting_transmission_system_operator_native", F.col("ANFORDERNDER_UENB")
+    )
     .withColumn(
         "requesting_market_area_codes",
         F.filter(
@@ -167,7 +171,10 @@ events = (
         "primary_energy_type",
         lit_map(LABELS["primaerenergieart"]["map"])[F.col("PRIMAERENERGIEART")],
     )
-    .withColumn("measurement_basis", F.lit("tso_reported_measure_pre_2021"))
+    .withColumn(
+        "measurement_basis",
+        F.lit("transmission_system_operator_reported_measure_pre_2021"),
+    )
     .withColumn("event_key", sha_key(*bronze_df.columns))
     .withColumn("source_record_id", F.col("event_key"))
 )
@@ -281,7 +288,7 @@ findings_blocks = inspect_table(
             (F.col("reason_native").isNotNull() & F.col("reason").isNull())
             | (F.col("direction_native").isNotNull() & F.col("direction").isNull())
             | (
-                F.col("instructing_tso_native").isNotNull()
+                F.col("instructing_transmission_system_operator_native").isNotNull()
                 & F.col("instructing_market_area_code").isNull()
             )
         ).count(),

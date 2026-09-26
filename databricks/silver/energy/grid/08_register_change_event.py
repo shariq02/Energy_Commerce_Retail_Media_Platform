@@ -62,7 +62,7 @@ KEYS = {
         "change_type",
         "previous_grid_operator_id",
         "new_grid_operator_id",
-        "_src_id_ord",
+        "_source_id_ordinal",
     ]
 }
 
@@ -114,7 +114,7 @@ changes = (
         F.col("commissioning_date") > _effective,
     )
     .drop("commissioning_date")
-    .withColumn("_srid", sha_key(*CHANGE_KEY, "_src_id_ord"))
+    .withColumn("_srid", sha_key(*CHANGE_KEY, "_source_id_ordinal"))
 )
 STRUCTURES["grid_operator_change_event"] = add_semantic_provenance(
     changes, SOURCE, CHANGE_BT, RID, "_srid"

@@ -33,18 +33,18 @@ _PROVENANCE_TAIL = [
 
 # Place/time scaffolding shared by every family; measurement columns below
 # are designed per family, not shared. Grain = (source_system, place,
-# observation_ts_utc, interval_seconds, interval_reference).
+# observation_timestamp_utc, interval_seconds, interval_reference).
 _PLACE_HEAD = [
     ("observation_key", "string"),
     ("location_key", "string"),
     ("source_location_id", "string"),
 ]
 _TIME_COLUMNS = [
-    ("observation_ts_native", "string"),
+    ("observation_timestamp_native", "string"),
     ("time_basis", "string"),
     ("utc_offset_hours", "double"),
-    ("observation_ts_utc", "timestamp"),
-    ("observation_ts_project", "timestamp"),
+    ("observation_timestamp_utc", "timestamp"),
+    ("observation_timestamp_project", "timestamp"),
     ("local_date", "date"),
     ("interval_seconds", "int"),
     ("interval_reference", "string"),
@@ -72,9 +72,9 @@ WEATHER_TEMPERATURE_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
     ("air_temperature_degc", "double"),
-    ("air_temperature_alt", _ALT_READING),
+    ("air_temperature_alternate", _ALT_READING),
     ("dew_point_temperature_degc", "double"),
-    ("dew_point_temperature_alt", _ALT_READING),
+    ("dew_point_temperature_alternate", _ALT_READING),
     ("wet_bulb_temperature_degc", "double"),
     *_QUALITY_COLUMNS,
     *_TAIL,
@@ -84,7 +84,7 @@ WEATHER_HUMIDITY_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
     ("relative_humidity_percent", "double"),
-    ("relative_humidity_alt", _ALT_READING),
+    ("relative_humidity_alternate", _ALT_READING),
     ("absolute_humidity_g_per_m3", "double"),
     ("vapour_pressure_hpa", "double"),
     *_QUALITY_COLUMNS,
@@ -98,7 +98,7 @@ WEATHER_PRESSURE_COLUMNS = [
     ("pressure_station_hpa", "double"),
     ("pressure_station_native_value", "double"),
     ("pressure_station_native_unit", "string"),
-    ("pressure_station_alt", _ALT_READING),
+    ("pressure_station_alternate", _ALT_READING),
     ("pressure_sea_level_hpa", "double"),
     ("pressure_sea_level_native_value", "double"),
     ("pressure_sea_level_native_unit", "string"),
@@ -142,7 +142,7 @@ WEATHER_CLOUD_COLUMNS = [
     ("cloud_cover_total_percent", "double"),
     ("cloud_cover_total_native_value", "double"),
     ("cloud_cover_total_native_unit", "string"),
-    ("cloud_cover_total_alt", _ALT_READING),
+    ("cloud_cover_total_alternate", _ALT_READING),
     ("cloud_base_height_m", "double"),
     ("observation_method", "string"),
     (
@@ -225,7 +225,7 @@ WEATHER_LONGWAVE_RADIATION_COLUMNS = [
 ]
 
 # A duration, not a flux. dwd_sun (clock hour) and dwd_solar (true-solar
-# hour) are different windows, so separate rows, never _alt.
+# hour) are different windows, so separate rows, never _alternate.
 WEATHER_SUNSHINE_DURATION_COLUMNS = [
     *_PLACE_HEAD,
     *_TIME_COLUMNS,
@@ -290,7 +290,7 @@ WEATHER_DAILY_COLUMNS = [
     ("unit", "string"),
     ("value_origin", "string"),
     ("derivation_rule", "string"),
-    ("n_observations", "int"),
+    ("observation_count", "int"),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     ("source_column", "string"),
@@ -309,7 +309,7 @@ WEATHER_LOCATION_COLUMNS = [
     ("country_code", "string"),
     ("region", "string"),
     ("city", "string"),
-    ("ags_code", "string"),
+    ("official_municipality_key", "string"),
     ("geography_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
@@ -385,8 +385,8 @@ WEATHER_MISSING_VALUE_PERIOD_COLUMNS = [
     ("source_location_id", "string"),
     ("name", "string"),
     ("parameter_source_code", "string"),
-    ("gap_start_ts", "timestamp"),
-    ("gap_end_ts", "timestamp"),
+    ("gap_start_timestamp", "timestamp"),
+    ("gap_end_timestamp", "timestamp"),
     ("record_ordinal", "int"),
     ("missing_value_count", "bigint"),
     ("gap_description", "string"),
@@ -427,9 +427,9 @@ REGISTER_LINK_COLUMNS = [
 # Commerce: GA4 and REES46 are separate identity spaces, so separate
 # structures; GA4 transaction fields sit on the event (same grain).
 _EVENT_TIME = [
-    ("event_ts_native", "string"),
-    ("event_ts_utc", "timestamp"),
-    ("event_ts_project", "timestamp"),
+    ("event_timestamp_native", "string"),
+    ("event_timestamp_utc", "timestamp"),
+    ("event_timestamp_project", "timestamp"),
     ("local_date", "date"),
 ]
 REES46_EVENT_COLUMNS = [
@@ -479,7 +479,7 @@ GA4_EVENT_ITEM_COLUMNS = [
     ("event_key", "string"),
     ("item_ordinal", "int"),
     ("event_name", "string"),
-    ("event_ts_utc", "timestamp"),
+    ("event_timestamp_utc", "timestamp"),
     ("user_pseudo_id", "string"),
     ("item_context", "string"),
     ("item_id", "string"),
@@ -495,7 +495,7 @@ GA4_EVENT_ITEM_COLUMNS = [
 WEATHER_GRAIN = [
     "source_system",
     "location_key",
-    "observation_ts_utc",
+    "observation_timestamp_utc",
     "interval_seconds",
     "interval_reference",
 ]
@@ -547,7 +547,7 @@ ELECTRICITY_PRICE_COLUMNS = [
 ELECTRICITY_GENERATION_FORECAST_COLUMNS = [
     *_ENERGY_HEAD,
     *_TIME_COLUMNS,
-    ("forecast_issue_ts", "timestamp"),
+    ("forecast_issue_timestamp", "timestamp"),
     (
         "components",
         (
@@ -563,7 +563,7 @@ THERMAL_ENERGY_COLUMNS = [
     *_ENERGY_HEAD,
     *_TIME_COLUMNS,
     ("heating_total_w", "double"),
-    ("heating_chp_heat_w", "double"),
+    ("heating_combined_heat_and_power_heat_w", "double"),
     ("cooling_total_w", "double"),
     *_ENERGY_TAIL,
 ]
@@ -571,13 +571,13 @@ THERMAL_ENERGY_COLUMNS = [
 # Cumulative register state (kWh) plus its derived forward increment.
 HONDA_METER_CHANNELS = {
     "electricity_total": ("electricity", "total"),
-    "electricity_pv": ("electricity", "PV"),
-    "electricity_chp": ("electricity", "CHP"),
+    "electricity_solar_photovoltaic": ("electricity", "PV"),
+    "electricity_combined_heat_and_power": ("electricity", "CHP"),
     "heating_total": ("heating", "total"),
-    "heating_chp_heat": ("heating", "CHP_heat"),
-    "heating_chp_elec": ("heating", "CHP_elec"),
+    "heating_combined_heat_and_power_heat": ("heating", "CHP_heat"),
+    "heating_combined_heat_and_power_electricity": ("heating", "CHP_elec"),
     "cooling_total": ("cooling", "total"),
-    "cooling_cool_elec": ("cooling", "cool_elec"),
+    "cooling_electricity": ("cooling", "cool_elec"),
 }
 ENERGY_METER_READING_COLUMNS = [
     *_ENERGY_HEAD,
@@ -617,9 +617,9 @@ GRID_INTERVENTION_EVENT_COLUMNS = [
     ("mean_power_mw", "double"),
     ("max_power_mw", "double"),
     ("energy_mwh", "double"),
-    ("instructing_tso_native", "string"),
+    ("instructing_transmission_system_operator_native", "string"),
     ("instructing_market_area_code", "string"),
-    ("requesting_tso_native", "string"),
+    ("requesting_transmission_system_operator_native", "string"),
     ("requesting_market_area_codes", "array<string>"),
     ("affected_asset_text", "string"),
     ("affected_unit_match_name", "string"),
@@ -636,7 +636,7 @@ GRID_INTERVENTION_EVENT_COLUMNS = [
 PLANT_OPERATING_SAMPLE_COLUMNS = [
     ("sample_key", "string"),
     ("ambient_temperature_degc", "double"),
-    ("exhaust_vacuum_cm_hg", "double"),
+    ("exhaust_vacuum_cm_of_mercury", "double"),
     ("ambient_pressure_mbar", "double"),
     ("relative_humidity_percent", "double"),
     ("net_electrical_output_mw", "double"),
@@ -657,8 +657,8 @@ DEVICE_TELEMETRY_SNAPSHOT_COLUMNS = [
     ("country_code", "string"),
     ("country_code_alpha3", "string"),
     ("country_name", "string"),
-    ("observation_ts_native", "string"),
-    ("observation_ts_utc", "timestamp"),
+    ("observation_timestamp_native", "string"),
+    ("observation_timestamp_utc", "timestamp"),
     ("temperature_degc", "double"),
     ("humidity_percent", "double"),
     ("co2_level", "double"),
@@ -697,6 +697,17 @@ SEMANTIC_STRUCTURES = {
 # Register structures whose wide column set comes from the MaStR / plant-list
 # contracts and mappings: registered as the union of their member tables'
 # registry rows (minus `ecosystem`) plus the listed discriminators.
+# MaStR Bronze table -> English name for its own key column (the same source
+# name means a different entity per table, so it cannot sit in the flat mapping).
+MASTR_KEY_NAMES = {
+    "mastr_ertuechtigungen": {"Id": "repowering_id"},
+    "mastr_bilanzierungsgebiete": {"Id": "balancing_area_id"},
+    "mastr_marktakteure": {"MastrNummer": "market_actor_id"},
+    "mastr_marktakteure_und_rollen": {"MastrNummer": "market_actor_id"},
+    "mastr_lokationen": {"MastrNummer": "location_id"},
+    "mastr_netze": {"MastrNummer": "grid_id"},
+}
+
 SEMANTIC_MEMBER_STRUCTURES = {
     "generation_unit": (
         [
@@ -818,11 +829,11 @@ def ensure_utc_session() -> None:
 # DBTITLE 1,Helper -- time columns
 
 
-def add_project_time(df, utc_col: str = "observation_ts_utc"):
+def add_project_time(df, utc_col: str = "observation_timestamp_utc"):
     """Project-time timestamp (Europe/Berlin wall clock) and local date from a
     UTC instant. NULL where the source has no instant."""
     local = F.from_utc_timestamp(F.col(utc_col), PROJECT_TZ)
-    return df.withColumn("observation_ts_project", local).withColumn(
+    return df.withColumn("observation_timestamp_project", local).withColumn(
         "local_date", F.to_date(local)
     )
 
@@ -983,7 +994,7 @@ SEMANTIC_HIGH_CARDINALITY = {
     "daily_key",
     "location_key",
     "source_location_id",
-    "observation_ts_native",
+    "observation_timestamp_native",
     "date_native",
     "event_key",
     "sample_key",
@@ -1027,7 +1038,8 @@ def structure_extra_checks(df) -> dict:
             agg[r[c]] = agg.get(r[c], 0) + r["count"]
         out[f"rows_by_{c}"] = dict(sorted(agg.items(), key=lambda kv: str(kv[0])))
     span_col = next(
-        (c for c in ("observation_ts_utc", "local_date") if c in df.columns), None
+        (c for c in ("observation_timestamp_utc", "local_date") if c in df.columns),
+        None,
     )
     if span_col:
         span = df.agg(F.min(span_col).alias("lo"), F.max(span_col).alias("hi")).first()

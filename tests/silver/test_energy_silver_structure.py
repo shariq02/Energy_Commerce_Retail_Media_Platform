@@ -33,6 +33,9 @@ _SILVER = _ROOT / "databricks" / "silver"
 _NOTEBOOKS = silver_notebooks(_SILVER)
 # forbidden as real code use (quoted column name / function call), not prose
 _FORBIDDEN = ('"canonical_id"', "'canonical_id'", "F.monotonically_increasing_id")
+# abbreviations that must be spelled out in Silver column names
+_SHORTHAND = {"ags", "eeg", "kwk", "chp", "tso", "pv", "sme", "nuts2", "ts", "alt"}
+_SHORTHAND |= {"src", "ord", "elec", "hg"}
 
 
 def _code_lines(text: str) -> str:
@@ -109,3 +112,19 @@ def test_assert_registry_complete_fails_on_a_missing_table() -> None:
 
 def test_assert_registry_complete_passes_on_the_real_repo() -> None:
     assert_registry_complete(build_rows())
+
+
+def test_silver_columns_are_english_and_spelled_out() -> None:
+    """Source-style (uppercase) names and abbreviations must not reach a Silver
+    structure; `_nv` companions are excluded until their meaning is settled."""
+    ns = _semantic_namespace()
+    tables = set(ns["SEMANTIC_STRUCTURES"]) | set(ns["SEMANTIC_MEMBER_STRUCTURES"])
+    untranslated: dict[str, list[str]] = {}
+    for r in build_rows():
+        col = r["column_name"]
+        if r["table_name"] not in tables:
+            continue
+        german = col != col.lower() and not col.endswith("_nv")
+        if german or _SHORTHAND & set(col.split("_")):
+            untranslated.setdefault(r["table_name"], []).append(col)
+    assert not untranslated, untranslated

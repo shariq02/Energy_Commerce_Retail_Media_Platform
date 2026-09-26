@@ -90,12 +90,15 @@ RECONCILIATION = reconciliation_stats(bronze_df, _kept, _q)
 events = (
     _kept.withColumn("event_key", sha_key(*KEY))
     .withColumn("event_date_native", F.col("event_date").cast("string"))
-    .withColumn("event_ts_native", F.col("event_timestamp").cast("string"))
+    .withColumn("event_timestamp_native", F.col("event_timestamp").cast("string"))
     .withColumn(
-        "event_ts_utc", F.timestamp_micros(F.col("event_timestamp").cast("long"))
+        "event_timestamp_utc", F.timestamp_micros(F.col("event_timestamp").cast("long"))
     )
-    .withColumn("event_ts_project", F.from_utc_timestamp("event_ts_utc", PROJECT_TZ))
-    .withColumn("local_date", F.to_date("event_ts_project"))
+    .withColumn(
+        "event_timestamp_project",
+        F.from_utc_timestamp("event_timestamp_utc", PROJECT_TZ),
+    )
+    .withColumn("local_date", F.to_date("event_timestamp_project"))
 )
 
 # COMMAND ----------
@@ -136,14 +139,14 @@ ga4_item = (
     events.select(
         "event_key",
         "event_name",
-        "event_ts_utc",
+        "event_timestamp_utc",
         "user_pseudo_id",
         F.posexplode("items").alias("item_ordinal", "item"),
     )
     .select(
         "event_key",
         "event_name",
-        "event_ts_utc",
+        "event_timestamp_utc",
         "user_pseudo_id",
         "item_ordinal",
         unset_to_null(F.col("item.item_id")).alias("item_id"),

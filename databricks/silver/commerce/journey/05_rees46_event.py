@@ -65,7 +65,7 @@ bronze_df = read_bronze(BT)
 
 # DBTITLE 1,Dedupe -- collapse identical rows, quarantine same-key value conflicts
 _typed = (
-    bronze_df.withColumn("event_ts_native", F.col("event_time"))
+    bronze_df.withColumn("event_timestamp_native", F.col("event_time"))
     .withColumn("event_time", F.col("event_time").cast("timestamp"))
     .withColumn("price", F.col("price").cast("double"))
 )
@@ -77,14 +77,17 @@ RECONCILIATION = reconciliation_stats(bronze_df, _kept, _q)
 
 # DBTITLE 1,Transform -- time, category path, flags
 _path = F.split(F.col("category_code"), r"\.")
-_burst = Window.partitionBy("user_id", "user_session", "event_ts_utc")
+_burst = Window.partitionBy("user_id", "user_session", "event_timestamp_utc")
 _ids_per_code = _kept.groupBy("category_code").agg(
     F.countDistinct("category_id").alias("_ids_per_code")
 )
 events = (
-    _kept.withColumn("event_ts_utc", F.col("event_time"))
-    .withColumn("event_ts_project", F.from_utc_timestamp("event_ts_utc", PROJECT_TZ))
-    .withColumn("local_date", F.to_date("event_ts_project"))
+    _kept.withColumn("event_timestamp_utc", F.col("event_time"))
+    .withColumn(
+        "event_timestamp_project",
+        F.from_utc_timestamp("event_timestamp_utc", PROJECT_TZ),
+    )
+    .withColumn("local_date", F.to_date("event_timestamp_project"))
     .withColumn("currency_unknown", F.lit(True))
     .withColumn("category_l1", F.get(_path, 0))
     .withColumn("category_l2", F.get(_path, 1))

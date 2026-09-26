@@ -54,11 +54,11 @@ COMMON_COLS = [
     "observation_key",
     "location_key",
     "source_location_id",
-    "observation_ts_native",
+    "observation_timestamp_native",
     "time_basis",
     "utc_offset_hours",
-    "observation_ts_utc",
-    "observation_ts_project",
+    "observation_timestamp_utc",
+    "observation_timestamp_project",
     "local_date",
     "interval_seconds",
     "interval_reference",
@@ -98,8 +98,8 @@ keep(
     obs_common.groupBy("family")
     .agg(
         F.count("*").alias("rows"),
-        F.min("observation_ts_utc").alias("first_ts"),
-        F.max("observation_ts_utc").alias("last_ts"),
+        F.min("observation_timestamp_utc").alias("first_timestamp"),
+        F.max("observation_timestamp_utc").alias("last_timestamp"),
     )
     .orderBy("family"),
 )
@@ -113,8 +113,8 @@ keep(
     .agg(
         F.count("*").alias("rows"),
         F.countDistinct("family").alias("families"),
-        F.min("observation_ts_utc").alias("first_ts"),
-        F.max("observation_ts_utc").alias("last_ts"),
+        F.min("observation_timestamp_utc").alias("first_timestamp"),
+        F.max("observation_timestamp_utc").alias("last_timestamp"),
     )
     .orderBy("source_system", "source_dataset"),
 )
@@ -140,7 +140,7 @@ for _fam, _fdf in FAMILY_FRAMES.items():
 
 # DBTITLE 1,Check -- one row per grain key per family (not per product)
 # A violation means a product fragmented the grain instead of landing in
-# an _alt/readings array.
+# an _alternate/readings array.
 for _fam, _fdf in FAMILY_FRAMES.items():
     _dup_grain = _fdf.groupBy(*WEATHER_GRAIN).count().filter("count > 1").count()
     report(
@@ -169,13 +169,14 @@ report(
 # DBTITLE 1,Check -- project time offset from UTC, by time_basis (Europe/Berlin)
 offsets = (
     obs_common.filter(
-        F.col("observation_ts_utc").isNotNull() & (F.col("source_system") == "dwd")
+        F.col("observation_timestamp_utc").isNotNull()
+        & (F.col("source_system") == "dwd")
     )
     .withColumn(
         "offset_h",
         (
-            F.col("observation_ts_project").cast("long")
-            - F.col("observation_ts_utc").cast("long")
+            F.col("observation_timestamp_project").cast("long")
+            - F.col("observation_timestamp_utc").cast("long")
         )
         / 3600,
     )
@@ -245,21 +246,21 @@ if "weather_temperature" in FAMILY_FRAMES:
     _t = FAMILY_FRAMES["weather_temperature"].filter(F.col("source_system") == "dwd")
     _alt = _t.select(
         "location_key",
-        "observation_ts_utc",
-        F.explode("air_temperature_alt").alias("a"),
+        "observation_timestamp_utc",
+        F.explode("air_temperature_alternate").alias("a"),
     ).select(
         "location_key",
-        "observation_ts_utc",
+        "observation_timestamp_utc",
         F.col("a.value").alias("alt_value"),
     )
     _p = _t.filter(F.col("air_temperature_degc").isNotNull()).select(
         "location_key",
-        "observation_ts_utc",
+        "observation_timestamp_utc",
         F.col("air_temperature_degc").alias("primary_value"),
     )
     keep(
         "primary vs alternate DWD air temperature agreement",
-        _p.join(_alt, ["location_key", "observation_ts_utc"]).agg(
+        _p.join(_alt, ["location_key", "observation_timestamp_utc"]).agg(
             F.count("*").alias("pairs"),
             F.avg(
                 (F.abs(F.col("primary_value") - F.col("alt_value")) < 1e-9).cast("int")

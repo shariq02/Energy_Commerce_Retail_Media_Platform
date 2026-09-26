@@ -169,13 +169,15 @@ for _field in AW_FIELDS:
 aw_base = (
     aw_source.withColumn("source_location_id", F.col("city_name"))
     .withColumn("location_key", location_key(SOURCE, "source_location_id"))
-    .withColumn("observation_ts_native", F.col("datetime_valid_local").cast("string"))
+    .withColumn(
+        "observation_timestamp_native", F.col("datetime_valid_local").cast("string")
+    )
     .withColumn("time_basis", F.lit("local_with_offset"))
     .withColumn("utc_offset_hours", F.col("gmt_offset").cast("double"))
     .withColumn("interval_seconds", F.lit(3600))
     .withColumn("interval_reference", F.lit("clock"))
     .withColumn(
-        "observation_ts_utc",
+        "observation_timestamp_utc",
         local_time_to_utc("datetime_valid_local", "utc_offset_hours"),
     )
     .withColumn("measurement_basis", F.lit("provider_historical"))

@@ -76,7 +76,7 @@ for unit_type, df in bronze.items():
     df = _drop_structural_constants(mastr_standardise(df, NAME_MAP, CODED))
     quarantine_out_of_bbox(df, bt)
     df = (
-        attach_ags_prefix(df, "municipality_key_ags")
+        attach_ags_prefix(df, "source_municipality_key")
         .withColumn("unit_type", F.lit(unit_type))
         .withColumn("source_dataset", F.lit(bt))
     )

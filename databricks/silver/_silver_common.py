@@ -373,8 +373,8 @@ def sha_key(*cols):
 
 
 def within_group_ordinal(df: DataFrame, key_cols: list[str], content_cols: list[str]):
-    """Add `_src_id_ord` (1-based, deterministic by a content hash) and
-    `_src_id_disambiguated` (ord > 1). Used only where a source has no unique
+    """Add `_source_id_ordinal` (1-based, deterministic by a content hash) and
+    `_source_id_disambiguated` (ord > 1). Used only where a source has no unique
     key -- makes the composite `source_record_id` unique and reproducible."""
     content_hash = F.sha2(
         F.concat_ws(
@@ -383,8 +383,8 @@ def within_group_ordinal(df: DataFrame, key_cols: list[str], content_cols: list[
         256,
     )
     w = Window.partitionBy(*key_cols).orderBy(content_hash)
-    return df.withColumn("_src_id_ord", F.row_number().over(w)).withColumn(
-        "_src_id_disambiguated", F.col("_src_id_ord") > 1
+    return df.withColumn("_source_id_ordinal", F.row_number().over(w)).withColumn(
+        "_source_id_disambiguated", F.col("_source_id_ordinal") > 1
     )
 
 
@@ -943,11 +943,15 @@ def read_silver(table: str) -> DataFrame:
 
 def attach_ags_prefix(df: DataFrame, ags_source_col: str) -> DataFrame:
     """AGS attribution from an 8-digit Gemeindeschluessel: keep the 2-digit
-    Bundesland prefix. `ags_level` = 'bundesland', `ags_method` = 'ags_prefix'."""
+    Bundesland prefix. Level = 'bundesland', method = 'municipality_key_prefix'."""
     return (
-        df.withColumn("ags_code", ags_from_gemeindeschluessel(ags_source_col))
-        .withColumn("ags_level", F.lit("bundesland"))
-        .withColumn("ags_method", F.lit("ags_prefix"))
+        df.withColumn(
+            "official_municipality_key", ags_from_gemeindeschluessel(ags_source_col)
+        )
+        .withColumn("official_municipality_key_level", F.lit("bundesland"))
+        .withColumn(
+            "official_municipality_key_method", F.lit("municipality_key_prefix")
+        )
     )
 
 
@@ -972,6 +976,12 @@ _MASTR_FLAG_COLS = ("FernsteuerbarkeitNb", "FernsteuerbarkeitDv")
 
 def _is_mastr_date(col: str) -> bool:
     return "_date" in col or col.endswith(("_at", "_deadline"))
+
+
+def untranslated_source_columns(columns) -> list:
+    """Columns still carrying a source-style (uppercase) name. The `_nv`
+    companions are excluded until their meaning is settled."""
+    return [c for c in columns if c != c.lower() and not c.endswith("_nv")]
 
 
 def mastr_standardise(
@@ -1031,6 +1041,9 @@ def mastr_standardise(
     for c in ("latitude", "longitude"):
         if c in df.columns:
             df = df.withColumn(c, F.col(c).cast("double"))
+    if untranslated := untranslated_source_columns(df.columns):
+        message = f"source columns without an English name: {untranslated}"
+        raise ValueError(message)
     return df
 
 

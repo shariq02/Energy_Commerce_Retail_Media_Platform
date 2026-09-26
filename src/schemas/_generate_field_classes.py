@@ -65,31 +65,31 @@ CONFLICT_COLS = {
         "a resolved same-key conflict existed",
         "silver conflict rule",
     ),
-    "_src_id_disambiguated": (
+    "_source_id_disambiguated": (
         "derived",
         "the content-hash ordinal disambiguated the composite key",
         "silver source_record_id rule",
     ),
-    "_src_id_ord": (
+    "_source_id_ordinal": (
         "derived",
         "1-based content-hash ordinal within a composite-key group",
         "silver source_record_id rule",
     ),
 }
 GEO_COLS = {
-    "ags_code": (
+    "official_municipality_key": (
         "derived",
         "curated / prefix attribution to the Bundesland AGS",
         "geography attribution, Bundesland level",
     ),
-    "ags_level": (
+    "official_municipality_key_level": (
         "derived",
         "geography level achieved (bundesland)",
         "geography attribution limit",
     ),
-    "ags_method": (
+    "official_municipality_key_method": (
         "derived",
-        "attribution method (city_lookup / ags_prefix / bundesland_code)",
+        "attribution method (city_lookup / municipality_key_prefix / bundesland_code)",
         "geography attribution",
     ),
 }
@@ -188,12 +188,16 @@ TOPOLOGY: dict[str, dict] = {
                     "curated 28-station city -> Bundesland",
                     "geography attribution",
                 ),
-                "ags_code": (
+                "official_municipality_key": (
                     "derived",
                     "curated 28-station city -> Bundesland AGS",
                     "geography attribution",
                 ),
-                "ags_level": ("derived", "'bundesland'", "geography attribution limit"),
+                "official_municipality_key_level": (
+                    "derived",
+                    "'bundesland'",
+                    "geography attribution limit",
+                ),
             },
             "dwd_missingness_reconciliation": {
                 "station_id": (
@@ -231,7 +235,7 @@ TOPOLOGY: dict[str, dict] = {
             "dwd_solar",
             "dwd_station_geography",
         },
-        "ts_rename": {"MESS_DATUM": "observation_ts"},
+        "ts_rename": {"MESS_DATUM": "observation_timestamp"},
         "qn_prefix": "qn_level",
     },
     "smard": {
@@ -291,8 +295,8 @@ TOPOLOGY: dict[str, dict] = {
         "extra_tables": {},
         "geo_tables": set(),
         "ts_pairs": {
-            "measure_start_ts": ["BEGINN_DATUM", "BEGINN_UHRZEIT"],
-            "measure_end_ts": ["ENDE_DATUM", "ENDE_UHRZEIT"],
+            "measure_start_timestamp": ["BEGINN_DATUM", "BEGINN_UHRZEIT"],
+            "measure_end_timestamp": ["ENDE_DATUM", "ENDE_UHRZEIT"],
         },
     },
 }
@@ -450,14 +454,14 @@ REFERENCE_TABLES = {
 
 # Per-table column-rename override for a bespoke rename that diverges from
 # the source's generic business-name mapping. dwd_missing_value_periods
-# keeps Von_Datum/Bis_Datum as gap_start_ts/gap_end_ts (its own notebook's
+# keeps Von_Datum/Bis_Datum as gap_start_timestamp/gap_end_timestamp (its own notebook's
 # explicit .withColumnRenamed), not the generic valid_from/valid_to every
 # other DWD metadata table uses -- verified against that notebook, not
 # guessed.
 TABLE_COLUMN_RENAME_OVERRIDES = {
     "dwd_missing_value_periods": {
-        "Von_Datum": "gap_start_ts",
-        "Bis_Datum": "gap_end_ts",
+        "Von_Datum": "gap_start_timestamp",
+        "Bis_Datum": "gap_end_timestamp",
     },
 }
 
@@ -478,8 +482,8 @@ SEMANTIC_DERIVED = {
     "_silver_loaded_at",
     "_silver_run_id",
     "time_basis",
-    "observation_ts_utc",
-    "observation_ts_project",
+    "observation_timestamp_utc",
+    "observation_timestamp_project",
     "local_date",
     "interval_seconds",
     "interval_reference",
@@ -496,10 +500,10 @@ SEMANTIC_DERIVED = {
     "unit",
     "value_origin",
     "derivation_rule",
-    "n_observations",
+    "observation_count",
     "location_role",
     "continent",
-    "ags_code",
+    "official_municipality_key",
     "geography_basis",
     "event_start_utc",
     "event_end_utc",
@@ -513,7 +517,7 @@ SEMANTIC_DERIVED = {
     "requesting_market_area_codes",
     "affected_unit_match_name",
     "affected_unit_match_confidence",
-    "forecast_issue_ts",
+    "forecast_issue_timestamp",
     "increment_derivation_rule",
     "repeat_index",
     "data_origin",
@@ -522,8 +526,8 @@ SEMANTIC_DERIVED = {
     "relationship_type",
     "parent_type",
     "linked_type",
-    "event_ts_utc",
-    "event_ts_project",
+    "event_timestamp_utc",
+    "event_timestamp_project",
     "item_ordinal",
     "item_context",
     "category_l1",
@@ -603,6 +607,7 @@ def target_schema_for(table_name: str, ecosystem_map: dict[str, str]) -> str:
 
 def build_rows() -> list[dict]:
     rows: list[dict] = []
+    key_names = _semantic_namespace()["MASTR_KEY_NAMES"]
 
     def add(table: str, col: str, cls: str, rule: str, ref: str) -> None:
         rows.append(
@@ -623,7 +628,7 @@ def build_rows() -> list[dict]:
         if conflict:
             add(table, "_had_key_conflict", *CONFLICT_COLS["_had_key_conflict"])
         if disambig:
-            for c in ("_src_id_disambiguated", "_src_id_ord"):
+            for c in ("_source_id_disambiguated", "_source_id_ordinal"):
                 add(table, c, *CONFLICT_COLS[c])
 
     # --- energy & weather wave, from contracts + mappings ---
@@ -640,10 +645,11 @@ def build_rows() -> list[dict]:
             for col in tdef["columns"]:
                 name = col["name"]
                 out_name = bn.get(name, name)
-                # DWD MESS_DATUM -> observation_ts
+                # DWD MESS_DATUM -> observation_timestamp
                 out_name = topo.get("ts_rename", {}).get(name, out_name)
                 # per-table override (e.g. dwd_missing_value_periods)
                 out_name = TABLE_COLUMN_RENAME_OVERRIDES.get(st, {}).get(name, out_name)
+                out_name = key_names.get(bt, {}).get(name, out_name)
                 add(
                     st,
                     out_name,
@@ -738,13 +744,13 @@ def build_rows() -> list[dict]:
             if bt in topo.get("geo_tables", set()):
                 for c, (cls, rule, ref) in GEO_COLS.items():
                     add(st, c, cls, rule, ref)
-            # DWD observation_ts derived timestamp + solar WOZ
+            # DWD observation_timestamp derived timestamp + solar WOZ
             if source == "dwd" and any(
                 c["name"] == "MESS_DATUM" for c in tdef["columns"]
             ):
                 add(
                     st,
-                    "observation_ts",
+                    "observation_timestamp",
                     "derived",
                     "MESS_DATUM parsed (UTC)",
                     "UTC conversion",
@@ -772,7 +778,10 @@ def build_rows() -> list[dict]:
                     "semantic_issue_ref",
                     "link to the contract quality rule for a disputed metric",
                 ),
-                ("observation_ts", "timestamp_utc verified Europe/Berlin -> UTC"),
+                (
+                    "observation_timestamp",
+                    "timestamp_utc verified Europe/Berlin -> UTC",
+                ),
             ):
                 add(
                     "smard_energy_timeseries",
@@ -785,11 +794,17 @@ def build_rows() -> list[dict]:
         if source == "redispatch":
             for c, rule in (
                 (
-                    "measure_start_ts",
+                    "measure_start_timestamp",
                     "BEGINN_DATUM + BEGINN_UHRZEIT, Europe/Berlin -> UTC",
                 ),
-                ("measure_end_ts", "ENDE_DATUM + ENDE_UHRZEIT, Europe/Berlin -> UTC"),
-                ("requesting_tso_list", "ANFORDERNDER_UENB split on '&'"),
+                (
+                    "measure_end_timestamp",
+                    "ENDE_DATUM + ENDE_UHRZEIT, Europe/Berlin -> UTC",
+                ),
+                (
+                    "requesting_transmission_system_operator_list",
+                    "ANFORDERNDER_UENB split on '&'",
+                ),
             ):
                 add(
                     "redispatch_measures",

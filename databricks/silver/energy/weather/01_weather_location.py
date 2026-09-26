@@ -115,7 +115,7 @@ dwd_validity = within_group_ordinal(
     dwd_validity,
     ["source_location_id", "valid_from"],
     ["latitude", "longitude", "elevation_m", "valid_to", "name"],
-).withColumnRenamed("_src_id_ord", "record_ordinal")
+).withColumnRenamed("_source_id_ordinal", "record_ordinal")
 dwd_validity = dwd_validity.withColumn(
     "quality_flags",
     flag_array({"coord_outside_de_bbox": bbox_outside_de("latitude", "longitude")}),
@@ -149,7 +149,7 @@ _latest = Window.partitionBy("source_location_id").orderBy(
 _city_lookup = spark.createDataFrame(
     [(sid, slug, CITY_REGION[slug]) for sid, slug in STATION_CITY.items()],
     "source_location_id string, city_slug string, region string",
-).withColumn("ags_code", bundesland_ags("region"))
+).withColumn("official_municipality_key", bundesland_ags("region"))
 dwd_locations = (
     dwd_validity.withColumn("_rn", F.row_number().over(_latest))
     .filter(F.col("_rn") == 1)

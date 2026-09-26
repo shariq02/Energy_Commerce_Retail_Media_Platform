@@ -99,9 +99,9 @@ honda_base = (
     .withColumn("interval_reference", F.lit("clock"))
     .withColumn("source_location_id", F.lit(SITE_ID))
     .withColumn("location_key", location_key(SOURCE, "source_location_id"))
-    .withColumn("observation_ts_native", F.col("datetime_utc").cast("string"))
+    .withColumn("observation_timestamp_native", F.col("datetime_utc").cast("string"))
     .withColumn("time_basis", F.lit("utc"))
-    .withColumn("observation_ts_utc", F.col("datetime_utc").cast("timestamp"))
+    .withColumn("observation_timestamp_utc", F.col("datetime_utc").cast("timestamp"))
     .withColumn("measurement_basis", F.lit("site_sensor"))
     .withColumn(
         "source_record_id", sha_key(F.lit(BRONZE_TABLE), "frequency", "datetime_utc")

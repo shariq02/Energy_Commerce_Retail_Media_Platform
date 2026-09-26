@@ -118,3 +118,10 @@ def test_coded_columns_mastr_uses_the_named_category_binding_shape(silver):
     mapping = silver["load_mapping"]("mastr")
     coded = silver["coded_columns"](mapping, "mastr")
     assert isinstance(coded, dict)
+
+
+def test_untranslated_source_columns_flags_source_names_only(silver):
+    found = silver["untranslated_source_columns"](
+        ["unit_id", "Strasse", "MastrNummer", "Fax_nv", "capacity_gross_kw"]
+    )
+    assert found == ["Strasse", "MastrNummer"]

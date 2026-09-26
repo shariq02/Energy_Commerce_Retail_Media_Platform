@@ -69,12 +69,12 @@ _W = Window.partitionBy("frequency").orderBy(F.col("datetime_utc").cast("timesta
 BALANCE = {
     "electricity__total": ("net_total", None),
     "electricity__PV": ("generation", "photovoltaic"),
-    "electricity__CHP": ("generation", "chp"),
+    "electricity__CHP": ("generation", "combined_heat_and_power"),
     "cooling__cool_elec": ("subsystem_consumption", None),
 }
 THERMAL = {
     "heating_total_w": "heating__total",
-    "heating_chp_heat_w": "heating__CHP_heat",
+    "heating_combined_heat_and_power_heat_w": "heating__CHP_heat",
     "cooling_total_w": "cooling__total",
 }
 
@@ -158,9 +158,11 @@ def _scaffold(df, family: str, dataset: str, cols: list, extra_flags=None):
     df = (
         df.withColumn("source_location_id", F.lit(SITE_ID))
         .withColumn("location_key", location_key(SOURCE, "source_location_id"))
-        .withColumn("observation_ts_native", F.col("datetime_utc"))
+        .withColumn("observation_timestamp_native", F.col("datetime_utc"))
         .withColumn("time_basis", F.lit("utc"))
-        .withColumn("observation_ts_utc", F.col("datetime_utc").cast("timestamp"))
+        .withColumn(
+            "observation_timestamp_utc", F.col("datetime_utc").cast("timestamp")
+        )
         .withColumn(
             "interval_seconds",
             lit_map(HONDA_INTERVAL_SECONDS)[F.col("frequency")].cast("int"),

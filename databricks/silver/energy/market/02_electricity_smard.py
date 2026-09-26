@@ -130,10 +130,10 @@ def _scaffold(df, family: str):
     return (
         df.withColumn("source_location_id", F.col("region"))
         .withColumn("market_area_code", lit_map(MARKET_AREA_CODES)[F.col("region")])
-        .withColumn("observation_ts_native", F.col("timestamp_utc"))
+        .withColumn("observation_timestamp_native", F.col("timestamp_utc"))
         .withColumn("time_basis", F.lit("utc"))
-        .withColumn("observation_ts_utc", utc)
-        .withColumn("observation_ts_project", project)
+        .withColumn("observation_timestamp_utc", utc)
+        .withColumn("observation_timestamp_project", project)
         .withColumn("local_date", F.to_date(project))
         .withColumn(
             "interval_seconds",

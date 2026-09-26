@@ -78,9 +78,9 @@ devices = (
     .withColumn("country_code", F.col("cca2"))
     .withColumn("country_code_alpha3", F.col("cca3"))
     .withColumn("country_name", F.col("cn"))
-    .withColumn("observation_ts_native", F.col("timestamp").cast("string"))
+    .withColumn("observation_timestamp_native", F.col("timestamp").cast("string"))
     .withColumn(
-        "observation_ts_utc",
+        "observation_timestamp_utc",
         (F.col("timestamp").cast("double") / 1000).cast("timestamp"),
     )
     .withColumn("temperature_degc", F.col("temp").cast("double"))

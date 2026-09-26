@@ -53,14 +53,14 @@ _EEG = [
 _UNITS = "VerknuepfteEinheitenMaStRNummern"
 # relationship_type -> (parent_type, linked_type, Bronze tables, parent col, link col)
 LINKS = {
-    "eeg_support_unit": (
+    "renewable_energy_act_support_unit": (
         "support_registration",
         "generation_unit",
         _EEG,
         "EegMaStRNummer",
         _UNITS,
     ),
-    "kwk_support_unit": (
+    "combined_heat_and_power_support_unit": (
         "support_registration",
         "generation_unit",
         ["mastr_anlagen_kwk"],
@@ -74,7 +74,7 @@ LINKS = {
         "GenMastrNummer",
         _UNITS,
     ),
-    "repowering_eeg": (
+    "repowering_renewable_energy_act": (
         "unit_repowering",
         "support_registration",
         ["mastr_ertuechtigungen"],

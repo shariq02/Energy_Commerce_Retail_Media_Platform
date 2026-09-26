@@ -12,8 +12,8 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** EEG (four technologies) and KWK registrations as one
-# MAGIC `support_registration` (`support_scheme`, `unit_type`; the id spaces are
+# MAGIC **Purpose:** Renewable-energy-act (four technologies) and combined-heat-and-power
+# MAGIC registrations as one `support_registration` (`support_scheme`, `unit_type`; the id spaces are
 # MAGIC disjoint); unit authorisations and repowering as their own structures.
 
 # COMMAND ----------
@@ -48,11 +48,19 @@ NAME_MAP = flatten_business_names(MAPPING, SOURCE)
 CODED = coded_columns(MAPPING, SOURCE)
 # Bronze table -> (support_scheme, unit_type, registration id column)
 SUPPORT = {
-    "mastr_anlagen_eeg_wind": ("eeg", "wind", "EegMaStRNummer"),
-    "mastr_anlagen_eeg_biomasse": ("eeg", "biomasse", "EegMaStRNummer"),
-    "mastr_anlagen_eeg_wasser": ("eeg", "wasser", "EegMaStRNummer"),
-    "mastr_anlagen_eeg_geothermie_gsgk": ("eeg", "geothermie_gsgk", "EegMaStRNummer"),
-    "mastr_anlagen_kwk": ("kwk", None, "KwkMastrNummer"),
+    "mastr_anlagen_eeg_wind": ("renewable_energy_act", "wind", "EegMaStRNummer"),
+    "mastr_anlagen_eeg_biomasse": (
+        "renewable_energy_act",
+        "biomasse",
+        "EegMaStRNummer",
+    ),
+    "mastr_anlagen_eeg_wasser": ("renewable_energy_act", "wasser", "EegMaStRNummer"),
+    "mastr_anlagen_eeg_geothermie_gsgk": (
+        "renewable_energy_act",
+        "geothermie_gsgk",
+        "EegMaStRNummer",
+    ),
+    "mastr_anlagen_kwk": ("combined_heat_and_power", None, "KwkMastrNummer"),
 }
 # structure -> (Bronze table, id column)
 SINGLE = {
@@ -100,8 +108,9 @@ registrations = add_semantic_provenance(registrations, SOURCE, None, RID, "_srid
 # DBTITLE 1,Transform -- unit_authorisation and unit_repowering
 singles = {}
 for name, (bt, id_col) in SINGLE.items():
-    df = mastr_standardise(single_bronze[name], NAME_MAP, CODED)
-    df = df.withColumn("_srid", F.col(NAME_MAP.get(id_col, id_col)).cast("string"))
+    names = {**NAME_MAP, **MASTR_KEY_NAMES.get(bt, {})}
+    df = mastr_standardise(single_bronze[name], names, CODED)
+    df = df.withColumn("_srid", F.col(names.get(id_col, id_col)).cast("string"))
     singles[name] = add_semantic_provenance(df, SOURCE, bt, RID, "_srid")
 
 # COMMAND ----------

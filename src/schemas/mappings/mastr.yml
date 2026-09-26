@@ -45,7 +45,7 @@ targets:
       - { source: "Nabenhoehe / Rotordurchmesser / Wassertiefe / Kuestenentfernung / GroesseDerInAnspruchGenommenenFlaeche", canonical: "wind/offshore geometry attributes" }
       - { source: "AnlagenbetreiberMastrNummer / AltAnlagenbetreiberMastrNummer", canonical: "operator_id / previous_operator_id -> dim_market_actor (FK)" }
       - { source: "LokationMaStRNummer",      canonical: "location_id -> dim_location (FK, nullable)" }
-      - { source: "GenMastrNummer / EegMaStRNummer / KwkMaStRNummer", canonical: "authorisation_id / eeg_support_id / kwk_support_id (FK to the support facts)" }
+      - { source: "GenMastrNummer / EegMaStRNummer / KwkMaStRNummer", canonical: "authorisation_id / renewable_energy_act_support_id / combined_heat_and_power_support_id (FK to the support facts)" }
       - { source: NichtVorhandenInMigriertenEinheiten, canonical: "migration_flag" }
     provenance:
       source_system: mastr
@@ -61,8 +61,8 @@ targets:
       1:1 with a generation unit via EegMaStRNummer. Biomass-specific biogas
       columns kept as nullable carrier-scoped attributes.
     field_map:
-      - { source: EegMaStRNummer,             canonical: "fact_eeg_support.eeg_support_id (natural key)" }
-      - { source: "EegInbetriebnahmedatum / Registrierungsdatum", canonical: "eeg_commissioning_date / registration_date" }
+      - { source: EegMaStRNummer,             canonical: "fact_eeg_support.renewable_energy_act_support_id (natural key)" }
+      - { source: "EegInbetriebnahmedatum / Registrierungsdatum", canonical: "renewable_energy_act_commissioning_date / registration_date" }
       - { source: InstallierteLeistung,       canonical: "installed_capacity_kw (overlaps dim_generation_unit.capacity -- not an independent measure)" }
       - { source: "AusschreibungZuschlag / Zuschlagsnummer / PilotAnlage / PrototypAnlage", canonical: "auction_award_flag / auction_award_number / pilot_flag / prototype_flag" }
       - { source: AnlageBetriebsstatus,       canonical: "support_status (+ label)" }
@@ -77,8 +77,8 @@ targets:
     canonical_grain: [kwk_support_key]
     key: KwkMastrNummer
     field_map:
-      - { source: KwkMastrNummer,             canonical: "kwk_support_id (natural key)" }
-      - { source: "ThermischeNutzleistung / ElektrischeKwkLeistung", canonical: "useful_thermal_output_kw / electrical_chp_capacity_kw" }
+      - { source: KwkMastrNummer,             canonical: "combined_heat_and_power_support_id (natural key)" }
+      - { source: "ThermischeNutzleistung / ElektrischeKwkLeistung", canonical: "useful_thermal_output_kw / electrical_combined_heat_and_power_capacity_kw" }
       - { source: "Inbetriebnahmedatum / Registrierungsdatum", canonical: "commissioning_date / registration_date" }
       - { source: AnlageBetriebsstatus,       canonical: "support_status (+ label)" }
       - { source: "AusschreibungZuschlag / Zuschlagnummer", canonical: "auction_award_flag / auction_award_number" }
@@ -106,7 +106,7 @@ targets:
     shape: "1:N against an EEG support record (a unit can be repowered more than once)"
     field_map:
       - { source: Id,                         canonical: "repowering_id (natural key)" }
-      - { source: EegMastrNummer,             canonical: "eeg_support_id (FK -> fact_eeg_support; 87% unique here)" }
+      - { source: EegMastrNummer,             canonical: "renewable_energy_act_support_id (FK -> fact_eeg_support; 87% unique here)" }
       - { source: "Leistungserhoehung",       canonical: "capacity_increase (confirm unit)" }
       - { source: WiederinbetriebnahmeDatum,  canonical: "recommissioning_date" }
       - { source: "Ertuechtigungsart / ErtuechtigungIstZulassungspflichtig", canonical: "repowering_type (+ label) / approval_required_flag" }
@@ -195,10 +195,10 @@ targets:
 business_names:
   identifiers:
     EinheitMastrNummer:            unit_id
-    EegMaStRNummer:                eeg_support_id
-    EegMastrNummer:                eeg_support_id
-    KwkMaStRNummer:                kwk_support_id
-    KwkMastrNummer:                kwk_support_id
+    EegMaStRNummer:                renewable_energy_act_support_id
+    EegMastrNummer:                renewable_energy_act_support_id
+    KwkMaStRNummer:                combined_heat_and_power_support_id
+    KwkMastrNummer:                combined_heat_and_power_support_id
     GenMastrNummer:                authorisation_id
     LokationMaStRNummer:           location_id
     LokationMastrNummer:           location_id
@@ -217,7 +217,7 @@ business_names:
     Registrierungsdatum:           registration_date
     Inbetriebnahmedatum:           commissioning_date
     GeplantesInbetriebnahmedatum:  planned_commissioning_date
-    EegInbetriebnahmedatum:        eeg_commissioning_date
+    EegInbetriebnahmedatum:        renewable_energy_act_commissioning_date
     InbetriebnahmedatumAmAktuellenStandort: commissioning_date_current_site
     DatumEndgueltigeStilllegung:   final_decommissioning_date
     DatumBeginnVoruebergehendeStilllegung:  provisional_shutdown_start_date
@@ -232,12 +232,12 @@ business_names:
     NettonennleistungDeutschland:  capacity_net_germany_kw
     InstallierteLeistung:          installed_capacity_kw
     ThermischeNutzleistung:        useful_thermal_output_kw
-    ElektrischeKwkLeistung:        electrical_chp_capacity_kw
+    ElektrischeKwkLeistung:        electrical_combined_heat_and_power_capacity_kw
     Land:                          country
     Bundesland:                    federal_state
     Landkreis:                     district
     Gemeinde:                      municipality
-    Gemeindeschluessel:            municipality_key_ags
+    Gemeindeschluessel:            source_municipality_key
     Postleitzahl:                  postcode
     Ort:                           locality
     Laengengrad:                   longitude
@@ -269,6 +269,117 @@ business_names:
     PrototypAnlage:                prototype_plant_flag
     VerknuepfteEinheitenMaStRNummern: linked_unit_ids
     NichtVorhandenInMigriertenEinheiten: migration_absence_flag
+    # register columns without a decoded code: German source name -> English
+    AcerCode:                                            energy_regulators_agency_code
+    Adresszusatz:                                        address_supplement
+    AdresszusatzAnZustelladresse:                        delivery_address_supplement
+    AnlageIstImKombibetrieb:                             unit_is_in_combined_operation
+    AnlagenkennzifferAnlagenregister:                    installation_register_identifier
+    AnlagenschluesselEeg:                                renewable_energy_act_installation_key
+    AnschlussAnHoechstOderHochSpannung:                  connected_to_extra_high_or_high_voltage
+    AuflageAbschaltungLeistungsbegrenzung:               curtailment_condition_power_limit
+    AuflagenAbschaltungEiswurf:                          curtailment_condition_ice_throw
+    AuflagenAbschaltungSchallimmissionsschutzNachts:     curtailment_condition_noise_protection_night
+    AuflagenAbschaltungSchallimmissionsschutzTagsueber:  curtailment_condition_noise_protection_day
+    AuflagenAbschaltungSchattenwurf:                     curtailment_condition_shadow_flicker
+    AuflagenAbschaltungSonstige:                         curtailment_condition_other
+    AuflagenAbschaltungTierschutz:                       curtailment_condition_animal_protection
+    AusschliesslicheVerwendungBiomasse:                  exclusive_use_of_biomass
+    AusschliesslicheVerwendungImKombibetrieb:            exclusive_use_in_combined_operation
+    BelieferungHaushaltskundenGas:                       supplies_household_customers_gas
+    BelieferungHaushaltskundenStrom:                     supplies_household_customers_electricity
+    BelieferungVonLetztverbrauchernGas:                  supplies_end_consumers_gas
+    BelieferungVonLetztverbrauchernStrom:                supplies_end_consumers_electricity
+    BestandteilGrenzkraftwerk:                           part_of_cross_border_plant
+    BilanzierungsgebietNetzanschlusspunkt:               balancing_area_connection_point
+    BilanzierungsgebietNetzanschlusspunktId:             balancing_area_connection_point_id
+    Bilanzierungsgebiete:                                balancing_areas
+    BiogasDatumInanspruchnahmeFlexiPraemie:              biogas_flexibility_premium_claim_date
+    BiogasDatumLeistungserhoehung:                       biogas_capacity_increase_date
+    BiogasGaserzeugungskapazitaet:                       biogas_gas_production_capacity
+    BiogasHoechstbemessungsleistung:                     biogas_maximum_rated_capacity
+    BiogasInanspruchnahmeFlexiPraemie:                   biogas_flexibility_premium_claimed
+    BiogasLeistungserhoehung:                            biogas_capacity_increased
+    BiogasUmfangLeistungserhoehung:                      biogas_capacity_increase_extent
+    BiomethanErstmaligerEinsatz:                         biomethane_first_use
+    Buergerenergie:                                      citizen_energy
+    BundesnetzagenturBetriebsnummer:                     federal_network_agency_operating_number
+    DatumBaubeginn:                                      construction_start_date
+    DatumDesBetreiberwechsels:                           operator_change_date
+    DatumKapazitaetsreserve:                             capacity_reserve_date
+    DatumNetzreserve:                                    grid_reserve_date
+    DatumRegistrierungDesBetreiberwechsels:              operator_change_registration_date
+    Direktvermarktungsunternehmen:                       direct_marketing_company
+    Einsatzverantwortlicher:                             operationally_responsible_party
+    Einsatzort:                                          deployment_location
+    Email:                                               email
+    ErtuechtigungIds:                                    retrofit_ids
+    Fax:                                                 fax
+    FlurFlurstuecknummern:                               land_parcel_numbers
+    Gasgrosshaendler:                                    gas_wholesaler
+    Gasqualitaet:                                        gas_quality
+    GebietNachDemFlaechenentwicklungsplanNordsee:        north_sea_area_development_plan_zone
+    GebietNachDemFlaechenentwicklungsplanOstsee:         baltic_sea_area_development_plan_zone
+    Gemarkung:                                           cadastral_district
+    GroesseDerInAnspruchGenommenenFlaeche:               land_area_used
+    HauptwirtdschaftszweigAbteilung:                     main_economic_sector_division
+    HauptwirtdschaftszweigGruppe:                        main_economic_sector_group
+    Hausnummer:                                          house_number
+    HausnummerAnZustelladresse:                          delivery_address_house_number
+    HausnummerNichtGefunden:                             house_number_not_found
+    KapazitaetsreserveZugeordnet:                        assigned_to_capacity_reserve
+    KontaktdatenMarktrolle:                              market_role_contact_details
+    Kraftwerksnummer:                                    power_plant_number
+    LandAnZustelladresse:                                delivery_address_country
+    LetzteAenderung:                                     last_changed_at
+    MarktakteurAnrede:                                   market_actor_salutation
+    MarktakteurNachname:                                 market_actor_last_name
+    MarktakteurVorname:                                  market_actor_first_name
+    Marktgebiet:                                         market_area
+    Marktpartneridentifikationsnummer:                   market_partner_identification_number
+    MastrNummernKombibetrieb:                            combined_operation_unit_ids
+    Messlokation:                                        metering_location
+    MinderungStromerzeugung:                             electricity_generation_reduction
+    Nachtkennzeichnung:                                  night_marking
+    NameDerTechnischenLokation:                          technical_location_name
+    Netz:                                                grid
+    NetzanschlusspunktBezeichnung:                       connection_point_name
+    NetzanschlusspunkteMaStRNummern:                     connection_point_ids
+    NetzbetreiberpruefungDatum:                          grid_operator_check_date
+    NetzbetreiberpruefungStatus:                         grid_operator_check_status
+    NetzreserveZugeordnet:                               assigned_to_grid_reserve
+    Notstromaggregat:                                    emergency_generator
+    OrtAnZustelladresse:                                 delivery_address_city
+    PostleitzahlAnZustelladresse:                        delivery_address_postcode
+    Region:                                              region
+    Registergericht:                                     registry_court
+    RegistergerichtAusland:                              foreign_registry_court
+    Registernummer:                                      registry_number
+    RegisternummerAusland:                               foreign_registry_number
+    RegisternummerPraefix:                               registry_number_prefix
+    RegistrierungsdatumMarktakteur:                      market_actor_registration_date
+    Rotorblattenteisungssystem:                          rotor_blade_deicing_system
+    SicherheitsbereitschaftAbDatum:                      security_standby_start_date
+    SonstigeRechtsform:                                  other_legal_form
+    SteigerungNettonennleistungKombibetrieb:             combined_operation_net_rated_capacity_increase
+    Strasse:                                             street
+    StrasseAnZustelladresse:                             delivery_address_street
+    StrasseNichtGefunden:                                street_not_found
+    Stromgrosshaendler:                                  electricity_wholesaler
+    Telefon:                                             telephone
+    UeberwiegendeNutzungsartDerFlaecheVorErrichtung:     predominant_land_use_before_construction
+    Umsatzsteueridentifikationsnummer:                   value_added_tax_identification_number
+    VerhaeltnisErtragsschaetzungReferenzertrag:          yield_estimate_to_reference_yield_ratio
+    VerhaeltnisReferenzertragErtrag5Jahre:               reference_yield_to_actual_yield_ratio_5_years
+    VerhaeltnisReferenzertragErtrag10Jahre:              reference_yield_to_actual_yield_ratio_10_years
+    VerhaeltnisReferenzertragErtrag15Jahre:              reference_yield_to_actual_yield_ratio_15_years
+    VorherigerNutzungsartenbereichDerFlaeche:            previous_land_use_category
+    WebportalDesNetzbetreibers:                          grid_operator_web_portal
+    Webseite:                                            website
+    Weic:                                                resource_energy_identification_code
+    WeicDisplayName:                                     resource_energy_identification_code_display_name
+    WeitereBrennstoffe:                                  additional_fuels
+    Yeic:                                                area_energy_identification_code
     # authorisation
     Art:                           authorisation_type
     Datum:                         decision_date
@@ -292,9 +403,9 @@ business_names:
     Rechtsform:                    legal_form
     Taetigkeitsbeginn:             activity_start_date
     Taetigkeitsende:               activity_end_date
-    Kmu:                           is_sme
+    Kmu:                           is_small_or_medium_enterprise
     HauptwirtdschaftszweigAbschnitt: economic_sector_section
-    Nuts2:                         nuts2_region
+    Nuts2:                         european_statistical_region_level_2
     # grid / connection
     Sparte:                        grid_sector
     Bezeichnung:                   name

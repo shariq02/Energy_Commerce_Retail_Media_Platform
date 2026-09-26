@@ -91,7 +91,7 @@ KEYS = {
         "mastr_unit_id",
         "plant_name",
         "commissioning_year",
-        "_src_id_ord",
+        "_source_id_ordinal",
     ],
     "power_plant_capacity_plan": ["capacity_section", "energy_carrier"],
 }
@@ -151,9 +151,11 @@ write_quarantine(capacity_q, RID)
 # DBTITLE 1,Transform -- Bundesland to AGS (Germany rows)
 _ags = bundesland_ags("federal_state")
 plants = (
-    plants.withColumn("ags_code", F.when(F.col("country") == "Deutschland", _ags))
-    .withColumn("ags_level", F.lit("bundesland"))
-    .withColumn("ags_method", F.lit("bundesland_code"))
+    plants.withColumn(
+        "official_municipality_key", F.when(F.col("country") == "Deutschland", _ags)
+    )
+    .withColumn("official_municipality_key_level", F.lit("bundesland"))
+    .withColumn("official_municipality_key_method", F.lit("bundesland_code"))
     .withColumn(
         "_bundesland_out_of_set",
         (F.col("country") == "Deutschland")
@@ -198,7 +200,7 @@ plants = within_group_ordinal(
     ["_ppl_key"],
     [c for c in plants.columns if c not in ("_ppl_key", "_capacity_all_null")],
 )
-plants = plants.withColumn("_srid", sha_key("_ppl_key", "_src_id_ord")).drop(
+plants = plants.withColumn("_srid", sha_key("_ppl_key", "_source_id_ordinal")).drop(
     "_ppl_key", "_capacity_all_null"
 )
 plants = add_semantic_provenance(plants, SOURCE, PLANT_BT, RID, "_srid")
@@ -245,7 +247,7 @@ plan = within_group_ordinal(
     plan, ["capacity_section", "energy_carrier"], ["2026", "2027", "2028", "2029"]
 )
 plan = plan.withColumn(
-    "_srid", sha_key("capacity_section", "energy_carrier", "_src_id_ord")
+    "_srid", sha_key("capacity_section", "energy_carrier", "_source_id_ordinal")
 )
 plan = add_semantic_provenance(plan, SOURCE, PLAN_BT, RID, "_srid")
 

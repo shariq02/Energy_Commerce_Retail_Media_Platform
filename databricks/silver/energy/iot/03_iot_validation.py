@@ -105,7 +105,7 @@ for fam in [f for f in FAMILIES if f in T]:
 
 # DBTITLE 1,Check -- Honda P against the forward W increment x1000 (1 h rows)
 if {"electricity_balance", "thermal_energy", "energy_meter_reading"} <= set(T):
-    _key = ["observation_ts_utc", "interval_seconds"]
+    _key = ["observation_timestamp_utc", "interval_seconds"]
     _p_bal = (
         T["electricity_balance"]
         .filter(
@@ -121,12 +121,12 @@ if {"electricity_balance", "thermal_energy", "energy_meter_reading"} <= set(T):
         T["thermal_energy"].filter(F.col("interval_seconds") == 3600), _key
     ).join(T["energy_meter_reading"].filter(F.col("interval_seconds") == 3600), _key)
     _pairs = {
-        "electricity.PV": "electricity_pv",
-        "electricity.CHP": "electricity_chp",
+        "electricity.PV": "electricity_solar_photovoltaic",
+        "electricity.CHP": "electricity_combined_heat_and_power",
         "electricity.total": "electricity_total",
-        "cooling.cool_elec": "cooling_cool_elec",
+        "cooling.cool_elec": "cooling_electricity",
         "heating_total_w": "heating_total",
-        "heating_chp_heat_w": "heating_chp_heat",
+        "heating_combined_heat_and_power_heat_w": "heating_combined_heat_and_power_heat",
         "cooling_total_w": "cooling_total",
     }
     keep(
@@ -146,14 +146,14 @@ if "energy_meter_reading" in T:
     _m = T["energy_meter_reading"]
     _cols = [f"{ch}_kwh" for ch in HONDA_METER_CHANNELS]
     _one = _m.filter(F.col("interval_seconds") == 60).select(
-        "observation_ts_utc", *[F.col(c).alias(f"m1_{c}") for c in _cols]
+        "observation_timestamp_utc", *[F.col(c).alias(f"m1_{c}") for c in _cols]
     )
     _hour = _m.filter(F.col("interval_seconds") == 3600).select(
-        "observation_ts_utc", *_cols
+        "observation_timestamp_utc", *_cols
     )
     keep(
         "Honda W: share equal between 1 min and 1 h rows at the same instant",
-        _one.join(_hour, "observation_ts_utc").select(
+        _one.join(_hour, "observation_timestamp_utc").select(
             *[F.avg((F.col(c) == F.col(f"m1_{c}")).cast("int")).alias(c) for c in _cols]
         ),
     )

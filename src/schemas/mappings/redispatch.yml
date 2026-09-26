@@ -74,8 +74,8 @@ business_names:
     MITTLERE_LEISTUNG_MW: mean_power_mw
     MAXIMALE_LEISTUNG_MW: max_power_mw
     GESAMTE_ARBEIT_MWH:   total_energy_mwh
-    ANWEISENDER_UENB:     instructing_tso
-    ANFORDERNDER_UENB:    requesting_tso
+    ANWEISENDER_UENB:     instructing_transmission_system_operator
+    ANFORDERNDER_UENB:    requesting_transmission_system_operator
     BETROFFENE_ANLAGE:    affected_unit_name
     PRIMAERENERGIEART:    affected_unit_primary_energy
 

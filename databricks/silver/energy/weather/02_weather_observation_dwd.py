@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** each DWD product built into its family-specific Silver
 # MAGIC structures, one row per (station, instant) per family. Same-instant
-# MAGIC products become an `_alt` array (competing) or a `readings` array
+# MAGIC products become an `_alternate` array (competing) or a `readings` array
 # MAGIC (non-competing), never extra rows. `dwd_solar` splits by meaning across
 # MAGIC four families.
 
@@ -113,7 +113,7 @@ def _dwd_time(native_ts_col):
     own convention, no era exception). Project time is the IANA-correct
     Europe/Berlin civil clock for that instant (CET/CEST, pre-1893 LMT,
     1945/1947 Hochsommerzeit) -- display only, never fed back into utc.
-    Returns (observation_ts_utc, observation_ts_project, time_basis)."""
+    Returns (observation_timestamp_utc, observation_timestamp_project, time_basis)."""
     utc = native_ts_col
     project = F.from_utc_timestamp(utc, PROJECT_TZ)
     return utc, project, F.lit("utc")
@@ -141,10 +141,10 @@ def _scaffold(
     return (
         df.withColumn("source_location_id", F.col("STATIONS_ID"))
         .withColumn("location_key", location_key(SOURCE, "source_location_id"))
-        .withColumn("observation_ts_native", F.trim(F.col("MESS_DATUM")))
+        .withColumn("observation_timestamp_native", F.trim(F.col("MESS_DATUM")))
         .withColumn("time_basis", time_basis)
-        .withColumn("observation_ts_utc", utc)
-        .withColumn("observation_ts_project", project)
+        .withColumn("observation_timestamp_utc", utc)
+        .withColumn("observation_timestamp_project", project)
         .withColumn("local_date", F.to_date(project))
         .withColumn("interval_seconds", F.lit(3600))
         .withColumn("interval_reference", F.lit(interval_reference))
@@ -233,7 +233,7 @@ def _keep_if_populated(df, fields: list, track: tuple):
         col = F.col(name)
         cond = cond | (
             (F.size(col) > 0)
-            if name.endswith(("_alt", "layers", "readings"))
+            if name.endswith(("_alternate", "layers", "readings"))
             else col.isNotNull()
         )
     return df.filter(cond)
@@ -270,7 +270,7 @@ def build_temperature():
             "air_temperature_degc", F.col("dwd_air_temperature__TT_TU").cast("double")
         )
         .withColumn(
-            "air_temperature_alt",
+            "air_temperature_alternate",
             _alt_array(
                 (
                     F.col("dwd_moisture__TT_STD").cast("double"),
@@ -288,7 +288,7 @@ def build_temperature():
             "dew_point_temperature_degc", F.col("dwd_dew_point__TD").cast("double")
         )
         .withColumn(
-            "dew_point_temperature_alt",
+            "dew_point_temperature_alternate",
             _alt_array(
                 (
                     F.col("dwd_moisture__TD_STD").cast("double"),
@@ -305,9 +305,9 @@ def build_temperature():
         row,
         [
             "air_temperature_degc",
-            "air_temperature_alt",
+            "air_temperature_alternate",
             "dew_point_temperature_degc",
-            "dew_point_temperature_alt",
+            "dew_point_temperature_alternate",
             "wet_bulb_temperature_degc",
         ],
         ("weather_temperature", "dwd_temperature"),
@@ -345,7 +345,7 @@ def build_humidity():
             F.col("dwd_air_temperature__RF_TU").cast("double"),
         )
         .withColumn(
-            "relative_humidity_alt",
+            "relative_humidity_alternate",
             _alt_array(
                 (
                     F.col("dwd_moisture__RF_STD").cast("double"),
@@ -363,7 +363,7 @@ def build_humidity():
         row,
         [
             "relative_humidity_percent",
-            "relative_humidity_alt",
+            "relative_humidity_alternate",
             "absolute_humidity_g_per_m3",
             "vapour_pressure_hpa",
         ],
@@ -393,7 +393,7 @@ def build_pressure():
     row = (
         row.withColumn("pressure_station_hpa", F.col("dwd_pressure__P0").cast("double"))
         .withColumn(
-            "pressure_station_alt",
+            "pressure_station_alternate",
             _alt_array(
                 (
                     F.col("dwd_moisture__P_STD").cast("double"),
@@ -406,7 +406,11 @@ def build_pressure():
     )
     row = _keep_if_populated(
         row,
-        ["pressure_station_hpa", "pressure_station_alt", "pressure_sea_level_hpa"],
+        [
+            "pressure_station_hpa",
+            "pressure_station_alternate",
+            "pressure_sea_level_hpa",
+        ],
         ("weather_pressure", "dwd_pressure"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_pressure", RID)
@@ -597,7 +601,7 @@ def build_cloud():
             F.when(v_n_primary.isNotNull(), F.lit("eighths")),
         )
         .withColumn(
-            "cloud_cover_total_alt",
+            "cloud_cover_total_alternate",
             _alt_array(
                 (
                     F.when(alt_special, F.lit(None)).otherwise(
@@ -625,7 +629,7 @@ def build_cloud():
     )
     row = _keep_if_populated(
         row,
-        ["cloud_cover_total_percent", "cloud_cover_total_alt", "layers"],
+        ["cloud_cover_total_percent", "cloud_cover_total_alternate", "layers"],
         ("weather_cloud", "dwd_cloud"),
     )
     row = add_semantic_provenance(row, SOURCE, "dwd_cloud", RID)

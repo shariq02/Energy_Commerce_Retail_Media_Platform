@@ -49,7 +49,7 @@ ROOT = "/Volumes/samples/databricks/datasets/power-plant"
 KEEP_FILE = "Sheet1.tsv"
 FIELDS = {
     "AT": "ambient_temperature_degc",
-    "V": "exhaust_vacuum_cm_hg",
+    "V": "exhaust_vacuum_cm_of_mercury",
     "AP": "ambient_pressure_mbar",
     "RH": "relative_humidity_percent",
     "PE": "net_electrical_output_mw",

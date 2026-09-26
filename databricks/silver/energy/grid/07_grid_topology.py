@@ -57,7 +57,7 @@ ENTITIES = {
 }
 BALANCING_BT = "mastr_bilanzierungsgebiete"
 CONFLICT = "grid_location_coordinate_conflict"
-KEYS = {"balancing_area": [NAME_MAP.get("Id", "Id")]}
+KEYS = {"balancing_area": [MASTR_KEY_NAMES[BALANCING_BT]["Id"]]}
 
 # COMMAND ----------
 
@@ -74,19 +74,27 @@ balancing_bronze = read_bronze(BALANCING_BT)
 # DBTITLE 1,Transform -- grid_location, grid_connection_point, grid_network
 STRUCTURES = {}
 for name, (bt, id_col) in ENTITIES.items():
-    df = mastr_standardise(bronze[name], NAME_MAP, CODED)
-    df = df.withColumn("_srid", F.col(NAME_MAP.get(id_col, id_col)).cast("string"))
+    names = {**NAME_MAP, **MASTR_KEY_NAMES.get(bt, {})}
+    df = mastr_standardise(bronze[name], names, CODED)
+    df = df.withColumn("_srid", F.col(names.get(id_col, id_col)).cast("string"))
     STRUCTURES[name] = add_semantic_provenance(df, SOURCE, bt, RID, "_srid")
 
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- balancing_area (Id not unique: ordinal, never a drop)
-_id = NAME_MAP.get("Id", "Id")
-areas = mastr_standardise(balancing_bronze.dropDuplicates(), NAME_MAP, CODED)
+_names = {**NAME_MAP, **MASTR_KEY_NAMES[BALANCING_BT]}
+_id = _names["Id"]
+areas = mastr_standardise(balancing_bronze.dropDuplicates(), _names, CODED)
 areas = within_group_ordinal(
-    areas, [_id], ["Yeic", "control_zone", "BilanzierungsgebietNetzanschlusspunkt"]
+    areas,
+    [_id],
+    [
+        "area_energy_identification_code",
+        "control_zone",
+        "balancing_area_connection_point",
+    ],
 )
-areas = areas.withColumn("_srid", sha_key(_id, "_src_id_ord"))
+areas = areas.withColumn("_srid", sha_key(_id, "_source_id_ordinal"))
 STRUCTURES["balancing_area"] = add_semantic_provenance(
     areas, SOURCE, BALANCING_BT, RID, "_srid"
 )

@@ -61,9 +61,9 @@ bronze = {name: read_bronze(bt) for name, bt in STRUCTURES_BRONZE.items()}
 # DBTITLE 1,Transform -- market_actor and market_actor_role
 STRUCTURES = {}
 for name, bt in STRUCTURES_BRONZE.items():
-    df = mastr_standardise(bronze[name], NAME_MAP, CODED)
-    _id = NAME_MAP.get("MastrNummer", "MastrNummer")
-    df = df.withColumn("_srid", F.col(_id).cast("string"))
+    names = {**NAME_MAP, **MASTR_KEY_NAMES.get(bt, {})}
+    df = mastr_standardise(bronze[name], names, CODED)
+    df = df.withColumn("_srid", F.col(names["MastrNummer"]).cast("string"))
     STRUCTURES[name] = add_semantic_provenance(df, SOURCE, bt, RID, "_srid")
 
 # COMMAND ----------
