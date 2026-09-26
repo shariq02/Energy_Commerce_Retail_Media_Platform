@@ -703,7 +703,7 @@ MASTR_KEY_NAMES = {
     "mastr_ertuechtigungen": {"Id": "repowering_id"},
     "mastr_bilanzierungsgebiete": {"Id": "balancing_area_id"},
     "mastr_marktakteure": {"MastrNummer": "market_actor_id"},
-    "mastr_marktakteure_und_rollen": {"MastrNummer": "market_actor_id"},
+    "mastr_marktakteure_und_rollen": {"MastrNummer": "market_actor_role_id"},
     "mastr_lokationen": {"MastrNummer": "location_id"},
     "mastr_netze": {"MastrNummer": "grid_id"},
 }
