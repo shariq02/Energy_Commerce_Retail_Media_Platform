@@ -110,8 +110,6 @@ scripts/utilities/verify_energy_weather_deepening_acquisition.py
 Thumbs.db
 desktop.ini
 
-#claude
-.claude/
 
 #Graphify
 graphify-out/
