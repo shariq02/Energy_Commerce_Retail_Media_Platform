@@ -88,6 +88,7 @@ energy_balance_component = (
         F.col("_component.energy_mwh").alias("energy_mwh"),
         F.col("_component.power_w").alias("power_w"),
         F.col("_component.source_series").alias("component_source_series"),
+        F.col("_component.source_filter_id").alias("source_filter_id"),
     )
     .drop("_component")
 )
@@ -122,6 +123,7 @@ _GRAIN = [
     "component_kind",
     "carrier_code",
     "native_label",
+    "source_filter_id",
     "origin_source_system",
 ]
 assert_unique_grain(

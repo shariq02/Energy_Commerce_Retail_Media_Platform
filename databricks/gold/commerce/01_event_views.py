@@ -45,20 +45,21 @@ rid = gold_run_id()
 # COMMAND ----------
 
 # DBTITLE 1,ga4_event -- view
-read_silver("ga4_event").createOrReplaceTempView("_ga4_event")
-write_gold_view("SELECT * FROM _ga4_event", "ga4_event", source="ga4")
+write_gold_view(f"SELECT * FROM {silver_fqn('ga4_event')}", "ga4_event", source="ga4")
 
 # COMMAND ----------
 
 # DBTITLE 1,ga4_event_item -- view
-read_silver("ga4_event_item").createOrReplaceTempView("_ga4_event_item")
-write_gold_view("SELECT * FROM _ga4_event_item", "ga4_event_item", source="ga4")
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('ga4_event_item')}", "ga4_event_item", source="ga4"
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,rees46_event -- view
-read_silver("rees46_event").createOrReplaceTempView("_rees46_event")
-write_gold_view("SELECT * FROM _rees46_event", "rees46_event", source="rees46")
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('rees46_event')}", "rees46_event", source="rees46"
+)
 
 # COMMAND ----------
 

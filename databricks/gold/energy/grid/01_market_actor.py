@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # GOLD -- MARKET_ACTOR
+# MAGIC # GOLD -- MARKET_ACTOR + MARKET_ACTOR_ROLE
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -12,9 +12,13 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** `energy_gold.market_actor` -- `market_actor` joined to
-# MAGIC `market_actor_role` (1:1 by actor id) plus `n_units_operated`. Grain:
-# MAGIC actor id -- the join asserts the 1:1 claim rather than assuming it.
+# MAGIC **Purpose:** `energy_gold.market_actor` -- the actor dimension plus
+# MAGIC `n_units_operated`. `energy_gold.market_actor_role` is a separate view
+# MAGIC over Silver `market_actor_role` -- a market actor legitimately holds more
+# MAGIC than one role registration (Silver's own docstring: "separate
+# MAGIC identities"), so it is not merged into `market_actor`; the actor <-> role
+# MAGIC relationship is already carried by `register_link` (`entity_link`).
+# MAGIC Grain: `market_actor` = actor id; `market_actor_role` = role id.
 
 # COMMAND ----------
 
@@ -37,6 +41,7 @@
 SOURCE = "mastr"
 COMPONENT = "gold/energy/grid/market_actor"
 TABLE = "market_actor"
+ROLE_TABLE = "market_actor_role"
 
 # COMMAND ----------
 
@@ -45,21 +50,14 @@ rid = gold_run_id()
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver
-market_actor = read_silver("market_actor")
-market_actor_role = read_silver("market_actor_role").drop(
-    "source_dataset",
-    "source_system",
-    "_silver_loaded_at",
-    "_silver_run_id",
-    "last_updated_at",
-)
-generation_unit = read_silver("generation_unit").select("operator_id")
+# DBTITLE 1,market_actor_role -- view (one row per role registration, not merged into market_actor)
+write_gold_view(f"SELECT * FROM {silver_fqn(ROLE_TABLE)}", ROLE_TABLE, source=SOURCE)
 
 # COMMAND ----------
 
-# DBTITLE 1,Join the role columns beside the actor columns
-market_actor = market_actor.join(market_actor_role, "market_actor_id", "left")
+# DBTITLE 1,Read Silver
+market_actor = read_silver("market_actor")
+generation_unit = read_silver("generation_unit").select("operator_id")
 
 # COMMAND ----------
 
@@ -79,7 +77,7 @@ market_actor = add_gold_provenance(market_actor, SOURCE, rid)
 
 # COMMAND ----------
 
-# DBTITLE 1,Grain gate -- confirms the 1:1 actor/role join, not assumed
+# DBTITLE 1,Grain gate
 assert_unique_grain(
     market_actor, ["market_actor_id"], component=COMPONENT, source=SOURCE, rid=rid
 )
@@ -100,4 +98,12 @@ _blocks = inspect_gold_table(
     rid=rid,
     key_cols=["market_actor_id"],
 )
-write_gold_findings(SOURCE, f"grid__{TABLE}", TABLE, _blocks)
+_blocks += inspect_gold_table(
+    read_gold(ROLE_TABLE, source=SOURCE),
+    ROLE_TABLE,
+    source=SOURCE,
+    component=COMPONENT,
+    rid=rid,
+    key_cols=["market_actor_role_id"],
+)
+write_gold_findings(SOURCE, f"grid__{TABLE}", f"{TABLE}(_role)", _blocks)

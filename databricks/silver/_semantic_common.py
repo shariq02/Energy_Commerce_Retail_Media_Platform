@@ -530,7 +530,7 @@ ELECTRICITY_BALANCE_COLUMNS = [
         (
             "array<struct<component_kind:string,carrier_code:string,"
             "native_label:string,energy_mwh:double,power_w:double,"
-            "source_series:string>>"
+            "source_series:string,source_filter_id:string>>"
         ),
     ),
     *_ENERGY_TAIL,
@@ -553,7 +553,7 @@ ELECTRICITY_GENERATION_FORECAST_COLUMNS = [
         (
             "array<struct<forecast_scope:string,native_label:string,"
             "energy_mwh:double,semantic_status:string,semantic_issue_ref:string,"
-            "source_series:string>>"
+            "source_series:string,source_filter_id:string>>"
         ),
     ),
     *_ENERGY_TAIL,

@@ -191,6 +191,7 @@ _components = F.filter(
                     F.lit(None).cast("double").alias("energy_mwh"),
                     F.col(c).alias("power_w"),
                     F.lit(f"honda_iot_{c.split('__')[0]}.p").alias("source_series"),
+                    F.lit(None).cast("string").alias("source_filter_id"),
                 ),
             )
             for c, (kind, carrier) in BALANCE.items()

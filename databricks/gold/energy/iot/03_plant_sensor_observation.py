@@ -45,13 +45,10 @@ rid = gold_run_id()
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver as a temp view
-read_silver("plant_operating_sample").createOrReplaceTempView("_src")
-
-# COMMAND ----------
-
 # DBTITLE 1,Create the view
-write_gold_view("SELECT * FROM _src", TABLE, source=SOURCE)
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('plant_operating_sample')}", TABLE, source=SOURCE
+)
 
 # COMMAND ----------
 

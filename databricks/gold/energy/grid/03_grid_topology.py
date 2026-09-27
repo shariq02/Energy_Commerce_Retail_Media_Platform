@@ -46,21 +46,26 @@ rid = gold_run_id()
 # COMMAND ----------
 
 # DBTITLE 1,grid_connection_point -- view
-read_silver("grid_connection_point").createOrReplaceTempView("_gcp")
-write_gold_view("SELECT * FROM _gcp", "grid_connection_point", source=SOURCE)
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('grid_connection_point')}",
+    "grid_connection_point",
+    source=SOURCE,
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,balancing_area -- view
-read_silver("balancing_area").createOrReplaceTempView("_ba")
-write_gold_view("SELECT * FROM _ba", "balancing_area", source=SOURCE)
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('balancing_area')}", "balancing_area", source=SOURCE
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,grid_location_coordinate_conflict -- view
-read_silver("grid_location_coordinate_conflict").createOrReplaceTempView("_glcc")
 write_gold_view(
-    "SELECT * FROM _glcc", "grid_location_coordinate_conflict", source=SOURCE
+    f"SELECT * FROM {silver_fqn('grid_location_coordinate_conflict')}",
+    "grid_location_coordinate_conflict",
+    source=SOURCE,
 )
 
 # COMMAND ----------

@@ -172,6 +172,11 @@ balance = (
                 F.col("value").alias("energy_mwh"),
                 F.lit(None).cast("double").alias("power_w"),
                 F.col("source_series").alias("source_series"),
+                # SMARD's own internal publication-series id -- a metric can
+                # legitimately publish under more than one filter_id for the
+                # same window (smard.yml:83); kept as its own field so two
+                # such rows stay two distinct components, not a collision.
+                F.col("filter_id").alias("source_filter_id"),
             )
         ).alias("components"),
         F.collect_list(_FLAG).alias("quality_flags"),
@@ -215,6 +220,8 @@ forecast = (
                     "semantic_issue_ref"
                 ),
                 F.col("source_series").alias("source_series"),
+                # see electricity_balance's own components struct above
+                F.col("filter_id").alias("source_filter_id"),
             )
         ).alias("components"),
         F.collect_list(_FLAG).alias("quality_flags"),

@@ -181,6 +181,7 @@ _GRAIN = [
     "location_key",
     "interval_start_utc",
     "interval_seconds",
+    "subsystem",
     "channel",
     "value_kind",
 ]

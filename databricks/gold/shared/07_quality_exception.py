@@ -13,8 +13,10 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** `shared_conformed.quality_exception` -- a view over
-# MAGIC `quality.quarantine` (already the right shape, no physical copy). Grain:
-# MAGIC rule x source x source record.
+# MAGIC `quality.quarantine`, latest quarantine event only per (rule, source,
+# MAGIC source record) -- `quarantine` is an append-only log across every Silver
+# MAGIC run, so a record re-flagged on a later run would otherwise collide with
+# MAGIC its own earlier entry. Grain: rule x source x source record.
 
 # COMMAND ----------
 
@@ -48,17 +50,26 @@ rid = gold_run_id()
 # DBTITLE 1,Create the view
 write_gold_view(
     f"""
-SELECT
-    rule_id           AS rule,
-    source_system      AS source,
-    bronze_table,
-    source_record_id,
-    reason,
-    field_name,
-    offending_value,
-    run_id,
-    quarantined_at
-FROM {QUARANTINE_TABLE}
+SELECT rule, source, bronze_table, source_record_id, reason, field_name,
+       offending_value, run_id, quarantined_at
+FROM (
+    SELECT
+        rule_id           AS rule,
+        source_system      AS source,
+        bronze_table,
+        source_record_id,
+        reason,
+        field_name,
+        offending_value,
+        run_id,
+        quarantined_at,
+        ROW_NUMBER() OVER (
+            PARTITION BY rule_id, source_system, source_record_id
+            ORDER BY quarantined_at DESC
+        ) AS _rn
+    FROM {QUARANTINE_TABLE}
+)
+WHERE _rn = 1
 """,
     TABLE,
     schema=SHARED_CONFORMED_SCHEMA,

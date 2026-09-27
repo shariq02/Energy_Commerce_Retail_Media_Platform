@@ -46,14 +46,18 @@ rid = gold_run_id()
 # COMMAND ----------
 
 # DBTITLE 1,market_price -- view
-read_silver("electricity_price").createOrReplaceTempView("_price")
-write_gold_view("SELECT * FROM _price", "market_price", source=SOURCE)
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('electricity_price')}", "market_price", source=SOURCE
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,generation_forecast -- view
-read_silver("electricity_generation_forecast").createOrReplaceTempView("_forecast")
-write_gold_view("SELECT * FROM _forecast", "generation_forecast", source=SOURCE)
+write_gold_view(
+    f"SELECT * FROM {silver_fqn('electricity_generation_forecast')}",
+    "generation_forecast",
+    source=SOURCE,
+)
 
 # COMMAND ----------
 

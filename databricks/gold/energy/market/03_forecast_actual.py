@@ -78,6 +78,7 @@ forecast = (
         F.col("_c.energy_mwh").alias("forecast_value"),
         F.col("_c.semantic_status").alias("semantic_status"),
         F.col("_c.semantic_issue_ref").alias("semantic_issue_ref"),
+        F.col("_c.source_filter_id").alias("source_filter_id"),
     )
     .drop("_c")
 )
@@ -120,7 +121,13 @@ forecast_actual = add_gold_provenance(forecast_actual, SOURCE, rid)
 # COMMAND ----------
 
 # DBTITLE 1,Grain gate
-_GRAIN = ["location_key", "market_area_code", "target_window_start", "forecast_scope"]
+_GRAIN = [
+    "location_key",
+    "market_area_code",
+    "target_window_start",
+    "forecast_scope",
+    "source_filter_id",
+]
 assert_unique_grain(
     forecast_actual, _GRAIN, component=COMPONENT, source=SOURCE, rid=rid
 )

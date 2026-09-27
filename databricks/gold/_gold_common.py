@@ -414,10 +414,18 @@ def write_gold_view(
     source: str | None = None,
 ) -> None:
     """CREATE OR REPLACE VIEW -- no physical copy, used where Silver (or another
-    Gold table) is already the right shape."""
+    Gold table) is already the right shape. select_sql must reference catalog
+    tables by their fully-qualified name (silver_fqn()), never a session temp
+    view -- a persistent view cannot resolve a temp-view reference."""
     full = f"{CATALOG}.{schema or gold_schema_for(source)}.{gold_table}"
     spark.sql(f"CREATE OR REPLACE VIEW {full} AS\n{select_sql}")
     print(f"OK  {full}: view created")
+
+
+def silver_fqn(table: str) -> str:
+    """Fully-qualified Silver table name, for building write_gold_view() SQL
+    directly against the catalog table."""
+    return f"{CATALOG}.{target_schema_for(table)}.{table}"
 
 
 # COMMAND ----------
