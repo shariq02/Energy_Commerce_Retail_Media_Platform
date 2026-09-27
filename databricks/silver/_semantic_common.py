@@ -931,6 +931,23 @@ def _schema_signature(schema) -> set:
     return {(f.name, f.dataType.simpleString()) for f in schema.fields}
 
 
+def _migrate_schema(existing_df, columns: list):
+    """Like conform(), for carrying pre-existing rows onto a changed schema --
+    a plain CAST has no rule for inventing a field a struct/array<struct>
+    column doesn't have yet (CAST_WITHOUT_SUGGESTION), so those columns are
+    round-tripped through JSON instead, which fills a new field with NULL."""
+
+    def _project(n, t):
+        if n not in existing_df.columns:
+            return F.lit(None).cast(t).alias(n)
+        col = F.col(n)
+        if t.startswith(("array<struct", "struct<")):
+            return F.from_json(F.to_json(col), t).alias(n)
+        return col.cast(t).alias(n)
+
+    return existing_df.select(*[_project(n, t) for n, t in columns])
+
+
 def write_semantic(
     df, table: str, *, source: str, component: str, rid: str, replace_where=None
 ) -> int | None:
@@ -953,7 +970,7 @@ def write_semantic(
             target_columns = [
                 (f.name, f.dataType.simpleString()) for f in df.schema.fields
             ]
-            kept = conform(
+            kept = _migrate_schema(
                 spark.table(full).filter(f"NOT ({replace_where})"), target_columns
             )
             df = kept.unionByName(df)
