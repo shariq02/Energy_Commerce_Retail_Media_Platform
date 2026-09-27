@@ -62,6 +62,11 @@ SHARED_CONTEXT = [
     "interval_seconds",
     "interval_reference",
     "true_solar_time_native",
+    # real per-row origin (dwd/honda_iot/accuweather -- location_key is source-
+    # specific, so this is uniform per grain key); add_gold_provenance below
+    # would otherwise overwrite a bare source_system with the constant "dwd"
+    # and mislabel every Honda/AccuWeather-origin row.
+    "source_system",
 ]
 
 # COMMAND ----------
@@ -117,6 +122,9 @@ weather_observation_radiation = weather_observation_radiation.withColumn(
 # COMMAND ----------
 
 # DBTITLE 1,Build the Gold row
+weather_observation_radiation = weather_observation_radiation.withColumnRenamed(
+    "source_system", "origin_source_system"
+)
 weather_observation_radiation = add_gold_provenance(
     weather_observation_radiation, SOURCE, rid
 )

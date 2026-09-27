@@ -111,6 +111,10 @@ _is_current = (
 # COMMAND ----------
 
 # DBTITLE 1,Build dim_place
+# origin_source_system preserves the real per-row Silver source (dwd/accuweather/
+# honda_iot/weather_seattle -- weather_location spans all four); add_gold_provenance
+# below overwrites a column literally named source_system with this table's own
+# SOURCE constant, which would otherwise mislabel every non-DWD place as dwd.
 dim_place = weather_location.select(
     F.col("location_key").alias("place_key"),
     "source_location_id",
@@ -125,7 +129,7 @@ dim_place = weather_location.select(
     "city",
     "official_municipality_key",
     "geography_basis",
-    "source_system",
+    F.col("source_system").alias("origin_source_system"),
     "source_dataset",
     "source_record_id",
 ).join(_is_current, "place_key", "left")
@@ -140,7 +144,7 @@ assert_unique_grain(
 )
 assert_unique_grain(
     dim_place_validity,
-    ["place_key", "validity_kind", "record_ordinal"],
+    ["place_key", "validity_kind", "valid_from", "record_ordinal"],
     component=COMPONENT,
     source=SOURCE,
     rid=rid,
@@ -186,6 +190,6 @@ _blocks += inspect_gold_table(
     component=COMPONENT,
     rid=rid,
     schema=SHARED_CONFORMED_SCHEMA,
-    key_cols=["place_key", "validity_kind", "record_ordinal"],
+    key_cols=["place_key", "validity_kind", "valid_from", "record_ordinal"],
 )
 write_gold_findings(SOURCE, "shared__dim_place", "dim_place(_validity)", _blocks)

@@ -127,6 +127,10 @@ _all_ids = (
 # COMMAND ----------
 
 # DBTITLE 1,register_link rows -- carried through
+# origin_source_system preserves the real per-row Silver source -- the plant_unit
+# links below come from power_plant_register (power_plant_list), not mastr; add_gold_
+# provenance overwrites a column literally named source_system with this table's own
+# SOURCE constant, which would otherwise mislabel those rows as mastr.
 _LINK_COLUMNS = [
     "relationship_type",
     "parent_type",
@@ -137,7 +141,7 @@ _LINK_COLUMNS = [
     "match_confidence",
     "source_record_id",
     "source_dataset",
-    "source_system",
+    "origin_source_system",
 ]
 _from_register_link = register_link.select(
     "relationship_type",
@@ -149,7 +153,7 @@ _from_register_link = register_link.select(
     F.lit(None).cast("string").alias("match_confidence"),
     "source_record_id",
     "source_dataset",
-    "source_system",
+    F.col("source_system").alias("origin_source_system"),
 )
 
 # COMMAND ----------
@@ -170,7 +174,7 @@ def _attribute_link(
         F.lit(None).cast("string").alias("match_confidence"),
         "source_record_id",
         "source_dataset",
-        "source_system",
+        F.col("source_system").alias("origin_source_system"),
     )
 
 
