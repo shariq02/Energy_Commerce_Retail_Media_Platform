@@ -147,7 +147,7 @@ assert_unique_grain(
 )
 assert_unique_grain(
     ref_energy_carrier_map,
-    ["source_vocabulary", "source_value"],
+    ["source_system", "source_vocabulary", "source_value"],
     component=COMPONENT,
     source=SOURCE,
     rid=rid,
@@ -192,7 +192,7 @@ _blocks += inspect_gold_table(
     component=COMPONENT,
     rid=rid,
     schema=SHARED_CONFORMED_SCHEMA,
-    key_cols=["source_vocabulary", "source_value"],
+    key_cols=["source_system", "source_vocabulary", "source_value"],
 )
 write_gold_findings(
     SOURCE, "shared__ref_energy_carrier", "ref_energy_carrier(_map)", _blocks

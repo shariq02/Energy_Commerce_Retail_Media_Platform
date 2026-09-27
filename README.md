@@ -16,13 +16,9 @@ Databricks owns Bronze → Silver → Gold → Analytical Processing and the sem
 
 ## Status
 
-Phases 0–9 are complete for the current-scope sources: environment, infrastructure, acquisition, Bronze, profiling, contracts, localisation, Silver and Gold. Phases 10 onward (analytical processing, ML, BI serving, the AI product capability, API serving, closure) are not started. EDA/profiling is done for four Databricks Samples datasets (`power-plant`, `iot`, `weather`, `accuweather`) whose Silver has not started. The plan has 22 phases (0–21). Live build status and the full plan are tracked in the design documentation.
+Early build stages are complete for the current-scope sources: environment, infrastructure, acquisition, Bronze, profiling, contracts, localisation and Silver. Gold is being rebuilt on the current Silver — the rebuild is written but not yet run. Later stages (analytical processing, ML, BI serving, the AI product capability, API serving, closure) are not started. EDA/profiling is done for four Databricks Samples datasets (`power-plant`, `iot`, `weather`, `accuweather`) whose Silver has not started.
 
 The repository and Unity Catalog names still contain "Retail Media" for historical reasons; Retail Media / advertising is not a target domain.
-
-## Documentation
-
-Full design documentation lives in the `docs/` tree (gitignored). Start with its top-level index (`docs/README.md`, "Current Project State").
 
 ---
 

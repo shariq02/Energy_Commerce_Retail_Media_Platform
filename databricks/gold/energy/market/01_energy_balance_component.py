@@ -94,9 +94,9 @@ energy_balance_component = (
 # DBTITLE 1,Resolve carrier_key
 _carrier = carrier_map.filter(
     F.col("source_vocabulary") == "electricity_balance.components.carrier_code"
-).select(F.col("source_value").alias("carrier_code"), "carrier_key")
+).select(F.col("source_value").alias("carrier_code"), "source_system", "carrier_key")
 energy_balance_component = energy_balance_component.join(
-    _carrier, "carrier_code", "left"
+    _carrier, ["carrier_code", "source_system"], "left"
 )
 
 # COMMAND ----------
