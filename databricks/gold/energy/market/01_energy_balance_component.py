@@ -56,6 +56,9 @@ carrier_map = read_gold(
 # COMMAND ----------
 
 # DBTITLE 1,Explode components -- one row per element
+# origin_source_system preserves the real per-row Silver source (smard/honda_iot);
+# add_gold_provenance below overwrites a column literally named source_system with
+# this table's own SOURCE constant, which would otherwise erase the distinction.
 energy_balance_component = (
     electricity_balance.select(
         "location_key",
@@ -73,7 +76,7 @@ energy_balance_component = (
         "sign_convention",
         "quality_flags",
         "measurement_basis",
-        "source_system",
+        F.col("source_system").alias("origin_source_system"),
         "source_dataset",
         "source_record_id",
     )
@@ -94,9 +97,13 @@ energy_balance_component = (
 # DBTITLE 1,Resolve carrier_key
 _carrier = carrier_map.filter(
     F.col("source_vocabulary") == "electricity_balance.components.carrier_code"
-).select(F.col("source_value").alias("carrier_code"), "source_system", "carrier_key")
+).select(
+    F.col("source_value").alias("carrier_code"),
+    "origin_source_system",
+    "carrier_key",
+)
 energy_balance_component = energy_balance_component.join(
-    _carrier, ["carrier_code", "source_system"], "left"
+    _carrier, ["carrier_code", "origin_source_system"], "left"
 )
 
 # COMMAND ----------
@@ -115,7 +122,7 @@ _GRAIN = [
     "component_kind",
     "carrier_code",
     "native_label",
-    "source_system",
+    "origin_source_system",
 ]
 assert_unique_grain(
     energy_balance_component, _GRAIN, component=COMPONENT, source=SOURCE, rid=rid

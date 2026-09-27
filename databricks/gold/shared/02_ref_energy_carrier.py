@@ -71,37 +71,41 @@ def _carrier_key(col):
 
 # COMMAND ----------
 
-# DBTITLE 1,Candidate raw values -- one row per (source_system, source_vocabulary, source_value)
+# DBTITLE 1,Candidate raw values -- one row per (origin_source_system, source_vocabulary, source_value)
+# origin_source_system is the real per-row Silver source (mastr/power_plant_list/
+# smard/honda_iot) -- kept under its own name because add_gold_provenance below
+# overwrites a column literally named source_system with this table's own SOURCE
+# constant, which would otherwise erase the very distinction this map needs.
 _candidates = (
     generation_unit.select(
-        F.col("source_system"),
+        F.col("source_system").alias("origin_source_system"),
         F.lit("generation_unit.unit_type").alias("source_vocabulary"),
         F.col("unit_type").alias("source_value"),
     )
     .unionByName(
         generation_unit.select(
-            F.col("source_system"),
+            F.col("source_system").alias("origin_source_system"),
             F.lit("generation_unit.main_fuel").alias("source_vocabulary"),
             F.col("main_fuel").alias("source_value"),
         )
     )
     .unionByName(
         generation_unit.select(
-            F.col("source_system"),
+            F.col("source_system").alias("origin_source_system"),
             F.lit("generation_unit.biomass_type").alias("source_vocabulary"),
             F.col("biomass_type").alias("source_value"),
         )
     )
     .unionByName(
         power_plant_register.select(
-            F.col("source_system"),
+            F.col("source_system").alias("origin_source_system"),
             F.lit("power_plant_register.energy_carrier").alias("source_vocabulary"),
             F.col("energy_carrier").alias("source_value"),
         )
     )
     .unionByName(
         power_plant_capacity_plan.select(
-            F.col("source_system"),
+            F.col("source_system").alias("origin_source_system"),
             F.lit("power_plant_capacity_plan.energy_carrier").alias(
                 "source_vocabulary"
             ),
@@ -110,7 +114,7 @@ _candidates = (
     )
     .unionByName(
         electricity_balance.select(
-            F.col("source_system"),
+            F.col("source_system").alias("origin_source_system"),
             F.lit("electricity_balance.components.carrier_code").alias(
                 "source_vocabulary"
             ),
@@ -147,7 +151,7 @@ assert_unique_grain(
 )
 assert_unique_grain(
     ref_energy_carrier_map,
-    ["source_system", "source_vocabulary", "source_value"],
+    ["origin_source_system", "source_vocabulary", "source_value"],
     component=COMPONENT,
     source=SOURCE,
     rid=rid,
@@ -192,7 +196,7 @@ _blocks += inspect_gold_table(
     component=COMPONENT,
     rid=rid,
     schema=SHARED_CONFORMED_SCHEMA,
-    key_cols=["source_system", "source_vocabulary", "source_value"],
+    key_cols=["origin_source_system", "source_vocabulary", "source_value"],
 )
 write_gold_findings(
     SOURCE, "shared__ref_energy_carrier", "ref_energy_carrier(_map)", _blocks
