@@ -5,11 +5,12 @@ Author: Sharique Mohammad
 Date: September 2026
 
 Purpose: one AST-based scanner, shared by `_generate_field_classes.py`,
-`databricks/silver/00_silver_setup.py`, `databricks/gold/00_gold_setup.py`
-and the test suite -- a table name literal is extracted straight from every
-`write_silver(...)` / `explode_link_bridge(...)` / `write_semantic(...)` call
-(Silver side) or `read_silver(...)` call (Gold side), never hand-maintained
-twice.
+`databricks/silver/00_silver_setup.py`, `databricks/gold/00_gold_setup.py`,
+`databricks/utility/07_gold_legacy_retirement.py` and the test suite -- a
+table name literal is extracted straight from every `write_silver(...)` /
+`explode_link_bridge(...)` / `write_semantic(...)` call (Silver side),
+`read_silver(...)` call (Gold reading Silver), or `write_gold(...)` /
+`write_gold_view(...)` call (Gold writing), never hand-maintained twice.
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ def gold_notebooks(gold_root: Path) -> list[Path]:
 
 
 def read_silver_targets(tree: ast.AST) -> set[str]:
+    consts = _module_str_constants(tree)
     out: set[str] = set()
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
@@ -90,6 +92,8 @@ def read_silver_targets(tree: ast.AST) -> set[str]:
         arg = node.args[0]
         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
             out.add(arg.value)
+        elif isinstance(arg, ast.Name) and arg.id in consts:
+            out.add(consts[arg.id])
     return out
 
 
@@ -106,5 +110,43 @@ def silver_dependencies_by_gold_notebook(gold_root: Path) -> dict[str, set[str]]
 def all_read_silver_tables(gold_root: Path) -> set[str]:
     out: set[str] = set()
     for targets in silver_dependencies_by_gold_notebook(gold_root).values():
+        out |= targets
+    return out
+
+
+# function name -> positional index of the Gold-table-name argument
+GOLD_TABLE_ARG = {"write_gold": 1, "write_gold_view": 1}
+
+
+def write_gold_targets(tree: ast.AST) -> set[str]:
+    consts = _module_str_constants(tree)
+    out: set[str] = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        idx = GOLD_TABLE_ARG.get(node.func.id)
+        if idx is None or len(node.args) <= idx:
+            continue
+        arg = node.args[idx]
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            out.add(arg.value)
+        elif isinstance(arg, ast.Name) and arg.id in consts:
+            out.add(consts[arg.id])
+    return out
+
+
+def tables_by_gold_notebook(gold_root: Path) -> dict[str, set[str]]:
+    """Gold notebook filename -> the Gold table/view names it writes."""
+    out: dict[str, set[str]] = {}
+    for nb in gold_notebooks(gold_root):
+        targets = write_gold_targets(ast.parse(nb.read_text(encoding="utf-8")))
+        if targets:
+            out[nb.name] = targets
+    return out
+
+
+def all_written_gold_tables(gold_root: Path) -> set[str]:
+    out: set[str] = set()
+    for targets in tables_by_gold_notebook(gold_root).values():
         out |= targets
     return out

@@ -403,6 +403,25 @@ def write_gold(
 
 # COMMAND ----------
 
+# DBTITLE 1,Gold view -- the home for a structure Silver already has in the right shape
+
+
+def write_gold_view(
+    select_sql: str,
+    gold_table: str,
+    *,
+    schema: str | None = None,
+    source: str | None = None,
+) -> None:
+    """CREATE OR REPLACE VIEW -- no physical copy, used where Silver (or another
+    Gold table) is already the right shape."""
+    full = f"{CATALOG}.{schema or gold_schema_for(source)}.{gold_table}"
+    spark.sql(f"CREATE OR REPLACE VIEW {full} AS\n{select_sql}")
+    print(f"OK  {full}: view created")
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Read a Gold table (for cross-notebook / cross-domain reads)
 
 

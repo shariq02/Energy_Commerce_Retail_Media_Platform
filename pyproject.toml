@@ -84,8 +84,10 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/gold/_gold_common.py" = ["F821"]
 "databricks/gold/_gold_inspect.py" = ["F821"]
 "databricks/gold/[0-9]*_*.py" = ["F821"]
+"databricks/gold/shared/*.py" = ["F821"]
 "databricks/gold/energy/**/*.py" = ["F821"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
+"databricks/utility/07_gold_legacy_retirement.py" = ["F821"]
 
 # Pytest config lives in pytest.ini only -- when both pytest.ini and
 # [tool.pytest.ini_options] exist, pytest uses pytest.ini and silently

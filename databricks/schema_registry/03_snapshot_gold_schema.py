@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # SILVER SCHEMA SNAPSHOT & VERSIONING
+# MAGIC # GOLD SCHEMA SNAPSHOT & VERSIONING
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -13,14 +13,11 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** capture the current schema (schema, table, column, datatype,
-# MAGIC nullable, ordinal position) of every table across all four Silver
-# MAGIC schemas and store it as a versioned Markdown file -- same mechanism as
-# MAGIC `01_snapshot_bronze_schema.py`. Tables are discovered live via
-# MAGIC `SHOW TABLES`, never a hardcoded list, so a table added after this
-# MAGIC notebook was written is picked up automatically on the next run. `v001`
-# MAGIC is the baseline; a later run that finds an unchanged schema does
-# MAGIC nothing, a changed schema is written as the next version. Previous
-# MAGIC versions are never overwritten.
+# MAGIC nullable, ordinal position) of every Gold table as a versioned Markdown
+# MAGIC file. Both the schema list and its tables are discovered live (`SHOW
+# MAGIC SCHEMAS`, `SHOW TABLES`), never hardcoded. `v001` is the baseline; an
+# MAGIC unchanged schema writes nothing, a changed one writes the next version.
+# MAGIC Previous versions are never overwritten.
 
 # COMMAND ----------
 
@@ -33,13 +30,8 @@ import os as _os
 
 # DBTITLE 1,Configuration
 CATALOG = "energy_commerce_retail_media"
-SILVER_SCHEMAS = (
-    "energy_silver",
-    "energy_silver_reference",
-    "commerce_silver",
-    "commerce_silver_reference",
-)
-REGISTRY_SUBDIR = "src/schemas/silver_registry"
+SHARED_CONFORMED_SCHEMA = "shared_conformed"
+REGISTRY_SUBDIR = "src/schemas/gold_registry"
 
 # COMMAND ----------
 
@@ -84,9 +76,20 @@ print(f"OK  registry directory: {REGISTRY_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Capture the current schema across all four Silver schemas
+# DBTITLE 1,Discover the Gold schemas -- every *_gold schema plus shared_conformed
+_all_schemas = sorted(
+    r["databaseName"] for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
+)
+GOLD_SCHEMAS = tuple(
+    s for s in _all_schemas if s.endswith("_gold") or s == SHARED_CONFORMED_SCHEMA
+)
+print(f"discovered {len(GOLD_SCHEMAS)} Gold schema(s): {list(GOLD_SCHEMAS)}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Capture the current schema across every discovered Gold schema
 rows = []  # (schema, table, ordinal, column, datatype, nullable)
-for _schema in SILVER_SCHEMAS:
+for _schema in GOLD_SCHEMAS:
     tables = sorted(
         r["tableName"]
         for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{_schema}").collect()
@@ -105,7 +108,7 @@ for _schema in SILVER_SCHEMAS:
 
 print(
     f"captured {len(rows)} column(s) across "
-    f"{len({(r[0], r[1]) for r in rows})} table(s) in {len(SILVER_SCHEMAS)} schema(s)"
+    f"{len({(r[0], r[1]) for r in rows})} table(s) in {len(GOLD_SCHEMAS)} schema(s)"
 )
 
 # COMMAND ----------
@@ -130,9 +133,9 @@ print(f"current schema hash: {current_hash}")
 def _version_files():
     out = []
     for name in _os.listdir(REGISTRY_DIR):
-        if name.startswith("silver_schema_v") and name.endswith(".md"):
+        if name.startswith("gold_schema_v") and name.endswith(".md"):
             try:
-                out.append((int(name[len("silver_schema_v") : -len(".md")]), name))
+                out.append((int(name[len("gold_schema_v") : -len(".md")]), name))
             except ValueError:
                 continue
     return sorted(out)
@@ -145,7 +148,7 @@ def _parse_snapshot(path):
         text = fh.read()
     h = ""
     for line in text.splitlines():
-        if line.startswith("<!-- silver-schema-hash:"):
+        if line.startswith("<!-- gold-schema-hash:"):
             h = line.split(":", 1)[1].strip().removesuffix("-->").strip()
             break
     parsed = []
@@ -232,7 +235,7 @@ if _latest and _latest_hash == current_hash:
     dbutils.notebook.exit(f"unchanged:{_latest[1]}")
 
 next_version = (_latest[0] + 1) if _latest else 1
-out_name = f"silver_schema_v{next_version:03d}.md"
+out_name = f"gold_schema_v{next_version:03d}.md"
 out_path = _os.path.join(REGISTRY_DIR, out_name)
 if _os.path.exists(out_path):
     raise RuntimeError(f"refusing to overwrite existing snapshot {out_path}")
@@ -270,12 +273,12 @@ _captured = _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 _table_count = len({(r[0], r[1]) for r in rows})
 
 lines = [
-    f"# Silver schema snapshot v{next_version:03d}",
+    f"# Gold schema snapshot v{next_version:03d}",
     "",
-    f"<!-- silver-schema-hash: {current_hash} -->",
+    f"<!-- gold-schema-hash: {current_hash} -->",
     "",
     f"**Captured:** {_captured}",
-    f"**Catalog / schemas:** `{CATALOG}.{{{', '.join(SILVER_SCHEMAS)}}}`",
+    f"**Catalog / schemas:** `{CATALOG}.{{{', '.join(GOLD_SCHEMAS)}}}`",
     f"**Tables:** {_table_count}  |  **Columns:** {len(rows)}",
     "",
     "## Change summary",
