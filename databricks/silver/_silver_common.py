@@ -450,10 +450,13 @@ def decode_via_ref(
     ref_label_col: str,
     out_prefix: str,
     english_map: dict | None = None,
+    multi_code: bool = False,
 ) -> DataFrame:
     """Add `<out_prefix>_code` (source code, verbatim), `<out_prefix>_label_de`
     (German label from the reference table) and `<out_prefix>` (English business
-    label from `english_map`, else the German label lowered). Broadcast join."""
+    label from `english_map`, else the German label lowered). Broadcast join.
+    `multi_code` also decodes comma-separated code lists; a list with any
+    unmatched code keeps a NULL label."""
     r = (
         ref_df.select(
             F.col(ref_code_col).cast("string").alias("_rc"),
@@ -476,7 +479,40 @@ def decode_via_ref(
             f"{out_prefix}",
             F.lower(F.regexp_replace(F.col(f"{out_prefix}_label_de"), r"\s+", "_")),
         )
-    return out
+    if not multi_code:
+        return out
+    lookup = r.agg(
+        F.map_from_entries(F.collect_list(F.struct("_rc", "_rl"))).alias("_lk")
+    )
+    labels = F.transform(
+        F.split(F.trim(F.col(f"{out_prefix}_code")), r"\s*,\s*"),
+        lambda c: F.col("_lk")[c],
+    )
+    is_list = F.col(f"{out_prefix}_code").contains(",") & F.forall(
+        labels, lambda x: x.isNotNull()
+    )
+    return (
+        out.crossJoin(F.broadcast(lookup))
+        .withColumn(
+            f"{out_prefix}_label_de",
+            F.when(is_list, F.concat_ws(", ", labels)).otherwise(
+                F.col(f"{out_prefix}_label_de")
+            ),
+        )
+        .withColumn(
+            out_prefix,
+            F.when(
+                is_list,
+                F.concat_ws(
+                    ",",
+                    F.transform(
+                        labels, lambda x: F.lower(F.regexp_replace(x, r"\s+", "_"))
+                    ),
+                ),
+            ).otherwise(F.col(out_prefix)),
+        )
+        .drop("_lk")
+    )
 
 
 def decode_via_map(
@@ -1011,6 +1047,7 @@ def mastr_standardise(
             "cat_id",
             "cat_wert",
             pref,
+            multi_code=True,
         )
         decoded.append(pref)
         if raw != pref:
