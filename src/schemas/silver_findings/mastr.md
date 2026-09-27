@@ -967,7 +967,7 @@ _Generated: 2026-09-26T14:29Z_
 <!-- BEGIN mastr:07_grid_topology__balancing_area -->
 ## balancing_area
 
-_Generated: 2026-09-26T14:37Z_
+_Generated: 2026-09-27T10:45Z_
 
 ### cardinality
 
@@ -1035,7 +1035,7 @@ _Generated: 2026-09-26T14:37Z_
 <!-- BEGIN mastr:07_grid_topology__grid_connection_point -->
 ## grid_connection_point
 
-_Generated: 2026-09-26T14:37Z_
+_Generated: 2026-09-27T10:45Z_
 
 ### cardinality
 
@@ -1139,7 +1139,7 @@ _Generated: 2026-09-26T14:37Z_
 <!-- BEGIN mastr:07_grid_topology__grid_location -->
 ## grid_location
 
-_Generated: 2026-09-26T14:37Z_
+_Generated: 2026-09-27T10:45Z_
 
 ### cardinality
 
@@ -1198,7 +1198,7 @@ _Generated: 2026-09-26T14:37Z_
 <!-- BEGIN mastr:07_grid_topology__grid_location_coordinate_conflict -->
 ## grid_location_coordinate_conflict
 
-_Generated: 2026-09-26T14:37Z_
+_Generated: 2026-09-27T10:45Z_
 
 ### cardinality
 
@@ -1264,7 +1264,7 @@ _Generated: 2026-09-26T14:37Z_
 <!-- BEGIN mastr:07_grid_topology__grid_network -->
 ## grid_network
 
-_Generated: 2026-09-26T14:37Z_
+_Generated: 2026-09-27T10:45Z_
 
 ### cardinality
 
@@ -1279,8 +1279,8 @@ _Generated: 2026-09-26T14:37Z_
 | distinct:balancing_areas | approx_distinct | 862.0 |  | INFO | INFO |  |
 | distinct:market_area | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:federal_state_code | approx_distinct | 66.0 |  | INFO | INFO |  |
-| distinct:federal_state_label_de | approx_distinct | 16.0 |  | INFO | INFO |  |
-| distinct:federal_state | approx_distinct | 16.0 |  | INFO | INFO |  |
+| distinct:federal_state_label_de | approx_distinct | 67.0 |  | INFO | INFO |  |
+| distinct:federal_state | approx_distinct | 70.0 |  | INFO | INFO |  |
 | distinct:_unmatched_code_columns | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1300,9 +1300,9 @@ _Generated: 2026-09-26T14:37Z_
 | null_rate:balancing_areas | null_rate | 0.4557471264367816 |  | INFO | INFO |  |
 | null_rate:market_area | null_rate | 0.7908045977011494 |  | INFO | INFO |  |
 | null_rate:federal_state_code | null_rate | 0.08793103448275862 |  | INFO | INFO |  |
-| null_rate:federal_state_label_de | null_rate | 0.14655172413793102 |  | INFO | INFO |  |
-| null_rate:federal_state | null_rate | 0.14655172413793102 |  | INFO | INFO |  |
-| null_rate:_unmatched_code_columns | null_rate | 0.9413793103448276 |  | INFO | INFO |  |
+| null_rate:federal_state_label_de | null_rate | 0.0896551724137931 |  | INFO | INFO |  |
+| null_rate:federal_state | null_rate | 0.0896551724137931 |  | INFO | INFO |  |
+| null_rate:_unmatched_code_columns | null_rate | 0.9982758620689656 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1615,7 +1615,7 @@ _Generated: 2026-09-26T14:36Z_
 <!-- BEGIN mastr:09_register_validation__validation -->
 ## register validation
 
-_Generated: 2026-09-26T14:44Z_
+_Generated: 2026-09-27T10:49Z_
 
 ### checks
 
