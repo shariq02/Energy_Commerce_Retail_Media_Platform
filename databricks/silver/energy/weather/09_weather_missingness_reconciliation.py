@@ -123,9 +123,18 @@ for _p in _missing_parts[1:]:
     observed = observed.unionByName(_p)
 observed = observed.distinct().withColumn("observed", F.lit(True))
 
-coverage = _coverage_parts[0]
+_coverage_union = _coverage_parts[0]
 for _p in _coverage_parts[1:]:
-    coverage = coverage.unionByName(_p)
+    _coverage_union = _coverage_union.unionByName(_p)
+# A handful of codes are reported by more than one Bronze table (the shared
+# QN_8 quality column; V_N/V_N_I, genuinely duplicated between dwd_cloudiness
+# and dwd_cloud_type) -- combine their per-table aggregates onto one row per
+# (station, code) instead of leaving one row per contributing table.
+coverage = _coverage_union.groupBy("source_location_id", "parameter_source_code").agg(
+    F.sum("observed_count").alias("observed_count"),
+    F.min("time_span_start_utc").alias("time_span_start_utc"),
+    F.max("time_span_end_utc").alias("time_span_end_utc"),
+)
 
 # COMMAND ----------
 
