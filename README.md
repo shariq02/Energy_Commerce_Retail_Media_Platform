@@ -14,10 +14,6 @@ Databricks | PySpark | Delta Lake / Unity Catalog | BigQuery (Google-source acqu
 
 Databricks owns Bronze → Silver → Gold → Analytical Processing and the semantic layer. Execution is a direct notebook/script sequence — no orchestration platform. Governance is cross-cutting, not a separate layer.
 
-## Status
-
-Early build stages are complete for the current-scope sources: environment, infrastructure, acquisition, Bronze, profiling, contracts, localisation and Silver. Gold is being rebuilt on the current Silver — the rebuild is written but not yet run. Later stages (analytical processing, ML, BI serving, the AI product capability, API serving, closure) are not started. EDA/profiling is done for four Databricks Samples datasets (`power-plant`, `iot`, `weather`, `accuweather`) whose Silver has not started.
-
 The repository and Unity Catalog names still contain "Retail Media" for historical reasons; Retail Media / advertising is not a target domain.
 
 ---
