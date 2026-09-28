@@ -62,12 +62,19 @@ check(
 
 # COMMAND ----------
 
-# DBTITLE 1,Gate 2 -- weather_observation and weather_observation_radiation don't share instants
-_obs_keys = read_gold("weather_observation", source=SOURCE).select(
-    "location_key", "observation_timestamp_utc"
+# DBTITLE 1,Gate 2 -- DWD's radiation instants (true solar time) don't share
+# clock instants with DWD's boundary-aligned families. Honda/AccuWeather
+# solar rows are clock-referenced like their other families and legitimately
+# share instants with weather_observation -- scoped to DWD only.
+_obs_keys = (
+    read_gold("weather_observation", source=SOURCE)
+    .filter(F.col("origin_source_system") == "dwd")
+    .select("location_key", "observation_timestamp_utc")
 )
-_rad_keys = read_gold("weather_observation_radiation", source=SOURCE).select(
-    "location_key", "observation_timestamp_utc"
+_rad_keys = (
+    read_gold("weather_observation_radiation", source=SOURCE)
+    .filter(F.col("origin_source_system") == "dwd")
+    .select("location_key", "observation_timestamp_utc")
 )
 _shared_instants = _obs_keys.intersect(_rad_keys).count()
 check(
