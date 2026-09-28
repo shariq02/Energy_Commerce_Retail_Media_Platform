@@ -149,20 +149,19 @@ def inspect_analytics_table(
     n_after = df_after.count()
     add("volume", "row_count", "rows", float(n_after), None, "INFO", "INFO")
     if df_before is not None:
+        # No ratio threshold here, unlike Gold's near-1:1 reshape check --
+        # every Analytics mart is a deliberate grain-changing roll-up, so a
+        # large row-count shrink is the expected outcome, not an anomaly.
         n_before = df_before.count()
         delta = n_after - n_before
-        ratio = (n_after / n_before) if n_before else None
-        vol_status = (
-            "WARN" if (ratio is not None and (ratio < 0.5 or ratio > 2.0)) else "PASS"
-        )
         add(
             "volume",
             "input_output_reconciliation",
             "row_delta",
             float(delta),
             float(n_before),
-            vol_status,
-            "WARN" if vol_status == "WARN" else "INFO",
+            "INFO",
+            "INFO",
             f"before={n_before} after={n_after}",
         )
 
