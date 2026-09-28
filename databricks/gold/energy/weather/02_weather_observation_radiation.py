@@ -13,9 +13,11 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** `energy_gold.weather_observation_radiation` -- the 3 solar-
-# MAGIC file families, kept apart from `weather_observation` because their
-# MAGIC timestamps are off-hour (true solar time), not boundary-aligned. Same
-# MAGIC generic union-then-left-join build as `01_weather_observation.py`.
+# MAGIC file families, kept apart from `weather_observation` because they carry
+# MAGIC an extra context column (`true_solar_time_native`, DWD only) and a
+# MAGIC distinct `interval_reference` tag; the instant grid itself is not
+# MAGIC shifted and can coincide with `weather_observation`'s. Same generic
+# MAGIC union-then-left-join build as `01_weather_observation.py`.
 
 # COMMAND ----------
 

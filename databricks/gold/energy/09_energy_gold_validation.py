@@ -13,8 +13,7 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** cross-table join gates that no single build notebook can
-# MAGIC assert on its own: site place keys resolve against `dim_place`, the
-# MAGIC radiation and boundary-aligned weather structures don't share instants,
+# MAGIC assert on its own: site place keys resolve against `dim_place`,
 # MAGIC `iot_device`'s distinct-device count matches its row count, and the
 # MAGIC carrier map hasn't silently dropped a candidate value. Run last, after
 # MAGIC every other `energy_gold`/`shared_conformed` notebook.
@@ -62,34 +61,7 @@ check(
 
 # COMMAND ----------
 
-# DBTITLE 1,Gate 2 -- DWD's radiation instants (true solar time) don't share
-# clock instants with DWD's boundary-aligned families. Honda/AccuWeather
-# solar rows are clock-referenced like their other families and legitimately
-# share instants with weather_observation -- scoped to DWD only.
-_obs_keys = (
-    read_gold("weather_observation", source=SOURCE)
-    .filter(F.col("origin_source_system") == "dwd")
-    .select("location_key", "observation_timestamp_utc")
-)
-_rad_keys = (
-    read_gold("weather_observation_radiation", source=SOURCE)
-    .filter(F.col("origin_source_system") == "dwd")
-    .select("location_key", "observation_timestamp_utc")
-)
-_shared_instants = _obs_keys.intersect(_rad_keys).count()
-check(
-    COMPONENT,
-    SOURCE,
-    "observation_radiation_instants_distinct",
-    _shared_instants == 0,
-    detail=f"shared_instant_count={_shared_instants}",
-    metric_value=float(_shared_instants),
-    rid=rid,
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Gate 3 -- iot_device distinct-device count matches its row count
+# DBTITLE 1,Gate 2 -- iot_device distinct-device count matches its row count
 _iot_device_rows = read_gold("iot_device", source="iot").count()
 _distinct_devices = (
     read_silver("device_telemetry_snapshot").select("device_key").distinct().count()
@@ -106,7 +78,7 @@ check(
 
 # COMMAND ----------
 
-# DBTITLE 1,Gate 4 -- ref_energy_carrier_map has not silently dropped a candidate
+# DBTITLE 1,Gate 3 -- ref_energy_carrier_map has not silently dropped a candidate
 _map_rows = read_gold(
     "ref_energy_carrier_map", source="mastr", schema=SHARED_CONFORMED_SCHEMA
 ).count()
