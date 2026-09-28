@@ -13,12 +13,10 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** `shared_conformed.series_coverage` (from
-# MAGIC `weather_missingness_reconciliation`) and `data_gap_period` (from
-# MAGIC `weather_missing_value_period`, place key already resolved).
-# MAGIC `gap_origin` is `declared` for every row. Observed-count and time-span
-# MAGIC coverage need the built `weather_observation` Gold table, which doesn't
-# MAGIC exist yet at this point in the build -- this notebook re-runs to add
-# MAGIC that once weather (build step 4) is done.
+# MAGIC `weather_missingness_reconciliation`, which already carries
+# MAGIC observed-value count and time span per station/parameter, computed
+# MAGIC against Bronze) and `data_gap_period` (from `weather_missing_value_period`,
+# MAGIC place key already resolved). `gap_origin` is `declared` for every row.
 
 # COMMAND ----------
 
@@ -57,14 +55,14 @@ weather_missing_value_period = read_silver("weather_missing_value_period")
 # COMMAND ----------
 
 # DBTITLE 1,Build series_coverage
-# ponytail: reconciliation status only, no observed-count/time-span join yet
-# (would need a scan across every weather family table) -- add when a
-# consumer needs it.
 series_coverage = weather_missingness_reconciliation.select(
     F.lit("weather_observation").alias("structure"),
     F.col("location_key").alias("place_key"),
     F.col("parameter_source_code").alias("measure"),
     "reconciliation_status",
+    "observed_count",
+    F.col("time_span_start_utc").alias("time_span_start"),
+    F.col("time_span_end_utc").alias("time_span_end"),
     "source_system",
     "source_dataset",
     "source_record_id",

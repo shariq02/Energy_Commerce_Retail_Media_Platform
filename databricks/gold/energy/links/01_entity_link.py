@@ -16,11 +16,12 @@
 # MAGIC rows plus every real, non-fuzzy FK already present as a plain attribute
 # MAGIC column elsewhere (unit-operator, unit-location, unit-support, unit-
 # MAGIC authorisation, plant-unit, connection-point-location/network/operator,
-# MAGIC operator-change previous/new operator). `redispatch`'s intervention-to-
-# MAGIC plant name match is NOT included here -- Silver stores the matched name
-# MAGIC and a confidence, not a resolved key, and re-deriving that match here
-# MAGIC would duplicate fuzzy logic rather than carry a real one; add it once a
-# MAGIC resolved key exists. `parent_resolved`/`linked_resolved` check against
+# MAGIC operator-change previous/new operator, redispatch event-to-plant).
+# MAGIC `redispatch`'s intervention-to-plant link resolves Silver's already-
+# MAGIC decided exact-normalised name match (`affected_unit_match_name`/
+# MAGIC `_confidence`) to `power_plant_register`'s key by re-applying the exact
+# MAGIC same normalisation, not by re-deriving the match itself -- no fuzzy
+# MAGIC logic lives here. `parent_resolved`/`linked_resolved` check against
 # MAGIC this notebook's own entity-kind labels ("unit", "market_actor", ...);
 # MAGIC `register_link`'s own `parent_type`/`linked_type` values are carried
 # MAGIC through as-is and only resolve if they already match that vocabulary --
@@ -68,6 +69,7 @@ generation_unit = read_silver("generation_unit")
 grid_connection_point = read_silver("grid_connection_point")
 grid_operator_change_event = read_silver("grid_operator_change_event")
 power_plant_register = read_silver("power_plant_register")
+grid_intervention_event = read_silver("grid_intervention_event")
 
 # COMMAND ----------
 
@@ -120,6 +122,12 @@ _all_ids = (
         .distinct()
         .withColumnRenamed("source_record_id", "_id")
         .withColumn("_kind", F.lit("plant"))
+    )
+    .unionByName(
+        grid_intervention_event.select("event_key")
+        .distinct()
+        .withColumnRenamed("event_key", "_id")
+        .withColumn("_kind", F.lit("event"))
     )
 )
 
@@ -254,6 +262,43 @@ _cp_operator = _attribute_link(
 
 # COMMAND ----------
 
+# DBTITLE 1,Redispatch event -> plant link -- resolves Silver's already-decided name match
+
+
+def _normalise(col: str):
+    """Same normalisation as the Silver match pass (05_grid_intervention_redispatch.py)
+    -- resolves Silver's decision to a key, does not re-derive the match."""
+    return F.upper(F.trim(F.regexp_replace(col, r"\s+", " ")))
+
+
+_plants_by_name = (
+    power_plant_register.select("source_record_id", "plant_name")
+    .dropna(subset=["plant_name"])
+    .withColumn("_norm_plant", _normalise("plant_name"))
+    .groupBy("_norm_plant")
+    .agg(F.min("source_record_id").alias("plant_id"))
+)
+_redispatch_affected_unit = (
+    grid_intervention_event.filter(F.col("affected_unit_match_name").isNotNull())
+    .withColumn("_norm_plant", _normalise("affected_unit_match_name"))
+    .join(_plants_by_name, "_norm_plant", "left")
+    .filter(F.col("plant_id").isNotNull())
+    .select(
+        F.lit("redispatch_affected_unit").alias("relationship_type"),
+        F.lit("event").alias("parent_type"),
+        F.col("event_key").alias("parent_id"),
+        F.lit("plant").alias("linked_type"),
+        F.col("plant_id").alias("linked_id"),
+        F.lit("name_match_exact_normalised").alias("link_basis"),
+        F.col("affected_unit_match_confidence").alias("match_confidence"),
+        "source_record_id",
+        "source_dataset",
+        F.col("source_system").alias("origin_source_system"),
+    )
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Attribute-FK links from grid_operator_change_event
 _operator_change_previous = _attribute_link(
     grid_operator_change_event,
@@ -288,6 +333,7 @@ entity_link = (
     .unionByName(_cp_operator)
     .unionByName(_operator_change_previous)
     .unionByName(_operator_change_new)
+    .unionByName(_redispatch_affected_unit)
 )
 
 # COMMAND ----------

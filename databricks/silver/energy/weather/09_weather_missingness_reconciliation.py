@@ -12,10 +12,12 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** cross-check REPORTED gaps (`weather_missing_value_period`)
-# MAGIC against OBSERVED missing values (NULL or sentinel) per station and DWD
-# MAGIC parameter code in the 14 hourly Bronze products. Flags disagreement only
-# MAGIC -- never deletes or corrects either signal.
+# MAGIC **Purpose:** one row per (station, DWD parameter code) actually present
+# MAGIC in the 14 hourly Bronze products, carrying its observed-value count and
+# MAGIC time span, plus a cross-check of REPORTED gaps
+# MAGIC (`weather_missing_value_period`) against OBSERVED missing values (NULL
+# MAGIC or sentinel). Flags disagreement only -- never deletes or corrects
+# MAGIC either signal.
 
 # COMMAND ----------
 
@@ -74,18 +76,26 @@ CODES = {
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- OBSERVED from the Bronze products
-# Bronze column names are the DWD parameter codes REPORTED uses.
-observed = None
+# DBTITLE 1,Transform -- coverage (observed_count, time span) and OBSERVED-missing, from Bronze
+# Bronze column names are the DWD parameter codes REPORTED uses. One pass per
+# table: `_clean` (sentinels stripped, timestamp parsed) feeds both the
+# per-column coverage aggregate (base grain -- every station x parameter code
+# structurally present) and the observed-missing explode (gap signal).
+_missing_parts = []
+_coverage_parts = []
 for _t in MEASUREMENT_TABLES:
     _df = read_bronze(_t)
     _value_cols = [c for c in _df.columns if c in CODES]
     if not _value_cols:
         continue
-    _part = (
+    _clean = (
         strip_sentinels(_df, _value_cols)
-        .select(
-            strip_float_suffix("STATIONS_ID").alias("source_location_id"),
+        .withColumn("source_location_id", strip_float_suffix("STATIONS_ID"))
+        .withColumn("_ts", parse_mess_datum("MESS_DATUM"))
+    )
+    _missing_parts.append(
+        _clean.select(
+            "source_location_id",
             F.explode(
                 F.array(*[F.when(F.col(c).isNull(), F.lit(c)) for c in _value_cols])
             ).alias("parameter_source_code"),
@@ -93,8 +103,29 @@ for _t in MEASUREMENT_TABLES:
         .filter(F.col("parameter_source_code").isNotNull())
         .distinct()
     )
-    observed = _part if observed is None else observed.unionByName(_part)
+    for _c in _value_cols:
+        _coverage_parts.append(
+            _clean.groupBy("source_location_id")
+            .agg(
+                F.count(F.col(_c)).alias("observed_count"),
+                F.min(F.when(F.col(_c).isNotNull(), F.col("_ts"))).alias(
+                    "time_span_start_utc"
+                ),
+                F.max(F.when(F.col(_c).isNotNull(), F.col("_ts"))).alias(
+                    "time_span_end_utc"
+                ),
+            )
+            .withColumn("parameter_source_code", F.lit(_c))
+        )
+
+observed = _missing_parts[0]
+for _p in _missing_parts[1:]:
+    observed = observed.unionByName(_p)
 observed = observed.distinct().withColumn("observed", F.lit(True))
+
+coverage = _coverage_parts[0]
+for _p in _coverage_parts[1:]:
+    coverage = coverage.unionByName(_p)
 
 # COMMAND ----------
 
@@ -108,16 +139,18 @@ reported = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- join REPORTED and OBSERVED
+# DBTITLE 1,Transform -- join coverage (base grain) with REPORTED and OBSERVED-missing
 _key = ["source_location_id", "parameter_source_code"]
 recon = (
-    observed.join(reported, _key, "full_outer")
+    coverage.join(observed, _key, "left")
+    .join(reported, _key, "left")
     .na.fill(False, subset=["observed", "reported"])
     .withColumn(
         "reconciliation_status",
         F.when(F.col("observed") & F.col("reported"), F.lit("matched"))
         .when(F.col("observed"), F.lit("observed_only"))
-        .otherwise(F.lit("reported_only")),
+        .when(F.col("reported"), F.lit("reported_only"))
+        .otherwise(F.lit("no_gap_signal")),
     )
     .withColumn("location_key", location_key(SOURCE, "source_location_id"))
     .withColumn("_srid", sha_key(*_key))

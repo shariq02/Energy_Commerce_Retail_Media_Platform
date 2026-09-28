@@ -398,6 +398,9 @@ WEATHER_MISSINGNESS_RECONCILIATION_COLUMNS = [
     ("source_location_id", "string"),
     ("parameter_source_code", "string"),
     ("reconciliation_status", "string"),
+    ("observed_count", "bigint"),
+    ("time_span_start_utc", "timestamp"),
+    ("time_span_end_utc", "timestamp"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
