@@ -32,7 +32,7 @@ _Generated: 2026-09-28T14:22Z_
 <!-- BEGIN smard:market__market_price_daily -->
 ## market_price_daily
 
-_Generated: 2026-09-28T14:22Z_
+_Generated: 2026-09-28T15:22Z_
 
 ### grain
 
@@ -52,6 +52,6 @@ _Generated: 2026-09-28T14:22Z_
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | row_count | rows | 2897.0 |  | INFO | INFO |  |
-| input_output_reconciliation | row_delta | -69792.0 | 72689.0 | WARN | WARN | before=72689 after=2897 |
+| input_output_reconciliation | row_delta | -69792.0 | 72689.0 | INFO | INFO | before=72689 after=2897 |
 
 <!-- END smard:market__market_price_daily -->
