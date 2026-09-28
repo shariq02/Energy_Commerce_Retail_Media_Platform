@@ -117,6 +117,7 @@ energy_balance_component = add_gold_provenance(energy_balance_component, SOURCE,
 # DBTITLE 1,Grain gate
 _GRAIN = [
     "location_key",
+    "market_area_code",
     "interval_start_utc",
     "interval_seconds",
     "interval_reference",

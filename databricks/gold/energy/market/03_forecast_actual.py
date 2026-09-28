@@ -88,6 +88,7 @@ forecast = (
 # DBTITLE 1,Aggregate the actual side to (place, market area, native label, interval)
 actual = energy_balance_component.groupBy(
     "location_key",
+    "market_area_code",
     "interval_start_utc",
     "interval_seconds",
     "interval_reference",
@@ -99,7 +100,8 @@ actual = energy_balance_component.groupBy(
 # DBTITLE 1,Pair forecast with actual on the same interval
 forecast_actual = forecast.join(
     actual,
-    (forecast.location_key == actual.location_key)
+    forecast.location_key.eqNullSafe(actual.location_key)
+    & forecast.market_area_code.eqNullSafe(actual.market_area_code)
     & (forecast.target_window_start == actual.interval_start_utc)
     & (forecast.interval_seconds == actual.interval_seconds)
     & (forecast.interval_reference == actual.interval_reference)

@@ -13,10 +13,13 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** `energy_gold.support_registration` -- a view over Silver
-# MAGIC `support_registration`, every column carried through, plus
-# MAGIC `linked_unit_ids` resolved from `generation_unit`'s own support-id
-# MAGIC columns (aggregated first, so a registration linked from more than one
-# MAGIC unit never fans the row out). Grain: support registration.
+# MAGIC `support_registration`, every column carried through (including its own
+# MAGIC native `linked_unit_ids` string), plus `resolved_linked_unit_ids` --
+# MAGIC an array resolved from `generation_unit`'s own support-id columns
+# MAGIC (aggregated first, so a registration linked from more than one unit
+# MAGIC never fans the row out), kept separate rather than overwriting the
+# MAGIC native column since the two are not verified equal. Grain: support
+# MAGIC registration.
 
 # COMMAND ----------
 
@@ -62,10 +65,10 @@ links AS (
     FROM gu_links WHERE combined_heat_and_power_support_id IS NOT NULL
 ),
 agg_links AS (
-    SELECT support_registration_id, collect_list(unit_id) AS linked_unit_ids
+    SELECT support_registration_id, collect_list(unit_id) AS resolved_linked_unit_ids
     FROM links GROUP BY support_registration_id
 )
-SELECT sr.*, al.linked_unit_ids
+SELECT sr.*, al.resolved_linked_unit_ids
 FROM {silver_fqn("support_registration")} sr
 LEFT JOIN agg_links al ON al.support_registration_id = sr.support_registration_id
 """,
