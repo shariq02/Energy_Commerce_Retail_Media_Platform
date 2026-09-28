@@ -1394,21 +1394,21 @@ _Generated: 2026-09-28T10:59Z_
 <!-- BEGIN mastr:links__entity_link -->
 ## entity_link
 
-_Generated: 2026-09-28T10:53Z_
+_Generated: 2026-09-28T12:43Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:linked_id | approx_distinct | 22763935.0 |  | INFO | INFO |  |
-| distinct:linked_type | approx_distinct | 9.0 |  | INFO | INFO |  |
+| distinct:linked_type | approx_distinct | 10.0 |  | INFO | INFO |  |
 | distinct:parent_id | approx_distinct | 13008610.0 |  | INFO | INFO |  |
-| distinct:parent_type | approx_distinct | 8.0 |  | INFO | INFO |  |
-| distinct:relationship_type | approx_distinct | 17.0 |  | INFO | INFO |  |
-| distinct:link_basis | approx_distinct | 2.0 |  | INFO | INFO |  |
-| distinct:match_confidence | approx_distinct | 0.0 |  | INFO | INFO |  |
-| distinct:source_dataset | approx_distinct | 18.0 |  | INFO | INFO |  |
-| distinct:origin_source_system | approx_distinct | 2.0 |  | INFO | INFO |  |
+| distinct:parent_type | approx_distinct | 9.0 |  | INFO | INFO |  |
+| distinct:relationship_type | approx_distinct | 18.0 |  | INFO | INFO |  |
+| distinct:link_basis | approx_distinct | 3.0 |  | INFO | INFO |  |
+| distinct:match_confidence | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_dataset | approx_distinct | 19.0 |  | INFO | INFO |  |
+| distinct:origin_source_system | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:parent_resolved | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:linked_resolved | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:link_ordinal | approx_distinct | 3.0 |  | INFO | INFO |  |
@@ -1427,7 +1427,7 @@ _Generated: 2026-09-28T10:53Z_
 | null_rate:parent_type | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:relationship_type | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:link_basis | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:match_confidence | null_rate | 1.0 |  | INFO | INFO |  |
+| null_rate:match_confidence | null_rate | 0.9998626744221071 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:origin_source_system | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1465,21 +1465,21 @@ _Generated: 2026-09-28T10:53Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 33958419.0 |  | INFO | INFO |  |
+| row_count | rows | 33963083.0 |  | INFO | INFO |  |
 
 <!-- END mastr:links__entity_link -->
 
 <!-- BEGIN mastr:shared__ref_energy_carrier -->
 ## ref_energy_carrier(_map)
 
-_Generated: 2026-09-28T10:47Z_
+_Generated: 2026-09-28T12:28Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| distinct:carrier_key | approx_distinct | 92.0 |  | INFO | INFO |  |
-| distinct:display_label | approx_distinct | 85.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 87.0 |  | INFO | INFO |  |
+| distinct:display_label | approx_distinct | 82.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_gold_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1513,7 +1513,7 @@ _Generated: 2026-09-28T10:47Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 88.0 |  | INFO | INFO |  |
+| row_count | rows | 84.0 |  | INFO | INFO |  |
 
 ### cardinality
 
@@ -1522,8 +1522,8 @@ _Generated: 2026-09-28T10:47Z_
 | distinct:origin_source_system | approx_distinct | 4.0 |  | INFO | INFO |  |
 | distinct:source_vocabulary | approx_distinct | 6.0 |  | INFO | INFO |  |
 | distinct:source_value | approx_distinct | 85.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 92.0 |  | INFO | INFO |  |
-| distinct:match_basis | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 87.0 |  | INFO | INFO |  |
+| distinct:match_basis | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_gold_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |

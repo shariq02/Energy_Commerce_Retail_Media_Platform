@@ -251,7 +251,7 @@ _Generated: 2026-09-28T10:46Z_
 <!-- BEGIN dwd:shared__series_coverage -->
 ## series_coverage / data_gap_period
 
-_Generated: 2026-09-28T10:48Z_
+_Generated: 2026-09-28T12:39Z_
 
 ### cardinality
 
@@ -259,8 +259,11 @@ _Generated: 2026-09-28T10:48Z_
 |---|---|---|---|---|---|---|
 | distinct:structure | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:place_key | approx_distinct | 28.0 |  | INFO | INFO |  |
-| distinct:measure | approx_distinct | 45.0 |  | INFO | INFO |  |
-| distinct:reconciliation_status | approx_distinct | 3.0 |  | INFO | INFO |  |
+| distinct:measure | approx_distinct | 48.0 |  | INFO | INFO |  |
+| distinct:reconciliation_status | approx_distinct | 4.0 |  | INFO | INFO |  |
+| distinct:observed_count | approx_distinct | 977.0 |  | INFO | INFO |  |
+| distinct:time_span_start | approx_distinct | 239.0 |  | INFO | INFO |  |
+| distinct:time_span_end | approx_distinct | 101.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -275,6 +278,9 @@ _Generated: 2026-09-28T10:48Z_
 | null_rate:place_key | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:measure | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:reconciliation_status | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:observed_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:time_span_start | null_rate | 0.005751258087706686 |  | INFO | INFO |  |
+| null_rate:time_span_end | null_rate | 0.005751258087706686 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
@@ -286,7 +292,7 @@ _Generated: 2026-09-28T10:48Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| value_counts:reconciliation_status | count |  |  | INFO | INFO | matched=1001, observed_only=185, reported_only=62 |
+| value_counts:reconciliation_status | count |  |  | INFO | INFO | matched=1001, observed_only=185, no_gap_signal=143, reported_only=62 |
 
 ### grain
 
@@ -294,19 +300,28 @@ _Generated: 2026-09-28T10:48Z_
 |---|---|---|---|---|---|---|
 | duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['structure', 'place_key', 'measure'] |
 
+### numeric
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| min:observed_count | min | 0.0 |  | INFO | INFO |  |
+| max:observed_count | max | 1341830.0 |  | INFO | INFO |  |
+| zero_count:observed_count | count | 8.0 |  | INFO | INFO |  |
+| negative_count:observed_count | count | 0.0 |  | INFO | INFO |  |
+
 ### schema
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
-| column_count | count | 10.0 |  | INFO | INFO |  |
+| column_count | count | 13.0 |  | INFO | INFO |  |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 1248.0 |  | INFO | INFO |  |
-| input_output_reconciliation | row_delta | 0.0 | 1248.0 | PASS | INFO | before=1248 after=1248 |
+| row_count | rows | 1391.0 |  | INFO | INFO |  |
+| input_output_reconciliation | row_delta | 0.0 | 1391.0 | PASS | INFO | before=1391 after=1391 |
 
 ### cardinality
 
