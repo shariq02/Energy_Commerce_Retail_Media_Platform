@@ -294,7 +294,7 @@ for eco in ECOSYSTEMS:
             .agg(
                 F.count("*").alias("n"),
                 F.count(t).alias("labelled"),
-                F.avg(F.col(t).cast("double")).alias("mean"),
+                F.expr(f"avg(try_cast(`{t}` AS DOUBLE))").alias("mean"),
             )
             .collect()
         )

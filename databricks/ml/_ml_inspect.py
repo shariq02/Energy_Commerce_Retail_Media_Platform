@@ -191,7 +191,7 @@ def inspect_ml_table(
         if target_col and target_col in cols:
             agg += [
                 F.count(target_col).alias("target_n"),
-                F.avg(F.col(target_col).cast("double")).alias("target_mean"),
+                F.expr(f"avg(try_cast(`{target_col}` AS DOUBLE))").alias("target_mean"),
             ]
         for r in df_after.groupBy(partition_col).agg(*agg).collect():
             d = r.asDict()
