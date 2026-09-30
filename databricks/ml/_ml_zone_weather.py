@@ -230,7 +230,12 @@ def zone_wind_daily(
 ) -> DataFrame:
     """Capacity-weighted, shear-adjusted zone wind per local date. Weights are
     renormalised over the stations that reported that day (zone level)."""
-    total = zw.groupBy("market_area_code", "month").agg(F.sum("w0").alias("w0_all"))
+    total = (
+        zw.groupBy("market_area_code", "place_key", "month")
+        .agg(F.max("w0").alias("w0"))
+        .groupBy("market_area_code", "month")
+        .agg(F.sum("w0").alias("w0_all"))
+    )
     j = sday.join(zw, ["place_key", "sensor_height_m", "month"], "inner")
     agg = j.groupBy("market_area_code", "local_date", "month").agg(
         F.sum(F.col("w1") * F.col("speed_mean")).alias("_num1"),

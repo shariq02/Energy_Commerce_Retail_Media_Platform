@@ -184,6 +184,13 @@ if all(r[3] is None for r in _results):
         "zone wind days with capacity factor": _zd.join(
             capacity_factor, ["market_area_code", "local_date"]
         ).count(),
+        "zone wind days with a wind value": _zd.filter(
+            F.col("wind_speed_cubed_adjusted_mean").isNotNull()
+        ).count(),
+        "coverage share min / median": _zd.agg(
+            F.min("covered_weight_share"),
+            F.percentile_approx("covered_weight_share", 0.5),
+        ).first(),
     }
     raise RuntimeError(f"no parameter set scored; row counts: {_counts}")
 
