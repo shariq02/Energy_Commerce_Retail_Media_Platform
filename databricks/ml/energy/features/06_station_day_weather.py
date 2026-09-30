@@ -28,6 +28,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Zone-weather library
+# MAGIC %run ../../_ml_zone_weather
+
+# COMMAND ----------
+
 # DBTITLE 1,Configuration
 ECO = "energy"
 SOURCE = "dwd"
