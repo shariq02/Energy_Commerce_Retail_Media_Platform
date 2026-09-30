@@ -64,6 +64,7 @@ rid = ml_run_id()
 weather = read_gold("weather_observation", source=SOURCE).filter(
     (F.col("origin_source_system") == "dwd")
     & (F.col("interval_seconds") == 3600)
+    & (F.col("interval_reference") == "clock")
     & F.col("local_date").between(TRAIN_START, TRAIN_END)
 )
 

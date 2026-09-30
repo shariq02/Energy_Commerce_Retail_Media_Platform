@@ -67,7 +67,8 @@ SELECT 'weather_imputation' AS dataset_id,
        visibility__visibility_m AS visibility,
        soil_temperature__soil_temperature_5cm_degc AS soil_temperature
 FROM {CATALOG}.energy_gold.weather_observation
-WHERE origin_source_system = 'dwd' AND interval_seconds = 3600 AND local_date >= DATE'2018-10-01'
+WHERE origin_source_system = 'dwd' AND interval_seconds = 3600 AND interval_reference = 'clock'
+  AND local_date >= DATE'2018-10-01'
 """,
     TABLE,
     ecosystem=ECO,

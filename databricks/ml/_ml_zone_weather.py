@@ -94,6 +94,7 @@ def station_day_wind(
     hourly = weather.filter(
         (F.col("origin_source_system") == "dwd")
         & (F.col("interval_seconds") == 3600)
+        & (F.col("interval_reference") == "clock")
         & F.col("local_date").between(date_from, date_to)
     ).select(
         F.col("location_key").alias("place_key"),
