@@ -53,10 +53,10 @@ print("normalised control zone values:", sorted(_present))
 write_ml_view(
     """
 SELECT * FROM VALUES
-  ('50hertz', 'fifty_hertz', '50Hertz'),
-  ('amprion', 'amprion', 'Amprion'),
-  ('tennet', 'tennet_de', 'TenneT'),
-  ('transnetbw', 'transnetbw', 'TransnetBW')
+  ('1000001', 'fifty_hertz', '50Hertz'),
+  ('1000010', 'amprion', 'Amprion'),
+  ('1001564', 'tennet_de', 'TenneT'),
+  ('1001572', 'transnetbw', 'TransnetBW')
 AS t(control_zone_key, market_area_code, control_zone_name)
 """,
     TABLE,

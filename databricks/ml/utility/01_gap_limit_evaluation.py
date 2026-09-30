@@ -36,9 +36,7 @@ TRAIN_START, TRAIN_END = SPLIT_CALENDARS["energy_daily"]["train"]
 MASK_SHARE = 10  # one block in ten is masked
 
 # variable -> (Gold column expression, circular)
-_WIND = (
-    "coalesce(filter(wind__readings, r -> r.statistic = 'mean')[0], wind__readings[0])"
-)
+_WIND = "coalesce(try_element_at(filter(wind__readings, r -> r.statistic = 'mean'), 1), try_element_at(wind__readings, 1))"
 HOURLY_VARIABLES = {
     "air_temperature": ("temperature__air_temperature_degc", False),
     "dew_point_temperature": ("temperature__dew_point_temperature_degc", False),

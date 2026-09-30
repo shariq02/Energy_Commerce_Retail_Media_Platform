@@ -31,8 +31,8 @@ MOUNTAIN_STATION_PATTERN = "(?i)zugspitze|feldberg|hohenpei"
 COASTAL_STATION_PATTERN = "(?i)list|norderney|kiel|warnem"
 WIND_CATEGORY_PATTERN = "(?i)windgeschwindigkeit|wind_?speed"
 WIND_SPEED_EXPR = (
-    "coalesce(filter(wind__readings, r -> r.statistic = 'mean')[0], "
-    "wind__readings[0]).wind_speed_m_per_s"
+    "coalesce(try_element_at(filter(wind__readings, r -> r.statistic = 'mean'), 1), "
+    "try_element_at(wind__readings, 1)).wind_speed_m_per_s"
 )
 MIN_STATION_HOURS = 18
 EARTH_RADIUS_KM = 6371.0
