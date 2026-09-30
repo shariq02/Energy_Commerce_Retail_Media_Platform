@@ -152,11 +152,6 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     needs: lint
-    # PAUSED (non-blocking): 5 generated JSON schemas
-    # (src/schemas/_generate_jsonschema.py output for dwd/smard/
-    # power_plant_list/redispatch/mastr) are not committed, which still fails
-    # collection. Re-enable (remove continue-on-error) once they are.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -168,6 +163,10 @@ jobs:
 
       - name: Install dependencies
         run: python -m pip install -e .[dev]
+
+      # Generated schemas are gitignored (derived from the YAML contracts).
+      - name: Generate JSON schemas
+        run: python src/schemas/_generate_jsonschema.py
 
       - name: Run unit tests
         env:
