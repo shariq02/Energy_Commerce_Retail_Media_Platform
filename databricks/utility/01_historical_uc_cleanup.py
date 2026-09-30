@@ -7,7 +7,9 @@
 # MAGIC # HISTORICAL UNITY CATALOG CLEANUP -- iPinYou / Criteo Attribution / KDD Cup 2012
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** inspect, then optionally delete, the Unity Catalog Bronze objects

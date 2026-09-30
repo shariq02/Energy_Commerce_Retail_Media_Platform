@@ -1,0 +1,217 @@
+# Source-to-canonical mapping -- power plant list (BNetzA Kraftwerksliste)
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: September 2026
+#
+# Purpose: map the acquired BNetzA power plant list schema (see
+# contracts/power_plant_list.yml) to the canonical model, and define the English
+# business meaning for every German / coded field. Design only -- no transform
+# code here.
+
+source: power_plant_list
+source_system: power_plant_list
+ecosystem: energy
+profiling_evidence: src/schemas/profiling/power_plant_list.md
+contract: src/schemas/contracts/power_plant_list.yml
+
+targets:
+
+  - canonical_dimension: dim_power_plant
+    from_tables: [power_plant_list]
+    canonical_grain: [power_plant_key]
+    shape: >
+      one row per reportable plant / block. This is the large-plant view of the
+      generation fleet; the complete register is MaStR. dim_power_plant is a
+      conformed generation-asset dimension shared with MaStR -- see cross_source.
+    field_map:
+      - source: EinheitMastrNummer
+        canonical: "dim_power_plant.mastr_unit_id (natural cross-reference; ~83% populated, not unique)"
+        transform: "keep as-is; the reconciliation key to MaStR, NOT an identity join"
+      - source: "Anzeigename / Anlagenbetreiber"
+        canonical: "dim_power_plant.plant_name / operator_name"
+      - source: "Postleitzahl / Ort / Bundesland / Land"
+        canonical: "dim_geography (German spine via AGS/ARS for Land=Deutschland; border plants keep their country)"
+      - source: "Jahr_Inbetriebnahme / Jahr_Stilllegung"
+        canonical: "dim_power_plant.commissioning_year / decommissioning_year (integer years)"
+      - source: Kraftwerksstatus
+        canonical: "dim_power_plant.operating_status (+ operating_status_label)"
+        transform: "carry the German status; attach the English label (coded_value_labels.kraftwerksstatus); keep the legal-basis edition in mind"
+      - source: "Energietraeger / Hauptbrennstoff"
+        canonical: "dim_power_plant.energy_carrier / main_fuel (+ *_label)"
+        transform: "reconcile against mastr_katalogwerte carrier categories at Silver; attach English label"
+      - source: "Bruttoleistung_MW / Nettonennleistung_MW"
+        canonical: "dim_power_plant.capacity_gross_mw / capacity_net_mw"
+        transform: "German-comma decimal -> double; unit MW (confirm MW vs kW against the BNetzA source layout)"
+      - source: "Technologie_Stromerzeugung / Volleinspeisung_Teileinspeisung / Spannungsebene / Waermeauskopplung_KWK / Erneuerbarer_Energietraeger"
+        canonical: "dim_power_plant attributes (+ English labels)"
+      - source: "Bestandteil_Grenzkraftwerk / Grenzkraftwerk_Nettonennleistung_MW"
+        canonical: "dim_power_plant.is_border_plant / border_plant_net_capacity_mw"
+      - source: Datensatztyp
+        canonical: "dim_power_plant.record_type (compilation attribute -- Einzelanlage / aggregated small-plant / decommissioned); NOT a physical feature"
+    provenance:
+      source_system: power_plant_list
+      source_record_id: "concat_ws('|', coalesce(EinheitMastrNummer,'NA'), Anzeigename, Jahr_Inbetriebnahme)"
+
+  - canonical_fact: fact_capacity_retirement_forecast
+    from_tables: [power_plant_capacity_additions]
+    canonical_grain: [energy_carrier, forecast_year]
+    shape: >
+      unpivot the year columns to long form -- one row per (carrier, year) with
+      the expected retiring conventional capacity in MW. A Silver planning /
+      forecast fact, revised each edition, NEVER merged into current-state plant
+      attributes.
+    field_map:
+      - source: energietraeger
+        canonical: "energy_carrier"
+        transform: >
+          keep ONLY rows resolving to a real carrier (Erdgas, Braunkohle,
+          Steinkohle, Batteriespeicher, Pumpspeicher, Abfall, ...); the
+          'Insgesamt' row -> a documented total; drop footnote / section-header
+          rows (contract quality_rules.capacity_additions_footnote_rows)
+      - source: "2026 / 2027 / 2028 / 2029"
+        canonical: "unpivot -> (forecast_year, expected_retiring_capacity_mw)"
+        transform: "German-comma decimal -> double; MW"
+      - source: "2026_2029_total"
+        canonical: "retained as a validation total, not a separate fact row"
+    provenance:
+      source_system: power_plant_list
+      source_record_id: "concat_ws('|', 'capacity_additions', energietraeger, <year>)"
+
+# ---------------------------------------------------------------------------
+# Business glossary -- German field / coded value -> English business name
+# German source values retained on every row for traceability.
+# ---------------------------------------------------------------------------
+
+business_names:
+  fields:
+    Datensatztyp:                        record_type
+    EinheitMastrNummer:                  mastr_unit_id
+    Anlagenbetreiber:                    operator_name
+    Anzeigename:                         plant_name
+    Postleitzahl:                        postcode
+    Ort:                                 municipality
+    Strasse:                             street
+    Hausnummer:                          house_number
+    Bundesland:                          federal_state
+    Land:                                country
+    Jahr_Inbetriebnahme:                 commissioning_year
+    Jahr_Stilllegung:                    decommissioning_year
+    Kraftwerksstatus:                    operating_status
+    Energietraeger:                      energy_carrier
+    Hauptbrennstoff:                     main_fuel
+    Waermeauskopplung_KWK:               is_combined_heat_and_power
+    Erneuerbarer_Energietraeger:         is_renewable_carrier
+    Bruttoleistung_MW:                   capacity_gross_mw
+    Nettonennleistung_MW:                capacity_net_mw
+    Technologie_Stromerzeugung:          generation_technology
+    Volleinspeisung_Teileinspeisung:     feed_in_type
+    Spannungsebene:                      grid_voltage_level
+    Anschlussnetzbetreiber:              connecting_grid_operator
+    Bestandteil_Grenzkraftwerk:          is_border_plant
+    Grenzkraftwerk_Nettonennleistung_MW: border_plant_net_capacity_mw
+    energietraeger:                      energy_carrier   # power_plant_capacity_additions
+    "2026_2029_total":                   retiring_capacity_total_2026_2029_mw
+
+coded_value_labels:
+
+  datensatztyp:
+    scope: "power_plant_list.Datensatztyp -- BNetzA record classification"
+    map:
+      Einzelanlage:            single_plant
+      "stillgelegte Anlagen":  decommissioned_plants
+      Kleinanlagen_aggregiert: small_plants_aggregated
+
+  kraftwerksstatus:
+    scope: "power_plant_list.Kraftwerksstatus -- operating / shutdown / reserve status (legal-basis specific)"
+    map:
+      InBetrieb:                                                  in_operation
+      "endgültig stillgelegt ohne § 13b EnWG oder KVBG":          permanently_decommissioned_no_legal_basis
+      "vorläufig Stillgelegt":                                    provisionally_decommissioned
+      "endgültig stillgelegt nach § 13b EnWG":                    permanently_decommissioned_para_13b_enwg
+      "endgültig stillgelegt nach KVBG":                          permanently_decommissioned_kvbg_coal_exit
+      "Netzreserve aufgrund § 13b EnWG":                          grid_reserve_para_13b_enwg
+      "Kapazitätsreserve aufgrund von § 13e EnWG":                capacity_reserve_para_13e_enwg
+      "besonderes netztechnisches Betriebsmittel":                special_grid_equipment
+      "Netzreserve aufgrund von KVBG":                            grid_reserve_kvbg
+      "zeitl. gestreckte Stilllegung aufgrund § 50 KVBG":         time_deferred_decommissioning_para_50_kvbg
+
+  energietraeger:
+    scope: "power_plant_list.Energietraeger -- primary energy carrier (reconcile against mastr_katalogwerte at Silver)"
+    map:
+      Erdgas:                                        natural_gas
+      Wasser:                                        hydropower
+      Batteriespeicher:                              battery_storage
+      Biomasse:                                      biomass
+      Mineraloelprodukte:                            mineral_oil_products
+      Steinkohle:                                    hard_coal
+      Waerme:                                        heat
+      Abfall:                                        waste
+      Pumpspeicher:                                  pumped_storage
+      Braunkohle:                                    lignite
+      "Sonstige Energietraeger (nicht erneuerbar)":  other_non_renewable
+      SolareStrahlungsenergie:                       solar_radiation
+      "Wind (onshore)":                              wind_onshore
+      "Wind (offshore)":                             wind_offshore
+      Grubengas:                                     mine_gas
+      Wasserstoff:                                   hydrogen
+      Geothermie:                                    geothermal
+      Kernenergie:                                   nuclear
+
+  ja_nein_flags:
+    scope: "Waermeauskopplung_KWK / Erneuerbarer_Energietraeger / Bestandteil_Grenzkraftwerk"
+    map:
+      Ja:   true
+      Nein: false
+      None: null
+
+  feed_in_type:
+    scope: "power_plant_list.Volleinspeisung_Teileinspeisung"
+    map:
+      Volleinspeisung:                full_feed_in
+      TeileinspeisungEigenverbrauch:  partial_feed_in_self_consumption
+
+  grid_voltage_level:
+    scope: "power_plant_list.Spannungsebene (some rows list several comma-joined levels)"
+    map:
+      Niederspannung:               low_voltage
+      Mittelspannung:               medium_voltage
+      Hochspannung:                 high_voltage
+      Hoechstspannung:              extra_high_voltage
+      UmspannungZurNiederspannung:  transformation_to_low_voltage
+      UmspannungZurMittelspannung:  transformation_to_medium_voltage
+      UmspannungZurHochspannung:    transformation_to_high_voltage
+
+dropped_columns: []          # every power_plant_list column carries information
+
+localisation:
+  required: true
+  approach: german_native_with_english_business_layer
+  geography: >
+    German plants -> conformed German geography spine (AGS/ARS) via Postleitzahl /
+    Ort / Bundesland; border plants (Land != Deutschland) keep their country and
+    are not forced onto the German spine.
+  language: >
+    all headers and coded values are German -- Englishised via business_names and
+    coded_value_labels; the German source value is retained on every row.
+  units: "capacity in MW (per column in business_names); confirm MW vs kW against the BNetzA source layout at Silver"
+  currency: not_applicable
+  never: "the list is never presented as the complete German fleet; it is the >10 MW register plus aggregated small-plant rows"
+
+cross_source:
+  mastr:
+    relationship: reference_reconciliation
+    rule: >
+      power_plant_list and MaStR both describe generation assets. They share the
+      MaStR unit identifier (EinheitMastrNummer here <-> EinheitMastrNummer in
+      mastr_einheiten_*) as an AUTHORITATIVE shared identifier, so a keyed join
+      IS permitted -- but it is a SUBSET join (large plants only, ~83% of rows
+      carry an id, id not unique here), resolved with a LEFT join and an
+      explicit unmatched flag. It is NOT an assumed 1:1 identity join, and the
+      aggregated small-plant rows and border plants have no MaStR link at all.
+      Belonging to the same Energy ecosystem does not by itself justify a join.
+  smard:
+    relationship: conformed_dimension_only
+    rule: >
+      SMARD carries no plant identifier -- power_plant_list connects to SMARD
+      generation series only through conformed dim_date / dim_geography /
+      dim_market and the energy-carrier vocabulary, never by an identity join.

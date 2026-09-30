@@ -4,8 +4,9 @@
 # Date: August 2026
 #
 # Purpose: formal contract for the Honda Research Institute smart-building
-# dataset -- 6 energy tables (electricity / heating / cooling, each a P and a W
-# variant) + 1 weather table. Every *_observed value is traceable to
+# dataset -- 6 logical energy datasets (electricity / heating / cooling, each a P
+# and a W variant), stored in 3 Bronze tables (one per metric, with a
+# measurement_type column), + 1 weather table. Every *_observed value is traceable to
 # src/schemas/profiling/honda_iot.md. Authored; generated/honda_iot_*.schema.json
 # is produced by src/schemas/_generate_jsonschema.py -- do not edit those by hand.
 
@@ -18,6 +19,13 @@ description: >
   1min / 15min / 1h resolution. Static one-time acquisition (reduced dataset).
 profiling_evidence: src/schemas/profiling/honda_iot.md
 bronze_physical_types: string
+bronze_layout: >
+  The P and W datasets of a metric share one Bronze table per metric
+  (honda_iot_electricity, honda_iot_heating, honda_iot_cooling), told apart by a
+  leading measurement_type column ('p' / 'w') added at load. Each table entry
+  below is one logical dataset; its bronze: block names the physical table and
+  the measurement_type value. measurement_type is not one of the source columns
+  listed here. honda_iot_weather is its own Bronze table.
 
 acquisition:
   method: manual_download
@@ -34,7 +42,8 @@ conventions:
     Same underlying series at 3 physical resolutions -- a real resolution, kept
     in the grain; frequencies are never blended.
   p_vs_w_note: >
-    '_p' tables and '_w' tables of a metric are schema-identical and join 1:1 on
+    The '_p' and '_w' datasets of a metric are schema-identical, are stored in the
+    same Bronze table (measurement_type = 'p' / 'w') and join 1:1 on
     (frequency, datetime_utc). Their meaning (instantaneous power vs cumulative
     energy) is not documented in the EDA; treated as power vs energy respectively.
   value_missing_note: >
@@ -44,6 +53,7 @@ conventions:
 tables:
 
   - name: honda_iot_electricity_p
+    bronze: { table: honda_iot_electricity, discriminator: measurement_type, value: p }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417959
     columns:
@@ -54,6 +64,7 @@ tables:
       - { name: CHP,          type: double, required: true, nullable: true, notes: "mostly negative; range -282562..27705" }
 
   - name: honda_iot_electricity_w
+    bronze: { table: honda_iot_electricity, discriminator: measurement_type, value: w }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417957
     columns:
@@ -64,6 +75,7 @@ tables:
       - { name: CHP,          type: double, required: true, nullable: true, notes: "range -3390184..0" }
 
   - name: honda_iot_heating_p
+    bronze: { table: honda_iot_heating, discriminator: measurement_type, value: p }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417959
     columns:
@@ -74,6 +86,7 @@ tables:
       - { name: CHP_elec,     type: double, required: true, nullable: true, notes: "mostly negative; identical stats to electricity CHP" }
 
   - name: honda_iot_heating_w
+    bronze: { table: honda_iot_heating, discriminator: measurement_type, value: w }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417947
     columns:
@@ -84,6 +97,7 @@ tables:
       - { name: CHP_elec,     type: double, required: true, nullable: true, notes: "range -3390184..0" }
 
   - name: honda_iot_cooling_p
+    bronze: { table: honda_iot_cooling, discriminator: measurement_type, value: p }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417960
     columns:
@@ -93,6 +107,7 @@ tables:
       - { name: cool_elec,    type: double, required: true, nullable: true, notes: "range 0..332025; 8430 5-sigma" }
 
   - name: honda_iot_cooling_w
+    bronze: { table: honda_iot_cooling, discriminator: measurement_type, value: w }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417895
     columns:

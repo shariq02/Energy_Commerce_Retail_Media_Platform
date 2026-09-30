@@ -1,24 +1,20 @@
 # ECRMAP — Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 
-A multi-ecosystem data and analytics platform built on GCP, Databricks, and BigQuery. ECRMAP acquires heterogeneous real-world data across independent ecosystems, preserves source meaning and provenance at every stage, and builds governed analytical data products that support BI, ML, and AI/GenAI as downstream consumers.
+A multi-ecosystem data and analytics platform built on GCP and Databricks (BigQuery is used only as the acquisition interface for Google datasets). ECRMAP acquires heterogeneous real-world data across independent ecosystems, preserves source meaning and provenance at every stage, and builds governed analytical data products that support BI, ML, and the platform's own GenAI capabilities as downstream consumers.
+
+**GenAI is a first-class part of ECRMAP from the beginning.** It applies across the whole project — development, engineering, analysis, documentation, research, reasoning and other project work — from the first phase (GenAI-assisted engineering). The later AI phases are where ECRMAP builds its own GenAI capabilities into the platform: RAG, agents, MCP tooling, evaluation and related capabilities. The later phases are not where GenAI starts.
 
 ## Ecosystems
 
-Energy, Commerce / Digital Behaviour, Mobility, Healthcare, and Agriculture — parallel peers, not a fixed or ranked list. Each ecosystem defines its own sources, domains, models, and use cases; none is "future" relative to another. Energy and Commerce / Digital Behaviour currently have acquired, profiled data; Mobility, Healthcare, and Agriculture are validated future directions.
+Energy, Commerce, Mobility, Healthcare, and Agriculture — five committed peer ecosystems, not a fixed or ranked list. Each ecosystem defines its own sources, domains, models, and use cases. The **current build is Energy + Commerce** (Commerce is retail-only: GA4 and REES46); Mobility, Healthcare, and Agriculture are committed ecosystems whose source build-out is a later cycle.
 
 ## Tech Stack
 
-GCP | BigQuery | Databricks | PySpark | Redpanda | PostgreSQL | Debezium | Dagster | Terraform | FastAPI | Grafana | Power BI | GitHub Actions
+Databricks | PySpark | Delta Lake / Unity Catalog | BigQuery (Google-source acquisition only) | GCP | Terraform | PostgreSQL (BI serving only) | FastAPI (API / Application Serving Platform) | Grafana | Power BI | GitHub Actions
 
-The analytical-modelling layer above BigQuery (staging → intermediate → marts → semantic) is a future detailed-design decision — no specific tool is assumed.
+Databricks owns Bronze → Silver → Gold → Analytical Processing and the semantic layer. Execution is a direct notebook/script sequence — no orchestration platform. Governance is cross-cutting, not a separate layer.
 
-## Status
-
-Environment, infrastructure, first-wave source acquisition/profiling/contracts, the operational PostgreSQL database, CDC/streaming, and the multi-ecosystem platform architecture are complete. Live build status and the full plan are tracked in the design documentation.
-
-## Documentation
-
-Full design documentation lives in the `docs/` tree (gitignored). Start with its top-level index.
+The repository and Unity Catalog names still contain "Retail Media" for historical reasons; Retail Media / advertising is not a target domain.
 
 ---
 

@@ -3,18 +3,6 @@ data "google_service_account" "ecrmap_admin" {
   account_id = var.service_account_id
 }
 
-resource "google_storage_bucket_iam_member" "raw_object_admin" {
-  bucket = var.raw_bucket_name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${data.google_service_account.ecrmap_admin.email}"
-}
-
-resource "google_storage_bucket_iam_member" "staged_object_admin" {
-  bucket = var.staged_bucket_name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${data.google_service_account.ecrmap_admin.email}"
-}
-
 resource "google_bigquery_dataset_iam_member" "dataset_editor" {
   for_each = var.bigquery_dataset_ids
 

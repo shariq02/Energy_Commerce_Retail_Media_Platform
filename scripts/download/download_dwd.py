@@ -3,8 +3,8 @@
 # Author: Sharique Mohammad
 # Date: August 2026
 #
-# Purpose: download German weather station data (temperature,
-# precipitation, wind, and related categories) from the DWD open-data server.
+# Purpose: download German weather station data (temperature, precipitation,
+# wind, and related categories) from the DWD open-data server.
 
 import io
 import re
@@ -24,11 +24,10 @@ logger = get_logger(__name__)
 BASE_URL = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly"
 REQUEST_TIMEOUT = 60
 
-# Category -> DWD parameter abbreviation for the curated fields
-# (temperature, precipitation, humidity, pressure, wind, sunshine,
-# cloud conditions). Solar radiation is DWD's "solar" category, which uses a
-# different directory layout (no recent/historical split, "_row" suffix instead
-# of "_akt") and is out of scope for this initial script.
+# Category -> DWD parameter abbreviation. Standard categories share the
+# {category}/{recent,historical}/stundenwerte_{param}_{station}_{suffix}.zip
+# layout. "solar" is handled separately below: flat directory, no
+# recent/historical split, "_row" filename suffix instead of "_akt"/"_hist".
 CATEGORIES = {
     "air_temperature": "TU",
     "precipitation": "RR",
@@ -37,21 +36,56 @@ CATEGORIES = {
     "wind": "FF",
     "sun": "SD",
     "cloudiness": "N",
+    "dew_point": "TD",
+    "soil_temperature": "EB",
+    "visibility": "VV",
+    "cloud_type": "CS",
+    "wind_synop": "F",
+    "extreme_wind": "FX",
+    "weather_phenomena": "WW",
 }
+SOLAR_PARAM = "ST"
 
-# Curated 8-station list. Matched against DWD's station name field
-# (substring, case-insensitive,
-# diacritics stripped via _normalize() since DWD's own file uses German
-# umlauts that this codebase keeps out of source text).
+# Germany-wide stratified network (population centres, climate regimes,
+# energy/agricultural relevance, historical continuity) -- see groupings
+# below. Values matched as substrings against DWD's station-name field after
+# _normalize(); compound/trailing-space forms disambiguate stations whose
+# names would otherwise collide (e.g. "Nurnberg " vs "Nurnberg-Netzstall").
 STATIONS = {
-    "berlin": "Berlin",
-    "hamburg": "Hamburg",
-    "munich": "Munchen",
-    "frankfurt_am_main": "Frankfurt",
-    "cologne": "Koln",
-    "leipzig": "Leipzig",
-    "rostock_warnemuende": "Rostock-Warnemuende",
+    # Population / economic centres
+    "berlin": "Berlin-Tempelhof",
+    "hamburg": "Hamburg-Fuhlsbuttel",
+    "munich": "Munchen-Flughafen",
+    "cologne_bonn": "Koln/Bonn",
+    "frankfurt_am_main": "Frankfurt/Main",
+    "stuttgart": "Stuttgart",
+    "essen": "Essen-Bredeney",
+    "leipzig": "Leipzig-Holzhausen",
+    "dresden": "Dresden-Klotzsche",
+    "nuremberg": "Nurnberg ",
+    "hannover": "Hannover",
+    "bremen": "Bremen",
+    # State capitals / regional anchors not already covered above
+    "potsdam": "Potsdam",
+    "magdeburg": "Magdeburg",
+    "erfurt": "Erfurt-Weimar",
+    "trier": "Trier-Petrisberg",
+    "saarbruecken": "Saarbrucken-Ensheim",
+    "kiel": "Kiel-Holtenau",
+    # Maritime / coastal wind-energy regimes
+    "rostock_warnemuende": "Rostock-Warnemunde",
+    "norderney": "Norderney",
+    "sylt": "List auf Sylt",
+    # Alpine / highland climate extremes
     "garmisch_partenkirchen": "Garmisch-Partenkirchen",
+    "zugspitze": "Zugspitze",
+    "hohenpeissenberg": "Hohenpeienberg",
+    "feldberg_schwarzwald": "Feldberg/Schwarzwald",
+    # Energy (lignite) and continental-climate regions
+    "cottbus": "Cottbus",
+    "goerlitz": "Gorlitz",
+    # Agricultural regions not already covered above
+    "braunschweig": "Braunschweig",
 }
 
 OUTPUT_DIR = DATA_RAW_DIR / "dwd"
@@ -108,32 +142,84 @@ def resolve_station_ids() -> dict[str, str]:
     return resolved
 
 
-def download_station_category(
+def _extract_zip(content: bytes, dest_dir: Path) -> None:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        archive.extractall(dest_dir)
+
+
+def download_recent(
     station_key: str, station_id: str, category: str, param: str
 ) -> None:
-    dest_dir = OUTPUT_DIR / station_key / category
+    dest_dir = OUTPUT_DIR / station_key / category / "recent"
     if dest_dir.exists() and any(dest_dir.iterdir()):
-        logger.info(
-            f"DWD {station_key}/{category} already downloaded, skipping: {dest_dir}"
-        )
+        logger.info(f"DWD {station_key}/{category}/recent already downloaded, skipping")
         return
 
     url = f"{BASE_URL}/{category}/recent/stundenwerte_{param}_{station_id}_akt.zip"
     response = requests.get(url, timeout=REQUEST_TIMEOUT)
     if response.status_code == 404:
         logger.warning(
-            f"No {category} data available for station {station_key} ({station_id}): {url}"
+            f"No {category}/recent data for station {station_key} ({station_id}): {url}"
         )
         return
     response.raise_for_status()
-
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-        archive.extractall(dest_dir)
-
+    _extract_zip(response.content, dest_dir)
     logger.info(
-        f"Downloaded DWD {category} for {station_key} ({station_id}) -> {dest_dir}"
+        f"Downloaded DWD {category}/recent for {station_key} ({station_id}) -> {dest_dir}"
     )
+
+
+def download_historical(
+    station_key: str, station_id: str, category: str, param: str
+) -> None:
+    dest_dir = OUTPUT_DIR / station_key / category / "historical"
+    if dest_dir.exists() and any(dest_dir.iterdir()):
+        logger.info(
+            f"DWD {station_key}/{category}/historical already downloaded, skipping"
+        )
+        return
+
+    index_url = f"{BASE_URL}/{category}/historical/"
+    index_response = requests.get(index_url, timeout=REQUEST_TIMEOUT)
+    if index_response.status_code == 404:
+        logger.warning(f"No {category}/historical index: {index_url}")
+        return
+    index_response.raise_for_status()
+
+    match = re.search(
+        rf"stundenwerte_{param}_{station_id}_\d{{8}}_\d{{8}}_hist\.zip",
+        index_response.text,
+    )
+    if not match:
+        logger.warning(
+            f"No {category}/historical file for station {station_key} ({station_id})"
+        )
+        return
+
+    filename = match.group(0)
+    response = requests.get(f"{index_url}{filename}", timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    _extract_zip(response.content, dest_dir)
+    logger.info(
+        f"Downloaded DWD {category}/historical for {station_key} ({station_id}) -> {dest_dir}"
+    )
+
+
+def download_solar(station_key: str, station_id: str) -> None:
+    dest_dir = OUTPUT_DIR / station_key / "solar"
+    if dest_dir.exists() and any(dest_dir.iterdir()):
+        logger.info(f"DWD {station_key}/solar already downloaded, skipping")
+        return
+
+    url = f"{BASE_URL}/solar/stundenwerte_{SOLAR_PARAM}_{station_id}_row.zip"
+    response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    if response.status_code == 404:
+        logger.warning(f"No solar data for station {station_key} ({station_id}): {url}")
+        return
+    response.raise_for_status()
+    _extract_zip(response.content, dest_dir)
+    logger.info(f"Downloaded DWD solar for {station_key} ({station_id}) -> {dest_dir}")
 
 
 def main() -> None:
@@ -142,7 +228,9 @@ def main() -> None:
     station_ids = resolve_station_ids()
     for station_key, station_id in station_ids.items():
         for category, param in CATEGORIES.items():
-            download_station_category(station_key, station_id, category, param)
+            download_recent(station_key, station_id, category, param)
+            download_historical(station_key, station_id, category, param)
+        download_solar(station_key, station_id)
 
     logger.info("DWD download complete.")
 

@@ -7,15 +7,22 @@
 # MAGIC # CREATE UNITY CATALOG SCHEMAS AND VOLUMES
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Create and verify the Unity Catalog structure required
 # MAGIC for the project.
 # MAGIC
 # MAGIC This notebook creates structure only:
-# MAGIC - the 5 project schemas (`bronze`, `silver`, `gold`, `quality`, `eda`)
-# MAGIC - the 11 frozen Bronze upload-unit Volumes (staging -> Volume -> Bronze)
+# MAGIC - the project schemas (`bronze`, `energy_silver`, `energy_silver_reference`,
+# MAGIC   `commerce_silver`, `commerce_silver_reference`, `energy_gold`,
+# MAGIC   `shared_conformed`, `quality`, `eda`). Silver is split per the
+# MAGIC   100-table-per-schema quota and per ecosystem; domain separation stays
+# MAGIC   at folder level. `shared_conformed`'s tables are built by
+# MAGIC   `03_create_shared_conformed.py`.
+# MAGIC - the frozen Bronze upload-unit Volumes (staging -> Volume -> Bronze)
 # MAGIC - the 2 quality/control Delta tables (`pipeline_watermarks`, `quality_audit_log`)
 # MAGIC
 # MAGIC It does **not** create any Bronze business/data table. Bronze tables are
@@ -23,7 +30,7 @@
 # MAGIC these Volumes.
 # MAGIC
 # MAGIC Three counts are never the same number and none derives from another:
-# MAGIC the staging dataset count, the Volume upload-unit count (11, fixed
+# MAGIC the staging dataset count, the Volume upload-unit count (fixed
 # MAGIC below), and the Bronze table count.
 # MAGIC
 # MAGIC This notebook is safe to run repeatedly -- every statement uses
@@ -45,31 +52,38 @@ from pyspark.sql.utils import AnalysisException
 # MAGIC ## 2. Configuration
 # MAGIC
 # MAGIC `CATALOG` is the single Unity Catalog catalog for this project.
-# MAGIC `SCHEMAS` are the 5 schemas created below.
-# MAGIC `VOLUME_UNITS` are the 11 frozen Bronze upload units -- one Volume per
+# MAGIC `SCHEMAS` are the schemas created below.
+# MAGIC `VOLUME_UNITS` are the first-wave Bronze upload units -- one Volume per
 # MAGIC upload unit, never one Volume per physical chunk. Chunks are files
-# MAGIC stored inside their upload unit's Volume.
+# MAGIC stored inside their upload unit's Volume. The energy/weather deepening
+# MAGIC wave's Volumes are created by `02_create_energy_weather_deepening_volumes.py`;
+# MAGIC the Commerce wave's net-new Volume is created by
+# MAGIC `04_create_commerce_volumes.py`.
 
 # COMMAND ----------
 
 CATALOG = "energy_commerce_retail_media"
 
-SCHEMAS = ["bronze", "silver", "gold", "quality", "eda"]
+SCHEMAS = [
+    "bronze",
+    "energy_silver",
+    "energy_silver_reference",
+    "commerce_silver",
+    "commerce_silver_reference",
+    "energy_gold",
+    "shared_conformed",
+    "quality",
+    "eda",
+]
 
-# 11 Volume upload units, fixed by the frozen staging -> Volume -> Bronze
-# architecture. Grouped here by source for readability only -- the schema
-# each Volume lives under is `bronze` in every case.
+# First-wave Volume upload units, fixed by the frozen staging -> Volume ->
+# Bronze architecture. Grouped here by source for readability only -- the
+# schema each Volume lives under is `bronze` in every case.
 VOLUME_UNITS = [
     "dwd_analytical",
     "dwd_metadata",
     "smard_analytical",
     "honda_iot_analytical",
-    "kddcup2012_analytical",
-    "criteo_attribution_events",
-    "search_visibility_events",
-    "search_visibility_reference",
-    "ipinyou_analytical",
-    "ipinyou_reference",
     "rees46_events",
 ]
 

@@ -7,7 +7,9 @@
 # MAGIC # BRONZE DATA LOADING
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
+# MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
 # MAGIC **Purpose:** Load uploaded Unity Catalog Volume data into the
@@ -37,6 +39,14 @@ DWD_ANALYTICAL_DATASETS = [
     "pressure",
     "sun",
     "wind",
+    "dew_point",
+    "soil_temperature",
+    "visibility",
+    "cloud_type",
+    "wind_synop",
+    "extreme_wind",
+    "weather_phenomena",
+    "solar",
 ]
 
 DWD_METADATA_DATASETS = [
@@ -63,7 +73,7 @@ COLUMN_RENAME_MAP: dict[str, dict[str, str]] = {
     },
 }
 
-# (dataset_name, source_volume) for all 12 Bronze upload units.
+# (dataset_name, source_volume) for all 20 Bronze upload units.
 DWD_DATASETS = [(d, DWD_ANALYTICAL_VOLUME) for d in DWD_ANALYTICAL_DATASETS] + [
     (d, DWD_METADATA_VOLUME) for d in DWD_METADATA_DATASETS
 ]

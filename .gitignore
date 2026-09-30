@@ -1,5 +1,5 @@
 # ====================================================================
-# Energy Commerce & Retail Media Analytics Platform - .gitignore
+# ECRMAP - Ecosystem-Centric Real-World Multi-Domain Analytics Platform - .gitignore
 # ====================================================================
 
 # Python
@@ -10,6 +10,11 @@ __pycache__/
 .Python
 env/
 venv/
+*.egg-info/
+
+# uv -- not the project's package manager (pip + pyproject.toml/requirements.txt is);
+# this lockfile is a local byproduct if uv is ever run against the repo, not tracked
+uv.lock
 
 # Jupyter
 .ipynb_checkpoints/
@@ -17,6 +22,9 @@ venv/
 # Project documentation - stays local/private until a sanitized
 # public version is prepared near project completion
 docs/
+
+# Retired code (superseded implementations) - kept locally only
+archive/
 
 # Local-only acquisition notes - not tracked
 scripts/download/README.md
@@ -26,7 +34,6 @@ data/raw/
 data/samples/
 data/staging/
 data/processed/
-data/cdc/
 *.csv
 *.parquet
 *.json.gz
@@ -68,23 +75,6 @@ override.tf.json
 .databricks/
 databricks/.databricks/
 
-# Redpanda
-redpanda/data/
-redpanda/logs/
-cdc/connect/offsets/
-cdc/connect/connect.pid
-cdc/plugins/
-
-# dbt
-dbt/target/
-dbt/dbt_packages/
-dbt/logs/
-dbt/.user.yml
-
-# Dagster
-.dagster/
-dagster_home/
-
 # ChromaDB / vector store
 ai/vector_store/data/
 chroma_db/
@@ -108,6 +98,8 @@ htmlcov/
 # Local developer utilities (not part of the pipeline)
 scripts/utilities/lint.py
 scripts/utilities/clean_cache.py
+scripts/utilities/run_energy_weather_deepening_acquisition.py
+scripts/utilities/verify_energy_weather_deepening_acquisition.py
 
 # VS Code
 .vscode/
@@ -117,3 +109,7 @@ scripts/utilities/clean_cache.py
 .DS_Store
 Thumbs.db
 desktop.ini
+
+
+#Graphify
+graphify-out/

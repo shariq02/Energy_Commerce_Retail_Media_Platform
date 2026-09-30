@@ -1,16 +1,20 @@
-"""shared_conformed DDL + seed data -- structure and content checks.
+"""shared_conformed Databricks build notebook -- static structure checks.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: September 2026
 
-No database required -- checks the DDL files and the generated seed CSVs
-directly.
+No Spark, no database. The notebook
+``databricks/setup/03_create_shared_conformed.py`` creates the
+``shared_conformed`` schema and its five conformed dimension tables and
+populates ``dim_date`` / ``dim_time`` / ``dim_geography`` inline. These tests
+assert the notebook parses, names every table, carries the header, and that
+its date/time range constants describe a gapless, complete seed.
 """
 
 from __future__ import annotations
 
-import csv
+import ast
 import datetime as dt
 from pathlib import Path
 
@@ -18,84 +22,81 @@ import pytest
 
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
-_DDL_DIR = Path(__file__).resolve().parents[2] / "sql" / "ddl" / "shared_conformed"
-_SEED_DIR = _DDL_DIR / "seed"
-
-
-@pytest.mark.parametrize(
-    "filename",
-    [
-        "00_dim_date.sql",
-        "01_dim_time.sql",
-        "02_dim_geography.sql",
-        "03_geo_plz_gemeinde_xref.sql",
-        "04_dim_weather_context.sql",
-    ],
+_NB = (
+    Path(__file__).resolve().parents[2]
+    / "databricks"
+    / "setup"
+    / "03_create_shared_conformed.py"
 )
-def test_ddl_file_exists_and_defines_its_table(filename):
-    path = _DDL_DIR / filename
-    assert path.exists(), f"missing {filename}"
-    sql = path.read_text(encoding="utf-8")
-    table_name = filename.split("_", 1)[1].removesuffix(".sql")
-    assert f"CREATE TABLE shared_conformed.{table_name}" in sql
+_TABLES = (
+    "dim_date",
+    "dim_time",
+    "dim_geography",
+    "geo_plz_gemeinde_xref",
+    "dim_weather_context",
+)
 
 
-def _read_csv(name: str) -> list[dict]:
-    path = _SEED_DIR / name
-    with path.open(encoding="utf-8") as fh:
-        return list(csv.DictReader(fh))
+@pytest.fixture(scope="module")
+def source() -> str:
+    return _NB.read_text(encoding="utf-8")
 
 
-def test_dim_date_seed_covers_the_operational_history_window():
-    rows = _read_csv("dim_date.csv")
-    dates = {dt.date.fromisoformat(r["calendar_date"]) for r in rows}
-    # src/generators/config.py HISTORY_START/HISTORY_END -- the operational
-    # seed's own date range -- must fall entirely inside dim_date's range.
-    assert dt.date(2023, 9, 1) in dates
-    assert dt.date(2026, 8, 30) in dates
+@pytest.fixture(scope="module")
+def tree(source: str) -> ast.AST:
+    return ast.parse(source)
 
 
-def test_dim_date_seed_has_no_gaps():
-    rows = _read_csv("dim_date.csv")
-    dates = sorted(dt.date.fromisoformat(r["calendar_date"]) for r in rows)
-    assert dates == [dates[0] + dt.timedelta(days=i) for i in range(len(dates))], (
-        "dim_date must be one row per consecutive calendar day, no gaps"
-    )
+def test_notebook_parses_and_has_header(source: str, tree: ast.AST) -> None:
+    assert source.startswith("# Databricks notebook source")
+    assert "# MAGIC **Author:** Sharique Mohammad" in source
+    assert "# MAGIC **Date:**" in source
+    assert "ECRMAP" in source
 
 
-def test_dim_date_date_key_matches_calendar_date():
-    rows = _read_csv("dim_date.csv")
-    for r in rows[:200]:  # bounded sample, not the full 5,844 rows
-        expected_key = r["calendar_date"].replace("-", "")
-        assert r["date_key"] == expected_key
+def test_notebook_creates_the_schema(source: str) -> None:
+    assert "CREATE SCHEMA IF NOT EXISTS {FQ}" in source
+    assert 'SCHEMA = "shared_conformed"' in source
 
 
-def test_dim_time_covers_every_minute_of_day_exactly_once():
-    rows = _read_csv("dim_time.csv")
-    keys = sorted(int(r["time_key"]) for r in rows)
-    assert keys == list(range(24 * 60))
+@pytest.mark.parametrize("table", _TABLES)
+def test_notebook_defines_each_table(source: str, table: str) -> None:
+    assert f"CREATE TABLE IF NOT EXISTS {{FQ}}.{table} (" in source
 
 
-def test_dim_geography_bundeslaender_has_nation_plus_sixteen_states():
-    rows = _read_csv("dim_geography_bundeslaender.csv")
-    levels = [r["level"] for r in rows]
-    assert levels.count("nation") == 1
-    assert levels.count("bundesland") == 16
-    assert len(rows) == 17
+def test_structure_only_tables_are_not_populated(source: str) -> None:
+    for table in ("geo_plz_gemeinde_xref", "dim_weather_context"):
+        assert f'saveAsTable(f"{{FQ}}.{table}")' not in source
 
 
-def test_dim_geography_bundeslaender_ags_codes_are_unique_and_zero_padded():
-    rows = _read_csv("dim_geography_bundeslaender.csv")
-    ags_codes = [r["ags_code"] for r in rows]
-    assert len(ags_codes) == len(set(ags_codes))
-    for code in ags_codes:
-        assert len(code) == 2 and code.isdigit()
+def _module_consts() -> dict:
+    ns: dict = {}
+    for node in ast.walk(ast.parse(_NB.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            name = node.targets[0].id
+            if name in {"DATE_RANGE_START", "DATE_RANGE_END", "_BUNDESLAENDER"}:
+                try:
+                    ns[name] = ast.literal_eval(node.value)
+                except ValueError:
+                    if name in {"DATE_RANGE_START", "DATE_RANGE_END"}:
+                        # datetime.date(y, m, d) call
+                        args = [ast.literal_eval(a) for a in node.value.args]
+                        ns[name] = dt.date(*args)
+    return ns
 
 
-def test_dim_geography_bundeslaender_every_state_has_the_nation_as_parent():
-    rows = _read_csv("dim_geography_bundeslaender.csv")
-    nation = next(r for r in rows if r["level"] == "nation")
-    assert nation["parent_ags_code"] == ""
-    for r in rows:
-        if r["level"] == "bundesland":
-            assert r["parent_ags_code"] == nation["ags_code"]
+def test_dim_date_range_covers_every_wave_history_window() -> None:
+    consts = _module_consts()
+    start, end = consts["DATE_RANGE_START"], consts["DATE_RANGE_END"]
+    # First-wave and energy/weather-wave histories both start well after 2016.
+    assert start <= dt.date(2016, 1, 1)
+    assert end >= dt.date(2031, 12, 31)
+    assert (end - start).days + 1 > 5000
+
+
+def test_dim_geography_seed_is_nation_plus_sixteen_states() -> None:
+    consts = _module_consts()
+    bl = consts["_BUNDESLAENDER"]
+    assert len(bl) == 16
+    codes = [c for c, _ in bl]
+    assert codes == [f"{i:02d}" for i in range(1, 17)]

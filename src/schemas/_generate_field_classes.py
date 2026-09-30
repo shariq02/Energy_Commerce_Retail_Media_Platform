@@ -1,0 +1,952 @@
+"""Generate the central energy_silver field-class registry seed.
+
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+Author: Sharique Mohammad
+Date: September 2026
+
+Purpose: one authoritative place that enumerates every column every Silver
+notebook emits, with its class -- source_provided / derived / synthetic --
+and its target_schema (energy_silver / energy_silver_reference /
+commerce_silver / commerce_silver_reference), resolved from
+source_ecosystem_map.yml plus the fixed reference-table set. The Silver
+notebooks validate against this; they never author it.
+
+Reads: src/schemas/contracts/*.yml + src/schemas/mappings/*.yml +
+src/schemas/reference/source_ecosystem_map.yml.
+
+`build_rows()` + `assert_registry_complete()` are imported directly by
+`databricks/silver/00_silver_setup.py`, which computes and loads
+`quality.field_class_registry` from them at Silver-setup time. There is no
+committed seed file; the registry is always generated from the code.
+
+Usage (local completeness check, writes nothing):
+    python3 src/schemas/_generate_field_classes.py
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+try:  # imported as src.schemas._generate_field_classes (e.g. 00_silver_setup.py)
+    from . import _silver_notebook_scan
+except ImportError:  # run as a standalone script -- its own dir is on sys.path[0]
+    import _silver_notebook_scan
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+CONTRACTS = ROOT / "src" / "schemas" / "contracts"
+MAPPINGS = ROOT / "src" / "schemas" / "mappings"
+SILVER_ROOT = ROOT / "databricks" / "silver"
+
+# Governance / provenance columns present on every primary Silver table.
+GOVERNANCE = {
+    "source_system": ("derived", "constant per source", "silver governance"),
+    "source_record_id": (
+        "derived",
+        "natural key or deterministic composite",
+        "silver governance",
+    ),
+    "ecosystem": (
+        "derived",
+        "source_ecosystem_map.yml at the Silver boundary",
+        "provenance standard",
+    ),
+    "_silver_loaded_at": (
+        "derived",
+        "current_timestamp() at write",
+        "silver governance",
+    ),
+    "_silver_run_id": ("derived", "the Silver run id", "silver governance"),
+}
+CONFLICT_COLS = {
+    "_had_key_conflict": (
+        "derived",
+        "a resolved same-key conflict existed",
+        "silver conflict rule",
+    ),
+    "_source_id_disambiguated": (
+        "derived",
+        "the content-hash ordinal disambiguated the composite key",
+        "silver source_record_id rule",
+    ),
+    "_source_id_ordinal": (
+        "derived",
+        "1-based content-hash ordinal within a composite-key group",
+        "silver source_record_id rule",
+    ),
+}
+GEO_COLS = {
+    "official_municipality_key": (
+        "derived",
+        "curated / prefix attribution to the Bundesland AGS",
+        "geography attribution, Bundesland level",
+    ),
+    "official_municipality_key_level": (
+        "derived",
+        "geography level achieved (bundesland)",
+        "geography attribution limit",
+    ),
+    "official_municipality_key_method": (
+        "derived",
+        "attribution method (city_lookup / municipality_key_prefix / bundesland_code)",
+        "geography attribution",
+    ),
+}
+
+
+def _load(path: Path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _contract_tables(contract: dict) -> dict:
+    if "tables" in contract:
+        return {t["name"]: t for t in contract["tables"] if "columns" in t}
+    if "columns" in contract:
+        name = contract.get("bronze_table", contract["source"]).split(".")[-1]
+        return {name: {"name": name, "columns": contract["columns"]}}
+    return {}
+
+
+def _flatten_business_names(mapping: dict, source: str) -> dict[str, str]:
+    """Bronze column -> English business name, per the mapping's own structure."""
+    bn = mapping.get("business_names", {}) or {}
+    out: dict[str, str] = {}
+    if source == "dwd":
+        for code, spec in (bn.get("parameters") or {}).items():
+            out[code] = spec["business_name"] if isinstance(spec, dict) else spec
+        out.update(bn.get("metadata_fields") or {})
+    elif source == "smard":
+        out.update(bn.get("columns") or {})
+    elif source == "mastr":
+        out.update(bn.get("identifiers") or {})
+        out.update(bn.get("common_fields") or {})
+    else:  # power_plant_list, redispatch
+        out.update(bn.get("fields") or {})
+    return out
+
+
+def _coded_columns(mapping: dict, source: str) -> list[str]:
+    """Bronze columns that get the <x>_code / <x>_label_de / <x> decode triple."""
+    if source == "mastr":
+        return list(
+            (mapping.get("coded_value_labels", {}) or {}).get(
+                "named_category_bindings", {}
+            )
+        )
+    labels = mapping.get("coded_value_labels", {}) or {}
+    scopes = []
+    for spec in labels.values():
+        if isinstance(spec, dict) and "scope" in spec:
+            col = spec["scope"].split(" -- ")[0].split(".")[-1].strip()
+            scopes.append(col)
+    return scopes
+
+
+# Per-source Silver-table topology: which Bronze table(s) map to which Silver
+# table(s), plus additive bridges. The Silver notebooks follow this naming.
+TOPOLOGY: dict[str, dict] = {
+    "dwd": {
+        # measurement tables keep their name; metadata tables keep their name;
+        # + a derived dwd_parameter_catalog + dwd_city_bundesland_xref
+        "extra_tables": {
+            "dwd_parameter_catalog": {
+                "parameter_source_code": (
+                    "source_provided",
+                    "dwd_parameter_unit.Parameter",
+                    "dwd contract",
+                ),
+                "parameter_business_name": (
+                    "derived",
+                    "business-name mapping (parameters)",
+                    "business-name mapping",
+                ),
+                "parameter_unit": (
+                    "derived",
+                    "dwd_parameter_unit.Einheit",
+                    "unit registry",
+                ),
+                "parameter_description_de": (
+                    "source_provided",
+                    "dwd_parameter_unit.Parameterbeschreibung",
+                    "dwd contract",
+                ),
+                "catalog_vintage": (
+                    "derived",
+                    "pinned DWD archive vintage",
+                    "decode-authority vintage",
+                ),
+            },
+            "dwd_city_bundesland_xref": {
+                "city": (
+                    "source_provided",
+                    "DWD station folder name",
+                    "dwd contract station_set",
+                ),
+                "bundesland_name": (
+                    "derived",
+                    "curated 28-station city -> Bundesland",
+                    "geography attribution",
+                ),
+                "official_municipality_key": (
+                    "derived",
+                    "curated 28-station city -> Bundesland AGS",
+                    "geography attribution",
+                ),
+                "official_municipality_key_level": (
+                    "derived",
+                    "'bundesland'",
+                    "geography attribution limit",
+                ),
+            },
+            "dwd_missingness_reconciliation": {
+                "station_id": (
+                    "derived",
+                    "STATIONS_ID from each dwd_hourly measurement table",
+                    "cross-table missingness check",
+                ),
+                "parameter_source_code": (
+                    "derived",
+                    "exploded from each measurement table's own value columns",
+                    "cross-table missingness check",
+                ),
+                "_missingness_reconciliation_status": (
+                    "derived",
+                    "'matched' / 'observed_only' / 'reported_only' from a full outer join",
+                    "cross-table missingness check",
+                ),
+            },
+        },
+        "geo_tables": {
+            "dwd_air_temperature",
+            "dwd_cloudiness",
+            "dwd_moisture",
+            "dwd_precipitation",
+            "dwd_pressure",
+            "dwd_sun",
+            "dwd_wind",
+            "dwd_dew_point",
+            "dwd_visibility",
+            "dwd_cloud_type",
+            "dwd_wind_synop",
+            "dwd_extreme_wind",
+            "dwd_weather_phenomena",
+            "dwd_soil_temperature",
+            "dwd_solar",
+            "dwd_station_geography",
+        },
+        "ts_rename": {"MESS_DATUM": "observation_timestamp"},
+        "qn_prefix": "qn_level",
+    },
+    "smard": {
+        "extra_tables": {},
+        "geo_tables": set(),
+        "value_flags": ["metric_semantic_status"],
+    },
+    "mastr": {
+        "extra_tables": {
+            "mastr_location_coordinate_conflict": {
+                "location_id": (
+                    "derived",
+                    "gathered from the 6 mastr_einheiten_* Silver tables",
+                    "cross-table coordinate-agreement check",
+                ),
+                "distinct_coords": (
+                    "derived",
+                    "countDistinct(lat, lon) rounded to 2dp across linked units",
+                    "cross-table coordinate-agreement check",
+                ),
+                "_coordinate_conflict": (
+                    "derived",
+                    "distinct_coords > 1",
+                    "cross-table coordinate-agreement check",
+                ),
+            },
+        },
+        "geo_tables": {
+            "mastr_einheiten_wind",
+            "mastr_einheiten_biomasse",
+            "mastr_einheiten_wasser",
+            "mastr_einheiten_verbrennung",
+            "mastr_einheiten_kernkraft",
+            "mastr_einheiten_geothermie_gsgk",
+        },
+        "bridges": {
+            "mastr_eeg_support_unit_bridge",
+            "mastr_kwk_support_unit_bridge",
+            "mastr_authorisation_unit_bridge",
+            "mastr_repowering_eeg_bridge",
+            "mastr_actor_role_bridge",
+            "mastr_location_unit_bridge",
+            "mastr_location_connection_bridge",
+        },
+        "renamed_tables": {
+            "mastr_geloeschte_deaktivierte_einheiten": "mastr_unit_deletion_events",
+            "mastr_geloeschte_deaktivierte_marktakteure": "mastr_actor_deletion_events",
+            "mastr_einheiten_aenderung_netzbetreiberzuordnungen": "mastr_grid_operator_change_events",
+        },
+    },
+    "power_plant_list": {
+        "extra_tables": {},
+        "geo_tables": {"power_plant_list"},
+        "value_flags_by_table": {"power_plant_capacity_additions": []},
+    },
+    "redispatch": {
+        "extra_tables": {},
+        "geo_tables": set(),
+        "ts_pairs": {
+            "measure_start_timestamp": ["BEGINN_DATUM", "BEGINN_UHRZEIT"],
+            "measure_end_timestamp": ["ENDE_DATUM", "ENDE_UHRZEIT"],
+        },
+    },
+}
+
+# Silver topology for the foundation sources -- Honda IoT, REES46 and search
+# visibility -- whose Silver shape is enumerated here rather than derived from
+# an energy / weather contract.
+FOUNDATION_SOURCES = {
+    "honda_iot": {
+        "silver": {
+            "honda_electricity_p": ["frequency", "datetime_utc", "total", "PV", "CHP"],
+            "honda_electricity_w": ["frequency", "datetime_utc", "total", "PV", "CHP"],
+            "honda_heating_p": [
+                "frequency",
+                "datetime_utc",
+                "total",
+                "CHP_heat",
+                "CHP_elec",
+            ],
+            "honda_heating_w": [
+                "frequency",
+                "datetime_utc",
+                "total",
+                "CHP_heat",
+                "CHP_elec",
+            ],
+            "honda_cooling_p": ["frequency", "datetime_utc", "total", "cool_elec"],
+            "honda_cooling_w": ["frequency", "datetime_utc", "total", "cool_elec"],
+            "honda_weather": [
+                "frequency",
+                "datetime_utc",
+                "air_temperature_2m",
+                "global_irradiance",
+                "weather_location",
+            ],
+        },
+        "synthetic": {
+            "honda_weather": {
+                "weather_location": (
+                    "synthetic",
+                    "constant 'honda_site' -- single fixed site",
+                    "synthetic field",
+                )
+            },
+        },
+    },
+    "rees46": {
+        "silver": {
+            "rees46_events": [
+                "event_time",
+                "event_type",
+                "product_id",
+                "category_id",
+                "category_code",
+                "brand",
+                "price",
+                "user_id",
+                "user_session",
+                "currency_unknown",
+            ],
+        },
+        "deferred": {
+            "rees46_user_country_synthetic": {
+                "country_synthetic": (
+                    "synthetic",
+                    "DEFERRED -- no defensible generation rule; not built in the silver layer",
+                    "localisation design",
+                )
+            }
+        },
+    },
+    "ga4": {
+        "silver": {
+            # The 8 top-level Bronze columns -- event_params/ecommerce/items
+            # stay nested (Delta STRUCT/ARRAY); the registry classifies the
+            # top-level column only, matching what df.columns returns for a
+            # nested field, not each inner field individually.
+            "ga4_events": [
+                "event_date",
+                "event_timestamp",
+                "event_name",
+                "user_pseudo_id",
+                "geo_country",
+                "event_params",
+                "ecommerce",
+                "items",
+            ],
+            # ga4_items: ga4_events.items exploded to item grain -- item_id is
+            # overloaded (campaign id on promotion events, product id
+            # otherwise), only separable once exploded (03_ga4_items.py).
+            "ga4_items": [
+                "event_date",
+                "event_timestamp",
+                "user_pseudo_id",
+                "event_name",
+                "item_ordinal",
+                "item_id",
+                "item_name",
+                "item_category",
+                "price",
+                "quantity",
+                "item_revenue",
+                "item_context",
+            ],
+            # ga4_transactions: ga4_events.ecommerce filtered + flattened to
+            # transaction-bearing event grain (04_ga4_transactions.py).
+            "ga4_transactions": [
+                "event_date",
+                "event_timestamp",
+                "user_pseudo_id",
+                "event_name",
+                "transaction_id",
+                "purchase_revenue",
+                "unique_items",
+                "total_item_quantity",
+            ],
+        },
+        "synthetic": {
+            "ga4_items": {
+                "item_ordinal": (
+                    "derived",
+                    "posexplode_outer position within the items array",
+                    "explode ordinal",
+                ),
+                "item_context": (
+                    "derived",
+                    "'promotion' for view_promotion/select_promotion events, else 'product'",
+                    "ga4 contract / business rule",
+                ),
+            }
+        },
+    },
+}
+
+
+# Reference-layer tables -- additive/decode/catalog tables, never the primary
+# source-grain table. Every other table is primary. Matches exactly what
+# databricks/silver/{energy,commerce}/_reference/*.py write (verified against
+# those notebooks' write_silver() calls, not re-derived from a naming rule).
+REFERENCE_TABLES = {
+    "dwd_city_bundesland_xref",
+    "dwd_station_geography",
+    "dwd_station_name_history",
+    "dwd_device_instrument",
+    "dwd_parameter_unit",
+    "dwd_parameter_catalog",
+    "dwd_missing_value_periods",
+    "mastr_katalogkategorien",
+    "mastr_katalogwerte",
+    "mastr_einheitentypen",
+    "mastr_lokationstypen",
+    "mastr_marktfunktionen",
+    "mastr_marktrollen",
+}
+
+# Per-table column-rename override for a bespoke rename that diverges from
+# the source's generic business-name mapping. dwd_missing_value_periods
+# keeps Von_Datum/Bis_Datum as gap_start_timestamp/gap_end_timestamp (its own notebook's
+# explicit .withColumnRenamed), not the generic valid_from/valid_to every
+# other DWD metadata table uses -- verified against that notebook, not
+# guessed.
+TABLE_COLUMN_RENAME_OVERRIDES = {
+    "dwd_missing_value_periods": {
+        "Von_Datum": "gap_start_timestamp",
+        "Bis_Datum": "gap_end_timestamp",
+    },
+}
+
+# Semantic Silver structures: tables and columns are declared once in
+# databricks/silver/_semantic_common.py (SEMANTIC_STRUCTURES). A column is
+# derived when the build computes it; otherwise it carries source values.
+SEMANTIC_COMMON = SILVER_ROOT / "_semantic_common.py"
+SEMANTIC_DERIVED = {
+    "observation_key",
+    "location_key",
+    "daily_key",
+    "event_key",
+    "sample_key",
+    "device_key",
+    "source_system",
+    "source_dataset",
+    "source_record_id",
+    "_silver_loaded_at",
+    "_silver_run_id",
+    "time_basis",
+    "observation_timestamp_utc",
+    "observation_timestamp_project",
+    "local_date",
+    "interval_seconds",
+    "interval_reference",
+    "market_area_code",
+    "measurement_basis",
+    "sign_convention",
+    "quality_label",
+    "quality_flag",
+    "quality_flags",
+    "variable",
+    "statistic",
+    "is_primary",
+    "value",
+    "unit",
+    "value_origin",
+    "derivation_rule",
+    "observation_count",
+    "location_role",
+    "continent",
+    "official_municipality_key",
+    "geography_basis",
+    "event_start_utc",
+    "event_end_utc",
+    "event_start_project",
+    "event_end_project",
+    "duration_hours",
+    "reason",
+    "direction",
+    "primary_energy_type",
+    "instructing_market_area_code",
+    "requesting_market_area_codes",
+    "affected_unit_match_name",
+    "affected_unit_match_confidence",
+    "forecast_issue_timestamp",
+    "increment_derivation_rule",
+    "repeat_index",
+    "data_origin",
+    "record_ordinal",
+    "reconciliation_status",
+    "relationship_type",
+    "parent_type",
+    "linked_type",
+    "event_timestamp_utc",
+    "event_timestamp_project",
+    "item_ordinal",
+    "item_context",
+    "category_l1",
+    "category_l2",
+    "category_l3",
+    "currency_unknown",
+}
+
+
+def _semantic_namespace() -> dict:
+    """The notebook's module-level names; it holds only constants and function
+    definitions at module level (a fixed repo-local file, so exec is safe)."""
+    ns: dict = {}
+    text = SEMANTIC_COMMON.read_text(encoding="utf-8")
+    exec(compile(text, str(SEMANTIC_COMMON), "exec"), ns)  # noqa: S102
+    return ns
+
+
+def _semantic_structures() -> tuple[dict, str]:
+    """(table -> [(column, type)], default target schema)."""
+    ns = _semantic_namespace()
+    return ns["SEMANTIC_STRUCTURES"], ns["SEMANTIC_SCHEMA"]
+
+
+# flag_col columns value_quarantine() adds on top of the source's own
+# contract columns -- verified against every value_quarantine() call in
+# databricks/silver/, not derivable from the contract itself.
+VALUE_QUARANTINE_FLAGS = {
+    "dwd_station_geography": [
+        (
+            "_coord_outside_de_bbox",
+            "station coordinate outside the Germany bounding box",
+        ),
+    ],
+    "power_plant_list": [
+        (
+            "_capacity_all_null",
+            "no capacity value parsed on the row",
+        ),
+    ],
+}
+
+# table_name prefix -> the contract's source_system (the source_ecosystem_map.yml
+# key), longest/most-specific prefix first so "power_plant_" is checked before
+# any shorter prefix could apply.
+_PREFIX_TO_SOURCE_SYSTEM = (
+    ("power_plant_", "power_plant_list"),
+    ("redispatch_", "redispatch"),
+    ("mastr_", "mastr"),
+    ("smard_", "smard"),
+    ("honda_", "honda_iot"),
+    ("rees46_", "rees46"),
+    ("dwd_", "dwd"),
+    ("ga4_", "ga4"),
+)
+
+
+def _ecosystem_by_source_system() -> dict[str, str]:
+    doc = _load(ROOT / "src" / "schemas" / "reference" / "source_ecosystem_map.yml")
+    return {m["source_system"]: m["ecosystem"] for m in doc["mappings"]}
+
+
+def _source_system_for_table(table_name: str) -> str:
+    for prefix, source_system in _PREFIX_TO_SOURCE_SYSTEM:
+        if table_name.startswith(prefix):
+            return source_system
+    message = f"no known source prefix for table {table_name!r}"
+    raise ValueError(message)
+
+
+def target_schema_for(table_name: str, ecosystem_map: dict[str, str]) -> str:
+    source_system = _source_system_for_table(table_name)
+    ecosystem = ecosystem_map.get(source_system, "energy")
+    base = f"{ecosystem}_silver"
+    return f"{base}_reference" if table_name in REFERENCE_TABLES else base
+
+
+def build_rows() -> list[dict]:
+    rows: list[dict] = []
+    key_names = _semantic_namespace()["MASTR_KEY_NAMES"]
+
+    def add(table: str, col: str, cls: str, rule: str, ref: str) -> None:
+        rows.append(
+            {
+                "table_name": table,
+                "column_name": col,
+                "field_class": cls,
+                "derivation_rule": rule,
+                "source_reference": ref,
+            }
+        )
+
+    def add_governance(
+        table: str, *, conflict: bool = False, disambig: bool = False
+    ) -> None:
+        for c, (cls, rule, ref) in GOVERNANCE.items():
+            add(table, c, cls, rule, ref)
+        if conflict:
+            add(table, "_had_key_conflict", *CONFLICT_COLS["_had_key_conflict"])
+        if disambig:
+            for c in ("_source_id_disambiguated", "_source_id_ordinal"):
+                add(table, c, *CONFLICT_COLS[c])
+
+    # --- energy & weather wave, from contracts + mappings ---
+    for source in ("dwd", "smard", "mastr", "power_plant_list", "redispatch"):
+        contract = _load(CONTRACTS / f"{source}.yml")
+        mapping = _load(MAPPINGS / f"{source}.yml")
+        topo = TOPOLOGY[source]
+        bn = _flatten_business_names(mapping, source)
+        coded = set(_coded_columns(mapping, source))
+        tables = _contract_tables(contract)
+
+        for bt, tdef in tables.items():
+            st = topo.get("renamed_tables", {}).get(bt, bt) if source == "mastr" else bt
+            for col in tdef["columns"]:
+                name = col["name"]
+                out_name = bn.get(name, name)
+                # DWD MESS_DATUM -> observation_timestamp
+                out_name = topo.get("ts_rename", {}).get(name, out_name)
+                # per-table override (e.g. dwd_missing_value_periods)
+                out_name = TABLE_COLUMN_RENAME_OVERRIDES.get(st, {}).get(name, out_name)
+                out_name = key_names.get(bt, {}).get(name, out_name)
+                add(
+                    st,
+                    out_name,
+                    "source_provided",
+                    "typed cast + English business rename"
+                    if out_name != name
+                    else "typed cast",
+                    f"{source} contract / business-name mapping",
+                )
+                # decode triple for coded columns
+                if source == "mastr":
+                    match_coded = name in coded
+                else:
+                    match_coded = name in coded or out_name in coded
+                if match_coded:
+                    pref = bn.get(name, name)
+                    add(
+                        st,
+                        f"{pref}_code",
+                        "derived",
+                        "source code, verbatim",
+                        "coded-value decode triple",
+                    )
+                    add(
+                        st,
+                        f"{pref}_label_de",
+                        "derived",
+                        "German label from the decode reference",
+                        "coded-value decode triple",
+                    )
+                    # the English label reuses the business-name column (out_name)
+                # DWD QN column -> qn_level triple
+                if source == "dwd" and name.startswith("QN_"):
+                    for suf in ("qn_level_code", "qn_level_label_de", "qn_level"):
+                        add(
+                            st,
+                            suf,
+                            "derived",
+                            "DWD quality-level decode",
+                            "DWD quality-level decode",
+                        )
+            # governance
+            has_conflict = (
+                source == "dwd"
+                and st.startswith("dwd_")
+                and "observation" in " ".join(c["name"] for c in tdef["columns"])
+                or (
+                    source == "dwd"
+                    and any(c["name"] == "MESS_DATUM" for c in tdef["columns"])
+                )
+            )
+            disambig = (
+                source in ("power_plant_list", "redispatch")
+                or (
+                    source == "mastr"
+                    and st
+                    in (
+                        "mastr_grid_operator_change_events",
+                        "mastr_bilanzierungsgebiete",
+                    )
+                )
+                or st
+                in (
+                    "dwd_missing_value_periods",
+                    "dwd_station_geography",
+                    "dwd_station_name_history",
+                    "dwd_device_instrument",
+                    "dwd_parameter_unit",
+                )
+            )
+            add_governance(st, conflict=has_conflict, disambig=disambig)
+            if source == "mastr":
+                add(
+                    st,
+                    "_unmatched_code_columns",
+                    "derived",
+                    "coded columns whose code has no label in the decode reference",
+                    "coded-value decode triple",
+                )
+            # value_quarantine flag columns -- the notebook's own flag_col=
+            # argument, not derivable from the contract; verified against every
+            # value_quarantine() call in databricks/silver/, not guessed.
+            for flag_col, reason in VALUE_QUARANTINE_FLAGS.get(st, []):
+                add(
+                    st,
+                    flag_col,
+                    "derived",
+                    reason,
+                    "value_quarantine flag column",
+                )
+            # geo
+            if bt in topo.get("geo_tables", set()):
+                for c, (cls, rule, ref) in GEO_COLS.items():
+                    add(st, c, cls, rule, ref)
+            # DWD observation_timestamp derived timestamp + solar WOZ
+            if source == "dwd" and any(
+                c["name"] == "MESS_DATUM" for c in tdef["columns"]
+            ):
+                add(
+                    st,
+                    "observation_timestamp",
+                    "derived",
+                    "MESS_DATUM parsed (UTC)",
+                    "UTC conversion",
+                )
+            if bt == "dwd_solar":
+                add(
+                    st,
+                    "observation_woz",
+                    "derived",
+                    "MESS_DATUM_WOZ kept as true local solar time",
+                    "local solar time",
+                )
+
+        # smard derived
+        if source == "smard":
+            for c, rule in (
+                ("market_zone", "region -> dim_market zone vocabulary"),
+                ("unit", "per metric x resolution, unit registry"),
+                ("metric_business_name", "business-name mapping (metrics)"),
+                (
+                    "metric_semantic_status",
+                    "'disputed' for the PV-forecast mirror, else 'confirmed'",
+                ),
+                (
+                    "semantic_issue_ref",
+                    "link to the contract quality rule for a disputed metric",
+                ),
+                (
+                    "observation_timestamp",
+                    "timestamp_utc verified Europe/Berlin -> UTC",
+                ),
+            ):
+                add(
+                    "smard_energy_timeseries",
+                    c,
+                    "derived",
+                    rule,
+                    "smard contract / localisation",
+                )
+        # redispatch derived timestamps + tso list
+        if source == "redispatch":
+            for c, rule in (
+                (
+                    "measure_start_timestamp",
+                    "BEGINN_DATUM + BEGINN_UHRZEIT, Europe/Berlin -> UTC",
+                ),
+                (
+                    "measure_end_timestamp",
+                    "ENDE_DATUM + ENDE_UHRZEIT, Europe/Berlin -> UTC",
+                ),
+                (
+                    "requesting_transmission_system_operator_list",
+                    "ANFORDERNDER_UENB split on '&'",
+                ),
+            ):
+                add(
+                    "redispatch_measures",
+                    c,
+                    "derived",
+                    rule,
+                    "redispatch contract / localisation",
+                )
+        # mastr bridges
+        if source == "mastr":
+            for br in topo["bridges"]:
+                add(
+                    br,
+                    "parent_id",
+                    "source_provided",
+                    "the owning record's MaStR id",
+                    "mastr contract",
+                )
+                add(
+                    br,
+                    "linked_id",
+                    "source_provided",
+                    "one exploded id from the delimited link array",
+                    "mastr contract",
+                )
+                add_governance(br)
+
+        # extra derived tables
+        for tname, cols in topo.get("extra_tables", {}).items():
+            for c, (cls, rule, ref) in cols.items():
+                add(tname, c, cls, rule, ref)
+
+    # --- foundation sources, from the enumerated topology ---
+    for src, spec in FOUNDATION_SOURCES.items():
+        for st, cols in spec.get("silver", {}).items():
+            for c in cols:
+                cls = "source_provided"
+                rule = "typed cast (+ rename where localised)"
+                syn = spec.get("synthetic", {}).get(st, {})
+                if c in syn:
+                    cls, rule, ref = syn[c]
+                    add(st, c, cls, rule, ref)
+                    continue
+                add(st, c, cls, rule, f"{src} contract")
+            has_conflict = st in ("rees46_events", "ga4_events")
+            add_governance(st, conflict=has_conflict)
+        for st, cols in spec.get("deferred", {}).items():
+            for c, (cls, rule, ref) in cols.items():
+                add(st, c, cls, rule, ref)
+        # honda weather geo (single fixed site -- no ags, weather_location is synthetic)
+        if src == "rees46":
+            add(
+                "rees46_events",
+                "currency_unknown",
+                "derived",
+                "price currency undocumented -- relative measures only",
+                "rees46 contract / localisation",
+            )
+
+    # --- semantic Silver structures ---
+    ns = _semantic_namespace()
+    semantic = ns["SEMANTIC_STRUCTURES"]
+    members = ns["SEMANTIC_MEMBER_STRUCTURES"]
+    for table, (member_tables, discriminators) in members.items():
+        for r in [r for r in rows if r["table_name"] in member_tables]:
+            if r["column_name"] != "ecosystem":
+                add(
+                    table,
+                    r["column_name"],
+                    r["field_class"],
+                    r["derivation_rule"],
+                    r["source_reference"],
+                )
+        for col in (*discriminators, "source_dataset"):
+            add(table, col, "derived", "discriminator / provenance", "semantic")
+    for table, columns in semantic.items():
+        for col, _ in columns:
+            if col in SEMANTIC_DERIVED or col.endswith("_increment_kwh"):
+                add(table, col, "derived", "derived in Silver", "semantic")
+            else:
+                add(
+                    table,
+                    col,
+                    "source_provided",
+                    "typed; standard unit beside the native value where converted",
+                    "semantic",
+                )
+
+    # de-dup (a column can be added twice by overlapping rules)
+    seen: set[tuple[str, str]] = set()
+    uniq: list[dict] = []
+    for r in rows:
+        key = (r["table_name"], r["column_name"])
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(r)
+
+    ecosystem_map = _ecosystem_by_source_system()
+    for r in uniq:
+        r["target_schema"] = (
+            ns["semantic_target_schema"](r["table_name"])
+            if r["table_name"] in semantic or r["table_name"] in members
+            else target_schema_for(r["table_name"], ecosystem_map)
+        )
+
+    return sorted(uniq, key=lambda r: (r["table_name"], r["column_name"]))
+
+
+def assert_registry_complete(rows: list[dict]) -> None:
+    """Hard-fail if a table some Silver notebook actually writes has no row
+    here -- this is the generator's own knowledge falling behind real code.
+    Never silently emit an incomplete registry, and never guess a
+    classification for an undeclared table -- raises so both the CLI and a
+    library caller (e.g. `00_silver_setup.py`) get a catchable, clear error
+    naming exactly which table(s) and notebook(s) are missing."""
+    produced = {r["table_name"] for r in rows}
+    missing = {
+        nb: gap
+        for nb, targets in _silver_notebook_scan.tables_by_notebook(SILVER_ROOT).items()
+        if (gap := targets - produced)
+    }
+    if missing:
+        message = (
+            f"field-class registry has no entry for tables real Silver notebooks "
+            f"write: {missing} -- add each to TOPOLOGY / FOUNDATION_SOURCES in "
+            "_generate_field_classes.py; this is never auto-guessed"
+        )
+        raise RuntimeError(message)
+
+
+def main() -> int:
+    rows = build_rows()
+    try:
+        assert_registry_complete(rows)
+    except RuntimeError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    tables = {r["table_name"] for r in rows}
+    print(f"OK  registry complete: {len(rows)} rows, {len(tables)} tables")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

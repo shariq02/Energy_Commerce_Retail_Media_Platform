@@ -7,28 +7,30 @@
 # MAGIC # EDA -- DWD WEATHER MEASUREMENTS
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
 # MAGIC **Author:** Sharique Mohammad
-# MAGIC **Date:** August 2026
+# MAGIC
+# MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the seven DWD weather-measurement Bronze tables
 # MAGIC (air_temperature ... wind) -- schema, missingness, quality flags,
-# MAGIC constant columns, temporal coverage & frequency (expected vs actual
-# MAGIC hourly grid, gaps, longest gap per station), station x measurement
-# MAGIC coverage matrix, per-station duplicates (identical vs conflicting),
-# MAGIC value distributions & plausibility, QN-vs-missingness relationship --
-# MAGIC as evidence for Silver design.
+# MAGIC constant columns, temporal coverage & frequency against an independent
+# MAGIC hourly grid, station x measurement coverage, per-station duplicates
+# MAGIC (identical vs conflicting), value distributions & plausibility, the
+# MAGIC QN quality-flag domain, per-decade regime evidence, and the layered
+# MAGIC modelling-risk checklist -- as evidence for Silver design.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import contextlib
-import os as _os
-import re as _re
-
 import matplotlib.pyplot as plt
 import numpy as np
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# MAGIC %run ../_eda_common
 
 # COMMAND ----------
 
@@ -49,11 +51,21 @@ MEASUREMENTS = [
 ]
 TABLES = {m: f"{CATALOG}.{BRONZE_SCHEMA}.dwd_{m}" for m in MEASUREMENTS}
 NON_VALUE = {"STATIONS_ID", "CITY", "MESS_DATUM", "EOR"}
-# Any `QN_*` column is a DWD quality byte, never a measured value.
-QN_CANDIDATES = ("QN_9", "QN_8", "QN_7", "QN_4", "QN_3", "QN")
+
+
+# Any `QN*` column is a DWD quality byte, never a measured value. The numeric
+# suffix varies by parameter (QN_9, QN_8, QN_7, QN_3, QN_592, QN_2, ...), so
+# detect by prefix rather than a fixed list.
+def qn_col(df):
+    return next((c for c in df.columns if c.upper().startswith("QN")), None)
+
+
 # DWD companion "Messverfahren-Index" columns -- string indicators, not measured
 # values; treating them as numeric produced all-None distribution rows.
 INDICATOR_COLS = {"V_N_I"}
+# DWD hourly-historical quality levels (Qualitaetsniveau). A QN value outside
+# this set is either a parse artefact or a schema change, not a real level.
+DWD_QN_CODES = {"1", "2", "3", "5", "7", "9", "10"}
 
 # Physical plausibility windows for the common DWD hourly parameters (values
 # outside, and not the -999 sentinel, are "suspicious" not necessarily wrong).
@@ -74,22 +86,24 @@ PLAUSIBLE = {
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers
+# DBTITLE 1,Helpers -- DWD hourly timestamp + value-column selection
 
 
-def find_col(df: DataFrame, *cands: str) -> str | None:
-    low = {c.lower(): c for c in df.columns}
-    for x in cands:
-        if x.lower() in low:
-            return low[x.lower()]
-    return None
+def as_ts(col):
+    # MESS_DATUM is yyyyMMddHH, but a double-inferred column arrives as
+    # "2025021300.0" -- to_timestamp(x, "yyyyMMddHH") then parses NOTHING. Strip a
+    # trailing ".0", then try the compact hour / minute forms.
+    s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
+    # try_to_timestamp -> NULL on bad input; a plain to_timestamp with a format
+    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI (e.g. a stray "1981010723:38").
+    return F.coalesce(
+        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHHmm")),
+        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
+    )
 
 
-def as_ts(col: str):
-    return F.to_timestamp(F.col(col).cast("string"), "yyyyMMddHH")
-
-
-def value_columns(df: DataFrame) -> list:
+def value_columns(df):
     return [
         c
         for c in df.columns
@@ -99,189 +113,11 @@ def value_columns(df: DataFrame) -> list:
     ]
 
 
-def barplot(pairs, title, xlabel, ylabel="rows", rot=0, figsize=(10, 4), filename=None):
-    plt.figure(figsize=figsize)
-    plt.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=rot, ha="right" if rot else "center")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-def histplot(values, title, xlabel, bins=50, filename=None):
-    plt.figure(figsize=(10, 4))
-    plt.hist(values, bins=bins)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel("count")
-    plt.tight_layout()
-    if filename:
-        plt.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Profiling-export helper (writes src/schemas/profiling/<source>.md)
-
-
-def _repo_root():
-    # Notebook CWD in a Databricks Git folder is <repo>/databricks/eda/<source>.
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks", "eda")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    with contextlib.suppress(Exception):
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-        i = wp.rfind("/databricks/eda/")
-        if i > 0:
-            for cand in (wp[:i], "/Workspace" + wp[:i]):
-                if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                    return cand
-    raise RuntimeError(
-        "repo root not found -- run from <repo>/databricks/eda/<source>/"
-    )
-
-
-def _profiling_dir():
-    d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
-    return d
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
-
-
-def fmt_pairs(pairs, n=25):
-    # Render (label, value) pairs as markdown list lines, capped at n with a
-    # "... (N more)" tail so the profiling .md never carries a 1000-row dump.
-    items = list(pairs)
-    out = [f"- {lbl}: {val}" for lbl, val in items[:n]]
-    if len(items) > n:
-        out.append(f"- ... ({len(items) - n} more)")
-    return "\n".join(out)
-
-
-def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
-    items = [(str(k), draw) for k, draw in items if draw is not None]
-    if not items:
-        print(f"  _facet_grid: no data -> {filename}")
-        return False
-    ncols = min(ncols, len(items))
-    nrows = -(-len(items) // ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
-    )
-    flat = list(axes.flatten())
-    for ax, (title, draw) in zip(flat, items):
-        draw(ax)
-        ax.set_title(title, fontsize=9)
-        ax.tick_params(labelsize=7)
-    for ax in flat[len(items) :]:
-        ax.set_visible(False)
-    fig.suptitle(suptitle)
-    fig.tight_layout()
-    fig.savefig(fig_path(filename), dpi=110, bbox_inches="tight")
-    plt.show()
-    plt.close(fig)
-    return True
-
-
-def facet_bars(groups, suptitle, filename, rot=45, ncols=3, logy=False):
-    def _mk(pairs):
-        if not pairs:
-            return None
-
-        def draw(ax):
-            ax.bar([str(p[0]) for p in pairs], [p[1] for p in pairs])
-            if logy:
-                ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rot)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(list(v))) for k, v in src], suptitle, filename, ncols)
-
-
-def facet_hists(groups, suptitle, filename, bins=40, ncols=3, logy=True):
-    def _mk(vals):
-        if vals is None or not len(vals):
-            return None
-
-        def draw(ax):
-            ax.hist(list(vals), bins=bins, log=logy)
-
-        return draw
-
-    src = groups.items() if hasattr(groups, "items") else groups
-    return _facet_grid([(k, _mk(v)) for k, v in src], suptitle, filename, ncols)
-
-
-def write_profiling(source, notebook_key, section_title, blocks, figures=None):
-    # One <source>.md per source; each notebook owns one marker-delimited
-    # `## ` section, re-run replaces its own, others preserved, order by key.
-    d = _profiling_dir()
-    md = _os.path.join(d, source + ".md")
-    lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
-    for heading, body in blocks:
-        if body is None or str(body).strip() == "":
-            continue
-        lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
-    lines.append(f"<!-- END {source}:{notebook_key} -->")
-    block = "\n".join(lines)
-    existing = ""
-    if _os.path.exists(md):
-        with open(md, encoding="utf-8") as fh:
-            existing = fh.read()
-    pat = _re.compile(
-        r"<!-- BEGIN "
-        + _re.escape(source)
-        + r":([\w.\-]+) -->.*?<!-- END "
-        + _re.escape(source)
-        + r":\1 -->",
-        _re.DOTALL,
-    )
-    kept = {mm.group(1): mm.group(0) for mm in pat.finditer(existing)}
-    kept[notebook_key] = block
-    intro = f"_Auto-generated by the EDA notebooks (`databricks/eda/{source}/`). One `## ` section per notebook; re-running a notebook replaces its own section, other sections are preserved._"
-    header = f"# {source.upper()} EDA PROFILE\n\n{intro}\n\n"
-    body = "\n\n".join(kept[k] for k in sorted(kept))
-    out = header + body + "\n"
-    tmp = md + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(out)
-    _os.replace(tmp, md)
-    print(f"profiling export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
 REPO_ROOT = _repo_root()
 PROFILING_DIR = _profiling_dir()
-
 print(f"OK  repo root: {REPO_ROOT}")
 print(f"OK  profiling directory: {PROFILING_DIR}")
 
@@ -358,16 +194,18 @@ for m in MEASUREMENTS:
 # DBTITLE 1,QN quality-flag vs missingness / out-of-range (one groupBy per table)
 qn_dist = {}
 qn_quality = {}
+qn_domain = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    qn = find_col(df, *QN_CANDIDATES)
+    qn = qn_col(df)
     vcols = value_columns(df)
     if qn is None:
         continue
+    qn_domain[m] = categorical_domain(df, qn, DWD_QN_CODES, name=f"{m}.{qn}")
     any_sentinel = F.lit(False)
     any_oor = F.lit(False)
     for c in vcols:
-        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
+        v = safe_num(c)
         any_sentinel = any_sentinel | (v == -999)
         b = PLAUSIBLE.get(c.upper())
         if b:
@@ -384,7 +222,7 @@ for m in MEASUREMENTS:
     )
     qn_dist[m] = [(x[qn], x["rows"]) for x in g]
     qn_quality[m] = [x.asDict() for x in g]
-    print(f"--- {m} ({qn}) ---", qn_quality[m])
+    print(f"--- {m} ({qn}) ---", qn_quality[m], " domain:", qn_domain[m])
 
 # COMMAND ----------
 
@@ -392,27 +230,9 @@ for m in MEASUREMENTS:
 dup_breakdown = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    cols = df.columns
     key = [find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")]
-    dk = df.groupBy(*key).agg(
-        F.count(F.lit(1)).alias("n"),
-        F.countDistinct(F.hash(*[F.col(c) for c in cols])).alias("row_variants"),
-    )
-    b = (
-        dk.agg(
-            F.sum((F.col("n") > 1).cast("long")).alias("dup_groups"),
-            F.sum(((F.col("n") > 1) & (F.col("row_variants") == 1)).cast("long")).alias(
-                "identical"
-            ),
-            F.sum(((F.col("n") > 1) & (F.col("row_variants") > 1)).cast("long")).alias(
-                "conflicting"
-            ),
-        )
-        .first()
-        .asDict()
-    )
-    dup_breakdown[m] = b
-    print(f"{m:<18} {b}")
+    dup_breakdown[m] = dup_key_composition(df, key)
+    print(f"{m:<18} {dup_breakdown[m]}")
 
 # COMMAND ----------
 
@@ -422,7 +242,7 @@ for m in MEASUREMENTS:
     df = frames[m]
     exprs = []
     for c in value_columns(df):
-        v = F.when(F.col(c).rlike(r"^-?\d+(\.\d+)?$"), F.col(c).cast("double"))
+        v = safe_num(c)
         b = PLAUSIBLE.get(c.upper())
         exprs += [
             F.min(v).alias(c + "_min"),
@@ -432,10 +252,6 @@ for m in MEASUREMENTS:
             F.sum((v == -999).cast("long")).alias(c + "_sentinel"),
             F.avg(F.when(v != -999, v)).alias(c + "_mean"),
             F.stddev(F.when(v != -999, v)).alias(c + "_sd"),
-            # Reuse the parsed, sentinel-excluded column expression `v` directly.
-            # (An inline SQL regex string here is mangled by the Spark-SQL string
-            # parser -- `\d` -> `d` -- so the CASE matched nothing and every
-            # percentile came back NULL.)
             F.percentile_approx(F.when(v != -999, v), [0.01, 0.5, 0.99]).alias(
                 c + "_p"
             ),
@@ -463,16 +279,198 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
-# DBTITLE 1,Hourly coverage % + longest gap per station (one windowed pass per table)
+# DBTITLE 1,Special values -- which candidate codes occur, in which columns
+# Candidate codes are values that look like codes rather than measurements (round
+# extremes seen in the value ranges). None is assumed to be a missing-value
+# marker: the checks below record where each one occurs and let the data speak.
+CANDIDATES = (-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9999.0)
+# Plausible physical range per value column. A candidate inside the range is an
+# ordinary value there (-1 degC, 990 hPa) and is not searched; only candidates
+# outside the range are. Columns without a known range keep every candidate.
+PLAUSIBLE_RANGE = {
+    "TT_TU": (-70.0, 60.0),
+    "TT_STD": (-70.0, 60.0),
+    "TF_STD": (-70.0, 60.0),
+    "TD_STD": (-70.0, 60.0),
+    "RF_TU": (0.0, 101.0),
+    "RF_STD": (0.0, 101.0),
+    "P": (300.0, 1100.0),
+    "P0": (200.0, 1100.0),
+    "P_STD": (200.0, 1100.0),
+    "V_N": (0.0, 8.0),
+    "N": (0.0, 8.0),
+    "R1": (0.0, 300.0),
+    "RS_IND": (0.0, 1.0),
+    "WRTR": (0.0, 9.0),
+    "SD_SO": (0.0, 60.0),
+    "F": (0.0, 100.0),
+    "D": (0.0, 360.0),
+    "ABSF_STD": (0.0, 60.0),
+    "VP_STD": (0.0, 100.0),
+}
+
+
+def codes_for(col):
+    rng = PLAUSIBLE_RANGE.get(col.upper())
+    return [x for x in CANDIDATES if rng is None or x < rng[0] or x > rng[1]]
+
+
+def clean_value(col):
+    v = safe_num(col)
+    codes = codes_for(col)
+    return F.when(~v.isin(codes), v) if codes else v
+
+
+special = {}
+for m in MEASUREMENTS:
+    df = frames[m]
+    cols = value_columns(df)
+    exprs = [F.count(F.lit(1)).alias("rows")]
+    for i, c in enumerate(cols):
+        v = safe_num(c)
+        exprs += [
+            F.sum((v == cand).cast("long")).alias(f"n_{i}_{j}")
+            for j, cand in enumerate(codes_for(c))
+        ]
+    r = df.agg(*exprs).first().asDict()
+    special[m] = {
+        "rows": r["rows"],
+        "hits": [
+            (c, cand, r[f"n_{i}_{j}"])
+            for i, c in enumerate(cols)
+            for j, cand in enumerate(codes_for(c))
+            if r[f"n_{i}_{j}"]
+        ],
+    }
+    print(m, special[m]["hits"])
+
+# COMMAND ----------
+
+# DBTITLE 1,Special values -- quality level, decade, station and co-occurrence per hit
+special_detail = {}
+for m in MEASUREMENTS:
+    hits = special[m]["hits"]
+    if not hits:
+        continue
+    df = frames[m]
+    qn, sid, dts = qn_col(df), find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
+    flags = [(safe_num(c) == cand) for c, cand, _ in hits]
+
+    def by(group_col, df=df, flags=flags):
+        return (
+            df.groupBy(group_col.alias("g"))
+            .agg(
+                F.count(F.lit(1)).alias("rows"),
+                *[F.sum(fl.cast("long")).alias(f"h{i}") for i, fl in enumerate(flags)],
+            )
+            .collect()
+        )
+
+    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    by_qn = by(F.col(qn)) if qn else []
+    by_dec = by(decade)
+    by_st = by(F.col(sid))
+    any_special = None
+    for c in value_columns(df):
+        codes = codes_for(c)
+        term = safe_num(c).isin(codes).cast("int") if codes else F.lit(0)
+        any_special = term if any_special is None else any_special + term
+    bundle = [
+        (x["k"], x["count"])
+        for x in df.groupBy(any_special.alias("k")).count().orderBy("k").collect()
+    ]
+    special_detail[m] = {"bundle": bundle, "hits": []}
+    for i, (c, cand, n) in enumerate(hits):
+        top_st = sorted(
+            ((x["g"], x[f"h{i}"]) for x in by_st), key=lambda t: -(t[1] or 0)
+        )[:3]
+        special_detail[m]["hits"].append(
+            {
+                "column": c,
+                "code": cand,
+                "rows": n,
+                "share": round(n / special[m]["rows"], 5),
+                "by_qn": [(x["g"], x[f"h{i}"], x["rows"]) for x in by_qn if x[f"h{i}"]],
+                "by_decade": [
+                    (x["g"], x[f"h{i}"])
+                    for x in sorted(by_dec, key=lambda t: (t["g"] is None, t["g"]))
+                    if x[f"h{i}"]
+                ],
+                "top_stations": top_st,
+                "top3_station_share": round(sum(t[1] or 0 for t in top_st) / n, 3)
+                if n
+                else None,
+            }
+        )
+    print(
+        m,
+        special_detail[m]["bundle"],
+        [h["column"] + "=" + str(h["code"]) for h in special_detail[m]["hits"]],
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Value range once every candidate code is set aside
+clean_range = {}
+for m in MEASUREMENTS:
+    df = frames[m]
+    exprs = []
+    cols = value_columns(df)
+    for c in cols:
+        v = clean_value(c)
+        exprs += [F.min(v).alias(c + "_min"), F.max(v).alias(c + "_max")]
+    r = df.agg(*exprs).first().asDict()
+    clean_range[m] = {c: (r[c + "_min"], r[c + "_max"]) for c in cols}
+    print(m, clean_range[m])
+
+# COMMAND ----------
+
+# DBTITLE 1,Seasonal (month) and diurnal (hour of day) profiles, as stored
+PROFILE_COLS = {
+    "air_temperature": ["TT_TU", "RF_TU"],
+    "cloudiness": ["V_N"],
+    "precipitation": ["R1"],
+    "pressure": ["P"],
+    "sun": ["SD_SO"],
+    "wind": ["F"],
+}
+profiles = {}
+for m, cols in PROFILE_COLS.items():
+    df = frames[m]
+    cols = [c for c in cols if c in df.columns]
+    if not cols:
+        continue
+    ts = as_ts(find_col(df, "MESS_DATUM"))
+    aggs = [F.avg(clean_value(c)).alias(c) for c in cols]
+    profiles[m] = {}
+    for key, k in (("month", F.month(ts)), ("hour", F.hour(ts))):
+        rows = (
+            df.groupBy(k.alias("k"))
+            .agg(*aggs)
+            .where(F.col("k").isNotNull())
+            .orderBy("k")
+            .collect()
+        )
+        profiles[m][key] = {
+            c: [(int(x["k"]), round(x[c], 2)) for x in rows if x[c] is not None]
+            for c in cols
+        }
+    print(m, {k: {c: len(v) for c, v in d.items()} for k, d in profiles[m].items()})
+
+# COMMAND ----------
+
+# DBTITLE 1,Hourly continuity vs an INDEPENDENT calendar + longest gap per station
 freq_cov = {}
 for m in MEASUREMENTS:
     df = frames[m]
     sid, dts = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     w = Window.partitionBy("station").orderBy("ts")
+    # No pre-.distinct() shuffle: duplicate (station, hour) rows make lag() give
+    # gap_h <= 0, which the `> 0` filters drop; observed_hours uses
+    # countDistinct. Saves a full 91M-row shuffle per table.
     per_station = (
         df.select(F.col(sid).alias("station"), as_ts(dts).alias("ts"))
         .where(F.col("ts").isNotNull())
-        .distinct()
         .withColumn(
             "gap_h",
             (F.col("ts").cast("long") - F.lag("ts").over(w).cast("long")) / 3600 - 1,
@@ -481,7 +479,7 @@ for m in MEASUREMENTS:
         .agg(
             F.min("ts").alias("min_ts"),
             F.max("ts").alias("max_ts"),
-            F.count(F.lit(1)).alias("observed_hours"),
+            F.countDistinct("ts").alias("observed_hours"),
             F.max(F.when(F.col("gap_h") > 0, F.col("gap_h"))).alias(
                 "longest_gap_hours"
             ),
@@ -506,6 +504,27 @@ for m in MEASUREMENTS:
 
 # COMMAND ----------
 
+# DBTITLE 1,Regime evidence -- per-decade station count / QN vocabulary / value-column population
+regime = {}
+for m in MEASUREMENTS:
+    df = frames[m]
+    dts = find_col(df, "MESS_DATUM")
+    qn = qn_col(df)
+    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    probe = [c for c in ([qn] if qn else []) + value_columns(df)]
+    by_decade = population_by_group(
+        df.withColumn("__decade", decade).where(F.col("__decade").isNotNull()),
+        "__decade",
+        probe,
+    )
+    regime[m] = by_decade
+    print(f"{m} by decade:")
+    for d, dv in sorted(by_decade.items()):
+        qd = dv["columns"].get(qn, {}).get("distinct") if qn else None
+        print(f"  {d}: rows={dv['rows']}  QN distinct={qd}")
+
+# COMMAND ----------
+
 # DBTITLE 1,Station x measurement coverage matrix (reuses per-station row counts)
 all_stations = sorted({s for m in MEASUREMENTS for s in station_counts[m]})
 coverage_matrix = [
@@ -523,16 +542,7 @@ for m in MEASUREMENTS:
     df = frames[m]
     vcols = value_columns(df)
     value_pdf[m] = (
-        df.select(
-            *[
-                F.when(
-                    F.col(c).rlike(r"^-?\d+(\.\d+)?$")
-                    & (F.col(c).cast("double") != -999),
-                    F.col(c).cast("double"),
-                ).alias(c)
-                for c in vcols
-            ]
-        )
+        df.select(*[F.when(safe_num(c) != -999, safe_num(c)).alias(c) for c in vcols])
         .sample(0.05, seed=42)
         .limit(150_000)
         .toPandas()
@@ -542,7 +552,8 @@ for m in MEASUREMENTS:
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- measurement overview (rows / stations / cities / year span)
-facet_bars(
+figs = []
+if facet_bars(
     {
         "rows per measurement": [(m, totals[m]) for m in MEASUREMENTS],
         "distinct stations": [(m, coverage[m]["stations"]) for m in MEASUREMENTS],
@@ -561,51 +572,54 @@ facet_bars(
     "dwd_measurement_overview.png",
     rot=30,
     ncols=2,
-)
+):
+    figs.append(("DWD measurement overview", "dwd_measurement_overview.png"))
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- QN distribution, dup composition, coverage %, longest gap
-facet_bars(
+if facet_bars(
     qn_dist,
     "DWD -- QN quality-flag distribution per measurement",
     "dwd_qn_distribution.png",
     rot=0,
-)
-x = np.arange(len(MEASUREMENTS))
-plt.figure(figsize=(11, 4))
-plt.bar(
-    x - 0.2,
-    [dup_breakdown[m]["identical"] for m in MEASUREMENTS],
-    width=0.4,
-    label="fully-identical repeat groups",
-)
-plt.bar(
-    x + 0.2,
-    [dup_breakdown[m]["conflicting"] for m in MEASUREMENTS],
-    width=0.4,
-    label="keys with conflicting rows",
-)
-plt.xticks(x, MEASUREMENTS, rotation=30, ha="right")
-plt.legend()
-plt.title("DWD -- duplicate key composition")
-plt.ylabel("key groups")
-plt.tight_layout()
-plt.savefig(fig_path("dwd_duplicate_key_composition.png"), dpi=110, bbox_inches="tight")
-plt.show()
-facet_bars(
+):
+    figs.append(("DWD QN quality-flag distribution", "dwd_qn_distribution.png"))
+
+_dup_pairs = {
+    "fully-identical repeat groups": [
+        (m, dup_breakdown[m]["identical"]) for m in MEASUREMENTS
+    ],
+    "keys with conflicting rows": [
+        (m, dup_breakdown[m]["conflicting"]) for m in MEASUREMENTS
+    ],
+}
+if facet_bars(
+    _dup_pairs,
+    "DWD -- duplicate key composition",
+    "dwd_duplicate_key_composition.png",
+    rot=30,
+):
+    figs.append(("DWD duplicate key composition", "dwd_duplicate_key_composition.png"))
+
+if facet_bars(
     {m: [(r["station"], r["coverage_pct"]) for r in freq_cov[m]] for m in MEASUREMENTS},
     "DWD -- hourly coverage % per station, by measurement",
     "dwd_hourly_coverage_pct.png",
-)
-facet_bars(
+):
+    figs.append(("DWD hourly coverage % per station", "dwd_hourly_coverage_pct.png"))
+
+if facet_bars(
     {
         m: [(r["station"], r["longest_gap_hours"] or 0) for r in freq_cov[m]]
         for m in MEASUREMENTS
     },
     "DWD -- longest missing-hours gap per station, by measurement",
     "dwd_longest_gap_hours.png",
-)
+):
+    figs.append(
+        ("DWD longest missing-hours gap per station", "dwd_longest_gap_hours.png")
+    )
 
 # COMMAND ----------
 
@@ -613,46 +627,39 @@ facet_bars(
 grid = np.array(
     [[row[m] for m in MEASUREMENTS] for row in coverage_matrix], dtype=float
 )
-plt.figure(figsize=(9, max(3, 0.4 * len(all_stations))))
-plt.imshow(
-    np.where(grid > 0, np.log10(grid + 1), np.nan), aspect="auto", cmap="viridis"
-)
-plt.colorbar(label="log10(row count)")
-plt.xticks(range(len(MEASUREMENTS)), MEASUREMENTS, rotation=45, ha="right")
-plt.yticks(range(len(all_stations)), all_stations)
-plt.title("DWD -- station x measurement coverage (row count)")
-plt.tight_layout()
-plt.savefig(
-    fig_path("dwd_station_x_measurement_coverage.png"), dpi=110, bbox_inches="tight"
-)
-plt.show()
+if grid.size:
+    fig, ax = plt.subplots(figsize=(9, max(3, 0.4 * len(all_stations))))
+    ax.imshow(
+        np.where(grid > 0, np.log10(grid + 1), np.nan), aspect="auto", cmap="viridis"
+    )
+    ax.set_xticks(range(len(MEASUREMENTS)))
+    ax.set_xticklabels(MEASUREMENTS, rotation=45, ha="right")
+    ax.set_yticks(range(len(all_stations)))
+    ax.set_yticklabels(all_stations)
+    ax.set_title("DWD -- station x measurement coverage (log10 row count)")
+    fig.tight_layout()
+    _save_and_show(fig, "dwd_station_x_measurement_coverage.png")
+    figs.append(
+        ("DWD station x measurement coverage", "dwd_station_x_measurement_coverage.png")
+    )
 
 # COMMAND ----------
 
 # DBTITLE 1,Figure -- value column spread per measurement (sampled, sentinel excluded)
-
-
-def _box_draw(pdf, cols):
-    def draw(ax):
-        ax.boxplot(
-            [pdf[c].dropna().tolist() for c in cols], labels=cols, showfliers=True
-        )
-        ax.tick_params(axis="x", labelrotation=30)
-
-    return draw
-
-
-_box_items = []
-for m in MEASUREMENTS:
-    pdf = value_pdf[m]
-    cols = [c for c in pdf.columns if pdf[c].notna().any()]
-    if cols:
-        _box_items.append((m, _box_draw(pdf, cols)))
-_facet_grid(
-    _box_items,
-    "DWD -- value column spread per measurement (sampled)",
+if facet_hists(
+    {
+        f"{m}.{c}": value_pdf[m][c].dropna().tolist()
+        for m in MEASUREMENTS
+        for c in value_pdf[m].columns
+        if value_pdf[m][c].notna().any()
+    },
+    "DWD -- value column distribution per measurement (sampled)",
     "dwd_value_column_spread.png",
-)
+    ncols=4,
+):
+    figs.append(
+        ("DWD value column spread per measurement", "dwd_value_column_spread.png")
+    )
 
 # COMMAND ----------
 
@@ -713,8 +720,31 @@ for m in MEASUREMENTS:
         f"| {m} | {b['dup_groups']} | {b['identical']} | {b['conflicting']} | {sent[0]}={sent[1]} | {oor[0]}={oor[1]} |"
     )
 
+_domain = [
+    "QN quality-flag values vs the DWD hourly-historical code set (1/2/3/5/7/9/10):"
+]
+for m in MEASUREMENTS:
+    d = qn_domain.get(m)
+    if not d:
+        _domain.append(f"- {m}: no QN column.")
+        continue
+    _domain.append(
+        f"- {d['column']}: unexpected={d['unexpected'] or 'none'}, unused={d['unused_allowed'] or 'none'}."
+    )
+_domain.append(
+    para(
+        "An unexpected QN value is a parse artefact or a schema drift, not a real",
+        "quality level -- confirm the raw column encoding before decoding it.",
+    )
+)
+
 _temporal = [
-    "Hourly grid (expected one row per station per hour); MESS_DATUM parsed yyyyMMddHH:"
+    para(
+        "Hourly grid, expected one row per station per hour; MESS_DATUM parsed",
+        "yyyyMMddHH (a trailing `.0` from a double-inferred column is stripped",
+        "first). Coverage is observed_hours / (span/3600 + 1) -- an independent",
+        "calendar, so <100% is a genuine gap.",
+    ),
 ]
 for m in MEASUREMENTS:
     cov = [r["coverage_pct"] for r in freq_cov[m] if r["coverage_pct"] is not None]
@@ -724,15 +754,43 @@ for m in MEASUREMENTS:
         f"per-station coverage {min(cov) if cov else 'n/a'}-{max(cov) if cov else 'n/a'}%, longest gap {worst}h"
     )
 
+_regime = [
+    para(
+        "Per-decade row count and QN-vocabulary / value-column population. DWD's",
+        "measurement network, instrumentation and QN scheme all changed over its",
+        "multi-decade history -- a model pooling decades sees several regimes.",
+    ),
+    "",
+]
+for m in MEASUREMENTS:
+    qn = qn_col(frames[m])
+    _regime.append(f"- {m}:")
+    for d, dv in sorted(regime[m].items()):
+        qd = dv["columns"].get(qn, {}).get("distinct") if qn else "n/a"
+        _regime.append(f"  - {d}s: rows={dv['rows']}, distinct QN codes={qd}")
+_regime.append(
+    para(
+        "A registration-era / decade indicator and a per-station availability",
+        "window are warranted before pooling -- not chosen here.",
+    )
+)
+
 _coverage = [
     f"{len(all_stations)} distinct station ids across the 7 measurements: {all_stations}.",
-    "Per-measurement station presence (row count per cell) — see the exported heatmap figure.",
+    "Per-measurement station presence (row count per cell) -- see the exported heatmap figure.",
 ]
 for row in coverage_matrix:
     _coverage.append(
         f"- station {row['station']}: "
         + ", ".join(f"{m}={row[m]}" for m in MEASUREMENTS)
     )
+_coverage.append(
+    para(
+        "Station presence is uneven -- an inner join across all 7 measurements",
+        "silently drops a station's rows for hours it lacks one parameter; this is",
+        "a coverage bias toward the fully-instrumented stations.",
+    )
+)
 
 _dist = []
 for m in MEASUREMENTS:
@@ -745,12 +803,56 @@ for m in MEASUREMENTS:
             + (f", out-of-range={vs.get(c + '_oor')}" if c + "_oor" in vs else "")
         )
 
+
+def short_list(items, n=8):
+    items = list(items)
+    return items if len(items) <= n else f"{items[:n]} (+{len(items) - n} more)"
+
+
+_special = [
+    para(
+        f"Candidate special codes {CANDIDATES}, searched in each value column only where the code lies outside that column's plausible range {PLAUSIBLE_RANGE}",
+        "(a code inside the range, such as -1 degC or 990 hPa, is an ordinary value there).",
+        "None is assumed to be a missing-value marker; each is characterised by where it occurs.",
+    )
+]
+for m, sd in special_detail.items():
+    _special.append(
+        f"- {m}: rows with k candidate codes per row (k, rows): {sd['bundle']}."
+    )
+    for h in sd["hits"]:
+        _special.append(
+            f"  - `{h['column']}` = {h['code']}: {h['rows']} rows ({h['share']:.3%}); by quality level (level, rows with the code, rows at level) {short_list(h['by_qn'])}; "
+            f"by decade (decade, rows) {short_list(h['by_decade'])}; top stations (station, rows) {h['top_stations']} = {h['top3_station_share']} of the code's rows."
+        )
+_special.append(
+    "Value range with the out-of-range candidate codes of each column set aside (column: min, max):"
+)
+for m, cr in clean_range.items():
+    _special.append(f"- {m}: {cr}")
+_special.append(
+    para(
+        "Reading the evidence: a code confined to one quality level, appearing in the same rows across",
+        "several columns, or concentrated in specific decades or stations points to a recording convention;",
+        "a code spread across quality levels and stations with values on both sides points to a real value.",
+        "The role of each code is not decided here -- it needs the source documentation.",
+    )
+)
+
+_patterns = [
+    "Mean by calendar month and by hour of day of MESS_DATUM (as stored, all stations, candidate codes excluded):"
+]
+for m, kinds_ in profiles.items():
+    for key, cols in kinds_.items():
+        for c, vs in cols.items():
+            _patterns.append(f"- {m}.`{c}` by {key}: {vs}")
+
 _qn = ["QN quality flag vs -999 sentinel / out-of-range rows:"]
 for m in MEASUREMENTS:
     if m in qn_quality:
         _qn.append(f"- {m}: " + "; ".join(str(d) for d in qn_quality[m]))
 
-_any_conflict = any(dup_breakdown[m]["conflicting"] > 0 for m in MEASUREMENTS)
+_any_conflict = any(dup_breakdown[m]["conflicting"] for m in MEASUREMENTS)
 _any_sentinel = any(
     value_stats[m].get(c + "_sentinel", 0) > 0
     for m in MEASUREMENTS
@@ -765,16 +867,164 @@ if _any_conflict:
     _silver.append(
         "- (STATIONS_ID, MESS_DATUM) has conflicting duplicate rows in at least one measurement -> a conflict-resolution rule is required (rule not yet established)."
     )
-_silver.append(
-    "- Identical (STATIONS_ID, MESS_DATUM) repeats can be de-duplicated safely."
+_silver += [
+    "- Identical (STATIONS_ID, MESS_DATUM) repeats can be de-duplicated safely.",
+    "- Constant columns above carry no information.",
+    "- Hourly series are not continuous (coverage % / gaps above) -> no dense-grid assumption.",
+    "- Out-of-range non-sentinel values are flagged suspicious, not proven wrong -> keep raw + a quality flag.",
+    "- Decode QN against the DWD scheme valid for the record's era (see Regime / Version Evidence).",
+]
+
+_no_target = para(
+    "No candidate ML target lives in these tables -- raw per-station hourly",
+    "measurements feeding the shared weather feature source, not a labelled table.",
 )
-_silver.append("- Constant columns above carry no information.")
-_silver.append(
-    "- Hourly series are not continuous (coverage % / gaps above) -> no dense-grid assumption."
+_ml = ml_readiness_block(
+    [
+        (
+            "Grain / grain drift",
+            para(
+                "One row per (STATIONS_ID, MESS_DATUM) per measurement.",
+                "Pooling measurements or resampling to a coarser step drifts the grain;",
+                "a station-level or contiguous-date split is required, never a random row split.",
+            ),
+        ),
+        (
+            "Join multiplication (1:N / M:N expansion)",
+            para(
+                "Cross-measurement joins on (STATIONS_ID, MESS_DATUM) are 1:1 where both",
+                "sides are present (confirmed in 04) -- the risk is row LOSS on an inner",
+                "join across uneven station coverage, not multiplication.",
+            ),
+        ),
+        ("Target contamination", _no_target),
+        (
+            "Temporal / post-event leakage",
+            para(
+                "QN_* flags are set by DWD's QC alongside the value -- not available",
+                "before the value; any forecasting feature may use only rows with",
+                "MESS_DATUM strictly before the prediction timestamp.",
+            ),
+        ),
+        (
+            "Proxy leakage",
+            "STATIONS_ID / city identify a specific site -- a model given them memorises the station.",
+        ),
+        (
+            "Split / entity leakage",
+            "Split by STATIONS_ID or by contiguous date range -- a station's adjacent hourly rows are highly correlated.",
+        ),
+        (
+            "Historical-reference (point-in-time) leakage",
+            para(
+                "Station location / name / instrument are time-varying (metadata, 02) --",
+                "a climatology or a station attribute joined to a historical row must use",
+                "the value valid at that row's MESS_DATUM, not the latest.",
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            para(
+                "Hourly coverage above shows the real gaps; the station x measurement",
+                "matrix shows uneven instrumentation. A pooled statistic is dominated by",
+                "the long-history, fully-instrumented stations.",
+            ),
+        ),
+        (
+            "Missingness leakage",
+            para(
+                "-999 / blank rate correlates with station, parameter and era (Regime /",
+                "Version Evidence) -- an 'is-missing' feature can leak an outage window.",
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            f"Conflicting (station, ts) duplicates per measurement: { {m: dup_breakdown[m]['conflicting'] for m in MEASUREMENTS} } -- resolve before counting or splitting.",
+        ),
+        (
+            "Target / feature temporal misalignment",
+            "MESS_DATUM is the observation hour; a feature/target pair must align to one hour convention (interval start vs end).",
+        ),
+        (
+            "Unit / sign / circular-feature leakage",
+            para(
+                "Units are not in Bronze (reconcile via parameter_unit, 02). Net vs",
+                "gross / related parameters within a measurement can be near-collinear.",
+            ),
+        ),
+        (
+            "Data-generation-process leakage",
+            "QN_* encodes DWD's QC decision, not the physical weather -- a feature keyed on it encodes the QC pipeline.",
+        ),
+        (
+            "Class / label instability",
+            para(
+                "QN codes are a DWD enumeration that changed across the archive's history",
+                "(Regime / Version Evidence) -- a class defined by a raw QN is only stable",
+                "within one scheme vintage.",
+            ),
+        ),
+        (
+            "Label availability lag",
+            "DWD publishes historical data with a lag and revises it -- a nowcast cannot use the current hour's value.",
+        ),
+        (
+            "Source / version / regime change",
+            para(
+                "Per-decade row count, QN vocabulary and value-column population are",
+                "measured in Regime / Version Evidence -- a decade/era indicator is",
+                "warranted before pooling.",
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            para(
+                "The value-column figure is drawn from a 5% sample capped at 150k rows;",
+                "every reported statistic (value_stats, freq_cov, dup_breakdown) is a",
+                "full Spark aggregation.",
+            ),
+        ),
+    ]
 )
-_silver.append(
-    "- Out-of-range non-sentinel values are flagged as suspicious, not proven wrong -> keep raw + a quality flag."
-)
+
+
+_areas = {
+    "Domain understanding": [
+        "hourly station observations of air temperature, humidity, pressure, wind, precipitation, cloudiness and sunshine",
+        f"candidate special codes found: { {m: sorted({(h['column'], h['code']) for h in sd['hits']}) for m, sd in special_detail.items()} }",
+        f"seasonal and diurnal cycles measured for {list(profiles)}",
+    ],
+    "Structure and engineering": [
+        "7 Bronze tables keyed (station, MESS_DATUM); all columns are strings and are cast with a safe numeric parse",
+        "timestamps arrive as yyyyMMddHH, sometimes with a trailing .0",
+        f"quality-level column per table: { {m: qn_col(frames[m]) for m in MEASUREMENTS} }",
+    ],
+    "Temporal": [
+        f"spans { {m: (str(coverage[m]['min_ts'])[:10], str(coverage[m]['max_ts'])[:10]) for m in MEASUREMENTS} }",
+        f"longest station gap (hours) per measurement { {m: max((r['longest_gap_hours'] or 0 for r in freq_cov[m]), default=0) for m in MEASUREMENTS} }",
+    ],
+    "Spatial": [
+        f"{len(all_stations)} stations; station-level spatial patterns are in the relationships notebook"
+    ],
+    "Data quality": [
+        f"duplicate keys { {m: (dup_breakdown[m]['dup_groups'], dup_breakdown[m]['conflicting']) for m in MEASUREMENTS} } (groups, conflicting)",
+        f"-999 rows { {m: sum(value_stats[m].get(c + '_sentinel', 0) for c in value_columns(frames[m])) for m in MEASUREMENTS} }",
+        "other candidate codes: see Special Values",
+    ],
+    "Statistical patterns": [
+        "month and hour profiles (see Seasonal and Diurnal Profiles); value ranges per column in Distributions"
+    ],
+    "Relationships": ["cross-variable checks are in the relationships notebook"],
+    "Analytics use": [
+        "long hourly history at a small set of stations, with a quality flag per row"
+    ],
+    "ML use": [
+        "continuous targets (temperature, pressure, wind, sunshine) with strong seasonal and diurnal structure; the quality flag and special codes must be handled before use"
+    ],
+    "AI / knowledge use": [
+        "no text; parameter and station metadata form a small reference catalog (see the metadata notebook)"
+    ],
+}
 
 write_profiling(
     SOURCE,
@@ -783,22 +1033,17 @@ write_profiling(
     blocks=[
         ("Profile", "\n".join(_profile) + "\n\n" + "\n".join(_miss)),
         ("Data Quality", "\n".join(_dq) + "\n\n" + "\n".join(_qn)),
+        ("Special Values", "\n".join(_special)),
+        ("Categorical / Domain Validation", "\n".join(_domain)),
         ("Temporal", "\n".join(_temporal)),
+        ("Regime / Version Evidence", "\n".join(_regime)),
         ("Coverage", "\n".join(_coverage)),
         ("Distributions", "\n".join(_dist)),
+        ("Seasonal and Diurnal Profiles", "\n".join(_patterns)),
         ("EDA Findings", "\n".join(f"- {ln}" for ln in findings_lines)),
+        ("ML-Readiness Evidence", _ml),
+        ("Observations by Area", area_block(_areas)),
         ("Silver Implications", "\n".join(_silver)),
     ],
-    figures=[
-        ("DWD measurement overview", "dwd_measurement_overview.png"),
-        ("DWD QN quality-flag distribution", "dwd_qn_distribution.png"),
-        ("DWD duplicate key composition", "dwd_duplicate_key_composition.png"),
-        ("DWD hourly coverage % per station", "dwd_hourly_coverage_pct.png"),
-        ("DWD longest missing-hours gap per station", "dwd_longest_gap_hours.png"),
-        (
-            "DWD station x measurement coverage",
-            "dwd_station_x_measurement_coverage.png",
-        ),
-        ("DWD value column spread per measurement", "dwd_value_column_spread.png"),
-    ],
+    figures=figs,
 )

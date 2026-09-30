@@ -10,6 +10,11 @@ source: honda_iot
 source_system: honda_iot
 profiling_evidence: src/schemas/profiling/honda_iot.md
 contract: src/schemas/contracts/honda_iot.yml
+bronze_layout: >
+  from_tables name the logical datasets of the contract. In Bronze the P and W
+  datasets of a metric are one table (honda_iot_electricity / _heating /
+  _cooling) with a measurement_type column ('p' / 'w'); see the contract's
+  bronze: blocks. The "_p vs _w table" rule below reads measurement_type.
 
 targets:
 
@@ -24,7 +29,7 @@ targets:
         canonical: "dim_device.subsystem (electricity / heating / cooling)"
       - source: "value column name -> channel"
         canonical: "dim_device.channel (total / PV / CHP / CHP_heat / CHP_elec / cool_elec)"
-      - source: "_p vs _w table -> measure"
+      - source: "_p vs _w dataset (measurement_type p / w) -> measure"
         canonical: "fact_energy_consumption.measure ('power' for _p, 'energy' for _w)"
       - source: "frequency"
         canonical: "interval attribute (1min / 15min / 1h)"
