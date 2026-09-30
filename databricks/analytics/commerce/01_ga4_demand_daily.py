@@ -15,7 +15,7 @@
 # MAGIC **Purpose:** `commerce_analytics.ga4_demand_daily` -- Gold `ga4_session`
 # MAGIC rolled up from session to day and country: sessions, transactions and
 # MAGIC revenue. No REES46 join -- GA4 and REES46 stay source-distinct at every
-# MAGIC layer (ADR-036/GOLD_DESIGN Section E: no shared identity). Grain: country
+# MAGIC layer (no shared identity). Grain: country
 # MAGIC x local date.
 
 # COMMAND ----------

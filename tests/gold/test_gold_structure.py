@@ -57,14 +57,16 @@ def test_notebook_has_the_standard_databricks_header(path):
     assert first_line == "# Databricks notebook source"
 
 
-@pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: str(p.relative_to(_GOLD)))
+_WRITERS = [
+    p
+    for p in _NOTEBOOKS
+    if _WRITE_CALL in _call_names(ast.parse(p.read_text(encoding="utf-8")))
+]
+
+
+@pytest.mark.parametrize("path", _WRITERS, ids=lambda p: str(p.relative_to(_GOLD)))
 def test_every_notebook_that_writes_gold_also_calls_the_hard_fail_gate(path):
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    calls = _call_names(tree)
-    if _WRITE_CALL not in calls:
-        pytest.skip(
-            f"{path.name} does not call {_WRITE_CALL} -- not a table-writing notebook"
-        )
+    calls = _call_names(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
     assert calls & _GATE_CALLS, (
         f"{path.name} calls {_WRITE_CALL} without calling check() or "
         "assert_unique_grain() -- a Gold table would be written with no "
