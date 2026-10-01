@@ -102,6 +102,7 @@ extend-ignore = ["E402", "BLE001"]
 # Silver libraries) and their own `_ml_*` libraries, the same chain shape as
 # Analytics; every ML file legitimately uses names from that chain.
 "databricks/ml/**/*.py" = ["F821"]
+"databricks/models/**/*.py" = ["F821"]
 
 # Pytest config lives in pytest.ini only -- when both pytest.ini and
 # [tool.pytest.ini_options] exist, pytest uses pytest.ini and silently

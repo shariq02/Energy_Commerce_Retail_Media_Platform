@@ -1,0 +1,1184 @@
+# Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
+# MAGIC %md
+# MAGIC # MODEL SHARED LIBRARY
+# MAGIC
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
+# MAGIC **Author:** Sharique Mohammad
+# MAGIC
+# MAGIC **Date:** October 2026
+# MAGIC
+# MAGIC **Purpose:** plumbing shared by every model notebook, pulled in with
+# MAGIC `%run ../_model_common`. Definitions only -- no side effects at import.
+# MAGIC
+# MAGIC Covers the task registry, frozen-dataset reads (test partition never read),
+# MAGIC feature resolution, the feature encoder, the isolated candidate runner, result
+# MAGIC recording and MLflow logging. No model logic lives here.
+
+# COMMAND ----------
+
+# DBTITLE 1,ML shared library (read_ml, ml_fqn, check, user_hash_bucket, ...)
+# MAGIC %run ../ml/_ml_common
+
+# COMMAND ----------
+
+# DBTITLE 1,Imports
+import datetime as _dt
+import hashlib as _hashlib
+import importlib.metadata as _importlib_metadata
+import importlib.util as _importlib_util
+import os as _os
+import tempfile as _tempfile
+import time as _time
+
+import numpy as np
+import pandas as pd
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
+# COMMAND ----------
+
+# DBTITLE 1,Configuration constants
+MODEL_STAGE = "models"
+MODEL_SCHEMAS = {"energy": "energy_ml_models", "commerce": "commerce_ml_models"}
+MODEL_SEED = 42
+MODEL_SPLIT_VERSION = "e1"
+ALLOWED_PARTITIONS = ("train", "validation")
+SMOKE_ROWS = 4000
+TRAIN_ROW_CAP = 6_000_000
+TUNE_MAX_ROWS = 500_000
+TUNE_MAX_FOLDS = 3
+USER_SAMPLE_PERCENT = 10
+USER_SAMPLE_SEED = "ecrmap-model-sample-s1"
+WEAK_SPLIT_PERCENT = (70, 15, 15)
+MATCHING_SPLIT_PERCENT = (60, 20, 20)
+MIN_TIER_ROWS = 10
+MIN_SERIES_ENTITIES = 10
+SURVIVAL_HORIZONS_YEARS = (1, 3, 5)
+QUANTILES = (0.1, 0.5, 0.9)
+RANK_KS = (5, 10, 20)
+FORWARD_TOP_N = 2
+MLFLOW_EXPERIMENT_PREFIX = "/Shared/ecrmap_models"
+RESULT_COLUMNS = (
+    "dataset_id string, task_id string, model_name string, family string, "
+    "stage string, partition string, metric string, value double, n_rows bigint, "
+    "status string, detail string, frozen_delta_version bigint, "
+    "mlflow_run_id string, artifact_status string, params string, smoke boolean, "
+    "run_id string, run_at timestamp"
+)
+MODEL_DDL = {
+    "task_registry": (
+        "task_id string, dataset_id string, ecosystem string, paradigm string, "
+        "task_type string, target string, baseline string, primary_metric string, "
+        "higher_is_better boolean, notebook string, registered_at timestamp"
+    ),
+    "evaluation_split_manifest": (
+        "dataset_id string, frozen_delta_version bigint, grain_key string, "
+        "partition string, fold_id int, group_key string, stratum string, "
+        "rule_id string, split_version string"
+    ),
+    "evaluation_spec": (
+        "dataset_id string, spec_key string, spec_value string, run_id string, "
+        "recorded_at timestamp"
+    ),
+    "candidate_results": RESULT_COLUMNS,
+    "candidate_selection": (
+        "task_id string, dataset_id string, model_name string, family string, "
+        "rank int, primary_metric string, primary_value double, is_baseline boolean, "
+        "mlflow_run_id string, frozen_delta_version bigint, run_id string, "
+        "selected_at timestamp"
+    ),
+    "library_availability": (
+        "library string, version string, available boolean, checked_at timestamp"
+    ),
+}
+LIBRARIES = {
+    "sklearn": "scikit-learn",
+    "lightgbm": "lightgbm",
+    "xgboost": "xgboost",
+    "lifelines": "lifelines",
+    "sksurv": "scikit-survival",
+    "torch": "torch",
+    "mlflow": "mlflow",
+    "cloudpickle": "cloudpickle",
+    "psutil": "psutil",
+}
+
+
+def _task(
+    task_id,
+    dataset_id,
+    ecosystem,
+    paradigm,
+    task_type,
+    target,
+    baseline,
+    primary,
+    higher,
+    notebook,
+):
+    return {
+        "task_id": task_id,
+        "dataset_id": dataset_id,
+        "ecosystem": ecosystem,
+        "paradigm": paradigm,
+        "task_type": task_type,
+        "target": target,
+        "baseline": baseline,
+        "primary_metric": primary,
+        "higher_is_better": higher,
+        "notebook": notebook,
+    }
+
+
+TASKS = [
+    _task(
+        "price_daily.price",
+        "price_daily",
+        "energy",
+        "supervised",
+        "regression_price",
+        "target_price_eur_per_mwh",
+        "seasonal_naive",
+        "mae",
+        False,
+        "energy/01_price_daily.py",
+    ),
+    _task(
+        "price_quarter_hour.price",
+        "price_quarter_hour",
+        "energy",
+        "supervised",
+        "regression_price",
+        "target_price_eur_per_mwh",
+        "persistence",
+        "mae",
+        False,
+        "energy/02_price_quarter_hour.py",
+    ),
+    _task(
+        "price_quarter_hour.negative_price",
+        "price_quarter_hour",
+        "energy",
+        "supervised",
+        "classification",
+        "target_is_negative_price",
+        "base_rate",
+        "pr_auc",
+        True,
+        "energy/02_price_quarter_hour.py",
+    ),
+    _task(
+        "load.load",
+        "load",
+        "energy",
+        "supervised",
+        "regression",
+        "target_value_mwh",
+        "seasonal_mean",
+        "mae",
+        False,
+        "energy/03_load.py",
+    ),
+    _task(
+        "bias.bias",
+        "bias",
+        "energy",
+        "supervised",
+        "regression",
+        "target_bias_mwh",
+        "zero_correction",
+        "mae",
+        False,
+        "energy/04_bias.py",
+    ),
+    _task(
+        "zone_generation.generation",
+        "zone_generation",
+        "energy",
+        "supervised",
+        "regression",
+        "target_generation_mwh",
+        "capacity_factor",
+        "mae",
+        False,
+        "energy/05_zone_generation.py",
+    ),
+    _task(
+        "honda_forecast.increment",
+        "honda_forecast",
+        "energy",
+        "supervised",
+        "regression",
+        "target_increment",
+        "persistence",
+        "mae",
+        False,
+        "energy/06_honda_forecast.py",
+    ),
+    _task(
+        "honda_anomaly.anomaly",
+        "honda_anomaly",
+        "energy",
+        "unsupervised",
+        "anomaly",
+        "injected_anomaly",
+        "seasonal_zscore",
+        "pr_auc",
+        True,
+        "energy/07_honda_anomaly.py",
+    ),
+    _task(
+        "ccpp.output",
+        "ccpp",
+        "energy",
+        "supervised",
+        "regression",
+        "target_net_output_mw",
+        "train_mean",
+        "mae",
+        False,
+        "energy/08_ccpp.py",
+    ),
+    _task(
+        "capacity_additions.additions",
+        "capacity_additions",
+        "energy",
+        "supervised",
+        "regression_count",
+        "target_capacity_added_mw",
+        "seasonal_mean",
+        "mae",
+        False,
+        "energy/09_capacity_additions.py",
+    ),
+    _task(
+        "redispatch.any_event",
+        "redispatch",
+        "energy",
+        "supervised",
+        "classification",
+        "target_any_event",
+        "base_rate",
+        "pr_auc",
+        True,
+        "energy/10_redispatch.py",
+    ),
+    _task(
+        "redispatch.event_energy",
+        "redispatch",
+        "energy",
+        "supervised",
+        "regression",
+        "target_log_event_energy_mwh",
+        "zone_mean",
+        "mae",
+        False,
+        "energy/10_redispatch.py",
+    ),
+    _task(
+        "survival.unit_lifetime",
+        "survival",
+        "energy",
+        "survival",
+        "survival",
+        "target_duration_years",
+        "kaplan_meier",
+        "concordance",
+        True,
+        "energy/11_survival.py",
+    ),
+    _task(
+        "redispatch_matching.tier",
+        "redispatch_matching",
+        "energy",
+        "matching",
+        "multiclass",
+        "target_match_tier",
+        "majority_tier",
+        "balanced_accuracy",
+        True,
+        "energy/12_redispatch_matching.py",
+    ),
+    _task(
+        "weak_supervision.labels",
+        "weak_supervision",
+        "energy",
+        "weak_supervision",
+        "label_model",
+        "lf_label",
+        "majority_vote",
+        "coverage",
+        True,
+        "energy/13_weak_supervision.py",
+    ),
+    _task(
+        "weather_imputation.reconstruction",
+        "weather_imputation",
+        "energy",
+        "self_supervised",
+        "reconstruction",
+        "masked_value",
+        "carry_forward",
+        "skill_mae_mean",
+        True,
+        "energy/14_weather_imputation.py",
+    ),
+    _task(
+        "self_supervised_other.reconstruction",
+        "self_supervised_other",
+        "energy",
+        "self_supervised",
+        "reconstruction",
+        "masked_or_shifted_value",
+        "seasonal_carry",
+        "skill_mae_mean",
+        True,
+        "energy/15_self_supervised_other.py",
+    ),
+    _task(
+        "rl_pumped_storage.policy",
+        "rl_pumped_storage",
+        "energy",
+        "offline_rl",
+        "policy",
+        "action_net_mwh",
+        "rule_policy",
+        "reward_policy",
+        True,
+        "energy/16_rl_pumped_storage.py",
+    ),
+    _task(
+        "rl_redispatch.policy",
+        "rl_redispatch",
+        "energy",
+        "offline_rl",
+        "policy",
+        "action_direction",
+        "majority_action",
+        "action_agreement",
+        True,
+        "energy/17_rl_redispatch.py",
+    ),
+    _task(
+        "session_purchase_ga4.purchase",
+        "session_purchase_ga4",
+        "commerce",
+        "supervised",
+        "classification",
+        "target_purchase_after_prefix",
+        "base_rate",
+        "pr_auc",
+        True,
+        "commerce/01_session_purchase_ga4.py",
+    ),
+    _task(
+        "session_purchase_rees46.purchase",
+        "session_purchase_rees46",
+        "commerce",
+        "supervised",
+        "classification",
+        "target_purchase_after_prefix",
+        "base_rate",
+        "pr_auc",
+        True,
+        "commerce/02_session_purchase_rees46.py",
+    ),
+    _task(
+        "lapse_ga4.return",
+        "lapse_ga4",
+        "commerce",
+        "supervised",
+        "classification",
+        "target_returned",
+        "base_rate",
+        "pr_auc",
+        True,
+        "commerce/03_lapse_ga4.py",
+    ),
+    _task(
+        "lapse_rees46.return",
+        "lapse_rees46",
+        "commerce",
+        "supervised",
+        "classification",
+        "target_returned",
+        "base_rate",
+        "pr_auc",
+        True,
+        "commerce/04_lapse_rees46.py",
+    ),
+    _task(
+        "next_item_ga4.next_item",
+        "next_item_ga4",
+        "commerce",
+        "ranking",
+        "ranking",
+        "target_next_product_id",
+        "popularity",
+        "ndcg_at_10",
+        True,
+        "commerce/05_next_item_ga4.py",
+    ),
+    _task(
+        "next_item_rees46.next_item",
+        "next_item_rees46",
+        "commerce",
+        "ranking",
+        "ranking",
+        "target_next_product_id",
+        "popularity",
+        "ndcg_at_10",
+        True,
+        "commerce/06_next_item_rees46.py",
+    ),
+    _task(
+        "rl_session_sequences.policy",
+        "rl_session_sequences",
+        "commerce",
+        "offline_rl",
+        "policy",
+        "target_action_event_type",
+        "most_frequent_event",
+        "action_agreement",
+        True,
+        "commerce/07_rl_session_sequences.py",
+    ),
+]
+TASK_BY_ID = {t["task_id"]: t for t in TASKS}
+
+# COMMAND ----------
+
+# DBTITLE 1,Naming, run identity and registry access
+
+
+def model_schema_for(ecosystem: str) -> str:
+    return MODEL_SCHEMAS[ecosystem]
+
+
+def model_fqn(table: str, ecosystem: str) -> str:
+    return f"{CATALOG}.{model_schema_for(ecosystem)}.{table}"
+
+
+def model_run_id() -> str:
+    return _dt.datetime.now(_dt.UTC).strftime("model-%Y%m%dT%H%M%SZ")
+
+
+def read_model(table: str, *, ecosystem: str) -> DataFrame:
+    return spark.table(model_fqn(table, ecosystem))
+
+
+def replace_model_rows(
+    df: DataFrame, table: str, *, ecosystem: str, predicate: str
+) -> None:
+    """Replace only the registry rows matching the predicate."""
+    full = model_fqn(table, ecosystem)
+    cols = spark.table(full).columns
+    (
+        df.select(*cols)
+        .write.format("delta")
+        .mode("overwrite")
+        .option("replaceWhere", predicate)
+        .saveAsTable(full)
+    )
+    print(f"OK  {full}: rows replaced where {predicate}")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Library availability
+
+
+def library_available(name: str) -> bool:
+    return _importlib_util.find_spec(name) is not None
+
+
+def library_version(name: str) -> str | None:
+    try:
+        return _importlib_metadata.version(LIBRARIES.get(name, name))
+    except _importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def missing_libraries(requires) -> list[str]:
+    return [lib for lib in requires if not library_available(lib)]
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Frozen dataset reads -- the test partition is never read
+
+
+def frozen_version(dataset_id: str, ecosystem: str) -> int:
+    row = (
+        read_ml("dataset_manifest", ecosystem=ecosystem)
+        .filter(F.col("dataset_id") == dataset_id)
+        .select("freeze_status", "frozen_delta_version")
+        .first()
+    )
+    if row is None or row["freeze_status"] != "frozen":
+        raise RuntimeError(
+            f"{ecosystem}.{dataset_id} is not frozen; models read frozen datasets only"
+        )
+    return int(row["frozen_delta_version"])
+
+
+class TaskContext:
+    """Identity of one modelling task for one notebook run."""
+
+    def __init__(self, task_id: str, rid: str, smoke: bool = False):
+        t = TASK_BY_ID[task_id]
+        self.task_id = task_id
+        self.dataset_id = t["dataset_id"]
+        self.ecosystem = t["ecosystem"]
+        self.primary_metric = t["primary_metric"]
+        self.higher_is_better = t["higher_is_better"]
+        self.rid = rid
+        self.smoke = bool(smoke)
+        self.frozen_version = frozen_version(self.dataset_id, self.ecosystem)
+        self.component = f"models/{t['notebook'].removesuffix('.py')}"
+
+
+def assert_no_test_partition(partitions) -> None:
+    bad = [p for p in partitions if p not in ALLOWED_PARTITIONS]
+    if bad:
+        raise RuntimeError(
+            f"model notebooks may read {ALLOWED_PARTITIONS} only, asked for {bad}"
+        )
+
+
+def smoke_subset(df: DataFrame, rows: int = SMOKE_ROWS) -> DataFrame:
+    """A few rows of each partition, enough to exercise every code path."""
+    parts = [df.filter(F.col("partition") == p).limit(rows) for p in ALLOWED_PARTITIONS]
+    return parts[0].unionByName(parts[1])
+
+
+def read_frozen(
+    ctx: TaskContext, partitions=ALLOWED_PARTITIONS, apply_smoke: bool = True
+) -> DataFrame:
+    """The dataset at its frozen Delta version, train and validation rows only."""
+    assert_no_test_partition(partitions)
+    full = ml_fqn(f"dataset_{ctx.dataset_id}", ctx.ecosystem)
+    df = spark.sql(f"SELECT * FROM {full} VERSION AS OF {ctx.frozen_version}")
+    df = df.filter(F.col("partition").isin(*partitions))
+    return smoke_subset(df) if ctx.smoke and apply_smoke else df
+
+
+def attach_evaluation_partition(
+    df: DataFrame, ctx: TaskContext, key_cols: list[str]
+) -> DataFrame:
+    """Replace partition, fold and group by the evaluation split manifest."""
+    m = (
+        read_model("evaluation_split_manifest", ecosystem=ctx.ecosystem)
+        .filter(F.col("dataset_id") == ctx.dataset_id)
+        .select("grain_key", "partition", "fold_id", "group_key")
+    )
+    base = df.drop("partition", "fold_id", "group_key").withColumn(
+        "_grain_key", grain_key(*key_cols)
+    )
+    out = base.join(m, base["_grain_key"] == m["grain_key"], "inner").drop(
+        "grain_key", "_grain_key"
+    )
+    out = out.filter(F.col("partition").isin(*ALLOWED_PARTITIONS))
+    return smoke_subset(out) if ctx.smoke else out
+
+
+def sample_users(df: DataFrame, user_col: str = "user_id") -> DataFrame:
+    """Stable user-level sample; the same users fall in every partition."""
+    bucket = user_hash_bucket([user_col], seed=USER_SAMPLE_SEED)
+    return df.filter(bucket < USER_SAMPLE_PERCENT)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Feature resolution and the pandas conversion
+
+
+def select_features(roles: dict, columns, *, id_features=(), drop=()) -> list[str]:
+    """Contract features, with the fitted replacement where one exists.
+
+    roles maps column -> contract role; `x_imputed` replaces `x` and
+    `x_is_missing` is kept alongside it. Keys, time, target and provenance
+    columns never enter; `id_features` promotes listed key columns."""
+    have = set(columns)
+    out: list[str] = []
+    for c, r in roles.items():
+        if r != "feature" or c not in have or c in drop:
+            continue
+        out.append(f"{c}_imputed" if f"{c}_imputed" in have else c)
+        if f"{c}_is_missing" in have:
+            out.append(f"{c}_is_missing")
+    out += [c for c in id_features if c in have and c not in drop]
+    return list(dict.fromkeys(out))
+
+
+def resolve_features(
+    ctx: TaskContext, columns, *, id_features=(), drop=()
+) -> list[str]:
+    rows = (
+        read_ml("feature_contract", ecosystem=ctx.ecosystem)
+        .filter(F.col("dataset_id") == ctx.dataset_id)
+        .select("column_name", "role")
+        .collect()
+    )
+    roles = {r["column_name"]: r["role"] for r in rows}
+    feats = select_features(roles, columns, id_features=id_features, drop=drop)
+    if not feats:
+        raise RuntimeError(f"no features resolved for {ctx.dataset_id}")
+    return feats
+
+
+def training_row_cap(n_columns: int) -> int:
+    """Rows that fit comfortably in driver memory for this width."""
+    cap = TRAIN_ROW_CAP
+    if library_available("psutil"):
+        import psutil
+
+        avail = psutil.virtual_memory().available
+        cap = min(cap, int(0.4 * avail / (8 * max(n_columns, 1) * 3)))
+    return max(cap, 10_000)
+
+
+def to_training_frame(df: DataFrame, *, key_cols: list[str], columns=None):
+    """(pandas frame, row fraction). Loads up to the memory-derived cap; above it
+    a stable hash sample over key_cols is taken and its fraction is returned."""
+    cols = list(dict.fromkeys(columns or df.columns))
+    d = df.select(*cols)
+    cap = training_row_cap(len(cols))
+    pdf = d.limit(cap + 1).toPandas()
+    fraction = 1.0
+    if len(pdf) > cap:
+        total = d.count()
+        fraction = cap / total
+        bucket = F.pmod(
+            F.xxhash64(*[F.col(c).cast("string") for c in key_cols]), F.lit(10000)
+        )
+        pdf = d.filter(bucket < int(fraction * 10000)).toPandas()
+    return pdf, fraction
+
+
+class FeatureEncoder:
+    """Frame to float matrix: numeric as is, bool to 0/1, dates to days, text to
+    train-fitted level codes (unseen level -> NaN). Plain Python, picklable."""
+
+    def __init__(self, features, max_levels: int = 50):
+        self.features = list(features)
+        self.max_levels = max_levels
+        self.kinds: dict = {}
+        self.levels: dict = {}
+        self.medians = np.zeros(len(self.features))
+
+    @staticmethod
+    def _kind(s: pd.Series) -> str:
+        if s.dtype == bool:
+            return "num"
+        if pd.api.types.is_datetime64_any_dtype(s):
+            return "date"
+        if pd.api.types.is_numeric_dtype(s):
+            return "num"
+        nn = s.dropna()
+        if not len(nn):
+            return "num"
+        if isinstance(nn.iloc[0], _dt.date):
+            return "date"
+        num = pd.to_numeric(nn, errors="coerce")
+        return "num" if num.notna().mean() >= 0.95 else "cat"
+
+    def _column(self, pdf: pd.DataFrame, c: str) -> np.ndarray:
+        s = pdf[c]
+        kind = self.kinds[c]
+        if kind == "num":
+            return pd.to_numeric(s, errors="coerce").to_numpy(dtype="float64")
+        if kind == "date":
+            t = pd.to_datetime(s, errors="coerce")
+            days = t.astype("datetime64[ns]").astype("int64") / 86_400_000_000_000
+            return np.where(t.isna(), np.nan, days)
+        codes = s.map(self.levels[c])
+        return pd.to_numeric(codes, errors="coerce").to_numpy(dtype="float64")
+
+    def fit(self, pdf: pd.DataFrame):
+        for c in self.features:
+            self.kinds[c] = self._kind(pdf[c])
+            if self.kinds[c] == "cat":
+                top = pdf[c].value_counts().head(self.max_levels).index
+                self.levels[c] = {v: i for i, v in enumerate(top)}
+        mat = self.transform(pdf)
+        with np.errstate(all="ignore"):
+            med = np.nanmedian(mat, axis=0) if len(mat) else np.zeros(mat.shape[1])
+        self.medians = np.where(np.isfinite(med), med, 0.0)
+        return self
+
+    def transform(self, pdf: pd.DataFrame, fill: bool = False) -> np.ndarray:
+        cols = [self._column(pdf, c) for c in self.features]
+        mat = np.column_stack(cols) if cols else np.zeros((len(pdf), 0))
+        if fill:
+            mat = np.where(np.isnan(mat), self.medians, mat)
+        return mat
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Folds inside the training partition
+
+
+def fold_splits(
+    pdf: pd.DataFrame,
+    mode: str,
+    *,
+    date_col: str | None = None,
+    gap_days: int = 0,
+    max_folds: int = TUNE_MAX_FOLDS,
+):
+    """[(train mask, validation mask)] from fold_id over training rows.
+
+    rolling: a fold trains on earlier rows only (rows without a fold are the
+    earliest data), with a gap before the block; grouped: a fold trains on all
+    other folds."""
+    if mode == "none" or "fold_id" not in pdf.columns:
+        return []
+    tr_rows = (pdf["partition"] == "train").to_numpy()
+    fold = pd.to_numeric(pdf["fold_id"], errors="coerce").to_numpy()
+    ids = sorted(int(f) for f in np.unique(fold[np.isfinite(fold)]))[-max_folds:]
+    out = []
+    for f in ids:
+        va = tr_rows & (fold == f)
+        if mode == "rolling":
+            tr = tr_rows & (~np.isfinite(fold) | (fold < f))
+            if date_col and gap_days:
+                d = pd.to_datetime(pdf[date_col], errors="coerce")
+                start = d[va].min()
+                tr = tr & (d < start - pd.Timedelta(days=gap_days)).to_numpy()
+        else:
+            tr = tr_rows & np.isfinite(fold) & (fold != f)
+        if tr.any() and va.any():
+            out.append((tr, va))
+    return out
+
+
+def pick_params(grid, folds, fit_score, lower_is_better: bool = True) -> dict:
+    """Best parameter set by mean fold score; the first set when there are no folds."""
+    if not folds or len(grid) == 1:
+        return grid[0]
+    best, best_score = grid[0], None
+    for params in grid:
+        scores = [fit_score(params, tr, va) for tr, va in folds]
+        mean = float(np.nanmean(scores)) if np.isfinite(scores).any() else None
+        if mean is None:
+            continue
+        better = best_score is None or (
+            mean < best_score if lower_is_better else mean > best_score
+        )
+        if better:
+            best, best_score = params, mean
+    return best
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Group-stratified split assignment and text normalisation
+
+
+def assign_group_partitions(groups, fractions, seed: str = "ecrmap-model-split-s1"):
+    """groups: [(group_key, stratum)] -> {group_key: partition}.
+
+    Inside each stratum the groups are ordered by a seeded hash and cut by the
+    fractions, so every group lands in exactly one partition. A stratum with
+    fewer than three groups stays entirely in train."""
+    _, va_f, te_f = (f / 100.0 for f in fractions)
+    by_stratum: dict = {}
+    for g, s in groups:
+        by_stratum.setdefault(s, []).append(g)
+    out: dict = {}
+    for members in by_stratum.values():
+        members = sorted(
+            set(members),
+            key=lambda g: _hashlib.md5(
+                f"{seed}|{g}".encode(), usedforsecurity=False
+            ).hexdigest(),
+        )
+        n = len(members)
+        if n < 3:
+            n_va = n_te = 0
+        else:
+            n_va = max(1, round(n * va_f))
+            n_te = max(1, round(n * te_f))
+            if n - n_va - n_te < 1:
+                n_va, n_te = 1, 1
+        n_tr = n - n_va - n_te
+        for i, g in enumerate(members):
+            out[g] = (
+                "train" if i < n_tr else ("validation" if i < n_tr + n_va else "test")
+            )
+    return out
+
+
+def normalise_asset_text(text) -> str | None:
+    """Collapse whitespace, trim and upper-case -- the same normalisation the
+    redispatch name match applies."""
+    if text is None:
+        return None
+    return " ".join(str(text).split()).upper()
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings markdown (pure text, no Spark)
+
+
+def _cell(value, width: int = 160) -> str:
+    text = "" if value is None else str(value)
+    return " ".join(text.replace("|", "/").split())[:width]
+
+
+def _number(value) -> str:
+    return "" if value is None else f"{float(value):.4g}"
+
+
+def markdown_table(headers, rows) -> str:
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "|" + "|".join("---" for _ in headers) + "|",
+    ]
+    lines += ["| " + " | ".join(_cell(c) for c in row) + " |" for row in rows]
+    return "\n".join(lines)
+
+
+def render_findings(
+    ecosystem: str, results, selection, *, smoke: bool, stamp: str
+) -> str:
+    """One markdown document: a summary table, then per task the candidates with
+    status and stored-artifact state, every metric per successful model, and the
+    models forwarded for test-partition evaluation.
+
+    results: dicts with task_id, model_name, stage, status, metric, value, n_rows,
+    detail, frozen_delta_version, artifact_status, run_id; selection: dicts with
+    task_id, model_name, rank, primary_value."""
+    tasks = [t for t in TASKS if t["ecosystem"] == ecosystem]
+    kind = "SMOKE RUN" if smoke else "MODEL"
+    out = [
+        f"# {ecosystem.upper()} {kind} FINDINGS",
+        "",
+        (
+            "_Auto-generated by `databricks/models/gate/03_export_findings`. One section "
+            f"per task; re-running replaces the file. Generated: {stamp}_"
+        ),
+        "",
+    ]
+    summary = []
+    for t in tasks:
+        rows = [r for r in results if r["task_id"] == t["task_id"]]
+        models = {}
+        for r in rows:
+            models.setdefault(r["model_name"], r)
+        counts = {"ok": 0, "failed": 0, "skipped_library_unavailable": 0}
+        for r in models.values():
+            counts[r["status"]] = counts.get(r["status"], 0) + 1
+        base = any(
+            r["stage"] == "baseline" and r["status"] == "ok" for r in models.values()
+        )
+        summary.append(
+            (
+                t["task_id"],
+                "yes" if base else "NO",
+                counts["ok"] - (1 if base else 0),
+                counts["failed"],
+                counts["skipped_library_unavailable"],
+            )
+        )
+    out += [
+        "## summary",
+        "",
+        markdown_table(
+            ["task", "baseline ran", "candidates ok", "failed", "skipped (library)"],
+            summary,
+        ),
+        "",
+    ]
+    for t in tasks:
+        rows = [r for r in results if r["task_id"] == t["task_id"]]
+        out += [f"## {t['task_id']}", ""]
+        if not rows:
+            out += ["_no results recorded_", ""]
+            continue
+        out += [
+            (
+                f"_dataset `{t['dataset_id']}`, frozen version "
+                f"{rows[0]['frozen_delta_version']}, primary metric `{t['primary_metric']}` "
+                f"({'higher' if t['higher_is_better'] else 'lower'} is better)_"
+            ),
+            "",
+        ]
+        models = {}
+        for r in rows:
+            models.setdefault(r["model_name"], []).append(r)
+        order = sorted(models, key=lambda m: (models[m][0]["stage"] != "baseline", m))
+        cand = []
+        for m in order:
+            first = models[m][0]
+            primary = next(
+                (r["value"] for r in models[m] if r["metric"] == t["primary_metric"]),
+                None,
+            )
+            cand.append(
+                (
+                    m,
+                    first["stage"],
+                    first["status"],
+                    first["artifact_status"],
+                    first["n_rows"],
+                    _number(primary),
+                    first["detail"] if first["status"] != "ok" else "",
+                )
+            )
+        out += [
+            "### candidates",
+            "",
+            markdown_table(
+                [
+                    "model",
+                    "stage",
+                    "status",
+                    "artifact",
+                    "rows",
+                    t["primary_metric"],
+                    "detail",
+                ],
+                cand,
+            ),
+            "",
+        ]
+        ok = [m for m in order if models[m][0]["status"] == "ok"]
+        names = list(
+            dict.fromkeys(r["metric"] for m in ok for r in models[m] if r["metric"])
+        )
+        if ok and names:
+            grid = []
+            for name in names:
+                row = [name]
+                for m in ok:
+                    v = next(
+                        (r["value"] for r in models[m] if r["metric"] == name), None
+                    )
+                    row.append(_number(v))
+                grid.append(row)
+            out += [
+                "### metrics (validation partition)",
+                "",
+                markdown_table(["metric", *ok], grid),
+                "",
+            ]
+        chosen = [s for s in selection if s["task_id"] == t["task_id"]]
+        if chosen and not smoke:
+            out += [
+                "### forwarded for test evaluation",
+                "",
+                markdown_table(
+                    ["rank", "model", t["primary_metric"]],
+                    [
+                        (s["rank"], s["model_name"], _number(s["primary_value"]))
+                        for s in sorted(chosen, key=lambda s: s["rank"])
+                    ],
+                ),
+                "",
+            ]
+    return "\n".join(out)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Result recording
+
+
+def _finite(v):
+    return None if v is None or not np.isfinite(float(v)) else float(v)
+
+
+def record_result(
+    ctx: TaskContext,
+    name: str,
+    family: str,
+    stage: str,
+    status: str,
+    metrics: dict,
+    n_rows,
+    detail: str,
+    mlflow_run_id,
+    artifact_status: str,
+    params: dict,
+) -> None:
+    now = _dt.datetime.now(_dt.UTC)
+    base = (
+        ctx.dataset_id,
+        ctx.task_id,
+        name,
+        family,
+        stage,
+        "validation",
+    )
+    tail = (
+        None if n_rows is None else int(n_rows),
+        status,
+        detail[:900] if detail else None,
+        int(ctx.frozen_version),
+        mlflow_run_id,
+        artifact_status,
+        str(params)[:900],
+        ctx.smoke,
+        ctx.rid,
+        now,
+    )
+    items = list(metrics.items()) if status == "ok" else [(None, None)]
+    rows = [(*base, m, None if v is None else _finite(v), *tail) for m, v in items] or [
+        (*base, None, None, *tail)
+    ]
+    spark.createDataFrame(rows, RESULT_COLUMNS).write.format("delta").mode(
+        "append"
+    ).saveAsTable(model_fqn("candidate_results", ctx.ecosystem))
+
+
+def start_task(ctx: TaskContext) -> None:
+    """Drop this task's earlier rows of the same kind (smoke or full)."""
+    spark.sql(
+        f"DELETE FROM {model_fqn('candidate_results', ctx.ecosystem)} "
+        f"WHERE task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}"
+    )
+    print(
+        f"task {ctx.task_id} (smoke={ctx.smoke}) at frozen version {ctx.frozen_version}"
+    )
+
+
+def log_candidate_to_mlflow(ctx, name, family, params, metrics, bundle):
+    """(run id, artifact status). Never raises: a logging failure is a status."""
+    if not library_available("mlflow"):
+        return None, "skipped_mlflow_unavailable"
+    try:
+        import mlflow
+
+        mlflow.set_experiment(f"{MLFLOW_EXPERIMENT_PREFIX}_{ctx.dataset_id}")
+        with mlflow.start_run(run_name=f"{ctx.task_id}:{name}") as run:
+            mlflow.set_tags(
+                {
+                    "task_id": ctx.task_id,
+                    "dataset_id": ctx.dataset_id,
+                    "model_name": name,
+                    "family": family,
+                    "frozen_delta_version": str(ctx.frozen_version),
+                    "smoke": str(ctx.smoke),
+                    "run_id": ctx.rid,
+                }
+            )
+            mlflow.log_params({str(k)[:200]: str(v)[:450] for k, v in params.items()})
+            mlflow.log_metrics(
+                {k: float(v) for k, v in metrics.items() if _finite(v) is not None}
+            )
+            if bundle is None:
+                return run.info.run_id, "none"
+            if not library_available("cloudpickle"):
+                return run.info.run_id, "skipped_cloudpickle_unavailable"
+            import cloudpickle
+
+            with _tempfile.TemporaryDirectory() as tmp:
+                path = _os.path.join(tmp, "candidate.pkl")
+                with open(path, "wb") as fh:
+                    cloudpickle.dump(bundle, fh)
+                mlflow.log_artifact(path, artifact_path="candidate")
+            return run.info.run_id, "ok"
+    except Exception as exc:
+        return None, f"failed: {type(exc).__name__}: {str(exc)[:200]}"
+
+
+def run_candidate(
+    ctx: TaskContext,
+    name: str,
+    family: str,
+    fit_fn,
+    *,
+    requires=(),
+    params=None,
+    stage: str = "candidate",
+):
+    """Run one candidate in isolation and record exactly what happened.
+
+    fit_fn() returns (bundle, metrics dict, n_rows). A missing library or an
+    exception becomes a recorded row and the notebook goes on; a failing
+    baseline is re-raised because it means the plumbing is wrong."""
+    if params is None:
+        params = {}
+    missing = missing_libraries(requires)
+    if missing:
+        record_result(
+            ctx,
+            name,
+            family,
+            stage,
+            "skipped_library_unavailable",
+            {},
+            None,
+            f"missing: {', '.join(missing)}",
+            None,
+            "none",
+            params,
+        )
+        print(f"SKIP {name}: missing {missing}")
+        return None
+    started = _time.time()
+    try:
+        bundle, metrics, n_rows = fit_fn()
+    except Exception as exc:
+        detail = f"{type(exc).__name__}: {str(exc)[:600]}"
+        record_result(
+            ctx, name, family, stage, "failed", {}, None, detail, None, "none", params
+        )
+        print(f"FAIL {name}: {detail}")
+        if stage == "baseline":
+            raise
+        return None
+    run_id, artifact = log_candidate_to_mlflow(
+        ctx, name, family, params, metrics, bundle
+    )
+    record_result(
+        ctx,
+        name,
+        family,
+        stage,
+        "ok",
+        metrics,
+        n_rows,
+        f"seconds={_time.time() - started:.1f}",
+        run_id,
+        artifact,
+        params,
+    )
+    shown = {k: round(v, 4) for k, v in metrics.items() if _finite(v) is not None}
+    print(f"OK   {name} [{artifact}]: {shown}")
+    return metrics
+
+
+def finish_task(ctx: TaskContext) -> None:
+    """Hard-fail unless the baseline ran; print the per-status summary."""
+    mine = read_model("candidate_results", ecosystem=ctx.ecosystem).filter(
+        (F.col("run_id") == ctx.rid) & (F.col("task_id") == ctx.task_id)
+    )
+    mine.filter(
+        F.col("metric").isNull() | (F.col("metric") == ctx.primary_metric)
+    ).select("model_name", "stage", "status", "metric", "value").show(
+        50, truncate=False
+    )
+    baseline_ok = (
+        mine.filter((F.col("stage") == "baseline") & (F.col("status") == "ok"))
+        .limit(1)
+        .count()
+        > 0
+    )
+    check(
+        ctx.component,
+        "models",
+        "baseline_recorded",
+        baseline_ok,
+        detail=f"task={ctx.task_id}",
+        rid=ctx.rid,
+    )
