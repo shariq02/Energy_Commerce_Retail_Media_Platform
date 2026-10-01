@@ -43,6 +43,8 @@ PACKAGES = {
     "scikit-survival": "sksurv.ensemble",
     "torch": "torch.nn",
 }
+# release that matches the environment's scikit-learn 1.6
+PIP_SPECS = {"scikit-survival": "scikit-survival>=0.24,<0.26"}
 FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 INSTALL_TIMEOUT_SECONDS = 600
@@ -109,12 +111,33 @@ def pip_install(pkg: str, target: str, index: str | None) -> bool:
 
 
 def drop_what_the_environment_has(target: str) -> None:
+    dropped = set()
     for name in os.listdir(target):
         path = os.path.join(target, name)
         is_cuda = name.startswith(("nvidia", "triton"))
         is_base = os.path.isdir(path) and in_base_environment(name)
         if is_cuda or (is_base and not name.endswith(".dist-info")):
             shutil.rmtree(path, ignore_errors=True)
+            dropped.add(name)
+    for name in os.listdir(target):
+        top = os.path.join(target, name, "top_level.txt")
+        if name.endswith(".dist-info") and os.path.isfile(top):
+            with open(top, encoding="utf-8") as handle:
+                modules = {line.strip() for line in handle if line.strip()}
+            if modules and modules <= dropped:
+                shutil.rmtree(os.path.join(target, name), ignore_errors=True)
+
+
+def clear_old_versions(target: str, folder: str) -> None:
+    """Remove what an earlier install of the same packages left in the folder."""
+    for name in os.listdir(target):
+        if name.endswith(".dist-info"):
+            stem = name.rsplit("-", 1)[0]
+            for old in os.listdir(folder):
+                if old.endswith(".dist-info") and old.rsplit("-", 1)[0] == stem:
+                    shutil.rmtree(os.path.join(folder, old), ignore_errors=True)
+        else:
+            shutil.rmtree(os.path.join(folder, name), ignore_errors=True)
 
 
 def copy_tree(src: str, dst: str) -> int:
@@ -133,10 +156,12 @@ def copy_tree(src: str, dst: str) -> int:
 # DBTITLE 1,Install each missing package into a local folder, keep only what is new, copy
 for _pkg in missing:
     _tmp = tempfile.mkdtemp()
-    _ok = _pkg == "torch" and pip_install(_pkg, _tmp, TORCH_CPU_INDEX)
-    _ok = _ok or pip_install(_pkg, _tmp, None)
+    _spec = PIP_SPECS.get(_pkg, _pkg)
+    _ok = _pkg == "torch" and pip_install(_spec, _tmp, TORCH_CPU_INDEX)
+    _ok = _ok or pip_install(_spec, _tmp, None)
     if _ok:
         drop_what_the_environment_has(_tmp)
+        clear_old_versions(_tmp, FOLDER)
         print(f"OK  {_pkg}: {copy_tree(_tmp, FOLDER)} file(s) copied")
     else:
         print(f"WARN {_pkg}: install failed or timed out")
