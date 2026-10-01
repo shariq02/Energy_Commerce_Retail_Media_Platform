@@ -32,6 +32,7 @@ import datetime as _dt
 import hashlib as _hashlib
 import importlib.metadata as _importlib_metadata
 import importlib.util as _importlib_util
+import logging as _logging
 import os as _os
 import sys as _sys
 import tempfile as _tempfile
@@ -1077,6 +1078,8 @@ def log_candidate_to_mlflow(ctx, name, family, params, metrics, bundle):
     try:
         import mlflow
 
+        # serverless blocks the notebook-context call MLflow uses for run tags
+        _logging.getLogger("mlflow.tracking.context.registry").setLevel(_logging.ERROR)
         mlflow.set_experiment(f"{MLFLOW_EXPERIMENT_PREFIX}_{ctx.dataset_id}")
         with mlflow.start_run(run_name=f"{ctx.task_id}:{name}") as run:
             mlflow.set_tags(

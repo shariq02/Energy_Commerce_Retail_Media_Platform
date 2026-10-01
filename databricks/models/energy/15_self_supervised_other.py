@@ -54,7 +54,7 @@ ctx = TaskContext("self_supervised_other.reconstruction", rid, SMOKE)
 # COMMAND ----------
 
 # DBTITLE 1,Read the frozen dataset
-df = read_frozen(ctx)
+df = read_frozen(ctx, apply_smoke=False)
 
 # COMMAND ----------
 

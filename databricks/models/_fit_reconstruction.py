@@ -37,6 +37,7 @@ SEQUENCE_EPOCHS = 3
 SEQUENCE_BATCH = 256
 SEQUENCE_HIDDEN = 64
 SMOKE_DIVISOR = 20
+SMOKE_SERIES = 4
 MIN_SERIES_STEPS = 200
 CIRCULAR_DEGREES = 360.0
 
@@ -325,11 +326,24 @@ def _lengths_in_steps(lengths_hours, step_hours):
     return [max(1, round(h / step_hours)) for h in lengths_hours]
 
 
-def _prepare_set(df, cfg, n_train, n_eval, steps, weights, held):
+def _smoke_series(d, id_col, held):
+    """A few whole series that are long enough in both partitions."""
+    counts = d.groupBy(id_col).pivot("partition", list(ALLOWED_PARTITIONS)).count()
+    long_enough = counts.filter(
+        (F.col("train") >= MIN_SERIES_STEPS) & (F.col("validation") >= MIN_SERIES_STEPS)
+    )
+    ids = [r[id_col] for r in long_enough.orderBy(id_col).collect()]
+    keep = [i for i in ids if i not in held][:SMOKE_SERIES]
+    return d.filter(F.col(id_col).isin(keep))
+
+
+def _prepare_set(df, cfg, n_train, n_eval, steps, weights, held, smoke=False):
     """(train set, validation set, sampled events per variable) for one family."""
     d = df
     if cfg.get("filter_col"):
         d = d.filter(F.col(cfg["filter_col"]) == cfg["filter_value"])
+    if smoke:
+        d = _smoke_series(d, cfg["id_col"], held)
     cols = [cfg["id_col"], cfg["ts_col"], *cfg["variables"], "partition"]
     pdf, _ = to_training_frame(d, key_cols=[cfg["id_col"], cfg["ts_col"]], columns=cols)
     sets = {}
@@ -378,6 +392,7 @@ def run_reconstruction(ctx, df, spec):
             steps,
             weights,
             held,
+            ctx.smoke,
         )
         prepared.append((cfg, tr, va, ev, steps))
     start_task(ctx)
