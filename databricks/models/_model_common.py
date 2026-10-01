@@ -13,7 +13,8 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** plumbing shared by every model notebook, pulled in with
-# MAGIC `%run ../_model_common`. Definitions only -- no side effects at import.
+# MAGIC `%run ../_model_common`. Definitions only; the one side effect is adding the
+# MAGIC model library folder to the import path.
 # MAGIC
 # MAGIC Covers the task registry, frozen-dataset reads (test partition never read),
 # MAGIC feature resolution, the feature encoder, the isolated candidate runner, result
@@ -32,6 +33,7 @@ import hashlib as _hashlib
 import importlib.metadata as _importlib_metadata
 import importlib.util as _importlib_util
 import os as _os
+import sys as _sys
 import tempfile as _tempfile
 import time as _time
 
@@ -46,6 +48,7 @@ from pyspark.sql import functions as F
 MODEL_STAGE = "models"
 MODEL_SCHEMAS = {"energy": "energy_ml_models", "commerce": "commerce_ml_models"}
 MODEL_SEED = 42
+LIBRARY_VOLUME = "model_libraries"
 MODEL_SPLIT_VERSION = "e1"
 ALLOWED_PARTITIONS = ("train", "validation")
 SMOKE_ROWS = 4000
@@ -491,6 +494,22 @@ def replace_model_rows(
 # COMMAND ----------
 
 # DBTITLE 1,Library availability
+
+
+def library_folder() -> str:
+    return (
+        f"/Volumes/{CATALOG}/{MODEL_SCHEMAS['energy']}/{LIBRARY_VOLUME}/site_packages"
+    )
+
+
+def use_model_libraries() -> None:
+    """Append the installed-once library folder; packages already present win."""
+    folder = library_folder()
+    if _os.path.isdir(folder) and folder not in _sys.path:
+        _sys.path.append(folder)
+
+
+use_model_libraries()
 
 
 def library_available(name: str) -> bool:

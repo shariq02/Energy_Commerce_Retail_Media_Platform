@@ -68,7 +68,7 @@ print(f"{len(_groups)} group(s) across {len({s for _, s in _groups})} entity typ
 # DBTITLE 1,Assign each group to one partition
 _assigned = assign_group_partitions(_groups, WEAK_SPLIT_PERCENT)
 _assignment = spark.createDataFrame(
-    list(_assigned.items()), "group_key string, partition string"
+    list(_assigned.items()), "group_key string, assigned_partition string"
 )
 
 # COMMAND ----------
@@ -76,9 +76,9 @@ _assignment = spark.createDataFrame(
 # DBTITLE 1,Manifest rows at the dataset grain
 manifest = grouped.join(_assignment, "group_key", "inner").select(
     F.lit(DATASET_ID).alias("dataset_id"),
-    F.lit(int(ctx.frozen_version)).alias("frozen_delta_version"),
+    F.lit(int(ctx.frozen_version)).cast("bigint").alias("frozen_delta_version"),
     grain_key(*KEYS).alias("grain_key"),
-    F.col("partition"),
+    F.col("assigned_partition").alias("partition"),
     F.lit(None).cast("int").alias("fold_id"),
     F.col("group_key"),
     F.col("entity_type").alias("stratum"),
@@ -158,11 +158,13 @@ check(
 _series = (
     grouped.filter(F.col("entity_type") == "series")
     .join(_assignment, "group_key")
-    .groupBy("partition")
+    .groupBy("assigned_partition")
     .agg(F.countDistinct("entity_id").alias("entities"))
     .collect()
 )
-_thin = [r["partition"] for r in _series if r["entities"] < MIN_SERIES_ENTITIES]
+_thin = [
+    r["assigned_partition"] for r in _series if r["entities"] < MIN_SERIES_ENTITIES
+]
 check(
     COMPONENT,
     SOURCE,
@@ -177,7 +179,7 @@ check(
 
 # DBTITLE 1,Label distribution per partition
 grouped.join(_assignment, "group_key").groupBy(
-    "entity_type", "partition", "lf_name", "lf_label"
-).count().orderBy("entity_type", "partition", "lf_name", "lf_label").show(
+    "entity_type", "assigned_partition", "lf_name", "lf_label"
+).count().orderBy("entity_type", "assigned_partition", "lf_name", "lf_label").show(
     60, truncate=False
 )

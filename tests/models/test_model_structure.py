@@ -110,6 +110,7 @@ def test_model_schemas_are_only_the_two_agreed_names():
 def test_setup_preflight_splits_and_gates_exist():
     for rel in (
         "00_model_setup.py",
+        "00_model_libraries.py",
         "00_model_preflight.py",
         "split/01_weak_supervision_split.py",
         "split/02_redispatch_matching_split.py",

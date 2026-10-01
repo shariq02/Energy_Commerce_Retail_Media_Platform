@@ -91,7 +91,7 @@ _assignment = spark.createDataFrame(
 # DBTITLE 1,Manifest rows at the dataset grain
 manifest = _assignment.select(
     F.lit(DATASET_ID).alias("dataset_id"),
-    F.lit(int(ctx.frozen_version)).alias("frozen_delta_version"),
+    F.lit(int(ctx.frozen_version)).cast("bigint").alias("frozen_delta_version"),
     grain_key("affected_asset_text").alias("grain_key"),
     F.col("partition"),
     F.lit(None).cast("int").alias("fold_id"),
