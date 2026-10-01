@@ -27,6 +27,8 @@
 # DBTITLE 1,Configuration
 COMPONENT = "models/gate/01_candidate_guards"
 SOURCE = "models"
+dbutils.widgets.text("use_smoke_results", "false")
+USE_SMOKE = dbutils.widgets.get("use_smoke_results").lower() == "true"
 SKILL_TASK_TYPES = ("regression", "regression_price", "regression_count")
 
 # COMMAND ----------
@@ -36,9 +38,11 @@ rid = model_run_id()
 
 # COMMAND ----------
 
-# DBTITLE 1,Read the full candidate record
+# DBTITLE 1,Read the candidate record (full runs, or smoke runs when use_smoke_results is true)
 results = {
-    eco: read_model("candidate_results", ecosystem=eco).filter(~F.col("smoke"))
+    eco: read_model("candidate_results", ecosystem=eco).filter(
+        F.col("smoke") == USE_SMOKE
+    )
     for eco in ("energy", "commerce")
 }
 rows = [

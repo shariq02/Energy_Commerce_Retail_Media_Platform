@@ -57,7 +57,7 @@ spark.sql(
     f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{MODEL_SCHEMAS['energy']}.{LIBRARY_VOLUME}"
 )
 if REFRESH:
-    shutil.rmtree(FOLDER, ignore_errors=True)
+    dbutils.fs.rm(FOLDER, True)
 os.makedirs(FOLDER, exist_ok=True)
 print(f"OK  volume ready: {FOLDER}")
 
@@ -135,9 +135,9 @@ def clear_old_versions(target: str, folder: str) -> None:
             stem = name.rsplit("-", 1)[0]
             for old in os.listdir(folder):
                 if old.endswith(".dist-info") and old.rsplit("-", 1)[0] == stem:
-                    shutil.rmtree(os.path.join(folder, old), ignore_errors=True)
-        else:
-            shutil.rmtree(os.path.join(folder, name), ignore_errors=True)
+                    dbutils.fs.rm(os.path.join(folder, old), True)
+        elif os.path.exists(os.path.join(folder, name)):
+            dbutils.fs.rm(os.path.join(folder, name), True)
 
 
 def copy_tree(src: str, dst: str) -> int:

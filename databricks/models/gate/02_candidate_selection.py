@@ -27,6 +27,8 @@
 # DBTITLE 1,Configuration
 COMPONENT = "models/gate/02_candidate_selection"
 SOURCE = "models"
+dbutils.widgets.text("use_smoke_results", "false")
+USE_SMOKE = dbutils.widgets.get("use_smoke_results").lower() == "true"
 
 # COMMAND ----------
 
@@ -35,14 +37,14 @@ rid = model_run_id()
 
 # COMMAND ----------
 
-# DBTITLE 1,Primary metric per candidate from the full (non-smoke) record
+# DBTITLE 1,Primary metric per candidate (full runs, or smoke runs when use_smoke_results is true)
 _records = {}
 for t in TASKS:
     df = (
         read_model("candidate_results", ecosystem=t["ecosystem"])
         .filter(
             (F.col("task_id") == t["task_id"])
-            & ~F.col("smoke")
+            & (F.col("smoke") == USE_SMOKE)
             & (F.col("status") == "ok")
             & (F.col("metric") == t["primary_metric"])
         )
