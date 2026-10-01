@@ -14,7 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** install the model libraries once into a Unity Catalog volume folder;
 # MAGIC every model notebook adds that folder to its import path through the shared
-# MAGIC library. Idempotent; re-running refreshes the packages.
+# MAGIC library. Libraries that already import are skipped; set `refresh` to `true` to
+# MAGIC reinstall everything.
 
 # COMMAND ----------
 
@@ -24,13 +25,27 @@
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
+import importlib.machinery
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
-PACKAGES = ["lightgbm", "xgboost", "lifelines", "scikit-survival", "torch"]
+dbutils.widgets.text("refresh", "false")
+REFRESH = dbutils.widgets.get("refresh").lower() == "true"
+PACKAGES = {
+    "lightgbm": "lightgbm",
+    "xgboost": "xgboost",
+    "lifelines": "lifelines",
+    "scikit-survival": "sksurv",
+    "torch": "torch",
+}
 FOLDER = library_folder()
+TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
+INSTALL_TIMEOUT_SECONDS = 600
+COPY_THREADS = 32
 
 # COMMAND ----------
 
@@ -38,20 +53,93 @@ FOLDER = library_folder()
 spark.sql(
     f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{MODEL_SCHEMAS['energy']}.{LIBRARY_VOLUME}"
 )
+if REFRESH:
+    shutil.rmtree(FOLDER, ignore_errors=True)
+os.makedirs(FOLDER, exist_ok=True)
 print(f"OK  volume ready: {FOLDER}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Install one package at a time into a local folder, then copy
-for _pkg in PACKAGES:
-    _tmp = tempfile.mkdtemp()
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", "--target", _tmp, _pkg],
-        check=True,
+
+# DBTITLE 1,Define the import check, run in a fresh interpreter
+def imports_from_folder(module: str) -> bool:
+    code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, check=False
     )
-    shutil.copytree(_tmp, FOLDER, dirs_exist_ok=True)
-    shutil.rmtree(_tmp)
-    print(f"OK  {_pkg} copied to {FOLDER}")
+    return result.returncode == 0
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Which libraries are missing
+missing = {
+    pkg: mod for pkg, mod in PACKAGES.items() if REFRESH or not imports_from_folder(mod)
+}
+print(f"already importable: {[p for p in PACKAGES if p not in missing]}")
+print(f"to install: {list(missing)}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Stop when nothing is missing
+if not missing:
+    dbutils.notebook.exit("all model libraries already installed")
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the install helpers
+_BASE_PATH = [p for p in sys.path if p != FOLDER]
+
+
+def in_base_environment(module: str) -> bool:
+    return importlib.machinery.PathFinder.find_spec(module, _BASE_PATH) is not None
+
+
+def pip_install(pkg: str, target: str, index: str | None) -> bool:
+    cmd = [sys.executable, "-m", "pip", "install", "-q", "--no-compile"]
+    cmd += ["--disable-pip-version-check", "--target", target]
+    cmd += ["--index-url", index] if index else []
+    cmd.append(pkg)
+    try:
+        result = subprocess.run(cmd, timeout=INSTALL_TIMEOUT_SECONDS, check=False)
+        return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+
+
+def drop_what_the_environment_has(target: str) -> None:
+    for name in os.listdir(target):
+        path = os.path.join(target, name)
+        is_cuda = name.startswith(("nvidia", "triton"))
+        is_base = os.path.isdir(path) and in_base_environment(name)
+        if is_cuda or (is_base and not name.endswith(".dist-info")):
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def copy_tree(src: str, dst: str) -> int:
+    jobs = []
+    for root, _, files in os.walk(src):
+        out = os.path.join(dst, os.path.relpath(root, src))
+        os.makedirs(out, exist_ok=True)
+        jobs += [(os.path.join(root, f), os.path.join(out, f)) for f in files]
+    with ThreadPoolExecutor(COPY_THREADS) as pool:
+        list(pool.map(lambda j: shutil.copyfile(*j), jobs))
+    return len(jobs)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Install each missing package into a local folder, keep only what is new, copy
+for _pkg in missing:
+    _tmp = tempfile.mkdtemp()
+    _ok = _pkg == "torch" and pip_install(_pkg, _tmp, TORCH_CPU_INDEX)
+    _ok = _ok or pip_install(_pkg, _tmp, None)
+    if _ok:
+        drop_what_the_environment_has(_tmp)
+        print(f"OK  {_pkg}: {copy_tree(_tmp, FOLDER)} file(s) copied")
+    else:
+        print(f"WARN {_pkg}: install failed or timed out")
+    shutil.rmtree(_tmp, ignore_errors=True)
 
 # COMMAND ----------
 
@@ -62,6 +150,6 @@ print(FOLDER in sys.path)
 # COMMAND ----------
 
 # DBTITLE 1,Which libraries import
-for _name in ["lightgbm", "xgboost", "lifelines", "sksurv", "torch"]:
-    _ok = library_available(_name)
-    print(f"{'OK  ' if _ok else 'WARN'} {_name}: version {library_version(_name)}")
+for _pkg, _mod in PACKAGES.items():
+    _ok = imports_from_folder(_mod)
+    print(f"{'OK  ' if _ok else 'WARN'} {_pkg}: version {library_version(_mod)}")
