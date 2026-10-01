@@ -30,8 +30,8 @@
 # DBTITLE 1,Imports
 import datetime as _dt
 import hashlib as _hashlib
+import importlib as _importlib
 import importlib.metadata as _importlib_metadata
-import importlib.util as _importlib_util
 import logging as _logging
 import os as _os
 import sys as _sys
@@ -100,6 +100,8 @@ MODEL_DDL = {
         "library string, version string, available boolean, checked_at timestamp"
     ),
 }
+# imported instead of the bare name so a partial install counts as missing
+LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
 LIBRARIES = {
     "sklearn": "scikit-learn",
     "lightgbm": "lightgbm",
@@ -514,7 +516,12 @@ use_model_libraries()
 
 
 def library_available(name: str) -> bool:
-    return _importlib_util.find_spec(name) is not None
+    """True only when the library really imports; a half-copied folder does not."""
+    try:
+        module = _importlib.import_module(LIBRARY_PROBES.get(name, name))
+    except Exception:
+        return False
+    return getattr(module, "__file__", None) is not None
 
 
 def library_version(name: str) -> str | None:

@@ -35,12 +35,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 dbutils.widgets.text("refresh", "false")
 REFRESH = dbutils.widgets.get("refresh").lower() == "true"
+# import probe per package: a half-copied folder passes `import torch`, not `torch.nn`
 PACKAGES = {
     "lightgbm": "lightgbm",
     "xgboost": "xgboost",
     "lifelines": "lifelines",
-    "scikit-survival": "sksurv",
-    "torch": "torch",
+    "scikit-survival": "sksurv.ensemble",
+    "torch": "torch.nn",
 }
 FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
@@ -152,4 +153,6 @@ print(FOLDER in sys.path)
 # DBTITLE 1,Which libraries import
 for _pkg, _mod in PACKAGES.items():
     _ok = imports_from_folder(_mod)
-    print(f"{'OK  ' if _ok else 'WARN'} {_pkg}: version {library_version(_mod)}")
+    print(
+        f"{'OK  ' if _ok else 'WARN'} {_pkg}: version {library_version(_mod.split('.')[0])}"
+    )
