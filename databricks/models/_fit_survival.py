@@ -244,32 +244,6 @@ def run_survival(ctx, df, spec):
         stage="baseline",
     )
 
-    if diag:
-
-        def fit_diagnostic():
-            enc_d = FeatureEncoder([diag]).fit(train)
-            frame = pd.DataFrame(enc_d.transform(train, fill=True), columns=["x0"])
-            frame["duration"], frame["event"], frame["entry"] = (
-                dur[tr_m],
-                ev[tr_m],
-                entry[tr_m],
-            )
-            model = _make_cox()
-            model.fit(
-                frame, duration_col="duration", event_col="event", entry_col="entry"
-            )
-            return scored(SurvivalBundle("cox", enc_d, model))
-
-        run_candidate(
-            ctx,
-            f"{diag}_cox",
-            "survival",
-            fit_diagnostic,
-            requires=("lifelines",),
-            params={"feature": diag, "entry": "delayed entry used"},
-            stage="diagnostic",
-        )
-
     keep = np.nanstd(enc.transform(train, fill=True), axis=0) > 0
     enc_keep = [f for f, k in zip(feats, keep, strict=True) if k]
     enc_k = FeatureEncoder(enc_keep).fit(train)
@@ -321,5 +295,30 @@ def run_survival(ctx, df, spec):
             fn,
             requires=requires,
             params={**params, "row_fraction": round(fraction, 4)},
+        )
+    if diag:
+
+        def fit_diagnostic():
+            enc_d = FeatureEncoder([diag]).fit(train)
+            frame = pd.DataFrame(enc_d.transform(train, fill=True), columns=["x0"])
+            frame["duration"], frame["event"], frame["entry"] = (
+                dur[tr_m],
+                ev[tr_m],
+                entry[tr_m],
+            )
+            model = _make_cox()
+            model.fit(
+                frame, duration_col="duration", event_col="event", entry_col="entry"
+            )
+            return scored(SurvivalBundle("cox", enc_d, model))
+
+        run_candidate(
+            ctx,
+            f"{diag}_cox",
+            "survival",
+            fit_diagnostic,
+            requires=("lifelines",),
+            params={"feature": diag, "entry": "delayed entry used"},
+            stage="diagnostic",
         )
     finish_task(ctx)

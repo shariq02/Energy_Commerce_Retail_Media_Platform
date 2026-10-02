@@ -29,6 +29,7 @@
 
 # DBTITLE 1,Imports
 import datetime as _dt
+import gc as _gc
 import hashlib as _hashlib
 import importlib as _importlib
 import importlib.metadata as _importlib_metadata
@@ -1691,6 +1692,7 @@ def run_candidate(
         print(f"FAIL {name}: {detail}")
         if stage == "baseline":
             raise
+        _gc.collect()
         return None
     run_id, artifact = log_candidate_to_mlflow(
         ctx, name, family, params, metrics, bundle
@@ -1710,6 +1712,8 @@ def run_candidate(
     )
     shown = {k: round(v, 4) for k, v in metrics.items() if _finite(v) is not None}
     print(f"OK   {name} [{artifact}]: {shown}")
+    del bundle
+    _gc.collect()
     return metrics
 
 
