@@ -345,6 +345,14 @@ def _masks(pdf):
     ).to_numpy()
 
 
+def _train_sample(tr_m):
+    """Row positions of the training rows used for the train-side metrics, capped."""
+    idx = np.flatnonzero(tr_m)
+    if len(idx) > TUNE_MAX_ROWS:
+        idx = idx[:: len(idx) // TUNE_MAX_ROWS + 1]
+    return idx
+
+
 def _tune(ctx, spec, pdf, x, y, grid, build, scorer, tr_m):
     """Best grid entry by rolling or grouped folds inside train; the first entry
     when the frame is large or has no folds."""
@@ -386,6 +394,7 @@ def run_regression(ctx, df, spec):
     y = pd.to_numeric(pdf[spec["target"]], errors="coerce").to_numpy(dtype="float64")
     enc = FeatureEncoder(feats).fit(pdf[tr_m])
     price = bool(spec.get("price"))
+    note_target(y, tr_m, va_m, "regression")
     start_task(ctx)
 
     base = fit_baseline(pdf[tr_m], spec["target"], spec["baseline"])
@@ -437,9 +446,22 @@ def run_regression(ctx, df, spec):
             params.update(best)
             model = build(best).fit(x[tr_m], y[tr_m])
             pred = model.predict(x[va_m])
+            metrics = _point_metrics(y[va_m], pred, base_pred, price)
+            tr_s = _train_sample(tr_m)
+            metrics.update(
+                train_side(
+                    lambda: {
+                        f"train_{k}": v
+                        for k, v in regression_metrics(
+                            y[tr_s], model.predict(x[tr_s])
+                        ).items()
+                        if k in ("mae", "rmse")
+                    }
+                )
+            )
             return (
                 TabularBundle(enc, model, "regression", fill),
-                _point_metrics(y[va_m], pred, base_pred, price),
+                metrics,
                 int(va_m.sum()),
             )
 
@@ -459,6 +481,16 @@ def run_regression(ctx, df, spec):
                 preds = bundle.predict(pdf[va_m])
                 metrics = quantile_metrics(y[va_m], preds, qbase.predict(pdf[va_m]))
                 metrics.update(regression_metrics(y[va_m], preds[0.5], base_pred))
+                tr_s = _train_sample(tr_m)
+                metrics.update(
+                    train_side(
+                        lambda: {
+                            "train_pinball_q50": pinball(
+                                y[tr_s], bundle.predict(pdf.iloc[tr_s])[0.5], 0.5
+                            )
+                        }
+                    )
+                )
                 return bundle, metrics, int(va_m.sum())
 
             run_candidate(ctx, name, "tabular", fit_q, requires=requires, params=params)
@@ -487,6 +519,7 @@ def run_classification(ctx, df, spec):
     tr_m, va_m = _masks(pdf)
     y = pd.to_numeric(pdf[spec["target"]], errors="coerce").to_numpy(dtype="int64")
     enc = FeatureEncoder(feats).fit(pdf[tr_m])
+    note_target(y, tr_m, va_m, "classification")
     start_task(ctx)
 
     rate = float(np.mean(y[tr_m]))
@@ -523,9 +556,22 @@ def run_classification(ctx, df, spec):
             params.update(best)
             model = build(best).fit(x[tr_m], y[tr_m])
             p = model.predict_proba(x[va_m])[:, 1]
+            metrics = _class_metrics(y[va_m], p)
+            tr_s = _train_sample(tr_m)
+            metrics.update(
+                train_side(
+                    lambda: {
+                        f"train_{k}": v
+                        for k, v in classification_metrics(
+                            y[tr_s], model.predict_proba(x[tr_s])[:, 1]
+                        ).items()
+                        if k in ("pr_auc", "log_loss")
+                    }
+                )
+            )
             return (
                 TabularBundle(enc, model, "classification", fill),
-                _class_metrics(y[va_m], p),
+                metrics,
                 int(va_m.sum()),
             )
 

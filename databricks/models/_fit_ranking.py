@@ -230,14 +230,36 @@ def run_ranking(ctx, df, spec):
             .sample(frac=SEQ_EVAL_ROWS / len(valid), random_state=MODEL_SEED)
         )
         valid = valid[valid[sc].isin(chosen)]
+    train_eval = train
+    if len(train) > SEQ_EVAL_ROWS:
+        chosen_tr = (
+            train[sc]
+            .drop_duplicates()
+            .sample(frac=SEQ_EVAL_ROWS / len(train), random_state=MODEL_SEED)
+        )
+        train_eval = train[train[sc].isin(chosen_tr)]
     start_task(ctx)
+
+    def scored(ranker):
+        metrics = ranking_metrics(ranker.ranks(valid), RANK_KS)
+
+        def fitted():
+            r = ranking_metrics(ranker.ranks(train_eval), RANK_KS)
+            return {
+                f"train_{k}": r[k]
+                for k in ("recall_at_10", "ndcg_at_10", "mrr")
+                if k in r
+            }
+
+        metrics.update(train_side(fitted))
+        return metrics
 
     pop = fit_popularity(train, yc)
     run_candidate(
         ctx,
         "popularity",
         "baseline",
-        lambda: (pop, ranking_metrics(pop.ranks(valid), RANK_KS), len(valid)),
+        lambda: (pop, scored(pop), len(valid)),
         params={"row_fraction": round(fraction, 4)},
         stage="baseline",
     )
@@ -247,7 +269,7 @@ def run_ranking(ctx, df, spec):
             ctx,
             "cooccurrence",
             "ranking",
-            lambda: (cooc, ranking_metrics(cooc.ranks(valid), RANK_KS), len(valid)),
+            lambda: (cooc, scored(cooc), len(valid)),
             params={"top": COOCCURRENCE_TOP},
         )
 
@@ -280,7 +302,7 @@ def run_ranking(ctx, df, spec):
                 kind, hist_tr[usable], target_tr[usable], len(item_ids)
             )
             ranker = SequenceRanker(kind, net, item_ids, sc, tc, ic, yc)
-            return ranker, ranking_metrics(ranker.ranks(valid), RANK_KS), len(valid)
+            return ranker, scored(ranker), len(valid)
 
         run_candidate(ctx, name, "sequence", fit, requires=("torch",), params=params)
     finish_task(ctx)

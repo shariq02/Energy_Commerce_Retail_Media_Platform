@@ -145,3 +145,13 @@ def test_per_class_precision_recall_marks_thin_classes(m):
     assert (p, r, n, ok) == (pytest.approx(12 / 13), pytest.approx(1.0), 12, True)
     assert out["b"][3] is False
     assert math.isnan(out["b"][0])
+
+
+def test_bias_metrics_report_signed_error_and_spread(m):
+    out = m["bias_metrics"]([1, 2, 3, 4], [2, 3, 4, 5])
+    assert out["mean_error"] == pytest.approx(1.0)
+    assert out["mean_error_relative"] == pytest.approx(0.4)
+    assert out["pred_std_ratio"] == pytest.approx(1.0)
+    assert m["bias_metrics"]([1, 2, 3, 4], [2.5] * 4)[
+        "pred_std_ratio"
+    ] == pytest.approx(0.0)

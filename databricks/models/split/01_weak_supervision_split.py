@@ -36,7 +36,7 @@ RULE_ID = "group_hash:place_or_unit:70/15/15"
 
 # DBTITLE 1,Run identity
 rid = model_run_id()
-ctx = TaskContext("weak_supervision.labels", rid, False)
+ctx = TaskContext("weak_supervision.labels", rid, False, record=False)
 
 # COMMAND ----------
 

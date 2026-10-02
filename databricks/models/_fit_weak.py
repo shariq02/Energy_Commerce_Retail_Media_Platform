@@ -131,6 +131,11 @@ def run_weak_supervision(ctx, df, spec):
             total += len(va)
             covered += int(np.sum((va >= 0).any(axis=1)))
         out["coverage"] = covered / total if total else float("nan")
+        tr_total = sum(int((m[3] == "train").sum()) for m in mats.values())
+        tr_covered = sum(
+            int(np.sum((m[0][m[3] == "train"] >= 0).any(axis=1))) for m in mats.values()
+        )
+        out["train_coverage"] = tr_covered / tr_total if tr_total else float("nan")
         return out
 
     def vote_predict(etype, mat, part):
@@ -246,12 +251,25 @@ def run_matching(ctx, df, spec):
     enc = FeatureEncoder(feats).fit(train)
     start_task(ctx)
 
+    def scored(model):
+        metrics = tier_metrics(y_va, model.predict(valid), labels)
+
+        def fitted():
+            t = tier_metrics(y_tr, model.predict(train), labels)
+            return {
+                "train_accuracy": t["accuracy"],
+                "train_balanced_accuracy": t["balanced_accuracy"],
+            }
+
+        metrics.update(train_side(fitted))
+        return metrics
+
     major = MajorityTier(train[spec["target"]].value_counts().idxmax())
     run_candidate(
         ctx,
         "majority_tier",
         "baseline",
-        lambda: (major, tier_metrics(y_va, major.predict(valid), labels), len(valid)),
+        lambda: (major, scored(major), len(valid)),
         params={"row_fraction": round(fraction, 4)},
         stage="baseline",
     )
@@ -267,7 +285,7 @@ def run_matching(ctx, df, spec):
             bundle = TierClassifier(enc, None, labels, fill, vec, text)
             model = build().fit(bundle._x(train), y_tr)
             bundle.model = model
-            return bundle, tier_metrics(y_va, bundle.predict(valid), labels), len(valid)
+            return bundle, scored(bundle), len(valid)
 
         return fit
 

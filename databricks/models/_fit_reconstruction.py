@@ -447,6 +447,24 @@ def run_reconstruction(ctx, df, spec):
         out["skill_mae_mean"] = float(np.nanmean(skills)) if skills else float("nan")
         return out
 
+    def train_skill(examples, predict):
+        """Skill over the baseline on the training events, averaged over variables.
+        examples(key) -> (inputs, truth); predict(key, inputs) -> predictions."""
+        skills = []
+        for cfg in spec["sets"]:
+            circ = cfg.get("circular", ())
+            for j, var in enumerate(cfg["variables"]):
+                key = (cfg["name"], j)
+                xt, yt = examples(key)
+                if not len(yt):
+                    continue
+                base = BaselineReconstructor(cfg["baseline"], {j: fallbacks[key]})
+                e_m = masked_abs_error(var, circ, yt, np.asarray(predict(key, xt)))
+                e_b = masked_abs_error(var, circ, yt, base.predict(j, xt))
+                skills.append(skill(float(e_m.mean()), float(e_b.mean())))
+        mean = float(np.nanmean(skills)) if skills else float("nan")
+        return {"train_skill_mae_mean": mean}
+
     kinds = {cfg["name"]: cfg["baseline"] for cfg in spec["sets"]}
     run_candidate(
         ctx,
@@ -497,11 +515,18 @@ def run_reconstruction(ctx, df, spec):
                 x = np.where(np.isnan(xv), medians[key], xv) if fill else xv
                 return models[key].predict(x)
 
-            return (
-                FeatureReconstructor(models, medians, fill),
-                score(predict),
-                len(data),
+            metrics = score(predict)
+            metrics.update(
+                train_side(
+                    lambda: train_skill(
+                        lambda key: data[key][:2],
+                        lambda key, x: models[key].predict(
+                            np.where(np.isnan(x), medians[key], x) if fill else x
+                        ),
+                    )
+                )
             )
+            return FeatureReconstructor(models, medians, fill), metrics, len(data)
 
         run_candidate(
             ctx, name, "reconstruction", fit, requires=requires, params=dict(params)
@@ -528,7 +553,26 @@ def run_reconstruction(ctx, df, spec):
                 events = ev[("validation", j)]
                 return nets[cfg["name"]].predict(va, events, [j] * len(events))
 
-            return nets, score(predict), len(data)
+            train_events = {
+                (cfg["name"], j): (tr, ev[("train", j)])
+                for cfg, tr, va, ev, steps in prepared
+                for j in range(len(cfg["variables"]))
+            }
+
+            def train_examples(key):
+                tr, events = train_events[key]
+                xt, yt, _s = build_examples(tr, key[1], events)
+                return xt, yt
+
+            def train_predict(key, x):
+                tr, events = train_events[key]
+                return nets[key[0]].predict(tr, events, [key[1]] * len(events))
+
+            metrics = score(predict)
+            metrics.update(
+                train_side(lambda: train_skill(train_examples, train_predict))
+            )
+            return nets, metrics, len(data)
 
         run_candidate(
             ctx,

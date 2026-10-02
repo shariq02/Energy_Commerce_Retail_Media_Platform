@@ -140,6 +140,20 @@ class SurvivalBundle:
 # DBTITLE 1,Survival runner
 
 
+SURVIVAL_TRAIN_CONCORDANCE_ROWS = 20000
+
+
+def _train_concordance(bundle, train, dur_tr, ev_tr):
+    idx = np.arange(len(train))
+    if len(idx) > SURVIVAL_TRAIN_CONCORDANCE_ROWS:
+        idx = idx[:: len(idx) // SURVIVAL_TRAIN_CONCORDANCE_ROWS + 1]
+    return {
+        "train_concordance": concordance_index(
+            dur_tr[idx], ev_tr[idx], bundle.risk(train.iloc[idx])
+        )
+    }
+
+
 def _make_cox(penalizer=0.1):
     from lifelines import CoxPHFitter
 
@@ -201,6 +215,15 @@ def run_survival(ctx, df, spec):
     enc = FeatureEncoder(feats).fit(train)
     start_task(ctx)
 
+    def scored(bundle):
+        metrics = _score(
+            dur[va_m], ev[va_m], bundle.risk(valid), bundle.survival(valid)
+        )
+        metrics.update(
+            train_side(lambda: _train_concordance(bundle, train, dur[tr_m], ev[tr_m]))
+        )
+        return bundle, metrics, int(va_m.sum())
+
     km = KaplanMeierBaseline(spec["group_col"]).fit(train, dcol, ecol)
     run_candidate(
         ctx,
@@ -231,12 +254,7 @@ def run_survival(ctx, df, spec):
             entry[tr_m],
         )
         model.fit(frame, duration_col="duration", event_col="event", entry_col="entry")
-        bundle = SurvivalBundle("cox", enc_k, model)
-        return (
-            bundle,
-            _score(dur[va_m], ev[va_m], bundle.risk(valid), bundle.survival(valid)),
-            int(va_m.sum()),
-        )
+        return scored(SurvivalBundle("cox", enc_k, model))
 
     def fit_forest():
         model = _make_forest()
@@ -245,12 +263,7 @@ def run_survival(ctx, df, spec):
             dtype=[("event", "?"), ("time", "<f8")],
         )
         model.fit(enc_k.transform(train, fill=True), y)
-        bundle = SurvivalBundle("forest", enc_k, model)
-        return (
-            bundle,
-            _score(dur[va_m], ev[va_m], bundle.risk(valid), bundle.survival(valid)),
-            int(va_m.sum()),
-        )
+        return scored(SurvivalBundle("forest", enc_k, model))
 
     def fit_boosted():
         model = _make_boosted_cox()
@@ -260,12 +273,7 @@ def run_survival(ctx, df, spec):
             model.predict(enc_k.transform(train, fill=True)), dtype="float64"
         )
         baseline = breslow_baseline(dur[tr_m], ev[tr_m], risk_tr)
-        bundle = SurvivalBundle("boosted_cox", enc_k, model, baseline)
-        return (
-            bundle,
-            _score(dur[va_m], ev[va_m], bundle.risk(valid), bundle.survival(valid)),
-            int(va_m.sum()),
-        )
+        return scored(SurvivalBundle("boosted_cox", enc_k, model, baseline))
 
     table = {
         "cox_lifelines": (fit_cox, ("lifelines",), {"entry": "delayed entry used"}),

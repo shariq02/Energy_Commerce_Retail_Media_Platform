@@ -162,6 +162,7 @@ def test_model_schemas_are_the_agreed_names(c):
         "candidate_results",
         "candidate_selection",
         "library_availability",
+        "task_run_context",
     }
 
 
@@ -228,3 +229,105 @@ def test_findings_mark_tasks_without_results_and_hide_selection_for_smoke(c):
     assert "# COMMERCE SMOKE RUN FINDINGS" in text
     assert "_no results recorded_" in text
     assert "forwarded" not in text
+
+
+def _flag_task(primary="pr_auc", higher=True):
+    return {"task_id": "t.x", "primary_metric": primary, "higher_is_better": higher}
+
+
+def test_flags_raise_for_perfect_score_single_class_and_train_gap(c):
+    results = [
+        _row("t.x", "base", "baseline", "ok", "pr_auc", 0.5),
+        _row("t.x", "m1", "candidate", "ok", "pr_auc", 1.0),
+        _row("t.x", "m1", "candidate", "ok", "train_pr_auc", 1.0),
+        _row("t.x", "m1", "candidate", "ok", "pred_positive_share", 1.0),
+        _row("t.x", "m2", "candidate", "ok", "pr_auc", 0.2),
+        _row("t.x", "m2", "candidate", "ok", "train_pr_auc", 0.9),
+    ]
+    found = {(m, f) for _, m, f, _ in c["findings_flags"]([_flag_task()], results)}
+    assert ("m1", "near-perfect score") in found
+    assert ("m1", "a single class is predicted") in found
+    assert ("m2", "validation score far below training score") in found
+
+
+def test_flags_report_failures_bias_and_baseline_not_beaten(c):
+    results = [
+        _row("t.x", "base", "baseline", "ok", "mae", 5.0),
+        _row("t.x", "m1", "candidate", "ok", "mae", 6.0),
+        _row("t.x", "m1", "candidate", "ok", "mean_error_relative", 0.4),
+        _row("t.x", "m2", "candidate", "failed", detail="ValueError: x"),
+    ]
+    found = {
+        (m, f)
+        for _, m, f, _ in c["findings_flags"]([_flag_task("mae", False)], results)
+    }
+    assert ("m1", "biased predictions") in found
+    assert ("m2", "failed") in found
+    assert ("base", "no candidate beats the baseline") in found
+
+
+def test_findings_show_run_context_flags_and_the_other_mode(c):
+    ctx = [
+        {
+            "task_id": "load.load",
+            "smoke": True,
+            "smoke_widget": "true",
+            "run_id": "r1",
+            "status": s,
+            "notebook_path": "/x/03_load",
+            "job_id": "7",
+            "job_run_id": "9",
+            "library_versions": '{"torch": "2.1"}',
+            "data_notes": None,
+            "recorded_at": f"2026-10-01 0{i}:00:00",
+        }
+        for i, s in enumerate(["started", "data_ready"])
+    ]
+    text = c["render_findings"](
+        "energy",
+        [],
+        [],
+        smoke=True,
+        stamp="t",
+        context=ctx,
+        other_mode={"load.load": (14, "2026-10-01T20:00:00")},
+    )
+    assert "## run context" in text
+    assert "| load.load | r1 | started > data_ready | true | 7 | 9 |" in text
+    assert "libraries: torch 2.1" in text
+    assert "run did not finish" in text
+    assert "the other run mode holds 14 result row(s)" in text
+
+
+def test_findings_keep_user_folders_and_emails_out(c):
+    ctx = [
+        {
+            "task_id": "load.load",
+            "smoke": True,
+            "smoke_widget": "true",
+            "run_id": "r1",
+            "status": "finished",
+            "notebook_path": "/Users/someone@example.com/Repo/databricks/models/energy/03_load",
+            "job_id": "7",
+            "job_run_id": "9",
+            "library_versions": None,
+            "data_notes": None,
+            "recorded_at": "2026-10-01 01:00:00",
+        }
+    ]
+    results = [
+        _row(
+            "load.load",
+            "m",
+            "candidate",
+            "failed",
+            detail="/Workspace/Users/someone@example.com/x.py failed",
+        )
+    ]
+    text = c["render_findings"](
+        "energy", results, [], smoke=True, stamp="t", context=ctx
+    )
+    assert "someone@example.com" not in text
+    assert "/Users/someone" not in text
+    assert "databricks/models/energy/03_load" in text
+    assert "/Users/<user>/" in text

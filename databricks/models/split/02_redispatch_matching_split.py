@@ -35,7 +35,7 @@ RULE_ID = "group_hash:normalised_asset_identity:60/20/20"
 
 # DBTITLE 1,Run identity
 rid = model_run_id()
-ctx = TaskContext("redispatch_matching.tier", rid, False)
+ctx = TaskContext("redispatch_matching.tier", rid, False, record=False)
 
 # COMMAND ----------
 

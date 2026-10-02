@@ -163,6 +163,44 @@ def pumped_metrics(valid, action, spec):
     return out
 
 
+RL_TRAIN_EVAL_ROWS = 200_000
+
+
+def _train_eval_frame(train, session_col=None):
+    """The training rows the train-side scores are computed on: all of them, or an
+    evenly spaced sample (whole sessions when the policy reads session history)."""
+    if len(train) <= RL_TRAIN_EVAL_ROWS:
+        return train
+    step = len(train) // RL_TRAIN_EVAL_ROWS + 1
+    if session_col:
+        keep = train[session_col].drop_duplicates().iloc[::step]
+        return train[train[session_col].isin(keep)]
+    return train.iloc[::step]
+
+
+def _policy_scores(policy, valid, train_eval, spec, kind):
+    """Validation metrics of a policy plus its action score on the training rows."""
+    if kind == "pumped":
+        metrics = pumped_metrics(valid, policy.action(valid), spec)
+
+        def fitted():
+            t = pumped_metrics(train_eval, policy.action(train_eval), spec)
+            return {
+                "train_action_mae": t["action_mae"],
+                "train_sign_agreement": t["sign_agreement"],
+            }
+
+    else:
+        metrics = action_metrics(valid, policy.action(valid), spec)
+
+        def fitted():
+            t = action_metrics(train_eval, policy.action(train_eval), spec)
+            return {"train_action_agreement": t["action_agreement"]}
+
+    metrics.update(train_side(fitted))
+    return metrics
+
+
 def run_pumped_storage(ctx, df, spec):
     """Rule baseline, behaviour cloning, reward-weighted regression, conservative Q.
 
@@ -185,6 +223,7 @@ def run_pumped_storage(ctx, df, spec):
     valid = pdf[pdf["partition"] == "validation"].reset_index(drop=True)
     if train.empty or valid.empty:
         raise RuntimeError("need train and validation rows")
+    train_eval = _train_eval_frame(train)
     enc = FeatureEncoder(spec["state_cols"]).fit(train)
     y = train[spec["action_col"]].to_numpy(dtype="float64")
     w = reward_weights(train[spec["reward_col"]])
@@ -203,7 +242,11 @@ def run_pumped_storage(ctx, df, spec):
         ctx,
         "rule_policy",
         "baseline",
-        lambda: (rule, pumped_metrics(valid, rule.action(valid), spec), len(valid)),
+        lambda: (
+            rule,
+            _policy_scores(rule, valid, train_eval, spec, "pumped"),
+            len(valid),
+        ),
         params=base_params,
         stage="baseline",
     )
@@ -229,7 +272,11 @@ def run_pumped_storage(ctx, df, spec):
                 else:
                     model.fit(x, y)
                 pol = RegressionPolicy(enc, model, False)
-                return pol, pumped_metrics(valid, pol.action(valid), spec), len(valid)
+                return (
+                    pol,
+                    _policy_scores(pol, valid, train_eval, spec, "pumped"),
+                    len(valid),
+                )
 
             run_candidate(
                 ctx,
@@ -253,7 +300,11 @@ def run_pumped_storage(ctx, df, spec):
                 ACTION_BINS,
             )
             pol = QPolicy(enc, mean, std, net, centres)
-            return pol, pumped_metrics(valid, pol.action(valid), spec), len(valid)
+            return (
+                pol,
+                _policy_scores(pol, valid, train_eval, spec, "pumped"),
+                len(valid),
+            )
 
         run_candidate(
             ctx,
@@ -332,6 +383,7 @@ def run_action_policy(ctx, df, spec):
     valid = pdf[pdf["partition"] == "validation"].reset_index(drop=True)
     if train.empty or valid.empty:
         raise RuntimeError("need train and validation rows")
+    train_eval = _train_eval_frame(train)
     enc = FeatureEncoder(feats).fit(train)
     y = train[spec["action_col"]].to_numpy()
     w = reward_weights(train[spec["reward_col"]])
@@ -343,7 +395,11 @@ def run_action_policy(ctx, df, spec):
         ctx,
         "majority_action",
         "baseline",
-        lambda: (major, action_metrics(valid, major.action(valid), spec), len(valid)),
+        lambda: (
+            major,
+            _policy_scores(major, valid, train_eval, spec, "action"),
+            len(valid),
+        ),
         params=params,
         stage="baseline",
     )
@@ -372,7 +428,11 @@ def run_action_policy(ctx, df, spec):
                 else:
                     model.fit(x, y)
                 pol = ClassPolicy(enc, model, fill)
-                return pol, action_metrics(valid, pol.action(valid), spec), len(valid)
+                return (
+                    pol,
+                    _policy_scores(pol, valid, train_eval, spec, "action"),
+                    len(valid),
+                )
 
             run_candidate(
                 ctx, name, "offline_rl", fit, requires=requires, params=dict(params)
@@ -505,6 +565,7 @@ def run_session_policy(ctx, df, spec):
     valid = pdf[pdf["partition"] == "validation"].reset_index(drop=True)
     if train.empty or valid.empty:
         raise RuntimeError("need train and validation rows")
+    train_eval = _train_eval_frame(train, sc)
     enc = FeatureEncoder(feats).fit(train)
     y = train[ac].to_numpy()
     w = reward_weights(train[rc])
@@ -516,7 +577,11 @@ def run_session_policy(ctx, df, spec):
         ctx,
         "most_frequent_event",
         "baseline",
-        lambda: (major, action_metrics(valid, major.action(valid), spec), len(valid)),
+        lambda: (
+            major,
+            _policy_scores(major, valid, train_eval, spec, "action"),
+            len(valid),
+        ),
         params=params,
         stage="baseline",
     )
@@ -533,7 +598,7 @@ def run_session_policy(ctx, df, spec):
             "offline_rl",
             lambda: (
                 markov,
-                action_metrics(valid, markov.action(valid), spec),
+                _policy_scores(markov, valid, train_eval, spec, "action"),
                 len(valid),
             ),
             params=params,
@@ -557,7 +622,11 @@ def run_session_policy(ctx, df, spec):
                 else:
                     model.fit(x, y)
                 pol = ClassPolicy(enc, model, False)
-                return pol, action_metrics(valid, pol.action(valid), spec), len(valid)
+                return (
+                    pol,
+                    _policy_scores(pol, valid, train_eval, spec, "action"),
+                    len(valid),
+                )
 
             run_candidate(
                 ctx, name, "offline_rl", fit, requires=requires, params=dict(params)
@@ -587,7 +656,11 @@ def run_session_policy(ctx, df, spec):
                 hist, labels, weights = hist[keep], labels[keep], weights[keep]
             net = _train_event_net(hist, labels, weights, len(types), len(classes))
             pol = SequencePolicy(net, type_ids, classes, sc, tc)
-            return pol, action_metrics(valid, pol.action(valid), spec), len(valid)
+            return (
+                pol,
+                _policy_scores(pol, valid, train_eval, spec, "action"),
+                len(valid),
+            )
 
         run_candidate(
             ctx,

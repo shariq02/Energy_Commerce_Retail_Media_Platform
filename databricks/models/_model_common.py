@@ -32,8 +32,10 @@ import datetime as _dt
 import hashlib as _hashlib
 import importlib as _importlib
 import importlib.metadata as _importlib_metadata
+import json as _json
 import logging as _logging
 import os as _os
+import re as _re
 import sys as _sys
 import tempfile as _tempfile
 import time as _time
@@ -98,6 +100,12 @@ MODEL_DDL = {
     ),
     "library_availability": (
         "library string, version string, available boolean, checked_at timestamp"
+    ),
+    "task_run_context": (
+        "task_id string, dataset_id string, smoke boolean, smoke_widget string, "
+        "run_id string, status string, notebook_path string, job_id string, "
+        "job_run_id string, frozen_delta_version bigint, data_notes string, "
+        "library_versions string, detail string, recorded_at timestamp"
     ),
 }
 # imported instead of the bare name so a partial install counts as missing
@@ -557,7 +565,9 @@ def frozen_version(dataset_id: str, ecosystem: str) -> int:
 class TaskContext:
     """Identity of one modelling task for one notebook run."""
 
-    def __init__(self, task_id: str, rid: str, smoke: bool = False):
+    def __init__(
+        self, task_id: str, rid: str, smoke: bool = False, record: bool = True
+    ):
         t = TASK_BY_ID[task_id]
         self.task_id = task_id
         self.dataset_id = t["dataset_id"]
@@ -568,6 +578,8 @@ class TaskContext:
         self.smoke = bool(smoke)
         self.frozen_version = frozen_version(self.dataset_id, self.ecosystem)
         self.component = f"models/{t['notebook'].removesuffix('.py')}"
+        if record:
+            record_task_context(self, "started")
 
 
 def assert_no_test_partition(partitions) -> None:
@@ -685,6 +697,7 @@ def to_training_frame(df: DataFrame, *, key_cols: list[str], columns=None):
             F.xxhash64(*[F.col(c).cast("string") for c in key_cols]), F.lit(10000)
         )
         pdf = d.filter(bucket < int(fraction * 10000)).toPandas()
+    _note_frame(pdf, fraction)
     return pdf, fraction
 
 
@@ -865,6 +878,23 @@ def _number(value) -> str:
     return "" if value is None else f"{float(value):.4g}"
 
 
+_USER_FOLDER = _re.compile(r"(?:/Workspace)?/Users/[^/\s|]+/")
+_EMAIL = _re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+
+
+def scrub_private(text: str) -> str:
+    """Remove workspace user folders and e-mail addresses from committed text."""
+    return _EMAIL.sub("<email>", _USER_FOLDER.sub("/Users/<user>/", text))
+
+
+def _repo_relative(path):
+    """A notebook path from the repository's `databricks/` folder onwards."""
+    if not path:
+        return path
+    i = path.find("/databricks/")
+    return path[i + 1 :] if i >= 0 else path
+
+
 def markdown_table(headers, rows) -> str:
     lines = [
         "| " + " | ".join(headers) + " |",
@@ -874,8 +904,194 @@ def markdown_table(headers, rows) -> str:
     return "\n".join(lines)
 
 
+def _context_by_task(context, smoke: bool) -> dict:
+    """Latest run's context rows per task for this mode, oldest first."""
+    rows = [c for c in context or [] if bool(c["smoke"]) == smoke]
+    latest = {}
+    for c in sorted(rows, key=lambda c: str(c["recorded_at"])):
+        latest[c["task_id"]] = c["run_id"]
+    out = {}
+    for c in sorted(rows, key=lambda c: str(c["recorded_at"])):
+        if latest.get(c["task_id"]) == c["run_id"]:
+            out.setdefault(c["task_id"], []).append(c)
+    return out
+
+
+def _data_note_lines(rows) -> list:
+    """Bullet lines for what the models saw, from the data_ready context row."""
+    ready = [r for r in rows if r["status"] == "data_ready" and r.get("data_notes")]
+    if not ready:
+        return []
+    try:
+        notes = _json.loads(ready[-1]["data_notes"])
+    except ValueError:
+        return []
+    lines = []
+    for i, n in enumerate(notes, 1):
+        if "target" in n:
+            for part, st in n["target"].items():
+                shown = ", ".join(f"{k} {_number(v)}" for k, v in st.items())
+                lines.append(f"- target, {part}: {shown}")
+        else:
+            lines.append(
+                f"- frame {i}: {n.get('rows')} rows x {n.get('columns')} columns, "
+                f"sample fraction {n.get('sample_fraction')}, rows by partition "
+                f"{n.get('rows_by_partition')}, highest null rates "
+                f"{n.get('highest_null_rates') or 'none'}"
+            )
+    return lines
+
+
+TRAIN_PAIRS_LOWER = (
+    ("train_mae", "mae"),
+    ("train_rmse", "rmse"),
+    ("train_pinball_q50", "pinball_q50"),
+    ("train_log_loss", "log_loss"),
+    ("train_action_mae", "action_mae"),
+)
+TRAIN_PAIRS_HIGHER = (
+    ("train_pr_auc", "pr_auc"),
+    ("train_concordance", "concordance"),
+    ("train_action_agreement", "action_agreement"),
+    ("train_sign_agreement", "sign_agreement"),
+    ("train_skill_mae_mean", "skill_mae_mean"),
+    ("train_recall_at_10", "recall_at_10"),
+    ("train_ndcg_at_10", "ndcg_at_10"),
+    ("train_mrr", "mrr"),
+    ("train_balanced_accuracy", "balanced_accuracy"),
+)
+
+
+def findings_flags(tasks, results, context=None) -> list:
+    """(task, model, flag, detail) for results a reader should look at first."""
+    flags = []
+    ctx_rows = context or {}
+    for t in tasks:
+        tid, primary, higher = t["task_id"], t["primary_metric"], t["higher_is_better"]
+        by = {}
+        for r in results:
+            if r["task_id"] == tid:
+                by.setdefault(r["model_name"], []).append(r)
+        values = {}
+        for m, rs in by.items():
+            if rs[0]["status"] != "ok":
+                label = "failed" if rs[0]["status"] == "failed" else "skipped"
+                flags.append((tid, m, label, rs[0]["detail"]))
+                continue
+            values[m] = {
+                r["metric"]: r["value"]
+                for r in rs
+                if r["metric"] and r["value"] is not None
+            }
+        for m, v in values.items():
+            p = v.get(primary)
+            if p is not None and (
+                (higher and p >= 0.995) or (not higher and abs(p) < 1e-9)
+            ):
+                flags.append((tid, m, "near-perfect score", f"{primary} = {p:.4g}"))
+            for tr_key, va_key in TRAIN_PAIRS_LOWER:
+                tr, va = v.get(tr_key), v.get(va_key)
+                if tr is not None and va is not None and va > 0 and va > 2 * tr:
+                    flags.append(
+                        (
+                            tid,
+                            m,
+                            "validation error far above training error",
+                            f"{va_key} {va:.4g} vs {tr_key} {tr:.4g}",
+                        )
+                    )
+            for tr_key, va_key in TRAIN_PAIRS_HIGHER:
+                tr, va = v.get(tr_key), v.get(va_key)
+                if tr is not None and va is not None and tr - va > 0.3:
+                    flags.append(
+                        (
+                            tid,
+                            m,
+                            "validation score far below training score",
+                            f"{va_key} {va:.4g} vs {tr_key} {tr:.4g}",
+                        )
+                    )
+            for key in ("skill_mae", "skill_pinball_q50"):
+                if key in v and v[key] <= 0:
+                    flags.append(
+                        (tid, m, "no skill over the baseline", f"{key} = {v[key]:.4g}")
+                    )
+            rel = v.get("mean_error_relative")
+            if rel is not None and abs(rel) > 0.25:
+                flags.append(
+                    (
+                        tid,
+                        m,
+                        "biased predictions",
+                        f"mean error is {rel:+.0%} of the mean absolute target",
+                    )
+                )
+            ratio = v.get("pred_std_ratio")
+            if ratio is not None and ratio < 0.1:
+                flags.append(
+                    (
+                        tid,
+                        m,
+                        "near-constant predictions",
+                        f"prediction spread is {ratio:.2g} of the target spread",
+                    )
+                )
+            share = v.get("pred_positive_share")
+            if share is not None and share in (0.0, 1.0):
+                flags.append(
+                    (
+                        tid,
+                        m,
+                        "a single class is predicted",
+                        f"share of positive predictions = {share:g}",
+                    )
+                )
+        scored = {m: v[primary] for m, v in values.items() if primary in v}
+        counts = {}
+        for val in scored.values():
+            counts.setdefault(round(val, 10), []).append(1)
+        if any(len(c) >= 3 for c in counts.values()):
+            flags.append(
+                (
+                    tid,
+                    "",
+                    "identical primary metric across models",
+                    f"{primary} repeats on 3 or more models",
+                )
+            )
+        base = [m for m in scored if by[m][0]["stage"] == "baseline"]
+        cand = [m for m in scored if by[m][0]["stage"] == "candidate"]
+        if base and cand:
+            top = max if higher else min
+            best_candidate = top(scored[m] for m in cand)
+            floor = scored[base[0]]
+            if (higher and best_candidate <= floor) or (
+                not higher and best_candidate >= floor
+            ):
+                flags.append((tid, base[0], "no candidate beats the baseline", primary))
+        rows = ctx_rows.get(tid)
+        if rows and rows[-1]["status"] != "finished":
+            flags.append(
+                (
+                    tid,
+                    "",
+                    "run did not finish",
+                    f"last recorded step: {rows[-1]['status']}",
+                )
+            )
+    return flags
+
+
 def render_findings(
-    ecosystem: str, results, selection, *, smoke: bool, stamp: str
+    ecosystem: str,
+    results,
+    selection,
+    *,
+    smoke: bool,
+    stamp: str,
+    context=None,
+    other_mode=None,
+    checks=None,
 ) -> str:
     """One markdown document: a summary table, then per task the candidates with
     status and stored-artifact state, every metric per successful model, and the
@@ -883,8 +1099,11 @@ def render_findings(
 
     results: dicts with task_id, model_name, stage, status, metric, value, n_rows,
     detail, frozen_delta_version, artifact_status, run_id; selection: dicts with
-    task_id, model_name, rank, primary_value."""
+    task_id, model_name, rank, primary_value; context: task_run_context rows;
+    other_mode: {task_id: (rows, last write)} for the other run mode; checks:
+    quality-log rows of the model notebooks."""
     tasks = [t for t in TASKS if t["ecosystem"] == ecosystem]
+    by_task_context = _context_by_task(context, smoke)
     kind = "SMOKE RUN" if smoke else "MODEL"
     out = [
         f"# {ecosystem.upper()} {kind} FINDINGS",
@@ -925,11 +1144,99 @@ def render_findings(
         ),
         "",
     ]
+    if context is not None:
+        run_rows = []
+        for t in tasks:
+            rs = by_task_context.get(t["task_id"], [])
+            if rs:
+                last = rs[-1]
+                run_rows.append(
+                    (
+                        t["task_id"],
+                        last["run_id"],
+                        " > ".join(r["status"] for r in rs),
+                        last["smoke_widget"],
+                        last["job_id"],
+                        last["job_run_id"],
+                        _repo_relative(last["notebook_path"]),
+                        str(rs[0]["recorded_at"])[:19],
+                        str(last["recorded_at"])[:19],
+                    )
+                )
+        out += ["## run context", ""]
+        if run_rows:
+            out += [
+                markdown_table(
+                    [
+                        "task",
+                        "run id",
+                        "steps",
+                        "smoke widget",
+                        "job id",
+                        "job run id",
+                        "notebook",
+                        "first",
+                        "last",
+                    ],
+                    run_rows,
+                ),
+                "",
+            ]
+            try:
+                versions = _json.loads(
+                    next(
+                        r["library_versions"]
+                        for r in reversed(by_task_context[run_rows[-1][0]])
+                        if r["library_versions"]
+                    )
+                )
+                out += [
+                    "libraries: " + ", ".join(f"{k} {v}" for k, v in versions.items()),
+                    "",
+                ]
+            except (StopIteration, ValueError):
+                pass
+        else:
+            out += ["_no run context recorded for this mode_", ""]
+    flags = findings_flags(tasks, results, by_task_context)
+    out += ["## flags", ""]
+    if flags:
+        out += [markdown_table(["task", "model", "flag", "detail"], flags), ""]
+    else:
+        out += ["_no automatic flags raised_", ""]
+    if checks:
+        latest = {}
+        for c in sorted(checks, key=lambda c: str(c["recorded_at"])):
+            latest[(c["component"], c["metric_name"])] = c
+        out += [
+            "## check results",
+            "",
+            markdown_table(
+                ["component", "check", "status", "detail", "recorded"],
+                [
+                    (
+                        c["component"],
+                        c["metric_name"],
+                        c["status"],
+                        c["error_detail"],
+                        str(c["recorded_at"])[:19],
+                    )
+                    for c in latest.values()
+                ],
+            ),
+            "",
+        ]
     for t in tasks:
         rows = [r for r in results if r["task_id"] == t["task_id"]]
         out += [f"## {t['task_id']}", ""]
         if not rows:
             out += ["_no results recorded_", ""]
+            other = (other_mode or {}).get(t["task_id"])
+            if other:
+                out += [
+                    f"_the other run mode holds {other[0]} result row(s) for this task, last written {other[1]}_",
+                    "",
+                ]
             continue
         out += [
             (
@@ -939,6 +1246,9 @@ def render_findings(
             ),
             "",
         ]
+        notes = _data_note_lines(by_task_context.get(t["task_id"], []))
+        if notes:
+            out += ["### data seen by the models", "", *notes, ""]
         models = {}
         for r in rows:
             models.setdefault(r["model_name"], []).append(r)
@@ -1012,7 +1322,130 @@ def render_findings(
                 ),
                 "",
             ]
-    return "\n".join(out)
+    return scrub_private("\n".join(out))
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Run context: where and how a task ran, and what data it saw
+_FRAME_NOTES: list = []
+
+
+def _note_frame(pdf, fraction) -> None:
+    """Remember what the model frame looks like; written by start_task."""
+    try:
+        by = pdf["partition"].value_counts().to_dict() if "partition" in pdf else {}
+        nulls = pdf.isna().mean()
+        worst = nulls[nulls > 0].sort_values(ascending=False).head(5)
+        _FRAME_NOTES.append(
+            {
+                "rows": len(pdf),
+                "columns": int(pdf.shape[1]),
+                "sample_fraction": round(float(fraction), 4),
+                "rows_by_partition": {str(k): int(v) for k, v in by.items()},
+                "highest_null_rates": {c: round(float(v), 4) for c, v in worst.items()},
+            }
+        )
+    except Exception as exc:
+        print(f"WARN frame notes not recorded: {type(exc).__name__}: {exc}")
+
+
+def note_target(y, tr_m, va_m, kind: str) -> None:
+    """Target distribution per partition: positive rate, or mean and spread."""
+    try:
+        out = {}
+        for label, mask in (("train", tr_m), ("validation", va_m)):
+            v = np.asarray(y, dtype="float64")[mask]
+            v = v[np.isfinite(v)]
+            if not len(v):
+                continue
+            if kind == "classification":
+                out[label] = {
+                    "rows": len(v),
+                    "positive_rate": round(float(v.mean()), 4),
+                }
+            else:
+                out[label] = {
+                    "rows": len(v),
+                    "mean": float(v.mean()),
+                    "std": float(v.std()),
+                    "min": float(v.min()),
+                    "max": float(v.max()),
+                }
+        _FRAME_NOTES.append({"target": out})
+    except Exception as exc:
+        print(f"WARN target notes not recorded: {type(exc).__name__}: {exc}")
+
+
+def _take_notes() -> list:
+    notes = list(_FRAME_NOTES)
+    _FRAME_NOTES.clear()
+    return notes
+
+
+def _notebook_identity():
+    """(notebook path, job id, job run id); None where the platform hides them."""
+    try:
+        info = _json.loads(
+            dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()
+        )
+    except Exception:
+        return None, None, None
+    tags = info.get("tags") or {}
+    extra = info.get("extraContext") or {}
+    path = extra.get("notebook_path") or tags.get("notebookPath")
+    job = tags.get("jobId") or extra.get("jobId")
+    run = tags.get("runId") or info.get("currentRunId") or extra.get("runId")
+    return path, job, str(run) if run is not None else None
+
+
+def _smoke_widget():
+    try:
+        return dbutils.widgets.get("smoke")
+    except Exception:
+        return None
+
+
+def train_side(fn) -> dict:
+    """Run a train-side metric computation; a failure is printed and never fails
+    the candidate."""
+    try:
+        return fn()
+    except Exception as exc:
+        print(f"WARN train-side metrics not computed: {type(exc).__name__}: {exc}")
+        return {}
+
+
+def record_task_context(ctx, status: str, detail=None, data_notes=None) -> None:
+    """Append one run-context row (started, data_ready, finished). Never raises."""
+    try:
+        full = model_fqn("task_run_context", ctx.ecosystem)
+        spark.sql(
+            f"CREATE TABLE IF NOT EXISTS {full} ({MODEL_DDL['task_run_context']}) USING delta"
+        )
+        path, job, run = _notebook_identity()
+        versions = {k: library_version(k) or "missing" for k in LIBRARIES}
+        row = (
+            ctx.task_id,
+            ctx.dataset_id,
+            ctx.smoke,
+            _smoke_widget(),
+            ctx.rid,
+            status,
+            path,
+            job,
+            run,
+            int(ctx.frozen_version),
+            _json.dumps(data_notes, default=str)[:30000] if data_notes else None,
+            _json.dumps(versions),
+            detail[:900] if detail else None,
+            _dt.datetime.now(_dt.UTC),
+        )
+        spark.createDataFrame([row], MODEL_DDL["task_run_context"]).write.format(
+            "delta"
+        ).mode("append").saveAsTable(full)
+    except Exception as exc:
+        print(f"WARN run context not recorded: {type(exc).__name__}: {exc}")
 
 
 # COMMAND ----------
@@ -1076,6 +1509,7 @@ def start_task(ctx: TaskContext) -> None:
     print(
         f"task {ctx.task_id} (smoke={ctx.smoke}) at frozen version {ctx.frozen_version}"
     )
+    record_task_context(ctx, "data_ready", data_notes=_take_notes())
 
 
 def log_candidate_to_mlflow(ctx, name, family, params, metrics, bundle):
@@ -1203,6 +1637,7 @@ def finish_task(ctx: TaskContext) -> None:
         .count()
         > 0
     )
+    record_task_context(ctx, "finished", detail=f"baseline_ok={baseline_ok}")
     check(
         ctx.component,
         "models",

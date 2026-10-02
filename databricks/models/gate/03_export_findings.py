@@ -43,6 +43,7 @@ RESULT_FIELDS = (
     "frozen_delta_version",
     "artifact_status",
     "run_id",
+    "run_at",
 )
 SELECTION_FIELDS = ("task_id", "model_name", "rank", "primary_value")
 
@@ -109,19 +110,55 @@ for eco in ("energy", "commerce"):
         .select(*SELECTION_FIELDS)
         .collect()
     ]
-    record[eco] = (results, selection)
-    print(f"{eco}: {len(results)} result row(s), {len(selection)} selection row(s)")
+    try:
+        context = [
+            r.asDict() for r in read_model("task_run_context", ecosystem=eco).collect()
+        ]
+    except Exception as exc:
+        print(f"WARN no run context for {eco}: {type(exc).__name__}")
+        context = []
+    record[eco] = (results, selection, context)
+    print(
+        f"{eco}: {len(results)} result row(s), {len(selection)} selection row(s), "
+        f"{len(context)} run-context row(s)"
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Read the check results of the model notebooks
+checks = [
+    r.asDict()
+    for r in spark.table(AUDIT_TABLE)
+    .filter((F.col("stage") == ML_STAGE) & F.col("component").like("models/%"))
+    .select("component", "metric_name", "status", "error_detail", "recorded_at")
+    .collect()
+]
+print(f"{len(checks)} check row(s)")
 
 # COMMAND ----------
 
 # DBTITLE 1,Write the full-run and smoke-run files
 stamp = now_utc().strftime("%Y-%m-%dT%H:%MZ")
-for eco, (results, selection) in record.items():
+for eco, (results, selection, context) in record.items():
     for smoke in (False, True):
         rows = [r for r in results if r["smoke"] == smoke]
         if smoke and not rows:
             continue
-        text = render_findings(eco, rows, selection, smoke=smoke, stamp=stamp)
+        other_mode = {}
+        for r in results:
+            if r["smoke"] != smoke:
+                n, last = other_mode.get(r["task_id"], (0, ""))
+                other_mode[r["task_id"]] = (n + 1, max(last, str(r["run_at"])[:19]))
+        text = render_findings(
+            eco,
+            rows,
+            selection,
+            smoke=smoke,
+            stamp=stamp,
+            context=context,
+            other_mode=other_mode,
+            checks=checks,
+        )
         name = f"{eco}_smoke.md" if smoke else f"{eco}.md"
         with open(_os.path.join(FINDINGS_DIR, name), "w", encoding="utf-8") as fh:
             fh.write(text + "\n")

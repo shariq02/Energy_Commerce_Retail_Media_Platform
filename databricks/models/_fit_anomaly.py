@@ -207,12 +207,14 @@ def _evaluate(
 
     def fit():
         scorer = make_scorer()
-        thr = float(np.nanquantile(scorer.score(train), FLAG_QUANTILE))
+        s_train = scorer.score(train)
+        thr = float(np.nanquantile(s_train, FLAG_QUANTILE))
         s_inj = scorer.score(valid_injected)
         s_orig = scorer.score(valid)
         metrics = detection_metrics(injected, s_inj > thr, float(np.mean(s_orig > thr)))
         metrics["pr_auc"] = average_precision(injected, s_inj)
         metrics["threshold"] = thr
+        metrics["train_flag_rate"] = float(np.mean(s_train > thr))
         return scorer, metrics, len(valid)
 
     return run_candidate(

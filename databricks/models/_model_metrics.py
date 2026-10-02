@@ -57,8 +57,25 @@ def pinball(y, q_pred, tau: float) -> float:
     return float(np.mean(np.maximum(tau * d, (tau - 1.0) * d)))
 
 
+def bias_metrics(y, pred) -> dict:
+    """Signed mean error, that error relative to the mean absolute target, and the
+    spread of the predictions relative to the spread of the target."""
+    y_, p = _pair(y, pred)
+    if not len(y_):
+        return {}
+    out = {"mean_error": float(np.mean(p - y_))}
+    scale = float(np.mean(np.abs(y_)))
+    if scale > 0:
+        out["mean_error_relative"] = out["mean_error"] / scale
+    spread = float(np.std(y_))
+    if spread > 0:
+        out["pred_std_ratio"] = float(np.std(p)) / spread
+    return out
+
+
 def regression_metrics(y, pred, baseline_pred=None) -> dict:
     out = {"mae": mae(y, pred), "rmse": rmse(y, pred)}
+    out.update(bias_metrics(y, pred))
     if baseline_pred is not None:
         out["skill_mae"] = skill(out["mae"], mae(y, baseline_pred))
         out["skill_rmse"] = skill(out["rmse"], rmse(y, baseline_pred))
@@ -133,6 +150,8 @@ def classification_metrics(y_true, p) -> dict:
         "log_loss": log_loss(y, q),
         "calibration_error": calibration_error(y, q),
         "base_rate": float(np.mean(y)) if len(y) else float("nan"),
+        "pred_mean": float(np.mean(q)) if len(q) else float("nan"),
+        "pred_positive_share": float(np.mean(q >= 0.5)) if len(q) else float("nan"),
     }
 
 
