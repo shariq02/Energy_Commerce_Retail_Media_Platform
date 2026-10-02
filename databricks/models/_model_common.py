@@ -34,6 +34,7 @@ import importlib as _importlib
 import importlib.metadata as _importlib_metadata
 import json as _json
 import logging as _logging
+import math as _math
 import os as _os
 import re as _re
 import sys as _sys
@@ -362,7 +363,7 @@ TASKS = [
         "policy",
         "action_net_mwh",
         "rule_policy",
-        "reward_policy",
+        "reward_timing",
         True,
         "energy/16_rl_pumped_storage.py",
     ),
@@ -684,20 +685,21 @@ def training_row_cap(n_columns: int) -> int:
 
 def to_training_frame(df: DataFrame, *, key_cols: list[str], columns=None):
     """(pandas frame, row fraction). Loads up to the memory-derived cap; above it
-    a stable hash sample over key_cols is taken and its fraction is returned."""
+    a stable hash sample over key_cols is taken. The fraction is rounded down to a
+    multiple of 0.05 so it does not drift with free memory."""
     cols = list(dict.fromkeys(columns or df.columns))
     d = df.select(*cols)
     cap = training_row_cap(len(cols))
     pdf = d.limit(cap + 1).toPandas()
-    fraction = 1.0
+    fraction, total = 1.0, None
     if len(pdf) > cap:
         total = d.count()
-        fraction = cap / total
+        fraction = max(_math.floor(cap / total * 20) / 20, 0.05)
         bucket = F.pmod(
             F.xxhash64(*[F.col(c).cast("string") for c in key_cols]), F.lit(10000)
         )
         pdf = d.filter(bucket < int(fraction * 10000)).toPandas()
-    _note_frame(pdf, fraction)
+    _note_frame(pdf, fraction, cap=cap, total=total)
     return pdf, fraction
 
 
@@ -932,10 +934,18 @@ def _data_note_lines(rows) -> list:
             for part, st in n["target"].items():
                 shown = ", ".join(f"{k} {_number(v)}" for k, v in st.items())
                 lines.append(f"- target, {part}: {shown}")
+        elif "diagnostics" in n:
+            shown = ", ".join(f"{k} {_number(v)}" for k, v in n["diagnostics"].items())
+            lines.append(f"- diagnostics: {shown}")
         else:
+            cap = (
+                f", row cap {n['row_cap']} of {n['rows_before_cap']} rows"
+                if "row_cap" in n
+                else ""
+            )
             lines.append(
                 f"- frame {i}: {n.get('rows')} rows x {n.get('columns')} columns, "
-                f"sample fraction {n.get('sample_fraction')}, rows by partition "
+                f"sample fraction {n.get('sample_fraction')}{cap}, rows by partition "
                 f"{n.get('rows_by_partition')}, highest null rates "
                 f"{n.get('highest_null_rates') or 'none'}"
             )
@@ -962,6 +972,28 @@ TRAIN_PAIRS_HIGHER = (
 )
 
 
+BOUNDED_PRIMARY_METRICS = (
+    "pr_auc",
+    "concordance",
+    "balanced_accuracy",
+    "action_agreement",
+    "ndcg_at_10",
+    "skill_mae_mean",
+)
+
+
+def _sampled_frames(rows) -> list:
+    """Row fractions below 1 among the model frames of the latest data_ready row."""
+    ready = [r for r in rows if r["status"] == "data_ready" and r.get("data_notes")]
+    if not ready:
+        return []
+    try:
+        notes = _json.loads(ready[-1]["data_notes"])
+    except ValueError:
+        return []
+    return [n["sample_fraction"] for n in notes if n.get("sample_fraction", 1.0) < 1.0]
+
+
 def findings_flags(tasks, results, context=None) -> list:
     """(task, model, flag, detail) for results a reader should look at first."""
     flags = []
@@ -984,9 +1016,12 @@ def findings_flags(tasks, results, context=None) -> list:
                 if r["metric"] and r["value"] is not None
             }
         for m, v in values.items():
+            is_baseline = by[m][0]["stage"] == "baseline"
+            is_candidate = by[m][0]["stage"] == "candidate"
             p = v.get(primary)
             if p is not None and (
-                (higher and p >= 0.995) or (not higher and abs(p) < 1e-9)
+                (higher and primary in BOUNDED_PRIMARY_METRICS and p >= 0.995)
+                or (not higher and abs(p) < 1e-9)
             ):
                 flags.append((tid, m, "near-perfect score", f"{primary} = {p:.4g}"))
             for tr_key, va_key in TRAIN_PAIRS_LOWER:
@@ -1016,6 +1051,16 @@ def findings_flags(tasks, results, context=None) -> list:
                     flags.append(
                         (tid, m, "no skill over the baseline", f"{key} = {v[key]:.4g}")
                     )
+            for key, val in v.items():
+                if is_candidate and key.startswith("skill_mae_vs_") and val <= 0:
+                    flags.append(
+                        (
+                            tid,
+                            m,
+                            f"no skill over the {key[13:]} diagnostic",
+                            f"{key} = {val:.4g}",
+                        )
+                    )
             rel = v.get("mean_error_relative")
             if rel is not None and abs(rel) > 0.25:
                 flags.append(
@@ -1027,7 +1072,7 @@ def findings_flags(tasks, results, context=None) -> list:
                     )
                 )
             ratio = v.get("pred_std_ratio")
-            if ratio is not None and ratio < 0.1:
+            if ratio is not None and ratio < 0.1 and not is_baseline:
                 flags.append(
                     (
                         tid,
@@ -1037,7 +1082,7 @@ def findings_flags(tasks, results, context=None) -> list:
                     )
                 )
             share = v.get("pred_positive_share")
-            if share is not None and share in (0.0, 1.0):
+            if share is not None and share in (0.0, 1.0) and not is_baseline:
                 flags.append(
                     (
                         tid,
@@ -1046,6 +1091,30 @@ def findings_flags(tasks, results, context=None) -> list:
                         f"share of positive predictions = {share:g}",
                     )
                 )
+        estimable = [
+            x
+            for v in values.values()
+            for k, x in v.items()
+            if k.startswith("estimable__")
+        ]
+        if estimable and sum(estimable) / len(values) < 2:
+            flags.append(
+                (
+                    tid,
+                    "",
+                    "fewer than two classes estimable in the evaluation",
+                    "the primary metric rests on a single class",
+                )
+            )
+        if any(v.get("base_rate") in (0.0, 1.0) for v in values.values()):
+            flags.append(
+                (
+                    tid,
+                    "",
+                    "single-class evaluation target",
+                    "validation base rate is 0 or 1",
+                )
+            )
         scored = {m: v[primary] for m, v in values.items() if primary in v}
         counts = {}
         for val in scored.values():
@@ -1070,6 +1139,15 @@ def findings_flags(tasks, results, context=None) -> list:
             ):
                 flags.append((tid, base[0], "no candidate beats the baseline", primary))
         rows = ctx_rows.get(tid)
+        if rows and _sampled_frames(rows):
+            flags.append(
+                (
+                    tid,
+                    "",
+                    "model frame is a sample of the dataset",
+                    f"row fraction {_sampled_frames(rows)} (memory cap)",
+                )
+            )
         if rows and rows[-1]["status"] != "finished":
             flags.append(
                 (
@@ -1130,7 +1208,10 @@ def render_findings(
             (
                 t["task_id"],
                 "yes" if base else "NO",
-                counts["ok"] - (1 if base else 0),
+                sum(
+                    r["stage"] == "candidate" and r["status"] == "ok"
+                    for r in models.values()
+                ),
                 counts["failed"],
                 counts["skipped_library_unavailable"],
             )
@@ -1331,23 +1412,34 @@ def render_findings(
 _FRAME_NOTES: list = []
 
 
-def _note_frame(pdf, fraction) -> None:
+def _note_frame(pdf, fraction, cap=None, total=None) -> None:
     """Remember what the model frame looks like; written by start_task."""
     try:
         by = pdf["partition"].value_counts().to_dict() if "partition" in pdf else {}
         nulls = pdf.isna().mean()
         worst = nulls[nulls > 0].sort_values(ascending=False).head(5)
-        _FRAME_NOTES.append(
-            {
-                "rows": len(pdf),
-                "columns": int(pdf.shape[1]),
-                "sample_fraction": round(float(fraction), 4),
-                "rows_by_partition": {str(k): int(v) for k, v in by.items()},
-                "highest_null_rates": {c: round(float(v), 4) for c, v in worst.items()},
-            }
-        )
+        note = {
+            "rows": len(pdf),
+            "columns": int(pdf.shape[1]),
+            "sample_fraction": round(float(fraction), 4),
+            "rows_by_partition": {str(k): int(v) for k, v in by.items()},
+            "highest_null_rates": {c: round(float(v), 4) for c, v in worst.items()},
+        }
+        if total is not None:
+            note["row_cap"], note["rows_before_cap"] = int(cap), int(total)
+        _FRAME_NOTES.append(note)
     except Exception as exc:
         print(f"WARN frame notes not recorded: {type(exc).__name__}: {exc}")
+
+
+def note_diagnostics(values: dict) -> None:
+    """Named diagnostic figures of the task's data, shown with the data notes."""
+    try:
+        _FRAME_NOTES.append(
+            {"diagnostics": {k: round(float(v), 4) for k, v in values.items()}}
+        )
+    except Exception as exc:
+        print(f"WARN diagnostics not recorded: {type(exc).__name__}: {exc}")
 
 
 def note_target(y, tr_m, va_m, kind: str) -> None:

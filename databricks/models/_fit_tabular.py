@@ -313,16 +313,18 @@ class TabularBundle:
 
 def _prepare(ctx, df, spec):
     """(pandas frame, features, row fraction): train and validation rows with
-    the target, features, folds and any baseline columns."""
+    the target, features, folds and any baseline columns. `extra_features` are
+    columns added after the contract was registered (see the load notebook)."""
     feats = resolve_features(
         ctx,
         df.columns,
-        id_features=spec.get("id_features", ()),
+        id_features=[*spec.get("id_features", ()), *spec.get("extra_features", ())],
         drop=spec.get("drop", ()),
     )
     base = spec.get("baseline", {})
     extra = [base.get("column"), base.get("denominator"), *base.get("cols", [])]
     extra += [*spec.get("quantile_cols", []), spec.get("date_col")]
+    extra += spec.get("diagnostic", {}).get("cols", [])
     needed = [spec["target"], "partition", "fold_id", *spec["key_cols"], *extra]
     have = set(df.columns)
     cols = []
@@ -384,11 +386,26 @@ def _point_metrics(y, pred, base_pred, price):
     return m
 
 
+def _diagnostic_metrics(y, pred, frame, diag, diag_pred, skill=True):
+    """Skill over the group-mean diagnostic and the error per group."""
+    out = {}
+    denominator = mae(y, diag_pred)
+    if skill and denominator > 0:
+        out[f"skill_mae_vs_{diag['name']}"] = 1.0 - mae(y, pred) / denominator
+    groups = frame[diag["group_col"]].astype(str).to_numpy()
+    for g in np.unique(groups):
+        sel = groups == g
+        out[f"mae__{diag['group_col']}__{g}"] = mae(y[sel], pred[sel])
+    return out
+
+
 def run_regression(ctx, df, spec):
     """Baseline, point candidates and (spec["quantile"]) quantile candidates.
 
     spec: target, key_cols, models, baseline{kind,...}, optional id_features,
-    drop, fold_mode, date_col, gap_days, price, quantile, quantile_cols."""
+    extra_features, drop, fold_mode, date_col, gap_days, price, quantile,
+    quantile_cols, diagnostic{name, cols, group_col}: a group-mean model recorded
+    beside the baseline, with every model's skill over it and its error per group."""
     pdf, feats, fraction = _prepare(ctx, df, spec)
     tr_m, va_m = _masks(pdf)
     y = pd.to_numeric(pdf[spec["target"]], errors="coerce").to_numpy(dtype="float64")
@@ -399,18 +416,52 @@ def run_regression(ctx, df, spec):
 
     base = fit_baseline(pdf[tr_m], spec["target"], spec["baseline"])
     base_pred = base.predict(pdf[va_m])
+    diag = spec.get("diagnostic")
+    diag_pred = None
+    if diag:
+        diag_model = fit_baseline(
+            pdf[tr_m], spec["target"], {"kind": "group_mean", "cols": diag["cols"]}
+        )
+        diag_pred = diag_model.predict(pdf[va_m])
+
+    def group_extras(pred, skill=True):
+        if not diag:
+            return {}
+        return _diagnostic_metrics(
+            y[va_m], pred, pdf[va_m], diag, diag_pred, skill=skill
+        )
+
     run_candidate(
         ctx,
         spec["baseline"].get("name", spec["baseline"]["kind"]),
         "baseline",
         lambda: (
             base,
-            _point_metrics(y[va_m], base_pred, None, price),
+            {
+                **_point_metrics(y[va_m], base_pred, None, price),
+                **group_extras(base_pred),
+            },
             int(va_m.sum()),
         ),
         params={"row_fraction": round(fraction, 4)},
         stage="baseline",
     )
+    if diag:
+        run_candidate(
+            ctx,
+            diag["name"],
+            "baseline",
+            lambda: (
+                diag_model,
+                {
+                    **regression_metrics(y[va_m], diag_pred, base_pred),
+                    **group_extras(diag_pred, skill=False),
+                },
+                int(va_m.sum()),
+            ),
+            params={"cols": diag["cols"]},
+            stage="diagnostic",
+        )
     qbase = None
     if spec.get("quantile"):
         qbase = fit_quantile_baseline(
@@ -447,6 +498,7 @@ def run_regression(ctx, df, spec):
             model = build(best).fit(x[tr_m], y[tr_m])
             pred = model.predict(x[va_m])
             metrics = _point_metrics(y[va_m], pred, base_pred, price)
+            metrics.update(group_extras(pred))
             tr_s = _train_sample(tr_m)
             metrics.update(
                 train_side(

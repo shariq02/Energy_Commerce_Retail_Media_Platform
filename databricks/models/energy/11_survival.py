@@ -60,6 +60,7 @@ SPEC = {
     "entry_col": "entry_years",
     "key_cols": ["unit_id"],
     "group_col": "is_offshore",
+    "diagnostic_feature": "commissioning_year",
     "drop": ["entry_years", "left_truncated", "entry_date"],
     "models": ["cox_lifelines", "survival_forest", "boosted_cox_xgboost"],
 }

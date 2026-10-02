@@ -253,12 +253,19 @@ def test_label_matrices_split_by_entity_type(lib):
     assert mats["unit"][0].shape == (1, 1)
 
 
-def test_tier_metrics_skip_thin_tiers_in_the_balanced_score(lib):
+def test_tier_metrics_keep_thin_tiers_in_the_balanced_score(lib):
     y_true = np.array(["a"] * 12 + ["b"] * 2)
     y_pred = np.array(["a"] * 12 + ["a", "b"])
     out = lib["tier_metrics"](y_true, y_pred, ["a", "b"])
     assert out["estimable__b"] == 0.0
-    assert out["balanced_accuracy"] == pytest.approx(1.0)
+    assert out["estimable_tiers"] == 1.0
+    assert out["balanced_accuracy"] == pytest.approx(0.75)
+
+
+def test_majority_tier_does_not_score_perfectly_when_a_thin_tier_exists(lib):
+    y_true = np.array(["a"] * 12 + ["b"] * 2)
+    out = lib["tier_metrics"](y_true, np.array(["a"] * 14), ["a", "b"])
+    assert out["balanced_accuracy"] == pytest.approx(0.5)
 
 
 # --- policies ---------------------------------------------------------------
@@ -291,3 +298,55 @@ def test_event_histories_exclude_the_current_event(lib):
     )
     hist = lib["event_histories"](frame, {"view": 1, "cart": 2, "purchase": 3}, 2, "s")
     assert hist.tolist() == [[0, 0], [0, 1], [1, 2]]
+
+
+def test_pumped_metrics_clip_actions_and_score_timing_at_the_logged_size(lib):
+    valid = pd.DataFrame(
+        {
+            "episode_id": ["d1", "d1", "d1", "d1"],
+            "action_net_mwh": [10.0, -10.0, 10.0, -10.0],
+            "state_price_eur_per_mwh": [100.0, 20.0, 80.0, 40.0],
+            "reward_eur": [1000.0, -200.0, 800.0, -400.0],
+        }
+    )
+    spec = {
+        "action_col": "action_net_mwh",
+        "price_col": "state_price_eur_per_mwh",
+        "reward_col": "reward_eur",
+        "key_cols": ["episode_id", "step"],
+        "action_bounds": (-10.0, 10.0),
+    }
+    out = lib["pumped_metrics"](valid, np.array([500.0, -500.0, 500.0, -500.0]), spec)
+    assert out["action_mae"] == pytest.approx(0.0)
+    assert out["reward_policy"] == pytest.approx(out["reward_logged"])
+    greedy = lib["pumped_metrics"](valid, np.array([1.0, 1.0, 1.0, -1.0]), spec)
+    assert greedy["reward_timing"] == pytest.approx((1000 + 200 + 800 - 400) / 4)
+    assert greedy["reward_timing_gain"] == pytest.approx(greedy["reward_timing"] - 300)
+
+
+def test_group_diagnostic_reports_skill_over_the_group_mean_and_error_per_group(lib):
+    frame = pd.DataFrame({"scope": ["a", "a", "b", "b"]})
+    diag = {"name": "scope_mean", "group_col": "scope"}
+    y = np.array([1.0, 1.0, 5.0, 5.0])
+    out = lib["_diagnostic_metrics"](y, y + 1.0, frame, diag, y + 2.0)
+    assert out["skill_mae_vs_scope_mean"] == pytest.approx(0.5)
+    assert out["mae__scope__a"] == pytest.approx(1.0)
+    assert "skill_mae_vs_scope_mean" not in lib["_diagnostic_metrics"](
+        y, y, frame, diag, y, skill=False
+    )
+
+
+def test_item_diagnostics_count_targets_already_seen_in_the_session(lib):
+    valid = pd.DataFrame(
+        {
+            "s": ["a", "a", "a"],
+            "step": [0, 1, 2],
+            "item": ["x", "y", "x"],
+            "next": ["y", "x", "z"],
+        }
+    )
+    train = pd.DataFrame({"item": ["x", "y"], "next": ["y", "x"]})
+    out = lib["item_diagnostics"](train, valid, "s", "step", "item", "next")
+    assert out["item_vocabulary_train"] == 2
+    assert out["target_seen_earlier_in_session"] == pytest.approx(1 / 3)
+    assert out["target_in_train_vocabulary"] == pytest.approx(2 / 3)

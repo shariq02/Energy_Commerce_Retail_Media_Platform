@@ -94,6 +94,34 @@ def fit_cooccurrence(train, src_col, truth_col, popularity, top=COOCCURRENCE_TOP
 
 # COMMAND ----------
 
+# DBTITLE 1,Item diagnostics: vocabulary and targets already seen in the session
+
+
+def item_diagnostics(train, valid, session_col, step_col, item_col, truth_col):
+    """Item vocabulary, and how often the target item already occurred earlier in
+    the same session (which a ranker can exploit by repeating its history)."""
+    first = (
+        valid.groupby([session_col, item_col])[step_col]
+        .min()
+        .rename("first_step")
+        .reset_index()
+        .rename(columns={item_col: truth_col})
+    )
+    merged = valid[[session_col, step_col, truth_col]].merge(
+        first, on=[session_col, truth_col], how="left"
+    )
+    vocabulary = set(train[item_col]) | set(train[truth_col])
+    return {
+        "item_vocabulary_train": len(vocabulary),
+        "target_seen_earlier_in_session": float(
+            merged["first_step"].le(merged[step_col]).mean()
+        ),
+        "target_in_train_vocabulary": float(valid[truth_col].isin(vocabulary).mean()),
+    }
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Session histories and the sequence network
 
 
@@ -238,6 +266,7 @@ def run_ranking(ctx, df, spec):
             .sample(frac=SEQ_EVAL_ROWS / len(train), random_state=MODEL_SEED)
         )
         train_eval = train[train[sc].isin(chosen_tr)]
+    note_diagnostics(item_diagnostics(train, valid, sc, tc, ic, yc))
     start_task(ctx)
 
     def scored(ranker):

@@ -58,6 +58,11 @@ SPEC = {
     "key_cols": ["market_area_code", "local_date", "forecast_scope"],
     "id_features": ["market_area_code", "forecast_scope"],
     "baseline": {"kind": "zero", "name": "zero_correction"},
+    "diagnostic": {
+        "name": "scope_mean",
+        "cols": ["market_area_code", "forecast_scope"],
+        "group_col": "forecast_scope",
+    },
     "models": ["ridge", "gbt_lightgbm", "gbt_sklearn"],
     "fold_mode": "rolling",
     "date_col": "local_date",

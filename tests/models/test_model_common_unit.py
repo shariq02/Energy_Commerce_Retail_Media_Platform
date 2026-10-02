@@ -250,6 +250,44 @@ def test_flags_raise_for_perfect_score_single_class_and_train_gap(c):
     assert ("m2", "validation score far below training score") in found
 
 
+def test_flags_skip_baselines_for_constant_predictions_and_unbounded_metrics(c):
+    results = [
+        _row("t.x", "base", "baseline", "ok", "reward_timing", 5e4),
+        _row("t.x", "base", "baseline", "ok", "pred_positive_share", 0.0),
+        _row("t.x", "base", "baseline", "ok", "pred_std_ratio", 0.0),
+        _row("t.x", "m1", "candidate", "ok", "reward_timing", 6e4),
+    ]
+    flags = c["findings_flags"]([_flag_task("reward_timing")], results)
+    assert not [f for f in flags if f[2] != "no candidate beats the baseline"]
+
+
+def test_flags_report_single_class_and_single_tier_evaluations(c):
+    results = [
+        _row("t.x", "base", "baseline", "ok", "balanced_accuracy", 1.0),
+        _row("t.x", "base", "baseline", "ok", "estimable__a", 1.0),
+        _row("t.x", "base", "baseline", "ok", "estimable__b", 0.0),
+        _row("t.x", "base", "baseline", "ok", "base_rate", 1.0),
+    ]
+    task = _flag_task("balanced_accuracy")
+    found = {f for _, _, f, _ in c["findings_flags"]([task], results)}
+    assert "fewer than two classes estimable in the evaluation" in found
+    assert "single-class evaluation target" in found
+
+
+def test_flags_report_a_sampled_model_frame_and_no_skill_over_a_diagnostic(c):
+    results = [
+        _row("t.x", "base", "baseline", "ok", "mae", 5.0),
+        _row("t.x", "m1", "candidate", "ok", "mae", 4.0),
+        _row("t.x", "m1", "candidate", "ok", "skill_mae_vs_scope_mean", -0.1),
+    ]
+    notes = '[{"rows": 10, "sample_fraction": 0.65}]'
+    context = {"t.x": [{"status": "data_ready", "data_notes": notes}]}
+    task = _flag_task("mae", False)
+    found = {f for _, _, f, _ in c["findings_flags"]([task], results, context)}
+    assert "model frame is a sample of the dataset" in found
+    assert "no skill over the scope_mean diagnostic" in found
+
+
 def test_flags_report_failures_bias_and_baseline_not_beaten(c):
     results = [
         _row("t.x", "base", "baseline", "ok", "mae", 5.0),

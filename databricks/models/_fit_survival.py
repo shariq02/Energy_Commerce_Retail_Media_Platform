@@ -183,13 +183,19 @@ def _make_boosted_cox():
 def run_survival(ctx, df, spec):
     """Kaplan-Meier baseline plus Cox, survival forest and boosted Cox.
 
-    spec: duration_col, event_col, entry_col, key_cols, group_col, drop, models."""
+    spec: duration_col, event_col, entry_col, key_cols, group_col, drop, models,
+    optional diagnostic_feature: a Cox model on that one column, recorded beside the
+    baseline, because with one calendar censor date the duration of a censored unit
+    follows from its start year."""
     dcol, ecol, ncol = spec["duration_col"], spec["event_col"], spec["entry_col"]
     feats = resolve_features(ctx, df.columns, drop=spec.get("drop", ()))
+    diag = spec.get("diagnostic_feature")
+    diag = diag if diag in df.columns else None
     cols = list(
         dict.fromkeys(
             [
                 *feats,
+                *([diag] if diag else []),
                 dcol,
                 ecol,
                 ncol,
@@ -237,6 +243,32 @@ def run_survival(ctx, df, spec):
         params={"group": spec["group_col"]},
         stage="baseline",
     )
+
+    if diag:
+
+        def fit_diagnostic():
+            enc_d = FeatureEncoder([diag]).fit(train)
+            frame = pd.DataFrame(enc_d.transform(train, fill=True), columns=["x0"])
+            frame["duration"], frame["event"], frame["entry"] = (
+                dur[tr_m],
+                ev[tr_m],
+                entry[tr_m],
+            )
+            model = _make_cox()
+            model.fit(
+                frame, duration_col="duration", event_col="event", entry_col="entry"
+            )
+            return scored(SurvivalBundle("cox", enc_d, model))
+
+        run_candidate(
+            ctx,
+            f"{diag}_cox",
+            "survival",
+            fit_diagnostic,
+            requires=("lifelines",),
+            params={"feature": diag, "entry": "delayed entry used"},
+            stage="diagnostic",
+        )
 
     keep = np.nanstd(enc.transform(train, fill=True), axis=0) > 0
     enc_keep = [f for f, k in zip(feats, keep, strict=True) if k]

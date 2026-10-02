@@ -219,15 +219,17 @@ class MajorityTier:
 
 def tier_metrics(y_true, y_pred, labels):
     per = per_class_precision_recall(y_true, y_pred, labels, MIN_TIER_ROWS)
-    out = {"accuracy": float(np.mean(np.asarray(y_true) == np.asarray(y_pred)))}
+    yt, yp = np.asarray(y_true), np.asarray(y_pred)
+    out = {"accuracy": float(np.mean(yt == yp))}
     recalls = []
     for lab, (p, r, n, ok) in per.items():
         out[f"precision__{lab}"] = p
         out[f"recall__{lab}"] = r
         out[f"n_true__{lab}"] = float(n)
         out[f"estimable__{lab}"] = 1.0 if ok else 0.0
-        if ok and np.isfinite(r):
-            recalls.append(r)
+        if n:
+            recalls.append(float(np.sum((yt == lab) & (yp == lab))) / n)
+    out["estimable_tiers"] = float(sum(v[3] for v in per.values()))
     out["balanced_accuracy"] = float(np.mean(recalls)) if recalls else float("nan")
     return out
 

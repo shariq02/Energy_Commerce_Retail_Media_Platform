@@ -148,18 +148,39 @@ def _train_cql(z, action_idx, reward, n_actions):
     return net
 
 
+def _episode_net_abs(frame, action, episode_col):
+    """Mean over episodes of the absolute summed net energy."""
+    return float(
+        pd.Series(action, index=frame.index)
+        .groupby(frame[episode_col])
+        .sum()
+        .abs()
+        .mean()
+    )
+
+
 def pumped_metrics(valid, action, spec):
+    """Actions are clipped to the logged range. reward_policy values any size of
+    action; reward_timing keeps the logged size and scores only the direction, since
+    no storage state or power limit is modelled."""
+    lo, hi = spec.get("action_bounds", (-np.inf, np.inf))
+    action = np.clip(np.asarray(action, dtype="float64"), lo, hi)
     logged = valid[spec["action_col"]].to_numpy(dtype="float64")
     price = valid[spec["price_col"]].to_numpy(dtype="float64")
     out = {
         "action_mae": mae(logged, action),
         "reward_policy": float(np.nanmean(price * action)),
+        "reward_timing": float(np.nanmean(price * np.sign(action) * np.abs(logged))),
         "reward_logged": float(
             np.nanmean(valid[spec["reward_col"]].to_numpy(dtype="float64"))
         ),
         "sign_agreement": float(np.mean(np.sign(action) == np.sign(logged))),
     }
     out["reward_gain"] = out["reward_policy"] - out["reward_logged"]
+    out["reward_timing_gain"] = out["reward_timing"] - out["reward_logged"]
+    episode = spec["key_cols"][0]
+    out["episode_net_abs_policy"] = _episode_net_abs(valid, action, episode)
+    out["episode_net_abs_logged"] = _episode_net_abs(valid, logged, episode)
     return out
 
 
@@ -227,6 +248,7 @@ def run_pumped_storage(ctx, df, spec):
     enc = FeatureEncoder(spec["state_cols"]).fit(train)
     y = train[spec["action_col"]].to_numpy(dtype="float64")
     w = reward_weights(train[spec["reward_col"]])
+    spec = {**spec, "action_bounds": (float(y.min()), float(y.max()))}
     base_params = {
         "row_fraction": round(fraction, 4),
         "reward": "price x net energy, price-taker",
