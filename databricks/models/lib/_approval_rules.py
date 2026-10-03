@@ -377,20 +377,33 @@ def _row_for(task, sel, rows, role, decision) -> dict:
     }
 
 
+def _baseline_of(task, selection) -> dict:
+    """The forwarded baseline: the one named like the registry baseline, else the
+    only baseline row (a runner records its baseline under its own name)."""
+    bases = [s for s in selection if s["is_baseline"]]
+    named = [s for s in bases if s["model_name"] == task["baseline"]]
+    if named:
+        return named[0]
+    if len(bases) == 1:
+        return bases[0]
+    raise ValueError(
+        f"{task['task_id']}: {len(bases)} baseline rows, none named {task['baseline']}"
+    )
+
+
 def recommend_task(task, selection, results, spec, reads) -> list:
     """Rows for the selected candidate, the runner-up and the baseline fallback.
     The selected candidate is the best forwarded candidate by validation rank."""
     by_model: dict = {}
     for r in results:
         by_model.setdefault(r["model_name"], []).append(r)
-    base_name = task["baseline"]
     cands = sorted(
         (s for s in selection if not s["is_baseline"]), key=lambda s: s["rank"]
     )
-    base = next((s for s in selection if s["model_name"] == base_name), None)
-    if not cands or base is None:
-        raise ValueError(f"{task['task_id']}: no forwarded candidate or baseline")
-    base_rows = by_model.get(base_name, [])
+    if not cands:
+        raise ValueError(f"{task['task_id']}: no forwarded candidate")
+    base = _baseline_of(task, selection)
+    base_rows = by_model.get(base["model_name"], [])
     out = []
     for i, sel in enumerate(cands):
         rows = by_model.get(sel["model_name"], [])

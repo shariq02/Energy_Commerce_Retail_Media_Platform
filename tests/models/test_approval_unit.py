@@ -269,6 +269,44 @@ def test_the_selected_model_follows_the_validation_rank(lib):
     assert by_role["baseline_fallback"]["decision"] == "approved"
 
 
+def test_a_baseline_recorded_under_another_name_is_found(lib):
+    task_id = "weather_imputation.reconstruction"
+    task = lib["TASK_BY_ID"][task_id]
+    selection = [_sel(task_id, "causal_baseline", 0, True), _sel(task_id, "cand", 1)]
+    results = _rows(task_id, "cand", **GOOD) + _rows(
+        task_id, "causal_baseline", "baseline", skill_mae_mean=0.0
+    )
+    rows = lib["recommend_task"](task, selection, results, SPEC, 1)
+    fallback = next(r for r in rows if r["role"] == "baseline_fallback")
+    assert fallback["model_name"] == "causal_baseline"
+
+
+def test_several_baselines_without_the_registered_name_raise(lib):
+    task_id = "weather_imputation.reconstruction"
+    task = lib["TASK_BY_ID"][task_id]
+    selection = [
+        _sel(task_id, "one", 0, True),
+        _sel(task_id, "two", 0, True),
+        _sel(task_id, "cand", 1),
+    ]
+    with pytest.raises(ValueError, match="none named"):
+        lib["recommend_task"](task, selection, [], SPEC, 1)
+
+
+def test_the_registered_baseline_wins_among_several(lib):
+    task_id = "price_daily.price"
+    task = lib["TASK_BY_ID"][task_id]
+    selection = [
+        _sel(task_id, "empirical_quantiles", 0, True),
+        _sel(task_id, task["baseline"], 0, True),
+        _sel(task_id, "cand", 1),
+    ]
+    results = _rows(task_id, "cand", **GOOD)
+    rows = lib["recommend_task"](task, selection, results, SPEC, 1)
+    fallback = next(r for r in rows if r["role"] == "baseline_fallback")
+    assert fallback["model_name"] == task["baseline"]
+
+
 def test_a_task_without_a_candidate_raises(lib):
     task = lib["TASK_BY_ID"]["load.load"]
     only_base = [_sel("load.load", task["baseline"], 0, True)]
