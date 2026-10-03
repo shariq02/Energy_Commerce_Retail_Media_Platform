@@ -1,7 +1,8 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "6"
+# base_environment = "databricks_ai_v5"
+# environment_version = "5"
 # ///
 # MAGIC %md
 # MAGIC # MODEL LIBRARIES
