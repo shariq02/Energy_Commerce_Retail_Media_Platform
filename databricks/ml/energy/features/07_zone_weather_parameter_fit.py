@@ -165,6 +165,37 @@ for k in GRID_K:
 
 # COMMAND ----------
 
+# DBTITLE 1,Stop with row counts when no parameter set scored
+if all(r[3] is None for r in _results):
+    _k, _cap, _alpha = GRID_K[0], GRID_CAP_KM[-1], GRID_ALPHA[0]
+    _w = unit_station_weights(units, stations, k=_k, cap_km=_cap)
+    _um = unit_months(units, FIT_FROM, VALID_TO)
+    _zw = zone_station_weights(_um, _w, heights, _alpha)
+    _zd = zone_wind_daily(sday, _zw, min_covered=MIN_COVERED)
+    _counts = {
+        "units": units.count(),
+        "stations": stations.count(),
+        "unit-station weights": _w.count(),
+        "unit months": _um.count(),
+        "zone station weights": _zw.count(),
+        "station days": sday.count(),
+        "capacity factor days": capacity_factor.count(),
+        "zone wind days": _zd.count(),
+        "zone wind days with capacity factor": _zd.join(
+            capacity_factor, ["market_area_code", "local_date"]
+        ).count(),
+        "zone wind days with a wind value": _zd.filter(
+            F.col("wind_speed_cubed_adjusted_mean").isNotNull()
+        ).count(),
+        "coverage share min / median": _zd.agg(
+            F.min("covered_weight_share"),
+            F.percentile_approx("covered_weight_share", 0.5),
+        ).first(),
+    }
+    raise RuntimeError(f"no parameter set scored; row counts: {_counts}")
+
+# COMMAND ----------
+
 # DBTITLE 1,Select on the training score
 _scored = [r for r in _results if r[3] is not None]
 _best = max(_scored, key=lambda r: r[3])

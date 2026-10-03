@@ -100,7 +100,9 @@ for eco in ECOSYSTEMS:
         by_col = {r["column_name"]: r for r in contract}
         cols = read_ml(f"dataset_{ds}", ecosystem=eco).columns
         uncovered = [
-            c for c in cols if c not in PASSTHROUGH and base_column(c) not in by_col
+            c
+            for c in cols
+            if c not in PASSTHROUGH and c not in by_col and base_column(c) not in by_col
         ]
         audit(
             eco,
@@ -182,20 +184,25 @@ for eco in ECOSYSTEMS:
             )
             continue
         t = F.col(time_cols[0]).cast("date")
-        df = (
-            read_ml(f"dataset_{ds}", ecosystem=eco)
-            .groupBy("partition")
-            .agg(F.min(t).alias("lo"), F.max(t).alias("hi"))
+        data = read_ml(f"dataset_{ds}", ecosystem=eco)
+        # a dataset that unions series families splits each family on its own calendar
+        families = ["series_family"] if "series_family" in data.columns else []
+        df = data.groupBy(*families, "partition").agg(
+            F.min(t).alias("lo"), F.max(t).alias("hi")
         )
-        rng = {r["partition"]: (r["lo"], r["hi"]) for r in df.collect()}
+        by_family = {}
+        for r in df.collect():
+            fam = r["series_family"] if families else ""
+            by_family.setdefault(fam, {})[r["partition"]] = (r["lo"], r["hi"])
         need = int(spec["embargo_days"])
         ok = True
         detail = []
-        for a, b in (("train", "validation"), ("validation", "test")):
-            if a in rng and b in rng:
-                gap = (rng[b][0] - rng[a][1]).days
-                detail.append(f"{a}->{b} gap={gap}d")
-                ok = ok and gap >= need
+        for fam, rng in sorted(by_family.items()):
+            for a, b in (("train", "validation"), ("validation", "test")):
+                if a in rng and b in rng:
+                    gap = (rng[b][0] - rng[a][1]).days
+                    detail.append(f"{fam + ' ' if fam else ''}{a}->{b} gap={gap}d")
+                    ok = ok and gap >= need
         audit(
             eco, ds, "embargo_respected", ok, "; ".join(detail) + f" required={need}d"
         )
@@ -206,7 +213,17 @@ for eco in ECOSYSTEMS:
 for eco in ECOSYSTEMS:
     for d in fitted_datasets(eco):
         ds = d["dataset_id"]
-        m = read_partition_manifest(ds, eco).filter(
+        manifest = read_partition_manifest(ds, eco)
+        if not manifest.filter(F.col("rule_id").startswith("hash:")).limit(1).count():
+            audit(
+                eco,
+                ds,
+                "groups_not_split_across_partitions",
+                True,
+                "time-based split; groups only define folds inside the training partition",
+            )
+            continue
+        m = manifest.filter(
             F.col("group_key").isNotNull()
             & F.col("partition").isin("train", "validation", "test")
         )
@@ -294,7 +311,7 @@ for eco in ECOSYSTEMS:
             .agg(
                 F.count("*").alias("n"),
                 F.count(t).alias("labelled"),
-                F.avg(F.col(t).cast("double")).alias("mean"),
+                F.expr(f"avg(try_cast(`{t}` AS DOUBLE))").alias("mean"),
             )
             .collect()
         )

@@ -31,8 +31,8 @@ MOUNTAIN_STATION_PATTERN = "(?i)zugspitze|feldberg|hohenpei"
 COASTAL_STATION_PATTERN = "(?i)list|norderney|kiel|warnem"
 WIND_CATEGORY_PATTERN = "(?i)windgeschwindigkeit|wind_?speed"
 WIND_SPEED_EXPR = (
-    "coalesce(filter(wind__readings, r -> r.statistic = 'mean')[0], "
-    "wind__readings[0]).wind_speed_m_per_s"
+    "coalesce(try_element_at(filter(wind__readings, r -> r.statistic = 'mean'), 1), "
+    "try_element_at(wind__readings, 1)).wind_speed_m_per_s"
 )
 MIN_STATION_HOURS = 18
 EARTH_RADIUS_KM = 6371.0
@@ -94,6 +94,7 @@ def station_day_wind(
     hourly = weather.filter(
         (F.col("origin_source_system") == "dwd")
         & (F.col("interval_seconds") == 3600)
+        & (F.col("interval_reference") == "clock")
         & F.col("local_date").between(date_from, date_to)
     ).select(
         F.col("location_key").alias("place_key"),
@@ -230,7 +231,12 @@ def zone_wind_daily(
 ) -> DataFrame:
     """Capacity-weighted, shear-adjusted zone wind per local date. Weights are
     renormalised over the stations that reported that day (zone level)."""
-    total = zw.groupBy("market_area_code", "month").agg(F.sum("w0").alias("w0_all"))
+    total = (
+        zw.groupBy("market_area_code", "place_key", "month")
+        .agg(F.max("w0").alias("w0"))
+        .groupBy("market_area_code", "month")
+        .agg(F.sum("w0").alias("w0_all"))
+    )
     j = sday.join(zw, ["place_key", "sensor_height_m", "month"], "inner")
     agg = j.groupBy("market_area_code", "local_date", "month").agg(
         F.sum(F.col("w1") * F.col("speed_mean")).alias("_num1"),

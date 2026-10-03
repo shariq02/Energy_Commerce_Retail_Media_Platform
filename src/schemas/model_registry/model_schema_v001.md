@@ -1,0 +1,162 @@
+# Model schema snapshot v001
+
+<!-- model-schema-hash: 0977739b24b484cb4dcb652adb3d5e39b22381f330168aae0ff0d6cadbd69ff3 -->
+
+**Captured:** 2026-10-02T13:25:46Z
+**Catalog / schemas:** `energy_commerce_retail_media.{commerce_ml_models, energy_ml_models}`
+**Tables:** 14  |  **Columns:** 146
+
+## Change summary
+
+First snapshot -- baseline.
+
+## Schema
+
+| schema | table | # | column | type | nullable |
+|---|---|---|---|---|---|
+| commerce_ml_models | candidate_results | 1 | dataset_id | string | true |
+| commerce_ml_models | candidate_results | 2 | task_id | string | true |
+| commerce_ml_models | candidate_results | 3 | model_name | string | true |
+| commerce_ml_models | candidate_results | 4 | family | string | true |
+| commerce_ml_models | candidate_results | 5 | stage | string | true |
+| commerce_ml_models | candidate_results | 6 | partition | string | true |
+| commerce_ml_models | candidate_results | 7 | metric | string | true |
+| commerce_ml_models | candidate_results | 8 | value | double | true |
+| commerce_ml_models | candidate_results | 9 | n_rows | bigint | true |
+| commerce_ml_models | candidate_results | 10 | status | string | true |
+| commerce_ml_models | candidate_results | 11 | detail | string | true |
+| commerce_ml_models | candidate_results | 12 | frozen_delta_version | bigint | true |
+| commerce_ml_models | candidate_results | 13 | mlflow_run_id | string | true |
+| commerce_ml_models | candidate_results | 14 | artifact_status | string | true |
+| commerce_ml_models | candidate_results | 15 | params | string | true |
+| commerce_ml_models | candidate_results | 16 | smoke | boolean | true |
+| commerce_ml_models | candidate_results | 17 | run_id | string | true |
+| commerce_ml_models | candidate_results | 18 | run_at | timestamp | true |
+| commerce_ml_models | candidate_selection | 1 | task_id | string | true |
+| commerce_ml_models | candidate_selection | 2 | dataset_id | string | true |
+| commerce_ml_models | candidate_selection | 3 | model_name | string | true |
+| commerce_ml_models | candidate_selection | 4 | family | string | true |
+| commerce_ml_models | candidate_selection | 5 | rank | int | true |
+| commerce_ml_models | candidate_selection | 6 | primary_metric | string | true |
+| commerce_ml_models | candidate_selection | 7 | primary_value | double | true |
+| commerce_ml_models | candidate_selection | 8 | is_baseline | boolean | true |
+| commerce_ml_models | candidate_selection | 9 | mlflow_run_id | string | true |
+| commerce_ml_models | candidate_selection | 10 | frozen_delta_version | bigint | true |
+| commerce_ml_models | candidate_selection | 11 | run_id | string | true |
+| commerce_ml_models | candidate_selection | 12 | selected_at | timestamp | true |
+| commerce_ml_models | evaluation_spec | 1 | dataset_id | string | true |
+| commerce_ml_models | evaluation_spec | 2 | spec_key | string | true |
+| commerce_ml_models | evaluation_spec | 3 | spec_value | string | true |
+| commerce_ml_models | evaluation_spec | 4 | run_id | string | true |
+| commerce_ml_models | evaluation_spec | 5 | recorded_at | timestamp | true |
+| commerce_ml_models | evaluation_split_manifest | 1 | dataset_id | string | true |
+| commerce_ml_models | evaluation_split_manifest | 2 | frozen_delta_version | bigint | true |
+| commerce_ml_models | evaluation_split_manifest | 3 | grain_key | string | true |
+| commerce_ml_models | evaluation_split_manifest | 4 | partition | string | true |
+| commerce_ml_models | evaluation_split_manifest | 5 | fold_id | int | true |
+| commerce_ml_models | evaluation_split_manifest | 6 | group_key | string | true |
+| commerce_ml_models | evaluation_split_manifest | 7 | stratum | string | true |
+| commerce_ml_models | evaluation_split_manifest | 8 | rule_id | string | true |
+| commerce_ml_models | evaluation_split_manifest | 9 | split_version | string | true |
+| commerce_ml_models | library_availability | 1 | library | string | true |
+| commerce_ml_models | library_availability | 2 | version | string | true |
+| commerce_ml_models | library_availability | 3 | available | boolean | true |
+| commerce_ml_models | library_availability | 4 | checked_at | timestamp | true |
+| commerce_ml_models | task_registry | 1 | task_id | string | true |
+| commerce_ml_models | task_registry | 2 | dataset_id | string | true |
+| commerce_ml_models | task_registry | 3 | ecosystem | string | true |
+| commerce_ml_models | task_registry | 4 | paradigm | string | true |
+| commerce_ml_models | task_registry | 5 | task_type | string | true |
+| commerce_ml_models | task_registry | 6 | target | string | true |
+| commerce_ml_models | task_registry | 7 | baseline | string | true |
+| commerce_ml_models | task_registry | 8 | primary_metric | string | true |
+| commerce_ml_models | task_registry | 9 | higher_is_better | boolean | true |
+| commerce_ml_models | task_registry | 10 | notebook | string | true |
+| commerce_ml_models | task_registry | 11 | registered_at | timestamp | true |
+| commerce_ml_models | task_run_context | 1 | task_id | string | true |
+| commerce_ml_models | task_run_context | 2 | dataset_id | string | true |
+| commerce_ml_models | task_run_context | 3 | smoke | boolean | true |
+| commerce_ml_models | task_run_context | 4 | smoke_widget | string | true |
+| commerce_ml_models | task_run_context | 5 | run_id | string | true |
+| commerce_ml_models | task_run_context | 6 | status | string | true |
+| commerce_ml_models | task_run_context | 7 | notebook_path | string | true |
+| commerce_ml_models | task_run_context | 8 | job_id | string | true |
+| commerce_ml_models | task_run_context | 9 | job_run_id | string | true |
+| commerce_ml_models | task_run_context | 10 | frozen_delta_version | bigint | true |
+| commerce_ml_models | task_run_context | 11 | data_notes | string | true |
+| commerce_ml_models | task_run_context | 12 | library_versions | string | true |
+| commerce_ml_models | task_run_context | 13 | detail | string | true |
+| commerce_ml_models | task_run_context | 14 | recorded_at | timestamp | true |
+| energy_ml_models | candidate_results | 1 | dataset_id | string | true |
+| energy_ml_models | candidate_results | 2 | task_id | string | true |
+| energy_ml_models | candidate_results | 3 | model_name | string | true |
+| energy_ml_models | candidate_results | 4 | family | string | true |
+| energy_ml_models | candidate_results | 5 | stage | string | true |
+| energy_ml_models | candidate_results | 6 | partition | string | true |
+| energy_ml_models | candidate_results | 7 | metric | string | true |
+| energy_ml_models | candidate_results | 8 | value | double | true |
+| energy_ml_models | candidate_results | 9 | n_rows | bigint | true |
+| energy_ml_models | candidate_results | 10 | status | string | true |
+| energy_ml_models | candidate_results | 11 | detail | string | true |
+| energy_ml_models | candidate_results | 12 | frozen_delta_version | bigint | true |
+| energy_ml_models | candidate_results | 13 | mlflow_run_id | string | true |
+| energy_ml_models | candidate_results | 14 | artifact_status | string | true |
+| energy_ml_models | candidate_results | 15 | params | string | true |
+| energy_ml_models | candidate_results | 16 | smoke | boolean | true |
+| energy_ml_models | candidate_results | 17 | run_id | string | true |
+| energy_ml_models | candidate_results | 18 | run_at | timestamp | true |
+| energy_ml_models | candidate_selection | 1 | task_id | string | true |
+| energy_ml_models | candidate_selection | 2 | dataset_id | string | true |
+| energy_ml_models | candidate_selection | 3 | model_name | string | true |
+| energy_ml_models | candidate_selection | 4 | family | string | true |
+| energy_ml_models | candidate_selection | 5 | rank | int | true |
+| energy_ml_models | candidate_selection | 6 | primary_metric | string | true |
+| energy_ml_models | candidate_selection | 7 | primary_value | double | true |
+| energy_ml_models | candidate_selection | 8 | is_baseline | boolean | true |
+| energy_ml_models | candidate_selection | 9 | mlflow_run_id | string | true |
+| energy_ml_models | candidate_selection | 10 | frozen_delta_version | bigint | true |
+| energy_ml_models | candidate_selection | 11 | run_id | string | true |
+| energy_ml_models | candidate_selection | 12 | selected_at | timestamp | true |
+| energy_ml_models | evaluation_spec | 1 | dataset_id | string | true |
+| energy_ml_models | evaluation_spec | 2 | spec_key | string | true |
+| energy_ml_models | evaluation_spec | 3 | spec_value | string | true |
+| energy_ml_models | evaluation_spec | 4 | run_id | string | true |
+| energy_ml_models | evaluation_spec | 5 | recorded_at | timestamp | true |
+| energy_ml_models | evaluation_split_manifest | 1 | dataset_id | string | true |
+| energy_ml_models | evaluation_split_manifest | 2 | frozen_delta_version | bigint | true |
+| energy_ml_models | evaluation_split_manifest | 3 | grain_key | string | true |
+| energy_ml_models | evaluation_split_manifest | 4 | partition | string | true |
+| energy_ml_models | evaluation_split_manifest | 5 | fold_id | int | true |
+| energy_ml_models | evaluation_split_manifest | 6 | group_key | string | true |
+| energy_ml_models | evaluation_split_manifest | 7 | stratum | string | true |
+| energy_ml_models | evaluation_split_manifest | 8 | rule_id | string | true |
+| energy_ml_models | evaluation_split_manifest | 9 | split_version | string | true |
+| energy_ml_models | library_availability | 1 | library | string | true |
+| energy_ml_models | library_availability | 2 | version | string | true |
+| energy_ml_models | library_availability | 3 | available | boolean | true |
+| energy_ml_models | library_availability | 4 | checked_at | timestamp | true |
+| energy_ml_models | task_registry | 1 | task_id | string | true |
+| energy_ml_models | task_registry | 2 | dataset_id | string | true |
+| energy_ml_models | task_registry | 3 | ecosystem | string | true |
+| energy_ml_models | task_registry | 4 | paradigm | string | true |
+| energy_ml_models | task_registry | 5 | task_type | string | true |
+| energy_ml_models | task_registry | 6 | target | string | true |
+| energy_ml_models | task_registry | 7 | baseline | string | true |
+| energy_ml_models | task_registry | 8 | primary_metric | string | true |
+| energy_ml_models | task_registry | 9 | higher_is_better | boolean | true |
+| energy_ml_models | task_registry | 10 | notebook | string | true |
+| energy_ml_models | task_registry | 11 | registered_at | timestamp | true |
+| energy_ml_models | task_run_context | 1 | task_id | string | true |
+| energy_ml_models | task_run_context | 2 | dataset_id | string | true |
+| energy_ml_models | task_run_context | 3 | smoke | boolean | true |
+| energy_ml_models | task_run_context | 4 | smoke_widget | string | true |
+| energy_ml_models | task_run_context | 5 | run_id | string | true |
+| energy_ml_models | task_run_context | 6 | status | string | true |
+| energy_ml_models | task_run_context | 7 | notebook_path | string | true |
+| energy_ml_models | task_run_context | 8 | job_id | string | true |
+| energy_ml_models | task_run_context | 9 | job_run_id | string | true |
+| energy_ml_models | task_run_context | 10 | frozen_delta_version | bigint | true |
+| energy_ml_models | task_run_context | 11 | data_notes | string | true |
+| energy_ml_models | task_run_context | 12 | library_versions | string | true |
+| energy_ml_models | task_run_context | 13 | detail | string | true |
+| energy_ml_models | task_run_context | 14 | recorded_at | timestamp | true |
