@@ -166,6 +166,8 @@ def test_model_schemas_are_the_agreed_names(c):
         "evaluation_run_context",
         "evaluation_results",
         "evaluation_flags",
+        "approval_spec",
+        "model_approval",
     }
 
 

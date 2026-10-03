@@ -145,8 +145,34 @@ def test_setup_preflight_splits_and_gates_exist():
         "evaluate/gate/03_export_findings.py",
         "lib/_eval_common.py",
         "lib/_eval_specs.py",
+        "approve/00_approval_setup.py",
+        "approve/01_recommend.py",
+        "approve/02_record_decisions.py",
+        "approve/03_model_cards.py",
+        "approve/gate/01_approval_guards.py",
+        "approve/gate/02_approval_cards.py",
+        "approve/gate/03_export_findings.py",
+        "lib/_approval_rules.py",
+        "lib/_approval_render.py",
     ):
         assert (_MODELS / rel).exists(), rel
     assert (
         _ROOT / "databricks" / "schema_registry" / "05_snapshot_model_schema.py"
     ).exists()
+
+
+_APPROVAL = [p for p in _NOTEBOOKS if _rel(p).startswith("approve/")]
+
+
+@pytest.mark.parametrize("path", _APPROVAL, ids=_rel)
+def test_approval_notebooks_read_recorded_results_only(path):
+    text = path.read_text(encoding="utf-8")
+    assert ".toPandas(" not in text
+    assert "evaluate_by_id(" not in text and "load_bundle(" not in text
+
+
+def test_approval_notebooks_load_the_approval_libraries():
+    for p in _APPROVAL:
+        text = p.read_text(encoding="utf-8")
+        assert "lib/_model_common" in text, _rel(p)
+        assert "lib/_approval_rules" in text, _rel(p)

@@ -136,3 +136,14 @@ def load_eval_libs() -> dict:
             REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
         )
     return namespace
+
+
+def load_approval_libs() -> dict:
+    """The model shared library, then the approval libraries in the order the
+    approval notebooks `%run` them."""
+    namespace = load_model_common()
+    for name in ("_approval_rules", "_approval_render"):
+        _exec_notebook(
+            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
+        )
+    return namespace

@@ -124,6 +124,20 @@ MODEL_DDL = {
         "detail string, value double, threshold double, run_id string, "
         "flagged_at timestamp"
     ),
+    "approval_spec": (
+        "rule_id string, rule_class string, description string, parameter string, "
+        "parameter_value string, run_id string, recorded_at timestamp"
+    ),
+    "model_approval": (
+        "task_id string, dataset_id string, model_name string, role string, "
+        "rank int, decision string, restriction string, "
+        "recommended_decision string, recommended_restriction string, "
+        "overridden boolean, override_reason string, rules string, "
+        "conditions string, segments string, notes string, primary_metric string, "
+        "validation_value double, evaluated_value double, "
+        "frozen_delta_version bigint, mlflow_run_id string, decided_by string, "
+        "recommended_at timestamp, decided_at timestamp, run_id string"
+    ),
 }
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
