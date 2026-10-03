@@ -100,7 +100,7 @@ class ReconstructionEvaluator(Evaluator):
         if isinstance(bundle, dict) and "kinds" in bundle:
             fallback = {j: bundle["fallbacks"][(name, j)]}
             return BaselineReconstructor(bundle["kinds"][name], fallback).predict(j, x)
-        if isinstance(bundle, FeatureReconstructor):
+        if hasattr(bundle, "medians"):
             key = (name, j)
             filled = np.where(np.isnan(x), bundle.medians[key], x) if bundle.fill else x
             return bundle.models[key].predict(filled)
