@@ -31,6 +31,7 @@ EVAL_SPEC_DATASET = "evaluation"
 EVAL_CONTEXT_TABLE = "evaluation_run_context"
 EVAL_SEED = MODEL_SEED + 1
 BOOTSTRAP_MAX_ROWS = 100_000
+RESIDENT_MODELS = ("empirical_quantiles",)
 SEGMENT_MAX_LEVELS = 30
 EVAL_SPEC_DEFAULTS = {
     "scoring_rule": "models scored as stored, no refit, no re-selection",
@@ -386,6 +387,7 @@ class Evaluator:
     inspects the stored models in attach(), and returns Scored from score()."""
 
     can_reproduce = True
+    needs_all_bundles = False
 
     def __init__(self, ctx: EvalContext, cfg: dict):
         self.ctx, self.cfg = ctx, cfg
@@ -589,17 +591,26 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
     models = forwarded_models(ctx)
     base_name = next(m["model_name"] for m in models if m["rank"] == 0)
     bundles, errors = {}, {}
-    for m in models:
+    resident = {base_name, *RESIDENT_MODELS}
+
+    def fetch(model):
         try:
-            bundles[m["model_name"]] = load_bundle(m)
+            bundles[model["model_name"]] = load_bundle(model)
         except Exception as exc:
-            errors[m["model_name"]] = f"{type(exc).__name__}: {str(exc)[:300]}"
+            detail = f"{type(exc).__name__}: {str(exc)[:300]}"
+            errors[model["model_name"]] = detail
+
+    for m in models:
+        if evaluator.needs_all_bundles or m["model_name"] in resident:
+            fetch(m)
     evaluator.recorded = {m["model_name"]: m["validation"] for m in models}
     evaluator.attach(bundles, base_name)
     start_evaluation(ctx)
     scored: dict = {}
     for m in models:
         name = m["model_name"]
+        if name not in bundles and name not in errors:
+            fetch(m)
         if name in errors:
             record_evaluation(ctx, m, "failed", {}, None, errors[name])
             print(f"FAIL {name}: {errors[name]}")
@@ -626,6 +637,8 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
             print(f"FAIL {name}: {detail}")
             if name == base_name:
                 raise
+        if not evaluator.needs_all_bundles and name not in resident:
+            bundles.pop(name, None)
         _gc.collect()
     ok = base_name in scored
     scored.clear()

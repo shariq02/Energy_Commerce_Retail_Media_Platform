@@ -128,6 +128,8 @@ class MatchingEvaluator(Evaluator):
     """Match-tier classification; tiers with fewer than the minimum rows stay not
     estimable, as in the candidate record."""
 
+    needs_all_bundles = True
+
     def load(self, df_eval, df_validation, validation_fraction: float = 1.0):
         spec = self.spec
         feats = resolve_features(self.ctx, df_eval.columns)
