@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # MODEL LIBRARIES
@@ -63,8 +63,8 @@ print(f"OK  volume ready: {FOLDER}")
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Define the import check, run in a fresh interpreter
+
 def imports_from_folder(module: str) -> bool:
     code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
     result = subprocess.run(
