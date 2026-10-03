@@ -37,6 +37,7 @@ import json as _json
 import logging as _logging
 import math as _math
 import os as _os
+import platform as _platform
 import re as _re
 import sys as _sys
 import tempfile as _tempfile
@@ -524,8 +525,10 @@ def replace_model_rows(
 
 
 def library_folder() -> str:
+    """One folder per processor type: compiled packages only import on their own."""
     return (
-        f"/Volumes/{CATALOG}/{MODEL_SCHEMAS['energy']}/{LIBRARY_VOLUME}/site_packages"
+        f"/Volumes/{CATALOG}/{MODEL_SCHEMAS['energy']}/{LIBRARY_VOLUME}"
+        f"/site_packages_{_platform.machine()}"
     )
 
 
