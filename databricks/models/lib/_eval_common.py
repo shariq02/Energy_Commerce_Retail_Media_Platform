@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** plumbing shared by the evaluation notebooks, pulled in with
-# MAGIC `%run ../_eval_common` after `_model_common` and `_model_metrics`. Definitions
+# MAGIC `%run ../lib/_eval_common` after `_model_common` and `_model_metrics`. Definitions
 # MAGIC only. Reads the held-out partition, loads the stored models, scores them exactly
 # MAGIC as stored, and records results, intervals, breakdowns and run context.
 
@@ -234,8 +234,30 @@ def load_bundle(model: dict):
     path = mlflow.artifacts.download_artifacts(
         artifact_uri=f"runs:/{model['mlflow_run_id']}/candidate/candidate.pkl"
     )
+    try:
+        with open(path, "rb") as fh:
+            return cloudpickle.load(fh)
+    except ModuleNotFoundError as exc:
+        if "sksurv" not in str(exc) or not _alias_legacy_coxnet():
+            raise
     with open(path, "rb") as fh:
         return cloudpickle.load(fh)
+
+
+def _alias_legacy_coxnet() -> bool:
+    """scikit-survival 0.24 and earlier name the module `coxnet`, 0.25 and later
+    `_coxnet`; a model fitted under the newer name still loads under the older
+    one, and the validation re-score checks the predictions."""
+    import importlib
+    import sys
+
+    try:
+        sys.modules["sksurv.linear_model._coxnet"] = importlib.import_module(
+            "sksurv.linear_model.coxnet"
+        )
+    except ModuleNotFoundError:
+        return False
+    return True
 
 
 # COMMAND ----------

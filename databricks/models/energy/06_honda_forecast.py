@@ -17,17 +17,17 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ../_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model metrics library
-# MAGIC %run ../_model_metrics
+# MAGIC %run ../lib/_model_metrics
 
 # COMMAND ----------
 
 # DBTITLE 1,Tabular model library
-# MAGIC %run ../_fit_tabular
+# MAGIC %run ../lib/_fit_tabular
 
 # COMMAND ----------
 

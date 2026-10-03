@@ -18,37 +18,37 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ../_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model metrics library
-# MAGIC %run ../_model_metrics
+# MAGIC %run ../lib/_model_metrics
 
 # COMMAND ----------
 
 # DBTITLE 1,Tabular model library
-# MAGIC %run ../_fit_tabular
+# MAGIC %run ../lib/_fit_tabular
 
 # COMMAND ----------
 
 # DBTITLE 1,Ranking model library
-# MAGIC %run ../_fit_ranking
+# MAGIC %run ../lib/_fit_ranking
 
 # COMMAND ----------
 
 # DBTITLE 1,Evaluation shared library
-# MAGIC %run ../_eval_common
+# MAGIC %run ../lib/_eval_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Ranking evaluation library
-# MAGIC %run ../_eval_ranking
+# MAGIC %run ../lib/_eval_ranking
 
 # COMMAND ----------
 
 # DBTITLE 1,Evaluation task specifications
-# MAGIC %run ../_eval_specs
+# MAGIC %run ../lib/_eval_specs
 
 # COMMAND ----------
 

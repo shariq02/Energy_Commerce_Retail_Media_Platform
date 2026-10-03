@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** scoring of the stored regression, quantile and classification
 # MAGIC models and their baselines on the evaluated partition, pulled in with
-# MAGIC `%run ../_eval_tabular` after `_fit_tabular` and `_eval_common`.
+# MAGIC `%run ../lib/_eval_tabular` after `_fit_tabular` and `_eval_common`.
 
 # COMMAND ----------
 

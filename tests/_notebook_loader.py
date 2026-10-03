@@ -83,10 +83,10 @@ def load_ml_common() -> dict:
 
 
 def load_model_common() -> dict:
-    """The ML shared library chain, then `databricks/models/_model_common.py`."""
+    """The ML shared library chain, then `databricks/models/lib/_model_common.py`."""
     namespace = load_ml_common()
     return _exec_notebook(
-        REPO_ROOT / "databricks" / "models" / "_model_common.py", namespace
+        REPO_ROOT / "databricks" / "models" / "lib" / "_model_common.py", namespace
     )
 
 
@@ -94,7 +94,7 @@ def load_model_metrics() -> dict:
     """`_model_metrics.py` alone: numpy only, no Spark names."""
     namespace: dict = {"__name__": "_model_metrics_under_test"}
     return _exec_notebook(
-        REPO_ROOT / "databricks" / "models" / "_model_metrics.py", namespace
+        REPO_ROOT / "databricks" / "models" / "lib" / "_model_metrics.py", namespace
     )
 
 
@@ -111,7 +111,9 @@ def load_model_libs() -> dict:
         "_fit_weak",
         "_fit_rl",
     ):
-        _exec_notebook(REPO_ROOT / "databricks" / "models" / f"{name}.py", namespace)
+        _exec_notebook(
+            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
+        )
     return namespace
 
 
@@ -130,5 +132,7 @@ def load_eval_libs() -> dict:
         "_eval_rl",
         "_eval_specs",
     ):
-        _exec_notebook(REPO_ROOT / "databricks" / "models" / f"{name}.py", namespace)
+        _exec_notebook(
+            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
+        )
     return namespace

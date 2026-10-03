@@ -20,17 +20,17 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ../../_model_common
+# MAGIC %run ../../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model metrics library
-# MAGIC %run ../../_model_metrics
+# MAGIC %run ../../lib/_model_metrics
 
 # COMMAND ----------
 
 # DBTITLE 1,Evaluation shared library
-# MAGIC %run ../../_eval_common
+# MAGIC %run ../../lib/_eval_common
 
 # COMMAND ----------
 

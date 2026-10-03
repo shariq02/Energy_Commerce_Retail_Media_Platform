@@ -20,7 +20,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ../_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 

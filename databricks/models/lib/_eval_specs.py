@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** per task, how the evaluated partition is read and prepared (as the
 # MAGIC candidates were), which evaluator scores it and how its results are grouped for
-# MAGIC resampling. Pulled in with `%run ../_eval_specs` after `_eval_common` and the
+# MAGIC resampling. Pulled in with `%run ../lib/_eval_specs` after `_eval_common` and the
 # MAGIC paradigm evaluation library.
 
 # COMMAND ----------

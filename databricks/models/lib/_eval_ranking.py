@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** scoring of the stored next-item rankers and the popularity baseline
-# MAGIC on the evaluated partition, pulled in with `%run ../_eval_ranking` after
+# MAGIC on the evaluated partition, pulled in with `%run ../lib/_eval_ranking` after
 # MAGIC `_fit_ranking` and `_eval_common`.
 
 # COMMAND ----------

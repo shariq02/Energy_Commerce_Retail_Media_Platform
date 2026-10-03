@@ -119,7 +119,7 @@ def test_evaluation_notebooks_use_the_evaluation_entry_point(path):
         return
     assert "spark.table(" not in text and "spark.read" not in text
     assert 'dbutils.widgets.text("smoke"' in text
-    assert "%run ../_eval_common" in text and "%run ../_eval_specs" in text
+    assert "%run ../lib/_eval_common" in text and "%run ../lib/_eval_specs" in text
 
 
 def test_model_schemas_are_only_the_two_agreed_names():
@@ -143,8 +143,8 @@ def test_setup_preflight_splits_and_gates_exist():
         "evaluate/gate/01_evaluation_guards.py",
         "evaluate/gate/02_evaluation_flags.py",
         "evaluate/gate/03_export_findings.py",
-        "_eval_common.py",
-        "_eval_specs.py",
+        "lib/_eval_common.py",
+        "lib/_eval_specs.py",
     ):
         assert (_MODELS / rel).exists(), rel
     assert (

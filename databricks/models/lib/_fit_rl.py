@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** offline policy candidates on logged trajectories, pulled in with
-# MAGIC `%run ../_fit_rl` after `_model_common`, `_model_metrics` and `_fit_tabular`
+# MAGIC `%run ../lib/_fit_rl` after `_model_common`, `_model_metrics` and `_fit_tabular`
 # MAGIC (its estimator builders). The logged action is what operators or users did, so
 # MAGIC policies are imitation and reward-weighted fits; only the pumped-storage reward
 # MAGIC is recomputed under a new action (price times net energy, price-taker assumption).

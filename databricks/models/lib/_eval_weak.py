@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** scoring of the stored label model and the majority-vote baseline,
 # MAGIC and of the stored match-tier classifiers, on the evaluated partition of their
-# MAGIC own split manifests, pulled in with `%run ../_eval_weak` after `_fit_weak` and
+# MAGIC own split manifests, pulled in with `%run ../lib/_eval_weak` after `_fit_weak` and
 # MAGIC `_eval_common`.
 
 # COMMAND ----------

@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** anomaly scores for unlabelled sensor series, evaluated on anomalies
-# MAGIC injected into the validation period. Pulled in with `%run ../_fit_anomaly` after
+# MAGIC injected into the validation period. Pulled in with `%run ../lib/_fit_anomaly` after
 # MAGIC `_model_common`, `_model_metrics` and `_fit_tabular` (its regressor builders).
 # MAGIC Injection follows the stored mask specification; the dataset is never changed.
 

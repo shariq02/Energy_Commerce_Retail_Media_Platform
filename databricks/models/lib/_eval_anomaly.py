@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** scoring of the stored anomaly detectors on a copy of the evaluated
 # MAGIC partition with injected anomalies (new fixed seed), at the flag threshold
-# MAGIC recorded for each detector, pulled in with `%run ../_eval_anomaly` after
+# MAGIC recorded for each detector, pulled in with `%run ../lib/_eval_anomaly` after
 # MAGIC `_fit_anomaly` and `_eval_common`.
 
 # COMMAND ----------

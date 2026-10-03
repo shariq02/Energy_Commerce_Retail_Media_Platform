@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** scoring of the stored offline policies and their baselines on the
 # MAGIC evaluated partition (reward and action agreement against the logged data),
-# MAGIC pulled in with `%run ../_eval_rl` after `_fit_rl` and `_eval_common`.
+# MAGIC pulled in with `%run ../lib/_eval_rl` after `_fit_rl` and `_eval_common`.
 
 # COMMAND ----------
 

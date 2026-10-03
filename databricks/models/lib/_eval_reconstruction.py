@@ -15,7 +15,7 @@
 # MAGIC **Purpose:** scoring of the stored reconstruction models and the causal baseline
 # MAGIC on mask events placed in the evaluated partition (new fixed seed, block lengths
 # MAGIC from the stored mask specification), pulled in with
-# MAGIC `%run ../_eval_reconstruction` after `_fit_reconstruction` and `_eval_common`.
+# MAGIC `%run ../lib/_eval_reconstruction` after `_fit_reconstruction` and `_eval_common`.
 
 # COMMAND ----------
 

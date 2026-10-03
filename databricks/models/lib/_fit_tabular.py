@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** baselines and candidates for one-row-one-example datasets (regression,
-# MAGIC quantile regression, binary classification), pulled in with `%run ../_fit_tabular`
+# MAGIC quantile regression, binary classification), pulled in with `%run ../lib/_fit_tabular`
 # MAGIC after `_model_common` and `_model_metrics`. Libraries are imported inside the
 # MAGIC builders so a missing one becomes a recorded skip, never an import error.
 

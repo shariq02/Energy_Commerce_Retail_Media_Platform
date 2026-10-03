@@ -1,4 +1,4 @@
-"""Known-answer tests for `databricks/models/_model_metrics.py`.
+"""Known-answer tests for `databricks/models/lib/_model_metrics.py`.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad

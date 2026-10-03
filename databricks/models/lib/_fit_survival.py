@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** Kaplan-Meier baseline and the Cox, survival forest and boosted Cox
-# MAGIC candidates for unit lifetimes, pulled in with `%run ../_fit_survival` after
+# MAGIC candidates for unit lifetimes, pulled in with `%run ../lib/_fit_survival` after
 # MAGIC `_model_common` and `_model_metrics`. Only Cox uses the delayed entry time; the
 # MAGIC forest and the boosted model ignore it and say so in their parameters.
 

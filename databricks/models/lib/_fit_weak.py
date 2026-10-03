@@ -12,7 +12,7 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** the two small entity datasets, pulled in with `%run ../_fit_weak`
+# MAGIC **Purpose:** the two small entity datasets, pulled in with `%run ../lib/_fit_weak`
 # MAGIC after `_model_common`, `_model_metrics` and `_fit_tabular` (its classifier
 # MAGIC builders). Weak supervision combines labelling-function votes per entity type;
 # MAGIC matching predicts the match tier of an asset text. Both read the evaluation

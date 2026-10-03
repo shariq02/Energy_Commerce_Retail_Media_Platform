@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** next-item ranking: popularity and co-occurrence baselines and the GRU
-# MAGIC and transformer sequence candidates, pulled in with `%run ../_fit_ranking` after
+# MAGIC and transformer sequence candidates, pulled in with `%run ../lib/_fit_ranking` after
 # MAGIC `_model_common` and `_model_metrics`. Every ranker exposes `ranks(frame)`: the
 # MAGIC 1-based rank of the true next item per row, infinity when it is not ranked.
 

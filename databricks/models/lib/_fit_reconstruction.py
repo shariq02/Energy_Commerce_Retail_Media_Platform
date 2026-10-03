@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** self-supervised reconstruction of masked blocks in regular series,
-# MAGIC pulled in with `%run ../_fit_reconstruction` after `_model_common`,
+# MAGIC pulled in with `%run ../lib/_fit_reconstruction` after `_model_common`,
 # MAGIC `_model_metrics` and `_fit_tabular` (its regressor builders). A block of one
 # MAGIC variable is hidden and predicted from what was observed before it (causal), plus
 # MAGIC the other variables at the same time. Block lengths and held-out stations come

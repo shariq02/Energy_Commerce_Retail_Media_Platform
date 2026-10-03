@@ -20,12 +20,12 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ../../_model_common
+# MAGIC %run ../../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Evaluation shared library
-# MAGIC %run ../../_eval_common
+# MAGIC %run ../../lib/_eval_common
 
 # COMMAND ----------
 
@@ -52,6 +52,7 @@ for eco in ("energy", "commerce"):
             "partition",
             "metric",
             "status",
+            "detail",
             "frozen_delta_version",
             "run_id",
         )
@@ -79,11 +80,14 @@ for eco in ("energy", "commerce"):
 _missing = []
 for eco, (results, selection, _context, _spec) in record.items():
     done = {(r["task_id"], r["model_name"]) for r in results if r["status"] == "ok"}
-    _missing += [
-        (s["task_id"], s["model_name"])
-        for s in selection
-        if (s["task_id"], s["model_name"]) not in done
-    ]
+    other = {(r["task_id"], r["model_name"]): r for r in results}
+    for s in selection:
+        key = (s["task_id"], s["model_name"])
+        if key in done:
+            continue
+        row = other.get(key)
+        why = f"{row['status']}: {row['detail']}" if row else "no result row"
+        _missing.append((*key, why[:300]))
 check(
     COMPONENT,
     SOURCE,

@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** plumbing shared by every model notebook, pulled in with
-# MAGIC `%run ../_model_common`. Definitions only; the one side effect is adding the
+# MAGIC `%run ../lib/_model_common`. Definitions only; the one side effect is adding the
 # MAGIC model library folder to the import path.
 # MAGIC
 # MAGIC Covers the task registry, frozen-dataset reads (test partition never read),
@@ -23,7 +23,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,ML shared library (read_ml, ml_fqn, check, user_hash_bucket, ...)
-# MAGIC %run ../ml/_ml_common
+# MAGIC %run ../../ml/_ml_common
 
 # COMMAND ----------
 

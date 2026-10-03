@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** the evaluation metrics used by the model notebooks, pulled in with
-# MAGIC `%run ../_model_metrics`. Numpy only, no Spark, so every function is unit-tested.
+# MAGIC `%run ../lib/_model_metrics`. Numpy only, no Spark, so every function is unit-tested.
 
 # COMMAND ----------
 

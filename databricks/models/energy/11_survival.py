@@ -19,17 +19,17 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ../_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model metrics library
-# MAGIC %run ../_model_metrics
+# MAGIC %run ../lib/_model_metrics
 
 # COMMAND ----------
 
 # DBTITLE 1,Survival model library
-# MAGIC %run ../_fit_survival
+# MAGIC %run ../lib/_fit_survival
 
 # COMMAND ----------
 

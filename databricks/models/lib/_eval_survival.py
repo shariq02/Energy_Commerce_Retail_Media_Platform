@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** scoring of the stored survival models and the Kaplan-Meier baseline
-# MAGIC on the evaluated partition, pulled in with `%run ../_eval_survival` after
+# MAGIC on the evaluated partition, pulled in with `%run ../lib/_eval_survival` after
 # MAGIC `_fit_survival` and `_eval_common`.
 
 # COMMAND ----------

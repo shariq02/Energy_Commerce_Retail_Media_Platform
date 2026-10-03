@@ -1,4 +1,4 @@
-"""Unit tests for the pure parts of `databricks/models/_model_common.py`.
+"""Unit tests for the pure parts of `databricks/models/lib/_model_common.py`.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
