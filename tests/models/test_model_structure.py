@@ -6,8 +6,8 @@ Date: October 2026
 
 Every file must parse, carry the standard header, stay within the cell limit and cite
 no planning documents. Dataset notebooks must pin a registered task, read through
-`read_frozen`, and never name the test partition; only the shared library may convert
-Spark frames to pandas.
+`read_frozen`, and never name the test partition; only the evaluation code and the
+split code may. Only the shared library may convert Spark frames to pandas.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ _FILES = sorted(_MODELS.rglob("*.py"))
 _NOTEBOOKS = [p for p in _FILES if not p.name.startswith("_")]
 _DATASET_NOTEBOOKS = [p for p in _NOTEBOOKS if p.parent.name in ("energy", "commerce")]
 _MAX_CELLS = 30
+_EVALUATION = [p for p in _NOTEBOOKS if p.parent.name == "evaluate"]
 _DOC_REFERENCES = re.compile(r"docs/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
 
 
@@ -63,9 +64,11 @@ def test_only_the_shared_library_converts_frames_to_pandas(path):
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)
 def test_model_code_never_names_the_test_partition(path):
-    # Splitting code assigns the partition; the libraries and the model notebooks
-    # only ever read train and validation.
+    # Splitting code assigns the partition and the evaluation code reads it; the
+    # other libraries and the model notebooks only ever read train and validation.
     if path.name == "_model_common.py" or path.parent.name == "split":
+        return
+    if _rel(path).startswith("evaluate/") or path.name.startswith("_eval_"):
         return
     text = path.read_text(encoding="utf-8")
     assert not re.search(r"""['"]test['"]""", text), _rel(path)
@@ -101,6 +104,24 @@ def test_dataset_notebooks_call_a_paradigm_runner(path):
     assert re.search(r"\brun_[a-z_]+\(ctx", text), _rel(path)
 
 
+def test_every_registered_task_is_evaluated_by_exactly_one_notebook():
+    tasks = load_model_common()["TASKS"]
+    named = []
+    for p in _EVALUATION:
+        named += re.findall(r'evaluate_by_id\("([^"]+)"', p.read_text(encoding="utf-8"))
+    assert sorted(named) == sorted(t["task_id"] for t in tasks)
+
+
+@pytest.mark.parametrize("path", _EVALUATION, ids=_rel)
+def test_evaluation_notebooks_use_the_evaluation_entry_point(path):
+    text = path.read_text(encoding="utf-8")
+    if path.name == "00_evaluation_setup.py":
+        return
+    assert "spark.table(" not in text and "spark.read" not in text
+    assert 'dbutils.widgets.text("smoke"' in text
+    assert "%run ../_eval_common" in text and "%run ../_eval_specs" in text
+
+
 def test_model_schemas_are_only_the_two_agreed_names():
     for p in _FILES:
         names = set(re.findall(r"\b(\w+_ml_models)\b", p.read_text(encoding="utf-8")))
@@ -118,6 +139,12 @@ def test_setup_preflight_splits_and_gates_exist():
         "gate/01_candidate_guards.py",
         "gate/02_candidate_selection.py",
         "gate/03_export_findings.py",
+        "evaluate/00_evaluation_setup.py",
+        "evaluate/gate/01_evaluation_guards.py",
+        "evaluate/gate/02_evaluation_flags.py",
+        "evaluate/gate/03_export_findings.py",
+        "_eval_common.py",
+        "_eval_specs.py",
     ):
         assert (_MODELS / rel).exists(), rel
     assert (

@@ -78,6 +78,12 @@ RESULT_COLUMNS = (
     "mlflow_run_id string, artifact_status string, params string, smoke boolean, "
     "run_id string, run_at timestamp"
 )
+RUN_CONTEXT_COLUMNS = (
+    "task_id string, dataset_id string, smoke boolean, smoke_widget string, "
+    "run_id string, status string, notebook_path string, job_id string, "
+    "job_run_id string, frozen_delta_version bigint, data_notes string, "
+    "library_versions string, detail string, recorded_at timestamp"
+)
 MODEL_DDL = {
     "task_registry": (
         "task_id string, dataset_id string, ecosystem string, paradigm string, "
@@ -103,11 +109,19 @@ MODEL_DDL = {
     "library_availability": (
         "library string, version string, available boolean, checked_at timestamp"
     ),
-    "task_run_context": (
-        "task_id string, dataset_id string, smoke boolean, smoke_widget string, "
-        "run_id string, status string, notebook_path string, job_id string, "
-        "job_run_id string, frozen_delta_version bigint, data_notes string, "
-        "library_versions string, detail string, recorded_at timestamp"
+    "task_run_context": RUN_CONTEXT_COLUMNS,
+    "evaluation_run_context": RUN_CONTEXT_COLUMNS,
+    "evaluation_results": (
+        "dataset_id string, task_id string, model_name string, family string, "
+        "stage string, partition string, metric string, value double, "
+        "validation_value double, n_rows bigint, status string, detail string, "
+        "frozen_delta_version bigint, mlflow_run_id string, smoke boolean, "
+        "run_id string, run_at timestamp"
+    ),
+    "evaluation_flags": (
+        "task_id string, model_name string, stage string, flag string, "
+        "detail string, value double, threshold double, run_id string, "
+        "flagged_at timestamp"
     ),
 }
 # imported instead of the bare name so a partial install counts as missing
@@ -1509,13 +1523,13 @@ def train_side(fn) -> dict:
         return {}
 
 
-def record_task_context(ctx, status: str, detail=None, data_notes=None) -> None:
+def record_task_context(
+    ctx, status: str, detail=None, data_notes=None, table: str = "task_run_context"
+) -> None:
     """Append one run-context row (started, data_ready, finished). Never raises."""
     try:
-        full = model_fqn("task_run_context", ctx.ecosystem)
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {full} ({MODEL_DDL['task_run_context']}) USING delta"
-        )
+        full = model_fqn(table, ctx.ecosystem)
+        spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({MODEL_DDL[table]}) USING delta")
         path, job, run = _notebook_identity()
         versions = {k: library_version(k) or "missing" for k in LIBRARIES}
         row = (
@@ -1534,9 +1548,9 @@ def record_task_context(ctx, status: str, detail=None, data_notes=None) -> None:
             detail[:900] if detail else None,
             _dt.datetime.now(_dt.UTC),
         )
-        spark.createDataFrame([row], MODEL_DDL["task_run_context"]).write.format(
-            "delta"
-        ).mode("append").saveAsTable(full)
+        spark.createDataFrame([row], MODEL_DDL[table]).write.format("delta").mode(
+            "append"
+        ).saveAsTable(full)
     except Exception as exc:
         print(f"WARN run context not recorded: {type(exc).__name__}: {exc}")
 

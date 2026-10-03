@@ -71,6 +71,7 @@ REALISED_LAGS = [2, 7, 14]
 
 # DBTITLE 1,Helper -- calendar and realised lags for every market area
 
+
 def complete_load_features(frame):
     """The frozen features exist for one market area only. Calendar columns come
     from the calendar table for every area; realised load at least two days back

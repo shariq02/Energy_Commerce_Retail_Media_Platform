@@ -113,3 +113,22 @@ def load_model_libs() -> dict:
     ):
         _exec_notebook(REPO_ROOT / "databricks" / "models" / f"{name}.py", namespace)
     return namespace
+
+
+def load_eval_libs() -> dict:
+    """The model libraries, then the evaluation libraries in the order the
+    evaluation notebooks `%run` them."""
+    namespace = load_model_libs()
+    for name in (
+        "_eval_common",
+        "_eval_tabular",
+        "_eval_survival",
+        "_eval_ranking",
+        "_eval_anomaly",
+        "_eval_reconstruction",
+        "_eval_weak",
+        "_eval_rl",
+        "_eval_specs",
+    ):
+        _exec_notebook(REPO_ROOT / "databricks" / "models" / f"{name}.py", namespace)
+    return namespace

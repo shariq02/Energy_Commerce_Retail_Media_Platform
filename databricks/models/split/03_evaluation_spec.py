@@ -77,6 +77,6 @@ for eco, datasets in _spec.items():
         spark.createDataFrame(rows, MODEL_DDL["evaluation_spec"]),
         "evaluation_spec",
         ecosystem=eco,
-        predicate="spec_key IS NOT NULL",
+        predicate="dataset_id <> 'evaluation'",
     )
     print(f"OK  {len(rows)} specification row(s) for {eco}")

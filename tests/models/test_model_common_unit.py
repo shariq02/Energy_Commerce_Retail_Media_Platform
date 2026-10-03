@@ -163,6 +163,9 @@ def test_model_schemas_are_the_agreed_names(c):
         "candidate_selection",
         "library_availability",
         "task_run_context",
+        "evaluation_run_context",
+        "evaluation_results",
+        "evaluation_flags",
     }
 
 
