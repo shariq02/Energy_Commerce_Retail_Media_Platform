@@ -377,6 +377,9 @@ class Scored:
         self.pred = pred
         self.target = target
 
+    def release(self) -> None:
+        self.row_stat = self.pred = self.target = None
+
 
 class Evaluator:
     """Per-paradigm scoring. A subclass reads and converts its frames in load(),
@@ -608,6 +611,8 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
             scored[name] = sc
             base_sc = scored.get(base_name)
             metrics = enrich(ctx, evaluator, m, bundles[name], sc, base_sc, bundles)
+            if name != base_name:
+                sc.release()
             record_evaluation(ctx, m, "ok", metrics, sc.n_rows, f"on {ctx.partition}")
             shown = {
                 k: round(v, 4)
@@ -623,6 +628,8 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
                 raise
         _gc.collect()
     ok = base_name in scored
+    scored.clear()
+    bundles.clear()
     record_task_context(
         ctx, "finished", detail=f"baseline_ok={ok}", table=EVAL_CONTEXT_TABLE
     )
