@@ -90,7 +90,33 @@ APPROVAL_RULES = (
         "",
         "",
     ),
-    ("R10", "disclosure", "held-out partition read more than once", "", ""),
+    (
+        "R10",
+        "disclosure",
+        (
+            "held-out partition read in more than one evaluation run; the exact read "
+            "count is not recoverable and the card states the minimum number of runs"
+        ),
+        "",
+        "",
+    ),
+    (
+        "R11",
+        "conditional",
+        "segment with positive skill but no uncertainty interval",
+        "",
+        "",
+    ),
+    (
+        "R12",
+        "conditional",
+        (
+            "task-specific limits: survival calibration gap, unrecorded held-out "
+            "event count and revalidation"
+        ),
+        "",
+        "",
+    ),
 )
 APPROVAL_DEFAULTS = {p: v for _r, _c, _d, p, v in APPROVAL_RULES if p}
 
@@ -382,10 +408,17 @@ def decide_selected(task, rows, base_rows, spec, reads) -> dict:
         text = f"segments not approved: {', '.join(excluded)}"
         out["rules"].append(_rule("R07", "segment", text))
         out["conditions"].append(text)
-    out["conditions"] += _positive_segment_condition(segments)
+    positive = _positive_segment_condition(segments)
+    out["conditions"] += positive
+    out["rules"] += [_rule("R11", "condition", text) for text in positive]
     task_conditions = TASK_CONDITIONS.get(task["task_id"])
-    if task_conditions:
-        out["conditions"] += task_conditions(metrics, model_metrics(base_rows or []))
+    limits = (
+        task_conditions(metrics, model_metrics(base_rows or []))
+        if task_conditions
+        else []
+    )
+    out["conditions"] += limits
+    out["rules"] += [_rule("R12", "condition", text) for text in limits]
     clean = not out["conditions"] and restriction is None
     out["decision"] = "approved" if clean else "approved_with_conditions"
     return out

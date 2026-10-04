@@ -33,6 +33,10 @@ def _loads(text, default):
         return default
 
 
+# a check recorded per ecosystem carries the ecosystem after a colon
+_OTHER_ECOSYSTEM_SUFFIX = {"energy": ":commerce", "commerce": ":energy"}
+
+
 def _bullets(items) -> list:
     return [f"- {_cell(i, 400)}" for i in items] or ["- none"]
 
@@ -169,6 +173,7 @@ def render_approval_findings(eco, rows, spec_rows, checks, stamp) -> str:
                     c["recorded_at"],
                 )
                 for c in sorted(checks, key=lambda c: str(c["recorded_at"]))
+                if not c["metric_name"].endswith(_OTHER_ECOSYSTEM_SUFFIX[eco])
             ],
         )
     )

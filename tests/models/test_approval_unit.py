@@ -266,6 +266,8 @@ def test_survival_without_a_calibration_gap_keeps_the_other_conditions(lib):
     out = _decide(lib, "survival.unit_lifetime")
     assert out["decision"] == "approved_with_conditions"
     assert len(out["conditions"]) == 2
+    assert "R12" in _rule_ids(out)
+    assert sum(r["rule"] == "R12" for r in out["rules"]) == 2
 
 
 def test_positive_segment_skill_without_an_interval_is_conditional(lib):
@@ -279,6 +281,7 @@ def test_positive_segment_skill_without_an_interval_is_conditional(lib):
         "no uncertainty interval" in c and "air_temperature (0.93)" in c
         for c in out["conditions"]
     )
+    assert "R11" in _rule_ids(out)
 
 
 def test_the_selected_model_follows_the_validation_rank(lib):
@@ -363,7 +366,7 @@ def test_the_approval_settings_are_typed_and_must_be_recorded(lib):
 
 def test_the_rule_table_has_every_rule_once_with_its_class(lib):
     ids = {r[0] for r in lib["APPROVAL_RULES"]}
-    assert ids == {f"R{i:02d}" for i in range(1, 11)}
+    assert ids == {f"R{i:02d}" for i in range(1, 13)}
     classes = {r[0]: r[1] for r in lib["APPROVAL_RULES"]}
     assert classes["R03"] == classes["R05"] == "blocking"
 
@@ -424,6 +427,23 @@ def test_findings_text_lists_rules_decisions_and_overrides(lib):
     assert "owner accepts the drift" in text
     assert "## load.load" in text and "R04" in text
     assert "every_task_has_a_decision" in text
+
+
+def test_findings_text_drops_the_checks_of_the_other_ecosystem(lib):
+    recommended, _results = _recommended(lib)
+    rows = _table_rows(lib, recommended)
+    checks = [
+        {
+            "component": "models/approve/00_approval_setup",
+            "metric_name": f"settings_unchanged_after_first_recommendation:{eco}",
+            "status": "PASS",
+            "error_detail": "",
+            "recorded_at": "2026-10-04",
+        }
+        for eco in ("energy", "commerce")
+    ]
+    text = lib["render_approval_findings"]("commerce", rows, [], checks, "stamp")
+    assert "recommendation:commerce" in text and "recommendation:energy" not in text
 
 
 def _card(lib, text_extra=None, model="gbt_lightgbm", **cand):
