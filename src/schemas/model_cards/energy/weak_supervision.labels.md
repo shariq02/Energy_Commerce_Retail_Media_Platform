@@ -1,6 +1,6 @@
 # Model card: weak_supervision.labels
 
-_model `label_model`, dataset `weak_supervision`, frozen version 2, primary metric `coverage` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `label_model`, dataset `weak_supervision`, frozen version 2, primary metric `coverage` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,9 @@ _model `label_model`, dataset `weak_supervision`, frozen version 2, primary metr
 
 ## Intended use
 
-- estimates `lf_label` for the entities and period of dataset `weak_supervision`
-- comparison and analysis with the stated conditions below
+- combines labelling functions into one label; there is no ground truth
+- target `lf_label`, dataset `weak_supervision`
+- restricted to diagnostic only (see the conditions below)
 
 ## Out of scope
 
@@ -37,20 +38,15 @@ _model `label_model`, dataset `weak_supervision`, frozen version 2, primary metr
 
 - model family: label_model; MLflow run `285b09e3bb8f44fa966137b42024a406`
 - parameters: {'em_iterations': 50, 'note': 'two correlated functions; accuracies not identifiable', 'applies_to': 'entity types with two or more functions'}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: none beyond the standard numerical stack
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | label_model held-out | label_model validation | majority_vote held-out |
 |---|---|---|---|
-| bootstrap_blocks | 2.565e+04 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 2.585e+04 |  |  |
 | coverage | 1 | 1 | 1 |
 | primary_change_relative | 0 |  | 0 |
-| reproduced_validation_value | 1 |  | 1 |
-| reproduction_gap_relative | 0 |  | 0 |
 | skill_primary | 0 |  |  |
 | skill_primary_ci_high | 0 |  |  |
 | skill_primary_ci_low | 0 |  |  |

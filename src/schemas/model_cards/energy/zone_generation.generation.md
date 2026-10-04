@@ -1,6 +1,6 @@
 # Model card: zone_generation.generation
 
-_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 
 ## Intended use
 
-- estimates `target_generation_mwh` for the entities and period of dataset `zone_generation`
-- comparison and analysis with the stated conditions below
+- estimates the generation in MWh of a control zone
+- target `target_generation_mwh`, dataset `zone_generation`
 
 ## Out of scope
 
@@ -38,26 +38,17 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 
 - model family: gbt_lightgbm; MLflow run `5cc0cef088374428907bef305222d7ae`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_lightgbm held-out | gbt_lightgbm validation | capacity_factor held-out |
 |---|---|---|---|
-| bootstrap_blocks | 21 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 6110 |  |  |
 | mae | 1.617e+04 | 1.093e+04 | 3.144e+04 |
 | mean_error | -7477 | -959.3 | -2594 |
 | mean_error_relative | -0.1258 | -0.01745 | -0.04364 |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 5.014e+04 |  | 4.975e+04 |
-| pred_std_ratio | 0.8673 | 0.9577 | 0.8604 |
 | primary_change_relative | 0.4796 |  | 0.2229 |
-| reproduced_validation_value | 1.093e+04 |  | 2.571e+04 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 2.412e+04 | 1.587e+04 | 4.644e+04 |
 | skill_mae | 0.4857 | 0.5749 |  |
 | skill_primary | 0.4857 |  |  |

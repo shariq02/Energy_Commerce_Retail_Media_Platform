@@ -1,6 +1,6 @@
 # Model card: rl_pumped_storage.policy
 
-_model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary metric `reward_timing` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary metric `reward_timing` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,9 @@ _model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary 
 
 ## Intended use
 
-- estimates `action_net_mwh` for the entities and period of dataset `rl_pumped_storage`
-- comparison and analysis with the stated conditions below
+- proposes the net pumped-storage action in MWh; evaluated on logged data only
+- target `action_net_mwh`, dataset `rl_pumped_storage`
+- restricted to offline only (see the conditions below)
 
 ## Out of scope
 
@@ -38,7 +39,7 @@ _model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary 
 
 - model family: conservative_q; MLflow run `df01f87aeada4151a852f7ad9ccc99db`
 - parameters: {'row_fraction': 1.0, 'reward': 'price x net energy, price-taker', 'alpha': 1.0, 'bins': 9, 'discount': 0.0}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: torch 2.14.1+cpu
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,17 +47,9 @@ _model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary 
 | metric | conservative_q held-out | conservative_q validation | rule_policy held-out |
 |---|---|---|---|
 | action_mae | 557.7 | 527.7 | 557.3 |
-| bootstrap_blocks | 247 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 2.369e+04 |  |  |
 | episode_net_abs_logged | 1.26e+04 | 1.127e+04 | 1.26e+04 |
 | episode_net_abs_policy | 4.42e+04 | 4.036e+04 | 2.673e+04 |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 859.3 |  | 584.7 |
 | primary_change_relative | -0.7866 |  | -2.179 |
-| reproduced_validation_value | 2.484e+04 |  | 1.308e+04 |
-| reproduction_gap_relative | 0 |  | 0 |
 | reward_gain | 5.327e+04 | 4.15e+04 | 1.373e+04 |
 | reward_logged | 3.081e+04 | 1.483e+04 | 3.081e+04 |
 | reward_policy | 8.407e+04 | 5.633e+04 | 4.453e+04 |

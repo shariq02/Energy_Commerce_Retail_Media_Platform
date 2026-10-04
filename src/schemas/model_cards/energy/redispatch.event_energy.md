@@ -1,6 +1,6 @@
 # Model card: redispatch.event_energy
 
-_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 
 ## Intended use
 
-- estimates `target_log_event_energy_mwh` for the entities and period of dataset `redispatch`
-- comparison and analysis with the stated conditions below
+- estimates the logarithm of the energy of a redispatch event in MWh
+- target `target_log_event_energy_mwh`, dataset `redispatch`
 
 ## Out of scope
 
@@ -38,26 +38,17 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 
 - model family: gbt_sklearn; MLflow run `958132873ea4435fa0b4a1841c8508fa`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_sklearn held-out | gbt_sklearn validation | zone_mean held-out |
 |---|---|---|---|
-| bootstrap_blocks | 12 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 1012 |  |  |
 | mae | 1.077 | 1.033 | 1.334 |
 | mean_error | -0.1221 | -0.07086 | -0.4554 |
 | mean_error_relative | -0.01426 | -0.008421 | -0.05318 |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 0.726 |  | 0.3223 |
-| pred_std_ratio | 0.4838 | 0.4719 | 0.2148 |
 | primary_change_relative | 0.04293 |  | 0.1289 |
-| reproduced_validation_value | 1.033 |  | 1.182 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 1.392 | 1.334 | 1.612 |
 | skill_mae | 0.1926 | 0.126 |  |
 | skill_primary | 0.1926 |  |  |

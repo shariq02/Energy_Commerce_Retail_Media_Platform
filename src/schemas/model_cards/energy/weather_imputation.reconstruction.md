@@ -1,6 +1,6 @@
 # Model card: weather_imputation.reconstruction
 
-_model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen version 2, primary metric `skill_mae_mean` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen version 2, primary metric `skill_mae_mean` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen versi
 
 ## Intended use
 
-- estimates `masked_value` for the entities and period of dataset `weather_imputation`
-- comparison and analysis with the stated conditions below
+- fills missing weather values, per weather variable
+- target `masked_value`, dataset `weather_imputation`
 
 ## Out of scope
 
@@ -37,16 +37,13 @@ _model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen versi
 
 - model family: gbt_cross_variable_lightgbm; MLflow run `ca0d775acc044272aa3e0e03fc1d9c9a`
 - parameters: {'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_cross_variable_lightgbm held-out | gbt_cross_variable_lightgbm validation | causal_baseline held-out |
 |---|---|---|---|
-| bootstrap_blocks | 28 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 2.98e+05 |  |  |
 | primary_change_relative | 0.04501 |  |  |
 | skill_mae_mean | 0.4467 | 0.4678 | 0 |
 | skill_primary | 0.4467 |  |  |
@@ -75,10 +72,11 @@ _model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen versi
 ## Conditions and known limits
 
 - segments not approved: wind_direction
+- segments with positive skill but no uncertainty interval, conditional until an interval is recorded: air_temperature (0.932), cloud_cover (0.111), dew_point_temperature (0.934), pressure_sea_level (0.239), pressure_station (0.0915), relative_humidity (0.917), soil_temperature (0.701), visibility (0.397), wind_speed (0.223)
 
 ## Disclosures
 
-- held-out partition read 2 times (re-runs); scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

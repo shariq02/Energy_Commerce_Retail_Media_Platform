@@ -1,6 +1,6 @@
 # Model card: lapse_rees46.return
 
-_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 
 ## Intended use
 
-- estimates `target_returned` for the entities and period of dataset `lapse_rees46`
-- comparison and analysis with the stated conditions below
+- estimates the probability that a REES46 user returns
+- target `target_returned`, dataset `lapse_rees46`
 
 ## Out of scope
 
@@ -38,7 +38,7 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 
 - model family: gbt_lightgbm; MLflow run `8bd902503c664e05a8252492f9cbec52`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,20 +46,11 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 | metric | gbt_lightgbm held-out | gbt_lightgbm validation | base_rate held-out |
 |---|---|---|---|
 | base_rate | 0.463 | 0.4634 | 0.463 |
-| bootstrap_blocks | 1.002e+05 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 1.002e+05 |  |  |
 | calibration_error | 0.002463 | 0.00216 | 0.0001588 |
 | log_loss | 0.59 | 0.5906 | 0.6904 |
 | pr_auc | 0.7321 | 0.7318 | 0.463 |
 | pr_auc_lift | 1.581 | 1.579 | 1 |
-| pred_finite_share | 1 |  | 1 |
-| pred_mean | 0.4631 | 0.4629 | 0.4631 |
-| pred_positive_share | 0.3659 | 0.3653 | 0 |
-| pred_std | 0.2132 |  | 2.776e-16 |
 | primary_change_relative | -0.0004111 |  | 0.0008643 |
-| reproduced_validation_value | 0.7318 |  | 0.4634 |
-| reproduction_gap_relative | 0 |  | 0 |
 | skill_primary | 0.2692 |  |  |
 | skill_primary_ci_high | 0.2717 |  |  |
 | skill_primary_ci_low | 0.2642 |  |  |

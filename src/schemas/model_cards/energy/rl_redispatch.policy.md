@@ -1,6 +1,6 @@
 # Model card: rl_redispatch.policy
 
-_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,9 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 
 ## Intended use
 
-- estimates `action_direction` for the entities and period of dataset `rl_redispatch`
-- comparison and analysis with the stated conditions below
+- proposes the direction of a redispatch action; evaluated on logged data only
+- target `action_direction`, dataset `rl_redispatch`
+- restricted to offline only (see the conditions below)
 
 ## Out of scope
 
@@ -38,7 +39,7 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 
 - model family: reward_weighted_gbt_sklearn; MLflow run `953f1c391ea3456c9356c1ac7e831d4a`
 - parameters: {'row_fraction': 1.0}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,12 +47,7 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 | metric | reward_weighted_gbt_sklearn held-out | reward_weighted_gbt_sklearn validation | majority_action held-out |
 |---|---|---|---|
 | action_agreement | 0.6285 | 0.6962 | 0.5428 |
-| bootstrap_blocks | 1026 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 6778 |  |  |
 | primary_change_relative | 0.09721 |  | -0.02999 |
-| reproduced_validation_value | 0.6962 |  | 0.527 |
-| reproduction_gap_relative | 0 |  | 0 |
 | reward_weighted_agreement | 0.5883 | 0.6929 | 0.6312 |
 | reward_when_agree | -1547 | -1678 | -1922 |
 | reward_when_disagree | -1831 | -1704 | -1333 |

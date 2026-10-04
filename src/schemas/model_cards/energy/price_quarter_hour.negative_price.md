@@ -1,6 +1,6 @@
 # Model card: price_quarter_hour.negative_price
 
-_model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metri
 
 ## Intended use
 
-- estimates `target_is_negative_price` for the entities and period of dataset `price_quarter_hour`
-- comparison and analysis with the stated conditions below
+- estimates the probability that a quarter-hour has a negative electricity price
+- target `target_is_negative_price`, dataset `price_quarter_hour`
 
 ## Out of scope
 
@@ -38,7 +38,7 @@ _model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metri
 
 - model family: logistic; MLflow run `cdad4ea678a1436b9c3f730f3a634d3a`
 - parameters: {'row_fraction': 1.0, 'C': 0.1}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,20 +46,11 @@ _model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metri
 | metric | logistic held-out | logistic validation | base_rate held-out |
 |---|---|---|---|
 | base_rate | 0.07381 | 0.04252 | 0.07381 |
-| bootstrap_blocks | 9 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 2.38e+04 |  |  |
 | calibration_error | 0.03368 | 0.01277 | 0.008823 |
 | log_loss | 0.1287 | 0.08613 | 0.264 |
 | pr_auc | 0.7205 | 0.6168 | 0.07381 |
 | pr_auc_lift | 9.761 | 14.51 | 1 |
-| pred_finite_share | 1 |  | 1 |
-| pred_mean | 0.1075 | 0.05497 | 0.06499 |
-| pred_positive_share | 0.09406 | 0.03651 | 0 |
-| pred_std | 0.2443 |  | 0 |
 | primary_change_relative | -0.1681 |  | -0.7361 |
-| reproduced_validation_value | 0.6168 |  | 0.04252 |
-| reproduction_gap_relative | 0 |  | 0 |
 | skill_primary | 0.6467 |  |  |
 | skill_primary_ci_high | 0.735 |  |  |
 | skill_primary_ci_low | 0.4814 |  |  |
@@ -74,7 +65,7 @@ _model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metri
 
 ## Disclosures
 
-- held-out partition read 2 times (re-runs); scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

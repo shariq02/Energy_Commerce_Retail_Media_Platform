@@ -1,6 +1,6 @@
 # Model card: lapse_ga4.return
 
-_model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_
 
 ## Intended use
 
-- estimates `target_returned` for the entities and period of dataset `lapse_ga4`
-- comparison and analysis with the stated conditions below
+- estimates the probability that a GA4 user returns
+- target `target_returned`, dataset `lapse_ga4`
 
 ## Out of scope
 
@@ -38,7 +38,7 @@ _model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_
 
 - model family: gbt_sklearn; MLflow run `a9f81375379840ab9a2826a8d57f723b`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,20 +46,11 @@ _model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_
 | metric | gbt_sklearn held-out | gbt_sklearn validation | base_rate held-out |
 |---|---|---|---|
 | base_rate | 0.07814 | 0.07863 | 0.07814 |
-| bootstrap_blocks | 6872 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 6872 |  |  |
 | calibration_error | 0.00986 | 0.005187 | 0.02073 |
 | log_loss | 0.2532 | 0.2508 | 0.2768 |
 | pr_auc | 0.1933 | 0.2147 | 0.07814 |
 | pr_auc_lift | 2.473 | 2.731 | 1 |
-| pred_finite_share | 1 |  | 1 |
-| pred_mean | 0.08146 | 0.08066 | 0.09888 |
-| pred_positive_share | 0.003056 | 0.004598 | 0 |
-| pred_std | 0.07915 |  | 1.388e-17 |
 | primary_change_relative | 0.09988 |  | 0.006226 |
-| reproduced_validation_value | 0.2147 |  | 0.07863 |
-| reproduction_gap_relative | 0 |  | 0 |
 | skill_primary | 0.1151 |  |  |
 | skill_primary_ci_high | 0.1418 |  |  |
 | skill_primary_ci_low | 0.09327 |  |  |

@@ -1,6 +1,6 @@
 # Model card: bias.bias
 
-_model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 
 ## Intended use
 
-- estimates `target_bias_mwh` for the entities and period of dataset `bias`
-- comparison and analysis with the stated conditions below
+- estimates the bias of the published generation forecast in MWh, per forecast scope
+- target `target_bias_mwh`, dataset `bias`
 
 ## Out of scope
 
@@ -38,26 +38,17 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 
 - model family: gbt_lightgbm; MLflow run `c41cb25a0b3343969578f27cc0b55883`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_lightgbm held-out | gbt_lightgbm validation | zero_correction held-out |
 |---|---|---|---|
-| bootstrap_blocks | 21 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 3049 |  |  |
 | mae | 1.625e+04 | 1.533e+04 | 1.025e+05 |
 | mean_error | -1827 | -725.7 | 8.691e+04 |
 | mean_error_relative | -0.01782 | -0.007749 | 0.848 |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0.000328 |  | 0 |
-| pred_std | 1.873e+05 |  | 0 |
-| pred_std_ratio | 0.9772 | 0.9986 | 0 |
 | primary_change_relative | 0.05955 |  | 0.09444 |
-| reproduced_validation_value | 1.533e+04 |  | 9.365e+04 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 2.379e+04 | 2.288e+04 | 2.105e+05 |
 | skill_mae | 0.8415 | 0.8363 |  |
 | skill_primary | 0.8415 |  |  |
@@ -82,6 +73,7 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 ## Conditions and known limits
 
 - segments not approved: offshore_wind
+- segments with positive skill but no uncertainty interval, conditional until an interval is recorded: onshore_wind (0.0313), other (0.972), photovoltaic (0.0295), wind_and_photovoltaic (0.0334)
 
 ## Disclosures
 

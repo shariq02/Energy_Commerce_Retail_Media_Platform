@@ -1,6 +1,6 @@
 # Model card: price_quarter_hour.price
 
-_model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, 
 
 ## Intended use
 
-- estimates `target_price_eur_per_mwh` for the entities and period of dataset `price_quarter_hour`
-- comparison and analysis with the stated conditions below
+- estimates the quarter-hour electricity price in EUR per MWh
+- target `target_price_eur_per_mwh`, dataset `price_quarter_hour`
 
 ## Out of scope
 
@@ -38,16 +38,13 @@ _model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, 
 
 - model family: quantile_gbt_lightgbm; MLflow run `cb36ec00aad54e7c8bf831ffed77c6d5`
 - parameters: {'quantiles': [0.1, 0.5, 0.9], 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | quantile_gbt_lightgbm held-out | quantile_gbt_lightgbm validation | persistence held-out |
 |---|---|---|---|
-| bootstrap_blocks | 9 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 2.38e+04 |  |  |
 | interval_coverage_80 | 0.494 | 0.6224 |  |
 | mae | 29.45 | 17.74 | 37.3 |
 | mean_error | -13.27 | -3.306 | 0.1774 |
@@ -55,13 +52,7 @@ _model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, 
 | pinball_q10 | 5.905 | 4.085 |  |
 | pinball_q50 | 14.72 | 8.87 | 18.65 |
 | pinball_q90 | 9.628 | 5.362 |  |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 49.02 |  | 63.29 |
-| pred_std_ratio | 0.7712 | 0.8947 | 0.9957 |
 | primary_change_relative | 0.6599 |  | 0.1254 |
-| reproduced_validation_value | 17.74 |  | 33.15 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 42.29 | 27.92 | 57.28 |
 | skill_mae | 0.2107 | 0.4648 |  |
 | skill_pinball_q10 | 0.4676 | 0.4985 |  |
@@ -85,7 +76,7 @@ _model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, 
 
 ## Disclosures
 
-- held-out partition read 2 times (re-runs); scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

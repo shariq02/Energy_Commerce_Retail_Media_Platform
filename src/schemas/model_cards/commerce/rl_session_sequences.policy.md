@@ -1,6 +1,6 @@
 # Model card: rl_session_sequences.policy
 
-_model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary metric `action_agreement` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,9 @@ _model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary
 
 ## Intended use
 
-- estimates `target_action_event_type` for the entities and period of dataset `rl_session_sequences`
-- comparison and analysis with the stated conditions below
+- proposes the next event type of a session; evaluated on logged data only
+- target `target_action_event_type`, dataset `rl_session_sequences`
+- restricted to offline only (see the conditions below)
 
 ## Out of scope
 
@@ -38,7 +39,7 @@ _model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary
 
 - model family: sequence_gru; MLflow run `17c2f675e55f4197a5f33a77e81c7974`
 - parameters: {'row_fraction': 1.0, 'history': 10, 'epochs': 2}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: torch 2.14.1+cpu
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,12 +47,7 @@ _model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary
 | metric | sequence_gru held-out | sequence_gru validation | most_frequent_event held-out |
 |---|---|---|---|
 | action_agreement | 0.9439 | 0.9445 | 0.9433 |
-| bootstrap_blocks | 5332 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 1.049e+05 |  |  |
 | primary_change_relative | 0.0006808 |  | 0.0009683 |
-| reproduced_validation_value | 0.9445 |  | 0.9442 |
-| reproduction_gap_relative | 0 |  | 0 |
 | reward_weighted_agreement | 0.3527 | 0.3337 | 0 |
 | reward_when_agree | 2.019 | 1.764 | 0 |
 | reward_when_disagree | 62.3 | 59.97 | 95.22 |

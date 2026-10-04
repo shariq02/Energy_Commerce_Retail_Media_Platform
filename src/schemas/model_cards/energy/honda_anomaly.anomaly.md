@@ -1,6 +1,6 @@
 # Model card: honda_anomaly.anomaly
 
-_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-03T23:11Z_
+_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,9 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 
 ## Intended use
 
-- estimates `injected_anomaly` for the entities and period of dataset `honda_anomaly`
-- comparison and analysis with the stated conditions below
+- scores Honda site energy readings for anomalies; the evidence rests on injected anomalies
+- target `injected_anomaly`, dataset `honda_anomaly`
+- restricted to offline only (see the conditions below)
 
 ## Out of scope
 
@@ -37,22 +38,17 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 
 - model family: forecast_residual_sklearn; MLflow run `41c192648f6441488d6897f624d75b48`
 - parameters: {'inject_rate': 0.02, 'flag_quantile': 0.99, 'injected_rows': 537, 'row_fraction': 1.0}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | forecast_residual_sklearn held-out | forecast_residual_sklearn validation | seasonal_zscore held-out |
 |---|---|---|---|
-| bootstrap_blocks | 13 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 2.628e+04 |  |  |
 | flag_rate | 0.02984 | 0.03156 | 0.03124 |
 | injected_rows | 575 |  | 575 |
 | pr_auc | 0.5587 | 0.6517 | 0.357 |
 | precision | 0.3251 | 0.3112 | 0.266 |
-| pred_finite_share | 1 |  | 1 |
-| pred_std | 1.656 |  | 1804 |
 | primary_change_relative | 0.1428 |  | 0.1923 |
 | recall | 0.6435 | 0.6909 | 0.5061 |
 | skill_primary | 0.2016 |  |  |

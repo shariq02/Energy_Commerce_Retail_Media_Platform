@@ -1,6 +1,6 @@
 # Model card: load.load
 
-_model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lo
 
 ## Intended use
 
-- estimates `target_value_mwh` for the entities and period of dataset `load`
-- comparison and analysis with the stated conditions below
+- estimates the electricity load in MWh
+- target `target_value_mwh`, dataset `load`
 
 ## Out of scope
 
@@ -38,26 +38,17 @@ _model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lo
 
 - model family: gbt_sklearn; MLflow run `e45bd9d3d2c244ed80b585739d3283e5`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_sklearn held-out | gbt_sklearn validation | seasonal_mean held-out |
 |---|---|---|---|
-| bootstrap_blocks | 21 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 3666 |  |  |
 | mae | 2.684e+04 | 2.486e+04 | 6.419e+04 |
 | mean_error | 3291 | -88.19 | 4.46e+04 |
 | mean_error_relative | 0.006061 | -0.0001608 | 0.08214 |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 3.919e+05 |  | 4.089e+05 |
-| pred_std_ratio | 0.9901 | 0.9923 | 1.033 |
 | primary_change_relative | 0.07957 |  | 0.126 |
-| reproduced_validation_value | 2.486e+04 |  | 5.7e+04 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 4.455e+04 | 4.317e+04 | 1.252e+05 |
 | skill_mae | 0.5819 | 0.5639 |  |
 | skill_primary | 0.5819 |  |  |

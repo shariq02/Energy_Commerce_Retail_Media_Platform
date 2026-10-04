@@ -1,6 +1,6 @@
 # Model card: price_daily.price
 
-_model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary
 
 ## Intended use
 
-- estimates `target_price_eur_per_mwh` for the entities and period of dataset `price_daily`
-- comparison and analysis with the stated conditions below
+- estimates the daily electricity price in EUR per MWh
+- target `target_price_eur_per_mwh`, dataset `price_daily`
 
 ## Out of scope
 
@@ -38,16 +38,13 @@ _model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary
 
 - model family: quantile_gbt_lightgbm; MLflow run `db846a81684e45939e4584e2c5eb9c10`
 - parameters: {'quantiles': [0.1, 0.5, 0.9], 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | quantile_gbt_lightgbm held-out | quantile_gbt_lightgbm validation | seasonal_naive held-out |
 |---|---|---|---|
-| bootstrap_blocks | 21 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 613 |  |  |
 | interval_coverage_80 | 0.5677 | 0.5824 |  |
 | mae | 15.95 | 11.81 | 28.62 |
 | mean_error | -8.262 | -4.773 | -0.09514 |
@@ -55,13 +52,7 @@ _model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary
 | pinball_q10 | 3.331 | 2.668 |  |
 | pinball_q50 | 7.973 | 5.906 | 14.31 |
 | pinball_q90 | 4.734 | 4.362 |  |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 30.65 |  | 33.75 |
-| pred_std_ratio | 0.9025 | 0.8137 | 0.9938 |
 | primary_change_relative | 0.35 |  | 0.02071 |
-| reproduced_validation_value | 11.81 |  | 28.04 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 21.22 | 19.71 | 38.47 |
 | skill_mae | 0.4429 | 0.5788 |  |
 | skill_pinball_q10 | 0.5514 | 0.5403 |  |
@@ -83,7 +74,7 @@ _model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary
 
 ## Disclosures
 
-- held-out partition read 2 times (re-runs); scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

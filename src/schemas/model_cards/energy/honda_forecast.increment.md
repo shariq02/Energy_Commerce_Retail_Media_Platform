@@ -1,6 +1,6 @@
 # Model card: honda_forecast.increment
 
-_model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-03T23:11Z_
+_model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
 
 ## Decision
 
@@ -19,8 +19,8 @@ _model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metri
 
 ## Intended use
 
-- estimates `target_increment` for the entities and period of dataset `honda_forecast`
-- comparison and analysis with the stated conditions below
+- estimates the next energy increment of a Honda site channel
+- target `target_increment`, dataset `honda_forecast`
 
 ## Out of scope
 
@@ -38,26 +38,17 @@ _model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metri
 
 - model family: gbt_lightgbm; MLflow run `b64ee8daf1244c1bb74f2aab87532d51`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
-- library versions: cloudpickle 3.0.0, lifelines 0.30.3, lightgbm 4.7.0, psutil 5.9.0, sklearn 1.6.1, sksurv 0.25.0, torch 2.14.1+cpu, xgboost 3.4.1
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_lightgbm held-out | gbt_lightgbm validation | persistence held-out |
 |---|---|---|---|
-| bootstrap_blocks | 9 |  |  |
-| bootstrap_resamples_valid | 200 |  |  |
-| bootstrap_rows_used | 9.864e+04 |  |  |
 | mae | 20.47 | 17.97 | 23.28 |
 | mean_error | 2.656 | 1.544 | 0.02136 |
 | mean_error_relative | 0.06998 | 0.03938 | 0.0005626 |
-| pred_finite_share | 1 |  | 1 |
-| pred_outside_range_share | 0 |  | 0 |
-| pred_std | 62.84 |  | 70.56 |
-| pred_std_ratio | 0.8902 | 0.9021 | 0.9996 |
 | primary_change_relative | 0.1394 |  | 0.1468 |
-| reproduced_validation_value | 17.97 |  | 20.3 |
-| reproduction_gap_relative | 0 |  | 0 |
 | rmse | 37.82 | 35.3 | 49.99 |
 | skill_mae | 0.1208 | 0.1152 |  |
 | skill_primary | 0.1208 |  |  |
@@ -80,6 +71,7 @@ _model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metri
 ## Conditions and known limits
 
 - segments not approved: combined_heat_and_power
+- segments with positive skill but no uncertainty interval, conditional until an interval is recorded: solar_photovoltaic (0.0402), total (0.217)
 
 ## Disclosures
 
