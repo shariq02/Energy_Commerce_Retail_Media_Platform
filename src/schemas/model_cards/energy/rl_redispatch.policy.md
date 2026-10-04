@@ -1,6 +1,6 @@
 # Model card: rl_redispatch.policy
 
-_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

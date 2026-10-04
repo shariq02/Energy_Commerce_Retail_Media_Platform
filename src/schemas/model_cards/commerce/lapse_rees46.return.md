@@ -1,6 +1,6 @@
 # Model card: lapse_rees46.return
 
-_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

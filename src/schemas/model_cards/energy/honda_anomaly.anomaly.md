@@ -1,6 +1,6 @@
 # Model card: honda_anomaly.anomaly
 
-_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

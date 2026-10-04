@@ -1,6 +1,6 @@
 # Model card: survival.unit_lifetime
 
-_model `survival_forest`, dataset `survival`, frozen version 0, primary metric `concordance` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `survival_forest`, dataset `survival`, frozen version 0, primary metric `concordance` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R10
+- rules applied: R10, R12
 
 ## Purpose and task
 

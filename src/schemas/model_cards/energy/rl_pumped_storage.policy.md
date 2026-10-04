@@ -1,6 +1,6 @@
 # Model card: rl_pumped_storage.policy
 
-_model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary metric `reward_timing` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `conservative_q`, dataset `rl_pumped_storage`, frozen version 2, primary metric `reward_timing` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

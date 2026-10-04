@@ -1,6 +1,6 @@
 # Model card: redispatch.event_energy
 
-_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

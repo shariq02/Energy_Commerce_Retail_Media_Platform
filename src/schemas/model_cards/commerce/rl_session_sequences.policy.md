@@ -1,6 +1,6 @@
 # Model card: rl_session_sequences.policy
 
-_model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `sequence_gru`, dataset `rl_session_sequences`, frozen version 0, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

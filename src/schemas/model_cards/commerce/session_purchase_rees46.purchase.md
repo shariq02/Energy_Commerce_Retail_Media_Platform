@@ -1,6 +1,6 @@
 # Model card: session_purchase_rees46.purchase
 
-_model `gbt_lightgbm`, dataset `session_purchase_rees46`, frozen version 1, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_lightgbm`, dataset `session_purchase_rees46`, frozen version 1, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

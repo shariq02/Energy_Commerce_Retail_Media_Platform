@@ -1,6 +1,6 @@
 # Model card: price_daily.price
 
-_model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
+_model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

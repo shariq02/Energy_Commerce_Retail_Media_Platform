@@ -1,6 +1,6 @@
 # Model card: session_purchase_ga4.purchase
 
-_model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

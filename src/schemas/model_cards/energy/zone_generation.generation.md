@@ -1,6 +1,6 @@
 # Model card: zone_generation.generation
 
-_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

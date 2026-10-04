@@ -1,6 +1,6 @@
 # Model card: next_item_rees46.next_item
 
-_model `sequence_transformer`, dataset `next_item_rees46`, frozen version 0, primary metric `ndcg_at_10` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `sequence_transformer`, dataset `next_item_rees46`, frozen version 0, primary metric `ndcg_at_10` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

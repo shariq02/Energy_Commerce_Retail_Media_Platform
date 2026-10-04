@@ -1,6 +1,6 @@
 # Model card: weather_imputation.reconstruction
 
-_model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen version 2, primary metric `skill_mae_mean` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen version 2, primary metric `skill_mae_mean` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_cross_variable_lightgbm`, dataset `weather_imputation`, frozen versi
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R07, R10
+- rules applied: R07, R10, R11
 
 ## Purpose and task
 

@@ -1,6 +1,6 @@
 # Model card: bias.bias
 
-_model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T17:19Z_
+_model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R07
+- rules applied: R07, R11
 
 ## Purpose and task
 

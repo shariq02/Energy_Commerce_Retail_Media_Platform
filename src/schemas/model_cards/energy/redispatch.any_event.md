@@ -1,6 +1,6 @@
 # Model card: redispatch.any_event
 
-_model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

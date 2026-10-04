@@ -1,6 +1,6 @@
 # Model card: price_quarter_hour.negative_price
 
-_model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 

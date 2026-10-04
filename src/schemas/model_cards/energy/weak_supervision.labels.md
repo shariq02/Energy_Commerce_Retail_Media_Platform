@@ -1,6 +1,6 @@
 # Model card: weak_supervision.labels
 
-_model `label_model`, dataset `weak_supervision`, frozen version 2, primary metric `coverage` (higher is better). Generated: 2026-10-04T17:19Z_
+_model `label_model`, dataset `weak_supervision`, frozen version 2, primary metric `coverage` (higher is better). Generated: 2026-10-04T18:03Z_
 
 ## Decision
 
