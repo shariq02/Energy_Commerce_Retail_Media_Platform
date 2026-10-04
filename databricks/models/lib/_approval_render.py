@@ -177,6 +177,100 @@ def render_approval_findings(eco, rows, spec_rows, checks, stamp) -> str:
 
 # COMMAND ----------
 
+# DBTITLE 1,Card constants
+INTERNAL_METRIC_PREFIXES = ("bootstrap_", "pred_", "reproduc")
+# libraries a model needs; the run records every installed library
+MODEL_LIBRARIES = {
+    "logistic": ("sklearn",),
+    "gbt_sklearn": ("sklearn",),
+    "poisson_gbt_sklearn": ("sklearn",),
+    "forecast_residual_sklearn": ("sklearn",),
+    "reward_weighted_gbt_sklearn": ("sklearn",),
+    "gbt_lightgbm": ("lightgbm",),
+    "gbt_cross_variable_lightgbm": ("lightgbm",),
+    "quantile_gbt_lightgbm": ("lightgbm",),
+    "survival_forest": ("sksurv",),
+    "conservative_q": ("torch",),
+    "sequence_gru": ("torch",),
+    "sequence_transformer": ("torch",),
+    "label_model": (),
+}
+INTENDED_USE = {
+    "price_daily.price": "estimates the daily electricity price in EUR per MWh",
+    "price_quarter_hour.price": (
+        "estimates the quarter-hour electricity price in EUR per MWh"
+    ),
+    "price_quarter_hour.negative_price": (
+        "estimates the probability that a quarter-hour has a negative electricity price"
+    ),
+    "load.load": "estimates the electricity load in MWh",
+    "bias.bias": (
+        "estimates the bias of the published generation forecast in MWh, per forecast scope"
+    ),
+    "zone_generation.generation": ("estimates the generation in MWh of a control zone"),
+    "honda_forecast.increment": (
+        "estimates the next energy increment of a Honda site channel"
+    ),
+    "honda_anomaly.anomaly": (
+        "scores Honda site energy readings for anomalies; the evidence rests on "
+        "injected anomalies"
+    ),
+    "ccpp.output": (
+        "estimates the net electrical output in MW of a combined cycle power plant "
+        "from its operating conditions"
+    ),
+    "capacity_additions.additions": ("estimates the capacity in MW added per period"),
+    "redispatch.any_event": (
+        "estimates the probability that a redispatch event occurs"
+    ),
+    "redispatch.event_energy": (
+        "estimates the logarithm of the energy of a redispatch event in MWh"
+    ),
+    "survival.unit_lifetime": (
+        "estimates the lifetime in years of a generation unit and its probability "
+        "of still being in operation after 1, 3 and 5 years"
+    ),
+    "redispatch_matching.tier": (
+        "predicts the match tier of a redispatch plant name against the registered units"
+    ),
+    "weak_supervision.labels": (
+        "combines labelling functions into one label; there is no ground truth"
+    ),
+    "weather_imputation.reconstruction": (
+        "fills missing weather values, per weather variable"
+    ),
+    "self_supervised_other.reconstruction": (
+        "reconstructs masked or shifted values of the energy series"
+    ),
+    "rl_pumped_storage.policy": (
+        "proposes the net pumped-storage action in MWh; evaluated on logged data only"
+    ),
+    "rl_redispatch.policy": (
+        "proposes the direction of a redispatch action; evaluated on logged data only"
+    ),
+    "session_purchase_ga4.purchase": (
+        "estimates the probability that a GA4 session ends in a purchase, from "
+        "the first events of the session"
+    ),
+    "session_purchase_rees46.purchase": (
+        "estimates the probability that a REES46 session ends in a purchase, from "
+        "the first events of the session"
+    ),
+    "lapse_ga4.return": "estimates the probability that a GA4 user returns",
+    "lapse_rees46.return": "estimates the probability that a REES46 user returns",
+    "next_item_ga4.next_item": (
+        "ranks products by the probability of being the next product in a GA4 session"
+    ),
+    "next_item_rees46.next_item": (
+        "ranks products by the probability of being the next product in a REES46 session"
+    ),
+    "rl_session_sequences.policy": (
+        "proposes the next event type of a session; evaluated on logged data only"
+    ),
+}
+
+# COMMAND ----------
+
 # DBTITLE 1,Facts for a card: data notes and library versions
 
 
@@ -200,13 +294,19 @@ def _read_note_lines(context_rows) -> list:
     return out or ["- not recorded"]
 
 
-def _library_line(fit_rows) -> str:
+def _library_line(fit_rows, model_name) -> str:
+    needed = MODEL_LIBRARIES.get(model_name)
     rows = [r for r in fit_rows or [] if r["library_versions"]]
-    if not rows:
+    if needed is None or not rows:
         return "not recorded"
+    if not needed:
+        return "none beyond the standard numerical stack"
     last = max(rows, key=lambda r: str(r["recorded_at"]))
     versions = _loads(last["library_versions"], {})
-    return ", ".join(f"{k} {v}" for k, v in sorted(versions.items()) if v != "missing")
+    shown = [
+        f"{k} {versions[k]}" for k in needed if versions.get(k, "missing") != "missing"
+    ]
+    return ", ".join(shown) or "not recorded"
 
 
 # COMMAND ----------
@@ -219,7 +319,10 @@ def _metric_table(selected, baseline, results) -> str:
         return {
             r["metric"]: (r["value"], r["validation_value"])
             for r in results
-            if r["model_name"] == model and r["metric"] and "__" not in r["metric"]
+            if r["model_name"] == model
+            and r["metric"]
+            and "__" not in r["metric"]
+            and not r["metric"].startswith(INTERNAL_METRIC_PREFIXES)
         }
 
     mine = values(selected["model_name"])
@@ -240,6 +343,22 @@ def _metric_table(selected, baseline, results) -> str:
         f"{baseline['model_name']} held-out",
     ]
     return markdown_table(heads, rows)
+
+
+def _intended_use_lines(task, selected) -> list:
+    text = INTENDED_USE.get(task["task_id"])
+    if text is None:
+        return [f"- estimates `{task['target']}` on dataset `{task['dataset_id']}`"]
+    lines = [
+        f"- {text}",
+        f"- target `{task['target']}`, dataset `{task['dataset_id']}`",
+    ]
+    if selected["restriction"]:
+        lines.append(
+            f"- restricted to {selected['restriction'].replace('_', ' ')} "
+            "(see the conditions below)"
+        )
+    return lines
 
 
 def render_model_card(task, selected, baseline, facts, spec, stamp) -> str:
@@ -279,11 +398,7 @@ def render_model_card(task, selected, baseline, facts, spec, stamp) -> str:
         "",
         "## Intended use",
         "",
-        (
-            f"- estimates `{task['target']}` for the entities and period of "
-            f"dataset `{task['dataset_id']}`"
-        ),
-        "- comparison and analysis with the stated conditions below",
+        *_intended_use_lines(task, selected),
         "",
         "## Out of scope",
         "",
@@ -303,7 +418,7 @@ def render_model_card(task, selected, baseline, facts, spec, stamp) -> str:
             f"`{selected['mlflow_run_id']}`"
         ),
         f"- parameters: {_cell(facts.get('params'), 600) or 'not recorded'}",
-        f"- library versions: {_library_line(facts.get('fit_context'))}",
+        f"- library versions: {_library_line(facts.get('fit_context'), selected['model_name'])}",
         "- processor type: not recorded for the training and evaluation runs",
         "",
         "## Metrics",

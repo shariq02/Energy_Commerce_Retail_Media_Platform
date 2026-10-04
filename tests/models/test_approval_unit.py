@@ -236,13 +236,49 @@ def test_recorded_segment_skill_is_read_for_weather_variables(lib):
 def test_repeated_reads_are_disclosed_and_change_no_decision(lib):
     out = _decide(lib, "load.load", reads=7)
     assert out["decision"] == "approved"
-    assert "R10" in _rule_ids(out) and any("7 times" in n for n in out["notes"])
+    assert "R10" in _rule_ids(out)
+    assert any(
+        "at least 7 evaluation runs" in n and "not recoverable" in n
+        for n in out["notes"]
+    )
 
 
 def test_task_disclosures_are_attached(lib):
+    out = _decide(lib, "next_item_ga4.next_item")
+    assert any("only baseline" in n for n in out["notes"])
+
+
+def test_survival_is_conditional_with_the_gap_the_event_count_and_a_revalidation(lib):
+    out = _decide(
+        lib,
+        "survival.unit_lifetime",
+        calibration_gap_5y=0.0036,
+        base={"concordance": 0.5, "calibration_gap_5y": 0.00004},
+    )
+    assert out["decision"] == "approved_with_conditions"
+    text = " | ".join(out["conditions"])
+    assert "5-year calibration gap 0.0036 against 4e-05" in text
+    assert "number of events in the held-out partition was not recorded" in text
+    assert "revalidate on a new frozen dataset version" in text
+
+
+def test_survival_without_a_calibration_gap_keeps_the_other_conditions(lib):
     out = _decide(lib, "survival.unit_lifetime")
-    assert any("number of events" in n for n in out["notes"])
-    assert out["decision"] == "approved"
+    assert out["decision"] == "approved_with_conditions"
+    assert len(out["conditions"]) == 2
+
+
+def test_positive_segment_skill_without_an_interval_is_conditional(lib):
+    out = _decide(
+        lib,
+        "weather_imputation.reconstruction",
+        skill_mae__weather__air_temperature=0.93,
+    )
+    assert out["decision"] == "approved_with_conditions"
+    assert any(
+        "no uncertainty interval" in c and "air_temperature (0.93)" in c
+        for c in out["conditions"]
+    )
 
 
 def test_the_selected_model_follows_the_validation_rank(lib):
@@ -340,10 +376,10 @@ def _table_rows(lib, recommended):
     return [dict(zip(columns, t, strict=True)) for t in tuples]
 
 
-def _recommended(lib, task_id="load.load", **cand):
+def _recommended(lib, task_id="load.load", model="cand", **cand):
     task = lib["TASK_BY_ID"][task_id]
-    selection = [_sel(task_id, task["baseline"], 0, True), _sel(task_id, "cand", 1)]
-    results = _rows(task_id, "cand", **{**GOOD, **cand}) + _rows(
+    selection = [_sel(task_id, task["baseline"], 0, True), _sel(task_id, model, 1)]
+    results = _rows(task_id, model, **{**GOOD, **cand}) + _rows(
         task_id, task["baseline"], "baseline", mae=1.0, mfinite=1.0
     )
     return lib["recommend_task"](task, selection, results, SPEC, 1), results
@@ -390,8 +426,8 @@ def test_findings_text_lists_rules_decisions_and_overrides(lib):
     assert "every_task_has_a_decision" in text
 
 
-def _card(lib, text_extra=None, **cand):
-    recommended, results = _recommended(lib, **cand)
+def _card(lib, text_extra=None, model="gbt_lightgbm", **cand):
+    recommended, results = _recommended(lib, model=model, **cand)
     rows = _table_rows(lib, recommended)
     selected, baseline = rows[0], rows[-1]
     selected["recommended_decision"] = selected["decision"]
@@ -445,6 +481,25 @@ def test_the_model_card_has_every_section(lib):
     assert "lightgbm 4.7.0" in text and "torch" not in text
     assert "held-out read: partition held-out, rows 3666" in text
     assert "20%" in text
+
+
+def test_the_card_names_only_the_libraries_of_the_model(lib):
+    assert "library versions: lightgbm 4.7.0\n" in _card(lib)
+    assert "library versions: not recorded" in _card(lib, model="unknown_model")
+
+
+def test_the_card_metric_table_hides_internal_fields(lib):
+    text = _card(lib, bootstrap_resamples_valid=200.0, pred_std=1.0)
+    table = text.split("## Metrics")[1].split("## Flags")[0]
+    assert "skill_primary_ci_low" in table
+    for hidden in ("bootstrap_", "pred_", "reproduc"):
+        assert hidden not in table
+
+
+def test_every_task_has_its_own_intended_use_and_a_model_library_entry(lib):
+    texts = [lib["INTENDED_USE"][t["task_id"]] for t in lib["TASKS"]]
+    assert len(set(texts)) == len(texts)
+    assert "estimates the electricity load" in _card(lib).split("## Intended use")[1]
 
 
 def test_the_model_card_carries_extra_facts_and_the_processor_note(lib):

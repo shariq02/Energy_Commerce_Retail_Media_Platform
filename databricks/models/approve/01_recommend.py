@@ -79,7 +79,7 @@ for eco in ("energy", "commerce"):
     ]
     context = (
         read_model(APPROVAL_CONTEXT_TABLE, ecosystem=eco)
-        .filter(~F.col("smoke") & (F.col("status") == "data_ready"))
+        .filter(~F.col("smoke"))
         .select("task_id", "run_id")
         .distinct()
         .collect()

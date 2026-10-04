@@ -113,12 +113,6 @@ TASK_NOTES = {
             "the items already seen in the session."
         )
     ],
-    "survival.unit_lifetime": [
-        (
-            "The number of events in the held-out partition was not recorded; the "
-            "concordance and Brier scores rest on an unknown number of events."
-        )
-    ],
 }
 ENERGY_FIGURES = ("episode_net_abs_policy", "episode_net_abs_logged")
 
@@ -228,6 +222,47 @@ def segment_decisions(task_id: str, metrics: dict, base_metrics: dict) -> list:
 
 # COMMAND ----------
 
+
+# DBTITLE 1,Task conditions
+def _survival_conditions(metrics: dict, base_metrics: dict) -> list:
+    out = []
+    gap = _val(metrics, "calibration_gap_5y")
+    base_gap = _val(base_metrics, "calibration_gap_5y")
+    if gap is not None and base_gap is not None and gap > base_gap:
+        out.append(
+            f"5-year calibration gap {gap:.3g} against {base_gap:.3g} for the "
+            "baseline; predicted risk is less well calibrated than the baseline"
+        )
+    out.append(
+        "the number of events in the held-out partition was not recorded; the "
+        "concordance and Brier scores rest on an unknown number of events"
+    )
+    out.append(
+        "revalidate on a new frozen dataset version, with the held-out event "
+        "count recorded, before relying on the risk values"
+    )
+    return out
+
+
+TASK_CONDITIONS = {"survival.unit_lifetime": _survival_conditions}
+
+
+def _positive_segment_condition(segments: list) -> list:
+    """Positive skill without a segment interval is not enough for approval."""
+    positive = [s for s in segments if s["decision"] != "not_approved"]
+    if not positive:
+        return []
+    shown = ", ".join(f"{s['segment']} ({s['skill']:.3g})" for s in positive)
+    return [
+        (
+            "segments with positive skill but no uncertainty interval, conditional "
+            f"until an interval is recorded: {shown}"
+        )
+    ]
+
+
+# COMMAND ----------
+
 # DBTITLE 1,One selected model: rules, conditions and decision
 
 
@@ -305,7 +340,10 @@ def decide_selected(task, rows, base_rows, spec, reads) -> dict:
         "notes": list(TASK_NOTES.get(task["task_id"], [])),
     }
     if reads > 1:
-        text = f"held-out partition read {reads} times (re-runs); scores unchanged"
+        text = (
+            f"the held-out partition was read in at least {reads} evaluation runs; "
+            "the exact number of held-out reads is not recoverable; scores unchanged"
+        )
         out["rules"].append(_rule("R10", "disclosure", text))
         out["notes"].append(text)
     if not rows or rows[0]["status"] != "ok":
@@ -344,6 +382,10 @@ def decide_selected(task, rows, base_rows, spec, reads) -> dict:
         text = f"segments not approved: {', '.join(excluded)}"
         out["rules"].append(_rule("R07", "segment", text))
         out["conditions"].append(text)
+    out["conditions"] += _positive_segment_condition(segments)
+    task_conditions = TASK_CONDITIONS.get(task["task_id"])
+    if task_conditions:
+        out["conditions"] += task_conditions(metrics, model_metrics(base_rows or []))
     clean = not out["conditions"] and restriction is None
     out["decision"] = "approved" if clean else "approved_with_conditions"
     return out
