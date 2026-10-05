@@ -147,3 +147,14 @@ def load_approval_libs() -> dict:
             REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
         )
     return namespace
+
+
+def load_registry_libs() -> dict:
+    """The evaluation libraries, then the approval rules and the registry
+    libraries in the order the registry notebooks `%run` them."""
+    namespace = load_eval_libs()
+    for name in ("_approval_rules", "_registry_rules", "_registry_check"):
+        _exec_notebook(
+            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
+        )
+    return namespace

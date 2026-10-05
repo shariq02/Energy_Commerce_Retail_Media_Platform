@@ -154,6 +154,15 @@ def test_setup_preflight_splits_and_gates_exist():
         "approve/gate/03_export_findings.py",
         "lib/_approval_rules.py",
         "lib/_approval_render.py",
+        "register/00_registry_setup.py",
+        "register/01_register_models.py",
+        "register/02_reproducibility_energy.py",
+        "register/02_reproducibility_commerce.py",
+        "register/gate/01_registry_guards.py",
+        "register/gate/02_reproducibility_guards.py",
+        "register/gate/03_export_findings.py",
+        "lib/_registry_rules.py",
+        "lib/_registry_check.py",
     ):
         assert (_MODELS / rel).exists(), rel
     assert (
@@ -176,3 +185,34 @@ def test_approval_notebooks_load_the_approval_libraries():
         text = p.read_text(encoding="utf-8")
         assert "lib/_model_common" in text, _rel(p)
         assert "lib/_approval_rules" in text, _rel(p)
+
+
+_REGISTER = [p for p in _NOTEBOOKS if _rel(p).startswith("register/")]
+_REGISTER_CHECKS = [p for p in _REGISTER if p.name.startswith("02_")]
+_REGISTER_RECORD_ONLY = [p for p in _REGISTER if p not in _REGISTER_CHECKS]
+
+
+@pytest.mark.parametrize("path", _REGISTER_RECORD_ONLY, ids=_rel)
+def test_registry_record_notebooks_read_recorded_results_only(path):
+    text = path.read_text(encoding="utf-8")
+    assert "evaluate_by_id(" not in text and "load_bundle(" not in text
+    needs = ["lib/_model_common"]
+    if path.name != "00_registry_setup.py":
+        needs.append("lib/_registry_rules")
+    for lib in needs:
+        assert lib in text, _rel(path)
+
+
+@pytest.mark.parametrize("path", _REGISTER_CHECKS, ids=_rel)
+def test_reproducibility_notebooks_use_the_check_library(path):
+    text = path.read_text(encoding="utf-8")
+    for lib in ("_registry_rules", "_registry_check", "_eval_common", "_eval_specs"):
+        assert f"%run ../lib/{lib}" in text, _rel(path)
+    assert "reproduce_ecosystem(" in text and "record_checks(" in text
+    assert "evaluate_by_id(" not in text
+
+
+def test_registry_check_library_scores_the_earlier_partitions_only():
+    text = (_MODELS / "lib" / "_registry_check.py").read_text(encoding="utf-8")
+    assert "ALLOWED_PARTITIONS" in text and 'partition = "validation"' in text
+    assert "evaluate_task(" not in text and "run_candidate(" not in text

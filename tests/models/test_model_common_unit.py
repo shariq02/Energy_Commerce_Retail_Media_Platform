@@ -168,6 +168,8 @@ def test_model_schemas_are_the_agreed_names(c):
         "evaluation_flags",
         "approval_spec",
         "model_approval",
+        "model_registry",
+        "registry_check",
     }
 
 

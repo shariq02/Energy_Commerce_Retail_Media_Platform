@@ -138,6 +138,23 @@ MODEL_DDL = {
         "frozen_delta_version bigint, mlflow_run_id string, decided_by string, "
         "recommended_at timestamp, decided_at timestamp, run_id string"
     ),
+    "model_registry": (
+        "task_id string, dataset_id string, model_name string, role string, "
+        "version int, lifecycle_status string, decision string, restriction string, "
+        "conditions string, primary_metric string, validation_value double, "
+        "frozen_delta_version bigint, mlflow_run_id string, artifact_uri string, "
+        "approval_run_id string, approval_decided_at timestamp, card_path string, "
+        "fit_library_versions string, reason string, run_id string, "
+        "registered_at timestamp"
+    ),
+    "registry_check": (
+        "task_id string, model_name string, role string, registry_version int, "
+        "processor_type string, python_version string, library_versions string, "
+        "reload_status string, reload_detail string, rescore_status string, "
+        "recorded_value double, rescored_value double, gap_relative double, "
+        "tolerance double, status string, detail string, run_id string, "
+        "checked_at timestamp"
+    ),
 }
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
