@@ -188,7 +188,9 @@ def test_approval_notebooks_load_the_approval_libraries():
 
 
 _REGISTER = [p for p in _NOTEBOOKS if _rel(p).startswith("register/")]
-_REGISTER_CHECKS = [p for p in _REGISTER if p.name.startswith("02_")]
+_REGISTER_CHECKS = [
+    p for p in _REGISTER if p.parent.name == "register" and p.name.startswith("02_")
+]
 _REGISTER_RECORD_ONLY = [p for p in _REGISTER if p not in _REGISTER_CHECKS]
 
 
