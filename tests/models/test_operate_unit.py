@@ -143,6 +143,33 @@ def test_a_shifted_distribution_is_flagged_with_the_recorded_thresholds(lib):
     assert drift["n_reference"] == 5000 and drift["n_window"] == 5000
 
 
+@pytest.mark.parametrize(
+    ("subject", "level"),
+    [
+        ("year", "info"),
+        ("month", "info"),
+        ("trend_years", "info"),
+        ("day_of_year", "info"),
+        ("iso_week", "info"),
+        ("price", "flag"),
+    ],
+)
+def test_calendar_feature_drift_is_informational_only(lib, subject, level):
+    ref = lib["profile_series"](subject, _normal(seed=1), SPEC)
+    out = lib["compare_series"](ref, subject, _normal(shift=2.0, seed=2), SPEC)
+    drift = next(r for r in out if r["check_kind"] == "feature_drift")
+    assert drift["level"] == level and drift["value"] >= 0.25
+
+
+def test_a_calendar_name_is_not_informational_for_the_prediction(lib):
+    ref = lib["profile_series"]("year", _normal(seed=1), SPEC)
+    out = lib["compare_series"](
+        ref, "year", _normal(shift=2.0, seed=2), SPEC, "prediction_"
+    )
+    drift = next(r for r in out if r["check_kind"] == "prediction_drift")
+    assert drift["level"] == "flag"
+
+
 def test_a_rise_of_the_null_rate_is_flagged(lib):
     ref = lib["profile_series"]("x", _normal(seed=1), SPEC)
     window = _normal(seed=2)

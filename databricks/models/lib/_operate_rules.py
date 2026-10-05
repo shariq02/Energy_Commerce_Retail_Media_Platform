@@ -48,6 +48,9 @@ PREDICTION_SUBJECT = "__prediction__"
 NO_SUBJECT = "__none__"
 LEVELS = ("ok", "warning", "flag", "info", "not_applicable")
 DRIFT_KINDS = ("feature_drift", "null_rate", "prediction_drift", "prediction_null_rate")
+CALENDAR_FEATURES = frozenset(
+    ("year", "month", "trend_years", "day_of_year", "iso_week")
+)
 EPSILON = 1e-4
 
 # COMMAND ----------
@@ -256,12 +259,16 @@ def compare_series(ref: dict, subject: str, series: pd.Series, spec: dict, prefi
     ref_null = ref["null_rate"] or 0.0
     rise = (null_count / n - ref_null) * 100.0 if n else None
     kind_extra = f"prediction_{extra[0]}" if prefix else extra[0]
+    drift_level = psi_level(value, spec)
+    calendar = not prefix and subject in CALENDAR_FEATURES
+    if calendar and drift_level in ("warning", "flag"):
+        drift_level = "info"
     return [
         _result(
             drift,
             subject,
             value,
-            psi_level(value, spec),
+            drift_level,
             ref,
             n_value,
             f"{len(shares)} bins",
