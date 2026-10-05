@@ -83,6 +83,7 @@ print(f"fit population {len(fit_known)} known units; {len(to_fill)} units to fil
 # COMMAND ----------
 
 # DBTITLE 1,Mask-and-score the three methods
+assert len(fit_known) > 0, "no units with a known hub height in the fit population"
 scores = static_impute_scores(fit_known, "hub_height_m", FEATURES, GROUP)
 best_method = min(scores, key=scores.get)
 print(scores, "->", best_method)

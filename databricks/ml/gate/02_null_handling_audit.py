@@ -95,7 +95,7 @@ for eco in ECOSYSTEMS:
         feats = {
             r["column_name"]
             for r in read_ml("feature_contract", ecosystem=eco)
-            .filter((F.col("dataset_id") == ds) & F.col("role").isin("feature", "flag"))
+            .filter((F.col("dataset_id") == ds) & (F.col("role") == "feature"))
             .collect()
         }
         classed = {
@@ -135,7 +135,11 @@ for eco in ECOSYSTEMS:
         imputed = {
             r["column_name"]
             for r in read_ml("imputer_parameters", ecosystem=eco)
-            .filter((F.col("dataset_id") == ds) & (F.col("fold_id") == -1))
+            .filter(
+                (F.col("dataset_id") == ds)
+                & (F.col("fold_id") == -1)
+                & (F.col("method") == "group_median")
+            )
             .collect()
         }
         lacking = sorted(
