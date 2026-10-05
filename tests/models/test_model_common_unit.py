@@ -170,6 +170,12 @@ def test_model_schemas_are_the_agreed_names(c):
         "model_approval",
         "model_registry",
         "registry_check",
+        "monitoring_spec",
+        "reference_profile",
+        "model_predictions",
+        "monitoring_results",
+        "monitoring_flags",
+        "monitoring_triggers",
     }
 
 
