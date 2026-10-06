@@ -1,4 +1,4 @@
-"""Remove STALE blocks from src/schemas/{silver,gold}_findings/*.md.
+"""Remove STALE blocks from src/findings/{silver,gold}_findings/*.md.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2] / "src/schemas"
+ROOT = Path(__file__).resolve().parents[2] / "src/findings"
 DIRS = [ROOT / "silver_findings", ROOT / "gold_findings"]
 BLOCK = re.compile(r"<!-- BEGIN (\S+) -->.*?<!-- END \1 -->\n*", re.DOTALL)
 

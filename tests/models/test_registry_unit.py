@@ -80,7 +80,7 @@ def test_an_entry_links_run_artifact_card_and_fit_environment(lib):
     eco = lib["TASK_BY_ID"][tid]["ecosystem"]
     entry = lib["registry_entries"](_approvals(lib), {tid: '{"torch": "2"}'})[0]
     assert entry["artifact_uri"] == "runs:/run-1/candidate/candidate.pkl"
-    assert entry["card_path"] == f"src/schemas/model_cards/{eco}/{tid}.md"
+    assert entry["card_path"] == f"src/model_cards/{eco}/{tid}.md"
     assert entry["approval_run_id"] == "model-approval-1"
     assert entry["fit_library_versions"] == '{"torch": "2"}'
 

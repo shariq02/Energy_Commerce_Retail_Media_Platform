@@ -12,7 +12,7 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** write the decision record of each ecosystem to the repository as markdown (src/schemas/model_findings/): the rule table, the decisions with the rules behind them, the overrides, the conditions and segments of every selected model, and the check results.
+# MAGIC **Purpose:** write the decision record of each ecosystem to the repository as markdown (src/findings/model_findings/): the rule table, the decisions with the rules behind them, the overrides, the conditions and segments of every selected model, and the check results.
 
 # COMMAND ----------
 
@@ -37,7 +37,7 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-FINDINGS_SUBDIR = "src/schemas/model_findings"
+FINDINGS_SUBDIR = "src/findings/model_findings"
 
 # COMMAND ----------
 

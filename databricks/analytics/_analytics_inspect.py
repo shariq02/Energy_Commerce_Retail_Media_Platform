@@ -17,7 +17,7 @@
 # MAGIC `_analytics_common`. Same two-step shape as `_gold_inspect.py`:
 # MAGIC `inspect_analytics_table()` computes and returns findings, the calling
 # MAGIC notebook explicitly calls `write_analytics_findings()` to write
-# MAGIC `src/schemas/analytics_findings/<source>.md`.
+# MAGIC `src/findings/analytics_findings/<source>.md`.
 
 # COMMAND ----------
 
@@ -31,11 +31,11 @@ from pyspark.sql import functions as F
 
 # COMMAND ----------
 
-# DBTITLE 1,Findings export (src/schemas/analytics_findings/<source>.md)
+# DBTITLE 1,Findings export (src/findings/analytics_findings/<source>.md)
 
 
 def _analytics_findings_dir():
-    d = _os.path.join(repo_root(), "src", "schemas", "analytics_findings")
+    d = _os.path.join(repo_root(), "src", "findings", "analytics_findings")
     _os.makedirs(d, exist_ok=True)
     return d
 

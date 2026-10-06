@@ -89,6 +89,7 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/gold/energy/**/*.py" = ["F821"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
 "databricks/utility/07_gold_legacy_retirement.py" = ["F821"]
+"databricks/utility/09_update_model_card_paths.py" = ["F821"]
 # Analytics notebooks pull `%run ../gold/_gold_common` then `%run ./_analytics_common`
 # (Databricks runtime magic), same chain shape as Gold's own. _analytics_common.py
 # and _analytics_inspect.py are the second/third links, depending on _gold_common's
