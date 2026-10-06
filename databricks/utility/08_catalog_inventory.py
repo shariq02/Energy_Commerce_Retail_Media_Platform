@@ -80,8 +80,8 @@ print(f"Tables and views: {len(tables)}")
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Define profile_table
+
 def profile_table(item):
     schema_name, table_name, table_type = item
     full_name = f"`{CATALOG}`.`{schema_name}`.`{table_name}`"
@@ -193,8 +193,8 @@ display(tables_df.filter(F.col("error").isNotNull()))
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Define find_repo_root
+
 def find_repo_root():
     path = os.path.abspath(os.getcwd())
     for _ in range(12):
@@ -231,8 +231,8 @@ print(f"Findings directory: {FINDINGS_DIR}")
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Define markdown_table
+
 def markdown_table(columns, rows):
     def cell(value):
         if value is None:
