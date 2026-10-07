@@ -81,7 +81,8 @@ def test_the_dry_run_checks_the_size_of_the_planned_bodies(
     monkeypatch, tmp_path, capsys
 ):
     only_step(monkeypatch, "tokens", ra.step_tokens)
-    assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
+    argv = ["--corpus-dir", str(tmp_path), "--authored-dir", str(tmp_path / "none")]
+    assert ra.main(argv) == 0
     assert not any(tmp_path.rglob("*"))
     assert "Units: 92" in capsys.readouterr().out
 
@@ -111,6 +112,8 @@ def test_apply_builds_units_and_stops_when_the_tokenizer_is_missing(tmp_path, ca
     argv = [
         "--corpus-dir",
         str(tmp_path),
+        "--authored-dir",
+        str(tmp_path / "none"),
         "--tokenizer",
         str(tmp_path / "none.json"),
         "--apply",

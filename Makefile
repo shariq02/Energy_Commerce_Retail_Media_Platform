@@ -58,7 +58,7 @@ test:
 
 test-unit:
 	PYTHONPATH=$(PWD) pytest tests/unit/ tests/ai/ -v \
-		--cov=src --cov=fastapi --cov=ai \
+		--cov=src --cov=fastapi --cov=ai --cov=scripts/knowledge \
 		--cov-report=term-missing \
 		--cov-report=html
 
