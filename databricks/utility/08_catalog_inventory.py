@@ -6,28 +6,21 @@
 # MAGIC %md
 # MAGIC # CATALOG INVENTORY -- schemas, tables, row counts and sizes
 # MAGIC
-# MAGIC **ECRMAP -- Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** list every schema in the catalog, every table in each schema,
-# MAGIC the row count and the size of each table, the totals per schema and the
-# MAGIC overall totals.
+# MAGIC **Purpose:** list every schema and table in the catalog with its row count
+# MAGIC and size, and the totals per schema and overall.
 # MAGIC
-# MAGIC **Read-only on the catalog.** The notebook only reads metadata
-# MAGIC (`information_schema`, `DESCRIBE DETAIL`) and runs `COUNT(*)`. It creates,
-# MAGIC changes and deletes no catalog object. Its only write is one Markdown
-# MAGIC file, `src/inventory/catalog_inventory_<date>.md`, in the Git folder.
-# MAGIC "Run All" is safe.
+# MAGIC **Read-only on the catalog** (metadata and `COUNT(*)` only). The one write is
+# MAGIC `src/inventory/catalog_inventory_<date>.md` in the Git folder. "Run All" is safe.
 # MAGIC
-# MAGIC **How the numbers are made:**
-# MAGIC - Size is `sizeInBytes` from `DESCRIBE DETAIL`: the data files of the
-# MAGIC   current table version. Older versions kept for time travel are not counted.
-# MAGIC - Row count is `COUNT(*)`. On a Delta table it is answered from file statistics.
-# MAGIC - A view has a row count and no size. A table that is not Delta has a row
-# MAGIC   count and no size. A table that fails is listed with its error text.
+# MAGIC Size is `sizeInBytes` from `DESCRIBE DETAIL` (current table version only). A
+# MAGIC view or a non-Delta table has a row count and no size. A table that fails is
+# MAGIC listed with its error text.
 
 # COMMAND ----------
 

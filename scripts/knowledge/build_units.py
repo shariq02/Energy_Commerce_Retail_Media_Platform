@@ -1,21 +1,14 @@
-"""Build the derived knowledge units from their sources.
+"""Build the metric, contract and rule units from their sources.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Purpose: convert the metric definitions, the contract descriptions and the
-quality rules into Markdown units in ``ai/knowledge_corpus/``, then rebuild the
-manifest. Only the included fields are written: metric key, definition and
-grain; rule id, expression and severity; the contract description. Every unit is
-written as ``pending``; only ``approve_units`` sets ``approved``.
+Writes pending units and rebuilds the manifest. It prints the plan first and asks
+before writing (y or yes); --apply writes without asking, --dry-run never writes.
 
-Dry run by default. A unit whose body changed gets a new version and loses its
-approval; the dry run lists those units.
-
-Usage (from the repository root):
-    python -m scripts.knowledge.build_units            # dry run
-    python -m scripts.knowledge.build_units --apply    # write units and manifest
+Usage (repository root):
+    python -m scripts.knowledge.build_units [--apply | --dry-run]
 """
 
 from __future__ import annotations
@@ -148,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--root", type=Path, default=uc.ROOT)
     parser.add_argument("--corpus-dir", type=Path, default=None)
-    parser.add_argument("--apply", action="store_true", help="write the units")
+    uc.add_write_mode(parser)
     args = parser.parse_args(argv)
     corpus_dir = args.corpus_dir or args.root / "ai" / "knowledge_corpus"
     today = datetime.now(UTC).date().isoformat()
@@ -166,18 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         for unit in units
     ]
-    counts = Counter((plan.kind, plan.action) for plan in plans)
-    for kind in uc.DERIVED_KINDS:
-        line = ", ".join(
-            f"{action} {counts[(kind, action)]}"
-            for action in ("created", "revised", "refreshed", "unchanged")
-        )
-        print(f"{kind}: {line}")
-    reset = [p.unit_id for p in plans if p.action == "revised" and p.was_approved]
-    if reset:
-        print(f"WARNING: {len(reset)} approved unit(s) lose their approval:")
-        for unit_id in reset:
-            print(f"  {unit_id}")
+    uc.print_plans(plans, uc.DERIVED_KINDS)
     produced = {unit["unit_id"] for unit in units}
     orphans = [
         unit.unit_id
@@ -188,18 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"WARNING: {len(orphans)} unit(s) have no source any more (kept):")
         for unit_id in orphans:
             print(f"  {unit_id}")
-    if not args.apply:
-        print("Dry run: nothing written. Use --apply to write.")
-        return 0
-    for plan in plans:
-        if plan.text is not None:
-            uc.write_text(plan.path, plan.text)
-    manifest = uc.write_manifest(corpus_dir)
-    print(
-        f"Manifest: corpus_version {manifest['corpus_version']}, "
-        f"{manifest['unit_count']} unit(s), approval {manifest['approval']}"
-    )
-    return 0
+    return uc.write_plans(plans, corpus_dir, args.apply, args.dry_run)
 
 
 if __name__ == "__main__":

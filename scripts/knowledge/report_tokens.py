@@ -1,19 +1,14 @@
 """Report the token length of every knowledge unit.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Purpose: count the tokens of each unit body with the embedding model's own
-tokenizer and report units that do not fit its input size. The limit counts the
-two special tokens. A unit that fits is ``ok``. A unit that is longer but whose
-every paragraph fits is ``split``. A unit with a paragraph that does not fit is
-``fail``: it must be rewritten, because a paragraph is never truncated.
+Counts the tokens of each body with the embedding model's tokenizer against the
+256-token limit (special tokens included). A paragraph over the limit is "fail".
+Read-only. Exit code 1 on fail, 2 when the tokenizer file is missing.
 
-Read-only. The exit code is 1 when a unit is ``fail`` and 2 when the tokenizer
-file is missing.
-
-Usage (from the repository root):
+Usage (repository root):
     python -m scripts.knowledge.report_tokens
 """
 
@@ -62,21 +57,17 @@ def classify(tokenizer, body: str) -> tuple[str, int, int]:
     return "ok", total, longest
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--tokenizer", type=Path, default=DEFAULT_TOKENIZER)
-    parser.add_argument("--corpus-dir", type=Path, default=uc.CORPUS_DIR)
-    args = parser.parse_args(argv)
-    if not args.tokenizer.is_file():
-        print(f"ERROR: tokenizer file not found: {args.tokenizer}")
+def report(tokenizer_path: Path, bodies: dict[str, str]) -> int:
+    """Print the size report for these bodies; return the exit code."""
+    if not tokenizer_path.is_file():
+        print(f"ERROR: tokenizer file not found: {tokenizer_path}")
         return 2
-
-    tokenizer = load_tokenizer(args.tokenizer)
+    tokenizer = load_tokenizer(tokenizer_path)
     rows = []
-    for unit in uc.scan_units(args.corpus_dir):
-        status, total, longest = classify(tokenizer, unit.body)
-        rows.append((unit.unit_id, status, total, longest))
-    print(f"Tokenizer: {args.tokenizer}")
+    for unit_id, body in sorted(bodies.items()):
+        status, total, longest = classify(tokenizer, body)
+        rows.append((unit_id, status, total, longest))
+    print(f"Tokenizer: {tokenizer_path}")
     print(f"Limit: {MAX_TOKENS} tokens including the two special tokens")
     print(f"Units: {len(rows)}")
     for status in ("ok", "split", "fail"):
@@ -88,6 +79,15 @@ def main(argv: list[str] | None = None) -> int:
     for unit_id, _, total, longest in failed:
         print(f"FAIL {unit_id}: a paragraph has {longest} tokens (unit {total})")
     return 1 if failed else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--tokenizer", type=Path, default=DEFAULT_TOKENIZER)
+    parser.add_argument("--corpus-dir", type=Path, default=uc.CORPUS_DIR)
+    args = parser.parse_args(argv)
+    bodies = {unit.unit_id: unit.body for unit in uc.scan_units(args.corpus_dir)}
+    return report(args.tokenizer, bodies)
 
 
 if __name__ == "__main__":

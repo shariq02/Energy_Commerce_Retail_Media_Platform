@@ -1,12 +1,11 @@
 """Knowledge units -- conversion, approval, versioning and manifest.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-The conversion tests read the real contracts and metric notebooks (read-only)
-and write only into a temporary folder. The token test needs the embedding
-model's tokenizer file and is skipped when it is not on the machine.
+Conversion tests read the real sources and write only to a temporary folder. The
+token test is skipped without the tokenizer file.
 """
 
 from __future__ import annotations
@@ -130,6 +129,58 @@ def test_second_build_changes_nothing(tmp_path):
 def test_dry_run_writes_nothing(tmp_path):
     assert bu.main(["--corpus-dir", str(tmp_path)]) == 0
     assert not any(tmp_path.rglob("*"))
+
+
+def test_the_dry_run_lists_every_new_unit(tmp_path, capsys):
+    assert bu.main(["--corpus-dir", str(tmp_path), "--dry-run"]) == 0
+    output = capsys.readouterr().out
+    assert "Created (92):" in output
+    assert "  rule.dwd.station_set  version 1, body " in output
+    assert uc.NOT_WRITTEN in output
+
+
+@pytest.mark.parametrize(
+    ("answer", "written"),
+    [("y", True), ("yes", True), ("n", False), ("no", False), ("", False)],
+)
+def test_without_a_flag_the_command_asks_before_it_writes(
+    monkeypatch, tmp_path, answer, written
+):
+    asked = []
+    monkeypatch.setattr(uc, "is_interactive", lambda: True)
+    monkeypatch.setattr(uc, "ask", lambda question: asked.append(question) or answer)
+    assert bu.main(["--corpus-dir", str(tmp_path)]) == 0
+    assert len(asked) == 1
+    assert any(tmp_path.rglob("*")) is written
+
+
+def test_the_dry_run_flag_never_asks(monkeypatch, tmp_path):
+    monkeypatch.setattr(uc, "is_interactive", lambda: True)
+    monkeypatch.setattr(uc, "ask", lambda question: pytest.fail("asked"))
+    assert bu.main(["--corpus-dir", str(tmp_path), "--dry-run"]) == 0
+    assert not any(tmp_path.rglob("*"))
+
+
+def test_nothing_to_write_means_no_question(monkeypatch, tmp_path, capsys):
+    build(tmp_path)
+    capsys.readouterr()
+    monkeypatch.setattr(uc, "is_interactive", lambda: True)
+    monkeypatch.setattr(uc, "ask", lambda question: pytest.fail("asked"))
+    assert bu.main(["--corpus-dir", str(tmp_path)]) == 0
+    assert "Nothing to write." in capsys.readouterr().out
+
+
+def test_a_revised_unit_shows_versions_hashes_and_the_cleared_approval(tmp_path):
+    plan = create_unit(tmp_path)
+    unit = uc.read_unit(plan.path)
+    uc.write_text(unit.path, au.approved_text(unit, "Owner", TODAY))
+    again = uc.plan_unit(
+        tmp_path, "rule.x.a", "rule", "energy", SOURCES, "# A\n\nnew", LATER
+    )
+    line = uc.plan_line(again)
+    assert "version 1 -> 2" in line
+    assert f"{uc.sha256_text('# A' + chr(10) + chr(10) + 'body')[:8]} ->" in line
+    assert line.endswith("approval cleared")
 
 
 def test_changed_body_raises_version_and_clears_approval(tmp_path):

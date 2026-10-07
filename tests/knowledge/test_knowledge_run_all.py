@@ -1,6 +1,6 @@
 """Knowledge run_all -- order, stop on failure and the approval boundary.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 """
@@ -18,15 +18,72 @@ pytestmark = [pytest.mark.unit, pytest.mark.ai]
 
 
 def test_steps_run_in_order():
-    assert [name for name, _ in ra.STEPS] == ["units", "tokens"]
+    assert [name for name, _ in ra.STEPS] == ["units", "authored", "tokens"]
 
 
-def test_dry_run_writes_nothing(tmp_path, capsys):
+def only_step(monkeypatch, name, step, answers=(), interactive=False):
+    """Run one step only; the prompts are answered from `answers`."""
+    asked = []
+    answers = list(answers)
+
+    def fake_ask(question):
+        asked.append(question)
+        return answers.pop(0)
+
+    monkeypatch.setattr(ra, "STEPS", [(name, step)])
+    monkeypatch.setattr(ra, "ask", fake_ask)
+    monkeypatch.setattr(ra, "is_interactive", lambda: interactive)
+    return asked
+
+
+def test_dry_run_lists_the_units_and_writes_nothing(monkeypatch, tmp_path, capsys):
+    only_step(monkeypatch, "units", ra.step_units)
     assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
     assert not any(tmp_path.rglob("*"))
     output = capsys.readouterr().out
-    assert "token check is skipped" in output
+    assert "Created (92):" in output
+    assert "  metric.ga4_sessions  version 1" in output
     assert "Dry run: nothing was written" in output
+
+
+def test_without_an_index_the_authored_step_is_skipped(monkeypatch, tmp_path, capsys):
+    only_step(monkeypatch, "authored", ra.step_authored)
+    argv = ["--corpus-dir", str(tmp_path), "--authored-dir", str(tmp_path / "none")]
+    assert ra.main(argv) == 0
+    assert "No authored units yet" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("answer", ["n", "no", "", "x", "maybe"])
+def test_any_answer_but_yes_writes_nothing(monkeypatch, tmp_path, answer):
+    asked = only_step(monkeypatch, "units", ra.step_units, [answer], interactive=True)
+    assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
+    assert len(asked) == 1
+    assert not any(tmp_path.rglob("*"))
+
+
+@pytest.mark.parametrize("answer", ["y", "Y", "yes", "YES"])
+def test_yes_runs_the_steps_again_to_write_then_offers_approval(
+    monkeypatch, tmp_path, answer
+):
+    asked = only_step(
+        monkeypatch, "units", ra.step_units, [answer, "5"], interactive=True
+    )
+    assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
+    assert len(asked) == 2
+    assert len(uc.scan_units(tmp_path)) == 92
+    assert approved_kinds(tmp_path) == {}
+
+
+@pytest.mark.skipif(
+    not ra.rt.DEFAULT_TOKENIZER.is_file(), reason="embedding tokenizer file not present"
+)
+def test_the_dry_run_checks_the_size_of_the_planned_bodies(
+    monkeypatch, tmp_path, capsys
+):
+    only_step(monkeypatch, "tokens", ra.step_tokens)
+    assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
+    assert not any(tmp_path.rglob("*"))
+    assert "Units: 92" in capsys.readouterr().out
 
 
 def test_a_failing_step_stops_the_run(monkeypatch, tmp_path, capsys):
@@ -134,10 +191,3 @@ def test_the_approver_argument_skips_the_name_question(monkeypatch, tmp_path):
     _, asked = run_units_only(monkeypatch, tmp_path, ["2"], extra=extra)
     assert len(asked) == 1
     assert approved_kinds(tmp_path) == {"metric": 8}
-
-
-def test_a_dry_run_never_asks(monkeypatch, tmp_path):
-    monkeypatch.setattr(ra, "STEPS", [("units", ra.step_units)])
-    monkeypatch.setattr(ra, "is_interactive", lambda: True)
-    monkeypatch.setattr(ra, "ask", lambda question: pytest.fail("asked in a dry run"))
-    assert ra.main(["--corpus-dir", str(tmp_path)]) == 0

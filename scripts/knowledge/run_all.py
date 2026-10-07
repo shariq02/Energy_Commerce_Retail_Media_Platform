@@ -1,61 +1,84 @@
 """Run the knowledge corpus steps in order.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Purpose: one command for the whole sequence, so the order does not have to be
-remembered. Each step runs in this process; the run stops at the first step
-that fails and returns that step's exit code. Steps, in order:
+Steps: units (build), authored (written bodies, skipped when there is no index),
+tokens (size check); stops at the first failure. It first runs every step as a
+dry run and prints the plan. In an interactive terminal it then asks whether to
+apply (y or yes), runs the steps again to write, and asks what to approve.
+--apply skips the question; without a terminal nothing is written.
 
-    units   convert the sources into units and rebuild the manifest
-    tokens  check that every unit fits the embedding model's input size
-
-Approval is the owner's decision. After the steps, with --apply and an
-interactive terminal, the run asks what to approve: 1 (all), 2 (metrics),
-3 (contracts), 4 (rules) or 5 (no approval). Nothing is approved without that
-answer and an approver name (--approver, or asked). Without --apply, or when
-the terminal is not interactive, nothing is approved and the approval command
-is printed.
-
-Dry run by default: with no --apply the steps write nothing.
-
-Usage (from the repository root):
-    python -m scripts.knowledge.run_all             # dry run
-    python -m scripts.knowledge.run_all --apply     # write, then ask about approval
+Usage (repository root):
+    python -m scripts.knowledge.run_all [--apply]
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import sys
 from collections import Counter
 from pathlib import Path
 
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import approve_units as au
+from scripts.knowledge import author_units as auth
 from scripts.knowledge import build_units as bu
 from scripts.knowledge import report_tokens as rt
 
 
+def write_mode(args: argparse.Namespace) -> list[str]:
+    return ["--apply"] if args.apply else ["--dry-run"]
+
+
+def authored_index(args: argparse.Namespace) -> Path:
+    return args.authored_dir / auth.INDEX_NAME
+
+
 def step_units(args: argparse.Namespace) -> int:
     argv = ["--root", str(args.root), "--corpus-dir", str(args.corpus_dir)]
-    if args.apply:
-        argv.append("--apply")
-    return bu.main(argv)
+    return bu.main([*argv, *write_mode(args)])
+
+
+def step_authored(args: argparse.Namespace) -> int:
+    if not authored_index(args).is_file():
+        print("No authored units yet, so this step is skipped.")
+        return 0
+    argv = [
+        "--authored-dir",
+        str(args.authored_dir),
+        "--corpus-dir",
+        str(args.corpus_dir),
+    ]
+    if args.local_sources is not None:
+        argv += ["--local-sources", str(args.local_sources)]
+    return auth.main([*argv, *write_mode(args)])
+
+
+def planned_bodies(args: argparse.Namespace) -> dict[str, str]:
+    """The bodies the units and authored steps would write."""
+    bodies = {unit["unit_id"]: unit["body"] for unit in bu.derived_units(args.root)}
+    if authored_index(args).is_file():
+        local = uc.load_local_sources(args.local_sources or uc.LOCAL_SOURCES_FILE)
+        for unit in auth.authored_units(args.authored_dir, local):
+            bodies[unit["unit_id"]] = unit["body"]
+    return bodies
 
 
 def step_tokens(args: argparse.Namespace) -> int:
+    tokenizer = args.tokenizer or rt.DEFAULT_TOKENIZER
+    if not args.apply:
+        return rt.report(tokenizer, planned_bodies(args))
     if not uc.scan_units(args.corpus_dir):
-        print("No units yet, so the token check is skipped. Run with --apply.")
+        print("No units yet, so the token check is skipped.")
         return 0
-    argv = ["--corpus-dir", str(args.corpus_dir)]
-    if args.tokenizer is not None:
-        argv += ["--tokenizer", str(args.tokenizer)]
+    argv = ["--corpus-dir", str(args.corpus_dir), "--tokenizer", str(tokenizer)]
     return rt.main(argv)
 
 
-STEPS = [("units", step_units), ("tokens", step_tokens)]
+STEPS = [("units", step_units), ("authored", step_authored), ("tokens", step_tokens)]
 
 
 KIND_CHOICES = {"2": "metric", "3": "contract", "4": "rule"}
@@ -67,6 +90,13 @@ def ask(question: str) -> str:
 
 def is_interactive() -> bool:
     return sys.stdin.isatty()
+
+
+def ask_apply() -> bool:
+    try:
+        return uc.is_yes(ask("Apply these changes? (y/yes or n/no): "))
+    except EOFError:
+        return False
 
 
 def print_approval_hint() -> None:
@@ -106,33 +136,48 @@ def approval_step(args: argparse.Namespace, waiting: list[uc.Unit]) -> None:
     print(f"Manifest approval: {manifest['approval']}")
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--root", type=Path, default=uc.ROOT)
-    parser.add_argument("--corpus-dir", type=Path, default=None)
-    parser.add_argument("--tokenizer", type=Path, default=None)
-    parser.add_argument("--approver", default=None, help="name for the approval")
-    parser.add_argument("--apply", action="store_true", help="write the units")
-    args = parser.parse_args(argv)
-    if args.corpus_dir is None:
-        args.corpus_dir = args.root / "ai" / "knowledge_corpus"
-
+def run_steps(args: argparse.Namespace) -> int:
     for name, step in STEPS:
         print(f"== step: {name} ==")
         code = step(args)
         if code != 0:
             print(f"Stopped at step {name} (exit code {code}).")
             return code
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--root", type=Path, default=uc.ROOT)
+    parser.add_argument("--corpus-dir", type=Path, default=None)
+    parser.add_argument("--authored-dir", type=Path, default=auth.AUTHORED_DIR)
+    parser.add_argument("--local-sources", type=Path, default=None)
+    parser.add_argument("--tokenizer", type=Path, default=None)
+    parser.add_argument("--approver", default=None, help="name for the approval")
+    parser.add_argument("--apply", action="store_true", help="write without asking")
+    args = parser.parse_args(argv)
+    if args.corpus_dir is None:
+        args.corpus_dir = args.root / "ai" / "knowledge_corpus"
+
+    code = run_steps(copy.copy(args))
+    if code != 0:
+        return code
+    if not args.apply:
+        if not (is_interactive() and ask_apply()):
+            print("Dry run: nothing was written. Use --apply, or answer y, to write.")
+            return 0
+        args.apply = True
+        code = run_steps(args)
+        if code != 0:
+            return code
     print("== done ==")
     units = uc.scan_units(args.corpus_dir)
     waiting = [unit for unit in units if au.needs_approval(unit)]
     print(f"Units: {len(units)}, waiting for approval: {len(waiting)}")
-    if waiting and args.apply and is_interactive():
+    if waiting and is_interactive():
         approval_step(args, waiting)
     elif waiting:
         print_approval_hint()
-    if not args.apply:
-        print("Dry run: nothing was written. Run with --apply to write.")
     return 0
 
 

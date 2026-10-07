@@ -6,21 +6,18 @@
 # MAGIC %md
 # MAGIC # UPDATE MODEL CARD PATHS IN THE REGISTRY
 # MAGIC
-# MAGIC **ECRMAP -- Energy Commerce and Retail Media Analytics Platform**
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** the model cards moved from `src/schemas/model_cards/` to
-# MAGIC `src/model_cards/`. Each registry row stores the card path in `card_path`.
-# MAGIC This notebook changes the old path prefix to the new one in the registry
-# MAGIC tables of both ecosystems. It changes no other column.
+# MAGIC `src/model_cards/`. This notebook changes the old prefix in `card_path` in the
+# MAGIC registry tables of both ecosystems. No other column changes.
 # MAGIC
-# MAGIC **Dry run by default.** With `APPLY = False` the notebook only counts the
-# MAGIC rows. Set `APPLY = True` in the configuration cell to run the update.
-# MAGIC The update is safe to run again: it only touches rows that still have the
-# MAGIC old prefix.
+# MAGIC **Dry run** with `APPLY = False` (counts rows only). Safe to run again: only
+# MAGIC rows with the old prefix change.
 
 # COMMAND ----------
 

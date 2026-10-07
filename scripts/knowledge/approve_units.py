@@ -1,21 +1,17 @@
 """Approve knowledge units.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Purpose: set a unit's approval to ``approved`` with the approver, the date and
-the approved version, then rebuild the manifest. This is the only command that
-sets ``approved``. The approval stores the hash of the approved body. A unit
-whose body no longer matches that hash is ``stale`` and waits for approval
-again. A unit that is approved at its current version and body is skipped.
+Sets the approval (approver, date, version, body hash) and rebuilds the manifest.
+Choose units with --kind, --unit-id or --all-pending. It prints the units first
+and asks before writing (y or yes); --apply writes without asking, --dry-run never
+writes.
 
-Dry run by default. Choose what to approve with --kind, --unit-id or
---all-pending.
-
-Usage (from the repository root):
+Usage (repository root):
     python -m scripts.knowledge.approve_units --approver NAME --kind metric
-    python -m scripts.knowledge.approve_units --approver NAME --unit-id contract.smard --apply
+    (add --apply to write without asking, or --dry-run to only print)
 """
 
 from __future__ import annotations
@@ -80,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--unit-id", action="append", default=[])
     parser.add_argument("--all-pending", action="store_true")
     parser.add_argument("--corpus-dir", type=Path, default=uc.CORPUS_DIR)
-    parser.add_argument("--apply", action="store_true", help="write the approvals")
+    uc.add_write_mode(parser)
     args = parser.parse_args(argv)
     if not args.approver.strip():
         parser.error("--approver must not be empty")
@@ -93,8 +89,13 @@ def main(argv: list[str] | None = None) -> int:
     for kind, count in sorted(Counter(unit.kind for unit in chosen).items()):
         print(f"{kind}: {count} unit(s) to approve")
     print(f"Total: {len(chosen)}")
-    if not args.apply:
-        print("Dry run: nothing written. Use --apply to write.")
+    for unit in chosen:
+        print(f"  {unit.unit_id}  version {unit.header['version']}")
+    if not chosen:
+        print("Nothing to approve.")
+        return 0
+    if not args.apply and (args.dry_run or not uc.confirm_apply()):
+        print(uc.NOT_WRITTEN)
         return 0
     manifest = approve_chosen(args.corpus_dir, chosen, args.approver.strip())
     print(f"Manifest approval: {manifest['approval']}")

@@ -1,16 +1,11 @@
 """Shared helpers for the knowledge corpus units.
 
-Energy Commerce and Retail Media Analytics Platform
+ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Purpose: read, write and hash the curated Markdown units in
-``ai/knowledge_corpus/`` and keep the corpus manifest in step with them. A unit
-is a Markdown file with a YAML header and a content body. The header is
-metadata; the body is the only text that is later embedded.
-
-Library only: the commands are ``build_units``, ``approve_units`` and
-``report_tokens``, run from the repository root with ``python -m``.
+Reads, writes and hashes the Markdown units in ai/knowledge_corpus/ and keeps the
+manifest in step. Library only; the commands are in this folder.
 """
 
 from __future__ import annotations
@@ -18,6 +13,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,10 +70,8 @@ def validate_unit_id(unit_id: object, where: str) -> None:
 def validate_sources(sources: object, where: str) -> None:
     """Check the source entries of a unit header.
 
-    A tracked unit names a source by a repository-relative path or, when the
-    file is not tracked, by a logical name. Both carry the SHA-256 of the file.
-    A path never points into the ignored ``docs`` folder and never leaves the
-    repository.
+    A source is a repository path or, for an untracked file, a logical name; both
+    carry the file's SHA-256. A path never points into ``docs`` or leaves the repo.
     """
     if not isinstance(sources, list) or not sources:
         raise ValueError(f"{where}: source must be a non-empty list")
@@ -184,6 +179,10 @@ class Plan:
     action: str
     text: str | None
     was_approved: bool
+    old_version: int | None = None
+    new_version: int | None = None
+    old_hash: str | None = None
+    new_hash: str | None = None
 
 
 def unit_path(corpus_dir: Path, kind: str, unit_id: str) -> Path:
@@ -224,9 +223,9 @@ def plan_unit(
 ) -> Plan:
     """Decide what writing this unit would do; nothing is written.
 
-    created: new unit, pending. revised: the body changed, so the version rises
-    and the approval is cleared. refreshed: same body, other header values (for
-    example a source hash) -- version and approval are kept. unchanged: no write.
+    created: new, pending. revised: body changed, version rises, approval cleared.
+    refreshed: same body, other header values -- version and approval kept.
+    unchanged: no write.
     """
     validate_unit_id(unit_id, unit_id)
     validate_sources(sources, unit_id)
@@ -242,13 +241,34 @@ def plan_unit(
         "approval": pending_approval(),
     }
     if not path.exists():
-        return Plan(unit_id, kind, path, "created", render_unit(header, body), False)
+        text = render_unit(header, body)
+        return Plan(
+            unit_id,
+            kind,
+            path,
+            "created",
+            text,
+            False,
+            new_version=1,
+            new_hash=sha256_text(body),
+        )
     old_header, old_body = parse_unit(path.read_text(encoding="utf-8"))
     was_approved = old_header["approval"]["status"] == "approved"
     if sha256_text(old_body) != sha256_text(body):
         header["version"] = int(old_header["version"]) + 1
         text = render_unit(header, body)
-        return Plan(unit_id, kind, path, "revised", text, was_approved)
+        return Plan(
+            unit_id,
+            kind,
+            path,
+            "revised",
+            text,
+            was_approved,
+            old_version=int(old_header["version"]),
+            new_version=header["version"],
+            old_hash=sha256_text(old_body),
+            new_hash=sha256_text(body),
+        )
     header["version"] = old_header["version"]
     header["last_updated"] = old_header["last_updated"]
     header["approval"] = old_header["approval"]
@@ -256,6 +276,84 @@ def plan_unit(
         return Plan(unit_id, kind, path, "unchanged", None, was_approved)
     text = render_unit(header, body)
     return Plan(unit_id, kind, path, "refreshed", text, was_approved)
+
+
+ACTIONS = ("created", "revised", "refreshed", "unchanged")
+NOT_WRITTEN = "Nothing written. Use --apply, or answer y when asked, to write."
+
+
+def add_write_mode(parser) -> None:
+    """--apply writes without asking; --dry-run only prints; neither asks at the end."""
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--apply", action="store_true", help="write without asking")
+    group.add_argument("--dry-run", action="store_true", help="print the plan only")
+
+
+def is_interactive() -> bool:
+    return sys.stdin.isatty()
+
+
+def ask(question: str) -> str:
+    return input(question).strip()
+
+
+def is_yes(answer: str) -> bool:
+    return answer.strip().lower() in ("y", "yes")
+
+
+def confirm_apply() -> bool:
+    """Ask once whether to write. Only y or yes means yes; no terminal means no."""
+    if not is_interactive():
+        return False
+    try:
+        return is_yes(ask("Apply these changes? (y/yes or n/no): "))
+    except EOFError:
+        return False
+
+
+def plan_line(plan: Plan) -> str:
+    if plan.action == "created":
+        return f"{plan.unit_id}  version 1, body {plan.new_hash[:8]}"
+    if plan.action == "revised":
+        line = (
+            f"{plan.unit_id}  version {plan.old_version} -> {plan.new_version}, "
+            f"body {plan.old_hash[:8]} -> {plan.new_hash[:8]}"
+        )
+        return line + (", approval cleared" if plan.was_approved else "")
+    return f"{plan.unit_id}  source hash updated"
+
+
+def print_plans(plans: list[Plan], kinds: tuple[str, ...]) -> None:
+    """Counts per kind, then the ids of every created, revised and refreshed unit."""
+    counts = Counter((plan.kind, plan.action) for plan in plans)
+    for kind in kinds:
+        print(f"{kind}: " + ", ".join(f"{a} {counts[(kind, a)]}" for a in ACTIONS))
+    for action in ("created", "revised", "refreshed"):
+        chosen = [plan for plan in plans if plan.action == action]
+        if chosen:
+            print(f"{action.capitalize()} ({len(chosen)}):")
+            for plan in chosen:
+                print(f"  {plan_line(plan)}")
+
+
+def write_plans(plans: list[Plan], corpus_dir: Path, apply: bool, dry_run: bool) -> int:
+    """Write the planned units and the manifest. Without --apply, ask first."""
+    if not apply:
+        if all(plan.text is None for plan in plans):
+            print("Nothing to write.")
+            return 0
+        if dry_run or not confirm_apply():
+            print(NOT_WRITTEN)
+            return 0
+    for plan in plans:
+        if plan.text is not None:
+            write_text(plan.path, plan.text)
+    manifest = write_manifest(corpus_dir)
+    print(
+        f"Manifest: corpus_version {manifest['corpus_version']}, "
+        f"{manifest['unit_count']} unit(s), approval {manifest['approval']}"
+    )
+    return 0
 
 
 def write_text(path: Path, text: str) -> None:
