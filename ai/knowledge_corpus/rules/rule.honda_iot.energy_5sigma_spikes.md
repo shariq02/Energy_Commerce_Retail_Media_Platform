@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 4f4bd0e922bdd39a3c282d4db2b6017241e4ff118bf7a4d45cb0cd0eb362dd47
 ---
 
 # Rule: energy_5sigma_spikes (honda_iot)

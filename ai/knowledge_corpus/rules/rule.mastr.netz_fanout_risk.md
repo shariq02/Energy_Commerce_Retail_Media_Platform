@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 79eaae65d51fa4c09d4463ca29718e63883c6a3e4184cfe51569cd9fa4715414
 ---
 
 # Rule: netz_fanout_risk (mastr)

@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: a38eb147ea407583425e5c7efddd1433bb490e312e3e680223540c807de6ec29
 ---
 
 # Rule: cloud_type_qn_defect (dwd)

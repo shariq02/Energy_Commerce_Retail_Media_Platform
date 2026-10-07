@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: c9ab73c293399115262a63b4e4ec2d2eb055f7ed4ecc04fc2a31929d80865179
 ---
 
 # Rule: commissioning_before_decommissioning (power_plant_list)

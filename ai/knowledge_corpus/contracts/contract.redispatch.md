@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 73b9d3b09bd2fcacc6c0baa76869a23377945669125581ad6697274219d32c29
 ---
 
 # Contract: redispatch

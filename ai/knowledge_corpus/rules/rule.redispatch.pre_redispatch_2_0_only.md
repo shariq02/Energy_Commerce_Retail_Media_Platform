@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 5097982080aefd1daeb2d49f3194dc9f4710f82145a2999326e32d3168027fb8
 ---
 
 # Rule: pre_redispatch_2_0_only (redispatch)

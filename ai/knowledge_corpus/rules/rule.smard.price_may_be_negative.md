@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: c44dbaa58ab69236967494eaa51aae22357b2ff034de3bb8138bd13771682e79
 ---
 
 # Rule: price_may_be_negative (smard)

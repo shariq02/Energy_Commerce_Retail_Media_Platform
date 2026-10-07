@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: e5a5da12a50e5e23ad0369f0c8ea13ecb8c2f99b6af7fceaea935022c8101aee
 ---
 
 # Rule: conflicting_dup_keys (dwd)

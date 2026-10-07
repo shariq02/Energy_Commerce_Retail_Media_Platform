@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 5144ab75c999108ee2ceae881005f5ad87c2a74ed953cab686105136226f0f4d
 ---
 
 # Rule: event_type_domain (rees46)

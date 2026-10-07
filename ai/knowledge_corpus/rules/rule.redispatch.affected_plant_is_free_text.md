@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 576cece48048083b2f0c1296170cff36a372a4d7787ed595032a084432e439a3
 ---
 
 # Rule: affected_plant_is_free_text (redispatch)

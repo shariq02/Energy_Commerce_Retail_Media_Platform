@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: f10c2039296a093f8c9f5f8d974afcb0bf622123618215ffdb649f81f877a8db
 ---
 
 # Rule: no_source_key_dedupe (redispatch)

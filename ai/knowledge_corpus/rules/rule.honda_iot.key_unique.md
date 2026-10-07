@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 0d9f0b4f9f2ee5b9688e79bec297fdd589f9a9146bcf00f2abc25c7711f72813
 ---
 
 # Rule: key_unique (honda_iot)

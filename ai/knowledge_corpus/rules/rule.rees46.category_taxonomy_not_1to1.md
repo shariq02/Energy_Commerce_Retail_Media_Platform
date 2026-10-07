@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: e403914899f41123b956f9773a4da8fb8b8b426e675f4e0027d894fef9c275b5
 ---
 
 # Rule: category_taxonomy_not_1to1 (rees46)

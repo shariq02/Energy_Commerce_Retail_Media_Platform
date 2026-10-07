@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: e489a22a9e5f86568ea33c939cb1df0c00ba1b8fab57bf31c27140b1e6d7e8f2
 ---
 
 # Rule: no_full_row_duplicates (mastr)

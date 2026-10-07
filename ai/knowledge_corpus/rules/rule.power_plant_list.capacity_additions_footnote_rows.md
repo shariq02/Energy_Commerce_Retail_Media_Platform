@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 683b7d0cb81640995ef9d0621f9786f5314d758f1e7d5b6f425712d448925f9c
 ---
 
 # Rule: capacity_additions_footnote_rows (power_plant_list)

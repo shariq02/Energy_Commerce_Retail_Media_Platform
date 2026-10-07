@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 044b16a42d12b32379bb7884ebd9eb065e4e1fcb558d729da83db72fbb109b5d
 ---
 
 # Rule: forecast_pv_sign_mirror (smard)

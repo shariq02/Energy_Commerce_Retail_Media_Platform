@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 9b1086c4b89e9a1d4792d223444c8b6445a27e2a60974548a7401cf146af4e92
 ---
 
 # Rule: catalog_vintage_pinned (mastr)

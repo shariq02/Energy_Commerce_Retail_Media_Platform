@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: adae0835cd6726c485cdd2515ab9361b5e29abcd6139bc1b4080cde25cdfdc40
 ---
 
 # Metric: generation_by_carrier

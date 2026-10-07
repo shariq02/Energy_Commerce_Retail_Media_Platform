@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 5e24c23e04e444aecdcfd9726ed307e4367a54c822e0f35dcd5c7cfcdd5655e3
 ---
 
 # Rule: mean_le_max_power (redispatch)

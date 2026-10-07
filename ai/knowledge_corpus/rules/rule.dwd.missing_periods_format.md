@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 4bea2fee4beaf6fecfd1454fbe441ed1236e5bb49ea63b72e239504007dc377e
 ---
 
 # Rule: missing_periods_format (dwd)

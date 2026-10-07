@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: eb59b93c25bf9b5a0ce4fbd2dddaa3d460ffe3bf4f6510086028ccb0c1c4dc10
 ---
 
 # Rule: frequency_domain (honda_iot)

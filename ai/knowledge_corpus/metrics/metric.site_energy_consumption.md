@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 7c87b5120b6e78a148cb4378636c251897e970d9c6c336257926f6f82bb1975e
 ---
 
 # Metric: site_energy_consumption

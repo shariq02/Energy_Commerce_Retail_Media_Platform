@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 5e33bf52af09e4926175b6dadf8c29bbc86f532aa13a8f8e1f0503b8150670d7
 ---
 
 # Rule: mastr_link_is_subset (power_plant_list)

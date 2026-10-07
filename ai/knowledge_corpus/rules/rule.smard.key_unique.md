@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: c59213d560e20bdbfbbb9c5e00d132f08d6de2a3e28bab7f335c5826373e09af
 ---
 
 # Rule: key_unique (smard)

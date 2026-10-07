@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 07b4d0e73fd66b8a3eb2cf991b3a763a005ca7aa8e5ceb542ad5f081ddca10ab
 ---
 
 # Rule: lokationen_link_arrays (mastr)

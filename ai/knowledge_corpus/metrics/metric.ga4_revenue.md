@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 357594bcf337001517afb8a7875877c4f4d0ce17c5dd71d609d47ccb0cd379f5
 ---
 
 # Metric: ga4_revenue

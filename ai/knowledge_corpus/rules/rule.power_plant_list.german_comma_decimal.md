@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 508adc79f04cb5c9de6870cc34698e602582116618ecdb0c4d1a82e706eb3590
 ---
 
 # Rule: german_comma_decimal (power_plant_list)

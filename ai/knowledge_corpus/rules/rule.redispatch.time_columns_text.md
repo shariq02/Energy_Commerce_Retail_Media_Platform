@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 1f48687ea18cea73fc960ddb514e097bd129a2d1b04420850150d649ddaf316d
 ---
 
 # Rule: time_columns_text (redispatch)

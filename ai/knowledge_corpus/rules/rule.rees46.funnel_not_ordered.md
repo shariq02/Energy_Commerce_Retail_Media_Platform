@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 66ea631fef81f9d93ee76d6f2db66714660de546340bb1a1fd5d48d23e0a63d1
 ---
 
 # Rule: funnel_not_ordered (rees46)

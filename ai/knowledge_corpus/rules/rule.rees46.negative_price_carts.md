@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: cf06128262da9ff2a66d914a663b3a372e0fd32bb051e07f182d3ac59cd8d59c
 ---
 
 # Rule: negative_price_carts (rees46)

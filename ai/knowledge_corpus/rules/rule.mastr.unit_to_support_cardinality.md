@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 18fddbcc0e8f9bfad10c4e087617508b22055fa53e73b838307de3cc56ac4e1b
 ---
 
 # Rule: unit_to_support_cardinality (mastr)

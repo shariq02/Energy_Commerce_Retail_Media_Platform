@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: b878b204b2783823a520a8318eada7e37e206364f98c3df61ae866e9517d7f19
 ---
 
 # Rule: dates_europe_berlin (mastr)

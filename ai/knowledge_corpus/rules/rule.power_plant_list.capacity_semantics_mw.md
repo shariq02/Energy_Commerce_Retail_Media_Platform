@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 734461a5cdd3e071c593dd421b6d82edfa0982607807fce1844414da3c917825
 ---
 
 # Rule: capacity_semantics_mw (power_plant_list)

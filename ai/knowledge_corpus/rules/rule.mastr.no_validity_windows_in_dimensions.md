@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 09dda5e7c4e0dcf0b4d1e1e3b71979b8f9d5b6ca7bae6025c99e2abb5f5f8948
 ---
 
 # Rule: no_validity_windows_in_dimensions (mastr)

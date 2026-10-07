@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 30405fc43856b0f2108215fa0610f9a3e5c1aaee23b7a5066304be30b9af8100
 ---
 
 # Rule: capacity_additions_is_projection (power_plant_list)

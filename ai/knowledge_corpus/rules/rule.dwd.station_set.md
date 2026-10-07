@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 25ac1d9792fb2f337dc58c81355adf2b623de152ea4f7fb582174b5e585725ce
 ---
 
 # Rule: station_set (dwd)

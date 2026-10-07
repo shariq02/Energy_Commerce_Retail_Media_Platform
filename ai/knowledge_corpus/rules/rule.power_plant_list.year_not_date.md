@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 7d9b82d7b6b66905f2db070403a1cdc2da9c86811f9cbf1fdfc20b94de0dcdd2
 ---
 
 # Rule: year_not_date (power_plant_list)

@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 8f8527912e607541c77c4a77458f773eb2b0f8792baf96a6b4832a2ab6a30ff5
 ---
 
 # Rule: qn_regime_dependent (dwd)

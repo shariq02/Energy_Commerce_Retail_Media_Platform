@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: f456b79d5e71a4f9f6509099464cddf0dd503e05325f71eacdb6b5a5c8fb0926
 ---
 
 # Rule: value_null_rate (smard)

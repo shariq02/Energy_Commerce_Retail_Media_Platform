@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: cf53738ebd8334754d8a0987422919d6fcd81fbeef2c87375be7ae00825f5191
 ---
 
 # Contract: dwd

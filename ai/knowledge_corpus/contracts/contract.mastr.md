@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: e6328ae2a4ed3873f731ed63d3ddc1e48592a40fa56cb836974bb6ac4d35d44b
 ---
 
 # Contract: mastr

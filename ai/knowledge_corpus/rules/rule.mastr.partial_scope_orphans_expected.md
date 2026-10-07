@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: b1a27098a8b29383a5265a49a4eb561ee4a694b240d3e976de47c738f23226e4
 ---
 
 # Rule: partial_scope_orphans_expected (mastr)

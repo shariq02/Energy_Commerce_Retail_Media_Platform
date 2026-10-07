@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 6eee404079248f9f4e531f8ce9677e0bbdf0e76dc91960dbc551fd458e66dcd1
 ---
 
 # Contract: smard

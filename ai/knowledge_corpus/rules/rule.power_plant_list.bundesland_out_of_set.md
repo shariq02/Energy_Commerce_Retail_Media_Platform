@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 402d35ceaf16b03e7c7962da0a1fec9e3bba186b49b98150b1885f079a3405d6
 ---
 
 # Rule: bundesland_out_of_set (power_plant_list)

@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 025228f1ff0841afcb1dd789061f98327b6180b43643813dcb47b08029ed2a24
 ---
 
 # Rule: hourly_grid_not_dense (dwd)

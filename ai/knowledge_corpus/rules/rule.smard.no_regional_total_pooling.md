@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: a7797b9683c05261a8c50a519fed5dd1ab70abe1e433705de1f03008f0093fdd
 ---
 
 # Rule: no_regional_total_pooling (smard)

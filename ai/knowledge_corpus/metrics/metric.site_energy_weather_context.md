@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 4d486302486ed03d4b30987329878e5d7fffb640977cef1c584f039570c14704
 ---
 
 # Metric: site_energy_weather_context

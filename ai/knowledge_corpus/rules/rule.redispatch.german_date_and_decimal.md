@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 765a628b232ae03deaaa167fd5b22afba9f30e5ed2dca7ad2abdc721f6f1d931
 ---
 
 # Rule: german_date_and_decimal (redispatch)

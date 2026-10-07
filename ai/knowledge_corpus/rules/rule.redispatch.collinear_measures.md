@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: af7dea3300831981c019d9d8ac48f312cbd69e56e19e1b3a394d946338450944
 ---
 
 # Rule: collinear_measures (redispatch)

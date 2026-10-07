@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: b67735a1968749fff03c82677deb51dba4ad98433fe7beb92916421407b6f71d
 ---
 
 # Rule: marktakteure_natural_persons (mastr)

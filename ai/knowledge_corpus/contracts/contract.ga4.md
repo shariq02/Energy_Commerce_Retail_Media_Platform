@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 65b9721a3ca2947a11a43cc25fb408d0b1aefef66dea2a110732eee49f59798c
 ---
 
 # Contract: ga4

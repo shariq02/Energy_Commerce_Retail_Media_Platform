@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 1878fd571c37e0af429b02ecafbdc7148a58f037c5f617abab528cf0d9a88881
 ---
 
 # Rule: bundesland_codes_1400_1416 (mastr)

@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 2f0313070608d3b9ef8886c46848cc6c6252611aee99841fcb92e9c55894210e
 ---
 
 # Rule: post_event_columns (redispatch)

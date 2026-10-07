@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 96730b55d91035c60391e6d5afc596e1e2edd52147f752ae3857f91c3cbd6119
 ---
 
 # Rule: milestone_vs_registration_ordering (mastr)

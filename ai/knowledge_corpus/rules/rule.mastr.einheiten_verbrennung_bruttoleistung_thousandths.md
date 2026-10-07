@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: d9859dc78515bdb64ead6f676785c5c86d36c866b217675a8f5bacda377e398e
 ---
 
 # Rule: einheiten_verbrennung_bruttoleistung_thousandths (mastr)

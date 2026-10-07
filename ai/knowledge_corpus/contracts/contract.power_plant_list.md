@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 95ebd4bb0d857807a460bb96ca1d48c1b8bb648adc2281de4591c1e914936999
 ---
 
 # Contract: power_plant_list

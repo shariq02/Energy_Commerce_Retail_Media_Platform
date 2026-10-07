@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 56da081eb38029c723f90ab82460318bdbb1734b927045b28eb5d3a8e1001ed1
 ---
 
 # Rule: station_geography_time_varying (dwd)

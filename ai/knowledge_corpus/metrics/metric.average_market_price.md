@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 99b22625c0a2fe3a0de3aafcf7093a2393d7e313cc320dd665965200d8390557
 ---
 
 # Metric: average_market_price

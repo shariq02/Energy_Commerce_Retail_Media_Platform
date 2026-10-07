@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: daa5490359c059fa02be42bf2a3435afcfd1481ceea3b69049542e5b6a844e2e
 ---
 
 # Rule: work_identity_unverifiable (redispatch)

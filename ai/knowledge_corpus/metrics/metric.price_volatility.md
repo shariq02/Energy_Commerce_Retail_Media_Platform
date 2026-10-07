@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 0466f32f6cdfa2a6eae582359796bd15ca2966104d58593861c2ec953a15cd2f
 ---
 
 # Metric: price_volatility

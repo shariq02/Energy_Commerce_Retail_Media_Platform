@@ -1,7 +1,8 @@
 {
   "approval": {
     "approved": 92,
-    "pending": 0
+    "pending": 0,
+    "stale": 0
   },
   "corpus_version": 1,
   "fingerprint": "2f428af4659dc17178cd2690569dd7f39f9f5c86bc7fa672e0b2a53b52ee280a",

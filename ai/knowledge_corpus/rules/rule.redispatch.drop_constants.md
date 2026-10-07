@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 3f64c320350df3b628f7da2d252b27ad9048a1d6b38b8f79ff67ed5846dd10b3
 ---
 
 # Rule: drop_constants (redispatch)

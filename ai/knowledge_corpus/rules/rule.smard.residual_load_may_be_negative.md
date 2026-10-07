@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: aa3a641de37cf7c23cd2660ce049b1950d9f13da8f1b8c97e35c4a70a3399773
 ---
 
 # Rule: residual_load_may_be_negative (smard)

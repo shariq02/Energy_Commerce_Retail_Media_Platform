@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 7fbc98d49453b06b7ddb4174fe1ce30aa29d464d1a3f539d1c130264d2ac6efc
 ---
 
 # Rule: session_grain (rees46)

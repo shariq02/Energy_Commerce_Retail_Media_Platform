@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: ab6e8b1c64c1137d375413aae9275d13570d5cae19c4902aaa30af04d7f15d00
 ---
 
 # Rule: change_logs_append_only (mastr)

@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 32d87a74590aae917916f16830ea582bccbecfc70f13656974e3a1a42a2ea048
 ---
 
 # Contract: rees46

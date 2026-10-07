@@ -9,9 +9,10 @@ version: 1
 last_updated: '2026-10-06'
 approval:
   status: approved
-  approver: Sharique
-  approved_at: '2026-10-06'
+  approver: mr.nobody
+  approved_at: '2026-10-07'
   approved_version: 1
+  approved_content_hash: 90c836d6f475c5b5d484d639508ef92da2bc0142c6d7e9d3c059cf9420c2ec51
 ---
 
 # Rule: weather_plausible_range (honda_iot)
