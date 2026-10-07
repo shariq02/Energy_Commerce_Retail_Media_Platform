@@ -1,12 +1,12 @@
 {
   "approval": {
-    "approved": 92,
+    "approved": 109,
     "pending": 0,
     "stale": 0
   },
-  "corpus_version": 1,
-  "fingerprint": "2f428af4659dc17178cd2690569dd7f39f9f5c86bc7fa672e0b2a53b52ee280a",
-  "unit_count": 92,
+  "corpus_version": 2,
+  "fingerprint": "aa36e951c9478e84e4675ca3ca7a4e90375a4e6cfb483f1e25b3d10fcddb9fc1",
+  "unit_count": 109,
   "units": [
     {
       "approval_status": "approved",
@@ -82,6 +82,114 @@
     },
     {
       "approval_status": "approved",
+      "content_hash": "5a34928cd6104d7c0c07436ffa0c64d278e4626214cf8d344fdb3cd574ac24e1",
+      "ecosystem": "energy",
+      "kind": "glossary",
+      "path": "glossary/glossary.energy_carriers_and_status_terms.md",
+      "unit_id": "glossary.energy_carriers_and_status_terms",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6f8d5c35490c5a5d08a68f04d641b2ae223efcee337012f0044eedb419dac5d7",
+      "ecosystem": "energy",
+      "kind": "glossary",
+      "path": "glossary/glossary.grid_and_market_terms.md",
+      "unit_id": "glossary.grid_and_market_terms",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6f58db247917c02a98ae1057319e2ccca92514959b92466d58ace632c8ce336d",
+      "ecosystem": "energy",
+      "kind": "glossary",
+      "path": "glossary/glossary.units_and_conventions.md",
+      "unit_id": "glossary.units_and_conventions",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "272505e7f8292ff83b9a831fe4ec06225c72821f62b38c7817f97cfa32273a0e",
+      "ecosystem": "energy",
+      "kind": "glossary",
+      "path": "glossary/glossary.weather_terms.md",
+      "unit_id": "glossary.weather_terms",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b83af0a198682e0ee8b1cca2d959d839a3346873ef2915b5fcfe5d93803cfcd2",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.ai_security_and_governance.md",
+      "unit_id": "governance.ai_security_and_governance",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "adc5bf9b8d0ec2cf10cc7b5a23352bde88d418442c98a4afbe00a4d33783cca5",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.auditability.md",
+      "unit_id": "governance.auditability",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "9b2ecf7691ddbacce346c2f2a4755a966b9df57d20841e4dc20650196d6b48aa",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.cross_ecosystem_integration.md",
+      "unit_id": "governance.cross_ecosystem_integration",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "1e1c5b1e89d485fbcd63ba05b8ddab8b2ca9f1734f05a9b229a51c2c7a7c4db9",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.data_contracts.md",
+      "unit_id": "governance.data_contracts",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "ed4c08a6a0d1c17273570454134174190015fcdb3e9056233371d132c869d183",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.data_quality_gates.md",
+      "unit_id": "governance.data_quality_gates",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6407f49518e76a8005e709c822eeb30a2639827e9aac08b74e190e32d37a75f4",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.licensing_and_attribution.md",
+      "unit_id": "governance.licensing_and_attribution",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c0bf72848546d84cd5174c6c0b0283bef7dbd7ea554d76829a1ab156443bd993",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.lineage.md",
+      "unit_id": "governance.lineage",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "25bd3ec8eebf7949f3325c7a74c43a9ab79117ef13fc57849b6c28ec9e170fc5",
+      "ecosystem": "shared",
+      "kind": "governance",
+      "path": "governance/governance.security_and_data_exchange.md",
+      "unit_id": "governance.security_and_data_exchange",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
       "content_hash": "99b22625c0a2fe3a0de3aafcf7093a2393d7e313cc320dd665965200d8390557",
       "ecosystem": "energy",
       "kind": "metric",
@@ -150,6 +258,51 @@
       "kind": "metric",
       "path": "metrics/metric.site_energy_weather_context.md",
       "unit_id": "metric.site_energy_weather_context",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "915e6243d8347f6daad854989e5c59c0679cf39d37e8ed3c9d9274f521ff8f95",
+      "ecosystem": "shared",
+      "kind": "pipeline",
+      "path": "pipeline/pipeline.batch_ingestion.md",
+      "unit_id": "pipeline.batch_ingestion",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "8339f6c16a842d0a1603fb86c7d0611d57d18c440fd9f44b39f1eef29c1207da",
+      "ecosystem": "shared",
+      "kind": "pipeline",
+      "path": "pipeline/pipeline.bronze_architecture.md",
+      "unit_id": "pipeline.bronze_architecture",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5e7c3d54dfe57e4ec5133bf9e5e189025cd81fd73203e1c4ddbe6a3dbd84fb9e",
+      "ecosystem": "shared",
+      "kind": "pipeline",
+      "path": "pipeline/pipeline.execution_model.md",
+      "unit_id": "pipeline.execution_model",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "7b176cfdc7132462aa669ff2b9a82192954099ca4bcfcacea0149dc89e7e346f",
+      "ecosystem": "shared",
+      "kind": "pipeline",
+      "path": "pipeline/pipeline.idempotency.md",
+      "unit_id": "pipeline.idempotency",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "9212d4811dd976bb2de56ef393c543a23a01aba3f255f08532f07a217f46e9c0",
+      "ecosystem": "shared",
+      "kind": "pipeline",
+      "path": "pipeline/pipeline.processing_layers.md",
+      "unit_id": "pipeline.processing_layers",
       "version": 1
     },
     {
@@ -839,10 +992,10 @@
   ],
   "units_by_kind": {
     "contract": 8,
-    "glossary": 0,
-    "governance": 0,
+    "glossary": 4,
+    "governance": 8,
     "metric": 8,
-    "pipeline": 0,
+    "pipeline": 5,
     "rule": 76
   }
 }
