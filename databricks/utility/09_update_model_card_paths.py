@@ -33,7 +33,7 @@
 OLD_PREFIX = "src/schemas/model_cards/"
 NEW_PREFIX = "src/model_cards/"
 ECOSYSTEMS = ("energy", "commerce")
-APPLY = True #False
+APPLY = True  # False
 
 print(f"Old prefix: {OLD_PREFIX}")
 print(f"New prefix: {NEW_PREFIX}")

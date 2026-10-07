@@ -17,6 +17,11 @@ databricks-sql-connector==3.1.2
 
 # AI / GCP - BigQuery is the Google-source acquisition interface
 chromadb==1.5.9
+# Production knowledge RAG: keyword index, knowledge graph, embedding runtime
+rank_bm25==0.2.1
+networkx==3.6.1
+onnxruntime==1.28.0
+tokenizers==0.23.1
 google-cloud-bigquery==3.43.0
 google-auth==2.56.3
 pyspark==4.2.0

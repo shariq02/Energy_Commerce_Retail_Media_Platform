@@ -38,6 +38,8 @@ data/processed/
 *.parquet
 *.json.gz
 *.json
+# The approved knowledge corpus manifest is committed.
+!ai/knowledge_corpus/manifest.json
 
 # Logs
 logs/
@@ -100,6 +102,8 @@ scripts/utilities/lint.py
 scripts/utilities/clean_cache.py
 scripts/utilities/run_energy_weather_deepening_acquisition.py
 scripts/utilities/verify_energy_weather_deepening_acquisition.py
+# Local paths of the files that authored knowledge units were written from.
+scripts/knowledge/local_sources.yml
 
 # VS Code
 .vscode/

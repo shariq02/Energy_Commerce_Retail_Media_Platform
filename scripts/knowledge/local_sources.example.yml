@@ -1,0 +1,11 @@
+# Local paths of the files that authored knowledge units were written from.
+#
+# Copy this file to local_sources.yml in the same folder (git ignores the copy)
+# and set each path on this machine, relative to the repository root or
+# absolute. Only the freshness check reads it. A unit header stores the source
+# name and the hash of the file, never the path, because these files are not
+# tracked.
+
+governance_design: path/to/the/governance/document.md
+pipeline_design: path/to/the/pipeline/document.md
+localisation_record: path/to/the/localisation/document.md
