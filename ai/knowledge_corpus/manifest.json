@@ -1,0 +1,847 @@
+{
+  "approval": {
+    "approved": 92,
+    "pending": 0
+  },
+  "corpus_version": 1,
+  "fingerprint": "2f428af4659dc17178cd2690569dd7f39f9f5c86bc7fa672e0b2a53b52ee280a",
+  "unit_count": 92,
+  "units": [
+    {
+      "approval_status": "approved",
+      "content_hash": "cf53738ebd8334754d8a0987422919d6fcd81fbeef2c87375be7ae00825f5191",
+      "ecosystem": "energy",
+      "kind": "contract",
+      "path": "contracts/contract.dwd.md",
+      "unit_id": "contract.dwd",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "65b9721a3ca2947a11a43cc25fb408d0b1aefef66dea2a110732eee49f59798c",
+      "ecosystem": "commerce",
+      "kind": "contract",
+      "path": "contracts/contract.ga4.md",
+      "unit_id": "contract.ga4",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "fe3e0e948f1282ee2ddf4c31715dacb2b65fa021f1629514f17dc14251eec4f3",
+      "ecosystem": "energy",
+      "kind": "contract",
+      "path": "contracts/contract.honda_iot.md",
+      "unit_id": "contract.honda_iot",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "e6328ae2a4ed3873f731ed63d3ddc1e48592a40fa56cb836974bb6ac4d35d44b",
+      "ecosystem": "energy",
+      "kind": "contract",
+      "path": "contracts/contract.mastr.md",
+      "unit_id": "contract.mastr",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "95ebd4bb0d857807a460bb96ca1d48c1b8bb648adc2281de4591c1e914936999",
+      "ecosystem": "energy",
+      "kind": "contract",
+      "path": "contracts/contract.power_plant_list.md",
+      "unit_id": "contract.power_plant_list",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "73b9d3b09bd2fcacc6c0baa76869a23377945669125581ad6697274219d32c29",
+      "ecosystem": "energy",
+      "kind": "contract",
+      "path": "contracts/contract.redispatch.md",
+      "unit_id": "contract.redispatch",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "32d87a74590aae917916f16830ea582bccbecfc70f13656974e3a1a42a2ea048",
+      "ecosystem": "commerce",
+      "kind": "contract",
+      "path": "contracts/contract.rees46.md",
+      "unit_id": "contract.rees46",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6eee404079248f9f4e531f8ce9677e0bbdf0e76dc91960dbc551fd458e66dcd1",
+      "ecosystem": "energy",
+      "kind": "contract",
+      "path": "contracts/contract.smard.md",
+      "unit_id": "contract.smard",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "99b22625c0a2fe3a0de3aafcf7093a2393d7e313cc320dd665965200d8390557",
+      "ecosystem": "energy",
+      "kind": "metric",
+      "path": "metrics/metric.average_market_price.md",
+      "unit_id": "metric.average_market_price",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "357594bcf337001517afb8a7875877c4f4d0ce17c5dd71d609d47ccb0cd379f5",
+      "ecosystem": "commerce",
+      "kind": "metric",
+      "path": "metrics/metric.ga4_revenue.md",
+      "unit_id": "metric.ga4_revenue",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "dcc668d359ed44507f3fc6a4671ab86647ee3157a4bca5a89e7a5ecdfd1d5aaa",
+      "ecosystem": "commerce",
+      "kind": "metric",
+      "path": "metrics/metric.ga4_sessions.md",
+      "unit_id": "metric.ga4_sessions",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "adae0835cd6726c485cdd2515ab9361b5e29abcd6139bc1b4080cde25cdfdc40",
+      "ecosystem": "energy",
+      "kind": "metric",
+      "path": "metrics/metric.generation_by_carrier.md",
+      "unit_id": "metric.generation_by_carrier",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "0466f32f6cdfa2a6eae582359796bd15ca2966104d58593861c2ec953a15cd2f",
+      "ecosystem": "energy",
+      "kind": "metric",
+      "path": "metrics/metric.price_volatility.md",
+      "unit_id": "metric.price_volatility",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "d34e4a21a699c9bad42aa2188b03acd25e093adc1b24cfe6aff10210b17f57d4",
+      "ecosystem": "commerce",
+      "kind": "metric",
+      "path": "metrics/metric.rees46_event_demand.md",
+      "unit_id": "metric.rees46_event_demand",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "7c87b5120b6e78a148cb4378636c251897e970d9c6c336257926f6f82bb1975e",
+      "ecosystem": "energy",
+      "kind": "metric",
+      "path": "metrics/metric.site_energy_consumption.md",
+      "unit_id": "metric.site_energy_consumption",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "4d486302486ed03d4b30987329878e5d7fffb640977cef1c584f039570c14704",
+      "ecosystem": "energy",
+      "kind": "metric",
+      "path": "metrics/metric.site_energy_weather_context.md",
+      "unit_id": "metric.site_energy_weather_context",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "a38eb147ea407583425e5c7efddd1433bb490e312e3e680223540c807de6ec29",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.cloud_type_qn_defect.md",
+      "unit_id": "rule.dwd.cloud_type_qn_defect",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "e5a5da12a50e5e23ad0369f0c8ea13ecb8c2f99b6af7fceaea935022c8101aee",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.conflicting_dup_keys.md",
+      "unit_id": "rule.dwd.conflicting_dup_keys",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "8ca6a9885feaf16cbe2097674f697fcc9a08add2fcd3cd6d715c4d2838e1ddb3",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.coordinate_quarantine.md",
+      "unit_id": "rule.dwd.coordinate_quarantine",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "025228f1ff0841afcb1dd789061f98327b6180b43643813dcb47b08029ed2a24",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.hourly_grid_not_dense.md",
+      "unit_id": "rule.dwd.hourly_grid_not_dense",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6ecfda799cd3f70692442fbf56b6991270083086f33b68eb2c2bcadb2200839a",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.measurement_key_not_unique.md",
+      "unit_id": "rule.dwd.measurement_key_not_unique",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "86267ecc20099ef3936017b622f1db162aae34fb6eaddb249377fe046cae047e",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.mess_datum_double_suffix.md",
+      "unit_id": "rule.dwd.mess_datum_double_suffix",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "ab81cae46804c12bffa3c639996ca6b2d83715d57022fe63c10cbf20942f30b9",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.metadata_trailer_and_header_rows.md",
+      "unit_id": "rule.dwd.metadata_trailer_and_header_rows",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "4bea2fee4beaf6fecfd1454fbe441ed1236e5bb49ea63b72e239504007dc377e",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.missing_periods_format.md",
+      "unit_id": "rule.dwd.missing_periods_format",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "86aa7bc6fc7807ffba4df56e76ecfbdb49f96ee258fcea3baaf234abebab150b",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.missing_periods_reconciliation.md",
+      "unit_id": "rule.dwd.missing_periods_reconciliation",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "8f8527912e607541c77c4a77458f773eb2b0f8792baf96a6b4832a2ab6a30ff5",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.qn_regime_dependent.md",
+      "unit_id": "rule.dwd.qn_regime_dependent",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "46e36a41a04e950a3def25b56b98bc3eeea1d89fc800ed5708bb7f4dfecbe5d8",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.sentinels_to_null.md",
+      "unit_id": "rule.dwd.sentinels_to_null",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5139f36d7aa7b1e14da69d15eef4fa2546858278aa62db7107ccaaa3c5372276",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.solar_is_ten_minute.md",
+      "unit_id": "rule.dwd.solar_is_ten_minute",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "56da081eb38029c723f90ab82460318bdbb1734b927045b28eb5d3a8e1001ed1",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.station_geography_time_varying.md",
+      "unit_id": "rule.dwd.station_geography_time_varying",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "25ac1d9792fb2f337dc58c81355adf2b623de152ea4f7fb582174b5e585725ce",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.dwd.station_set.md",
+      "unit_id": "rule.dwd.station_set",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "4f4bd0e922bdd39a3c282d4db2b6017241e4ff118bf7a4d45cb0cd0eb362dd47",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.honda_iot.energy_5sigma_spikes.md",
+      "unit_id": "rule.honda_iot.energy_5sigma_spikes",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "eb59b93c25bf9b5a0ce4fbd2dddaa3d460ffe3bf4f6510086028ccb0c1c4dc10",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.honda_iot.frequency_domain.md",
+      "unit_id": "rule.honda_iot.frequency_domain",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "0d9f0b4f9f2ee5b9688e79bec297fdd589f9a9146bcf00f2abc25c7711f72813",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.honda_iot.key_unique.md",
+      "unit_id": "rule.honda_iot.key_unique",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "a8a0783748d472397d96d0c6d5c6e926cb3899d04d91a424e83e01757520ef2d",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.honda_iot.p_w_1to1.md",
+      "unit_id": "rule.honda_iot.p_w_1to1",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "90c836d6f475c5b5d484d639508ef92da2bc0142c6d7e9d3c059cf9420c2ec51",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.honda_iot.weather_plausible_range.md",
+      "unit_id": "rule.honda_iot.weather_plausible_range",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "1878fd571c37e0af429b02ecafbdc7148a58f037c5f617abab528cf0d9a88881",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.bundesland_codes_1400_1416.md",
+      "unit_id": "rule.mastr.bundesland_codes_1400_1416",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "159aad6754cf87601ef7b63cd7fb55cd2b9e07b5c782a825b554972b42d2ac22",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.capacity_unit_kw.md",
+      "unit_id": "rule.mastr.capacity_unit_kw",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "96380470ddfbd293422119174893114829a6f9f25dbff6343fd06a45a3da4fc8",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.catalog_reconciliation.md",
+      "unit_id": "rule.mastr.catalog_reconciliation",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "9b1086c4b89e9a1d4792d223444c8b6445a27e2a60974548a7401cf146af4e92",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.catalog_vintage_pinned.md",
+      "unit_id": "rule.mastr.catalog_vintage_pinned",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "ab6e8b1c64c1137d375413aae9275d13570d5cae19c4902aaa30af04d7f15d00",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.change_logs_append_only.md",
+      "unit_id": "rule.mastr.change_logs_append_only",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b878b204b2783823a520a8318eada7e37e206364f98c3df61ae866e9517d7f19",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.dates_europe_berlin.md",
+      "unit_id": "rule.mastr.dates_europe_berlin",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b85292ef37ea295e98ef13f0d2c4722c74717d5751f95c64a7f4738664ecfd4c",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.deletion_logs_are_disjoint.md",
+      "unit_id": "rule.mastr.deletion_logs_are_disjoint",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "d9859dc78515bdb64ead6f676785c5c86d36c866b217675a8f5bacda377e398e",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.einheiten_verbrennung_bruttoleistung_thousandths.md",
+      "unit_id": "rule.mastr.einheiten_verbrennung_bruttoleistung_thousandths",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "112eac3d59de009b59fdb7d7290077708a73a6ecf0493f6f26f98a95e6446942",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.forward_dated_commissioning_ok.md",
+      "unit_id": "rule.mastr.forward_dated_commissioning_ok",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "d3ae8b1a4fd3ba92db007e3982477069048ab570a937bedc4b6d7a19ad8172ff",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.genehmigung_orphans.md",
+      "unit_id": "rule.mastr.genehmigung_orphans",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "07b4d0e73fd66b8a3eb2cf991b3a763a005ca7aa8e5ceb542ad5f081ddca10ab",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.lokationen_link_arrays.md",
+      "unit_id": "rule.mastr.lokationen_link_arrays",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b67735a1968749fff03c82677deb51dba4ad98433fe7beb92916421407b6f71d",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.marktakteure_natural_persons.md",
+      "unit_id": "rule.mastr.marktakteure_natural_persons",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "96730b55d91035c60391e6d5afc596e1e2edd52147f752ae3857f91c3cbd6119",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.milestone_vs_registration_ordering.md",
+      "unit_id": "rule.mastr.milestone_vs_registration_ordering",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "79eaae65d51fa4c09d4463ca29718e63883c6a3e4184cfe51569cd9fa4715414",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.netz_fanout_risk.md",
+      "unit_id": "rule.mastr.netz_fanout_risk",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "e489a22a9e5f86568ea33c939cb1df0c00ba1b8fab57bf31c27140b1e6d7e8f2",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.no_full_row_duplicates.md",
+      "unit_id": "rule.mastr.no_full_row_duplicates",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "09dda5e7c4e0dcf0b4d1e1e3b71979b8f9d5b6ca7bae6025c99e2abb5f5f8948",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.no_validity_windows_in_dimensions.md",
+      "unit_id": "rule.mastr.no_validity_windows_in_dimensions",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b1a27098a8b29383a5265a49a4eb561ee4a694b240d3e976de47c738f23226e4",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.partial_scope_orphans_expected.md",
+      "unit_id": "rule.mastr.partial_scope_orphans_expected",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "3bceb1e42649f85d95f9e7f92bb6815075172776bd547c52465611ffe61836a1",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.unit_key_unique.md",
+      "unit_id": "rule.mastr.unit_key_unique",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "18fddbcc0e8f9bfad10c4e087617508b22055fa53e73b838307de3cc56ac4e1b",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.mastr.unit_to_support_cardinality.md",
+      "unit_id": "rule.mastr.unit_to_support_cardinality",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "402d35ceaf16b03e7c7962da0a1fec9e3bba186b49b98150b1885f079a3405d6",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.bundesland_out_of_set.md",
+      "unit_id": "rule.power_plant_list.bundesland_out_of_set",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "683b7d0cb81640995ef9d0621f9786f5314d758f1e7d5b6f425712d448925f9c",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.capacity_additions_footnote_rows.md",
+      "unit_id": "rule.power_plant_list.capacity_additions_footnote_rows",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "30405fc43856b0f2108215fa0610f9a3e5c1aaee23b7a5066304be30b9af8100",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.capacity_additions_is_projection.md",
+      "unit_id": "rule.power_plant_list.capacity_additions_is_projection",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "734461a5cdd3e071c593dd421b6d82edfa0982607807fce1844414da3c917825",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.capacity_semantics_mw.md",
+      "unit_id": "rule.power_plant_list.capacity_semantics_mw",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c9ab73c293399115262a63b4e4ec2d2eb055f7ed4ecc04fc2a31929d80865179",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.commissioning_before_decommissioning.md",
+      "unit_id": "rule.power_plant_list.commissioning_before_decommissioning",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "508adc79f04cb5c9de6870cc34698e602582116618ecdb0c4d1a82e706eb3590",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.german_comma_decimal.md",
+      "unit_id": "rule.power_plant_list.german_comma_decimal",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5e33bf52af09e4926175b6dadf8c29bbc86f532aa13a8f8e1f0503b8150670d7",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.mastr_link_is_subset.md",
+      "unit_id": "rule.power_plant_list.mastr_link_is_subset",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "7d9b82d7b6b66905f2db070403a1cdc2da9c86811f9cbf1fdfc20b94de0dcdd2",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.power_plant_list.year_not_date.md",
+      "unit_id": "rule.power_plant_list.year_not_date",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "576cece48048083b2f0c1296170cff36a372a4d7787ed595032a084432e439a3",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.affected_plant_is_free_text.md",
+      "unit_id": "rule.redispatch.affected_plant_is_free_text",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "af7dea3300831981c019d9d8ac48f312cbd69e56e19e1b3a394d946338450944",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.collinear_measures.md",
+      "unit_id": "rule.redispatch.collinear_measures",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "3f64c320350df3b628f7da2d252b27ad9048a1d6b38b8f79ff67ed5846dd10b3",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.drop_constants.md",
+      "unit_id": "rule.redispatch.drop_constants",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "765a628b232ae03deaaa167fd5b22afba9f30e5ed2dca7ad2abdc721f6f1d931",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.german_date_and_decimal.md",
+      "unit_id": "rule.redispatch.german_date_and_decimal",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5e24c23e04e444aecdcfd9726ed307e4367a54c822e0f35dcd5c7cfcdd5655e3",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.mean_le_max_power.md",
+      "unit_id": "rule.redispatch.mean_le_max_power",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "f10c2039296a093f8c9f5f8d974afcb0bf622123618215ffdb649f81f877a8db",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.no_source_key_dedupe.md",
+      "unit_id": "rule.redispatch.no_source_key_dedupe",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "2f0313070608d3b9ef8886c46848cc6c6252611aee99841fcb92e9c55894210e",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.post_event_columns.md",
+      "unit_id": "rule.redispatch.post_event_columns",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5097982080aefd1daeb2d49f3194dc9f4710f82145a2999326e32d3168027fb8",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.pre_redispatch_2_0_only.md",
+      "unit_id": "rule.redispatch.pre_redispatch_2_0_only",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c61e3ea1372b773319eb8a049845d8ab9a4e65a542dc6b91887115c6b19ff20f",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.requesting_tso_combinations.md",
+      "unit_id": "rule.redispatch.requesting_tso_combinations",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "fd413342a9a6d6c2ad5a13e6972ec8dce5608814a86abf30c7446ec2fca896e5",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.start_before_end.md",
+      "unit_id": "rule.redispatch.start_before_end",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "1f48687ea18cea73fc960ddb514e097bd129a2d1b04420850150d649ddaf316d",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.time_columns_text.md",
+      "unit_id": "rule.redispatch.time_columns_text",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "daa5490359c059fa02be42bf2a3435afcfd1481ceea3b69049542e5b6a844e2e",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.redispatch.work_identity_unverifiable.md",
+      "unit_id": "rule.redispatch.work_identity_unverifiable",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "88dc116a63916f247e8492c2b3b92ace60c7cd27962001e447a23ad70c68c0f5",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.bot_bursts.md",
+      "unit_id": "rule.rees46.bot_bursts",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "e403914899f41123b956f9773a4da8fb8b8b426e675f4e0027d894fef9c275b5",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.category_taxonomy_not_1to1.md",
+      "unit_id": "rule.rees46.category_taxonomy_not_1to1",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "eb92b46c079557207e0ee4b103c919e5dd57007c22ab0893ec2609df850a0299",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.conflicting_dup_keys.md",
+      "unit_id": "rule.rees46.conflicting_dup_keys",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5144ab75c999108ee2ceae881005f5ad87c2a74ed953cab686105136226f0f4d",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.event_type_domain.md",
+      "unit_id": "rule.rees46.event_type_domain",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "66ea631fef81f9d93ee76d6f2db66714660de546340bb1a1fd5d48d23e0a63d1",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.funnel_not_ordered.md",
+      "unit_id": "rule.rees46.funnel_not_ordered",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "cf06128262da9ff2a66d914a663b3a372e0fd32bb051e07f182d3ac59cd8d59c",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.negative_price_carts.md",
+      "unit_id": "rule.rees46.negative_price_carts",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "06c2bcc4b264ad00dae7827e80176e9f652ef0f078aad471f61db365471d5833",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.product_attribute_drift.md",
+      "unit_id": "rule.rees46.product_attribute_drift",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "7fbc98d49453b06b7ddb4174fe1ce30aa29d464d1a3f539d1c130264d2ac6efc",
+      "ecosystem": "commerce",
+      "kind": "rule",
+      "path": "rules/rule.rees46.session_grain.md",
+      "unit_id": "rule.rees46.session_grain",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b3d2b05be01735dea4c7465228b437caa94211a4f496e9bd85e6e18018f89d7b",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.additive_identity_not_clean.md",
+      "unit_id": "rule.smard.additive_identity_not_clean",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "e5974023bb3e4235ca465c892376ece290d1d34e00dffef2ff2bbd0d3685f2e2",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.forecast_metrics_are_forecasts.md",
+      "unit_id": "rule.smard.forecast_metrics_are_forecasts",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "044b16a42d12b32379bb7884ebd9eb065e4e1fcb558d729da83db72fbb109b5d",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.forecast_pv_sign_mirror.md",
+      "unit_id": "rule.smard.forecast_pv_sign_mirror",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c99c9478c9bfe16a7a87a4074a9bc5eb0911e424f26cf580c8f10b7f7c40f8da",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.generation_non_negative.md",
+      "unit_id": "rule.smard.generation_non_negative",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c59213d560e20bdbfbbb9c5e00d132f08d6de2a3e28bab7f335c5826373e09af",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.key_unique.md",
+      "unit_id": "rule.smard.key_unique",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b07ff61e8178eea9457a57496ec6620658193a4b6e46002c69312b83cdc76904",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.metric_filter_id_consistent.md",
+      "unit_id": "rule.smard.metric_filter_id_consistent",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "a7797b9683c05261a8c50a519fed5dd1ab70abe1e433705de1f03008f0093fdd",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.no_regional_total_pooling.md",
+      "unit_id": "rule.smard.no_regional_total_pooling",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c44dbaa58ab69236967494eaa51aae22357b2ff034de3bb8138bd13771682e79",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.price_may_be_negative.md",
+      "unit_id": "rule.smard.price_may_be_negative",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "aa3a641de37cf7c23cd2660ce049b1950d9f13da8f1b8c97e35c4a70a3399773",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.residual_load_may_be_negative.md",
+      "unit_id": "rule.smard.residual_load_may_be_negative",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "f456b79d5e71a4f9f6509099464cddf0dd503e05325f71eacdb6b5a5c8fb0926",
+      "ecosystem": "energy",
+      "kind": "rule",
+      "path": "rules/rule.smard.value_null_rate.md",
+      "unit_id": "rule.smard.value_null_rate",
+      "version": 1
+    }
+  ],
+  "units_by_kind": {
+    "contract": 8,
+    "glossary": 0,
+    "governance": 0,
+    "metric": 8,
+    "pipeline": 0,
+    "rule": 76
+  }
+}
