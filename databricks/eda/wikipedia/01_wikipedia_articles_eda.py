@@ -15,9 +15,10 @@
 # MAGIC **Purpose:** Profile the `wikipedia-datasets` article parquet read in place
 # MAGIC from the Databricks Samples Volume (no Bronze table) -- file inventory and
 # MAGIC provenance, schema and nesting, missingness, title and id keys, title
-# MAGIC forms, text length and paragraph length (word and character proxies),
-# MAGIC markup, character issues, duplicate texts, date hints and domain-term
-# MAGIC coverage -- as evidence.
+# MAGIC forms, text length and section length (word and character proxies),
+# MAGIC length after stripping markup, markup, character issues, duplicate texts
+# MAGIC and duplicate keys, revision timestamps and domain-term coverage -- as
+# MAGIC evidence.
 
 # COMMAND ----------
 
@@ -47,8 +48,16 @@ NAME_HINTS = {
     "id": ("id", "page_id", "pageid", "curid", "article_id"),
     "title": ("title", "page_title", "article_title"),
     "text": ("text", "body", "content", "article", "wikitext"),
-    "timestamp": ("timestamp", "revision_timestamp", "last_modified", "date"),
+    "revision": ("revisionid", "revision_id"),
+    "timestamp": (
+        "timestamp",
+        "revisiontimestamp",
+        "revision_timestamp",
+        "last_modified",
+        "date",
+    ),
 }
+LIST_CAP = 5000
 TEXT_SAMPLE_FRACTION = 0.02
 SAMPLE_SEED = 7
 DOMAIN_TERMS = {
@@ -77,9 +86,11 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Discover files
-entries, kinds, frames = load_volume_frames(ROOT)
+entries, kinds, frames = load_volume_frames(ROOT, cap=LIST_CAP)
 require_frames(frames, ROOT, kinds)
 print(f"{ROOT}: {len(entries)} files, {sum(e['size'] for e in entries)} bytes")
+if len(entries) >= LIST_CAP:
+    print(f"WARNING: the listing reached the cap of {LIST_CAP}; files may be missing")
 for e in entries[:12]:
     print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
 print({k: len(v) for k, v in kinds.items()})
@@ -177,13 +188,13 @@ else:
 
 # COMMAND ----------
 
-# DBTITLE 1,Paragraph length against the chunk proxy (row sample)
-pstats = None
+# DBTITLE 1,Section length against the chunk proxy (row sample)
+sstats = None
 if role["text"]:
-    pstats = paragraph_stats(
+    sstats = section_stats(
         d0, role["text"], fraction=TEXT_SAMPLE_FRACTION, seed=SAMPLE_SEED
     )
-    print(pstats)
+    print(sstats)
 
 # COMMAND ----------
 
@@ -209,33 +220,63 @@ if role["text"]:
     text_dups = text_duplicates(d0, role["text"])
     print(text_dups)
 
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Duplicate-key helper
+def vary_exprs(exclude):
+    cand = {"id": role["id"], "revision": role["revision"], "title": role["title"]}
+    out = {k: as_str(c) for k, c in cand.items() if c and k != exclude}
+    if role["text"]:
+        out["text"] = F.xxhash64(as_str(role["text"]))
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Duplicate keys -- id
+id_dups = None
+if role["id"]:
+    id_dups = key_duplicate_profile(d0, role["id"], vary_exprs("id"))
+    print(id_dups)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Duplicate keys -- title
+title_dups = None
+if role["title"]:
+    title_dups = key_duplicate_profile(d0, role["title"], vary_exprs("title"))
+    print(title_dups)
+
 # COMMAND ----------
 
 # DBTITLE 1,Date columns
-ts_info = None
+ts_info, tprof = None, None
 if role["timestamp"]:
     tcol = role["timestamp"]
     ttype = dict(d0.dtypes)[tcol]
     if ttype in ("timestamp", "timestamp_ntz", "date"):
-        g = d0.agg(F.min(qcol(tcol)).alias("lo"), F.max(qcol(tcol)).alias("hi")).first()
-        ts_info = {"lines": [f"`{tcol}` ({ttype}): {g['lo']} .. {g['hi']}."]}
+        tprof = timestamp_profile(d0, tcol)
+        print(tprof)
     else:
         ts_info = timestamp_semantics(
             d0, tcol, valid_from="2001-01-01", tz="unspecified"
         )
-    print(ts_info)
+        print(ts_info)
 else:
     print("no date or timestamp column located")
 
 # COMMAND ----------
 
-# DBTITLE 1,Latest year mentioned per article (row sample)
-year_hint = None
+# DBTITLE 1,Length after stripping markup (row sample)
+cstats = None
 if role["text"]:
-    year_hint = latest_year_hint(
+    cstats = cleaned_length_stats(
         d0, role["text"], fraction=TEXT_SAMPLE_FRACTION, seed=SAMPLE_SEED
     )
-    print(year_hint)
+    print(cstats)
 
 # COMMAND ----------
 
@@ -341,6 +382,11 @@ if text_dups:
     _dq.append(
         f"Duplicate texts: {text_dups['dup_groups']} groups holding {text_dups['rows_in_dup_groups']} of {text_dups['rows']} rows."
     )
+_dq += [
+    f"Duplicate {label} keys: {kd['dup_keys']} of {kd['keys']} keys repeat, holding {kd['rows_in_dup_keys']} rows (most rows per key {kd['max_rows_per_key']}); keys whose rows differ in: { {k[7:]: v for k, v in kd.items() if k.startswith('varies_')} }."
+    for label, kd in (("id", id_dups), ("title", title_dups))
+    if kd
+]
 if chars:
     _dq.append(
         f"Character issues: replacement character in {chars['replacement_char_rows']} rows, control characters in {chars['control_char_rows']} rows, non-ASCII in {chars['non_ascii_rows']} rows (share of characters {chars['non_ascii_char_share']})."
@@ -375,11 +421,15 @@ if tstats:
         f"- characters per article, same quantiles: {[tstats['chars_q'][p] for p in QUANTILE_PROBS]}.",
         f"- articles above {WORDS_PER_CHUNK_PROXY} words (proxy for one chunk): {tstats['over_proxy_words']}.",
     ]
-if pstats:
+if sstats:
     _text += [
-        f"- paragraphs (non-blank lines) in a {pstats['sample_fraction']:.0%} row sample of {pstats['sampled_articles']} articles: {pstats['paragraphs']}; per article p50/p95 {pstats['per_article_p50_p95']}, max {pstats['per_article_max']}.",
-        f"- words per paragraph quantiles p1/p25/p50/p75/p95/p99: {[pstats['words_q'][p] for p in QUANTILE_PROBS]}; longest {pstats['max_words']}.",
-        f"- paragraphs above {WORDS_PER_CHUNK_PROXY} words (proxy for a 256-token limit): {pstats['over_proxy']} of {pstats['paragraphs']}. Words are a proxy; the token count belongs to the build that chunks the text.",
+        f"- sections (pieces between inline heading markers) in a {sstats['sample_fraction']:.0%} row sample of {sstats['sampled_articles']} articles: {sstats['sections']}; articles with at least one marker {sstats['with_marker']}; sections per article p50/p95 {sstats['per_article_p50_p95']}, max {sstats['per_article_max']}.",
+        f"- words per section quantiles p1/p25/p50/p75/p95/p99: {[sstats['words_q'][p] for p in QUANTILE_PROBS]}; longest {sstats['max_words']}.",
+        f"- sections above {WORDS_PER_CHUNK_PROXY} words (proxy for a 256-token limit): {sstats['over_proxy']} of {sstats['sections']}. Words are a proxy; the token count belongs to the build that chunks the text.",
+    ]
+if cstats:
+    _text += [
+        f"- after stripping references, templates, links, tags, URLs and quote marks by regular expressions ({cstats['sample_fraction']:.0%} row sample of {cstats['rows']} articles): {cstats['clean_words']} of {cstats['raw_words']} words kept ({cstats['kept_share']}); cleaned words per article quantiles p1/p25/p50/p75/p95/p99 {[cstats['words_q'][p] for p in QUANTILE_PROBS]}; under 50 cleaned words {cstats['under_50']}; above {WORDS_PER_CHUNK_PROXY} words {cstats['over_proxy']}.",
     ]
 if not _text:
     _text.append("- No text column located.")
@@ -392,12 +442,14 @@ _dist = [
 _temporal = []
 if ts_info and ts_info.get("lines"):
     _temporal += [f"- {ln}" for ln in ts_info["lines"]]
-if year_hint:
-    _temporal.append(
-        f"- latest year mentioned per article, most recent first (year, articles; {TEXT_SAMPLE_FRACTION:.0%} row sample): {year_hint}. A hint of the snapshot date, not a date field."
-    )
+if tprof:
+    _temporal += [
+        f"- `{role['timestamp']}` (timestamp): {tprof['lo']} .. {tprof['hi']}; nulls {tprof['nulls']}.",
+        f"- rows per year (year, rows): {tprof['years']}.",
+        f"- busiest months (month, rows): {tprof['top_months']}.",
+    ]
 if not _temporal:
-    _temporal.append("- No date column and no year mentions found.")
+    _temporal.append("- No date column located.")
 
 _domain = []
 if domain_text:
@@ -429,8 +481,9 @@ _areas = {
         f"markup in rows: { {k: v for k, v in (markup or {}).items() if k != 'rows'} }",
     ],
     "Temporal": [
-        f"latest years mentioned: {year_hint[:4] if year_hint else 'none found'}",
-        f"date column: {role['timestamp'] or 'none'}",
+        f"`{role['timestamp']}` range {tprof['lo']} .. {tprof['hi']}"
+        if tprof
+        else f"date column: {role['timestamp'] or 'none'}",
     ],
     "Spatial": [],
     "Data quality": [
@@ -440,17 +493,18 @@ _areas = {
     ],
     "Statistical patterns": [
         f"words per article p50 {tstats['words_q'][0.5] if tstats else 'n/a'}, p99 {tstats['words_q'][0.99] if tstats else 'n/a'}",
-        f"share of paragraphs above the chunk proxy: {pstats['over_proxy'] / pstats['paragraphs'] if pstats and pstats['paragraphs'] else 'n/a'}",
+        f"share of sections above the chunk proxy: {sstats['over_proxy'] / sstats['sections'] if sstats and sstats['sections'] else 'n/a'}",
     ],
     "Relationships": [
         f"id unique: {uniq[role['id']]['unique'] if role['id'] in uniq else 'n/a'}; title unique: {uniq[role['title']]['unique'] if role['title'] in uniq else 'n/a'}",
+        f"repeated ids {id_dups['dup_keys'] if id_dups else 'n/a'}, repeated titles {title_dups['dup_keys'] if title_dups else 'n/a'}",
     ],
     "Analytics use": [
         f"measures: article length; dimension: title forms ({forms['with_colon'] if forms else 'n/a'} with colon)",
     ],
     "ML use": [],
     "AI / knowledge use": [
-        f"free text in `{role['text']}` with {tstats['total_words'] if tstats else 'n/a'} words; paragraphs per article p50/p95 {pstats['per_article_p50_p95'] if pstats else 'n/a'}",
+        f"free text in `{role['text']}` with {tstats['total_words'] if tstats else 'n/a'} words; sections per article p50/p95 {sstats['per_article_p50_p95'] if sstats else 'n/a'}",
         "no category or link column in the article frame"
         if not any("categor" in c.lower() or "link" in c.lower() for c in DATA_COLS)
         else "a category or link column is present",
@@ -458,11 +512,11 @@ _areas = {
 }
 
 _corpus = [
-    "- Chunk fit: the share of paragraphs above the word proxy (see Text Structure) indicates how often a 256-token limit would split or fail a paragraph; the exact count needs the model tokenizer.",
-    "- Cleaning: the markup counts and character issues above show how much text needs cleaning before it can become a knowledge unit.",
-    "- Exclusion candidates: empty articles, very short articles, redirects, list titles, disambiguation titles and duplicate texts, with the counts above.",
+    "- Chunk fit: the sections and the cleaned-length block (see Text Structure) indicate how often a 256-token limit would split or fail a piece of text; the exact count needs the model tokenizer.",
+    "- Cleaning: the markup counts, the kept-word share after stripping and the character issues show how much text needs cleaning before it can become a knowledge unit.",
+    "- Exclusion candidates: empty articles, very short articles, redirects, list titles, disambiguation titles, duplicate texts and repeated keys, with the counts above.",
     "- Selection: the domain-term counts are a proxy only; the articles carry no category column unless listed in the structure block.",
-    "- Freshness: the date evidence above is all the copy offers; the upstream source is not read here.",
+    "- Freshness: the revision timestamps above are the only date evidence in the copy; the upstream source is not read here.",
 ]
 
 write_profiling(

@@ -56,6 +56,7 @@ CLICK_HINTS = {
 }
 LINK_TYPE = "link"
 TOP_N = 20
+LIST_CAP = 5000
 DOMAIN_TERMS = {
     "energy": (
         "electricity",
@@ -82,8 +83,10 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Load the article frame
-a_entries, a_kinds, a_frames = load_volume_frames(ROOT_ARTICLES)
+a_entries, a_kinds, a_frames = load_volume_frames(ROOT_ARTICLES, cap=LIST_CAP)
 require_frames(a_frames, ROOT_ARTICLES, a_kinds)
+if len(a_entries) >= LIST_CAP:
+    print(f"WARNING: the article listing reached the cap of {LIST_CAP}")
 a_name = "parquet" if "parquet" in a_frames else next(iter(a_frames))
 articles = a_frames[a_name]["df"].drop("__file")
 print(
@@ -93,7 +96,7 @@ print(
 # COMMAND ----------
 
 # DBTITLE 1,Load the clickstream frame
-c_entries, c_kinds, c_frames = load_volume_frames(ROOT_CLICKS)
+c_entries, c_kinds, c_frames = load_volume_frames(ROOT_CLICKS, cap=LIST_CAP)
 require_frames(c_frames, ROOT_CLICKS, c_kinds)
 c_name = "json" if "json" in c_frames else next(iter(c_frames))
 clicks = c_frames[c_name]["df"].drop("__file")

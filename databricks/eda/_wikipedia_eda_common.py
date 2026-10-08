@@ -13,9 +13,9 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** Profiling helpers for article text and weighted link edges:
-# MAGIC length and paragraph statistics (word and character proxies), markup and
-# MAGIC character checks, title forms, key overlap between two frames and degree
-# MAGIC summaries. Pulled in with `%run ../_wikipedia_eda_common` after
+# MAGIC length and section statistics (word and character proxies), markup
+# MAGIC stripping, markup and character checks, title forms, duplicate-key and
+# MAGIC timestamp profiles, key overlap between two frames and degree summaries. Pulled in with `%run ../_wikipedia_eda_common` after
 # MAGIC `%run ../_eda_common` and `%run ../_samples_eda_common`. Definitions only --
 # MAGIC no side effects at import; the caller owns `spark`.
 
@@ -27,11 +27,27 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Constants
-# Words per paragraph above which a paragraph probably exceeds a 256-token chunk.
+# Words per section above which a section probably exceeds a 256-token chunk.
 WORDS_PER_CHUNK_PROXY = 190
 QUANTILE_PROBS = (0.01, 0.25, 0.5, 0.75, 0.95, 0.99)
+# An inline section heading such as "== History ==" inside one-line text.
+HEADING_PATTERN = r"\s={2,}[^=\n]{1,100}?={2,}\s"
+CLEAN_STEPS = (
+    (r"(?s)<ref[^>/]*>.*?</ref>", ""),
+    (r"<ref[^>]*/>", ""),
+    (r"\{\{[^{}]*\}\}", ""),
+    (r"\{\{[^{}]*\}\}", ""),
+    (r"\{\{[^{}]*\}\}", ""),
+    (r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", "$1"),
+    (r"\[https?://[^\s\]]+\s?([^\]]*)\]", "$1"),
+    (r"<[^>]+>", ""),
+    (r"https?://\S+", ""),
+    (r"'{2,5}", ""),
+    (r"\s+", " "),
+)
 MARKUP_PATTERNS = {
-    "wiki_heading": r"(?m)^=+[^=]+=+\s*$",
+    "newline": r"\n",
+    "inline_heading": HEADING_PATTERN,
     "wiki_link": r"\[\[",
     "template_brace": r"\{\{",
     "html_tag": r"<[a-zA-Z/][^>]*>",
@@ -80,7 +96,7 @@ def word_count(text_col):
 
 # COMMAND ----------
 
-# DBTITLE 1,Text length and paragraph statistics
+# DBTITLE 1,Text length and section statistics
 
 
 def text_stats(df, col):
@@ -108,15 +124,17 @@ def text_stats(df, col):
     return r
 
 
-def paragraph_stats(df, col, fraction=1.0, seed=7):
-    # Paragraphs are non-blank lines. Computed on a row sample when fraction < 1.
+def section_stats(df, col, fraction=1.0, seed=7):
+    # Sections are the pieces between inline heading markers. Computed on a row
+    # sample when fraction < 1.
     src = df.select(as_str(col).alias("__t"))
     if fraction < 1.0:
         src = src.sample(fraction=fraction, seed=seed)
-    paras = src.select(F.split(F.col("__t"), r"\n+").alias("__p"))
+    parts = src.select(F.split(F.col("__t"), HEADING_PATTERN).alias("__p"))
     per_article = (
-        paras.agg(
+        parts.agg(
             F.count(F.lit(1)).alias("articles"),
+            F.sum((F.size("__p") > 1).cast("long")).alias("with_marker"),
             F.expr("percentile_approx(size(__p), array(0.5, 0.95))").alias("per_q"),
             F.max(F.size("__p")).alias("per_max"),
         )
@@ -124,14 +142,14 @@ def paragraph_stats(df, col, fraction=1.0, seed=7):
         .asDict()
     )
     flat = (
-        paras.select(F.explode("__p").alias("__x"))
+        parts.select(F.explode("__p").alias("__x"))
         .where(F.trim(F.col("__x")) != "")
         .select(word_count(F.col("__x")).alias("__w"))
     )
     probs = ",".join(str(p) for p in QUANTILE_PROBS)
     r = (
         flat.agg(
-            F.count(F.lit(1)).alias("paragraphs"),
+            F.count(F.lit(1)).alias("sections"),
             F.sum((F.col("__w") > WORDS_PER_CHUNK_PROXY).cast("long")).alias(
                 "over_proxy"
             ),
@@ -144,8 +162,103 @@ def paragraph_stats(df, col, fraction=1.0, seed=7):
     r["words_q"] = dict(zip(QUANTILE_PROBS, r["words_q"], strict=True))
     r["sample_fraction"] = fraction
     r["sampled_articles"] = per_article["articles"]
+    r["with_marker"] = per_article["with_marker"]
     r["per_article_p50_p95"] = per_article["per_q"]
     r["per_article_max"] = per_article["per_max"]
+    return r
+
+
+def clean_text(text_col):
+    # Approximate wikitext stripping by regular expressions.
+    out = text_col
+    for pattern, repl in CLEAN_STEPS:
+        out = F.regexp_replace(out, pattern, repl)
+    return out
+
+
+def cleaned_length_stats(df, col, fraction=1.0, seed=7):
+    src = df.select(as_str(col).alias("__t"))
+    if fraction < 1.0:
+        src = src.sample(fraction=fraction, seed=seed)
+    w = src.select(
+        word_count(F.col("__t")).alias("__raw"),
+        word_count(clean_text(F.col("__t"))).alias("__clean"),
+    )
+    probs = ",".join(str(p) for p in QUANTILE_PROBS)
+    r = (
+        w.agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.sum("__raw").alias("raw_words"),
+            F.sum("__clean").alias("clean_words"),
+            F.sum((F.col("__clean") < 50).cast("long")).alias("under_50"),
+            F.sum((F.col("__clean") > WORDS_PER_CHUNK_PROXY).cast("long")).alias(
+                "over_proxy"
+            ),
+            F.expr(f"percentile_approx(__clean, array({probs}))").alias("words_q"),
+        )
+        .first()
+        .asDict()
+    )
+    r["words_q"] = dict(zip(QUANTILE_PROBS, r["words_q"], strict=True))
+    r["kept_share"] = (
+        round(r["clean_words"] / r["raw_words"], 4) if r["raw_words"] else None
+    )
+    r["sample_fraction"] = fraction
+    return r
+
+
+def key_duplicate_profile(df, key_col, vary):
+    # vary: name -> Column expression. For each repeated key, whether the rows
+    # differ in that expression (HLL distinct count, exact for 1 versus more).
+    per = df.groupBy(as_str(key_col).alias("__k")).agg(
+        F.count(F.lit(1)).alias("__n"),
+        *[F.approx_count_distinct(e).alias(f"__v_{n}") for n, e in vary.items()],
+    )
+    exprs = [
+        F.count(F.lit(1)).alias("keys"),
+        F.sum((F.col("__n") > 1).cast("long")).alias("dup_keys"),
+        F.sum(F.when(F.col("__n") > 1, F.col("__n")).otherwise(0)).alias(
+            "rows_in_dup_keys"
+        ),
+        F.max("__n").alias("max_rows_per_key"),
+    ]
+    exprs += [
+        F.sum(((F.col("__n") > 1) & (F.col(f"__v_{n}") > 1)).cast("long")).alias(
+            f"varies_{n}"
+        )
+        for n in vary
+    ]
+    return per.agg(*exprs).first().asDict()
+
+
+def timestamp_profile(df, col, top=12):
+    ts = qcol(col)
+    r = (
+        df.agg(
+            F.min(ts).alias("lo"),
+            F.max(ts).alias("hi"),
+            F.sum(ts.isNull().cast("long")).alias("nulls"),
+        )
+        .first()
+        .asDict()
+    )
+    by_year = (
+        df.select(F.year(ts).alias("__y"))
+        .groupBy("__y")
+        .count()
+        .orderBy("__y")
+        .collect()
+    )
+    by_month = (
+        df.select(F.date_format(ts, "yyyy-MM").alias("__m"))
+        .groupBy("__m")
+        .count()
+        .orderBy(F.desc("count"))
+        .limit(top)
+        .collect()
+    )
+    r["years"] = [(x["__y"], x["count"]) for x in by_year]
+    r["top_months"] = [(x["__m"], x["count"]) for x in by_month]
     return r
 
 
@@ -254,7 +367,7 @@ def title_forms(df, col):
 
 # COMMAND ----------
 
-# DBTITLE 1,Domain term and date hints
+# DBTITLE 1,Domain term hints
 
 
 def domain_term_hits(df, col, terms_by_domain, fraction=1.0, seed=7):
@@ -269,25 +382,6 @@ def domain_term_hits(df, col, terms_by_domain, fraction=1.0, seed=7):
     r = src.agg(*exprs).first().asDict()
     r["sample_fraction"] = fraction
     return r
-
-
-def latest_year_hint(df, col, fraction=0.02, seed=7, top=8):
-    # Per-article latest four-digit year mentioned: a hint of the snapshot date.
-    src = df.select(as_str(col).alias("__t"))
-    if fraction < 1.0:
-        src = src.sample(fraction=fraction, seed=seed)
-    years = F.regexp_extract_all(F.col("__t"), F.lit(r"\b(19\d\d|20\d\d)\b"), F.lit(1))
-    latest = F.array_max(F.transform(years, lambda x: x.cast("int")))
-    rows = (
-        src.select(latest.alias("__y"))
-        .where(F.col("__y").isNotNull())
-        .groupBy("__y")
-        .count()
-        .orderBy(F.desc("__y"))
-        .limit(top)
-        .collect()
-    )
-    return [(r["__y"], r["count"]) for r in rows]
 
 
 def title_term_mass(df, title_col, weight_col, terms_by_domain):
