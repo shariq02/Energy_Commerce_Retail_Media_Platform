@@ -155,11 +155,11 @@ def test_dry_run_and_no_terminal_write_nothing(tmp_path, capsys):
 def test_connection_settings_need_all_three_values():
     full = {
         "DATABRICKS_HOST": "https://x.cloud.databricks.com",
-        "DATABRICKS_TOKEN": "t",
+        "DATABRICKS_TOKEN_SQL": "t",
         "DATABRICKS_HTTP_PATH": "/sql/1.0/warehouses/abc",
     }
     assert wf.connection_settings(full) == full
-    assert wf.connection_settings({**full, "DATABRICKS_TOKEN": " "}) is None
+    assert wf.connection_settings({**full, "DATABRICKS_TOKEN_SQL": " "}) is None
     assert wf.connection_settings({}) is None
 
 
@@ -170,3 +170,23 @@ def test_missing_settings_stop_with_a_message(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(wf, "connection_settings", lambda env=None: None)
     assert wf.main(["--wiki-dir", str(wiki), "--apply"]) == 1
     assert "DATABRICKS_HTTP_PATH" in capsys.readouterr().out
+
+
+def test_connector_error_prints_its_context_and_no_setting_values(tmp_path, capsys):
+    exc = pytest.importorskip("databricks.sql.exc")
+    wiki, _ = setup(tmp_path)
+
+    def connect():
+        raise exc.RequestError(
+            "Error during request to server",
+            {
+                "http-code": 401,
+                "error-message": "Invalid access token",
+                "method": "OpenSession",
+            },
+        )
+
+    assert wf.main(["--wiki-dir", str(wiki), "--apply"], connect=connect) == 1
+    output = capsys.readouterr().out
+    assert "http-code: 401" in output and "Invalid access token" in output
+    assert "DATABRICKS_HTTP_PATH" in output

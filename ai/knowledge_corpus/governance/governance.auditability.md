@@ -4,7 +4,7 @@ kind: governance
 ecosystem: shared
 source:
 - name: governance_design
-  sha256: eff32be5623c6cd21edad505ff965a7f5d24cc1568bbb88f55d0023d31fbb9c1
+  sha256: cee19de81195e0394240d9a6ae112d5f780056ade6e78ec055d2d548728a6f7e
 version: 1
 last_updated: '2026-10-07'
 approval:

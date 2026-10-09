@@ -8,7 +8,7 @@ Reads knowledge.wikipedia_selected through the Databricks SQL connector and
 writes the article units as JSON Lines files in ai/knowledge_corpus/wikipedia/shards/.
 It checks first that the table was built with the local selection terms, prints the
 plan and asks before writing (y or yes); --apply writes without asking, --dry-run
-never writes. Settings come from .env: DATABRICKS_HOST, DATABRICKS_TOKEN and
+never writes. Settings come from .env: DATABRICKS_HOST, DATABRICKS_TOKEN_SQL and
 DATABRICKS_HTTP_PATH (the HTTP path of a SQL warehouse).
 
 Usage (repository root):
@@ -27,11 +27,16 @@ from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import wikipedia_corpus as wc
 from scripts.knowledge import wikipedia_prepare as wp
 
+try:
+    from databricks.sql.exc import Error as DatabricksError
+except ImportError:  # the connector is only needed for a real fetch
+    DatabricksError = ()  # catches nothing
+
 CATALOG = "energy_commerce_retail_media"
 SELECTED_TABLE = f"{CATALOG}.knowledge.wikipedia_selected"
 ARTICLES_PER_FILE = 1000
 FETCH_SIZE = 1000
-ENV_KEYS = ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_HTTP_PATH")
+ENV_KEYS = ("DATABRICKS_HOST", "DATABRICKS_TOKEN_SQL", "DATABRICKS_HTTP_PATH")
 CHECK_QUERY = (
     "SELECT COUNT(*) AS articles, COUNT(DISTINCT terms_hash) AS hashes, "
     f"MIN(terms_hash) AS terms_hash FROM {SELECTED_TABLE}"
@@ -64,8 +69,31 @@ def open_connection(settings: dict):
     return sql.connect(
         server_hostname=host,
         http_path=settings["DATABRICKS_HTTP_PATH"],
-        access_token=settings["DATABRICKS_TOKEN"],
+        access_token=settings["DATABRICKS_TOKEN_SQL"],
     )
+
+
+CONTEXT_KEYS = (
+    "method",
+    "http-code",
+    "error-message",
+    "original-exception",
+    "no-retry-reason",
+    "attempt",
+    "elapsed-seconds",
+)
+
+
+def describe_error(error: Exception) -> list[str]:
+    """The message and the context of a connector error; no setting values."""
+    context = getattr(error, "context", None) or {}
+    lines = [f"Databricks request failed: {error}"]
+    lines += [f"  {key}: {context[key]}" for key in CONTEXT_KEYS if key in context]
+    lines.append(
+        "Check DATABRICKS_HOST (server hostname only), DATABRICKS_HTTP_PATH, "
+        "DATABRICKS_TOKEN_SQL and that the SQL warehouse is running."
+    )
+    return lines
 
 
 def check_table(cursor, terms: wp.Terms) -> int:
@@ -139,14 +167,18 @@ def main(argv: list[str] | None = None, connect=None) -> int:
             return open_connection(settings)
 
     shard_dir = args.wiki_dir / wc.SHARD_DIR_NAME
-    with connect() as connection, connection.cursor() as cursor:
-        count = check_table(cursor, terms)
-        print(f"{SELECTED_TABLE}: {count} articles, rule version {terms.version}")
-        print(f"Target: {shard_dir} (the existing files there are replaced)")
-        if not args.apply and (args.dry_run or not uc.confirm_apply()):
-            print(uc.NOT_WRITTEN)
-            return 0
-        entries = write_articles(cursor, terms, shard_dir)
+    try:
+        with connect() as connection, connection.cursor() as cursor:
+            count = check_table(cursor, terms)
+            print(f"{SELECTED_TABLE}: {count} articles, rule version {terms.version}")
+            print(f"Target: {shard_dir} (the existing files there are replaced)")
+            if not args.apply and (args.dry_run or not uc.confirm_apply()):
+                print(uc.NOT_WRITTEN)
+                return 0
+            entries = write_articles(cursor, terms, shard_dir)
+    except DatabricksError as error:
+        print("\n".join(describe_error(error)))
+        return 1
     written = sum(entry["articles"] for entry in entries)
     if written != count:
         raise ValueError(f"table has {count} articles, {written} were written")

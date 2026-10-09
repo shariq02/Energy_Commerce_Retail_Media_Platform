@@ -1,0 +1,224 @@
+{
+  "approval": {
+    "approved_at": "2026-10-09",
+    "approver": "nobody",
+    "article_count": 33443,
+    "id_list_hash": "a9cced421053aca70d4e1b31d18c290b5ec5bd2b72545ad2077b2f025a7294ea",
+    "mode": "development",
+    "rule_version": 1,
+    "status": "approved",
+    "terms_hash": "fe2e704bc4dd5e4b8ca16e99524fce4df7ff3d1b4cacbeda9a4120b4432eb01f"
+  },
+  "article_count": 33443,
+  "articles_by_term": {
+    "advertising": 2000,
+    "aircraft": 2000,
+    "airline": 2000,
+    "airport": 2000,
+    "aviation": 2000,
+    "charging station": 12,
+    "climate": 2000,
+    "consumer": 2000,
+    "e-commerce": 622,
+    "electric grid": 16,
+    "electric vehicle": 217,
+    "electricity": 2000,
+    "flight": 2000,
+    "meteorology": 578,
+    "online shopping": 72,
+    "power plant": 2000,
+    "precipitation": 733,
+    "public transport": 1711,
+    "railway": 2000,
+    "renewable energy": 892,
+    "retail": 2000,
+    "solar power": 269,
+    "storm": 2000,
+    "weather": 2000,
+    "wind power": 321
+  },
+  "corpus_id": "wikipedia",
+  "corpus_version": 1,
+  "fingerprint": "723914da924b1e0591b54cf2079ba4f9ecf41eba1c89ad76fdfb6e9e2564560b",
+  "mode": "development",
+  "selection": {
+    "article_count": 33443,
+    "cap_per_term": 2000,
+    "id_list_hash": "a9cced421053aca70d4e1b31d18c290b5ec5bd2b72545ad2077b2f025a7294ea",
+    "rule_version": 1,
+    "terms_hash": "fe2e704bc4dd5e4b8ca16e99524fce4df7ff3d1b4cacbeda9a4120b4432eb01f"
+  },
+  "shards": [
+    {
+      "articles": 1000,
+      "name": "shard_00001.jsonl",
+      "sha256": "d5069230b83a603d2ffb72abfef7d48d06c381871745eb3e4ee7a93a34ac18e6"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00002.jsonl",
+      "sha256": "f871c0d9c7016ccd7cb7ad6bee76630c76bd84298d560f57e87f0f0e2b0c5317"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00003.jsonl",
+      "sha256": "8dc6106f5d7d885d65f509d1f74ff0816ed0cb834699242d98bf85277841d9cf"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00004.jsonl",
+      "sha256": "804d6a4c7465fd78365cb0f1d5c269253263523a68e22effe79cbc6683875792"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00005.jsonl",
+      "sha256": "a67112c4e3db98232f34993a55a5612a5cbd5f4d3693d8513ec8f96ef9d4c723"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00006.jsonl",
+      "sha256": "361b65f658793d7000a46d10620935dee7192e064fcc626a687a2af41dc6da20"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00007.jsonl",
+      "sha256": "ae6ded98dbaf9086ed8696791d2f94559c002ff2d2654af3cd05abedee1a0efc"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00008.jsonl",
+      "sha256": "457245651fc273cf29f4083c34ee9c13709da6a2283d1bc0afc3d01497d4e554"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00009.jsonl",
+      "sha256": "6bda8e1fc22ee2f31d7282e07880b7b3a4ab3bd5ca948e87fbdc18633ed8233e"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00010.jsonl",
+      "sha256": "afcb8b405e5256a6c46a81e7b5995eb1224cbdccb4605db4302fc279d58ea38d"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00011.jsonl",
+      "sha256": "7f7d5808aabe3c2e442867b324a7ccb52c9ced5eb3f4a5649fd77e15922d8480"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00012.jsonl",
+      "sha256": "ff2d2631a3c53772ae6b7d50213bb33496922b85e6646400a25c1b0ae770dcc8"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00013.jsonl",
+      "sha256": "6d2abcdf91ca1270d4c5d83b0d8b70daa37c14a098792b7fa3df9a720ec5056c"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00014.jsonl",
+      "sha256": "d93085cf3d8f7638a2be05d1643bbdfca858ae653f20e5d720584575d346fd3e"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00015.jsonl",
+      "sha256": "d07a0c86067705fd2abfaaf50c08b64d9828990f9474dd0a29d341f39f74f145"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00016.jsonl",
+      "sha256": "6b37b8a85141324031aa279f4650c55280a7f3fcab13a02dc7b68dda81d32b49"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00017.jsonl",
+      "sha256": "eb657ad8d99b2b7caacd3eb2306e2776fa030f938ad4c53d29c4e68564738dfe"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00018.jsonl",
+      "sha256": "0f10e077886cc8085abd4c7257ed94f8f522ccd06dd2ac8d593cf1c126fc7c9b"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00019.jsonl",
+      "sha256": "8c740d0d17f41038aa00ec0a4b5f07b2572bcc357618b7304a2af270abdef056"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00020.jsonl",
+      "sha256": "e39dde091a324d04f96ad9a95b387028ab5c05f9568760096e93b6a07a9d51cb"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00021.jsonl",
+      "sha256": "6fd99d17136add5a45ef214fafa40bdaccd67b8e69368e1f103c89b0d1455865"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00022.jsonl",
+      "sha256": "89bc77a95c360fb6d3d07a0914a248fff386a0a9adfd9466b83bcfbbbaf440e6"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00023.jsonl",
+      "sha256": "9881075448bd1627bd448b22eacb7027d35a0e84bf7ca486f5c2f76685474d80"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00024.jsonl",
+      "sha256": "c814e5e8b00d25783a708a6262d34abe2f18b27e519ec453018756d2a9ae53b8"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00025.jsonl",
+      "sha256": "021f20418eeb27e133204c082677d8b0a1e8a80ecc9df04ec539154f7567657b"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00026.jsonl",
+      "sha256": "283261d406384858888871482be6e7baaaedd9fcdc2fa5e25af0ac5278253076"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00027.jsonl",
+      "sha256": "6b129272f23a0e380b1886e12d0c2168b704e1fd209357245af120c40b053f99"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00028.jsonl",
+      "sha256": "b22d18a68ace32b7e5546417ed5fb5f3a6604010f032e7ce0f924f6bfb331b6d"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00029.jsonl",
+      "sha256": "3de2a8c11449d5f8b16309daa3728ef46c51bee3a6db5ee9165b897749c77238"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00030.jsonl",
+      "sha256": "9e623aa219749bd81b70cad57f36261fa9f272f834d54935dc6a079c9c696f1e"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00031.jsonl",
+      "sha256": "4d7ef02f3bbe73ac470a5dc69181ef99b427c00d186a978992858598b5a50bfa"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00032.jsonl",
+      "sha256": "d7c549e6db8cfe042525ecf931979da6bf4daf3d465ccba107d7e76a90d8228e"
+    },
+    {
+      "articles": 1000,
+      "name": "shard_00033.jsonl",
+      "sha256": "553b17cb5b39ef4b86e7c8dcb72d31877e2764be20b9e4c8cc1fa4f5b1c0dc2a"
+    },
+    {
+      "articles": 443,
+      "name": "shard_00034.jsonl",
+      "sha256": "30bfcc72f5b18316fb60f674303dcbbf77320b9d312b445accbcada5406ebe4e"
+    }
+  ],
+  "snapshot": "wikipedia_samples_2015"
+}
