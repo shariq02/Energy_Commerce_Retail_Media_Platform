@@ -1,4 +1,4 @@
-"""Wikipedia fetch -- table check, files, report and the dry run.
+"""Wikipedia fetch -- table check, files and the dry run.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
@@ -35,19 +35,15 @@ class Row:
 
 
 class FakeCursor:
-    def __init__(self, check, articles, report):
-        self.check, self.articles, self.report = check, list(articles), report
+    def __init__(self, check, articles):
+        self.check, self.articles = check, list(articles)
         self.query = ""
 
     def execute(self, query):
         self.query = query
-        if query == wf.REPORT_QUERY and self.report is None:
-            raise RuntimeError("table not found")
 
     def fetchone(self):
-        if self.query == wf.CHECK_QUERY:
-            return Row(self.check)
-        return Row({"report_json": json.dumps(self.report)})
+        return Row(self.check)
 
     def fetchmany(self, size):
         chunk, self.articles = self.articles[:size], self.articles[size:]
@@ -91,7 +87,7 @@ def article_rows(count):
     ]
 
 
-def setup(tmp_path, count=5, report=None, hash_override=None, articles=None):
+def setup(tmp_path, count=5, hash_override=None, articles=None):
     wiki = tmp_path / "wikipedia"
     wiki.mkdir()
     (wiki / wc.TERMS_NAME).write_text(TERMS_TEXT, encoding="utf-8")
@@ -102,21 +98,16 @@ def setup(tmp_path, count=5, report=None, hash_override=None, articles=None):
         "terms_hash": hash_override or terms.file_hash,
     }
     rows = article_rows(count) if articles is None else articles
-    cursor = FakeCursor(check, rows, report)
+    cursor = FakeCursor(check, rows)
     return wiki, (lambda: FakeConnection(cursor))
 
 
-def test_fetch_writes_files_report_and_the_corpus_accepts_them(tmp_path):
-    report = {"silver": {"rows_read": 9}, "gold": {"articles_selected": 5}}
-    wiki, connect = setup(tmp_path, report=report)
+def test_fetch_writes_files_and_the_corpus_accepts_them(tmp_path):
+    wiki, connect = setup(tmp_path)
     argv = ["--wiki-dir", str(wiki), "--apply"]
     assert wf.main(argv, connect=connect) == 0
     shard_dir = wiki / wc.SHARD_DIR_NAME
     assert len(list(shard_dir.glob("shard_*.jsonl"))) == 1
-    written = json.loads((shard_dir / wf.REPORT_NAME).read_text(encoding="utf-8"))
-    assert (
-        written["silver"] == {"rows_read": 9} and written["files"][0]["articles"] == 5
-    )
     assert wc.main(["build", "--wiki-dir", str(wiki), "--apply"]) == 0
     manifest = json.loads((wiki / wc.MANIFEST_NAME).read_text(encoding="utf-8"))
     assert manifest["article_count"] == 5
@@ -132,13 +123,6 @@ def test_articles_are_split_into_files_and_old_files_are_removed(tmp_path, monke
     wf.main(["--wiki-dir", str(wiki), "--apply"], connect=connect)
     names = sorted(path.name for path in shard_dir.glob("shard_*.jsonl"))
     assert names == [wp.shard_name(1), wp.shard_name(2), wp.shard_name(3)]
-
-
-def test_missing_report_table_still_writes_the_articles(tmp_path, capsys):
-    wiki, connect = setup(tmp_path, report=None)
-    assert wf.main(["--wiki-dir", str(wiki), "--apply"], connect=connect) == 0
-    assert not (wiki / wc.SHARD_DIR_NAME / wf.REPORT_NAME).exists()
-    assert "Build report: not available" in capsys.readouterr().out
 
 
 def test_table_built_with_other_terms_is_refused(tmp_path):

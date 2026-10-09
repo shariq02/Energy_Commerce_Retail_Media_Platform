@@ -12,9 +12,9 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** create the `knowledge` schema and the `wikipedia_corpus` volume
-# MAGIC and check that the article source and the selection terms are readable.
-# MAGIC Idempotent -- safe to re-run.
+# MAGIC **Purpose:** create the `knowledge` schema and check that
+# MAGIC `quality.quality_audit_log`, the article source and the selection terms are
+# MAGIC in place. Idempotent -- safe to re-run.
 
 # COMMAND ----------
 
@@ -34,10 +34,12 @@ print(f"OK  schema ready: {CATALOG}.{SCHEMA}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the volume
-spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.{VOLUME}")
-os.makedirs(REPORT_DIR, exist_ok=True)
-print(f"OK  volume ready: {VOLUME_ROOT}")
+# DBTITLE 1,Assert the audit log exists
+if not spark.catalog.tableExists(AUDIT_TABLE):
+    raise RuntimeError(
+        f"{AUDIT_TABLE} not found: run databricks/setup/00_create_schemas.py first"
+    )
+print(f"OK  audit log present: {AUDIT_TABLE}")
 
 # COMMAND ----------
 

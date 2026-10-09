@@ -29,10 +29,8 @@ from scripts.knowledge import wikipedia_prepare as wp
 
 CATALOG = "energy_commerce_retail_media"
 SELECTED_TABLE = f"{CATALOG}.knowledge.wikipedia_selected"
-REPORT_TABLE = f"{CATALOG}.knowledge.wikipedia_build_report"
 ARTICLES_PER_FILE = 1000
 FETCH_SIZE = 1000
-REPORT_NAME = "build_report.json"
 ENV_KEYS = ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_HTTP_PATH")
 CHECK_QUERY = (
     "SELECT COUNT(*) AS articles, COUNT(DISTINCT terms_hash) AS hashes, "
@@ -43,7 +41,6 @@ ARTICLE_QUERY = (
     "snapshot, to_json(sections) AS sections_json "
     f"FROM {SELECTED_TABLE} ORDER BY article_id"
 )
-REPORT_QUERY = f"SELECT report_json FROM {REPORT_TABLE} LIMIT 1"
 
 
 def connection_settings(env=None) -> dict | None:
@@ -125,25 +122,6 @@ def write_articles(cursor, terms: wp.Terms, shard_dir: Path) -> list[dict]:
     return entries
 
 
-def write_report(cursor, shard_dir: Path, entries: list[dict]) -> bool:
-    """Write the build report of the notebooks when the table has one."""
-    try:
-        cursor.execute(REPORT_QUERY)
-        row = cursor.fetchone()
-    except Exception as error:  # the table may not exist yet; the articles stay valid
-        print(f"No build report read: {error}")
-        return False
-    if row is None:
-        return False
-    report = json.loads(row.asDict()["report_json"])
-    report["files"] = entries
-    uc.write_text(
-        shard_dir / REPORT_NAME,
-        json.dumps(report, indent=2, ensure_ascii=False) + "\n",
-    )
-    return True
-
-
 def main(argv: list[str] | None = None, connect=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--wiki-dir", type=Path, default=wc.WIKI_DIR)
@@ -169,12 +147,10 @@ def main(argv: list[str] | None = None, connect=None) -> int:
             print(uc.NOT_WRITTEN)
             return 0
         entries = write_articles(cursor, terms, shard_dir)
-        have_report = write_report(cursor, shard_dir, entries)
     written = sum(entry["articles"] for entry in entries)
     if written != count:
         raise ValueError(f"table has {count} articles, {written} were written")
     print(f"Written: {written} articles in {len(entries)} file(s)")
-    print("Build report: " + ("written" if have_report else "not available"))
     return 0
 
 

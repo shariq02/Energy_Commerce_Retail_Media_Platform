@@ -12,19 +12,19 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** constants, table names, Volume folders and small helpers shared
-# MAGIC by the Wikipedia preparation notebooks. Pulled in with
-# MAGIC `%run ./_wikipedia_common` after `%run ./_wikipedia_text`. Definitions only --
-# MAGIC no side effects at import.
-# MAGIC The local command `scripts/knowledge/wikipedia_fetch.py` reads the Gold
-# MAGIC table and the report table.
+# MAGIC **Purpose:** constants, run id, provenance columns and the audit-log gate
+# MAGIC shared by the Wikipedia notebooks. Pulled in with `%run ./_wikipedia_common`
+# MAGIC after `%run ./_wikipedia_text`. Same shape as `databricks/gold/_gold_common.py`.
+# MAGIC Definitions only -- no side effects at import.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
-import json
+import datetime as _dt
 import os
 from pathlib import Path
+
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -32,13 +32,14 @@ from pathlib import Path
 SOURCE_ROOT = "/Volumes/samples/databricks/datasets/wikipedia-datasets/data-001/en_wikipedia/articles-only-parquet"
 CATALOG = "energy_commerce_retail_media"
 SCHEMA = "knowledge"
-VOLUME = "wikipedia_corpus"
+QUALITY_SCHEMA = "quality"
+STAGE = "knowledge"
+AUDIT_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.quality_audit_log"
 SILVER_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_article"
 GOLD_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_selected"
-REPORT_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_build_report"
-VOLUME_ROOT = f"/Volumes/{CATALOG}/{SCHEMA}/{VOLUME}"
-REPORT_DIR = f"{VOLUME_ROOT}/reports"
 SNAPSHOT = "wikipedia_samples_2015"
+SOURCE_SYSTEM = "wikipedia_samples"
+FINDINGS_SOURCE = "wikipedia"
 TERMS_RELATIVE = ("ai", "knowledge_corpus", "wikipedia", "selection_terms.yml")
 
 # COMMAND ----------
@@ -61,15 +62,64 @@ def load_selection_terms():
 
 # COMMAND ----------
 
-# DBTITLE 1,Report helpers
+# DBTITLE 1,Run id and clock
 
 
-def write_report(folder, name, data):
-    os.makedirs(folder, exist_ok=True)
-    with open(os.path.join(folder, name), "w", encoding="utf-8") as handle:
-        json.dump(data, handle, indent=2, ensure_ascii=False)
+def run_id():
+    return _dt.datetime.now(_dt.UTC).strftime("knowledge-%Y%m%dT%H%M%SZ")
 
 
-def read_report(folder, name):
-    with open(os.path.join(folder, name), encoding="utf-8") as handle:
-        return json.load(handle)
+def now_utc():
+    return _dt.datetime.now(_dt.UTC)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Provenance columns
+
+
+def add_knowledge_provenance(df, source_dataset, rid):
+    return (
+        df.withColumn("source_system", F.lit(SOURCE_SYSTEM))
+        .withColumn("source_dataset", F.lit(source_dataset))
+        .withColumn("_knowledge_loaded_at", F.current_timestamp())
+        .withColumn("_knowledge_run_id", F.lit(rid))
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Hard-fail gate with audit log
+
+
+def check(
+    component, source, metric_name, condition, *, detail="", metric_value=None, rid
+):
+    # Logs to quality.quality_audit_log (stage 'knowledge') and raises when the
+    # condition is False, as the Gold check() does.
+    status = "PASS" if condition else "FAIL"
+    row = spark.createDataFrame(
+        [
+            (
+                rid,
+                _dt.datetime.now(_dt.UTC).date(),
+                source,
+                STAGE,
+                component,
+                metric_name,
+                None if metric_value is None else float(metric_value),
+                None,
+                status,
+                detail or None,
+                _dt.datetime.now(_dt.UTC),
+            )
+        ],
+        "run_id string, run_date date, source string, stage string, component string, "
+        "metric_name string, metric_value double, threshold double, status string, "
+        "error_detail string, recorded_at timestamp",
+    )
+    row.write.format("delta").mode("append").saveAsTable(AUDIT_TABLE)
+    if not condition:
+        raise RuntimeError(
+            f"KNOWLEDGE GATE FAILED: {component}.{metric_name} -- {detail or 'no detail'}"
+        )

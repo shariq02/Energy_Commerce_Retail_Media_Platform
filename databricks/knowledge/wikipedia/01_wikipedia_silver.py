@@ -16,6 +16,7 @@
 # MAGIC latest revision per article id, clean the wikitext and split it into sections.
 # MAGIC One row per article in `knowledge.wikipedia_article` with a `status`
 # MAGIC (`kept`, `redirect` or `empty`). The source table is never changed.
+# MAGIC Findings go to `src/findings/knowledge_findings/wikipedia.md`.
 
 # COMMAND ----------
 
@@ -29,11 +30,24 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Inspection library
+# MAGIC %run ./_wikipedia_inspect
+
+# COMMAND ----------
+
 # DBTITLE 1,Imports
 import pandas as pd
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
+
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
+SOURCE = FINDINGS_SOURCE
+COMPONENT = "knowledge/wikipedia/01_wikipedia_silver"
+RID = run_id()
+TABLE = "wikipedia_article"
 
 # COMMAND ----------
 
@@ -98,6 +112,7 @@ silver = (
         F.lit(SNAPSHOT).alias("snapshot"),
     )
 )
+silver = add_knowledge_provenance(silver, "articles-only-parquet", RID)
 
 # COMMAND ----------
 
@@ -121,24 +136,56 @@ print(by_status)
 
 # COMMAND ----------
 
-# DBTITLE 1,Check -- one row per article id
+# DBTITLE 1,Gate -- one row per article id
 duplicates = written.groupBy("article_id").count().filter(F.col("count") > 1).count()
-assert duplicates == 0, f"{duplicates} article ids appear more than once"
-print("OK  article_id is unique")
+check(
+    COMPONENT,
+    SOURCE,
+    "article_id_duplicates",
+    duplicates == 0,
+    detail=f"duplicate_groups={duplicates}",
+    metric_value=duplicates,
+    rid=RID,
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write the Silver report
-write_report(
-    REPORT_DIR,
-    "silver_report.json",
-    {
-        "snapshot": SNAPSHOT,
+# DBTITLE 1,Gate -- at least one kept article
+check(
+    COMPONENT,
+    SOURCE,
+    "kept_articles",
+    by_status.get("kept", 0) > 0,
+    detail=f"by_status={by_status}",
+    metric_value=by_status.get("kept", 0),
+    rid=RID,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect -- wikipedia_article
+findings_blocks = inspect_knowledge_table(
+    written,
+    TABLE,
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["article_id"],
+    extra_checks={
         "rows_read": raw_rows,
-        "distinct_ids": distinct_ids,
+        "distinct_article_ids": distinct_ids,
         "duplicate_rows_removed": raw_rows - distinct_ids,
-        "articles_by_status": by_status,
+        "articles_kept": by_status.get("kept", 0),
+        "articles_redirect": by_status.get("redirect", 0),
+        "articles_empty": by_status.get("empty", 0),
         "sections_total": int(sections_total),
+        "snapshot": SNAPSHOT,
     },
 )
-print(f"OK  report: {REPORT_DIR}/silver_report.json")
+
+# COMMAND ----------
+
+# DBTITLE 1,Export findings -- wikipedia_article
+write_knowledge_findings(
+    SOURCE, f"{COMPONENT.split('/')[-1]}__{TABLE}", TABLE, findings_blocks
+)
