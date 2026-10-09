@@ -208,3 +208,172 @@ _Generated: 2026-10-09T13:36Z_
 | row_count | rows | 33443.0 |  | INFO | INFO |  |
 
 <!-- END wikipedia:02_wikipedia_gold__wikipedia_selected -->
+
+<!-- BEGIN wikipedia:03_wikipedia_clickstream_silver__wikipedia_clickstream -->
+## wikipedia_clickstream
+
+_Generated: 2026-10-09T14:42Z_
+
+### cardinality
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| distinct:prev_id | approx_distinct | 1475344.0 |  | INFO | INFO |  |
+| distinct:curr_id | approx_distinct | 3046497.0 |  | INFO | INFO |  |
+| distinct:click_count | approx_distinct | 27248.0 |  | INFO | INFO |  |
+| distinct:edge_type | approx_distinct | 3.0 |  | INFO | INFO |  |
+| distinct:is_self_loop | approx_distinct | 2.0 |  | INFO | INFO |  |
+| distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_knowledge_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_knowledge_run_id | approx_distinct | 1.0 |  | INFO | INFO |  |
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:prev_id | null_rate | 0.35435195287332233 |  | INFO | INFO |  |
+| null_rate:curr_id | null_rate | 0.005059155571799285 |  | INFO | INFO |  |
+| null_rate:prev_title | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:curr_title | null_rate | 2.2212465520145086e-07 |  | INFO | INFO |  |
+| null_rate:click_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:edge_type | null_rate | 3.998243793626115e-07 |  | INFO | INFO |  |
+| null_rate:is_self_loop | null_rate | 0.35941133056977687 |  | INFO | INFO |  |
+| null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_knowledge_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_knowledge_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### dq
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| flag_true_count:is_self_loop | count | 37489.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['prev_title', 'curr_title', 'edge_type'] |
+
+### numeric
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| min:prev_id | min | 12.0 |  | INFO | INFO |  |
+| max:prev_id | max | 45530373.0 |  | INFO | INFO |  |
+| zero_count:prev_id | count | 0.0 |  | INFO | INFO |  |
+| negative_count:prev_id | count | 0.0 |  | INFO | INFO |  |
+| min:curr_id | min | 12.0 |  | INFO | INFO |  |
+| max:curr_id | max | 45530459.0 |  | INFO | INFO |  |
+| zero_count:curr_id | count | 0.0 |  | INFO | INFO |  |
+| negative_count:curr_id | count | 0.0 |  | INFO | INFO |  |
+| min:click_count | min | 10.0 |  | INFO | INFO |  |
+| max:click_count | max | 111855861.0 |  | INFO | INFO |  |
+| zero_count:click_count | count | 0.0 |  | INFO | INFO |  |
+| negative_count:click_count | count | 0.0 |  | INFO | INFO |  |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
+| column_count | count | 11.0 |  | INFO | INFO |  |
+
+### transformation_specific
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| edges_read | value | 22509897.0 |  | INFO | INFO | 22509897 |
+| edges_written | value | 22509883.0 |  | INFO | INFO | 22509883 |
+| duplicate_edges_removed | value | 14.0 |  | INFO | INFO | 14 |
+| edges_by_type | value |  |  | INFO | INFO | {'link': 12366768, 'redlink': 113880, 'other': 10029226, 'None': 9} |
+| self_loops | value | 37489.0 |  | INFO | INFO | 37489 |
+| unparsed_click_counts | value | 0.0 |  | INFO | INFO | 0 |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 22509883.0 |  | INFO | INFO |  |
+
+<!-- END wikipedia:03_wikipedia_clickstream_silver__wikipedia_clickstream -->
+
+<!-- BEGIN wikipedia:04_wikipedia_clickstream_gold__wikipedia_edges -->
+## wikipedia_edges
+
+_Generated: 2026-10-09T14:43Z_
+
+### cardinality
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| distinct:click_count | approx_distinct | 513.0 |  | INFO | INFO |  |
+| distinct:selection_terms_hash | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_knowledge_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_knowledge_run_id | approx_distinct | 1.0 |  | INFO | INFO |  |
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:prev_article_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:curr_article_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prev_title | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:curr_title | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:click_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:selection_terms_hash | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_knowledge_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_knowledge_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['prev_article_id', 'curr_article_id'] |
+
+### numeric
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| min:prev_article_id | min | 663.0 |  | INFO | INFO |  |
+| max:prev_article_id | max | 45497786.0 |  | INFO | INFO |  |
+| zero_count:prev_article_id | count | 0.0 |  | INFO | INFO |  |
+| negative_count:prev_article_id | count | 0.0 |  | INFO | INFO |  |
+| min:curr_article_id | min | 663.0 |  | INFO | INFO |  |
+| max:curr_article_id | max | 45492235.0 |  | INFO | INFO |  |
+| zero_count:curr_article_id | count | 0.0 |  | INFO | INFO |  |
+| negative_count:curr_article_id | count | 0.0 |  | INFO | INFO |  |
+| min:click_count | min | 10.0 |  | INFO | INFO |  |
+| max:click_count | max | 5306.0 |  | INFO | INFO |  |
+| zero_count:click_count | count | 0.0 |  | INFO | INFO |  |
+| negative_count:click_count | count | 0.0 |  | INFO | INFO |  |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
+| column_count | count | 10.0 |  | INFO | INFO |  |
+
+### transformation_specific
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| link_edges_without_self_loops | value | 12363201.0 |  | INFO | INFO | 12363201 |
+| edges_with_both_ends_selected | value | 8831.0 |  | INFO | INFO | 8831 |
+| duplicate_pairs_removed | value | 0.0 |  | INFO | INFO | 0 |
+| edges_written | value | 8831.0 |  | INFO | INFO | 8831 |
+| selection_terms_hash | value |  |  | INFO | INFO | fe2e704bc4dd5e4b8ca16e99524fce4df7ff3d1b4cacbeda9a4120b4432eb01f |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 8831.0 |  | INFO | INFO |  |
+
+<!-- END wikipedia:04_wikipedia_clickstream_gold__wikipedia_edges -->
