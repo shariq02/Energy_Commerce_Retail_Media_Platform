@@ -5,7 +5,9 @@ Author: Sharique Mohammad
 Date: October 2026
 
 Steps: units (build), authored (written bodies, skipped when there is no index),
-tokens (size check); stops at the first failure. It first runs every step as a
+tokens (size check), wikipedia_fetch (the selected articles from Databricks, only
+when no local files exist or --refresh-wikipedia is given and the Databricks
+settings are in .env), wikipedia (corpus manifest); stops at the first failure. It first runs every step as a
 dry run and prints the plan. In an interactive terminal it then asks whether to
 apply (y or yes), runs the steps again to write, and asks what to approve.
 --apply skips the question; without a terminal nothing is written.
@@ -27,6 +29,8 @@ from scripts.knowledge import approve_units as au
 from scripts.knowledge import author_units as auth
 from scripts.knowledge import build_units as bu
 from scripts.knowledge import report_tokens as rt
+from scripts.knowledge import wikipedia_corpus as wc
+from scripts.knowledge import wikipedia_fetch as wf
 
 
 def write_mode(args: argparse.Namespace) -> list[str]:
@@ -78,7 +82,41 @@ def step_tokens(args: argparse.Namespace) -> int:
     return rt.main(argv)
 
 
-STEPS = [("units", step_units), ("authored", step_authored), ("tokens", step_tokens)]
+def wiki_dir(args: argparse.Namespace) -> Path:
+    return args.corpus_dir / "wikipedia"
+
+
+def has_articles(args: argparse.Namespace) -> bool:
+    return any((wiki_dir(args) / wc.SHARD_DIR_NAME).glob("shard_*.jsonl"))
+
+
+def step_wikipedia_fetch(args: argparse.Namespace) -> int:
+    if not (wiki_dir(args) / wc.TERMS_NAME).is_file():
+        print("No Wikipedia selection terms, so this step is skipped.")
+        return 0
+    if has_articles(args) and not args.refresh_wikipedia:
+        print("Wikipedia articles are already local. Use --refresh-wikipedia to fetch.")
+        return 0
+    if wf.connection_settings() is None:
+        print("Databricks settings are not all set in .env, so this step is skipped.")
+        return 0
+    return wf.main(["--wiki-dir", str(wiki_dir(args)), *write_mode(args)])
+
+
+def step_wikipedia(args: argparse.Namespace) -> int:
+    if not has_articles(args):
+        print("No Wikipedia articles are local yet, so this step is skipped.")
+        return 0
+    return wc.main(["build", "--wiki-dir", str(wiki_dir(args)), *write_mode(args)])
+
+
+STEPS = [
+    ("units", step_units),
+    ("authored", step_authored),
+    ("tokens", step_tokens),
+    ("wikipedia_fetch", step_wikipedia_fetch),
+    ("wikipedia", step_wikipedia),
+]
 
 
 KIND_CHOICES = {"2": "metric", "3": "contract", "4": "rule"}
@@ -136,6 +174,34 @@ def approval_step(args: argparse.Namespace, waiting: list[uc.Unit]) -> None:
     print(f"Manifest approval: {manifest['approval']}")
 
 
+def wikipedia_approval_step(args: argparse.Namespace) -> None:
+    """Offer the corpus-level approval of the Wikipedia selection rule and id list."""
+    path = wiki_dir(args) / wc.MANIFEST_NAME
+    if not path.is_file():
+        return
+    manifest = wc.read_previous(wiki_dir(args))
+    status = manifest["approval"]["status"]
+    if status == "approved":
+        return
+    selection = manifest["selection"]
+    print(
+        f"Wikipedia corpus approval is {status}: rule version "
+        f"{selection['rule_version']}, {selection['article_count']} articles."
+    )
+    if not is_interactive():
+        print("  python -m scripts.knowledge.wikipedia_corpus approve --approver NAME")
+        return
+    try:
+        if not uc.is_yes(ask("Approve the Wikipedia corpus now? (y/yes or n/no): ")):
+            return
+        approver = (args.approver or "").strip() or ask("Approver name: ")
+    except EOFError:
+        return
+    if approver:
+        argv = ["approve", "--approver", approver, "--wiki-dir", str(wiki_dir(args))]
+        wc.main([*argv, "--apply"])
+
+
 def run_steps(args: argparse.Namespace) -> int:
     for name, step in STEPS:
         print(f"== step: {name} ==")
@@ -154,6 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--local-sources", type=Path, default=None)
     parser.add_argument("--tokenizer", type=Path, default=None)
     parser.add_argument("--approver", default=None, help="name for the approval")
+    parser.add_argument(
+        "--refresh-wikipedia",
+        action="store_true",
+        help="fetch the Wikipedia articles again even when local files exist",
+    )
     parser.add_argument("--apply", action="store_true", help="write without asking")
     args = parser.parse_args(argv)
     if args.corpus_dir is None:
@@ -178,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
         approval_step(args, waiting)
     elif waiting:
         print_approval_hint()
+    wikipedia_approval_step(args)
     return 0
 
 

@@ -50,6 +50,16 @@ def _exec_notebook(path: Path, namespace: dict) -> dict:
     return namespace
 
 
+def load_wikipedia_text() -> dict:
+    """`databricks/knowledge/wikipedia/_wikipedia_text.py` alone: re, yaml and the
+    standard library only, no Spark names."""
+    namespace: dict = {"__name__": "_wikipedia_text_under_test"}
+    return _exec_notebook(
+        REPO_ROOT / "databricks" / "knowledge" / "wikipedia" / "_wikipedia_text.py",
+        namespace,
+    )
+
+
 def load_silver_common() -> dict:
     """Executes `databricks/silver/_silver_common.py` into a fresh namespace
     and returns it -- the pure (non-Spark-API) functions defined there are

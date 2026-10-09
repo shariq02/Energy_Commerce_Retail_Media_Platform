@@ -1,0 +1,37 @@
+# Selection rule for the Wikipedia corpus. An article is selected when a term
+# matches its title or its lead section (whole word, any case). The first matching
+# term in this order owns the article; each term keeps at most cap_per_term
+# articles, ordered by a hash of the article id.
+version: 1
+cap_per_term: 2000
+terms:
+  energy:
+    - electricity
+    - power plant
+    - wind power
+    - solar power
+    - renewable energy
+    - electric grid
+  weather:
+    - weather
+    - climate
+    - meteorology
+    - precipitation
+    - storm
+  commerce:
+    - retail
+    - e-commerce
+    - online shopping
+    - advertising
+    - consumer
+  aviation:
+    - airline
+    - airport
+    - aviation
+    - aircraft
+    - flight
+  mobility:
+    - electric vehicle
+    - charging station
+    - public transport
+    - railway

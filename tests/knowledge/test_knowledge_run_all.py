@@ -7,6 +7,8 @@ Date: October 2026
 
 from __future__ import annotations
 
+import argparse
+import json
 from collections import Counter
 
 import pytest
@@ -18,7 +20,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.ai]
 
 
 def test_steps_run_in_order():
-    assert [name for name, _ in ra.STEPS] == ["units", "authored", "tokens"]
+    assert [name for name, _ in ra.STEPS] == [
+        "units",
+        "authored",
+        "tokens",
+        "wikipedia_fetch",
+        "wikipedia",
+    ]
 
 
 def only_step(monkeypatch, name, step, answers=(), interactive=False):
@@ -194,3 +202,75 @@ def test_the_approver_argument_skips_the_name_question(monkeypatch, tmp_path):
     _, asked = run_units_only(monkeypatch, tmp_path, ["2"], extra=extra)
     assert len(asked) == 1
     assert approved_kinds(tmp_path) == {"metric": 8}
+
+
+def wiki_args(tmp_path, refresh=False, apply=False, approver=None):
+    return argparse.Namespace(
+        corpus_dir=tmp_path,
+        refresh_wikipedia=refresh,
+        apply=apply,
+        approver=approver,
+    )
+
+
+def test_wikipedia_steps_are_skipped_without_terms_or_articles(tmp_path, capsys):
+    args = wiki_args(tmp_path)
+    assert ra.step_wikipedia_fetch(args) == 0
+    assert ra.step_wikipedia(args) == 0
+    output = capsys.readouterr().out
+    assert "No Wikipedia selection terms" in output
+    assert "No Wikipedia articles are local yet" in output
+
+
+def test_fetch_step_skips_without_settings_and_when_files_exist(
+    tmp_path, monkeypatch, capsys
+):
+    wiki = tmp_path / "wikipedia"
+    (wiki / "shards").mkdir(parents=True)
+    (wiki / "selection_terms.yml").write_text("version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(ra.wf, "connection_settings", lambda env=None: None)
+    assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
+    assert "settings are not all set" in capsys.readouterr().out
+    (wiki / "shards" / "shard_00001.jsonl").write_text("{}\n", encoding="utf-8")
+    assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
+    assert "already local" in capsys.readouterr().out
+
+
+def write_pending_manifest(tmp_path, status="pending"):
+    wiki = tmp_path / "wikipedia"
+    wiki.mkdir()
+    data = {
+        "approval": {"status": status},
+        "selection": {"rule_version": 1, "article_count": 7},
+    }
+    (wiki / "manifest.json").write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_wikipedia_approval_is_only_offered_when_not_approved(
+    monkeypatch, tmp_path, capsys
+):
+    write_pending_manifest(tmp_path, status="approved")
+    only_step(monkeypatch, "units", ra.step_units, interactive=True)
+    ra.wikipedia_approval_step(wiki_args(tmp_path))
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("answer", ["n", "", "maybe"])
+def test_any_answer_but_yes_does_not_approve_wikipedia(
+    monkeypatch, tmp_path, capsys, answer
+):
+    write_pending_manifest(tmp_path)
+    asked = only_step(monkeypatch, "units", ra.step_units, [answer], interactive=True)
+    ra.wikipedia_approval_step(wiki_args(tmp_path))
+    assert len(asked) == 1
+    assert "approval is pending" in capsys.readouterr().out
+
+
+def test_without_a_terminal_wikipedia_approval_prints_the_command(
+    monkeypatch, tmp_path, capsys
+):
+    write_pending_manifest(tmp_path, status="stale")
+    only_step(monkeypatch, "units", ra.step_units, interactive=False)
+    ra.wikipedia_approval_step(wiki_args(tmp_path))
+    output = capsys.readouterr().out
+    assert "approval is stale" in output and "wikipedia_corpus approve" in output
