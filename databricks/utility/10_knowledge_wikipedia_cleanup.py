@@ -28,7 +28,7 @@ CATALOG = "energy_commerce_retail_media"
 SCHEMA = "knowledge"
 TABLES = ["wikipedia_build_report"]
 VOLUMES = ["wikipedia_corpus"]
-DROP = False  # True
+DROP = True #False  # True
 
 # COMMAND ----------
 
