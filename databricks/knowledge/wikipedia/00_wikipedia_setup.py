@@ -18,6 +18,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Text library
+# MAGIC %run ./_wikipedia_text
+
+# COMMAND ----------
+
 # DBTITLE 1,Shared library
 # MAGIC %run ./_wikipedia_common
 
@@ -36,14 +41,8 @@ print(f"OK  volume ready: {VOLUME_ROOT}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Import the preparation library
-wp = load_preparation()
-print("OK  preparation library imported")
-
-# COMMAND ----------
-
 # DBTITLE 1,Check the selection terms
-terms = load_selection_terms(wp)
+terms = load_selection_terms()
 print(
     f"OK  rule version {terms.version}, {len(terms.pairs)} terms, "
     f"cap {terms.cap_per_term} per term"

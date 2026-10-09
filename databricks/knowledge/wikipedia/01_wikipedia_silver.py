@@ -19,6 +19,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Text library
+# MAGIC %run ./_wikipedia_text
+
+# COMMAND ----------
+
 # DBTITLE 1,Shared library
 # MAGIC %run ./_wikipedia_common
 
@@ -26,17 +31,9 @@
 
 # DBTITLE 1,Imports
 import pandas as pd
-from pyspark import cloudpickle
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
-
-# COMMAND ----------
-
-# DBTITLE 1,Import the preparation library
-wp = load_preparation()
-# The cleaning functions run on the workers, so they are shipped by value.
-cloudpickle.register_pickle_by_value(wp)
 
 # COMMAND ----------
 
@@ -75,9 +72,7 @@ SECTIONS_TYPE = T.ArrayType(
 
 @F.pandas_udf(SECTIONS_TYPE)
 def split_text(texts: pd.Series) -> pd.Series:
-    return texts.map(
-        lambda t: [] if wp.is_redirect(t or "") else wp.split_sections(t or "")
-    )
+    return texts.map(lambda t: [] if is_redirect(t or "") else split_sections(t or ""))
 
 
 # COMMAND ----------

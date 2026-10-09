@@ -14,7 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** constants, table names, Volume folders and small helpers shared
 # MAGIC by the Wikipedia preparation notebooks. Pulled in with
-# MAGIC `%run ./_wikipedia_common`. Definitions only -- no side effects at import.
+# MAGIC `%run ./_wikipedia_common` after `%run ./_wikipedia_text`. Definitions only --
+# MAGIC no side effects at import.
 # MAGIC The local command `scripts/knowledge/wikipedia_fetch.py` reads the Gold
 # MAGIC table and the report table.
 
@@ -23,7 +24,6 @@
 # DBTITLE 1,Imports
 import json
 import os
-import sys
 from pathlib import Path
 
 # COMMAND ----------
@@ -48,25 +48,15 @@ TERMS_RELATIVE = ("ai", "knowledge_corpus", "wikipedia", "selection_terms.yml")
 
 def repo_root():
     path = os.path.abspath(os.getcwd())
-    while not os.path.isdir(os.path.join(path, "scripts", "knowledge")):
+    while not os.path.isdir(os.path.join(path, "ai", "knowledge_corpus")):
         if os.path.dirname(path) == path:
             raise RuntimeError("repository root not found from the notebook folder")
         path = os.path.dirname(path)
     return path
 
 
-def load_preparation():
-    # The preparation library of scripts/knowledge, imported from the Git folder.
-    root = repo_root()
-    if root not in sys.path:
-        sys.path.insert(0, root)
-    from scripts.knowledge import wikipedia_prepare
-
-    return wikipedia_prepare
-
-
-def load_selection_terms(wp):
-    return wp.load_terms(Path(repo_root(), *TERMS_RELATIVE))
+def load_selection_terms():
+    return load_terms(Path(repo_root(), *TERMS_RELATIVE))
 
 
 # COMMAND ----------

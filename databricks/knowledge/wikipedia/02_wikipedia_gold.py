@@ -22,6 +22,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Text library
+# MAGIC %run ./_wikipedia_text
+
+# COMMAND ----------
+
 # DBTITLE 1,Shared library
 # MAGIC %run ./_wikipedia_common
 
@@ -36,8 +41,7 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Load the selection terms
-wp = load_preparation()
-terms = load_selection_terms(wp)
+terms = load_selection_terms()
 print(
     f"OK  rule version {terms.version}, {len(terms.pairs)} terms, "
     f"cap {terms.cap_per_term} per term"
@@ -48,16 +52,14 @@ print(
 # DBTITLE 1,Read the kept articles
 kept = spark.table(SILVER_TABLE).filter(F.col("status") == "kept")
 lead = F.expr("try_element_at(sections, 1)")
-kept = kept.withColumn(
-    "lead_text", F.when(lead["section"] == wp.LEAD_NAME, lead["text"])
-)
+kept = kept.withColumn("lead_text", F.when(lead["section"] == LEAD_NAME, lead["text"]))
 
 # COMMAND ----------
 
 # DBTITLE 1,Match the terms in the title and the lead section
 hits = [
-    F.col("title").rlike(wp.term_pattern(term))
-    | F.coalesce(F.col("lead_text").rlike(wp.term_pattern(term)), F.lit(False))
+    F.col("title").rlike(term_pattern(term))
+    | F.coalesce(F.col("lead_text").rlike(term_pattern(term)), F.lit(False))
     for _, term in terms.pairs
 ]
 term_index = reduce(
