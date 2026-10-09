@@ -225,6 +225,7 @@ if role["text"]:
 
 # DBTITLE 1,Duplicate-key helper
 
+
 def vary_exprs(exclude):
     cand = {"id": role["id"], "revision": role["revision"], "title": role["title"]}
     out = {k: as_str(c) for k, c in cand.items() if c and k != exclude}

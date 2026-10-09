@@ -73,6 +73,7 @@ extend-ignore = ["E402", "BLE001"]
 # _wikipedia_eda_common.py is %run after _eda_common and _samples_eda_common (never
 # first) and uses their column helpers (qcol, as_str, is_missing, to_double).
 "databricks/eda/_wikipedia_eda_common.py" = ["F821"]
+"databricks/knowledge/wikipedia/*.py" = ["F821"]
 # Silver source notebooks pull `%run ../../_silver_common` (a Databricks
 # runtime magic). databricks/silver/_silver_common.py is NOT exempted.
 "databricks/silver/[0-9]*_*.py" = ["F821"]

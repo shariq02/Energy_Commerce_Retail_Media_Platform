@@ -40,6 +40,9 @@ data/processed/
 *.json
 # The approved knowledge corpus manifest is committed.
 !ai/knowledge_corpus/manifest.json
+# The Wikipedia corpus manifest and selection rule are committed; its shards are not.
+!ai/knowledge_corpus/wikipedia/manifest.json
+ai/knowledge_corpus/wikipedia/shards/
 
 # Logs
 logs/
