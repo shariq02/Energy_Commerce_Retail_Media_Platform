@@ -5,7 +5,7 @@ Author: Sharique Mohammad
 Date: October 2026
 
 Reads the shards copied from Databricks into ai/knowledge_corpus/wikipedia/shards/,
-checks every article, writes the corpus manifest and records the approval of the
+checks every article and the edge file, writes the corpus manifest and records the approval of the
 selection rule and the selected-id list. A change of the rule or the list makes
 the approval stale. It prints the plan first and asks before writing (y or yes);
 --apply writes without asking, --dry-run never writes.
@@ -33,6 +33,8 @@ WIKI_DIR = uc.CORPUS_DIR / "wikipedia"
 SHARD_DIR_NAME = "shards"
 TERMS_NAME = "selection_terms.yml"
 MANIFEST_NAME = "manifest.json"
+EDGES_NAME = "edges.jsonl"
+EDGE_KEYS = {"source_id", "target_id", "click_count"}
 
 
 def read_shard(path: Path) -> list[dict]:
@@ -64,6 +66,28 @@ def scan_shards(shard_dir: Path) -> tuple[list[dict], list[dict]]:
             f"shards come from more than one snapshot: {sorted(snapshots)}"
         )
     return articles, entries
+
+
+def scan_edges(path: Path, articles: list[dict]) -> dict | None:
+    """Check the edge file against the articles; None when there is no file."""
+    if not path.is_file():
+        return None
+    known = {int(unit["unit_id"].removeprefix(wp.UNIT_PREFIX)) for unit in articles}
+    pairs = set()
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        edge = json.loads(line)
+        where = f"{path.name}:{number}"
+        if set(edge) != EDGE_KEYS or edge["click_count"] < 1:
+            raise ValueError(f"{where}: bad edge {edge!r}")
+        if edge["source_id"] == edge["target_id"]:
+            raise ValueError(f"{where}: self-loop on {edge['source_id']}")
+        if edge["source_id"] not in known or edge["target_id"] not in known:
+            raise ValueError(f"{where}: an edge end is not a selected article")
+        pair = (edge["source_id"], edge["target_id"])
+        if pair in pairs:
+            raise ValueError(f"{where}: edge {pair} appears twice")
+        pairs.add(pair)
+    return {"file": path.name, "sha256": uc.sha256_file(path), "edges": len(pairs)}
 
 
 def id_list_hash(articles: list[dict]) -> str:
@@ -105,8 +129,12 @@ def approval_status(approval: dict | None, selection: dict) -> str:
 def build_manifest_data(wiki_dir: Path, previous: dict) -> dict:
     articles, shards = scan_shards(wiki_dir / SHARD_DIR_NAME)
     selection = current_selection(wiki_dir, articles)
+    edges = scan_edges(wiki_dir / EDGES_NAME, articles)
     fingerprint = uc.sha256_text(
-        "\n".join([s["sha256"] for s in shards] + [selection["terms_hash"]])
+        "\n".join(
+            [s["sha256"] for s in shards]
+            + [selection["terms_hash"], edges["sha256"] if edges else ""]
+        )
     )
     version = previous.get("corpus_version", 0)
     if fingerprint != previous.get("fingerprint"):
@@ -121,6 +149,7 @@ def build_manifest_data(wiki_dir: Path, previous: dict) -> dict:
         "fingerprint": fingerprint,
         "article_count": len(articles),
         "shards": shards,
+        "edges": edges,
         "selection": selection,
         "articles_by_term": dict(
             sorted(Counter(unit["selection_term"] for unit in articles).items())
@@ -171,6 +200,8 @@ def print_summary(data: dict, old_status: str | None) -> None:
         f"{data['snapshot']}, corpus_version {data['corpus_version']}"
     )
     print(f"Articles: {data['article_count']} in {len(data['shards'])} shard(s)")
+    edges = data["edges"]
+    print(f"Edges: {edges['edges']}" if edges else "Edges: no edge file yet")
     for term, count in data["articles_by_term"].items():
         print(f"  {term}: {count}")
     selection = data["selection"]

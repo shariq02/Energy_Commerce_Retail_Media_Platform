@@ -43,6 +43,7 @@ data/processed/
 # The Wikipedia corpus manifest and selection rule are committed; its shards are not.
 !ai/knowledge_corpus/wikipedia/manifest.json
 ai/knowledge_corpus/wikipedia/shards/
+ai/knowledge_corpus/wikipedia/edges.jsonl
 
 # Logs
 logs/

@@ -5,9 +5,9 @@ Author: Sharique Mohammad
 Date: October 2026
 
 Steps: units (build), authored (written bodies, skipped when there is no index),
-tokens (size check), wikipedia_fetch (the selected articles from Databricks, only
-when no local files exist or --refresh-wikipedia is given and the Databricks
-settings are in .env), wikipedia (corpus manifest); stops at the first failure. It first runs every step as a
+tokens (size check), wikipedia_fetch (the selected articles and edges from
+Databricks; each part only when its local files are missing or --refresh-wikipedia
+is given, and when the Databricks settings are in .env), wikipedia (corpus manifest); stops at the first failure. It first runs every step as a
 dry run and prints the plan. In an interactive terminal it then asks whether to
 apply (y or yes), runs the steps again to write, and asks what to approve.
 --apply skips the question; without a terminal nothing is written.
@@ -90,17 +90,33 @@ def has_articles(args: argparse.Namespace) -> bool:
     return any((wiki_dir(args) / wc.SHARD_DIR_NAME).glob("shard_*.jsonl"))
 
 
+def has_edges(args: argparse.Namespace) -> bool:
+    return (wiki_dir(args) / wc.EDGES_NAME).is_file()
+
+
+def missing_parts(args: argparse.Namespace) -> list[str]:
+    """The Wikipedia parts to fetch: every part on refresh, else the missing ones."""
+    local = {"articles": has_articles(args), "edges": has_edges(args)}
+    return [p for p in wf.PARTS if args.refresh_wikipedia or not local[p]]
+
+
 def step_wikipedia_fetch(args: argparse.Namespace) -> int:
     if not (wiki_dir(args) / wc.TERMS_NAME).is_file():
         print("No Wikipedia selection terms, so this step is skipped.")
         return 0
-    if has_articles(args) and not args.refresh_wikipedia:
-        print("Wikipedia articles are already local. Use --refresh-wikipedia to fetch.")
+    parts = missing_parts(args)
+    if not parts:
+        print(
+            "Wikipedia articles and edges are already local. Use --refresh-wikipedia."
+        )
         return 0
     if wf.connection_settings() is None:
         print("Databricks settings are not all set in .env, so this step is skipped.")
         return 0
-    return wf.main(["--wiki-dir", str(wiki_dir(args)), *write_mode(args)])
+    argv = ["--wiki-dir", str(wiki_dir(args))]
+    for part in parts:
+        argv += ["--part", part]
+    return wf.main([*argv, *write_mode(args)])
 
 
 def step_wikipedia(args: argparse.Namespace) -> int:

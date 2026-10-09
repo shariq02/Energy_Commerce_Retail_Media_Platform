@@ -233,6 +233,9 @@ def test_fetch_step_skips_without_settings_and_when_files_exist(
     assert "settings are not all set" in capsys.readouterr().out
     (wiki / "shards" / "shard_00001.jsonl").write_text("{}\n", encoding="utf-8")
     assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
+    assert "settings are not all set" in capsys.readouterr().out
+    (wiki / "edges.jsonl").write_text("{}\n", encoding="utf-8")
+    assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
     assert "already local" in capsys.readouterr().out
 
 
@@ -274,3 +277,18 @@ def test_without_a_terminal_wikipedia_approval_prints_the_command(
     ra.wikipedia_approval_step(wiki_args(tmp_path))
     output = capsys.readouterr().out
     assert "approval is stale" in output and "wikipedia_corpus approve" in output
+
+
+def test_fetch_step_fetches_only_the_missing_parts(tmp_path, monkeypatch):
+    wiki = tmp_path / "wikipedia"
+    (wiki / "shards").mkdir(parents=True)
+    (wiki / "selection_terms.yml").write_text("version: 1\n", encoding="utf-8")
+    (wiki / "shards" / "shard_00001.jsonl").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(ra.wf, "connection_settings", lambda env=None: {"k": "v"})
+    calls = []
+    monkeypatch.setattr(ra.wf, "main", lambda argv: calls.append(argv) or 0)
+    assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
+    assert calls[0] == ["--wiki-dir", str(wiki), "--part", "edges", "--dry-run"]
+    (wiki / "edges.jsonl").write_text("{}\n", encoding="utf-8")
+    assert ra.missing_parts(wiki_args(tmp_path)) == []
+    assert ra.missing_parts(wiki_args(tmp_path, refresh=True)) == ["articles", "edges"]

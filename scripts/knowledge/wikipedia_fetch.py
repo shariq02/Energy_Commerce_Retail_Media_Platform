@@ -1,18 +1,20 @@
-"""Fetch the selected Wikipedia articles from Databricks.
+"""Fetch the selected Wikipedia articles and their edges from Databricks.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Reads knowledge.wikipedia_selected through the Databricks SQL connector and
-writes the article units as JSON Lines files in ai/knowledge_corpus/wikipedia/shards/.
-It checks first that the table was built with the local selection terms, prints the
-plan and asks before writing (y or yes); --apply writes without asking, --dry-run
-never writes. Settings come from .env: DATABRICKS_HOST, DATABRICKS_TOKEN_SQL and
-DATABRICKS_HTTP_PATH (the HTTP path of a SQL warehouse).
+Reads knowledge.wikipedia_selected and knowledge.wikipedia_edges through the
+Databricks SQL connector. The articles go to JSON Lines files in
+ai/knowledge_corpus/wikipedia/shards/, the edges to edges.jsonl beside them.
+--part chooses articles, edges or both (default both); each part replaces its own
+files only. It checks first that the tables were built with the local selection
+terms, prints the plan and asks before writing (y or yes); --apply writes without
+asking, --dry-run never writes. Settings come from .env: DATABRICKS_HOST,
+DATABRICKS_TOKEN_SQL and DATABRICKS_HTTP_PATH (the HTTP path of a SQL warehouse).
 
 Usage (repository root):
-    python -m scripts.knowledge.wikipedia_fetch
+    python -m scripts.knowledge.wikipedia_fetch [--part articles] [--part edges]
 """
 
 from __future__ import annotations
@@ -34,17 +36,36 @@ except ImportError:  # the connector is only needed for a real fetch
 
 CATALOG = "energy_commerce_retail_media"
 SELECTED_TABLE = f"{CATALOG}.knowledge.wikipedia_selected"
+EDGES_TABLE = f"{CATALOG}.knowledge.wikipedia_edges"
+PARTS = ("articles", "edges")
 ARTICLES_PER_FILE = 1000
 FETCH_SIZE = 1000
 ENV_KEYS = ("DATABRICKS_HOST", "DATABRICKS_TOKEN_SQL", "DATABRICKS_HTTP_PATH")
 CHECK_QUERY = (
-    "SELECT COUNT(*) AS articles, COUNT(DISTINCT terms_hash) AS hashes, "
+    "SELECT COUNT(*) AS n, COUNT(DISTINCT terms_hash) AS hashes, "
     f"MIN(terms_hash) AS terms_hash FROM {SELECTED_TABLE}"
+)
+EDGE_CHECK_QUERY = (
+    "SELECT COUNT(*) AS n, COUNT(DISTINCT selection_terms_hash) AS hashes, "
+    f"MIN(selection_terms_hash) AS terms_hash FROM {EDGES_TABLE}"
 )
 ARTICLE_QUERY = (
     "SELECT article_id, title, revision_id, revision_timestamp, term_index, "
     "snapshot, to_json(sections) AS sections_json "
     f"FROM {SELECTED_TABLE} ORDER BY article_id"
+)
+EDGE_QUERY = (
+    "SELECT prev_article_id, curr_article_id, click_count "
+    f"FROM {EDGES_TABLE} ORDER BY prev_article_id, curr_article_id"
+)
+CONTEXT_KEYS = (
+    "method",
+    "http-code",
+    "error-message",
+    "original-exception",
+    "no-retry-reason",
+    "attempt",
+    "elapsed-seconds",
 )
 
 
@@ -73,17 +94,6 @@ def open_connection(settings: dict):
     )
 
 
-CONTEXT_KEYS = (
-    "method",
-    "http-code",
-    "error-message",
-    "original-exception",
-    "no-retry-reason",
-    "attempt",
-    "elapsed-seconds",
-)
-
-
 def describe_error(error: Exception) -> list[str]:
     """The message and the context of a connector error; no setting values."""
     context = getattr(error, "context", None) or {}
@@ -96,18 +106,18 @@ def describe_error(error: Exception) -> list[str]:
     return lines
 
 
-def check_table(cursor, terms: wp.Terms) -> int:
-    """The table must exist, hold articles and come from the local terms file."""
-    cursor.execute(CHECK_QUERY)
+def check_table(cursor, terms: wp.Terms, query: str, table: str) -> int:
+    """The table must exist, hold rows and come from the local terms file."""
+    cursor.execute(query)
     row = cursor.fetchone().asDict()
-    if not row["articles"]:
-        raise ValueError(f"{SELECTED_TABLE} is empty: run the Gold notebook first")
+    if not row["n"]:
+        raise ValueError(f"{table} is empty: run its notebook first")
     if row["hashes"] != 1 or row["terms_hash"] != terms.file_hash:
         raise ValueError(
-            f"{SELECTED_TABLE} was built with other selection terms than the local "
-            "file: run 02_wikipedia_gold again"
+            f"{table} was built with other selection terms than the local file: "
+            "run the Gold notebooks again"
         )
-    return int(row["articles"])
+    return int(row["n"])
 
 
 def row_to_unit(row: dict, terms: wp.Terms) -> dict:
@@ -150,11 +160,34 @@ def write_articles(cursor, terms: wp.Terms, shard_dir: Path) -> list[dict]:
     return entries
 
 
+def write_edges(cursor, path: Path) -> int:
+    """Stream the edge rows into one JSON Lines file; returns the edge count."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    temp = path.with_suffix(".tmp")
+    cursor.execute(EDGE_QUERY)
+    with temp.open("w", encoding="utf-8", newline="\n") as handle:
+        while rows := cursor.fetchmany(FETCH_SIZE):
+            for row in rows:
+                data = row.asDict()
+                edge = {
+                    "source_id": int(data["prev_article_id"]),
+                    "target_id": int(data["curr_article_id"]),
+                    "click_count": int(data["click_count"]),
+                }
+                handle.write(json.dumps(edge, sort_keys=True) + "\n")
+                count += 1
+    temp.replace(path)
+    return count
+
+
 def main(argv: list[str] | None = None, connect=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--wiki-dir", type=Path, default=wc.WIKI_DIR)
+    parser.add_argument("--part", action="append", choices=PARTS, default=None)
     uc.add_write_mode(parser)
     args = parser.parse_args(argv)
+    parts = args.part or list(PARTS)
 
     terms = wp.load_terms(args.wiki_dir / wc.TERMS_NAME)
     if connect is None:
@@ -167,22 +200,41 @@ def main(argv: list[str] | None = None, connect=None) -> int:
             return open_connection(settings)
 
     shard_dir = args.wiki_dir / wc.SHARD_DIR_NAME
+    edges_path = args.wiki_dir / wc.EDGES_NAME
+    counts, written = {}, {}
     try:
         with connect() as connection, connection.cursor() as cursor:
-            count = check_table(cursor, terms)
-            print(f"{SELECTED_TABLE}: {count} articles, rule version {terms.version}")
-            print(f"Target: {shard_dir} (the existing files there are replaced)")
+            if "articles" in parts:
+                counts["articles"] = check_table(
+                    cursor, terms, CHECK_QUERY, SELECTED_TABLE
+                )
+                print(f"{SELECTED_TABLE}: {counts['articles']} articles")
+                print(f"Target: {shard_dir} (the existing article files are replaced)")
+            if "edges" in parts:
+                counts["edges"] = check_table(
+                    cursor, terms, EDGE_CHECK_QUERY, EDGES_TABLE
+                )
+                print(f"{EDGES_TABLE}: {counts['edges']} edges")
+                print(f"Target: {edges_path} (replaced)")
+            print(f"Rule version {terms.version}")
             if not args.apply and (args.dry_run or not uc.confirm_apply()):
                 print(uc.NOT_WRITTEN)
                 return 0
-            entries = write_articles(cursor, terms, shard_dir)
+            if "articles" in parts:
+                entries = write_articles(cursor, terms, shard_dir)
+                written["articles"] = sum(entry["articles"] for entry in entries)
+                print(
+                    f"Written: {written['articles']} articles in {len(entries)} file(s)"
+                )
+            if "edges" in parts:
+                written["edges"] = write_edges(cursor, edges_path)
+                print(f"Written: {written['edges']} edges")
     except DatabricksError as error:
         print("\n".join(describe_error(error)))
         return 1
-    written = sum(entry["articles"] for entry in entries)
-    if written != count:
-        raise ValueError(f"table has {count} articles, {written} were written")
-    print(f"Written: {written} articles in {len(entries)} file(s)")
+    for part, count in counts.items():
+        if written[part] != count:
+            raise ValueError(f"{part}: table has {count}, {written[part]} were written")
     return 0
 
 

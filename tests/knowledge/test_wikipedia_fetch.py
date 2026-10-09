@@ -35,18 +35,20 @@ class Row:
 
 
 class FakeCursor:
-    def __init__(self, check, articles):
-        self.check, self.articles = check, list(articles)
+    def __init__(self, checks, articles, edges):
+        self.checks, self.articles, self.edges = checks, list(articles), list(edges)
         self.query = ""
 
     def execute(self, query):
         self.query = query
 
     def fetchone(self):
-        return Row(self.check)
+        return Row(self.checks[self.query])
 
     def fetchmany(self, size):
-        chunk, self.articles = self.articles[:size], self.articles[size:]
+        rows = self.edges if self.query == wf.EDGE_QUERY else self.articles
+        chunk = rows[:size]
+        del rows[:size]
         return [Row(item) for item in chunk]
 
     def __enter__(self):
@@ -87,19 +89,30 @@ def article_rows(count):
     ]
 
 
-def setup(tmp_path, count=5, hash_override=None, articles=None):
+def edge_rows(pairs):
+    return [
+        {"prev_article_id": a, "curr_article_id": b, "click_count": 10 + a}
+        for a, b in pairs
+    ]
+
+
+def setup(tmp_path, count=5, hash_override=None, articles=None, edges=None):
     wiki = tmp_path / "wikipedia"
     wiki.mkdir()
     (wiki / wc.TERMS_NAME).write_text(TERMS_TEXT, encoding="utf-8")
     terms = wp.load_terms(wiki / wc.TERMS_NAME)
-    check = {
-        "articles": count,
-        "hashes": 1,
-        "terms_hash": hash_override or terms.file_hash,
-    }
+    terms_hash = hash_override or terms.file_hash
     rows = article_rows(count) if articles is None else articles
-    cursor = FakeCursor(check, rows)
-    return wiki, (lambda: FakeConnection(cursor))
+    edge_list = edge_rows([(1, 2), (2, 3), (4, 1)]) if edges is None else edges
+    checks = {
+        wf.CHECK_QUERY: {"n": count, "hashes": 1, "terms_hash": terms_hash},
+        wf.EDGE_CHECK_QUERY: {
+            "n": len(edge_list),
+            "hashes": 1,
+            "terms_hash": terms_hash,
+        },
+    }
+    return wiki, (lambda: FakeConnection(FakeCursor(checks, rows, edge_list)))
 
 
 def test_fetch_writes_files_and_the_corpus_accepts_them(tmp_path):
@@ -111,6 +124,7 @@ def test_fetch_writes_files_and_the_corpus_accepts_them(tmp_path):
     assert wc.main(["build", "--wiki-dir", str(wiki), "--apply"]) == 0
     manifest = json.loads((wiki / wc.MANIFEST_NAME).read_text(encoding="utf-8"))
     assert manifest["article_count"] == 5
+    assert manifest["edges"]["edges"] == 3
     assert manifest["articles_by_term"] == {"storm": 3, "wind power": 2}
 
 
@@ -190,3 +204,28 @@ def test_connector_error_prints_its_context_and_no_setting_values(tmp_path, caps
     output = capsys.readouterr().out
     assert "http-code: 401" in output and "Invalid access token" in output
     assert "DATABRICKS_HTTP_PATH" in output
+
+
+def test_each_part_replaces_only_its_own_files(tmp_path):
+    wiki, connect = setup(tmp_path)
+    shard_dir = wiki / wc.SHARD_DIR_NAME
+    wf.main(["--wiki-dir", str(wiki), "--apply"], connect=connect)
+    articles_before = (shard_dir / wp.shard_name(1)).read_text(encoding="utf-8")
+    (wiki / wc.EDGES_NAME).unlink()
+    wf.main(["--wiki-dir", str(wiki), "--part", "edges", "--apply"], connect=connect)
+    assert (wiki / wc.EDGES_NAME).is_file()
+    assert (shard_dir / wp.shard_name(1)).read_text(encoding="utf-8") == articles_before
+    (shard_dir / wp.shard_name(1)).unlink()
+    edges_before = (wiki / wc.EDGES_NAME).read_text(encoding="utf-8")
+    wf.main(["--wiki-dir", str(wiki), "--part", "articles", "--apply"], connect=connect)
+    assert (shard_dir / wp.shard_name(1)).is_file()
+    assert (wiki / wc.EDGES_NAME).read_text(encoding="utf-8") == edges_before
+
+
+def test_edges_table_built_with_other_terms_is_refused(tmp_path):
+    wiki, connect = setup(tmp_path)
+    connect().cursor().checks[wf.EDGE_CHECK_QUERY]["terms_hash"] = "0" * 64
+    argv = ["--wiki-dir", str(wiki), "--part", "edges", "--apply"]
+    with pytest.raises(ValueError, match="other selection terms"):
+        wf.main(argv, connect=connect)
+    assert not (wiki / wc.EDGES_NAME).exists()

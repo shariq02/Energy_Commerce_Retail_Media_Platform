@@ -152,3 +152,47 @@ def test_production_retrieval_refuses_a_development_corpus(tmp_path):
     with pytest.raises(ValueError, match="development corpus"):
         wc.require_production(manifest(wiki))
     wc.require_production({"mode": "production", "corpus_id": "wikipedia"})
+
+
+def write_edges(wiki, pairs):
+    lines = [
+        json.dumps({"source_id": a, "target_id": b, "click_count": 12})
+        for a, b in pairs
+    ]
+    (wiki / wc.EDGES_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_manifest_records_the_edge_file(tmp_path):
+    wiki = make_corpus(tmp_path)
+    wc.main(["build", "--wiki-dir", str(wiki), "--apply"])
+    assert manifest(wiki)["edges"] is None
+    write_edges(wiki, [(1, 2), (2, 3)])
+    wc.main(["build", "--wiki-dir", str(wiki), "--apply"])
+    data = manifest(wiki)
+    assert data["edges"]["edges"] == 2 and data["edges"]["file"] == "edges.jsonl"
+    assert data["corpus_version"] == 2
+
+
+@pytest.mark.parametrize(
+    ("pairs", "message"),
+    [
+        ([(1, 99)], "not a selected article"),
+        ([(2, 2)], "self-loop"),
+        ([(1, 2), (1, 2)], "twice"),
+    ],
+)
+def test_bad_edges_stop_the_build(tmp_path, pairs, message):
+    wiki = make_corpus(tmp_path)
+    write_edges(wiki, pairs)
+    with pytest.raises(ValueError, match=message):
+        wc.build_manifest_data(wiki, {})
+
+
+def test_edge_file_with_wrong_keys_or_count_is_refused(tmp_path):
+    wiki = make_corpus(tmp_path)
+    (wiki / wc.EDGES_NAME).write_text(
+        json.dumps({"source_id": 1, "target_id": 2, "click_count": 0}) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="bad edge"):
+        wc.build_manifest_data(wiki, {})

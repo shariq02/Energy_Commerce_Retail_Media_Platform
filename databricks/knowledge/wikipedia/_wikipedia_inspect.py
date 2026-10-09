@@ -33,7 +33,16 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration
 # Columns skipped for approx_count_distinct: identifiers and free text.
-HIGH_CARDINALITY_SKIP = {"article_id", "title", "revision_id", "sections"}
+HIGH_CARDINALITY_SKIP = {
+    "article_id",
+    "title",
+    "revision_id",
+    "sections",
+    "prev_title",
+    "curr_title",
+    "prev_article_id",
+    "curr_article_id",
+}
 
 # Boolean/status columns recognised as quality flags by name.
 _FLAG_COL_PATTERN = _re.compile(
