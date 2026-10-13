@@ -40,6 +40,13 @@ GOLD_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_selected"
 CLICKSTREAM_ROOT = "/Volumes/samples/databricks/datasets/wikipedia-datasets/data-001/clickstream/raw-uncompressed-json"
 CLICKSTREAM_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_clickstream"
 EDGES_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_edges"
+CHUNKS_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_chunks"
+CHUNKS_STAGING_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_chunks_staging"
+MODEL_VOLUME = "models"
+# model.onnx, tokenizer.json and model_hashes.json of all-MiniLM-L6-v2, put there by
+# scripts/knowledge/wikipedia_model_upload.py from the local model folder.
+MODEL_DIR = f"/Volumes/{CATALOG}/{SCHEMA}/{MODEL_VOLUME}/all-MiniLM-L6-v2"
+MODEL_HASHES_FILE = "model_hashes.json"
 LINK_TYPE = "link"
 SNAPSHOT = "wikipedia_samples_2015"
 SOURCE_SYSTEM = "wikipedia_samples"

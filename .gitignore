@@ -44,6 +44,8 @@ data/processed/
 !ai/knowledge_corpus/wikipedia/manifest.json
 ai/knowledge_corpus/wikipedia/shards/
 ai/knowledge_corpus/wikipedia/edges.jsonl
+ai/knowledge_corpus/wikipedia/chunks.parquet
+ai/knowledge_corpus/wikipedia/chunks.tmp
 
 # Logs
 logs/
@@ -82,7 +84,8 @@ override.tf.json
 databricks/.databricks/
 
 # ChromaDB / vector store
-ai/vector_store/data/
+# A link to ~/.local/share/ecrmap/vector_store_data on the Linux disk.
+ai/vector_store/data
 chroma_db/
 *.chroma/
 
@@ -121,3 +124,5 @@ desktop.ini
 
 #Graphify
 graphify-out/
+# Claude Code local settings and hooks
+.claude/

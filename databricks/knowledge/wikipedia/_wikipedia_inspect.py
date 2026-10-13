@@ -42,6 +42,11 @@ HIGH_CARDINALITY_SKIP = {
     "curr_title",
     "prev_article_id",
     "curr_article_id",
+    "chunk_id",
+    "text",
+    "text_hash",
+    "article_content_hash",
+    "vector",
 }
 
 # Boolean/status columns recognised as quality flags by name.

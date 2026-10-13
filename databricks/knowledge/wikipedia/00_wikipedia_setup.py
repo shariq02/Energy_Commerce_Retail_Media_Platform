@@ -34,6 +34,28 @@ print(f"OK  schema ready: {CATALOG}.{SCHEMA}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Create the model volume
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.{MODEL_VOLUME}")
+print(f"OK  volume ready: {CATALOG}.{SCHEMA}.{MODEL_VOLUME}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Check the model files (needed by notebook 05)
+missing = [
+    name
+    for name in ("model.onnx", "tokenizer.json", MODEL_HASHES_FILE)
+    if not os.path.isfile(os.path.join(MODEL_DIR, name))
+]
+if missing:
+    print(
+        f"WARN {missing} not in {MODEL_DIR}: run "
+        "python -m scripts.knowledge.wikipedia_model_upload before notebook 05"
+    )
+else:
+    print(f"OK  model files present in {MODEL_DIR}")
+
+# COMMAND ----------
+
 # DBTITLE 1,Assert the audit log exists
 if not spark.catalog.tableExists(AUDIT_TABLE):
     raise RuntimeError(
