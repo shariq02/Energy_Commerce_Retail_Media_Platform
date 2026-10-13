@@ -381,3 +381,107 @@ _Generated: 2026-10-13T18:37Z_
 | row_count | rows | 8831.0 |  | INFO | INFO |  |
 
 <!-- END wikipedia:04_wikipedia_clickstream_gold__wikipedia_edges -->
+
+<!-- BEGIN wikipedia:05_wikipedia_chunks_gold__wikipedia_chunks -->
+## wikipedia_chunks
+
+_Generated: 2026-10-13T23:27Z_
+
+### cardinality
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| distinct:piece | approx_distinct | 410.0 |  | INFO | INFO |  |
+| distinct:section | approx_distinct | 54580.0 |  | INFO | INFO |  |
+| distinct:section_index | approx_distinct | 410.0 |  | INFO | INFO |  |
+| distinct:token_count | approx_distinct | 259.0 |  | INFO | INFO |  |
+| distinct:selection_terms_hash | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:model_onnx_sha256 | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:tokenizer_sha256 | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_knowledge_loaded_at | approx_distinct | 11.0 |  | INFO | INFO |  |
+| distinct:_knowledge_run_id | approx_distinct | 1.0 |  | INFO | INFO |  |
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:chunk_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:article_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:piece | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:section | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:section_index | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:text | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:token_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:text_hash | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:article_content_hash | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:vector | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:selection_terms_hash | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:model_onnx_sha256 | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:tokenizer_sha256 | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_knowledge_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_knowledge_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['chunk_id'] |
+
+### numeric
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| min:article_id | min | 663.0 |  | INFO | INFO |  |
+| max:article_id | max | 48017916.0 |  | INFO | INFO |  |
+| zero_count:article_id | count | 0.0 |  | INFO | INFO |  |
+| negative_count:article_id | count | 0.0 |  | INFO | INFO |  |
+| min:piece | min | 0.0 |  | INFO | INFO |  |
+| max:piece | max | 410.0 |  | INFO | INFO |  |
+| zero_count:piece | count | 33305.0 |  | INFO | INFO |  |
+| negative_count:piece | count | 0.0 |  | INFO | INFO |  |
+| min:section_index | min | 0.0 |  | INFO | INFO |  |
+| max:section_index | max | 422.0 |  | INFO | INFO |  |
+| zero_count:section_index | count | 48257.0 |  | INFO | INFO |  |
+| negative_count:section_index | count | 0.0 |  | INFO | INFO |  |
+| min:token_count | min | 3.0 |  | INFO | INFO |  |
+| max:token_count | max | 256.0 |  | INFO | INFO |  |
+| zero_count:token_count | count | 0.0 |  | INFO | INFO |  |
+| negative_count:token_count | count | 0.0 |  | INFO | INFO |  |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
+| column_count | count | 17.0 |  | INFO | INFO |  |
+
+### transformation_specific
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| articles_read | value | 33443.0 |  | INFO | INFO | 33443 |
+| sections_read | value | 178576.0 |  | INFO | INFO | 178576 |
+| link_list_sections_dropped | value | 36000.0 |  | INFO | INFO | 36000 |
+| sentences_left_out | value | 8052.0 |  | INFO | INFO | 8052 |
+| chunks_written | value | 209100.0 |  | INFO | INFO | 209100 |
+| articles_without_chunk | value | 138.0 |  | INFO | INFO | 138 |
+| chunk_seconds | value | 505.0 |  | INFO | INFO | 505 |
+| embed_seconds | value | 192.0 |  | INFO | INFO | 192 |
+| chunks_per_second | value | 1088.0 |  | INFO | INFO | 1088 |
+| execution_provider | value |  |  | INFO | INFO | CUDAExecutionProvider |
+| max_norm_error | value | 5.960464477539063e-08 |  | INFO | INFO | 5.960464477539063e-08 |
+| model_onnx_sha256 | value |  |  | INFO | INFO | 4f148ba8ae9c2c7fbee4af2b132db8d06c6a6545b47fc83bbb98c3d22b8393e6 |
+| tokenizer_sha256 | value |  |  | INFO | INFO | da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0 |
+| selection_terms_hash | value |  |  | INFO | INFO | fe2e704bc4dd5e4b8ca16e99524fce4df7ff3d1b4cacbeda9a4120b4432eb01f |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 209100.0 |  | INFO | INFO |  |
+
+<!-- END wikipedia:05_wikipedia_chunks_gold__wikipedia_chunks -->
