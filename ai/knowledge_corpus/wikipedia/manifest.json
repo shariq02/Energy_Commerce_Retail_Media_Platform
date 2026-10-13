@@ -38,8 +38,13 @@
     "wind power": 321
   },
   "corpus_id": "wikipedia",
-  "corpus_version": 1,
-  "fingerprint": "723914da924b1e0591b54cf2079ba4f9ecf41eba1c89ad76fdfb6e9e2564560b",
+  "corpus_version": 2,
+  "edges": {
+    "edges": 8831,
+    "file": "edges.jsonl",
+    "sha256": "6969f49ecc0d9ab447ee3c12cd81263829d10acb843b12e59d0bdf17dacbbb9e"
+  },
+  "fingerprint": "0cd9856dc646f2e1c2998b1f65d462de3ab9f7f427617b40b905a1dfacc02ebe",
   "mode": "development",
   "selection": {
     "article_count": 33443,

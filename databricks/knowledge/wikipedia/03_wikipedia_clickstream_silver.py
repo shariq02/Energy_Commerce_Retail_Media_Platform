@@ -90,11 +90,9 @@ deduplicated = (
 # COMMAND ----------
 
 # DBTITLE 1,Flag self-loops and add provenance
-silver = deduplicated.withColumn(
-    "is_self_loop",
-    (F.col("prev_id") == F.col("curr_id"))
-    | (F.col("prev_title") == F.col("curr_title")),
-)
+same_id = F.coalesce(F.col("prev_id") == F.col("curr_id"), F.lit(False))
+same_title = F.coalesce(F.col("prev_title") == F.col("curr_title"), F.lit(False))
+silver = deduplicated.withColumn("is_self_loop", same_id | same_title)
 silver = add_knowledge_provenance(silver, "clickstream", RID)
 
 # COMMAND ----------
