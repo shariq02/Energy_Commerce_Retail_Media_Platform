@@ -20,10 +20,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ai.embeddings.progress import progress_line, show
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import wikipedia_prepare as wp
 
@@ -34,6 +36,8 @@ SHARD_DIR_NAME = "shards"
 TERMS_NAME = "selection_terms.yml"
 MANIFEST_NAME = "manifest.json"
 EDGES_NAME = "edges.jsonl"
+# Chunks and vectors made in Databricks; read by the embedding build.
+CHUNKS_NAME = "chunks.parquet"
 EDGE_KEYS = {"source_id", "target_id", "click_count"}
 
 
@@ -46,15 +50,22 @@ def read_shard(path: Path) -> list[dict]:
     return articles
 
 
-def scan_shards(shard_dir: Path) -> tuple[list[dict], list[dict]]:
-    """Return every article and one entry per shard (name, SHA-256, count)."""
+def scan_shards(shard_dir: Path, progress=None) -> tuple[list[dict], list[dict]]:
+    """Return every article and one entry per shard (name, SHA-256, count).
+
+    `progress`, when given, gets one line per shard file.
+    """
     articles, entries = [], []
-    for path in sorted(shard_dir.glob("shard_*.jsonl")):
+    paths = sorted(shard_dir.glob("shard_*.jsonl"))
+    started = time.monotonic()
+    for number, path in enumerate(paths, 1):
         shard = read_shard(path)
         articles.extend(shard)
         entries.append(
             {"name": path.name, "sha256": uc.sha256_file(path), "articles": len(shard)}
         )
+        if progress:
+            progress(progress_line("shards", number, len(paths), started, "files"))
     if not articles:
         raise FileNotFoundError(f"no shard files with articles in {shard_dir}")
     ids = [unit["unit_id"] for unit in articles]
@@ -126,8 +137,8 @@ def approval_status(approval: dict | None, selection: dict) -> str:
     return "approved" if same else "stale"
 
 
-def build_manifest_data(wiki_dir: Path, previous: dict) -> dict:
-    articles, shards = scan_shards(wiki_dir / SHARD_DIR_NAME)
+def build_manifest_data(wiki_dir: Path, previous: dict, progress=None) -> dict:
+    articles, shards = scan_shards(wiki_dir / SHARD_DIR_NAME, progress)
     selection = current_selection(wiki_dir, articles)
     edges = scan_edges(wiki_dir / EDGES_NAME, articles)
     fingerprint = uc.sha256_text(
@@ -141,7 +152,7 @@ def build_manifest_data(wiki_dir: Path, previous: dict) -> dict:
         version += 1
     record = dict(previous.get("approval") or {})
     record["status"] = approval_status(record, selection)
-    return {
+    data = {
         "corpus_id": CORPUS_ID,
         "mode": MODE,
         "snapshot": articles[0]["snapshot"],
@@ -156,6 +167,10 @@ def build_manifest_data(wiki_dir: Path, previous: dict) -> dict:
         ),
         "approval": record,
     }
+    # The embedding build owns this key; a rebuild of the manifest keeps it.
+    if "embedding" in previous:
+        data["embedding"] = previous["embedding"]
+    return data
 
 
 def read_previous(wiki_dir: Path) -> dict:
@@ -223,7 +238,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("approve needs --approver")
 
     previous = read_previous(args.wiki_dir)
-    data = build_manifest_data(args.wiki_dir, previous)
+    show("Reading the shards")
+    data = build_manifest_data(args.wiki_dir, previous, show)
     if args.command == "approve":
         today = datetime.now(UTC).date().isoformat()
         data = approved_manifest(previous, data, args.approver.strip(), today)

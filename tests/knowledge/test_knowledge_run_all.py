@@ -26,6 +26,7 @@ def test_steps_run_in_order():
         "tokens",
         "wikipedia_fetch",
         "wikipedia",
+        "embeddings",
     ]
 
 
@@ -235,6 +236,7 @@ def test_fetch_step_skips_without_settings_and_when_files_exist(
     assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
     assert "settings are not all set" in capsys.readouterr().out
     (wiki / "edges.jsonl").write_text("{}\n", encoding="utf-8")
+    (wiki / "chunks.parquet").write_bytes(b"")
     assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
     assert "already local" in capsys.readouterr().out
 
@@ -288,7 +290,23 @@ def test_fetch_step_fetches_only_the_missing_parts(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(ra.wf, "main", lambda argv: calls.append(argv) or 0)
     assert ra.step_wikipedia_fetch(wiki_args(tmp_path)) == 0
-    assert calls[0] == ["--wiki-dir", str(wiki), "--part", "edges", "--dry-run"]
+    assert calls[0] == [
+        "--wiki-dir",
+        str(wiki),
+        "--part",
+        "edges",
+        "--part",
+        "chunks",
+        "--dry-run",
+    ]
     (wiki / "edges.jsonl").write_text("{}\n", encoding="utf-8")
+    assert ra.missing_parts(wiki_args(tmp_path)) == ["chunks"]
+    (wiki / "chunks.parquet").write_bytes(b"")
     assert ra.missing_parts(wiki_args(tmp_path)) == []
-    assert ra.missing_parts(wiki_args(tmp_path, refresh=True)) == ["articles", "edges"]
+    (wiki / "shards" / "shard_00001.jsonl").unlink()
+    assert ra.missing_parts(wiki_args(tmp_path)) == ["articles", "chunks"]
+    assert ra.missing_parts(wiki_args(tmp_path, refresh=True)) == [
+        "articles",
+        "edges",
+        "chunks",
+    ]

@@ -60,6 +60,16 @@ def load_wikipedia_text() -> dict:
     )
 
 
+def load_wikipedia_chunks() -> dict:
+    """`databricks/knowledge/wikipedia/_wikipedia_chunks.py` alone: numpy and the
+    standard library at import; the model libraries load inside functions."""
+    namespace: dict = {"__name__": "_wikipedia_chunks_under_test"}
+    return _exec_notebook(
+        REPO_ROOT / "databricks" / "knowledge" / "wikipedia" / "_wikipedia_chunks.py",
+        namespace,
+    )
+
+
 def load_silver_common() -> dict:
     """Executes `databricks/silver/_silver_common.py` into a fresh namespace
     and returns it -- the pure (non-Spark-API) functions defined there are

@@ -5,9 +5,11 @@ Author: Sharique Mohammad
 Date: October 2026
 
 Steps: units (build), authored (written bodies, skipped when there is no index),
-tokens (size check), wikipedia_fetch (the selected articles and edges from
-Databricks; each part only when its local files are missing or --refresh-wikipedia
-is given, and when the Databricks settings are in .env), wikipedia (corpus manifest); stops at the first failure. It first runs every step as a
+tokens (size check), wikipedia_fetch (the selected articles, edges and chunks
+with vectors from Databricks; each part only when its local files are missing or --refresh-wikipedia
+is given, and when the Databricks settings are in .env), wikipedia (corpus manifest),
+embeddings (collection, keyword index and graph of each approved corpus, in the
+write pass only; a corpus that waits for approval is skipped); stops at the first failure. It first runs every step as a
 dry run and prints the plan. In an interactive terminal it then asks whether to
 apply (y or yes), runs the steps again to write, and asks what to approve.
 --apply skips the question; without a terminal nothing is written.
@@ -24,6 +26,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from ai.embeddings import build as eb
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import approve_units as au
 from scripts.knowledge import author_units as auth
@@ -94,9 +97,19 @@ def has_edges(args: argparse.Namespace) -> bool:
     return (wiki_dir(args) / wc.EDGES_NAME).is_file()
 
 
+def has_chunks(args: argparse.Namespace) -> bool:
+    return (wiki_dir(args) / wc.CHUNKS_NAME).is_file()
+
+
 def missing_parts(args: argparse.Namespace) -> list[str]:
     """The Wikipedia parts to fetch: every part on refresh, else the missing ones."""
-    local = {"articles": has_articles(args), "edges": has_edges(args)}
+    local = {
+        "articles": has_articles(args),
+        "edges": has_edges(args),
+        "chunks": has_chunks(args),
+    }
+    # New articles make the old chunk file stale, so the chunks come with them.
+    local["chunks"] = local["chunks"] and local["articles"]
     return [p for p in wf.PARTS if args.refresh_wikipedia or not local[p]]
 
 
@@ -107,7 +120,8 @@ def step_wikipedia_fetch(args: argparse.Namespace) -> int:
     parts = missing_parts(args)
     if not parts:
         print(
-            "Wikipedia articles and edges are already local. Use --refresh-wikipedia."
+            "Wikipedia articles, edges and chunks are already local. "
+            "Use --refresh-wikipedia."
         )
         return 0
     if wf.connection_settings() is None:
@@ -126,12 +140,36 @@ def step_wikipedia(args: argparse.Namespace) -> int:
     return wc.main(["build", "--wiki-dir", str(wiki_dir(args)), *write_mode(args)])
 
 
+def step_embeddings(args: argparse.Namespace) -> int:
+    ready = []
+    for name in eb.CORPORA:
+        reason = eb.not_ready(name, args.corpus_dir)
+        if reason:
+            print(f"{name}: {reason}, so the embedding build is skipped.")
+        else:
+            ready.append(name)
+    if not args.apply:
+        # The preparation reads every article, so it runs once, in the write pass.
+        for name in ready:
+            print(f"{name}: ready; planned and built after you answer y.")
+        return 0
+    argv = ["--corpus-dir", str(args.corpus_dir), "--apply"]
+    if args.tokenizer is not None:
+        argv += ["--model-dir", str(args.tokenizer.parent)]
+    for name in ready:
+        code = eb.main(["build", "--corpus", name, *argv])
+        if code != 0:
+            return code
+    return 0
+
+
 STEPS = [
     ("units", step_units),
     ("authored", step_authored),
     ("tokens", step_tokens),
     ("wikipedia_fetch", step_wikipedia_fetch),
     ("wikipedia", step_wikipedia),
+    ("embeddings", step_embeddings),
 ]
 
 

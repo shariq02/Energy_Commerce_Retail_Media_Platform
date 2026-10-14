@@ -35,9 +35,14 @@ class Row:
 
 
 class FakeCursor:
-    def __init__(self, checks, articles, edges):
+    def __init__(self, checks, articles, edges, chunks=None):
         self.checks, self.articles, self.edges = checks, list(articles), list(edges)
+        self.chunks = chunks
         self.query = ""
+
+    def fetchall(self):
+        # Only the chunk table lookup uses fetchall.
+        return [("knowledge", "wikipedia_chunks")] if self.chunks is not None else []
 
     def execute(self, query):
         self.query = query
@@ -50,6 +55,10 @@ class FakeCursor:
         chunk = rows[:size]
         del rows[:size]
         return [Row(item) for item in chunk]
+
+    def fetchmany_arrow(self, size):
+        part, self.chunks = self.chunks.slice(0, size), self.chunks.slice(size)
+        return part
 
     def __enter__(self):
         return self
@@ -96,7 +105,24 @@ def edge_rows(pairs):
     ]
 
 
-def setup(tmp_path, count=5, hash_override=None, articles=None, edges=None):
+def chunk_table(count):
+    pa = pytest.importorskip("pyarrow")
+    return pa.Table.from_pylist(
+        [
+            {
+                "chunk_id": f"wikipedia.{number}#0",
+                "article_id": number,
+                "piece": 0,
+                "vector": [0.5, 0.5],
+            }
+            for number in range(1, count + 1)
+        ]
+    )
+
+
+def setup(
+    tmp_path, count=5, hash_override=None, articles=None, edges=None, chunks=True
+):
     wiki = tmp_path / "wikipedia"
     wiki.mkdir()
     (wiki / wc.TERMS_NAME).write_text(TERMS_TEXT, encoding="utf-8")
@@ -111,8 +137,10 @@ def setup(tmp_path, count=5, hash_override=None, articles=None, edges=None):
             "hashes": 1,
             "terms_hash": terms_hash,
         },
+        wf.CHUNK_CHECK_QUERY: {"n": count, "hashes": 1, "terms_hash": terms_hash},
     }
-    return wiki, (lambda: FakeConnection(FakeCursor(checks, rows, edge_list)))
+    table = chunk_table(count) if chunks else None
+    return wiki, (lambda: FakeConnection(FakeCursor(checks, rows, edge_list, table)))
 
 
 def test_fetch_writes_files_and_the_corpus_accepts_them(tmp_path):
@@ -229,3 +257,34 @@ def test_edges_table_built_with_other_terms_is_refused(tmp_path):
     with pytest.raises(ValueError, match="other selection terms"):
         wf.main(argv, connect=connect)
     assert not (wiki / wc.EDGES_NAME).exists()
+
+
+def test_chunks_part_writes_the_parquet_file(tmp_path, capsys):
+    pq = pytest.importorskip("pyarrow.parquet")
+    wiki, connect = setup(tmp_path, count=4)
+    argv = ["--wiki-dir", str(wiki), "--part", "chunks", "--apply"]
+    assert wf.main(argv, connect=connect) == 0
+    table = pq.read_table(wiki / wc.CHUNKS_NAME)
+    assert table.num_rows == 4
+    assert "[chunks] 4/4 rows (100.0%)" in capsys.readouterr().out
+    assert table.column("vector").to_pylist()[0] == [0.5, 0.5]
+    assert not (wiki / wc.SHARD_DIR_NAME).exists()
+
+
+def test_chunks_part_is_skipped_until_notebook_05_made_its_table(tmp_path, capsys):
+    wiki, connect = setup(tmp_path, chunks=False)
+    assert wf.main(["--wiki-dir", str(wiki), "--apply"], connect=connect) == 0
+    assert "run notebook 05 first" in capsys.readouterr().out
+    assert len(list((wiki / wc.SHARD_DIR_NAME).glob("shard_*.jsonl"))) == 1
+    assert not (wiki / wc.CHUNKS_NAME).exists()
+    argv = ["--wiki-dir", str(wiki), "--part", "chunks", "--apply"]
+    assert wf.main(argv, connect=connect) == 0
+
+
+def test_new_articles_remove_an_old_chunk_file(tmp_path, capsys):
+    wiki, connect = setup(tmp_path)
+    (wiki / wc.CHUNKS_NAME).write_bytes(b"old")
+    argv = ["--wiki-dir", str(wiki), "--part", "articles", "--apply"]
+    assert wf.main(argv, connect=connect) == 0
+    assert not (wiki / wc.CHUNKS_NAME).exists()
+    assert "Removed the old chunks.parquet" in capsys.readouterr().out

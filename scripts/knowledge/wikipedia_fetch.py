@@ -4,17 +4,19 @@ ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-Reads knowledge.wikipedia_selected and knowledge.wikipedia_edges through the
-Databricks SQL connector. The articles go to JSON Lines files in
-ai/knowledge_corpus/wikipedia/shards/, the edges to edges.jsonl beside them.
---part chooses articles, edges or both (default both); each part replaces its own
-files only. It checks first that the tables were built with the local selection
-terms, prints the plan and asks before writing (y or yes); --apply writes without
+Reads knowledge.wikipedia_selected, knowledge.wikipedia_edges and
+knowledge.wikipedia_chunks through the Databricks SQL connector. The articles go to
+JSON Lines files in ai/knowledge_corpus/wikipedia/shards/, the edges to edges.jsonl
+beside them, the chunks with their vectors to chunks.parquet. --part chooses
+articles, edges or chunks (default all three); each part replaces its own files
+only, and new articles remove an old chunk file, whose chunks would not match
+them. The chunks part is skipped while notebook 05 has not made its table yet. It
+checks first that the tables were built with the local selection terms, prints the plan and asks before writing (y or yes); --apply writes without
 asking, --dry-run never writes. Settings come from .env: DATABRICKS_HOST,
 DATABRICKS_TOKEN_SQL and DATABRICKS_HTTP_PATH (the HTTP path of a SQL warehouse).
 
 Usage (repository root):
-    python -m scripts.knowledge.wikipedia_fetch [--part articles] [--part edges]
+    python -m scripts.knowledge.wikipedia_fetch [--part articles] [--part chunks]
 """
 
 from __future__ import annotations
@@ -23,8 +25,10 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
+from ai.embeddings.progress import progress_line, show
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import wikipedia_corpus as wc
 from scripts.knowledge import wikipedia_prepare as wp
@@ -37,9 +41,11 @@ except ImportError:  # the connector is only needed for a real fetch
 CATALOG = "energy_commerce_retail_media"
 SELECTED_TABLE = f"{CATALOG}.knowledge.wikipedia_selected"
 EDGES_TABLE = f"{CATALOG}.knowledge.wikipedia_edges"
-PARTS = ("articles", "edges")
+CHUNKS_TABLE = f"{CATALOG}.knowledge.wikipedia_chunks"
+PARTS = ("articles", "edges", "chunks")
 ARTICLES_PER_FILE = 1000
 FETCH_SIZE = 1000
+CHUNK_FETCH_SIZE = 10000
 ENV_KEYS = ("DATABRICKS_HOST", "DATABRICKS_TOKEN_SQL", "DATABRICKS_HTTP_PATH")
 CHECK_QUERY = (
     "SELECT COUNT(*) AS n, COUNT(DISTINCT terms_hash) AS hashes, "
@@ -48,6 +54,28 @@ CHECK_QUERY = (
 EDGE_CHECK_QUERY = (
     "SELECT COUNT(*) AS n, COUNT(DISTINCT selection_terms_hash) AS hashes, "
     f"MIN(selection_terms_hash) AS terms_hash FROM {EDGES_TABLE}"
+)
+CHUNK_TABLE_QUERY = f"SHOW TABLES IN {CATALOG}.knowledge LIKE 'wikipedia_chunks'"
+CHUNK_CHECK_QUERY = (
+    "SELECT COUNT(*) AS n, COUNT(DISTINCT selection_terms_hash) AS hashes, "
+    f"MIN(selection_terms_hash) AS terms_hash FROM {CHUNKS_TABLE}"
+)
+CHUNK_COLUMNS = (
+    "chunk_id",
+    "article_id",
+    "piece",
+    "section",
+    "section_index",
+    "text",
+    "token_count",
+    "text_hash",
+    "article_content_hash",
+    "model_onnx_sha256",
+    "tokenizer_sha256",
+    "vector",
+)
+CHUNK_QUERY = (
+    f"SELECT {', '.join(CHUNK_COLUMNS)} FROM {CHUNKS_TABLE} ORDER BY article_id, piece"
 )
 ARTICLE_QUERY = (
     "SELECT article_id, title, revision_id, revision_timestamp, term_index, "
@@ -138,10 +166,13 @@ def clear_files(shard_dir: Path) -> None:
         path.unlink()
 
 
-def write_articles(cursor, terms: wp.Terms, shard_dir: Path) -> list[dict]:
+def write_articles(
+    cursor, terms: wp.Terms, shard_dir: Path, total: int = 0, say=show
+) -> list[dict]:
     """Stream the article rows into numbered files; returns one entry per file."""
     clear_files(shard_dir)
     entries, buffer = [], []
+    done, started = 0, time.monotonic()
 
     def flush() -> None:
         name = wp.shard_name(len(entries) + 1)
@@ -155,15 +186,17 @@ def write_articles(cursor, terms: wp.Terms, shard_dir: Path) -> list[dict]:
             buffer.append(row_to_unit(row.asDict(), terms))
             if len(buffer) == ARTICLES_PER_FILE:
                 flush()
+        done += len(rows)
+        say(progress_line("articles", done, total or done, started, "rows"))
     if buffer:
         flush()
     return entries
 
 
-def write_edges(cursor, path: Path) -> int:
+def write_edges(cursor, path: Path, total: int = 0, say=show) -> int:
     """Stream the edge rows into one JSON Lines file; returns the edge count."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    count = 0
+    count, started = 0, time.monotonic()
     temp = path.with_suffix(".tmp")
     cursor.execute(EDGE_QUERY)
     with temp.open("w", encoding="utf-8", newline="\n") as handle:
@@ -177,7 +210,32 @@ def write_edges(cursor, path: Path) -> int:
                 }
                 handle.write(json.dumps(edge, sort_keys=True) + "\n")
                 count += 1
+            say(progress_line("edges", count, total or count, started, "rows"))
     temp.replace(path)
+    return count
+
+
+def write_chunks(cursor, path: Path, total: int = 0, say=show) -> int:
+    """Stream the chunk rows with their vectors into one Parquet file; returns the count."""
+    import pyarrow.parquet as pq
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(".tmp")
+    count, writer = 0, None
+    started = time.monotonic()
+    cursor.execute(CHUNK_QUERY)
+    try:
+        while (table := cursor.fetchmany_arrow(CHUNK_FETCH_SIZE)).num_rows:
+            if writer is None:
+                writer = pq.ParquetWriter(temp, table.schema)
+            writer.write_table(table)
+            count += table.num_rows
+            say(progress_line("chunks", count, total or count, started, "rows"))
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is not None:
+        temp.replace(path)
     return count
 
 
@@ -201,9 +259,20 @@ def main(argv: list[str] | None = None, connect=None) -> int:
 
     shard_dir = args.wiki_dir / wc.SHARD_DIR_NAME
     edges_path = args.wiki_dir / wc.EDGES_NAME
+    chunks_path = args.wiki_dir / wc.CHUNKS_NAME
     counts, written = {}, {}
     try:
         with connect() as connection, connection.cursor() as cursor:
+            if "chunks" in parts:
+                cursor.execute(CHUNK_TABLE_QUERY)
+                if not cursor.fetchall():
+                    print(
+                        f"{CHUNKS_TABLE} does not exist yet: run notebook 05 first; "
+                        "the chunks part is skipped."
+                    )
+                    parts = [part for part in parts if part != "chunks"]
+                    if not parts:
+                        return 0
             if "articles" in parts:
                 counts["articles"] = check_table(
                     cursor, terms, CHECK_QUERY, SELECTED_TABLE
@@ -216,19 +285,34 @@ def main(argv: list[str] | None = None, connect=None) -> int:
                 )
                 print(f"{EDGES_TABLE}: {counts['edges']} edges")
                 print(f"Target: {edges_path} (replaced)")
+            if "chunks" in parts:
+                counts["chunks"] = check_table(
+                    cursor, terms, CHUNK_CHECK_QUERY, CHUNKS_TABLE
+                )
+                print(f"{CHUNKS_TABLE}: {counts['chunks']} chunks")
+                print(f"Target: {chunks_path} (replaced)")
             print(f"Rule version {terms.version}")
             if not args.apply and (args.dry_run or not uc.confirm_apply()):
                 print(uc.NOT_WRITTEN)
                 return 0
             if "articles" in parts:
-                entries = write_articles(cursor, terms, shard_dir)
+                show("Fetching the articles")
+                entries = write_articles(cursor, terms, shard_dir, counts["articles"])
                 written["articles"] = sum(entry["articles"] for entry in entries)
                 print(
                     f"Written: {written['articles']} articles in {len(entries)} file(s)"
                 )
+                if "chunks" not in parts and chunks_path.exists():
+                    chunks_path.unlink()
+                    print(f"Removed the old {chunks_path.name}: fetch the chunks again")
             if "edges" in parts:
-                written["edges"] = write_edges(cursor, edges_path)
+                show("Fetching the edges")
+                written["edges"] = write_edges(cursor, edges_path, counts["edges"])
                 print(f"Written: {written['edges']} edges")
+            if "chunks" in parts:
+                show("Fetching the chunks with their vectors")
+                written["chunks"] = write_chunks(cursor, chunks_path, counts["chunks"])
+                print(f"Written: {written['chunks']} chunks")
     except DatabricksError as error:
         print("\n".join(describe_error(error)))
         return 1
