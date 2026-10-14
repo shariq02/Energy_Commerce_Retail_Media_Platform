@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** write the registry and the reproducibility record of each ecosystem to
-# MAGIC `src/schemas/model_findings/<ecosystem>_registry.md`. The files are committed,
+# MAGIC `src/findings/model_findings/<ecosystem>_registry.md`. The files are committed,
 # MAGIC so private paths and e-mail addresses are removed.
 
 # COMMAND ----------
@@ -39,7 +39,7 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-FINDINGS_SUBDIR = "src/schemas/model_findings"
+FINDINGS_SUBDIR = "src/findings/model_findings"
 
 # COMMAND ----------
 

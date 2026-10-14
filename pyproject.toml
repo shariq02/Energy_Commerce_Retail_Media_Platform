@@ -20,6 +20,10 @@ dependencies = [
     "databricks-sdk>=0.20.0",
     "databricks-sql-connector>=3.0.0",
     "chromadb>=0.5.0",
+    "rank_bm25>=0.2.1",
+    "networkx>=3.6.1",
+    "onnxruntime>=1.28.0",
+    "tokenizers>=0.23.1",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "requests>=2.31.0",
@@ -35,7 +39,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.12.0",
     "pytest-asyncio>=0.23.0",
-    "ruff==0.15.8",
+    "ruff==0.16.2",
 ]
 
 [tool.setuptools.packages.find]
@@ -66,6 +70,10 @@ extend-ignore = ["E402", "BLE001"]
 # fully lint-clean.
 "databricks/eda/*/*_eda.py" = ["F821"]
 "databricks/eda/*/*_relationships_and_findings.py" = ["F821"]
+# _wikipedia_eda_common.py is %run after _eda_common and _samples_eda_common (never
+# first) and uses their column helpers (qcol, as_str, is_missing, to_double).
+"databricks/eda/_wikipedia_eda_common.py" = ["F821"]
+"databricks/knowledge/wikipedia/*.py" = ["F821"]
 # Silver source notebooks pull `%run ../../_silver_common` (a Databricks
 # runtime magic). databricks/silver/_silver_common.py is NOT exempted.
 "databricks/silver/[0-9]*_*.py" = ["F821"]
@@ -89,6 +97,7 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/gold/energy/**/*.py" = ["F821"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
 "databricks/utility/07_gold_legacy_retirement.py" = ["F821"]
+"databricks/utility/09_update_model_card_paths.py" = ["F821"]
 # Analytics notebooks pull `%run ../gold/_gold_common` then `%run ./_analytics_common`
 # (Databricks runtime magic), same chain shape as Gold's own. _analytics_common.py
 # and _analytics_inspect.py are the second/third links, depending on _gold_common's

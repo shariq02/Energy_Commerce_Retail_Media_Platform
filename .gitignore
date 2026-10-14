@@ -38,6 +38,14 @@ data/processed/
 *.parquet
 *.json.gz
 *.json
+# The approved knowledge corpus manifest is committed.
+!ai/knowledge_corpus/manifest.json
+# The Wikipedia corpus manifest and selection rule are committed; its shards are not.
+!ai/knowledge_corpus/wikipedia/manifest.json
+ai/knowledge_corpus/wikipedia/shards/
+ai/knowledge_corpus/wikipedia/edges.jsonl
+ai/knowledge_corpus/wikipedia/chunks.parquet
+ai/knowledge_corpus/wikipedia/chunks.tmp
 
 # Logs
 logs/
@@ -76,7 +84,8 @@ override.tf.json
 databricks/.databricks/
 
 # ChromaDB / vector store
-ai/vector_store/data/
+# A link to ~/.local/share/ecrmap/vector_store_data on the Linux disk.
+ai/vector_store/data
 chroma_db/
 *.chroma/
 
@@ -98,8 +107,11 @@ htmlcov/
 # Local developer utilities (not part of the pipeline)
 scripts/utilities/lint.py
 scripts/utilities/clean_cache.py
+scripts/utilities/check_curated_retrieval.py
 scripts/utilities/run_energy_weather_deepening_acquisition.py
 scripts/utilities/verify_energy_weather_deepening_acquisition.py
+# Local paths of the files that authored knowledge units were written from.
+scripts/knowledge/local_sources.yml
 
 # VS Code
 .vscode/
@@ -113,3 +125,5 @@ desktop.ini
 
 #Graphify
 graphify-out/
+# Claude Code local settings and hooks
+.claude/

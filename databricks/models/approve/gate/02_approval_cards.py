@@ -35,7 +35,7 @@ import re as _re_card
 # DBTITLE 1,Configuration
 COMPONENT = "models/approve/gate/02_approval_cards"
 SOURCE = "models"
-CARDS_SUBDIR = "src/schemas/model_cards"
+CARDS_SUBDIR = "src/model_cards"
 PRIVATE = _re_card.compile(r"/Users/(?!<user>)|[\w.+-]+@[\w-]+\.[\w.]+")
 DOC_REFERENCE = _re_card.compile(r"doc[s]/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
 

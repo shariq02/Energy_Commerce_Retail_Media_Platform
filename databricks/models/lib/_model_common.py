@@ -155,6 +155,41 @@ MODEL_DDL = {
         "tolerance double, status string, detail string, run_id string, "
         "checked_at timestamp"
     ),
+    "monitoring_spec": (
+        "parameter string, parameter_value string, description string, "
+        "run_id string, recorded_at timestamp"
+    ),
+    "reference_profile": (
+        "task_id string, model_name string, registry_version int, "
+        "dataset_id string, frozen_delta_version bigint, subject string, "
+        "value_kind string, n_rows bigint, null_rate double, min_value double, "
+        "max_value double, bin_edges string, bin_shares string, run_id string, "
+        "recorded_at timestamp"
+    ),
+    "model_predictions": (
+        "task_id string, model_name string, registry_version int, "
+        "window_id string, row_key string, prediction double, "
+        "prediction_label string, frozen_delta_version bigint, run_id string, "
+        "scored_at timestamp"
+    ),
+    "monitoring_results": (
+        "task_id string, model_name string, registry_version int, "
+        "window_id string, check_kind string, subject string, value double, "
+        "warning_threshold double, flag_threshold double, level string, "
+        "n_reference bigint, n_window bigint, detail string, run_id string, "
+        "measured_at timestamp"
+    ),
+    "monitoring_flags": (
+        "task_id string, model_name string, registry_version int, "
+        "window_id string, check_kind string, subject string, level string, "
+        "value double, threshold double, detail string, run_id string, "
+        "flagged_at timestamp"
+    ),
+    "monitoring_triggers": (
+        "task_id string, model_name string, registry_version int, "
+        "trigger_kind string, source string, condition string, detail string, "
+        "value double, threshold double, run_id string, raised_at timestamp"
+    ),
 }
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}

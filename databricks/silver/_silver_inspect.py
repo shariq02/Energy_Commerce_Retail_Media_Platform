@@ -22,7 +22,7 @@
 # MAGIC Same two-step shape as `databricks/eda/_eda_common.py`: `inspect_table()`
 # MAGIC computes and returns findings, the calling notebook explicitly calls
 # MAGIC `write_silver_findings()` itself (visible in the notebook, not hidden) to
-# MAGIC write `src/schemas/silver_findings/<source>.md` -- a repo file, one `## `
+# MAGIC write `src/findings/silver_findings/<source>.md` -- a repo file, one `## `
 # MAGIC section per notebook/table, re-run replaces its own section. No database
 # MAGIC table involved.
 
@@ -63,14 +63,14 @@ _FLAG_COL_PATTERN = _re.compile(
 
 # COMMAND ----------
 
-# DBTITLE 1,Findings export (src/schemas/silver_findings/<source>.md)
+# DBTITLE 1,Findings export (src/findings/silver_findings/<source>.md)
 # Same mechanism as databricks/eda/_eda_common.py's write_profiling -- a repo
 # file, not just a table, so findings are readable the same way EDA's
 # profiling docs are.
 
 
 def _findings_dir():
-    d = _os.path.join(repo_root(), "src", "schemas", "silver_findings")
+    d = _os.path.join(repo_root(), "src", "findings", "silver_findings")
     _os.makedirs(d, exist_ok=True)
     return d
 

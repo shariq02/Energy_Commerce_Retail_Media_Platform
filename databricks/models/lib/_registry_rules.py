@@ -29,7 +29,7 @@ import math as _math_registry
 # DBTITLE 1,Registry constants
 LIFECYCLE = ("registered", "deprecated", "retired")
 REGISTRY_ROLES = ("selected", "baseline_fallback")
-CARDS_SUBDIR = "src/schemas/model_cards"
+CARDS_SUBDIR = "src/model_cards"
 # a change in one of these fields creates a new version
 LINK_FIELDS = (
     "decision",

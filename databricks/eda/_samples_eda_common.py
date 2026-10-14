@@ -308,13 +308,13 @@ def looks_delimited(path):
     return bool(lines) and any(sep in lines[0] for sep in SEP_CHOICES)
 
 
-def load_volume_frames(root, max_depth=3):
+def load_volume_frames(root, max_depth=3, cap=400):
     # Lists a Volume directory and returns (entries, kinds, frames). One frame
     # per distinct delimited header (or per JSON / Parquet file set), each with
     # a `__file` column so multi-file datasets stay separable. When no file has
     # a recognised extension, extensionless / unknown files whose first line
     # holds a separator are read as delimited text.
-    entries = list_tree(root, max_depth)
+    entries = list_tree(root, max_depth, cap)
     kinds = classify_files(entries)
     delim = kinds.get("delimited", [])
     js = [e["path"] for e in kinds.get("json", [])]

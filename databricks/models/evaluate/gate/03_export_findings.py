@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** write the evaluation record of each ecosystem to the repository as
-# MAGIC markdown (`src/schemas/model_findings/`): settings, run context, flags, check
+# MAGIC markdown (`src/findings/model_findings/`): settings, run context, flags, check
 # MAGIC results, and per task the validation and held-out values side by side with every
 # MAGIC metric. Smoke runs go to their own files.
 
@@ -40,7 +40,7 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-FINDINGS_SUBDIR = "src/schemas/model_findings"
+FINDINGS_SUBDIR = "src/findings/model_findings"
 RESULT_FIELDS = (
     "task_id",
     "model_name",

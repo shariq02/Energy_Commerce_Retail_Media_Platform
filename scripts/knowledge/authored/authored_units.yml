@@ -1,0 +1,86 @@
+units:
+- unit_id: governance.data_contracts
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.data_quality_gates
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.lineage
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.cross_ecosystem_integration
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.security_and_data_exchange
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.auditability
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.licensing_and_attribution
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: governance.ai_security_and_governance
+  kind: governance
+  ecosystem: shared
+  sources:
+  - governance_design
+- unit_id: pipeline.batch_ingestion
+  kind: pipeline
+  ecosystem: shared
+  sources:
+  - pipeline_design
+- unit_id: pipeline.bronze_architecture
+  kind: pipeline
+  ecosystem: shared
+  sources:
+  - pipeline_design
+- unit_id: pipeline.processing_layers
+  kind: pipeline
+  ecosystem: shared
+  sources:
+  - pipeline_design
+- unit_id: pipeline.execution_model
+  kind: pipeline
+  ecosystem: shared
+  sources:
+  - pipeline_design
+- unit_id: pipeline.idempotency
+  kind: pipeline
+  ecosystem: shared
+  sources:
+  - pipeline_design
+- unit_id: glossary.energy_carriers_and_status_terms
+  kind: glossary
+  ecosystem: energy
+  sources:
+  - localisation_record
+- unit_id: glossary.grid_and_market_terms
+  kind: glossary
+  ecosystem: energy
+  sources:
+  - localisation_record
+- unit_id: glossary.weather_terms
+  kind: glossary
+  ecosystem: energy
+  sources:
+  - localisation_record
+- unit_id: glossary.units_and_conventions
+  kind: glossary
+  ecosystem: energy
+  sources:
+  - localisation_record

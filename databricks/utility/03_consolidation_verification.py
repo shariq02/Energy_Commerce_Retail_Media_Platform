@@ -15,7 +15,7 @@
 # MAGIC **Purpose:** read-only checks on the live catalog for each table
 # MAGIC consolidation candidate -- grain, keys, schema, timestamps, identifiers,
 # MAGIC sparsity, provenance, Silver/Gold duplication. Output goes to
-# MAGIC `src/schemas/consolidation_findings/table_verification.md` (summary and
+# MAGIC `src/findings/consolidation_findings/table_verification.md` (summary and
 # MAGIC per-group verdicts first, then one section per check).
 # MAGIC
 # MAGIC Run all cells in order. Tables are only read; the findings file is the
@@ -48,7 +48,7 @@ RUN_HEAVY = False
 
 VERDICT_ORDER = ["REJECTS", "ERROR", "REVIEW", "SUPPORTS"]
 
-FINDINGS_DIR = ("src", "schemas", "consolidation_findings")
+FINDINGS_DIR = ("src", "findings", "consolidation_findings")
 FINDINGS_FILE = "table_verification.md"
 
 DWD_HOURLY = [

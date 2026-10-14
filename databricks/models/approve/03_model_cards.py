@@ -13,7 +13,7 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** write one model card per approved task to the repository
-# MAGIC (`src/schemas/model_cards/`), from the recorded decisions, evaluation results,
+# MAGIC (`src/model_cards/`), from the recorded decisions, evaluation results,
 # MAGIC flags and run context. The cards are committed, so private paths and e-mail
 # MAGIC addresses are removed.
 
@@ -40,7 +40,7 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-CARDS_SUBDIR = "src/schemas/model_cards"
+CARDS_SUBDIR = "src/model_cards"
 RESULT_FIELDS = (
     "task_id",
     "model_name",

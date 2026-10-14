@@ -15,7 +15,7 @@
 # MAGIC **Purpose:** the reusable post-build inspection framework, pulled into
 # MAGIC every ML notebook with `%run ../../_ml_inspect` after `_ml_common`.
 # MAGIC `inspect_ml_table()` computes findings, the calling notebook writes
-# MAGIC `src/schemas/ml_findings/<ecosystem>.md` with `write_ml_findings()`.
+# MAGIC `src/findings/ml_findings/<ecosystem>.md` with `write_ml_findings()`.
 
 # COMMAND ----------
 
@@ -29,11 +29,11 @@ from pyspark.sql import functions as F
 
 # COMMAND ----------
 
-# DBTITLE 1,Findings export (src/schemas/ml_findings/<source>.md)
+# DBTITLE 1,Findings export (src/findings/ml_findings/<source>.md)
 
 
 def _ml_findings_dir():
-    d = _os.path.join(repo_root(), "src", "schemas", "ml_findings")
+    d = _os.path.join(repo_root(), "src", "findings", "ml_findings")
     _os.makedirs(d, exist_ok=True)
     return d
 

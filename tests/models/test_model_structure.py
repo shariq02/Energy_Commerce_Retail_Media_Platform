@@ -163,6 +163,17 @@ def test_setup_preflight_splits_and_gates_exist():
         "register/gate/03_export_findings.py",
         "lib/_registry_rules.py",
         "lib/_registry_check.py",
+        "operate/00_operate_setup.py",
+        "operate/01_reference_profiles_energy.py",
+        "operate/01_reference_profiles_commerce.py",
+        "operate/02_monitor_energy.py",
+        "operate/02_monitor_commerce.py",
+        "operate/03_performance_and_triggers.py",
+        "operate/gate/01_operate_guards.py",
+        "operate/gate/02_monitoring_guards.py",
+        "operate/gate/03_export_findings.py",
+        "lib/_operate_rules.py",
+        "lib/_operate_windows.py",
     ):
         assert (_MODELS / rel).exists(), rel
     assert (
@@ -218,3 +229,43 @@ def test_registry_check_library_scores_the_earlier_partitions_only():
     text = (_MODELS / "lib" / "_registry_check.py").read_text(encoding="utf-8")
     assert "ALLOWED_PARTITIONS" in text and 'partition = "validation"' in text
     assert "evaluate_task(" not in text and "run_candidate(" not in text
+
+
+_OPERATE = [p for p in _NOTEBOOKS if _rel(p).startswith("operate/")]
+_OPERATE_WINDOW_RUNS = [
+    p for p in _OPERATE if p.name[:2] in ("01", "02") and p.parent.name == "operate"
+]
+_OPERATE_RECORD_ONLY = [p for p in _OPERATE if p not in _OPERATE_WINDOW_RUNS]
+
+
+@pytest.mark.parametrize("path", _OPERATE, ids=_rel)
+def test_operate_notebooks_never_change_a_decision_or_a_registry_row(path):
+    text = path.read_text(encoding="utf-8")
+    pattern = (
+        r"""(?:replace_rows|replace_model_rows)\([^)]*['"]model_(?:registry|approval)"""
+    )
+    assert not re.search(pattern, text), _rel(path)
+    assert 'saveAsTable(model_fqn("model_registry"' not in text, _rel(path)
+    assert 'saveAsTable(model_fqn("model_approval"' not in text, _rel(path)
+
+
+@pytest.mark.parametrize("path", _OPERATE_RECORD_ONLY, ids=_rel)
+def test_operate_record_notebooks_read_recorded_results_only(path):
+    text = path.read_text(encoding="utf-8")
+    assert "load_bundle(" not in text and "evaluate_by_id(" not in text
+    assert "operate_ecosystem(" not in text and ".toPandas(" not in text
+
+
+@pytest.mark.parametrize("path", _OPERATE_WINDOW_RUNS, ids=_rel)
+def test_operate_window_notebooks_use_the_window_library(path):
+    text = path.read_text(encoding="utf-8")
+    for lib in ("_eval_common", "_eval_specs", "_operate_rules", "_operate_windows"):
+        assert f"%run ../lib/{lib}" in text, _rel(path)
+    assert "operate_ecosystem(" in text and "evaluate_by_id(" not in text
+
+
+def test_operate_window_library_scores_no_target():
+    text = (_MODELS / "lib" / "_operate_windows.py").read_text(encoding="utf-8")
+    assert ".score(" not in text.replace("bundle.score(", "")
+    assert "evaluate_task(" not in text and "record_evaluation(" not in text
+    assert "window_partition(" in text and "TEST_PARTITION" in text
