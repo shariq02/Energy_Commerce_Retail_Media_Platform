@@ -44,6 +44,46 @@
     "file": "edges.jsonl",
     "sha256": "6969f49ecc0d9ab447ee3c12cd81263829d10acb843b12e59d0bdf17dacbbb9e"
   },
+  "embedding": {
+    "articles_without_chunks": 138,
+    "build_id": "49256c69116e",
+    "built_on": "2026-10-14",
+    "chunk_count": 209100,
+    "collection": "wikipedia_49256c69116e",
+    "corpus_fingerprint": "0cd9856dc646f2e1c2998b1f65d462de3ab9f7f427617b40b905a1dfacc02ebe",
+    "corpus_id": "wikipedia",
+    "corpus_version": 2,
+    "graph": {
+      "edges": 8831,
+      "file": "edges.jsonl",
+      "nodes": 33443,
+      "version": "6969f49ecc0d9ab447ee3c12cd81263829d10acb843b12e59d0bdf17dacbbb9e"
+    },
+    "keyword_index": {
+      "file": "vector_store/data/keyword/wikipedia.json",
+      "version": "7de9d94b98f63506b4d46f765460918d492b54cfc09f1216b601d6dc20764823"
+    },
+    "last_known_good": null,
+    "mode": "development",
+    "model": {
+      "archive_sha256": "913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3",
+      "dimension": 384,
+      "id": "all-MiniLM-L6-v2",
+      "max_tokens": 256,
+      "model_onnx_sha256": "4f148ba8ae9c2c7fbee4af2b132db8d06c6a6545b47fc83bbb98c3d22b8393e6",
+      "similarity": "cosine",
+      "tokenizer_sha256": "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0"
+    },
+    "skipped_sentences": null,
+    "split_units": 16605,
+    "unit_count": 33443,
+    "vectors": {
+      "file": "chunks.parquet",
+      "made_in": "databricks",
+      "parity_lowest_cosine": 1.0,
+      "sha256": "374671f3a6f551d6c350a2f896ec0bfed10a7cc26a5d045357404b43bdbe9fd7"
+    }
+  },
   "fingerprint": "0cd9856dc646f2e1c2998b1f65d462de3ab9f7f427617b40b905a1dfacc02ebe",
   "mode": "development",
   "selection": {
