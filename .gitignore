@@ -107,6 +107,7 @@ htmlcov/
 # Local developer utilities (not part of the pipeline)
 scripts/utilities/lint.py
 scripts/utilities/clean_cache.py
+scripts/utilities/check_curated_retrieval.py
 scripts/utilities/run_energy_weather_deepening_acquisition.py
 scripts/utilities/verify_energy_weather_deepening_acquisition.py
 # Local paths of the files that authored knowledge units were written from.
