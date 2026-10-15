@@ -33,3 +33,7 @@ class RetrievalConfig:
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RetrievalConfig:
+        return cls(**data)

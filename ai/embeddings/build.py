@@ -44,6 +44,7 @@ from ai.embeddings.chunks import (
     read_wikipedia,
     stored_sample,
 )
+from ai.knowledge_quality import state as qstate
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import wikipedia_corpus as wc
 
@@ -234,6 +235,7 @@ def build(item: Prepared, args: argparse.Namespace, ai_dir: Path) -> None:
     )
     br.write_record(corpus, record)
     keep = {record["collection"], record["last_known_good"]} - {None}
+    keep |= qstate.keep_collections(ai_dir, corpus.corpus_id)
     removed = coll.prune(client, corpus.corpus_id, keep)
     print(f"Record written: {corpus.manifest_path}")
     print(

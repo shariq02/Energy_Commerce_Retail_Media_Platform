@@ -234,7 +234,7 @@ def test_a_keyword_hit_needs_a_matching_term(tmp_path):
     result = ask("zebra", corpus_dir, build_id)
     assert result.retrievers["keyword"] == {"status": "ok", "hits": 0}
     assert result.retrievers["dense"]["hits"] == 6
-    assert result.status == "ok"
+    assert result.status == "no_match" and result.hits == []
 
 
 def test_filters_apply_before_ranking_in_every_retriever(tmp_path):
@@ -330,7 +330,7 @@ def test_retrieval_refuses_another_build_and_a_missing_build_id(tmp_path):
     corpus_dir, build_id = build_curated(tmp_path)
     with pytest.raises(ValueError, match="not the recorded build"):
         ask("price", corpus_dir, "0" * 12)
-    with pytest.raises(ValueError, match="a build id is required"):
+    with pytest.raises(ValueError, match="no build of curated is designated"):
         ask("price", corpus_dir, None)
     with pytest.raises(FileNotFoundError, match="run the corpus build first"):
         ask("price", tmp_path / "nowhere", build_id)
@@ -510,3 +510,20 @@ def test_the_index_command_needs_a_build_record(tmp_path):
     wiki = te.wikipedia_ready(tmp_path)
     with pytest.raises(ValueError, match="has no build record"):
         fts.main(["--corpus-dir", str(wiki.parent), "--apply"])
+
+
+def test_a_result_is_served_only_when_every_retriever_that_ran_finds_something(
+    tmp_path, monkeypatch
+):
+    corpus_dir, build_id = build_wikipedia(tmp_path)
+    agreed = ask("Lead text 3.", corpus_dir, build_id, corpus="wikipedia")
+    assert agreed.status == "ok" and agreed.hits
+    disagreed = ask("volcano lava", corpus_dir, build_id, corpus="wikipedia")
+    assert disagreed.retrievers["dense"] == {"status": "ok", "hits": 20}
+    assert disagreed.retrievers["keyword"] == {"status": "ok", "hits": 0}
+    assert disagreed.status == "no_match" and disagreed.hits == []
+    assert disagreed.retrievers["graph"]["hits"] == 0
+    monkeypatch.setattr(emb, "MAX_TOKENS", 3)
+    long_query = ask("lead text 3 part", corpus_dir, build_id, corpus="wikipedia")
+    assert long_query.retrievers["dense"]["status"] == "query_too_long"
+    assert long_query.status == "ok" and long_query.hits

@@ -22,6 +22,8 @@ from ai.embeddings import collection as coll
 from ai.embeddings import embedder as emb
 from ai.embeddings import keyword_index as ki
 from ai.embeddings import knowledge_graph as kg
+from ai.knowledge_quality import integrity
+from ai.knowledge_quality import state as qstate
 from ai.rag import graph as gr
 from ai.rag import keyword_fts as fts
 from ai.rag import query as qy
@@ -60,12 +62,15 @@ def manifest_path(corpus_id: str, corpus_dir: Path) -> Path:
     raise ValueError(f"unknown corpus {corpus_id!r}")
 
 
-def read_record(corpus_id: str, corpus_dir: Path) -> dict:
+def read_manifest(corpus_id: str, corpus_dir: Path) -> dict:
     path = manifest_path(corpus_id, corpus_dir)
     if not path.is_file():
         raise FileNotFoundError(f"{path} not found: run the corpus build first")
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    record = manifest.get(br.RECORD_KEY)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_record(corpus_id: str, corpus_dir: Path) -> dict:
+    record = read_manifest(corpus_id, corpus_dir).get(br.RECORD_KEY)
     if not record:
         raise ValueError(f"{corpus_id}: no build record: run the embedding build")
     return record
@@ -153,6 +158,43 @@ def load(
     if key not in _CACHE:
         _CACHE[key] = _open(corpus_id, corpus_dir, model_dir, record)
     return _CACHE[key]
+
+
+def load_designated(
+    corpus_id: str, corpus_dir: Path, model_dir: Path
+) -> tuple[Store, dict]:
+    """The store of the designated build, after an integrity check at the first open.
+
+    The keyword index and the graph exist for the recorded build only, so the
+    designated build must be the recorded one.
+    """
+    event = qstate.designated_event(corpus_dir.parent, corpus_id)
+    if event is None:
+        raise ValueError(
+            f"no build of {corpus_id} is designated: run the acceptance gate"
+        )
+    record = read_record(corpus_id, corpus_dir)
+    if event["build_id"] != record["build_id"]:
+        raise ValueError(
+            f"the designated build {event['build_id']} is not the recorded build "
+            f"{record['build_id']}: the keyword index and the graph exist for the "
+            "recorded build only"
+        )
+    key = (
+        "designated",
+        corpus_id,
+        str(corpus_dir),
+        str(model_dir),
+        event["event_hash"],
+    )
+    if key not in _CACHE:
+        report = integrity.check(corpus_id, corpus_dir, model_dir)
+        if not report.ok:
+            raise ValueError(
+                "integrity check failed: " + "; ".join(report.problems[:3])
+            )
+        _CACHE[key] = _open(corpus_id, corpus_dir, model_dir, record)
+    return _CACHE[key], event
 
 
 def clear_cache() -> None:

@@ -14,6 +14,7 @@ the same build gives the same result. Library only.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from ai.embeddings import embedder as emb
@@ -98,6 +99,70 @@ def _related_hits(store, direct, where, limit) -> list[Hit]:
     return related
 
 
+@dataclass
+class Searched:
+    """What the dense and the keyword retriever returned for one query."""
+
+    processed: qy.ProcessedQuery
+    where: dict | None
+    filters: dict
+    dense_status: str
+    dense: list[tuple[str, float]]
+    keyword_status: str
+    keyword: list[tuple[str, float]]
+
+
+def search_all(
+    store: st.Store, query: str, filters: dict, config: RetrievalConfig
+) -> Searched:
+    processed = qy.process(
+        query, store.unit_ids, store.glossary, config.expansion_terms_max
+    )
+    where = flt.to_where(filters)
+    dense_status, dense = store.dense.search(
+        processed.text, where, config.dense_k, config.dense_min_score
+    )
+    keyword_status, keyword = store.keyword.search(
+        processed.terms, filters, config.keyword_k, config.keyword_min_score
+    )
+    return Searched(
+        processed, where, filters, dense_status, dense, keyword_status, keyword
+    )
+
+
+def serve(
+    store: st.Store, searched: Searched, config: RetrievalConfig
+) -> tuple[list[Hit], list[Hit], str]:
+    """The direct hits (fused top chunks), the related hits, and the graph status.
+
+    A result is served only when every retriever that ran found something; one
+    that ran and found nothing (a query term in no chunk, or every score under its
+    threshold) means no match. A retriever that did not run (an empty query, a
+    query over the model limit) does not count.
+    """
+    ran = (
+        (searched.dense_status, searched.dense),
+        (searched.keyword_status, searched.keyword),
+    )
+    if any(status == "ok" and not hits for status, hits in ran):
+        return [], [], "no_seeds"
+    fused = fusion.fuse(
+        {
+            DENSE: [c for c, _ in searched.dense],
+            KEYWORD: [c for c, _ in searched.keyword],
+        },
+        config.rrf_constant,
+        config.final_k,
+    )
+    direct = _direct_hits(store, fused, dict(searched.dense), dict(searched.keyword))
+    graph_status = "disabled" if config.related_max == 0 else "no_seeds"
+    related: list[Hit] = []
+    if direct and config.related_max:
+        graph_status = OK
+        related = _related_hits(store, direct, searched.where, config.related_max)
+    return direct, related, graph_status
+
+
 def retrieve(
     query: str,
     *,
@@ -109,42 +174,28 @@ def retrieve(
     corpus_dir: Path | None = None,
     model_dir: Path | None = None,
 ) -> Result:
-    config = config or RetrievalConfig()
+    """Cited chunks for `query`. Without a build id, the designated build is used."""
+    corpus_dir = corpus_dir or uc.CORPUS_DIR
+    model_dir = model_dir or emb.DEFAULT_MODEL_DIR
     normalised = flt.normalise(filters, corpus)
-    store = st.load(
-        corpus,
-        corpus_dir or uc.CORPUS_DIR,
-        model_dir or emb.DEFAULT_MODEL_DIR,
-        build_id,
-    )
-    if production and store.mode == "development":
-        raise ValueError(f"{corpus} is a development corpus: refused in production")
-    processed = qy.process(
-        query, store.unit_ids, store.glossary, config.expansion_terms_max
-    )
-    where = flt.to_where(normalised)
-    dense_status, dense = store.dense.search(
-        processed.text, where, config.dense_k, config.dense_min_score
-    )
-    keyword_status, keyword = store.keyword.search(
-        processed.terms, normalised, config.keyword_k, config.keyword_min_score
-    )
-    fused = fusion.fuse(
-        {DENSE: [c for c, _ in dense], KEYWORD: [c for c, _ in keyword]},
-        config.rrf_constant,
-        config.final_k,
-    )
-    direct = _direct_hits(store, fused, dict(dense), dict(keyword))
-    graph_status = "disabled" if config.related_max == 0 else "no_seeds"
-    related: list[Hit] = []
-    if direct and config.related_max:
-        graph_status = OK
-        related = _related_hits(store, direct, where, config.related_max)
+    if production:
+        if st.read_record(corpus, corpus_dir)["mode"] == "development":
+            raise ValueError(f"{corpus} is a development corpus: refused in production")
+        if build_id is not None:
+            raise ValueError("production uses the designated build, not a build id")
+    if build_id is None:
+        store, event = st.load_designated(corpus, corpus_dir, model_dir)
+        config = config or RetrievalConfig.from_dict(event["config"])
+    else:
+        store = st.load(corpus, corpus_dir, model_dir, build_id)
+    config = config or RetrievalConfig()
+    searched = search_all(store, query, normalised, config)
+    direct, related, graph_status = serve(store, searched, config)
     hits = direct + related
     blocks = asm.build_blocks(hits)
     return Result(
         query=query,
-        processed=processed.as_dict(),
+        processed=searched.processed.as_dict(),
         filters=normalised,
         corpus=corpus,
         mode=store.mode,
@@ -152,8 +203,11 @@ def retrieve(
         collection=store.collection_name,
         status=OK if direct else NO_MATCH,
         retrievers={
-            DENSE: {"status": dense_status, "hits": len(dense)},
-            KEYWORD: {"status": keyword_status, "hits": len(keyword)},
+            DENSE: {"status": searched.dense_status, "hits": len(searched.dense)},
+            KEYWORD: {
+                "status": searched.keyword_status,
+                "hits": len(searched.keyword),
+            },
             GRAPH: {"status": graph_status, "hits": len(related)},
         },
         config=config.as_dict(),
