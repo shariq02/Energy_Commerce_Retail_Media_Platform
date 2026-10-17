@@ -8,8 +8,9 @@ The tokens of the 13b keyword file go into an FTS5 table on disk, ranked with BM
 so the index does not have to fit in memory. The keyword file is read as a stream.
 The filter columns come from the stored chunk metadata. The `meta` table holds the
 build id and the SHA-256 of the keyword file; retrieval refuses an index that does
-not match the build record. The build prints its plan and asks before writing
-(y or yes); --apply writes without asking, --dry-run never writes.
+not match the build record. The index is kept in the folder of its build. The build
+prints its plan and asks before writing (y or yes); --apply writes without asking,
+--dry-run never writes.
 
 Usage (repository root):
     python -m ai.rag.keyword_fts [--apply | --dry-run]
@@ -32,7 +33,6 @@ from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import wikipedia_corpus as wc
 
 CORPUS_ID = wc.CORPUS_ID
-INDEX_NAME = "wikipedia.sqlite"
 OK = "ok"
 NO_TERMS = "no_terms"
 READ_BLOCK = 1 << 20
@@ -60,8 +60,8 @@ LIMIT ?
 """
 
 
-def index_path(ai_dir: Path) -> Path:
-    return br.keyword_path(ai_dir, CORPUS_ID).with_name(INDEX_NAME)
+def index_path(ai_dir: Path, build_id: str) -> Path:
+    return br.fts_path(ai_dir, CORPUS_ID, build_id)
 
 
 def read_keyword_file(path: Path):
@@ -242,6 +242,11 @@ def prepare(corpus_dir: Path) -> tuple[dict, str, Path, Path]:
         raise ValueError(
             "the Wikipedia corpus has no build record: run the embedding build"
         )
+    if not br.is_migrated(record):
+        raise ValueError(
+            "the build record names the old file places: "
+            "run python -m ai.embeddings.build migrate"
+        )
     keyword = ai_dir / record["keyword_index"]["file"]
     if not keyword.is_file():
         raise FileNotFoundError(f"{keyword} not found: run the embedding build")
@@ -249,7 +254,7 @@ def prepare(corpus_dir: Path) -> tuple[dict, str, Path, Path]:
     file_hash = emb.file_sha256(keyword)
     if file_hash != record["keyword_index"]["version"]:
         raise ValueError("the keyword file differs from the build record")
-    return record, file_hash, keyword, index_path(ai_dir)
+    return record, file_hash, keyword, index_path(ai_dir, record["build_id"])
 
 
 def main(argv: list[str] | None = None) -> int:

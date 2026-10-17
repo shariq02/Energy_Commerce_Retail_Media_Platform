@@ -21,7 +21,7 @@
       "version": "8b2f3d2934de77deb5fa77b84b71a75687776c77184c21d9a92069febdbd6414"
     },
     "keyword_index": {
-      "file": "vector_store/data/keyword/curated.json",
+      "file": "vector_store/data/builds/curated/5e70ab63ba7c/keyword.json",
       "version": "ee615adf9d73921492cc13a11c66ecaa07ced0556b205cb37c6dc3b4f8627e6e"
     },
     "last_known_good": "curated_e5b3d84bb934",

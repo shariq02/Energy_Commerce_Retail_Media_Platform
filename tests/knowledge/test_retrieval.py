@@ -328,11 +328,11 @@ def test_identifier_and_glossary_terms_reach_the_keyword_retriever(tmp_path):
 def test_retrieval_refuses_another_build_and_a_missing_build_id(tmp_path):
     pytest.importorskip("rank_bm25")
     corpus_dir, build_id = build_curated(tmp_path)
-    with pytest.raises(ValueError, match="not the recorded build"):
+    with pytest.raises(ValueError, match="is not kept"):
         ask("price", corpus_dir, "0" * 12)
     with pytest.raises(ValueError, match="no build of curated is designated"):
         ask("price", corpus_dir, None)
-    with pytest.raises(FileNotFoundError, match="run the corpus build first"):
+    with pytest.raises(ValueError, match="is not kept"):
         ask("price", tmp_path / "nowhere", build_id)
 
 
@@ -346,11 +346,11 @@ def test_retrieval_checks_the_model_files_the_keyword_file_and_the_graph(
     with pytest.raises(ValueError, match="model files differ from the build record"):
         ask("price", corpus_dir, build_id)
     monkeypatch.setattr(emb, "model_hashes", lambda model_dir=None: dict(te.HASHES))
-    graph = corpus_dir.parent / "knowledge_graph" / "edges.jsonl"
+    graph = br.build_graph_dir(corpus_dir.parent, "curated", build_id) / "edges.jsonl"
     graph.write_text(graph.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="the graph differs"):
         ask("price", corpus_dir, build_id)
-    keyword = br.keyword_path(corpus_dir.parent, "curated")
+    keyword = br.keyword_path(corpus_dir.parent, "curated", build_id)
     keyword.write_text(keyword.read_text(encoding="utf-8") + " ", encoding="utf-8")
     with pytest.raises(ValueError, match="keyword index file differs"):
         ask("price", corpus_dir, build_id)
@@ -371,10 +371,11 @@ def test_a_chunk_without_a_complete_citation_is_an_error(tmp_path):
 def test_retrieval_does_not_change_the_stored_files(tmp_path):
     pytest.importorskip("rank_bm25")
     corpus_dir, build_id = build_curated(tmp_path)
+    copy = br.build_graph_dir(corpus_dir.parent, "curated", build_id)
     files = [
-        br.keyword_path(corpus_dir.parent, "curated"),
-        corpus_dir.parent / "knowledge_graph" / "nodes.jsonl",
-        corpus_dir.parent / "knowledge_graph" / "edges.jsonl",
+        br.keyword_path(corpus_dir.parent, "curated", build_id),
+        copy / "nodes.jsonl",
+        copy / "edges.jsonl",
         corpus_dir / uc.MANIFEST_NAME,
     ]
     before = [path.read_bytes() for path in files]
@@ -491,8 +492,8 @@ def test_wikipedia_needs_its_index_and_refuses_production_use(tmp_path):
 
 
 def test_the_index_command_plans_skips_and_checks_its_input(tmp_path, capsys):
-    corpus_dir, _ = build_wikipedia(tmp_path, index=False)
-    path = fts.index_path(corpus_dir.parent)
+    corpus_dir, build_id = build_wikipedia(tmp_path, index=False)
+    path = fts.index_path(corpus_dir.parent, build_id)
     assert fts.main(["--corpus-dir", str(corpus_dir), "--dry-run"]) == 0
     assert not path.exists() and "new build" in capsys.readouterr().out
     assert fts.main(["--corpus-dir", str(corpus_dir), "--apply"]) == 0
@@ -500,7 +501,7 @@ def test_the_index_command_plans_skips_and_checks_its_input(tmp_path, capsys):
     assert fts.read_meta(path)["chunk_count"] == "40"
     assert fts.main(["--corpus-dir", str(corpus_dir), "--apply"]) == 0
     assert "Nothing to build." in capsys.readouterr().out
-    keyword = br.keyword_path(corpus_dir.parent, "wikipedia")
+    keyword = br.keyword_path(corpus_dir.parent, "wikipedia", build_id)
     keyword.write_text(keyword.read_text(encoding="utf-8") + " ", encoding="utf-8")
     with pytest.raises(ValueError, match="keyword file differs from the build record"):
         fts.main(["--corpus-dir", str(corpus_dir), "--apply"])

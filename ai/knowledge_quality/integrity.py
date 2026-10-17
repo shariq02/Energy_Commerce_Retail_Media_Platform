@@ -9,6 +9,7 @@ keyword index and the graph (the 13b verifier), checks every curated chunk text 
 metadata against the units, checks the SQLite index of the Wikipedia corpus, and
 checks the designation chain. Units added, removed or changed since the designated
 build are reported; they explain a difference and are not a failure by themselves.
+`check_kept` checks a kept build that is not the recorded one from its build folder.
 Nothing is written. Library only.
 """
 
@@ -91,6 +92,58 @@ def _curated_chunks(client, record: dict, corpus: ch.Corpus) -> list[str]:
     return []
 
 
+def check_kept(
+    corpus_id: str, corpus_dir: Path, model_dir: Path, build_id: str, say=None
+) -> IntegrityReport:
+    """Check a kept build that is not the recorded one, from its own build folder.
+
+    The corpus has moved on, so the chunks are not compared with it; the model
+    files, the collection, the keyword file, the graph copy and the FTS index are.
+    """
+    say = say or (lambda line: None)
+    ai_dir = corpus_dir.parent
+    report = IntegrityReport(corpus_id)
+    record = br.read_build_record(ai_dir, corpus_id, build_id)
+    if record is None:
+        report.problems.append(f"build {build_id} is not kept (no build record)")
+        return report
+    report.notes.append(
+        f"build {build_id} is not the recorded build: chunks are not compared "
+        "with the corpus"
+    )
+    for key, value in emb.model_hashes(model_dir).items():
+        if record["model"].get(key) != value:
+            report.problems.append(f"model file hash differs from the record: {key}")
+    chroma = br.chroma_dir(ai_dir)
+    if not chroma.is_dir():
+        report.problems.append("the vector store folder is missing")
+        return report
+    name = record["collection"]
+    try:
+        collection = coll.open_client(chroma).get_collection(
+            name, embedding_function=None
+        )
+    except Exception:  # any client error means the collection is unusable
+        report.problems.append(f"collection {name} is missing")
+    else:
+        if collection.count() != record["chunk_count"]:
+            report.problems.append(
+                f"collection {name} holds {collection.count()} chunks, "
+                f"not {record['chunk_count']}"
+            )
+    report.problems += br.index_problems(corpus_id, record, ai_dir, say)
+    if corpus_id == WIKIPEDIA_ID:
+        problem = fts.check_index(
+            fts.index_path(ai_dir, build_id),
+            record,
+            record["keyword_index"]["version"],
+        )
+        if problem:
+            report.problems.append(problem)
+    report.problems += state.verify(ai_dir, corpus_id)
+    return report
+
+
 def check(
     corpus_id: str, corpus_dir: Path, model_dir: Path, say=None
 ) -> IntegrityReport:
@@ -121,7 +174,9 @@ def check(
             report.problems += _curated_chunks(client, record, corpus)
         if corpus is None and record:
             problem = fts.check_index(
-                fts.index_path(ai_dir), record, record["keyword_index"]["version"]
+                fts.index_path(ai_dir, record["build_id"]),
+                record,
+                record["keyword_index"]["version"],
             )
             if problem:
                 report.problems.append(problem)

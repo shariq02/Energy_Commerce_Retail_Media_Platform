@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 
 import numpy as np
 import pytest
@@ -232,13 +233,63 @@ def test_build_verify_and_rebuild(curated, capsys):
     assert newer["collection"] != record["collection"]
     assert newer["last_known_good"] == record["collection"]
     assert len(coll.names(client, "curated")) == 2
+    ai_dir = curated.parent
+    for kept in (record, newer):
+        folder = br.build_dir(ai_dir, "curated", kept["build_id"])
+        assert kept["keyword_index"]["file"] == br.keyword_file(
+            "curated", kept["build_id"]
+        )
+        assert br.read_build_record(ai_dir, "curated", kept["build_id"]) == kept
+        assert (folder / br.KEYWORD_FILE).is_file()
+        assert (folder / "graph" / kg.EDGES_FILE).is_file()
+
+
+def test_older_build_folders_are_pruned_with_their_collections(curated):
+    argv = ["--corpus", "curated", *args_for(curated, "--apply")]
+    ids = []
+    for text in ("A second rule.", "A third rule.", "A fourth rule."):
+        make_units(
+            curated, [("rule.dwd.one", "rule", f"# Rule: one\n\n{text}", SOURCE)]
+        )
+        assert eb.main(["build", *argv]) == 0
+        record = read_manifest(curated / uc.MANIFEST_NAME)[br.RECORD_KEY]
+        ids.append(record["build_id"])
+    root = br.builds_root(curated.parent, "curated")
+    assert sorted(p.name for p in root.iterdir()) == sorted(ids[1:])
+
+
+def test_migrate_moves_a_build_made_before_the_build_folders(curated, capsys):
+    argv = ["--corpus", "curated", *args_for(curated, "--apply")]
+    assert eb.main(["build", *argv]) == 0
+    manifest_file = curated / uc.MANIFEST_NAME
+    record = read_manifest(manifest_file)[br.RECORD_KEY]
+    ai_dir = curated.parent
+    folder = br.build_dir(ai_dir, "curated", record["build_id"])
+    old = ai_dir / "vector_store" / "data" / "keyword" / "curated.json"
+    old.parent.mkdir(parents=True)
+    shutil.move(folder / br.KEYWORD_FILE, old)
+    shutil.rmtree(folder)
+    legacy = "vector_store/data/keyword/curated.json"
+    old_index = {**record["keyword_index"], "file": legacy}
+    br.write_manifest_record(manifest_file, {**record, "keyword_index": old_index})
+    with pytest.raises(ValueError, match="build migrate"):
+        eb.main(["build", *argv])
+    assert eb.main(["migrate", *argv]) == 0
+    assert read_manifest(manifest_file)[br.RECORD_KEY] == record
+    assert (folder / br.KEYWORD_FILE).is_file() and not old.exists()
+    assert br.read_build_record(ai_dir, "curated", record["build_id"]) == record
+    assert eb.main(["verify", "--corpus", "curated", *args_for(curated)]) == 0
+    capsys.readouterr()
+    assert eb.main(["migrate", *argv]) == 0
+    assert "Nothing to move" in capsys.readouterr().out
 
 
 def test_verify_finds_a_changed_index_and_a_missing_record(curated, capsys):
     assert eb.main(["verify", "--corpus", "curated", *args_for(curated)]) == 1
     assert "no build record" in capsys.readouterr().out
     eb.main(["build", "--corpus", "curated", *args_for(curated, "--apply")])
-    keyword = br.keyword_path(curated.parent, "curated")
+    record = read_manifest(curated / uc.MANIFEST_NAME)[br.RECORD_KEY]
+    keyword = br.keyword_path(curated.parent, "curated", record["build_id"])
     keyword.write_text(keyword.read_text(encoding="utf-8") + " ", encoding="utf-8")
     assert eb.main(["verify", "--corpus", "curated", *args_for(curated)]) == 1
     assert "keyword index file differs" in capsys.readouterr().out

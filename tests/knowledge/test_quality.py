@@ -161,8 +161,8 @@ def test_integrity_fails_on_a_changed_chunk_metadata(tmp_path):
 
 
 def test_integrity_fails_on_a_changed_keyword_file_and_graph_file(tmp_path):
-    corpus_dir, _ = build_curated(tmp_path)
-    keyword = br.keyword_path(corpus_dir.parent, "curated")
+    corpus_dir, build_id = build_curated(tmp_path)
+    keyword = br.keyword_path(corpus_dir.parent, "curated", build_id)
     keyword.write_text(keyword.read_text(encoding="utf-8") + " ", encoding="utf-8")
     graph = corpus_dir.parent / "knowledge_graph" / "edges.jsonl"
     graph.write_text(graph.read_text(encoding="utf-8") + "\n", encoding="utf-8")
@@ -185,9 +185,9 @@ def test_integrity_lists_the_units_changed_since_the_designation(tmp_path):
 
 
 def test_integrity_of_the_wikipedia_corpus_and_its_index_and_shards(tmp_path):
-    corpus_dir, _ = build_wikipedia(tmp_path)
+    corpus_dir, build_id = build_wikipedia(tmp_path)
     assert iq.check("wikipedia", corpus_dir, model_dir(tmp_path)).ok
-    fts.index_path(corpus_dir.parent).unlink()
+    fts.index_path(corpus_dir.parent, build_id).unlink()
     problems = iq.check("wikipedia", corpus_dir, model_dir(tmp_path)).problems
     assert any("no FTS index file" in p for p in problems)
     assert fts.main(["--corpus-dir", str(corpus_dir), "--apply"]) == 0
@@ -798,7 +798,9 @@ def test_the_question_set_must_not_change_between_the_holdout_run_and_the_gate(
     assert "question set changed" in capsys.readouterr().out
 
 
-def test_retrieval_without_a_designation_or_with_another_build_stops(tmp_path):
+def test_retrieval_without_a_designation_or_with_a_build_that_is_not_kept_stops(
+    tmp_path,
+):
     corpus_dir, build_id = build_wikipedia(tmp_path)
     with pytest.raises(ValueError, match="no build of wikipedia is designated"):
         retrieve(
@@ -810,7 +812,7 @@ def test_retrieval_without_a_designation_or_with_another_build_stops(tmp_path):
     state.designate(
         corpus_dir.parent, "wikipedia", {**event_body("0" * 12), "config": {}}
     )
-    with pytest.raises(ValueError, match="is not the recorded build"):
+    with pytest.raises(ValueError, match="is not kept"):
         retrieve(
             "Lead text 3.",
             corpus="wikipedia",
@@ -818,6 +820,40 @@ def test_retrieval_without_a_designation_or_with_another_build_stops(tmp_path):
             model_dir=model_dir(tmp_path),
         )
     assert build_id != "0" * 12
+
+
+def test_production_serves_a_designated_build_that_is_no_longer_the_recorded_one(
+    tmp_path,
+):
+    pytest.importorskip("rank_bm25")
+    corpus_dir, old_id = build_curated(tmp_path)
+    te.make_units(
+        corpus_dir,
+        [("rule.dwd.one", "rule", "# Rule: one\n\nA changed rule.", te.SOURCE)],
+    )
+    argv = ["build", "--corpus", "curated", *te.args_for(corpus_dir, "--apply")]
+    assert eb.main(argv) == 0
+    recorded = te.read_manifest(corpus_dir / uc.MANIFEST_NAME)[br.RECORD_KEY]
+    assert recorded["build_id"] != old_id
+    old = br.read_build_record(corpus_dir.parent, "curated", old_id)
+    state.designate(
+        corpus_dir.parent,
+        "curated",
+        {**event_body(old_id, old["collection"]), "config": {}},
+    )
+    result = retrieve(
+        "price",
+        production=True,
+        corpus_dir=corpus_dir,
+        model_dir=model_dir(tmp_path),
+    )
+    assert result.build_id == old_id
+    kept = iq.check_kept("curated", corpus_dir, model_dir(tmp_path), old_id)
+    assert kept.ok and kept.notes
+    graph = br.build_graph_dir(corpus_dir.parent, "curated", old_id) / "edges.jsonl"
+    graph.write_text(graph.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    again = iq.check_kept("curated", corpus_dir, model_dir(tmp_path), old_id)
+    assert any("graph copy" in p for p in again.problems)
 
 
 def test_production_uses_the_designated_build_and_refuses_an_explicit_one(tmp_path):
