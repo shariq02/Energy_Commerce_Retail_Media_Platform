@@ -43,9 +43,19 @@ PACKAGES = {
     "lifelines": "lifelines",
     "scikit-survival": "sksurv.ensemble",
     "torch": "torch.nn",
+    "chronos-forecasting": "chronos",
+    "timesfm": "timesfm",
+    "granite-tsfm": "tsfm_public",
+    "tabpfn": "tabpfn",
+    "tabicl": "tabicl",
+    "momentfm": "momentfm",
+    "toto-models": "toto2",
 }
 # release that matches the environment's scikit-learn 1.6
-PIP_SPECS = {"scikit-survival": "scikit-survival>=0.24,<0.26"}
+PIP_SPECS = {
+    "scikit-survival": "scikit-survival>=0.24,<0.26",
+    "chronos-forecasting": "chronos-forecasting>=2.0,<3",
+}
 FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 INSTALL_TIMEOUT_SECONDS = 600

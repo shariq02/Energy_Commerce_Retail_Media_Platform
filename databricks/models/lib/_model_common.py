@@ -191,6 +191,14 @@ MODEL_DDL = {
         "value double, threshold double, run_id string, raised_at timestamp"
     ),
 }
+# a foundation candidate is named after its model and how it ran
+FOUNDATION_NAME_SUFFIXES = ("_zero_shot", "_lora", "_in_context")
+
+
+def is_foundation_model(name: str) -> bool:
+    return str(name).endswith(FOUNDATION_NAME_SUFFIXES)
+
+
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
 LIBRARIES = {
@@ -203,6 +211,13 @@ LIBRARIES = {
     "mlflow": "mlflow",
     "cloudpickle": "cloudpickle",
     "psutil": "psutil",
+    "chronos": "chronos-forecasting",
+    "timesfm": "timesfm",
+    "tsfm_public": "granite-tsfm",
+    "tabpfn": "tabpfn",
+    "tabicl": "tabicl",
+    "momentfm": "momentfm",
+    "toto2": "toto-models",
 }
 
 
@@ -1593,12 +1608,14 @@ def train_side(fn) -> dict:
 
 
 def record_task_context(
-    ctx, status: str, detail=None, data_notes=None, table: str = "task_run_context"
+    ctx, status: str, detail=None, data_notes=None, table: str | None = None
 ) -> None:
     """Append one run-context row (started, data_ready, finished). Never raises."""
     try:
+        table = table or getattr(ctx, "context_table", "task_run_context")
+        ddl = MODEL_DDL.get(table, RUN_CONTEXT_COLUMNS)
         full = model_fqn(table, ctx.ecosystem)
-        spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({MODEL_DDL[table]}) USING delta")
+        spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({ddl}) USING delta")
         path, job, run = _notebook_identity()
         versions = {k: library_version(k) or "missing" for k in LIBRARIES}
         row = (
@@ -1617,7 +1634,7 @@ def record_task_context(
             detail[:900] if detail else None,
             _dt.datetime.now(_dt.UTC),
         )
-        spark.createDataFrame([row], MODEL_DDL[table]).write.format("delta").mode(
+        spark.createDataFrame([row], ddl).write.format("delta").mode(
             "append"
         ).saveAsTable(full)
     except Exception as exc:
@@ -1671,15 +1688,17 @@ def record_result(
     rows = [(*base, m, None if v is None else _finite(v), *tail) for m, v in items] or [
         (*base, None, None, *tail)
     ]
+    table = getattr(ctx, "results_table", "candidate_results")
     spark.createDataFrame(rows, RESULT_COLUMNS).write.format("delta").mode(
         "append"
-    ).saveAsTable(model_fqn("candidate_results", ctx.ecosystem))
+    ).saveAsTable(model_fqn(table, ctx.ecosystem))
 
 
 def start_task(ctx: TaskContext) -> None:
     """Drop this task's earlier rows of the same kind (smoke or full)."""
+    table = getattr(ctx, "results_table", "candidate_results")
     spark.sql(
-        f"DELETE FROM {model_fqn('candidate_results', ctx.ecosystem)} "
+        f"DELETE FROM {model_fqn(table, ctx.ecosystem)} "
         f"WHERE task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}"
     )
     print(

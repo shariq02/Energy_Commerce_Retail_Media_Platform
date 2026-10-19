@@ -29,7 +29,7 @@ DECISIONS = ("approved", "approved_with_conditions", "not_approved", "deferred")
 RESTRICTIONS = ("diagnostic_only", "offline_only")
 ROLES = ("selected", "runner_up", "baseline_fallback")
 APPROVED = ("approved", "approved_with_conditions")
-BLOCKING_RULES = ("R03", "R05", "R07")
+BLOCKING_RULES = ("R03", "R05", "R07", "R14")
 DECIDER_ENGINE = "rule_engine"
 DECIDER_OWNER = "owner"
 # (rule id, class, description, parameter, default value)
@@ -114,6 +114,23 @@ APPROVAL_RULES = (
             "task-specific limits: survival calibration gap, unrecorded held-out "
             "event count and revalidation"
         ),
+        "",
+        "",
+    ),
+    (
+        "R13",
+        "conditional",
+        (
+            "foundation model: the pretraining data was not shown to be free of the "
+            "evaluated data (the contamination flag is not cleared)"
+        ),
+        "",
+        "",
+    ),
+    (
+        "R14",
+        "blocking",
+        "foundation model without a repository, revision or licence on record",
         "",
         "",
     ),
@@ -354,8 +371,38 @@ def _restriction(task: dict, metrics: dict) -> tuple[str | None, list, list]:
 # DBTITLE 1,Decision of the selected model
 
 
-def decide_selected(task, rows, base_rows, spec, reads) -> dict:
-    """Decision, restriction, rules, conditions, segments and notes of one model."""
+def foundation_notes(info: dict) -> list:
+    """The disclosure of a foundation model: repository, revision, licence and how
+    it ran (zero-shot, in-context or fine-tuned)."""
+    mode = str(info.get("mode") or "not recorded").replace("_", " ")
+    revision = str(info.get("revision") or "")[:12] or "not recorded"
+    repository = info.get("repo_id") or "not recorded"
+    licence = info.get("licence") or "not recorded"
+    text = (
+        f"foundation model {repository} at revision {revision}, "
+        f"licence {licence}, ran {mode}"
+    )
+    return [text]
+
+
+def foundation_rules(info: dict) -> tuple[list, list, bool]:
+    """(rules, conditions, blocked) of the foundation rules R13 and R14."""
+    if not (info.get("repo_id") and info.get("revision") and info.get("licence")):
+        text = "no repository, revision or licence on record"
+        return [_rule("R14", "blocking", text)], [], True
+    flag = info.get("contamination") or "unresolved"
+    if flag == "cleared":
+        return [], [], False
+    text = (
+        f"contamination flag {flag}: the pretraining data of the model was not "
+        f"shown to be free of the evaluated data; {info.get('contamination_note', '')}"
+    ).rstrip("; ")
+    return [_rule("R13", "condition", text)], [text], False
+
+
+def decide_selected(task, rows, base_rows, spec, reads, foundation=None) -> dict:
+    """Decision, restriction, rules, conditions, segments and notes of one model.
+    `foundation` holds the facts of a foundation model (None for the others)."""
     metrics = model_metrics(rows)
     out = {
         "decision": "deferred",
@@ -372,6 +419,14 @@ def decide_selected(task, rows, base_rows, spec, reads) -> dict:
         )
         out["rules"].append(_rule("R10", "disclosure", text))
         out["notes"].append(text)
+    f_rules, f_conditions = [], []
+    if foundation:
+        out["notes"] += foundation_notes(foundation)
+        f_rules, f_conditions, blocked = foundation_rules(foundation)
+        if blocked:
+            out["rules"] = [*f_rules, *out["rules"]]
+            out["decision"] = "not_approved"
+            return out
     if not rows or rows[0]["status"] != "ok":
         detail = "not evaluated" if not rows else str(rows[0].get("detail"))
         out["rules"].insert(0, _rule("R05", "blocking", detail))
@@ -387,8 +442,8 @@ def decide_selected(task, rows, base_rows, spec, reads) -> dict:
         out["decision"] = "not_approved"
         return out
     rules, conditions = _drift_and_coverage(metrics, spec)
-    out["rules"] += rules
-    out["conditions"] += conditions
+    out["rules"] += [*rules, *f_rules]
+    out["conditions"] += [*conditions, *f_conditions]
     restriction, rules, conditions = _restriction(task, metrics)
     out["restriction"] = restriction
     out["rules"] += rules
@@ -466,9 +521,21 @@ def _baseline_of(task, selection) -> dict:
     )
 
 
-def recommend_task(task, selection, results, spec, reads) -> list:
+def _validation_key(task, rows) -> float:
+    """Sort key of a candidate by its recorded validation value; best first."""
+    value = model_metrics(rows).get(task["primary_metric"], (None, None))[1]
+    if value is None:
+        return float("inf")
+    return -value if task["higher_is_better"] else value
+
+
+def recommend_task(task, selection, results, spec, reads, foundation=None) -> list:
     """Rows for the selected candidate, the runner-up and the baseline fallback.
-    The selected candidate is the best forwarded candidate by validation rank."""
+    The selected candidate is the best forwarded candidate by validation rank. When
+    foundation candidates are forwarded, all candidates are ranked by their recorded
+    validation value; a foundation candidate that ranks first but is not approved
+    (R14, R03, R05, R07) does not displace the next candidate."""
+    foundation = foundation or {}
     by_model: dict = {}
     for r in results:
         by_model.setdefault(r["model_name"], []).append(r)
@@ -477,17 +544,44 @@ def recommend_task(task, selection, results, spec, reads) -> list:
     )
     if not cands:
         raise ValueError(f"{task['task_id']}: no forwarded candidate")
+    if any(s["model_name"] in foundation for s in cands):
+        cands.sort(
+            key=lambda s: (
+                _validation_key(task, by_model.get(s["model_name"], [])),
+                s["rank"],
+            )
+        )
     base = _baseline_of(task, selection)
     base_rows = by_model.get(base["model_name"], [])
+    probes = {
+        s["model_name"]: decide_selected(
+            task,
+            by_model.get(s["model_name"], []),
+            base_rows,
+            spec,
+            reads,
+            foundation.get(s["model_name"]),
+        )
+        for s in cands
+    }
+    first = cands[0]
+    displaced = (
+        first["model_name"] in foundation
+        and probes[first["model_name"]]["decision"] == "not_approved"
+        and len(cands) > 1
+    )
+    if displaced:
+        cands = [*cands[1:], first]
     out = []
     for i, sel in enumerate(cands):
         rows = by_model.get(sel["model_name"], [])
         if i == 0:
-            decision = decide_selected(task, rows, base_rows, spec, reads)
-            out.append(_row_for(task, sel, rows, "selected", decision))
+            out.append(_row_for(task, sel, rows, "selected", probes[sel["model_name"]]))
             continue
-        probe = decide_selected(task, rows, base_rows, spec, reads)
+        probe = probes[sel["model_name"]]
         note = f"not selected: validation rank {sel['rank']}"
+        if displaced and sel is first:
+            note = "not selected: ranked first on validation but not approved"
         decision = {
             "decision": "not_approved",
             "restriction": None,
@@ -507,6 +601,31 @@ def recommend_task(task, selection, results, spec, reads) -> list:
     }
     out.append(_row_for(task, base, base_rows, "baseline_fallback", fallback))
     return out
+
+
+def foundation_facts(selection, params, register, contamination) -> dict:
+    """model name -> facts for R13 and R14, for the forwarded foundation models of
+    one task. `params` maps a model name to its recorded parameters, `register` a
+    model key to its register row, `contamination` a model key to its flag row."""
+    facts = {}
+    for sel in selection:
+        name = sel["model_name"]
+        if not str(sel.get("family") or "").startswith("foundation_"):
+            continue
+        info = params.get(name) or {}
+        key = info.get("model_key")
+        entry = register.get(key) or {}
+        flag = contamination.get(key) or {}
+        facts[name] = {
+            "model_key": key,
+            "repo_id": entry.get("repo_id") or info.get("repo_id"),
+            "revision": entry.get("revision") or info.get("revision"),
+            "licence": entry.get("licence") or info.get("licence"),
+            "mode": info.get("mode"),
+            "contamination": flag.get("flag") or "unresolved",
+            "contamination_note": flag.get("overlap_note") or "",
+        }
+    return facts
 
 
 # COMMAND ----------

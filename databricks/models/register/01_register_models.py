@@ -117,7 +117,9 @@ for eco in ("energy", "commerce"):
 now = now_utc()
 planned = {}
 for eco, (approvals, fit_versions, existing) in evidence.items():
-    wanted = registry_entries(approvals, fit_versions)
+    wanted = annotate_replacements(
+        registry_entries(approvals, fit_versions), existing, is_foundation_model
+    )
     changes = {
         k: v
         for k, v in LIFECYCLE_CHANGES.items()

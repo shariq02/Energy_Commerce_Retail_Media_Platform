@@ -162,14 +162,28 @@ for eco in ("energy", "commerce"):
         .select(*CONTEXT_FIELDS)
         .collect()
     ]
-    params = {
-        (r["task_id"], r["model_name"]): r["params"]
-        for r in read_model("candidate_results", ecosystem=eco)
-        .filter(~F.col("smoke") & (F.col("status") == "ok"))
-        .select("task_id", "model_name", "params")
-        .distinct()
-        .collect()
-    }
+    params = {}
+    for table in ("candidate_results", "foundation_results"):
+        if not spark.catalog.tableExists(model_fqn(table, eco)):
+            continue
+        params.update(
+            {
+                (r["task_id"], r["model_name"]): r["params"]
+                for r in read_model(table, ecosystem=eco)
+                .filter(~F.col("smoke") & (F.col("status") == "ok"))
+                .select("task_id", "model_name", "params")
+                .distinct()
+                .collect()
+            }
+        )
+    if spark.catalog.tableExists(model_fqn("foundation_run_context", eco)):
+        fit_context += [
+            r.asDict()
+            for r in read_model("foundation_run_context", ecosystem=eco)
+            .filter(~F.col("smoke") & (F.col("status") == "finished"))
+            .select(*CONTEXT_FIELDS)
+            .collect()
+        ]
     evidence[eco] = (spec, approvals, results, flags, eval_context, fit_context, params)
     print(f"{eco}: {len(approvals)} decision row(s)")
 

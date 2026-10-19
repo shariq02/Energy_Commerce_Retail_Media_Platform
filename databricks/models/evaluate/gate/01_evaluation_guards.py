@@ -59,6 +59,8 @@ for eco in ("energy", "commerce"):
         .collect()
     )
     selection = read_model("candidate_selection", ecosystem=eco).collect()
+    if spark.catalog.tableExists(model_fqn("foundation_selection", eco)):
+        selection += read_model("foundation_selection", ecosystem=eco).collect()
     context = (
         read_model(EVAL_CONTEXT_TABLE, ecosystem=eco)
         .filter(~F.col("smoke"))
