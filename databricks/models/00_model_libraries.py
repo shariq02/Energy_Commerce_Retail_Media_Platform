@@ -49,8 +49,10 @@ PACKAGES = {
     "tabpfn": "tabpfn",
     "tabicl": "tabicl",
     "momentfm": "momentfm",
-    "toto-models": "toto2",
+    "toto-2": "toto2",
 }
+# packages whose pinned dependencies cannot be built here: installed without them
+NO_DEPENDENCIES = {"momentfm"}
 # release that matches the environment's scikit-learn 1.6
 PIP_SPECS = {
     "scikit-survival": "scikit-survival>=0.24,<0.26",
@@ -113,6 +115,7 @@ def in_base_environment(module: str) -> bool:
 def pip_install(pkg: str, target: str, index: str | None) -> bool:
     cmd = [sys.executable, "-m", "pip", "install", "-q", "--no-compile"]
     cmd += ["--disable-pip-version-check", "--target", target]
+    cmd += ["--no-deps"] if pkg in NO_DEPENDENCIES else []
     cmd += ["--index-url", index] if index else []
     cmd.append(pkg)
     try:

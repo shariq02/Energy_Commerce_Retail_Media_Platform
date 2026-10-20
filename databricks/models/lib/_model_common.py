@@ -217,7 +217,7 @@ LIBRARIES = {
     "tabpfn": "tabpfn",
     "tabicl": "tabicl",
     "momentfm": "momentfm",
-    "toto2": "toto-models",
+    "toto2": "toto-2",
 }
 
 
