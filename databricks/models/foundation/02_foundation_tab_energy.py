@@ -128,3 +128,21 @@ df = read_frozen(ctx)
 
 # DBTITLE 1,Run the in-context candidates
 run_foundation_tab(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "energy",
+    "02_foundation_tab_energy",
+    "Foundation Tabular Energy",
+    [
+        "price_quarter_hour.negative_price",
+        "redispatch.any_event",
+        "redispatch.event_energy",
+        "ccpp.output",
+        "capacity_additions.additions",
+    ],
+    rid,
+    SMOKE,
+)

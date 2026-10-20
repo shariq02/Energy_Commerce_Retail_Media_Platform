@@ -1054,13 +1054,22 @@ def run_foundation_ts(ctx, df, models=None) -> None:
 
 
 def render_foundation_findings(
-    ecosystem, results, selection, context, register, checks, *, smoke, stamp
+    ecosystem,
+    results,
+    selection,
+    context,
+    register,
+    checks,
+    *,
+    smoke,
+    stamp,
+    task_ids=None,
 ) -> str:
     """One markdown document: summary, the models with their revision and licence,
     run context, flags, check results, then per task every candidate beside the
     baseline of the accepted models. `results` holds the foundation rows and the
     baseline rows of the accepted candidates."""
-    wanted = set(foundation_task_ids())
+    wanted = set(task_ids or foundation_task_ids())
     tasks = [t for t in TASKS if t["ecosystem"] == ecosystem and t["task_id"] in wanted]
     by_context = _context_by_task(context, smoke)
     kind = "SMOKE RUN" if smoke else "RUN"
@@ -1219,3 +1228,86 @@ def _foundation_task_section(t, results, selection, by_context) -> list:
             "",
         ]
     return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings section of one foundation notebook (src/findings/model_findings)
+
+_FINDINGS_FIELDS = (
+    "task_id",
+    "model_name",
+    "family",
+    "stage",
+    "status",
+    "metric",
+    "value",
+    "n_rows",
+    "detail",
+    "frozen_delta_version",
+    "artifact_status",
+    "run_id",
+    "run_at",
+    "smoke",
+)
+
+
+def _section_body(text: str) -> str:
+    """The rendered document without its title lines, headings one level lower."""
+    body = text.split("\n", 4)[4] if text.count("\n") >= 4 else text
+    return "\n".join("#" + ln if ln.startswith("#") else ln for ln in body.splitlines())
+
+
+def write_foundation_findings(
+    ecosystem, notebook_key, title, task_ids, run_id, smoke
+) -> None:
+    """Write the findings of this notebook run as one section of
+    foundation_<ecosystem>_notebooks.md (smoke runs: ..._notebooks_smoke.md)."""
+    ids = list(task_ids)
+    fields = list(_FINDINGS_FIELDS)
+    base = F.col("task_id").isin(*ids) & (F.col("smoke") == smoke)
+    results = [
+        r.asDict()
+        for r in read_model(FOUNDATION_RESULTS, ecosystem=ecosystem)
+        .filter((F.col("run_id") == run_id) & base)
+        .select(*fields)
+        .collect()
+    ]
+    results += [
+        r.asDict()
+        for r in read_model("candidate_results", ecosystem=ecosystem)
+        .filter((F.col("stage") == "baseline") & base)
+        .select(*fields)
+        .collect()
+    ]
+    context = [
+        r.asDict()
+        for r in read_model(FOUNDATION_CONTEXT, ecosystem=ecosystem)
+        .filter((F.col("run_id") == run_id) & F.col("task_id").isin(*ids))
+        .collect()
+    ]
+    register = [
+        r.asDict()
+        for r in read_model(FOUNDATION_REGISTER, ecosystem=ecosystem).collect()
+    ]
+    now = _dt.datetime.now(tz=_dt.UTC)
+    text = render_foundation_findings(
+        ecosystem,
+        results,
+        [],
+        context,
+        register,
+        [],
+        smoke=smoke,
+        stamp=now.strftime("%Y-%m-%dT%H:%MZ"),
+        task_ids=ids,
+    )
+    write_findings_section(
+        f"foundation_{ecosystem}_notebooks",
+        f"{ecosystem.upper()} FOUNDATION NOTEBOOK FINDINGS",
+        notebook_key,
+        title,
+        _section_body(text),
+        smoke,
+        now,
+    )

@@ -178,3 +178,14 @@ check(
     metric_value=float(len(_unlinked)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "register__01_register_models",
+    "Register Models",
+    ["model_registry"],
+    rid,
+)

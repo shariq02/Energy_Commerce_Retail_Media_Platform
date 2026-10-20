@@ -93,3 +93,18 @@ df = read_frozen(ctx, apply_smoke=False)
 
 # DBTITLE 1,Run the foundation candidates
 run_foundation_reconstruction(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "energy",
+    "04_foundation_anomaly_energy",
+    "Foundation Anomaly Energy",
+    [
+        "honda_anomaly.anomaly",
+        "weather_imputation.reconstruction",
+    ],
+    rid,
+    SMOKE,
+)

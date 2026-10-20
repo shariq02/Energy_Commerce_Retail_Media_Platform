@@ -110,3 +110,28 @@ evaluate_by_id("redispatch.any_event", rid, SMOKE)
 
 # DBTITLE 1,Evaluate redispatch.event_energy
 evaluate_by_id("redispatch.event_energy", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__01_tabular_energy",
+    "Evaluate Tabular Models Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=[
+        "price_daily.price",
+        "price_quarter_hour.price",
+        "price_quarter_hour.negative_price",
+        "load.load",
+        "bias.bias",
+        "zone_generation.generation",
+        "honda_forecast.increment",
+        "ccpp.output",
+        "capacity_additions.additions",
+        "redispatch.any_event",
+        "redispatch.event_energy",
+    ],
+    smoke=SMOKE,
+)

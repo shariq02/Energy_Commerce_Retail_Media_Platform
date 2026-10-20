@@ -113,3 +113,20 @@ df = read_frozen(ctx)
 
 # DBTITLE 1,Run the in-context candidates
 run_foundation_tab(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "commerce",
+    "03_foundation_tab_commerce",
+    "Foundation Tabular Commerce",
+    [
+        "session_purchase_ga4.purchase",
+        "session_purchase_rees46.purchase",
+        "lapse_ga4.return",
+        "lapse_rees46.return",
+    ],
+    rid,
+    SMOKE,
+)

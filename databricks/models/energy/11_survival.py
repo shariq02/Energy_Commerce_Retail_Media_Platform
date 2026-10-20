@@ -70,3 +70,16 @@ SPEC = {
 
 # DBTITLE 1,Run the survival candidates
 run_survival(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__11_survival",
+    "Model Unit Survival",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["survival.unit_lifetime"],
+    smoke=SMOKE,
+)

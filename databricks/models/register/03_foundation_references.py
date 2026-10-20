@@ -167,3 +167,14 @@ check(
     metric_value=float(len(_incomplete)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "register__03_foundation_references",
+    "Foundation References",
+    ["foundation_registry_entry"],
+    rid,
+)

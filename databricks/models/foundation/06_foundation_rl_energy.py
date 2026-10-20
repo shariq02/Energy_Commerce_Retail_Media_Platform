@@ -88,3 +88,18 @@ df = read_frozen(ctx)
 
 # DBTITLE 1,Run the foundation candidate
 run_foundation_policy(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "energy",
+    "06_foundation_rl_energy",
+    "Foundation Policy Energy",
+    [
+        "rl_pumped_storage.policy",
+        "rl_redispatch.policy",
+    ],
+    rid,
+    SMOKE,
+)

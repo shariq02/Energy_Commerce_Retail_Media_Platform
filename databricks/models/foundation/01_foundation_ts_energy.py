@@ -138,3 +138,22 @@ df = read_frozen(ctx)
 
 # DBTITLE 1,Run the foundation candidates
 run_foundation_ts(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "energy",
+    "01_foundation_ts_energy",
+    "Foundation Time Series Energy",
+    [
+        "price_daily.price",
+        "price_quarter_hour.price",
+        "load.load",
+        "bias.bias",
+        "zone_generation.generation",
+        "honda_forecast.increment",
+    ],
+    rid,
+    SMOKE,
+)

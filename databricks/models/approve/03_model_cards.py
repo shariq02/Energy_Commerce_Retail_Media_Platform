@@ -242,3 +242,18 @@ for eco, items in cards.items():
         with open(_os.path.join(folder, f"{tid}.md"), "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"OK  {eco}/{tid}.md")
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__03_model_cards",
+    "Model Cards",
+    [],
+    rid,
+    notes={
+        eco: [f"{len(items)} card(s) written to src/model_cards/{eco}"]
+        for eco, items in cards.items()
+    },
+)

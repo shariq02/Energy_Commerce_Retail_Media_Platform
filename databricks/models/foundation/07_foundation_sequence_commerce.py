@@ -113,3 +113,19 @@ df = sample_users(read_frozen(ctx))
 
 # DBTITLE 1,Run the foundation candidate
 run_foundation_policy(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "commerce",
+    "07_foundation_sequence_commerce",
+    "Foundation Sequence Commerce",
+    [
+        "next_item_ga4.next_item",
+        "next_item_rees46.next_item",
+        "rl_session_sequences.policy",
+    ],
+    rid,
+    SMOKE,
+)

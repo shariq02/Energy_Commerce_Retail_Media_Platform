@@ -142,3 +142,22 @@ df = read_frozen(ctx)
 
 # DBTITLE 1,Run the stacked candidates
 run_foundation_stacking(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "energy",
+    "08_foundation_stacking_energy",
+    "Foundation Stacking Energy",
+    [
+        "price_daily.price",
+        "price_quarter_hour.price",
+        "load.load",
+        "bias.bias",
+        "zone_generation.generation",
+        "honda_forecast.increment",
+    ],
+    rid,
+    SMOKE,
+)

@@ -70,3 +70,16 @@ evaluate_by_id("next_item_ga4.next_item", rid, SMOKE)
 
 # DBTITLE 1,Evaluate next_item_rees46.next_item
 evaluate_by_id("next_item_rees46.next_item", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "evaluate__09_ranking_commerce",
+    "Evaluate Ranking Models Commerce",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["next_item_ga4.next_item", "next_item_rees46.next_item"],
+    smoke=SMOKE,
+)

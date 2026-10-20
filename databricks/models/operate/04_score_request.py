@@ -265,3 +265,15 @@ check(
     metric_value=float(len(request_rows)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    (ECOSYSTEM,),
+    "operate__04_score_request",
+    "Score Request",
+    ["scoring_requests"],
+    rid,
+    task_ids=[TASK_ID],
+)

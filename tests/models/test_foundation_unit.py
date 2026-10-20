@@ -377,3 +377,61 @@ def test_the_foundation_notebooks_and_gates_exist():
         "lib/_fit_foundation_ts.py",
     ):
         assert (_MODELS / rel).is_file(), rel
+
+
+# --- findings section of one notebook ------------------------------------------
+
+
+def _block(key, stamp):
+    return f"<!-- BEGIN {key} -->\n## {key}\n\n_Generated: {stamp}_\n\nbody\n<!-- END {key} -->"
+
+
+def test_a_rerun_replaces_its_own_section_and_keeps_the_others(lib):
+    import datetime
+
+    now = datetime.datetime(2026, 10, 20, 12, 0, tzinfo=datetime.UTC)
+    old = (
+        _block("01_a", "2026-10-20T11:00Z")
+        + "\n\n"
+        + _block("02_b", "2026-10-20T11:00Z")
+    )
+    new = _block("01_a", "2026-10-20T12:00Z")
+    out = lib["merge_findings_sections"](old, "01_a", new, now)
+    assert out.count("<!-- BEGIN") == 2
+    assert "2026-10-20T12:00Z" in out and "STALE" not in out
+    assert out.index("01_a") < out.index("02_b")
+
+
+def test_a_section_older_than_a_day_is_marked_stale(lib):
+    import datetime
+
+    now = datetime.datetime(2026, 10, 20, 12, 0, tzinfo=datetime.UTC)
+    old = _block("02_b", "2026-10-18T11:00Z")
+    out = lib["merge_findings_sections"](
+        old, "01_a", _block("01_a", "2026-10-20T12:00Z"), now
+    )
+    stale = out.split("<!-- BEGIN 02_b -->")[1]
+    assert "> STALE" in stale
+    assert "> STALE" not in out.split("<!-- BEGIN 02_b -->")[0]
+
+
+def test_the_section_body_drops_the_title_and_lowers_the_headings(lib):
+    text = "# T\n\n_Auto-generated_\n\n## summary\n\nrow\n### candidates\n"
+    body = lib["_section_body"](text)
+    assert body.splitlines()[0] == "### summary"
+    assert "### candidates" not in body.splitlines()[0]
+    assert "#### candidates" in body and "# T" not in body
+
+
+def test_every_foundation_notebook_writes_its_findings_for_its_own_tasks(lib):
+    import re
+
+    tasks = {t["task_id"]: t["ecosystem"] for t in lib["TASKS"]}
+    for path in sorted((_MODELS / "foundation").glob("0[1-8]_*.py")):
+        text = path.read_text(encoding="utf-8")
+        used = set(re.findall(r'FoundationContext\("([\w.]+)"', text))
+        call = text.split("write_foundation_findings(")[1]
+        eco = re.search(r'"(energy|commerce)"', call).group(1)
+        named = set(re.findall(r'"([a-z_0-9]+\.[a-z_0-9]+)"', call))
+        assert named == used, path.name
+        assert {tasks[t] for t in named} == {eco}, path.name

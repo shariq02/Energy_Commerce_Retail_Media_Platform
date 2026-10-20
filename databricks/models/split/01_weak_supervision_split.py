@@ -183,3 +183,14 @@ grouped.join(_assignment, "group_key").groupBy(
 ).count().orderBy("entity_type", "assigned_partition", "lf_name", "lf_label").show(
     60, truncate=False
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "split__01_weak_supervision_split",
+    "Weak Supervision Split",
+    ["evaluation_split_manifest"],
+    rid,
+)

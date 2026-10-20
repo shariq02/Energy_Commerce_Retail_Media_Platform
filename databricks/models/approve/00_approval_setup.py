@@ -89,3 +89,14 @@ for eco, have in recorded.items():
 # DBTITLE 1,The recorded settings load
 for eco in ("energy", "commerce"):
     print(eco, spec_from_rows(read_model("approval_spec", ecosystem=eco).collect()))
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__00_approval_setup",
+    "Approval Setup",
+    ["approval_spec"],
+    rid,
+)

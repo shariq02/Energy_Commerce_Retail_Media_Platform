@@ -192,3 +192,14 @@ check(
     metric_value=float(len(_missing)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__01_recommend",
+    "Approval Recommendation",
+    ["model_approval"],
+    rid,
+)

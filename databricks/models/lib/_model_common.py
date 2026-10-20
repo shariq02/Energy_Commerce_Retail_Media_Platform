@@ -1844,3 +1844,301 @@ def finish_task(ctx: TaskContext) -> None:
         detail=f"task={ctx.task_id}",
         rid=ctx.rid,
     )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings section of one notebook (src/findings/model_findings)
+
+NOTEBOOK_FINDINGS_SUBDIR = "src/findings/model_findings"
+SECTION_STALE_HOURS = 24
+FINDINGS_ROW_LIMIT = 30
+_GENERATED = _re.compile(r"_Generated: (\d{4}-\d\d-\d\dT\d\d:\d\dZ)_")
+_SECTION = _re.compile(r"<!-- BEGIN ([\w.\-]+) -->.*?<!-- END \1 -->", _re.DOTALL)
+FINDINGS_COLUMNS = {
+    "candidate_results": [
+        "task_id",
+        "model_name",
+        "family",
+        "stage",
+        "partition",
+        "metric",
+        "value",
+        "n_rows",
+        "status",
+        "detail",
+    ],
+    "candidate_selection": [
+        "task_id",
+        "model_name",
+        "rank",
+        "primary_metric",
+        "primary_value",
+        "is_baseline",
+    ],
+    "task_run_context": [
+        "task_id",
+        "status",
+        "smoke",
+        "frozen_delta_version",
+        "detail",
+        "recorded_at",
+    ],
+    "evaluation_run_context": [
+        "task_id",
+        "status",
+        "smoke",
+        "frozen_delta_version",
+        "detail",
+        "recorded_at",
+    ],
+    "evaluation_results": [
+        "task_id",
+        "model_name",
+        "stage",
+        "partition",
+        "metric",
+        "value",
+        "validation_value",
+        "n_rows",
+        "status",
+        "detail",
+    ],
+    "evaluation_flags": [
+        "task_id",
+        "model_name",
+        "stage",
+        "flag",
+        "detail",
+        "value",
+        "threshold",
+    ],
+    "evaluation_spec": ["dataset_id", "spec_key", "spec_value"],
+    "approval_spec": ["rule_id", "rule_class", "parameter", "parameter_value"],
+    "model_approval": [
+        "task_id",
+        "model_name",
+        "role",
+        "decision",
+        "restriction",
+        "overridden",
+        "primary_metric",
+        "validation_value",
+        "evaluated_value",
+    ],
+    "model_registry": [
+        "task_id",
+        "model_name",
+        "role",
+        "version",
+        "lifecycle_status",
+        "decision",
+        "validation_value",
+        "reason",
+    ],
+    "registry_check": [
+        "task_id",
+        "model_name",
+        "role",
+        "registry_version",
+        "processor_type",
+        "reload_status",
+        "rescore_status",
+        "gap_relative",
+        "status",
+        "detail",
+    ],
+    "monitoring_spec": ["parameter", "parameter_value"],
+    "reference_profile": [
+        "task_id",
+        "model_name",
+        "subject",
+        "value_kind",
+        "n_rows",
+        "null_rate",
+    ],
+    "model_predictions": [
+        "task_id",
+        "model_name",
+        "window_id",
+        "row_key",
+        "prediction",
+    ],
+    "monitoring_results": [
+        "task_id",
+        "model_name",
+        "window_id",
+        "check_kind",
+        "subject",
+        "value",
+        "level",
+    ],
+    "monitoring_flags": [
+        "task_id",
+        "model_name",
+        "window_id",
+        "check_kind",
+        "subject",
+        "level",
+        "value",
+        "threshold",
+    ],
+    "monitoring_triggers": [
+        "task_id",
+        "model_name",
+        "trigger_kind",
+        "source",
+        "condition",
+        "value",
+        "threshold",
+    ],
+}
+# tables without a run id are summarised by these columns
+FINDINGS_GROUPED = {"evaluation_split_manifest": ["dataset_id", "partition"]}
+
+
+def _mark_section_stale(block: str, now) -> str:
+    """Add a STALE line under the section title once it is older than 24 hours."""
+    if "> STALE" in block:
+        return block
+    found = _GENERATED.search(block)
+    if found:
+        made = _dt.datetime.strptime(found.group(1), "%Y-%m-%dT%H:%MZ").replace(
+            tzinfo=_dt.UTC
+        )
+        if now - made <= _dt.timedelta(hours=SECTION_STALE_HOURS):
+            return block
+    head, _, rest = block.partition("\n## ")
+    title, _, tail = rest.partition("\n")
+    return (
+        f"{head}\n## {title}\n\n"
+        f"> STALE: not rewritten in the last {SECTION_STALE_HOURS}h\n{tail}"
+    )
+
+
+def merge_findings_sections(existing: str, key: str, block: str, now) -> str:
+    """The file text with the section of `key` replaced; the other sections stay and
+    are marked STALE once older than 24 hours."""
+    kept = {m.group(1): m.group(0) for m in _SECTION.finditer(existing)}
+    kept = {k: _mark_section_stale(v, now) for k, v in kept.items()}
+    kept[key] = block
+    return "\n\n".join(kept[k] for k in sorted(kept)) + "\n"
+
+
+def _findings_dir() -> str:
+    path = _os.path.abspath(_os.getcwd())
+    for _ in range(12):
+        if _os.path.isdir(_os.path.join(path, "src", "schemas")) and _os.path.isdir(
+            _os.path.join(path, "databricks")
+        ):
+            return _os.path.join(path, NOTEBOOK_FINDINGS_SUBDIR)
+        if _os.path.dirname(path) == path:
+            break
+        path = _os.path.dirname(path)
+    notebook = (
+        dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath()
+    ).get()
+    cut = notebook.rfind("/databricks/")
+    for root in (notebook[:cut], "/Workspace" + notebook[:cut]):
+        if cut > 0 and _os.path.isdir(_os.path.join(root, "src", "schemas")):
+            return _os.path.join(root, NOTEBOOK_FINDINGS_SUBDIR)
+    raise RuntimeError("repo root not found -- run from the Databricks Git folder")
+
+
+def write_findings_section(stem, heading, key, title, body, smoke, now) -> None:
+    """Put one notebook section into <stem>.md (smoke runs: <stem>_smoke.md)."""
+    block = scrub_private(
+        "\n".join(
+            [
+                f"<!-- BEGIN {key} -->",
+                f"## {title}",
+                "",
+                f"_Generated: {now.strftime('%Y-%m-%dT%H:%MZ')}_",
+                "",
+                body,
+                f"<!-- END {key} -->",
+            ]
+        )
+    )
+    path = _os.path.join(_findings_dir(), f"{stem}{'_smoke' if smoke else ''}.md")
+    _os.makedirs(_os.path.dirname(path), exist_ok=True)
+    existing = ""
+    if _os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            existing = fh.read()
+    intro = (
+        f"# {heading}{' (SMOKE RUN)' if smoke else ''}\n\n"
+        "_Auto-generated by the model notebooks (`databricks/models/`). One `## ` "
+        "section per notebook; a re-run replaces its own section, the other sections "
+        "stay and are marked STALE once older than 24h._\n\n"
+    )
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(intro + merge_findings_sections(existing, key, block, now))
+    print(f"findings export -> {path}  ('{key}')")
+
+
+def table_findings(table, ecosystem, run_id, task_ids=None, smoke=None) -> str:
+    """Markdown for the rows one run wrote to a model table."""
+    full = model_fqn(table, ecosystem)
+    if not spark.catalog.tableExists(full):
+        return f"_table `{table}` does not exist_"
+    frame = spark.table(full)
+    columns = frame.columns
+    if table in FINDINGS_GROUPED:
+        keys = FINDINGS_GROUPED[table]
+        rows = frame.groupBy(*keys).count().orderBy(*keys).collect()
+        return markdown_table([*keys, "rows"], [tuple(r) for r in rows])
+    if "run_id" in columns:
+        frame = frame.filter(F.col("run_id") == run_id)
+    if task_ids and "task_id" in columns:
+        frame = frame.filter(F.col("task_id").isin(*task_ids))
+    if smoke is not None and "smoke" in columns:
+        frame = frame.filter(F.col("smoke") == smoke)
+    total = frame.count()
+    if total == 0:
+        return "_no rows for this run_"
+    shown = [c for c in FINDINGS_COLUMNS.get(table, columns) if c in columns]
+    rows = frame.select(*shown).limit(FINDINGS_ROW_LIMIT).collect()
+    note = f"{total} row(s)"
+    if total > FINDINGS_ROW_LIMIT:
+        note += f", first {FINDINGS_ROW_LIMIT} shown"
+    table_text = markdown_table(
+        shown,
+        [tuple(round(v, 4) if isinstance(v, float) else v for v in r) for r in rows],
+    )
+    return f"{note}\n\n{table_text}"
+
+
+def write_model_findings(
+    ecosystems,
+    notebook_key,
+    title,
+    tables,
+    run_id,
+    task_ids=None,
+    smoke=None,
+    notes=None,
+) -> None:
+    """Write what one notebook run recorded in `tables`, one file per ecosystem
+    (<ecosystem>_notebooks.md; smoke runs: <ecosystem>_notebooks_smoke.md).
+    `notes` maps an ecosystem to extra lines for the section."""
+    now = _dt.datetime.now(tz=_dt.UTC)
+    for eco in ecosystems:
+        lines = (notes or {}).get(eco, [])
+        body = [*lines, ""] if lines else []
+        for table in tables:
+            body += [
+                f"### {table}",
+                "",
+                table_findings(table, eco, run_id, task_ids, smoke),
+                "",
+            ]
+        write_findings_section(
+            f"{eco}_notebooks",
+            f"{eco.upper()} MODEL NOTEBOOK FINDINGS",
+            notebook_key,
+            title,
+            "\n".join(body),
+            bool(smoke),
+            now,
+        )

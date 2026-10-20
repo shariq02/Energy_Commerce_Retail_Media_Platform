@@ -103,3 +103,18 @@ df = attach_evaluation_partition(df, ctx, ["affected_asset_text"])
 
 # DBTITLE 1,Run the in-context candidates
 run_foundation_tier(ctx, df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_foundation_findings(
+    "energy",
+    "05_foundation_survival_matching_energy",
+    "Foundation Survival And Matching Energy",
+    [
+        "survival.unit_lifetime",
+        "redispatch_matching.tier",
+    ],
+    rid,
+    SMOKE,
+)
