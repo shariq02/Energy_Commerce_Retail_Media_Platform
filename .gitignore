@@ -26,6 +26,9 @@ docs/
 # Retired code (superseded implementations) - kept locally only
 archive/
 
+# Prompts given to Genie to build the Databricks jobs - kept locally only
+databricks/genie_prompts/
+
 # Local-only acquisition notes - not tracked
 scripts/download/README.md
 

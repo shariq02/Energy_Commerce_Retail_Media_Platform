@@ -87,6 +87,15 @@ def imports_from_folder(module: str) -> bool:
     return result.returncode == 0
 
 
+def import_error(module: str) -> str:
+    code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=False
+    )
+    lines = result.stderr.strip().splitlines()
+    return lines[-1] if lines else "no error text"
+
+
 # COMMAND ----------
 
 # DBTITLE 1,Which libraries are missing
@@ -196,3 +205,5 @@ for _pkg, _mod in PACKAGES.items():
     print(
         f"{'OK  ' if _ok else 'WARN'} {_pkg}: version {library_version(_mod.split('.')[0])}"
     )
+    if not _ok:
+        print(f"     {import_error(_mod)}")

@@ -1264,7 +1264,7 @@ def write_foundation_findings(
     ecosystem, notebook_key, title, task_ids, run_id, smoke
 ) -> None:
     """Write the findings of this notebook run as one section of
-    foundation_<ecosystem>_notebooks.md (smoke runs: ..._notebooks_smoke.md)."""
+    notebooks/foundation_<ecosystem>__<notebook key>.md (smoke runs: ..._smoke.md)."""
     ids = list(task_ids)
     fields = list(_FINDINGS_FIELDS)
     base = F.col("task_id").isin(*ids) & (F.col("smoke") == smoke)
@@ -1305,9 +1305,8 @@ def write_foundation_findings(
         task_ids=ids,
     )
     write_findings_section(
-        f"foundation_{ecosystem}_notebooks",
+        f"foundation_{ecosystem}__{notebook_key}",
         f"{ecosystem.upper()} FOUNDATION NOTEBOOK FINDINGS",
-        notebook_key,
         title,
         _section_body(text),
         smoke,

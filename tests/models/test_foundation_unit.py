@@ -382,37 +382,19 @@ def test_the_foundation_notebooks_and_gates_exist():
 # --- findings section of one notebook ------------------------------------------
 
 
-def _block(key, stamp):
-    return f"<!-- BEGIN {key} -->\n## {key}\n\n_Generated: {stamp}_\n\nbody\n<!-- END {key} -->"
-
-
-def test_a_rerun_replaces_its_own_section_and_keeps_the_others(lib):
+def test_a_findings_file_has_one_notebook_and_a_smoke_mark(lib):
     import datetime
 
     now = datetime.datetime(2026, 10, 20, 12, 0, tzinfo=datetime.UTC)
-    old = (
-        _block("01_a", "2026-10-20T11:00Z")
-        + "\n\n"
-        + _block("02_b", "2026-10-20T11:00Z")
-    )
-    new = _block("01_a", "2026-10-20T12:00Z")
-    out = lib["merge_findings_sections"](old, "01_a", new, now)
-    assert out.count("<!-- BEGIN") == 2
-    assert "2026-10-20T12:00Z" in out and "STALE" not in out
-    assert out.index("01_a") < out.index("02_b")
+    text = lib["findings_file_text"]("ENERGY FOUNDATION", "01 ts", "body", True, now)
+    assert text.startswith("# ENERGY FOUNDATION (SMOKE RUN)")
+    assert "Generated: 2026-10-20T12:00Z" in text and "## 01 ts\n\nbody" in text
+    assert text.count("\n## ") == 1 and text.endswith("body\n")
 
 
-def test_a_section_older_than_a_day_is_marked_stale(lib):
-    import datetime
-
-    now = datetime.datetime(2026, 10, 20, 12, 0, tzinfo=datetime.UTC)
-    old = _block("02_b", "2026-10-18T11:00Z")
-    out = lib["merge_findings_sections"](
-        old, "01_a", _block("01_a", "2026-10-20T12:00Z"), now
-    )
-    stale = out.split("<!-- BEGIN 02_b -->")[1]
-    assert "> STALE" in stale
-    assert "> STALE" not in out.split("<!-- BEGIN 02_b -->")[0]
+def test_the_findings_file_name_is_the_stem_with_a_smoke_suffix(lib):
+    assert lib["findings_file_name"]("energy__01_a", False) == "energy__01_a.md"
+    assert lib["findings_file_name"]("energy__01_a", True) == "energy__01_a_smoke.md"
 
 
 def test_the_section_body_drops_the_title_and_lowers_the_headings(lib):
