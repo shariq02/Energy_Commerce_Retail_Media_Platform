@@ -435,3 +435,16 @@ def test_every_foundation_notebook_writes_its_findings_for_its_own_tasks(lib):
         named = set(re.findall(r'"([a-z_0-9]+\.[a-z_0-9]+)"', call))
         assert named == used, path.name
         assert {tasks[t] for t in named} == {eco}, path.name
+
+
+# --- training byproducts stay out of the repository ----------------------------
+
+
+def test_every_training_call_of_the_models_libraries_names_an_output_folder():
+    import re
+
+    for path in sorted((_MODELS / "lib").glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"\.fit\(\s*inputs=", text):
+            call = text[match.start() : text.index("\n        )", match.start())]
+            assert "output_dir=" in call, path.name

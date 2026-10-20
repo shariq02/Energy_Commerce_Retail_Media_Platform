@@ -51,6 +51,17 @@ ai/knowledge_corpus/wikipedia/chunks.tmp
 logs/
 *.log
 
+# Model training byproducts -- written into the working folder by training libraries
+chronos-2-finetuned/
+lightning_logs/
+mlruns/
+mlartifacts/
+wandb/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+
 # Database
 *.db
 *.sqlite

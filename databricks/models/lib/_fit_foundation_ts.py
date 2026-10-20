@@ -870,17 +870,19 @@ def tune_chronos2(weights_dir, arrays, horizon, settings, adapter_dir) -> None:
 
     torch.manual_seed(MODEL_SEED)
     pipeline = Chronos2Pipeline.from_pretrained(weights_dir, device_map=_device())
-    tuned = pipeline.fit(
-        inputs=[{"target": a} for a in arrays],
-        prediction_length=horizon,
-        finetune_mode="lora",
-        context_length=settings["context_length"],
-        learning_rate=settings["learning_rate"],
-        num_steps=settings["num_steps"],
-        batch_size=settings["batch_size"],
-    )
-    os.makedirs(adapter_dir, exist_ok=True)
-    tuned.save_pretrained(adapter_dir)
+    with _tempfile.TemporaryDirectory() as work:
+        tuned = pipeline.fit(
+            inputs=[{"target": a} for a in arrays],
+            prediction_length=horizon,
+            finetune_mode="lora",
+            context_length=settings["context_length"],
+            learning_rate=settings["learning_rate"],
+            num_steps=settings["num_steps"],
+            batch_size=settings["batch_size"],
+            output_dir=work,
+        )
+        os.makedirs(adapter_dir, exist_ok=True)
+        tuned.save_pretrained(adapter_dir)
 
 
 # COMMAND ----------
