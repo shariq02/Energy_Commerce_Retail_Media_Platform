@@ -34,10 +34,13 @@ ECOSYSTEMS = ("energy", "commerce")
 RETENTION = "interval 3650 days"
 APPLY_RETENTION = False  # True
 APPLY_CLONE = False  # True
+DROP_ECOSYSTEMS = ("energy",)
+APPLY_DROP = False  # True
 
 print(f"Retention: {RETENTION}")
 print(f"Apply retention: {APPLY_RETENTION}")
 print(f"Apply clone: {APPLY_CLONE}")
+print(f"Apply drop: {APPLY_DROP} for {DROP_ECOSYSTEMS}")
 
 # COMMAND ----------
 
@@ -177,3 +180,22 @@ for (eco, ds), name in clone_name.items():
     ).first()["n"]
     got = spark.table(name).count()
     print(f"{'OK  ' if want == got else 'FAIL'} {name}: {got} row(s), frozen {want}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Drop the clones of the chosen ecosystems (frees schema objects)
+for (eco, ds), name in clone_name.items():
+    if eco not in DROP_ECOSYSTEMS or not spark.catalog.tableExists(name):
+        continue
+    src = ml_fqn(f"dataset_{ds}", eco)
+    props = spark.sql(f"DESCRIBE DETAIL {src}").first()["properties"] or {}
+    if "delta.deletedFileRetentionDuration" not in props:
+        print(f"SKIP  {name}: retention is not set on {src}")
+        continue
+    if not APPLY_DROP:
+        print(f"SKIP  {name}: APPLY_DROP is False")
+        continue
+    spark.sql(f"DROP TABLE {name}")
+    print(f"OK  dropped {name}")
+for eco in DROP_ECOSYSTEMS:
+    print(f"{ml_schema_for(eco)}: {_schema_object_count(eco)} object(s)")
