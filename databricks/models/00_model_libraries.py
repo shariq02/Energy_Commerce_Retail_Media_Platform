@@ -60,6 +60,8 @@ PIP_SPECS = {
 }
 FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
+# a package that pulls its own torch must not overwrite the CPU build
+TORCH_GROUP = ("torch", "torchgen", "functorch")
 INSTALL_TIMEOUT_SECONDS = 600
 IMPORT_TIMEOUT_SECONDS = 300
 COPY_THREADS = 32
@@ -103,12 +105,14 @@ def import_error(module: str) -> str | None:
 
 # DBTITLE 1,Which libraries are missing
 missing = {}
+errors = {}
 for _pkg, _mod in PACKAGES.items():
     _error = "refresh" if REFRESH else import_error(_mod)
     _line = f"MISS {_pkg}: {_error}" if _error else f"OK   {_pkg}"
     print(_line, flush=True)
     if _error:
         missing[_pkg] = _mod
+        errors[_pkg] = _error
 print(f"already importable: {[p for p in PACKAGES if p not in missing]}")
 print(f"to install: {list(missing)}")
 
@@ -141,13 +145,34 @@ def pip_install(pkg: str, target: str, index: str | None) -> bool:
         return False
 
 
-def drop_what_the_environment_has(target: str) -> None:
+def is_torch_part(name: str) -> bool:
+    return name in TORCH_GROUP or (
+        name.startswith("torch-") and name.endswith(".dist-info")
+    )
+
+
+def clear_torch_group() -> None:
+    """Remove torch and its CUDA leftovers from the volume folder."""
+    for name in os.listdir(FOLDER):
+        if is_torch_part(name) or name.startswith(("nvidia", "triton")):
+            dbutils.fs.rm(os.path.join(FOLDER, name), True)
+
+
+def needs_install(pkg: str, error: str | None) -> bool:
+    """A reinstall fixes a missing module, not an error inside an installed one."""
+    if error is None:
+        return False
+    return pkg == "torch" or error == "refresh" or "No module named" in error
+
+
+def drop_what_the_environment_has(target: str, keep_torch: bool = False) -> None:
     dropped = set()
     for name in os.listdir(target):
         path = os.path.join(target, name)
         is_cuda = name.startswith(("nvidia", "triton"))
+        is_other_torch = is_torch_part(name) and not keep_torch
         is_base = os.path.isdir(path) and in_base_environment(name)
-        if is_cuda or (is_base and not name.endswith(".dist-info")):
+        if is_cuda or is_other_torch or (is_base and not name.endswith(".dist-info")):
             shutil.rmtree(path, ignore_errors=True)
             dropped.add(name)
     for name in os.listdir(target):
@@ -185,17 +210,26 @@ def copy_tree(src: str, dst: str) -> int:
 # COMMAND ----------
 
 # DBTITLE 1,Install each missing package into a local folder, keep only what is new, copy
-for _pkg in missing:
+_torch_fixed = False
+for _pkg, _mod in missing.items():
+    _error = import_error(_mod) if _torch_fixed and _pkg != "torch" else errors[_pkg]
+    if not needs_install(_pkg, _error):
+        _why = "imports now" if _error is None else f"reinstall does not fix: {_error}"
+        print(f"SKIP {_pkg}: {_why}", flush=True)
+        continue
+    if _pkg == "torch":
+        clear_torch_group()
     _tmp = tempfile.mkdtemp()
     _spec = PIP_SPECS.get(_pkg, _pkg)
     _ok = _pkg == "torch" and pip_install(_spec, _tmp, TORCH_CPU_INDEX)
     _ok = _ok or pip_install(_spec, _tmp, None)
     if _ok:
-        drop_what_the_environment_has(_tmp)
+        drop_what_the_environment_has(_tmp, keep_torch=_pkg == "torch")
         clear_old_versions(_tmp, FOLDER)
-        print(f"OK  {_pkg}: {copy_tree(_tmp, FOLDER)} file(s) copied")
+        print(f"OK  {_pkg}: {copy_tree(_tmp, FOLDER)} file(s) copied", flush=True)
+        _torch_fixed = _torch_fixed or _pkg == "torch"
     else:
-        print(f"WARN {_pkg}: install failed or timed out")
+        print(f"WARN {_pkg}: install failed or timed out", flush=True)
     shutil.rmtree(_tmp, ignore_errors=True)
 
 # COMMAND ----------
@@ -207,10 +241,13 @@ print(FOLDER in sys.path)
 # COMMAND ----------
 
 # DBTITLE 1,Which libraries import
+failed = {}
 for _pkg, _mod in PACKAGES.items():
     _error = import_error(_mod)
     print(
         f"{'WARN' if _error else 'OK  '} {_pkg}: version {library_version(_mod.split('.')[0])}"
     )
     if _error:
+        failed[_pkg] = _error
         print(f"     {_error}")
+print(f"still failing: {list(failed) or 'none'}")
