@@ -61,6 +61,7 @@ PIP_SPECS = {
 FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 INSTALL_TIMEOUT_SECONDS = 600
+IMPORT_TIMEOUT_SECONDS = 300
 COPY_THREADS = 32
 
 # COMMAND ----------
@@ -79,19 +80,21 @@ print(f"OK  volume ready: {FOLDER}")
 # DBTITLE 1,Define the import check, run in a fresh interpreter
 
 
-def imports_from_folder(module: str) -> bool:
+def import_error(module: str) -> str | None:
+    """Return None when the module imports, else the last line of the error."""
     code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, check=False
-    )
-    return result.returncode == 0
-
-
-def import_error(module: str) -> str:
-    code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, check=False
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=IMPORT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return f"import timed out after {IMPORT_TIMEOUT_SECONDS} s"
+    if result.returncode == 0:
+        return None
     lines = result.stderr.strip().splitlines()
     return lines[-1] if lines else "no error text"
 
@@ -99,9 +102,13 @@ def import_error(module: str) -> str:
 # COMMAND ----------
 
 # DBTITLE 1,Which libraries are missing
-missing = {
-    pkg: mod for pkg, mod in PACKAGES.items() if REFRESH or not imports_from_folder(mod)
-}
+missing = {}
+for _pkg, _mod in PACKAGES.items():
+    _error = "refresh" if REFRESH else import_error(_mod)
+    _line = f"MISS {_pkg}: {_error}" if _error else f"OK   {_pkg}"
+    print(_line, flush=True)
+    if _error:
+        missing[_pkg] = _mod
 print(f"already importable: {[p for p in PACKAGES if p not in missing]}")
 print(f"to install: {list(missing)}")
 
@@ -201,9 +208,9 @@ print(FOLDER in sys.path)
 
 # DBTITLE 1,Which libraries import
 for _pkg, _mod in PACKAGES.items():
-    _ok = imports_from_folder(_mod)
+    _error = import_error(_mod)
     print(
-        f"{'OK  ' if _ok else 'WARN'} {_pkg}: version {library_version(_mod.split('.')[0])}"
+        f"{'WARN' if _error else 'OK  '} {_pkg}: version {library_version(_mod.split('.')[0])}"
     )
-    if not _ok:
-        print(f"     {import_error(_mod)}")
+    if _error:
+        print(f"     {_error}")
