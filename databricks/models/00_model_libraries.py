@@ -353,6 +353,12 @@ def in_base_environment(module: str) -> bool:
     return importlib.machinery.PathFinder.find_spec(module, _BASE_PATH) is not None
 
 
+def remove_path(path: str) -> None:
+    """dbutils.fs.rm returns False on failure and raises no error; check both."""
+    if not dbutils.fs.rm(path, True) or os.path.exists(path):
+        raise RuntimeError(f"could not remove {path}")
+
+
 def pip_install(pkg: str, target: str, index: str | None) -> bool:
     cmd = [sys.executable, "-m", "pip", "install", "-q", "--no-compile"]
     cmd += ["--disable-pip-version-check", "--target", target]
@@ -373,7 +379,7 @@ def clear_torch_group() -> None:
     """Remove torch and its CUDA leftovers from the volume folder."""
     for name in os.listdir(FOLDER):
         if is_torch_part(name) or name.startswith(("nvidia", "triton")):
-            dbutils.fs.rm(os.path.join(FOLDER, name), True)
+            remove_path(os.path.join(FOLDER, name))
 
 
 def needs_install(pkg: str, error: str | None) -> bool:
@@ -420,9 +426,26 @@ def clear_old_versions(target: str, folder: str) -> None:
             stem = name.rsplit("-", 1)[0]
             for old in os.listdir(folder):
                 if old.endswith(".dist-info") and old.rsplit("-", 1)[0] == stem:
-                    dbutils.fs.rm(os.path.join(folder, old), True)
+                    remove_path(os.path.join(folder, old))
         elif os.path.exists(os.path.join(folder, name)):
-            dbutils.fs.rm(os.path.join(folder, name), True)
+            remove_path(os.path.join(folder, name))
+
+
+def remove_old_dist_info(target: str, folder: str) -> list[str]:
+    """After the copy: remove each other dist-info of a copied package from the folder."""
+    new = {name for name in os.listdir(target) if name.endswith(".dist-info")}
+    removed = []
+    for name in new:
+        stem = name.rsplit("-", 1)[0]
+        for old in os.listdir(folder):
+            if (
+                old.endswith(".dist-info")
+                and old not in new
+                and old.rsplit("-", 1)[0] == stem
+            ):
+                remove_path(os.path.join(folder, old))
+                removed.append(old)
+    return removed
 
 
 def copy_tree(src: str, dst: str) -> int:
@@ -472,6 +495,9 @@ for _pkg, _mod in missing.items():
         drop_what_the_environment_has(_tmp, keep_torch=_target == "torch")
         clear_old_versions(_tmp, FOLDER)
         print(f"OK  {_target}: {copy_tree(_tmp, FOLDER)} file(s) copied", flush=True)
+        _old = remove_old_dist_info(_tmp, FOLDER)
+        if _old:
+            print(f"    old dist-info removed: {_old}", flush=True)
         installed.append(_pkg)
         repaired.add(_target)
         _torch_fixed = _torch_fixed or _target == "torch"
