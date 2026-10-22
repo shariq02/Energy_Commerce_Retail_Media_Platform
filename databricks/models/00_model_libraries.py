@@ -27,6 +27,7 @@
 
 # DBTITLE 1,Configuration
 import importlib.machinery
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -64,8 +65,13 @@ FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 # a package that pulls its own torch must not overwrite the CPU build
 TORCH_GROUP = ("torch", "torchgen", "functorch")
+IMPORT_WORKERS = 4
+POLL_SECONDS = 1
 HEARTBEAT_SECONDS = 30
 SLOW_IMPORT_SECONDS = 5
+IMPORT_SECONDS = {}
+ERROR_TEXT = {}
+ERROR_ROWS = 15
 COPY_THREADS = 32
 
 # COMMAND ----------
@@ -81,52 +87,127 @@ print(f"OK  volume ready: {FOLDER}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Define the import check, run in a fresh interpreter
+# DBTITLE 1,Define the timer of a folder scan
 
 
-IMPORT_SECONDS = {}
+def timed(label: str, call) -> None:
+    started = time.monotonic()
+    count = call()
+    print(f"{label}: {count} item(s), {time.monotonic() - started:.1f} s", flush=True)
 
 
-def import_error(module: str) -> str | None:
-    """Return None when the module imports, else the last line of the error.
+# COMMAND ----------
 
-    No time limit: every HEARTBEAT_SECONDS a line names the last finished import.
-    """
+# DBTITLE 1,Time the listing of the library folder
+timed("list folder", lambda: len(os.listdir(FOLDER)))
+
+# COMMAND ----------
+
+# DBTITLE 1,Time the package metadata scan of the library folder
+timed(
+    "metadata scan, folder only",
+    lambda: sum(1 for _ in importlib.metadata.distributions(path=[FOLDER])),
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Time the package metadata scan of the import path plus the library folder
+timed(
+    "metadata scan, import path + folder",
+    lambda: sum(1 for _ in importlib.metadata.distributions(path=[*sys.path, FOLDER])),
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the reader of the import timing lines
+
+
+def read_importtime(job: dict) -> None:
+    for line in job["proc"].stderr:
+        fields = line.split("|")
+        if not (line.startswith("import time:") and len(fields) == 3):
+            job["text"].append(line)
+        elif fields[1].strip().isdigit():
+            job["last"] = fields[2].strip()
+            seconds = int(fields[1]) / 1e6
+            if seconds >= SLOW_IMPORT_SECONDS:
+                job["slow"].append(f"{job['last']} {seconds:.0f} s")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the start of one import in a fresh interpreter
+
+
+def start_import(module: str) -> dict:
     code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
     cmd = [sys.executable, "-X", "importtime", "-c", code]
     proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True)
-    state = {"last": "none", "slow": [], "text": []}
+    now = time.monotonic()
+    job = {"module": module, "proc": proc, "last": "none", "slow": [], "text": []}
+    job |= {"shown": 0, "started": now, "beat": now}
+    job["reader"] = threading.Thread(target=read_importtime, args=(job,), daemon=True)
+    job["reader"].start()
+    return job
 
-    def read_lines():
-        for line in proc.stderr:
-            fields = line.split("|")
-            if not (line.startswith("import time:") and len(fields) == 3):
-                state["text"].append(line)
-            elif fields[1].strip().isdigit():
-                state["last"] = fields[2].strip()
-                seconds = int(fields[1]) / 1e6
-                if seconds >= SLOW_IMPORT_SECONDS:
-                    state["slow"].append(f"{state['last']} {seconds:.0f} s")
 
-    reader = threading.Thread(target=read_lines, daemon=True)
-    reader.start()
-    started = time.monotonic()
-    shown = 0
-    while reader.is_alive():
-        reader.join(HEARTBEAT_SECONDS)
-        for item in state["slow"][shown:]:
-            print(f"     slow import {module}: {item}", flush=True)
-        shown = len(state["slow"])
-        if reader.is_alive():
-            waited = time.monotonic() - started
-            last = state["last"]
-            print(f"     {module}: {waited:.0f} s, last finished {last}", flush=True)
-    proc.wait()
-    IMPORT_SECONDS[module] = time.monotonic() - started
-    if proc.returncode == 0:
-        return None
-    lines = "".join(state["text"]).strip().splitlines()
-    return lines[-1] if lines else "no error text"
+# COMMAND ----------
+
+# DBTITLE 1,Define the progress lines of a running import
+
+
+def show_progress(job: dict) -> None:
+    for item in job["slow"][job["shown"] :]:
+        print(f"     slow import {job['module']}: {item}", flush=True)
+    job["shown"] = len(job["slow"])
+    now = time.monotonic()
+    if job["reader"].is_alive() and now - job["beat"] >= HEARTBEAT_SECONDS:
+        job["beat"] = now
+        waited = now - job["started"]
+        print(
+            f"     {job['module']}: {waited:.0f} s, last finished {job['last']}",
+            flush=True,
+        )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the import check, IMPORT_WORKERS at a time, no time limit
+
+
+def check_imports(modules: list[str]) -> dict:
+    """Return {module: None or the last line of the error}; the main thread prints."""
+    waiting = list(modules)
+    running = []
+    errors = {}
+    while waiting or running:
+        while waiting and len(running) < IMPORT_WORKERS:
+            running.append(start_import(waiting.pop(0)))
+        time.sleep(POLL_SECONDS)
+        for job in list(running):
+            alive = job["reader"].is_alive()
+            show_progress(job)
+            if alive:
+                continue
+            job["proc"].wait()
+            IMPORT_SECONDS[job["module"]] = time.monotonic() - job["started"]
+            lines = "".join(job["text"]).strip().splitlines()
+            failed = job["proc"].returncode != 0
+            ERROR_TEXT[job["module"]] = "\n".join(lines) if failed else ""
+            errors[job["module"]] = (
+                (lines[-1] if lines else "no error text") if failed else None
+            )
+            running.remove(job)
+    return errors
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the import check of one module
+
+
+def import_error(module: str) -> str | None:
+    return check_imports([module])[module]
 
 
 # COMMAND ----------
@@ -134,10 +215,13 @@ def import_error(module: str) -> str | None:
 # DBTITLE 1,Which libraries are missing
 missing = {}
 errors = {}
+results = {} if REFRESH else check_imports(list(PACKAGES.values()))
 for _pkg, _mod in PACKAGES.items():
-    _error = "refresh" if REFRESH else import_error(_mod)
+    _error = "refresh" if REFRESH else results[_mod]
     _line = f"MISS {_pkg}: {_error}" if _error else f"OK   {_pkg}"
     print(_line, flush=True)
+    for _row in ERROR_TEXT.get(_mod, "").splitlines()[-ERROR_ROWS:]:
+        print(f"     | {_row}", flush=True)
     if _error:
         missing[_pkg] = _mod
         errors[_pkg] = _error
@@ -253,7 +337,7 @@ for _pkg, _mod in missing.items():
         print(f"OK  {_pkg}: {copy_tree(_tmp, FOLDER)} file(s) copied", flush=True)
         _torch_fixed = _torch_fixed or _pkg == "torch"
     else:
-        print(f"WARN {_pkg}: install failed or timed out", flush=True)
+        print(f"WARN {_pkg}: install failed", flush=True)
     shutil.rmtree(_tmp, ignore_errors=True)
 
 # COMMAND ----------
@@ -266,12 +350,14 @@ print(FOLDER in sys.path)
 
 # DBTITLE 1,Which libraries import
 failed = {}
+results = check_imports(list(PACKAGES.values()))
 for _pkg, _mod in PACKAGES.items():
-    _error = import_error(_mod)
+    _error = results[_mod]
     _status = "WARN" if _error else "OK  "
     _version = library_version(_mod.split(".")[0])
     print(f"{_status} {_pkg}: version {_version}, import {IMPORT_SECONDS[_mod]:.0f} s")
     if _error:
         failed[_pkg] = _error
-        print(f"     {_error}")
+        for _row in ERROR_TEXT[_mod].splitlines()[-ERROR_ROWS:]:
+            print(f"     | {_row}")
 print(f"still failing: {list(failed) or 'none'}")
