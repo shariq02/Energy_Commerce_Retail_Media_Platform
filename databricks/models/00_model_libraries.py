@@ -72,6 +72,25 @@ SLOW_IMPORT_SECONDS = 5
 IMPORT_SECONDS = {}
 ERROR_TEXT = {}
 ERROR_ROWS = 15
+# the transformers version check ends its error with this advice
+TRANSFORMERS_HINT = "pip install transformers -U"
+STALL_DUMP_SECONDS = 120
+STALL_ROWS = 200
+# packages that the transformers version check reads
+VERSION_NAMES = (
+    "transformers",
+    "huggingface-hub",
+    "tokenizers",
+    "safetensors",
+    "numpy",
+    "torch",
+    "requests",
+    "tqdm",
+    "regex",
+    "packaging",
+    "filelock",
+    "pyyaml",
+)
 COPY_THREADS = 32
 
 # COMMAND ----------
@@ -116,6 +135,55 @@ timed(
     "metadata scan, import path + folder",
     lambda: sum(1 for _ in importlib.metadata.distributions(path=[*sys.path, FOLDER])),
 )
+
+# DBTITLE 1,Define the stall test of the transformers import
+
+
+def stall_test() -> None:
+    """Import transformers.utils.import_utils; after STALL_DUMP_SECONDS print the stack and stop."""
+    code = (
+        "import faulthandler, sys; "
+        f"sys.path.append({FOLDER!r}); "
+        f"faulthandler.dump_traceback_later({STALL_DUMP_SECONDS}, exit=True); "
+        "import transformers.utils.import_utils"
+    )
+    started = time.monotonic()
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=False
+    )
+    seconds = time.monotonic() - started
+    print(
+        f"transformers.utils.import_utils: exit {result.returncode}, {seconds:.0f} s",
+        flush=True,
+    )
+    for row in result.stderr.strip().splitlines()[:STALL_ROWS]:
+        print(f"     | {row}", flush=True)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Run the stall test of the transformers import
+stall_test()
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the version print
+
+
+def version_of(name: str, path: list[str]) -> str:
+    found = [d.version for d in importlib.metadata.distributions(name=name, path=path)]
+    return found[0] if found else "none"
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Print the versions in the library folder and in the environment
+_environment_path = [p for p in sys.path if p != FOLDER]
+for _name in VERSION_NAMES:
+    _in_folder = version_of(_name, [FOLDER])
+    print(
+        f"{_name}: folder {_in_folder} | environment {version_of(_name, _environment_path)}"
+    )
 
 # COMMAND ----------
 
@@ -267,10 +335,21 @@ def clear_torch_group() -> None:
 
 
 def needs_install(pkg: str, error: str | None) -> bool:
-    """A reinstall fixes a missing module, not an error inside an installed one."""
+    """A reinstall fixes a missing module or a transformers version error."""
     if error is None:
         return False
-    return pkg == "torch" or error == "refresh" or "No module named" in error
+    missing_module = "No module named" in error
+    return (
+        pkg == "torch"
+        or error == "refresh"
+        or missing_module
+        or TRANSFORMERS_HINT in error
+    )
+
+
+def install_target(pkg: str, error: str | None) -> str:
+    """The package to install: transformers when its own version check names it."""
+    return "transformers" if error and TRANSFORMERS_HINT in error else pkg
 
 
 def drop_what_the_environment_has(target: str, keep_torch: bool = False) -> None:
@@ -319,25 +398,36 @@ def copy_tree(src: str, dst: str) -> int:
 
 # DBTITLE 1,Install each missing package into a local folder, keep only what is new, copy
 _torch_fixed = False
+latest = dict(errors)
+installed = []
+repaired = set()
 for _pkg, _mod in missing.items():
     _error = import_error(_mod) if _torch_fixed and _pkg != "torch" else errors[_pkg]
+    latest[_pkg] = _error
     if not needs_install(_pkg, _error):
         _why = "imports now" if _error is None else f"reinstall does not fix: {_error}"
         print(f"SKIP {_pkg}: {_why}", flush=True)
         continue
-    if _pkg == "torch":
+    _target = install_target(_pkg, _error)
+    if _target in repaired:
+        installed.append(_pkg)
+        print(f"SKIP {_pkg}: {_target} was installed again in this run", flush=True)
+        continue
+    if _target == "torch":
         clear_torch_group()
     _tmp = tempfile.mkdtemp()
-    _spec = PIP_SPECS.get(_pkg, _pkg)
-    _ok = _pkg == "torch" and pip_install(_spec, _tmp, TORCH_CPU_INDEX)
+    _spec = PIP_SPECS.get(_target, _target)
+    _ok = _target == "torch" and pip_install(_spec, _tmp, TORCH_CPU_INDEX)
     _ok = _ok or pip_install(_spec, _tmp, None)
     if _ok:
-        drop_what_the_environment_has(_tmp, keep_torch=_pkg == "torch")
+        drop_what_the_environment_has(_tmp, keep_torch=_target == "torch")
         clear_old_versions(_tmp, FOLDER)
-        print(f"OK  {_pkg}: {copy_tree(_tmp, FOLDER)} file(s) copied", flush=True)
-        _torch_fixed = _torch_fixed or _pkg == "torch"
+        print(f"OK  {_target}: {copy_tree(_tmp, FOLDER)} file(s) copied", flush=True)
+        installed.append(_pkg)
+        repaired.add(_target)
+        _torch_fixed = _torch_fixed or _target == "torch"
     else:
-        print(f"WARN {_pkg}: install failed", flush=True)
+        print(f"WARN {_target}: install failed", flush=True)
     shutil.rmtree(_tmp, ignore_errors=True)
 
 # COMMAND ----------
@@ -348,16 +438,18 @@ print(FOLDER in sys.path)
 
 # COMMAND ----------
 
-# DBTITLE 1,Which libraries import
+# DBTITLE 1,Which libraries import (only the installed ones are checked again)
 failed = {}
-results = check_imports(list(PACKAGES.values()))
+rechecked = check_imports([PACKAGES[_pkg] for _pkg in installed])
 for _pkg, _mod in PACKAGES.items():
-    _error = results[_mod]
+    _error = rechecked.get(_mod, latest.get(_pkg))
     _status = "WARN" if _error else "OK  "
     _version = library_version(_mod.split(".")[0])
-    print(f"{_status} {_pkg}: version {_version}, import {IMPORT_SECONDS[_mod]:.0f} s")
+    _seconds = IMPORT_SECONDS.get(_mod, 0)
+    print(f"{_status} {_pkg}: version {_version}, import {_seconds:.0f} s")
     if _error:
         failed[_pkg] = _error
-        for _row in ERROR_TEXT[_mod].splitlines()[-ERROR_ROWS:]:
+        for _row in ERROR_TEXT.get(_mod, "").splitlines()[-ERROR_ROWS:]:
             print(f"     | {_row}")
+print(f"checked again: {installed or 'none'}")
 print(f"still failing: {list(failed) or 'none'}")
