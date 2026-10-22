@@ -30,7 +30,9 @@ import csv
 import importlib.machinery
 import importlib.metadata
 import inspect
+import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -78,24 +80,8 @@ ERROR_ROWS = 15
 TRANSFORMERS_HINT = "pip install transformers -U"
 # transformers 5.4 and later need a newer regex than the environment has; 5.18 and later need hub 1.31
 PIN_CONSTRAINTS = ("transformers>=5.0,<5.4", "huggingface-hub>=1.3,<2.0")
-STALL_DUMP_SECONDS = 120
-STALL_ROWS = 200
-# packages that the transformers version check reads
-VERSION_NAMES = (
-    "transformers",
-    "huggingface-hub",
-    "tokenizers",
-    "safetensors",
-    "numpy",
-    "torch",
-    "requests",
-    "tqdm",
-    "regex",
-    "packaging",
-    "filelock",
-    "pyyaml",
-)
 COPY_THREADS = 32
+MARKER = os.path.join(FOLDER, "libraries_ok.json")
 
 # COMMAND ----------
 
@@ -110,7 +96,44 @@ print(f"OK  volume ready: {FOLDER}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Define the timer of a folder scan
+# DBTITLE 1,Define the marker of a passing check
+
+
+def installed_version(pkg: str) -> str | None:
+    try:
+        return importlib.metadata.version(pkg)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def fingerprint() -> dict:
+    """What the folder and the environment hold now: any install changes it."""
+    dist_info = sorted(n for n in os.listdir(FOLDER) if n.endswith(".dist-info"))
+    versions = {pkg: installed_version(pkg) for pkg in PACKAGES}
+    return {"machine": platform.machine(), "dist_info": dist_info, "versions": versions}
+
+
+def read_marker() -> dict | None:
+    if not os.path.isfile(MARKER):
+        return None
+    with open(MARKER, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_marker() -> None:
+    with open(MARKER, "w", encoding="utf-8") as handle:
+        json.dump(fingerprint(), handle, indent=1)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Stop when nothing changed since the last passing check
+if not REFRESH and read_marker() == fingerprint():
+    dbutils.notebook.exit("libraries unchanged since the last passing import check")
+
+# COMMAND ----------
+
+# DBTITLE 1,Define the timer of a step
 
 
 def timed(label: str, call) -> None:
@@ -120,25 +143,6 @@ def timed(label: str, call) -> None:
 
 
 # COMMAND ----------
-
-# DBTITLE 1,Time the listing of the library folder
-timed("list folder", lambda: len(os.listdir(FOLDER)))
-
-# COMMAND ----------
-
-# DBTITLE 1,Time the package metadata scan of the library folder
-timed(
-    "metadata scan, folder only",
-    lambda: sum(1 for _ in importlib.metadata.distributions(path=[FOLDER])),
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Time the package metadata scan of the import path plus the library folder
-timed(
-    "metadata scan, import path + folder",
-    lambda: sum(1 for _ in importlib.metadata.distributions(path=[*sys.path, FOLDER])),
-)
 
 # DBTITLE 1,Define the top_level.txt writer
 
@@ -174,57 +178,6 @@ def write_top_level_files() -> int:
 
 # DBTITLE 1,Write top_level.txt for the packages in the library folder
 timed("top_level.txt written", write_top_level_files)
-
-# COMMAND ----------
-
-# DBTITLE 1,Define the stall test of the transformers import
-
-
-def stall_test() -> None:
-    """Import transformers.utils.import_utils; after STALL_DUMP_SECONDS print the stack and stop."""
-    code = (
-        "import faulthandler, sys; "
-        f"sys.path.append({FOLDER!r}); "
-        f"faulthandler.dump_traceback_later({STALL_DUMP_SECONDS}, exit=True); "
-        "import transformers.utils.import_utils"
-    )
-    started = time.monotonic()
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, check=False
-    )
-    seconds = time.monotonic() - started
-    print(
-        f"transformers.utils.import_utils: exit {result.returncode}, {seconds:.0f} s",
-        flush=True,
-    )
-    for row in result.stderr.strip().splitlines()[:STALL_ROWS]:
-        print(f"     | {row}", flush=True)
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Run the stall test of the transformers import
-stall_test()
-
-# COMMAND ----------
-
-# DBTITLE 1,Define the version print
-
-
-def version_of(name: str, path: list[str]) -> str:
-    found = [d.version for d in importlib.metadata.distributions(name=name, path=path)]
-    return found[0] if found else "none"
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Print the versions in the library folder and in the environment
-_environment_path = [p for p in sys.path if p != FOLDER]
-for _name in VERSION_NAMES:
-    _in_folder = version_of(_name, [FOLDER])
-    print(
-        f"{_name}: folder {_in_folder} | environment {version_of(_name, _environment_path)}"
-    )
 
 # COMMAND ----------
 
@@ -341,6 +294,7 @@ print(f"to install: {list(missing)}")
 
 # DBTITLE 1,Stop when nothing is missing
 if not missing:
+    write_marker()
     dbutils.notebook.exit("all model libraries already installed")
 
 # COMMAND ----------
@@ -469,6 +423,8 @@ with open(CONSTRAINTS_FILE, "w", encoding="utf-8") as _handle:
 # COMMAND ----------
 
 # DBTITLE 1,Install each missing package into a local folder, keep only what is new, copy
+if os.path.exists(MARKER):
+    remove_path(MARKER)
 _torch_fixed = False
 latest = dict(errors)
 installed = []
@@ -533,3 +489,5 @@ for _pkg, _mod in PACKAGES.items():
             print(f"     | {_row}")
 print(f"checked again: {installed or 'none'}")
 print(f"still failing: {list(failed) or 'none'}")
+if not failed:
+    write_marker()
