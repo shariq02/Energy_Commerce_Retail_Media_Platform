@@ -32,6 +32,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 dbutils.widgets.text("refresh", "false")
@@ -62,8 +64,8 @@ FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 # a package that pulls its own torch must not overwrite the CPU build
 TORCH_GROUP = ("torch", "torchgen", "functorch")
-INSTALL_TIMEOUT_SECONDS = 600
-IMPORT_TIMEOUT_SECONDS = 300
+HEARTBEAT_SECONDS = 30
+SLOW_IMPORT_SECONDS = 5
 COPY_THREADS = 32
 
 # COMMAND ----------
@@ -82,22 +84,48 @@ print(f"OK  volume ready: {FOLDER}")
 # DBTITLE 1,Define the import check, run in a fresh interpreter
 
 
+IMPORT_SECONDS = {}
+
+
 def import_error(module: str) -> str | None:
-    """Return None when the module imports, else the last line of the error."""
+    """Return None when the module imports, else the last line of the error.
+
+    No time limit: every HEARTBEAT_SECONDS a line names the last finished import.
+    """
     code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
-    try:
-        result = subprocess.run(
-            [sys.executable, "-c", code],
-            capture_output=True,
-            text=True,
-            timeout=IMPORT_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return f"import timed out after {IMPORT_TIMEOUT_SECONDS} s"
-    if result.returncode == 0:
+    cmd = [sys.executable, "-X", "importtime", "-c", code]
+    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True)
+    state = {"last": "none", "slow": [], "text": []}
+
+    def read_lines():
+        for line in proc.stderr:
+            fields = line.split("|")
+            if not (line.startswith("import time:") and len(fields) == 3):
+                state["text"].append(line)
+            elif fields[1].strip().isdigit():
+                state["last"] = fields[2].strip()
+                seconds = int(fields[1]) / 1e6
+                if seconds >= SLOW_IMPORT_SECONDS:
+                    state["slow"].append(f"{state['last']} {seconds:.0f} s")
+
+    reader = threading.Thread(target=read_lines, daemon=True)
+    reader.start()
+    started = time.monotonic()
+    shown = 0
+    while reader.is_alive():
+        reader.join(HEARTBEAT_SECONDS)
+        for item in state["slow"][shown:]:
+            print(f"     slow import {module}: {item}", flush=True)
+        shown = len(state["slow"])
+        if reader.is_alive():
+            waited = time.monotonic() - started
+            last = state["last"]
+            print(f"     {module}: {waited:.0f} s, last finished {last}", flush=True)
+    proc.wait()
+    IMPORT_SECONDS[module] = time.monotonic() - started
+    if proc.returncode == 0:
         return None
-    lines = result.stderr.strip().splitlines()
+    lines = "".join(state["text"]).strip().splitlines()
     return lines[-1] if lines else "no error text"
 
 
@@ -138,11 +166,7 @@ def pip_install(pkg: str, target: str, index: str | None) -> bool:
     cmd += ["--no-deps"] if pkg in NO_DEPENDENCIES else []
     cmd += ["--index-url", index] if index else []
     cmd.append(pkg)
-    try:
-        result = subprocess.run(cmd, timeout=INSTALL_TIMEOUT_SECONDS, check=False)
-        return result.returncode == 0
-    except subprocess.TimeoutExpired:
-        return False
+    return subprocess.run(cmd, check=False).returncode == 0
 
 
 def is_torch_part(name: str) -> bool:
@@ -244,9 +268,9 @@ print(FOLDER in sys.path)
 failed = {}
 for _pkg, _mod in PACKAGES.items():
     _error = import_error(_mod)
-    print(
-        f"{'WARN' if _error else 'OK  '} {_pkg}: version {library_version(_mod.split('.')[0])}"
-    )
+    _status = "WARN" if _error else "OK  "
+    _version = library_version(_mod.split(".")[0])
+    print(f"{_status} {_pkg}: version {_version}, import {IMPORT_SECONDS[_mod]:.0f} s")
     if _error:
         failed[_pkg] = _error
         print(f"     {_error}")
