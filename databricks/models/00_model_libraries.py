@@ -26,8 +26,10 @@
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
+import csv
 import importlib.machinery
 import importlib.metadata
+import inspect
 import os
 import shutil
 import subprocess
@@ -74,6 +76,8 @@ ERROR_TEXT = {}
 ERROR_ROWS = 15
 # the transformers version check ends its error with this advice
 TRANSFORMERS_HINT = "pip install transformers -U"
+# transformers 5.4 and later need a newer regex than the environment has; 5.18 and later need hub 1.31
+PIN_CONSTRAINTS = ("transformers>=5.0,<5.4", "huggingface-hub>=1.3,<2.0")
 STALL_DUMP_SECONDS = 120
 STALL_ROWS = 200
 # packages that the transformers version check reads
@@ -135,6 +139,43 @@ timed(
     "metadata scan, import path + folder",
     lambda: sum(1 for _ in importlib.metadata.distributions(path=[*sys.path, FOLDER])),
 )
+
+# DBTITLE 1,Define the top_level.txt writer
+
+
+def write_top_level_files() -> int:
+    """Write top_level.txt where it is missing, so importlib.metadata does not stat every file."""
+    written = 0
+    for name in os.listdir(FOLDER):
+        info = os.path.join(FOLDER, name)
+        record = os.path.join(info, "RECORD")
+        top = os.path.join(info, "top_level.txt")
+        if (
+            not name.endswith(".dist-info")
+            or os.path.exists(top)
+            or not os.path.isfile(record)
+        ):
+            continue
+        with open(record, encoding="utf-8", newline="") as handle:
+            paths = [row[0] for row in csv.reader(handle) if row]
+        names = set()
+        for path in paths:
+            parts = path.split("/")
+            names.add(parts[0] if len(parts) > 1 else inspect.getmodulename(path))
+        names = sorted(n for n in names if n and "." not in n)
+        if names:
+            with open(top, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(names) + "\n")
+            written += 1
+    return written
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Write top_level.txt for the packages in the library folder
+timed("top_level.txt written", write_top_level_files)
+
+# COMMAND ----------
 
 # DBTITLE 1,Define the stall test of the transformers import
 
@@ -317,6 +358,7 @@ def pip_install(pkg: str, target: str, index: str | None) -> bool:
     cmd += ["--disable-pip-version-check", "--target", target]
     cmd += ["--no-deps"] if pkg in NO_DEPENDENCIES else []
     cmd += ["--index-url", index] if index else []
+    cmd += ["--constraint", CONSTRAINTS_FILE]
     cmd.append(pkg)
     return subprocess.run(cmd, check=False).returncode == 0
 
@@ -396,6 +438,13 @@ def copy_tree(src: str, dst: str) -> int:
 
 # COMMAND ----------
 
+# DBTITLE 1,Write the pip constraints file
+CONSTRAINTS_FILE = os.path.join(tempfile.gettempdir(), "model_library_constraints.txt")
+with open(CONSTRAINTS_FILE, "w", encoding="utf-8") as _handle:
+    _handle.write("\n".join(PIN_CONSTRAINTS) + "\n")
+
+# COMMAND ----------
+
 # DBTITLE 1,Install each missing package into a local folder, keep only what is new, copy
 _torch_fixed = False
 latest = dict(errors)
@@ -429,6 +478,11 @@ for _pkg, _mod in missing.items():
     else:
         print(f"WARN {_target}: install failed", flush=True)
     shutil.rmtree(_tmp, ignore_errors=True)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write top_level.txt for the new packages
+timed("top_level.txt written", write_top_level_files)
 
 # COMMAND ----------
 
