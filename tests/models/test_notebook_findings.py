@@ -77,3 +77,44 @@ def test_the_findings_key_is_the_notebook_path():
             assert key == str(path.relative_to(_MODELS))[:-3].replace("/", "__")
         keys.add(key)
     assert len(keys) == len(_NOTEBOOKS)
+
+
+_GATES = (
+    "gate/03_export_findings.py",
+    "gate/06_foundation_findings.py",
+    "register/gate/03_export_findings.py",
+    "operate/gate/03_export_findings.py",
+)
+
+
+@pytest.mark.parametrize("gate", _GATES)
+def test_findings_gates_end_with_the_merge(gate):
+    last = (_MODELS / gate).read_text(encoding="utf-8").split("# COMMAND ----------")
+    assert last[-1].strip().endswith("merge_notebook_findings()")
+
+
+def test_notebook_findings_group_splits_prefix_smoke_and_key(lib):
+    group = lib["notebook_findings_group"]
+    assert group("energy__split__01_x.md") == ("energy", False, "energy__split__01_x")
+    assert group("foundation_commerce__foundation__03_a_smoke.md") == (
+        "foundation_commerce",
+        True,
+        "foundation_commerce__foundation__03_a",
+    )
+
+
+def test_merge_replaces_a_section_and_keeps_the_others(lib):
+    import datetime as dt
+
+    now = dt.datetime(2026, 10, 23, tzinfo=dt.UTC)
+    one = "# H\n\n_x_\n\n## A\n\n### t\n\nrow\n"
+    sections = {"energy__a": lib["section_of_findings_file"](one)}
+    sections["energy__b"] = "## B\n\nold"
+    text = lib["merged_findings_text"]("energy", sections, False, now)
+    again = lib["read_merged_sections"](text)
+    assert again == sections
+    again["energy__b"] = "## B\n\nnew"
+    text = lib["merged_findings_text"]("energy", again, False, now)
+    result = lib["read_merged_sections"](text)
+    assert result["energy__b"] == "## B\n\nnew"
+    assert result["energy__a"].startswith("## A")

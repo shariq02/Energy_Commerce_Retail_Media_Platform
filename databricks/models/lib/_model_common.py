@@ -2051,6 +2051,82 @@ def write_findings_section(stem, heading, title, body, smoke, now) -> None:
     print(f"findings export -> {path}")
 
 
+SECTION_MARK = "<!-- section: "
+
+
+def notebook_findings_group(name: str) -> tuple[str, bool, str]:
+    """(file prefix, smoke run, section key) of a per-notebook findings file name."""
+    stem = name[: -len(".md")]
+    smoke = stem.endswith("_smoke")
+    key = stem[: -len("_smoke")] if smoke else stem
+    return key.split("__", 1)[0], smoke, key
+
+
+def section_of_findings_file(text: str) -> str:
+    """The part of a per-notebook file from its first second-level heading on."""
+    return text[text.index("\n## ") + 1 :].rstrip("\n")
+
+
+def read_merged_sections(text: str) -> dict[str, str]:
+    sections = {}
+    for part in text.split(SECTION_MARK)[1:]:
+        key, _, body = part.partition(" -->\n")
+        sections[key] = body.strip("\n")
+    return sections
+
+
+def merged_findings_text(prefix: str, sections: dict[str, str], smoke, now) -> str:
+    title = prefix.upper().replace("_", " ")
+    lines = [
+        f"# {title} NOTEBOOK FINDINGS{' (SMOKE RUN)' if smoke else ''}",
+        "",
+        (
+            "_Merged by the findings gate from the files of the model notebooks; "
+            "a section is replaced when its notebook runs again. "
+            f"Generated: {now.strftime('%Y-%m-%dT%H:%MZ')}_"
+        ),
+    ]
+    for key in sorted(sections):
+        lines += ["", f"{SECTION_MARK}{key} -->", sections[key]]
+    return "\n".join(lines) + "\n"
+
+
+def merge_notebook_findings() -> list[str]:
+    """Merge notebooks/*.md into <prefix>_notebooks[_smoke].md, then delete them.
+    Only a gate task may call it: it is the single writer of the merged files."""
+    root = _findings_dir()
+    folder = _os.path.join(root, "notebooks")
+    names = (
+        sorted(n for n in _os.listdir(folder) if n.endswith(".md"))
+        if _os.path.isdir(folder)
+        else []
+    )
+    groups: dict[tuple[str, bool], dict[str, str]] = {}
+    for name in names:
+        prefix, smoke, key = notebook_findings_group(name)
+        groups.setdefault((prefix, smoke), {})[key] = name
+    now = _dt.datetime.now(tz=_dt.UTC)
+    written = []
+    for (prefix, smoke), files in sorted(groups.items()):
+        target = f"{prefix}_notebooks{'_smoke' if smoke else ''}.md"
+        path = _os.path.join(root, target)
+        sections = {}
+        if _os.path.isfile(path):
+            with open(path, encoding="utf-8") as fh:
+                sections = read_merged_sections(fh.read())
+        for key, name in files.items():
+            with open(_os.path.join(folder, name), encoding="utf-8") as fh:
+                sections[key] = section_of_findings_file(fh.read())
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(merged_findings_text(prefix, sections, smoke, now))
+        written.append(target)
+        print(f"OK  {target}: {len(files)} section(s) merged")
+    for name in names:
+        _os.remove(_os.path.join(folder, name))
+    print(f"{len(names)} notebook file(s) merged and removed")
+    return written
+
+
 def table_findings(table, ecosystem, run_id, task_ids=None, smoke=None) -> str:
     """Markdown for the rows one run wrote to a model table."""
     full = model_fqn(table, ecosystem)
