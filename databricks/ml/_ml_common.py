@@ -400,6 +400,28 @@ def _quota_guard(full: str, ecosystem: str) -> None:
         print(f"WARN {ml_schema_for(ecosystem)} holds {n} of {SCHEMA_OBJECT_QUOTA}")
 
 
+def _frozen_guard(table: str, ecosystem: str) -> None:
+    """A frozen dataset table is never overwritten; reopen it first."""
+    manifest = ml_fqn("dataset_manifest", ecosystem)
+    if table == "dataset_manifest" or not spark.catalog.tableExists(manifest):
+        return
+    if not table.startswith("dataset_"):
+        return
+    frozen = (
+        spark.table(manifest)
+        .filter(
+            (F.col("dataset_id") == table.removeprefix("dataset_"))
+            & (F.col("freeze_status") == "frozen")
+        )
+        .count()
+    )
+    if frozen:
+        raise RuntimeError(
+            f"{ml_fqn(table, ecosystem)} is frozen; run its assembled notebook "
+            "to reopen it"
+        )
+
+
 def _ml_delta_rows(table: str) -> int | None:
     try:
         m = (
@@ -424,6 +446,7 @@ def write_ml(
     """Deterministic full overwrite into the ecosystem's ML schema."""
     started = now_utc()
     full = ml_fqn(table, ecosystem)
+    _frozen_guard(table, ecosystem)
     _quota_guard(full, ecosystem)
     if spark.catalog.tableExists(full):
         v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]

@@ -28,11 +28,36 @@ ECOSYSTEMS = ("energy", "commerce")
 SOURCE = "ml"
 COMPONENT = "ml/gate/03_freeze_gate"
 GATES = ("01_leakage_audit", "02_null_handling_audit")
+RETENTION = "interval 3650 days"
 
 # COMMAND ----------
 
 # DBTITLE 1,Run identity
 rid = ml_run_id()
+
+# COMMAND ----------
+
+# DBTITLE 1,Protect a version and read all of it
+
+
+def protect_and_read(full: str, version: int) -> str | None:
+    """Set long retention, then read every file of the version; the error or None."""
+    spark.sql(
+        f"ALTER TABLE {full} SET TBLPROPERTIES ("
+        f"'delta.deletedFileRetentionDuration' = '{RETENTION}', "
+        f"'delta.logRetentionDuration' = '{RETENTION}')"
+    )
+    try:
+        (
+            spark.sql(f"SELECT * FROM {full} VERSION AS OF {version}")
+            .write.format("noop")
+            .mode("overwrite")
+            .save()
+        )
+    except Exception as exc:
+        return str(exc).splitlines()[0][:200]
+    return None
+
 
 # COMMAND ----------
 
@@ -62,6 +87,12 @@ for eco in ECOSYSTEMS:
         if seen >= set(GATES) and latest_fail == 0:
             full = ml_fqn(f"dataset_{ds}", eco)
             version = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
+            read_error = protect_and_read(full, int(version))
+            if read_error:
+                _refused.append(
+                    (eco, ds, f"version {int(version)} unreadable: {read_error}")
+                )
+                continue
             spark.sql(
                 f"UPDATE {ml_fqn('dataset_manifest', eco)} SET status = 'frozen', "
                 f"freeze_status = 'frozen', frozen_delta_version = {int(version)}, "
