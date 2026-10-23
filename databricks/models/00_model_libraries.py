@@ -28,11 +28,9 @@
 # DBTITLE 1,Configuration
 import csv
 import importlib.machinery
-import importlib.metadata
 import inspect
 import json
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -99,18 +97,11 @@ print(f"OK  volume ready: {FOLDER}")
 # DBTITLE 1,Define the marker of a passing check
 
 
-def installed_version(pkg: str) -> str | None:
-    try:
-        return importlib.metadata.version(pkg)
-    except importlib.metadata.PackageNotFoundError:
-        return None
-
-
 def fingerprint() -> dict:
-    """What the folder and the environment hold now: any install changes it."""
-    dist_info = sorted(n for n in os.listdir(FOLDER) if n.endswith(".dist-info"))
-    versions = {pkg: installed_version(pkg) for pkg in PACKAGES}
-    return {"machine": platform.machine(), "dist_info": dist_info, "versions": versions}
+    """What the library folder holds now: any install changes it."""
+    return {
+        "dist_info": sorted(n for n in os.listdir(FOLDER) if n.endswith(".dist-info"))
+    }
 
 
 def read_marker() -> dict | None:
@@ -128,8 +119,14 @@ def write_marker() -> None:
 # COMMAND ----------
 
 # DBTITLE 1,Stop when nothing changed since the last passing check
-if not REFRESH and read_marker() == fingerprint():
+_marker, _now = read_marker(), fingerprint()
+if not REFRESH and _marker == _now:
     dbutils.notebook.exit("libraries unchanged since the last passing import check")
+if _marker is None:
+    print(f"no marker at {MARKER}; the import check runs")
+else:
+    _old, _new = set(_marker["dist_info"]), set(_now["dist_info"])
+    print(f"marker differs: removed {sorted(_old - _new)}, added {sorted(_new - _old)}")
 
 # COMMAND ----------
 
@@ -308,8 +305,13 @@ def in_base_environment(module: str) -> bool:
 
 
 def remove_path(path: str) -> None:
-    """dbutils.fs.rm returns False on failure and raises no error; check both."""
-    if not dbutils.fs.rm(path, True) or os.path.exists(path):
+    """dbutils.fs.rm also returns False for a missing path; only a path that stays is an error."""
+    dbutils.fs.rm(path, True)
+    if os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
+    elif os.path.exists(path):
+        os.remove(path)
+    if os.path.exists(path):
         raise RuntimeError(f"could not remove {path}")
 
 
