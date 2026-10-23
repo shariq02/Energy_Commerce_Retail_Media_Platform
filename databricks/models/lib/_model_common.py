@@ -1851,6 +1851,7 @@ def finish_task(ctx: TaskContext) -> None:
 # DBTITLE 1,Findings section of one notebook (src/findings/model_findings)
 
 NOTEBOOK_FINDINGS_SUBDIR = "src/findings/model_findings"
+FINDINGS_ROW_LIMIT = 30
 FINDINGS_COLUMNS = {
     "candidate_results": [
         "task_id",
