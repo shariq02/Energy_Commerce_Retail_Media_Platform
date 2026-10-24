@@ -21,6 +21,8 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib as _contextlib
+
 import numpy as np
 import pandas as pd
 
@@ -29,6 +31,9 @@ import pandas as pd
 # DBTITLE 1,Candidates, weight files and context limits
 TAB_FAMILY = "foundation_tab"
 PREDICT_BATCH = 10_000
+# Context rows x batch rows per prediction call; a larger context gets smaller batches.
+PREDICT_BUDGET = 100_000_000
+MIN_PREDICT_BATCH = 1_000
 TAB_CANDIDATES = (
     ("tabpfn_v2_in_context", "tabpfn_v2", "tabpfn"),
     ("tabpfn_25_in_context", "tabpfn_25", "tabpfn"),
@@ -54,7 +59,7 @@ TAB_WEIGHTS = {
 }
 TAB_LIMITS = {
     "tabpfn_v2": {"max_rows": 10_000, "max_features": 500},
-    "tabpfn_25": {"max_rows": 50_000, "max_features": 2000},
+    "tabpfn_25": {"max_rows": 20_000, "max_features": 2000},
     "tabicl_v2": {"max_rows": 50_000, "max_features": None},
 }
 # TabPFN reads missing values itself; TabICL gets the train medians.
@@ -173,6 +178,57 @@ def build_estimator(cfg: dict):
     )
 
 
+def predict_batch(context_rows: int) -> int:
+    """Validation rows per prediction call: PREDICT_BATCH for a context of 10,000 rows
+    or fewer, smaller for a larger one."""
+    return int(
+        min(
+            PREDICT_BATCH,
+            max(MIN_PREDICT_BATCH, PREDICT_BUDGET // max(context_rows, 1)),
+        )
+    )
+
+
+def device_label() -> str:
+    """The compute device for a progress line; never raises."""
+    try:
+        return _device()
+    except Exception:
+        return "unknown"
+
+
+def inference_mode():
+    """torch.inference_mode() when torch is importable, else a no-op."""
+    try:
+        import torch
+    except ImportError:
+        return _contextlib.nullcontext()
+    return torch.inference_mode()
+
+
+def fit_estimator(cfg: dict, x: np.ndarray, y: np.ndarray):
+    """Build the estimator and fit it on the context rows, printing the time of each
+    step."""
+    backend = cfg.get("backend", "model")
+    with timed_stage(f"load {backend} checkpoint on {device_label()}"):
+        estimator = build_estimator(cfg)
+    with timed_stage(f"fit {len(x):,} context rows x {x.shape[1]} features"):
+        estimator.fit(x, y)
+    return estimator
+
+
+def predict_batches(estimator, x: np.ndarray, cfg: dict, context_rows: int):
+    """Predictions for all rows of x, one batch at a time with a progress line."""
+    size = predict_batch(context_rows)
+    count = max(1, -(-len(x) // size))
+    out = []
+    with inference_mode():
+        for number, start in enumerate(range(0, len(x), size), start=1):
+            with timed_stage(f"predict batch {number}/{count} ({size:,} rows each)"):
+                out.append(predict_part(estimator, x[start : start + size], cfg))
+    return out
+
+
 def predict_part(estimator, x: np.ndarray, cfg: dict) -> np.ndarray:
     if cfg["kind"] == "classification":
         return np.asarray(estimator.predict_proba(x))[:, 1]
@@ -209,19 +265,14 @@ class TabularContextBundle:
 
     def estimator(self):
         if self._estimator is None:
-            estimator = build_estimator(self.cfg)
-            estimator.fit(self.x, self.y)
-            self._estimator = estimator
+            self._estimator = fit_estimator(self.cfg, self.x, self.y)
         return self._estimator
 
     def predict(self, frame):
         x = self.encoder.transform(frame, fill=self.cfg["fill"])
         estimator = self.estimator()
-        out = np.empty(len(x), dtype="float64")
-        for start in range(0, len(x), PREDICT_BATCH):
-            part = x[start : start + PREDICT_BATCH]
-            out[start : start + len(part)] = predict_part(estimator, part, self.cfg)
-        return out
+        parts = predict_batches(estimator, x, self.cfg, len(self.x))
+        return np.concatenate(parts).astype("float64") if parts else np.zeros(0)
 
 
 # COMMAND ----------
@@ -267,6 +318,11 @@ def fit_tab_candidate(kind, backend, enc, pdf, tr_m, y, frame_va, y_va, base):
     x_ctx, y_ctx = x_train[keep], y_train[keep]
     if kind == "classification" and len(np.unique(y_ctx)) < 2:
         raise ValueError("the context rows hold one class only")
+    print(
+        f"  context {len(keep):,} of {len(x_train):,} train rows, "
+        f"{x_train.shape[1]} features, {len(frame_va):,} validation rows, "
+        f"device {device_label()}, batch {predict_batch(len(keep)):,}"
+    )
     bundle = TabularContextBundle(cfg, enc, x_ctx, y_ctx)
     pred = bundle.predict(frame_va)
     if kind == "classification":
@@ -367,9 +423,7 @@ class MulticlassContextBundle:
 
     def estimator(self):
         if self._estimator is None:
-            estimator = build_estimator(self.cfg)
-            estimator.fit(self.x, self.y)
-            self._estimator = estimator
+            self._estimator = fit_estimator(self.cfg, self.x, self.y)
         return self._estimator
 
     def predict(self, frame):
@@ -378,10 +432,13 @@ class MulticlassContextBundle:
         seen = np.asarray(estimator.classes_, dtype="int64")
         names = np.asarray(self.classes, dtype=object)
         out = np.empty(len(x), dtype=object)
-        for start in range(0, len(x), PREDICT_BATCH):
-            part = x[start : start + PREDICT_BATCH]
-            best = np.asarray(estimator.predict_proba(part)).argmax(axis=1)
-            out[start : start + len(part)] = names[seen[best]]
+        size = predict_batch(len(self.x))
+        with inference_mode():
+            for start in range(0, len(x), size):
+                part = x[start : start + size]
+                with timed_stage(f"predict rows {start:,} to {start + len(part):,}"):
+                    best = np.asarray(estimator.predict_proba(part)).argmax(axis=1)
+                out[start : start + len(part)] = names[seen[best]]
         return out
 
 

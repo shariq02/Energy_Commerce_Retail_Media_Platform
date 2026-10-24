@@ -97,7 +97,8 @@ def _train_sasrec(hist, target_ids, vocab):
     x = torch.as_tensor(hist, dtype=torch.long)
     y = torch.as_tensor(target_ids, dtype=torch.long)
     net.train()
-    for _ in range(SASREC_EPOCHS):
+    for epoch in range(SASREC_EPOCHS):
+        print(f"  .. SASRec epoch {epoch + 1}/{SASREC_EPOCHS} on {device}")
         order = torch.randperm(len(x))
         for i in range(0, len(x), SEQ_BATCH):
             idx = order[i : i + SEQ_BATCH]

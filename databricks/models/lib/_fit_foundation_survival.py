@@ -115,28 +115,38 @@ class SurvPFNBundle:
                 sys.path.insert(0, self.cfg["code_dir"])
             from src.SurvPFN import SurvPFN
 
-            model = SurvPFN(model_path=self.cfg["model_path"])
+            with timed_stage(f"load SurvPFN checkpoint on {device_label()}"):
+                model = SurvPFN(model_path=self.cfg["model_path"])
             target = Surv.from_arrays(event=self.event > 0, time=self.duration)
-            model.fit(self.x, target)
+            with timed_stage(f"fit {len(self.x):,} context rows"):
+                model.fit(self.x, target)
             self._model = model
         return self._model
 
     def risk(self, frame):
         x = self.encoder.transform(frame, fill=True)
         model = self.model()
-        parts = [model.predict(x[b]) for b in in_batches(len(x))]
+        batches = in_batches(len(x))
+        parts = []
+        with inference_mode():
+            for number, b in enumerate(batches, start=1):
+                with timed_stage(f"SurvPFN risk batch {number}/{len(batches)}"):
+                    parts.append(model.predict(x[b]))
         return np.concatenate(parts).astype("float64") if parts else np.zeros(0)
 
     def survival(self, frame):
         x = self.encoder.transform(frame, fill=True)
         model = self.model()
         out = np.ones((len(x), len(SURVIVAL_HORIZONS_YEARS)))
-        for b in in_batches(len(x)):
-            curves = model.predict_survival_function(x[b])
-            out[b] = [
-                [step_value(fn, float(h)) for h in SURVIVAL_HORIZONS_YEARS]
-                for fn in curves
-            ]
+        batches = in_batches(len(x))
+        with inference_mode():
+            for number, b in enumerate(batches, start=1):
+                with timed_stage(f"SurvPFN curve batch {number}/{len(batches)}"):
+                    curves = model.predict_survival_function(x[b])
+                out[b] = [
+                    [step_value(fn, float(h)) for h in SURVIVAL_HORIZONS_YEARS]
+                    for fn in curves
+                ]
         return out
 
 
@@ -158,9 +168,7 @@ class DiscreteSurvivalBundle:
 
     def estimator(self):
         if self._estimator is None:
-            estimator = build_estimator(self.cfg)
-            estimator.fit(self.x, self.label)
-            self._estimator = estimator
+            self._estimator = fit_estimator(self.cfg, self.x, self.label)
         return self._estimator
 
     def hazards(self, frame):
@@ -168,10 +176,17 @@ class DiscreteSurvivalBundle:
         estimator = self.estimator()
         column = list(estimator.classes_).index(1)
         out = np.zeros((len(x), DISCRETE_INTERVALS))
-        for k in range(DISCRETE_INTERVALS):
-            for b in in_batches(len(x)):
-                part = np.column_stack([x[b], np.full(len(x[b]), k)])
-                out[b, k] = np.asarray(estimator.predict_proba(part))[:, column]
+        size = min(SURV_PREDICT_BATCH, predict_batch(len(self.x)))
+        batches = in_batches(len(x), size)
+        with inference_mode():
+            for k in range(DISCRETE_INTERVALS):
+                with timed_stage(
+                    f"hazard interval {k + 1}/{DISCRETE_INTERVALS}, "
+                    f"{len(batches)} batches of {size:,}"
+                ):
+                    for b in batches:
+                        part = np.column_stack([x[b], np.full(len(x[b]), k)])
+                        out[b, k] = np.asarray(estimator.predict_proba(part))[:, column]
         return out
 
     def survival(self, frame):

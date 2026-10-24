@@ -28,6 +28,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib as _contextlib
 import datetime as _dt
 import gc as _gc
 import hashlib as _hashlib
@@ -39,9 +40,12 @@ import math as _math
 import os as _os
 import platform as _platform
 import re as _re
+import signal as _signal
 import sys as _sys
 import tempfile as _tempfile
+import threading as _threading
 import time as _time
+import traceback as _traceback
 
 import numpy as np
 import pandas as pd
@@ -1749,6 +1753,88 @@ def log_candidate_to_mlflow(ctx, name, family, params, metrics, bundle):
         return None, f"failed: {type(exc).__name__}: {str(exc)[:200]}"
 
 
+# COMMAND ----------
+
+# DBTITLE 1,Candidate guard -- time limit, stack print, stage times
+CANDIDATE_LIMIT_SECONDS = 1200
+FOUNDATION_LIMIT_SECONDS = 1800
+STACK_PRINT_SECONDS = 300
+STACK_PRINT_ROWS = 12
+
+
+def candidate_limit(family: str) -> int:
+    """Seconds one candidate may run: foundation families get the longer limit."""
+    if str(family).startswith("foundation"):
+        return FOUNDATION_LIMIT_SECONDS
+    return CANDIDATE_LIMIT_SECONDS
+
+
+def _print_main_stack(label: str, waited: float, main_id: int) -> None:
+    frame = _sys._current_frames().get(main_id)
+    rows = _traceback.format_stack(frame)[-STACK_PRINT_ROWS:] if frame else []
+    print(f"STACK {label} after {waited:.0f} s:")
+    for row in rows:
+        for line in row.rstrip().splitlines():
+            print(f"  | {line}")
+
+
+@_contextlib.contextmanager
+def candidate_guard(
+    label: str, limit_seconds: int, stack_seconds: float = STACK_PRINT_SECONDS
+):
+    """Guard for one candidate. Every `stack_seconds` it prints the stack of the
+    calling thread, so a wait shows its line. After `limit_seconds` it raises
+    TimeoutError in the calling thread (SIGALRM, main thread only). A wait inside a
+    native call is interrupted only when that call returns to Python; the stack print
+    still shows where it waits."""
+    stop = _threading.Event()
+    started = _time.time()
+    main_id = _threading.get_ident()
+
+    def watch() -> None:
+        while not stop.wait(stack_seconds):
+            _print_main_stack(label, _time.time() - started, main_id)
+
+    def on_alarm(signum, frame):
+        raise TimeoutError(f"{label}: timeout after {int(limit_seconds)} s")
+
+    watcher = None
+    if stack_seconds and stack_seconds > 0:
+        watcher = _threading.Thread(target=watch, daemon=True)
+        watcher.start()
+    previous = None
+    armed = (
+        int(limit_seconds) > 0
+        and _threading.current_thread() is _threading.main_thread()
+    )
+    if armed:
+        previous = _signal.signal(_signal.SIGALRM, on_alarm)
+        _signal.alarm(int(limit_seconds))
+    try:
+        yield
+    finally:
+        if armed:
+            _signal.alarm(0)
+            _signal.signal(_signal.SIGALRM, previous)
+        stop.set()
+        if watcher is not None:
+            watcher.join(timeout=1)
+
+
+@_contextlib.contextmanager
+def timed_stage(label: str):
+    """Prints the seconds of one stage inside a candidate, for example the checkpoint
+    load, the fit or one prediction batch."""
+    started = _time.time()
+    print(f"  .. {label}")
+    try:
+        yield
+    except BaseException:
+        print(f"  .. {label}: failed after {_time.time() - started:.1f} s")
+        raise
+    print(f"  .. {label}: done in {_time.time() - started:.1f} s")
+
+
 def run_candidate(
     ctx: TaskContext,
     name: str,
@@ -1758,12 +1844,14 @@ def run_candidate(
     requires=(),
     params=None,
     stage: str = "candidate",
+    limit_seconds=None,
 ):
     """Run one candidate in isolation and record exactly what happened.
 
-    fit_fn() returns (bundle, metrics dict, n_rows). A missing library or an
-    exception becomes a recorded row and the notebook goes on; a failing
-    baseline is re-raised because it means the plumbing is wrong."""
+    fit_fn() returns (bundle, metrics dict, n_rows). A missing library, a timeout
+    (`limit_seconds`, default by family) or an exception becomes a recorded row and
+    the notebook goes on; a failing baseline is re-raised because it means the
+    plumbing is wrong."""
     if params is None:
         params = {}
     missing = missing_libraries(requires)
@@ -1783,9 +1871,12 @@ def run_candidate(
         )
         print(f"SKIP {name}: missing {missing}")
         return None
+    limit = candidate_limit(family) if limit_seconds is None else limit_seconds
+    print(f"START {name} [{family}] task={ctx.task_id} limit={limit} s")
     started = _time.time()
     try:
-        bundle, metrics, n_rows = fit_fn()
+        with candidate_guard(f"{name} {ctx.task_id}", limit):
+            bundle, metrics, n_rows = fit_fn()
     except Exception as exc:
         detail = f"{type(exc).__name__}: {str(exc)[:600]}"
         record_result(

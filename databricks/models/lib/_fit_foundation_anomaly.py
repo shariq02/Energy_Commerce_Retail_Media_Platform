@@ -246,7 +246,10 @@ class ReconstructionScorer:
 
     def backend(self):
         if self._backend is None:
-            self._backend = RECON_BACKENDS[self.cfg["backend"]](self.cfg["weights_dir"])
+            with timed_stage(f"load {self.cfg['backend']} weights"):
+                self._backend = RECON_BACKENDS[self.cfg["backend"]](
+                    self.cfg["weights_dir"]
+                )
         return self._backend
 
     def score(self, pdf, max_windows=None):
@@ -273,7 +276,10 @@ class BlockReconstructor:
 
     def backend(self):
         if self._backend is None:
-            self._backend = RECON_BACKENDS[self.cfg["backend"]](self.cfg["weights_dir"])
+            with timed_stage(f"load {self.cfg['backend']} weights"):
+                self._backend = RECON_BACKENDS[self.cfg["backend"]](
+                    self.cfg["weights_dir"]
+                )
         return self._backend
 
     def predict(self, sset, events, var_js):

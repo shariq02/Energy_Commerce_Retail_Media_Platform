@@ -249,7 +249,8 @@ def _train_decision_transformer(prep, n_classes, rows):
     )
     order_rng = np.random.default_rng(MODEL_SEED)
     net.train()
-    for _ in range(DT_EPOCHS):
+    for epoch in range(DT_EPOCHS):
+        print(f"  .. decision transformer epoch {epoch + 1}/{DT_EPOCHS} on {device}")
         order = order_rng.permutation(rows)
         for i in range(0, len(order), DT_BATCH):
             batch = order[i : i + DT_BATCH]
