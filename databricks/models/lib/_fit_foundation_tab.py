@@ -148,15 +148,6 @@ TAB_TASKS = {
 # DBTITLE 1,Context rows and the estimators
 
 
-def context_positions(n_rows: int, max_rows: int, seed: int) -> np.ndarray:
-    """Positions of the train rows used as context: all of them, or a seeded sample
-    in the original order."""
-    if n_rows <= max_rows:
-        return np.arange(n_rows)
-    rng = np.random.default_rng(seed)
-    return np.sort(rng.choice(n_rows, size=max_rows, replace=False))
-
-
 def build_estimator(cfg: dict):
     """The estimator of a bundle, with the checkpoint file taken from the volume; the
     library is imported here so that a missing one is a recorded skip."""
@@ -345,6 +336,48 @@ def fit_tab_candidate(kind, backend, enc, pdf, tr_m, y, frame_va, y_va, base):
 
 # COMMAND ----------
 
+# DBTITLE 1,Validation sample and the accepted models on the same rows
+
+
+def accepted_selection(ctx) -> list[dict]:
+    """The accepted models forwarded for the task at this frozen version, best first;
+    the baseline is not included."""
+    if not spark.catalog.tableExists(model_fqn("candidate_selection", ctx.ecosystem)):
+        return []
+    rows = (
+        read_model("candidate_selection", ecosystem=ctx.ecosystem)
+        .filter(
+            (F.col("task_id") == ctx.task_id)
+            & ~F.col("is_baseline")
+            & (F.col("frozen_delta_version") == int(ctx.frozen_version))
+        )
+        .collect()
+    )
+    return sorted((r.asDict() for r in rows), key=lambda r: int(r["rank"]))
+
+
+def record_references(ctx, score_fn, n_rows: int, params: dict, selection=None) -> None:
+    """Score the accepted models of the task on the same validation sample as the
+    context models. Rows with stage `reference`; no stored artifact, so the selection
+    never forwards them."""
+    for sel in selection if selection is not None else accepted_selection(ctx):
+
+        def score(sel=sel):
+            bundle = load_bundle({"mlflow_run_id": sel["mlflow_run_id"]})
+            return None, score_fn(bundle), n_rows
+
+        run_candidate(
+            ctx,
+            f"{sel['model_name']}@validation_sample",
+            sel["family"],
+            score,
+            params=dict(params),
+            stage="reference",
+        )
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Runner -- in-context candidates of one task
 
 
@@ -370,19 +403,37 @@ def run_foundation_tab(ctx, df, models=None) -> None:
         base = fit_baseline(pdf[tr_m], spec["target"], spec["baseline"]).predict(
             pdf[va_m]
         )
-    frame_va = pdf[va_m].reset_index(drop=True)
+    frame_all = pdf[va_m].reset_index(drop=True)
+    y_all = y[va_m]
+    pos = context_positions(len(frame_all), IN_CONTEXT_SAMPLE_ROWS, MODEL_SEED)
+    sampled = len(pos) < len(frame_all)
+    frame_va, y_va = frame_all.iloc[pos].reset_index(drop=True), y_all[pos]
+    if sampled:
+        print(f"validation sample: {len(pos):,} of {len(frame_all):,} rows")
+        if base is not None:
+            base = np.asarray(base)[pos]
+    sample = sample_params(len(frame_all), len(pos)) if sampled else {}
     chosen = [c for c in TAB_CANDIDATES if models is None or c[0] in models]
     for name, backend, library in chosen:
-        params = {"row_fraction": round(fraction, 4)}
+        params = {"row_fraction": round(fraction, 4), **sample}
 
         def fit(backend=backend, params=params):
             bundle, metrics, extra = fit_tab_candidate(
-                kind, backend, enc, pdf, tr_m, y, frame_va, y[va_m], base
+                kind, backend, enc, pdf, tr_m, y, frame_va, y_va, base
             )
             params.update(extra)
-            return bundle, metrics, int(va_m.sum())
+            return bundle, metrics, len(frame_va)
 
         run_candidate(ctx, name, TAB_FAMILY, fit, requires=(library,), params=params)
+    if sampled:
+
+        def score_reference(bundle):
+            pred = bundle.predict(frame_va)
+            if classification:
+                return _class_metrics(y_va, pred)
+            return regression_metrics(y_va, pred, base)
+
+        record_references(ctx, score_reference, len(frame_va), sample)
     finish_foundation_task(ctx)
 
 
@@ -464,13 +515,19 @@ def run_foundation_tier(ctx, df, models=None) -> None:
     labels = sorted(train[spec["target"]].unique().tolist())
     code = {lab: i for i, lab in enumerate(labels)}
     y_train = train[spec["target"]].map(code).to_numpy(dtype="int64")
+    pos = context_positions(len(valid), IN_CONTEXT_SAMPLE_ROWS, MODEL_SEED)
+    sampled = len(pos) < len(valid)
+    sample = sample_params(len(valid), len(pos)) if sampled else {}
+    if sampled:
+        print(f"validation sample: {len(pos):,} of {len(valid):,} rows")
+        valid = valid.iloc[pos].reset_index(drop=True)
     y_valid = valid[spec["target"]].to_numpy()
     enc = FeatureEncoder(feats).fit(train)
     start_task(ctx)
 
     chosen = [c for c in TAB_CANDIDATES if models is None or c[0] in models]
     for name, backend, library in chosen:
-        params = {"row_fraction": round(fraction, 4)}
+        params = {"row_fraction": round(fraction, 4), **sample}
 
         def fit(backend=backend, params=params):
             limits = TAB_LIMITS[backend]
@@ -508,4 +565,11 @@ def run_foundation_tier(ctx, df, models=None) -> None:
             return bundle, metrics, len(valid)
 
         run_candidate(ctx, name, TAB_FAMILY, fit, requires=(library,), params=params)
+    if sampled:
+        record_references(
+            ctx,
+            lambda bundle: tier_metrics(y_valid, bundle.predict(valid), labels),
+            len(valid),
+            sample,
+        )
     finish_foundation_task(ctx)

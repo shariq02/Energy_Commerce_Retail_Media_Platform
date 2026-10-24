@@ -305,19 +305,34 @@ def run_foundation_survival(ctx, df, models=None) -> None:
     enc_k = FeatureEncoder(kept).fit(train)
     x_train = enc_k.transform(train, fill=True)
     start_task(ctx)
+    dur_v, ev_v = dur[va_m], ev[va_m]
+    pos = context_positions(len(valid), IN_CONTEXT_SAMPLE_ROWS, MODEL_SEED)
+    sampled = len(pos) < len(valid)
+    sample = sample_params(len(valid), len(pos)) if sampled else {}
+    if sampled:
+        print(f"validation sample: {len(pos):,} of {len(valid):,} rows")
+        valid = valid.iloc[pos].reset_index(drop=True)
+        dur_v, ev_v = dur_v[pos], ev_v[pos]
 
     builders = {"survpfn": fit_survpfn, "tabicl_discrete": fit_discrete}
     chosen = [c for c in SURV_CANDIDATES if models is None or c[0] in models]
     for name, backend, library in chosen:
-        params = {"row_fraction": round(fraction, 4)}
+        params = {"row_fraction": round(fraction, 4), **sample}
 
         def fit(backend=backend, params=params):
             bundle, extra = builders[backend](enc_k, x_train, dur[tr_m], ev[tr_m])
             params.update(extra, seed=MODEL_SEED)
-            metrics = _score(
-                dur[va_m], ev[va_m], bundle.risk(valid), bundle.survival(valid)
-            )
-            return bundle, metrics, int(va_m.sum())
+            metrics = _score(dur_v, ev_v, bundle.risk(valid), bundle.survival(valid))
+            return bundle, metrics, len(valid)
 
         run_candidate(ctx, name, SURV_FAMILY, fit, requires=(library,), params=params)
+    if sampled:
+        record_references(
+            ctx,
+            lambda bundle: _score(
+                dur_v, ev_v, bundle.risk(valid), bundle.survival(valid)
+            ),
+            len(valid),
+            sample,
+        )
     finish_foundation_task(ctx)

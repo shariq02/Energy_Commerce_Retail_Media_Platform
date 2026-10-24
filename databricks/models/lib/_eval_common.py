@@ -227,18 +227,33 @@ def row_fraction_of(models) -> float:
     return 1.0
 
 
-def load_bundle(model: dict):
-    """The stored fitted model of one candidate; the artifacts are our own runs."""
-    if not model["mlflow_run_id"]:
-        raise RuntimeError("no stored artifact for this model")
-    import cloudpickle
-    import mlflow
+def uses_context_model(models) -> bool:
+    """True when a forwarded model predicts from stored context rows (its recorded
+    parameters say `mode: in_context`)."""
+    return any("'mode': 'in_context'" in (m.get("params") or "") for m in models)
 
-    path = mlflow.artifacts.download_artifacts(
-        artifact_uri=f"runs:/{model['mlflow_run_id']}/candidate/candidate.pkl"
-    )
-    with open(path, "rb") as fh:
-        return cloudpickle.load(fh)
+
+def sample_eval_frames(evaluator, models, max_rows: int = IN_CONTEXT_SAMPLE_ROWS):
+    """When a context model is forwarded, score every model of the task on the same
+    seeded sample of each frame above `max_rows` rows, because a context model reads
+    all context rows for each scored row. The note goes to the recorded detail and
+    to the read notes. Frames that are not tables of rows stay as they are."""
+    if not uses_context_model(models):
+        return
+    notes = []
+    parts = (("eval", evaluator.ctx.partition), ("validation", "validation"))
+    for part, label in parts:
+        frame = evaluator.frames.get(part)
+        if not isinstance(frame, pd.DataFrame) or len(frame) <= max_rows:
+            continue
+        seed = evaluator.ctx.thresholds["bootstrap_seed"]
+        pos = context_positions(len(frame), max_rows, seed)
+        evaluator.frames[part] = frame.iloc[pos].reset_index(drop=True)
+        notes.append(f"{label} sample {len(pos)} of {len(frame)} rows")
+        read = {"partition": label, "sample_rows": len(pos), "of_rows": len(frame)}
+        _FRAME_NOTES.append({"read": read})
+    evaluator.sampler = None
+    evaluator.sample_note = f" ({'; '.join(notes)})" if notes else ""
 
 
 # COMMAND ----------
@@ -397,6 +412,7 @@ class Evaluator:
         self.spec = cfg["spec"]
         self.frames: dict = {"eval": None, "validation": None}
         self.sampler = None
+        self.sample_note = ""
         self.base_name = None
         self.recorded: dict = {}
 
@@ -627,7 +643,14 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
             metrics = enrich(ctx, evaluator, m, bundles[name], sc, base_sc, bundles)
             if name != base_name:
                 sc.release()
-            record_evaluation(ctx, m, "ok", metrics, sc.n_rows, f"on {ctx.partition}")
+            record_evaluation(
+                ctx,
+                m,
+                "ok",
+                metrics,
+                sc.n_rows,
+                f"on {ctx.partition}{evaluator.sample_note}",
+            )
             shown = {
                 k: round(v, 4)
                 for k, v in metrics.items()

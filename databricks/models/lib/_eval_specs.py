@@ -529,6 +529,7 @@ def evaluate_by_id(task_id: str, rid: str, smoke: bool) -> None:
             task_frame(ctx, "validation"),
             row_fraction_of(models),
         )
+        sample_eval_frames(evaluator, models)
         evaluate_task(ctx, evaluator)
     finally:
         evaluator.frames = {"eval": None, "validation": None}

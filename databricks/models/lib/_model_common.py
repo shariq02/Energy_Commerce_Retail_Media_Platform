@@ -1835,6 +1835,49 @@ def timed_stage(label: str):
     print(f"  .. {label}: done in {_time.time() - started:.1f} s")
 
 
+# COMMAND ----------
+
+# DBTITLE 1,In-context sampling -- rows scored by a context model, stored bundles
+IN_CONTEXT_SAMPLE_ROWS = 100_000
+
+
+def context_positions(n_rows: int, max_rows: int, seed: int) -> np.ndarray:
+    """Positions of the rows kept: all of them, or a seeded sample in the original
+    order. Used for the context rows and for the scored validation sample."""
+    if n_rows <= max_rows:
+        return np.arange(n_rows)
+    rng = np.random.default_rng(seed)
+    return np.sort(rng.choice(n_rows, size=max_rows, replace=False))
+
+
+def sample_params(total: int, used: int) -> dict:
+    """Recorded with a candidate that was scored on a sample of the rows."""
+    return {
+        "validation_rows": int(used),
+        "validation_rows_total": int(total),
+        "validation_fraction": round(used / total, 4) if total else 1.0,
+    }
+
+
+def load_bundle(model: dict):
+    """The stored fitted model of one candidate; the artifacts are our own runs."""
+    if not model["mlflow_run_id"]:
+        raise RuntimeError("no stored artifact for this model")
+    import cloudpickle
+    import mlflow
+
+    path = mlflow.artifacts.download_artifacts(
+        artifact_uri=f"runs:/{model['mlflow_run_id']}/candidate/candidate.pkl"
+    )
+    with open(path, "rb") as fh:
+        return cloudpickle.load(fh)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Isolated candidate runner
+
+
 def run_candidate(
     ctx: TaskContext,
     name: str,
