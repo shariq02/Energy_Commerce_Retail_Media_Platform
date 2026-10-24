@@ -143,12 +143,27 @@ def note_read(ctx: EvalContext, frame, time_col=None, group_col=None) -> None:
 # DBTITLE 1,Forwarded models and their stored artifacts
 
 
+FOUNDATION_SELECTION_TABLE = "foundation_selection"
+FOUNDATION_RESULTS_TABLE = "foundation_results"
+
+
+def table_rows(table: str, ctx: EvalContext, *, smoke: bool | None = None) -> list:
+    """The rows of one task from a model table; an empty list while the table does
+    not exist yet (the foundation tables exist after their setup)."""
+    if not spark.catalog.tableExists(model_fqn(table, ctx.ecosystem)):
+        return []
+    df = read_model(table, ecosystem=ctx.ecosystem).filter(
+        F.col("task_id") == ctx.task_id
+    )
+    if smoke is not None:
+        df = df.filter(F.col("smoke") == smoke)
+    return [r.asDict() for r in df.collect()]
+
+
 def _selection_rows(ctx: EvalContext) -> list[dict]:
     sel = [
-        r.asDict()
-        for r in read_model("candidate_selection", ecosystem=ctx.ecosystem)
-        .filter(F.col("task_id") == ctx.task_id)
-        .collect()
+        *table_rows("candidate_selection", ctx),
+        *table_rows(FOUNDATION_SELECTION_TABLE, ctx),
     ]
     if not sel:
         raise RuntimeError(f"{ctx.task_id}: no models forwarded by the selection")
@@ -166,24 +181,12 @@ def forwarded_models(ctx: EvalContext) -> list[dict]:
     """The selected models of the task (baseline first), each with its stored run id
     and recorded validation metrics, plus any other baseline kept for its metrics."""
     sel = _selection_rows(ctx)
-    rows = (
-        read_model("candidate_results", ecosystem=ctx.ecosystem)
-        .filter(
-            (F.col("task_id") == ctx.task_id)
-            & ~F.col("smoke")
-            & (F.col("status") == "ok")
-        )
-        .select(
-            "model_name",
-            "family",
-            "stage",
-            "metric",
-            "value",
-            "mlflow_run_id",
-            "params",
-        )
-        .collect()
-    )
+    rows = [
+        r
+        for table in ("candidate_results", FOUNDATION_RESULTS_TABLE)
+        for r in table_rows(table, ctx, smoke=False)
+        if r["status"] == "ok"
+    ]
     by: dict = {}
     for r in rows:
         d = by.setdefault(

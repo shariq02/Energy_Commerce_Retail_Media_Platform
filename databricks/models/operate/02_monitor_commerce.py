@@ -116,3 +116,14 @@ check(
     metric_value=float(len(failed)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "operate__02_monitor_commerce",
+    "Monitor Commerce",
+    ["monitoring_results", "monitoring_flags", "model_predictions"],
+    rid,
+)

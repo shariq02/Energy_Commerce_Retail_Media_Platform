@@ -121,3 +121,14 @@ check(
     metric_value=float(len(_open)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__02_record_decisions",
+    "Approval Decisions",
+    ["model_approval"],
+    rid,
+)

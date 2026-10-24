@@ -26,6 +26,9 @@ docs/
 # Retired code (superseded implementations) - kept locally only
 archive/
 
+# Prompts given to Genie to build the Databricks jobs - kept locally only
+databricks/genie_prompts/
+
 # Local-only acquisition notes - not tracked
 scripts/download/README.md
 
@@ -50,6 +53,17 @@ ai/knowledge_corpus/wikipedia/chunks.tmp
 # Logs
 logs/
 *.log
+
+# Model training byproducts -- written into the working folder by training libraries
+chronos-2-finetuned/
+lightning_logs/
+mlruns/
+mlartifacts/
+wandb/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
 
 # Database
 *.db

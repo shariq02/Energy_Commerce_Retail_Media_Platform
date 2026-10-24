@@ -114,3 +114,14 @@ for eco, have in recorded.items():
 for eco in ("energy", "commerce"):
     rows = read_model("monitoring_spec", ecosystem=eco).collect()
     print(eco, operate_spec_from_rows([r.asDict() for r in rows]))
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "operate__00_operate_setup",
+    "Operate Setup",
+    ["monitoring_spec"],
+    rid,
+)

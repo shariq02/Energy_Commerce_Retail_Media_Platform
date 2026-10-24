@@ -28,6 +28,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import contextlib as _contextlib
 import datetime as _dt
 import gc as _gc
 import hashlib as _hashlib
@@ -39,9 +40,12 @@ import math as _math
 import os as _os
 import platform as _platform
 import re as _re
+import signal as _signal
 import sys as _sys
 import tempfile as _tempfile
+import threading as _threading
 import time as _time
+import traceback as _traceback
 
 import numpy as np
 import pandas as pd
@@ -191,6 +195,14 @@ MODEL_DDL = {
         "value double, threshold double, run_id string, raised_at timestamp"
     ),
 }
+# a foundation candidate is named after its model and how it ran
+FOUNDATION_NAME_SUFFIXES = ("_zero_shot", "_lora", "_in_context")
+
+
+def is_foundation_model(name: str) -> bool:
+    return str(name).endswith(FOUNDATION_NAME_SUFFIXES)
+
+
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
 LIBRARIES = {
@@ -203,6 +215,13 @@ LIBRARIES = {
     "mlflow": "mlflow",
     "cloudpickle": "cloudpickle",
     "psutil": "psutil",
+    "chronos": "chronos-forecasting",
+    "timesfm": "timesfm",
+    "tsfm_public": "granite-tsfm",
+    "tabpfn": "tabpfn",
+    "tabicl": "tabicl",
+    "momentfm": "momentfm",
+    "toto2": "toto-2",
 }
 
 
@@ -1593,12 +1612,14 @@ def train_side(fn) -> dict:
 
 
 def record_task_context(
-    ctx, status: str, detail=None, data_notes=None, table: str = "task_run_context"
+    ctx, status: str, detail=None, data_notes=None, table: str | None = None
 ) -> None:
     """Append one run-context row (started, data_ready, finished). Never raises."""
     try:
+        table = table or getattr(ctx, "context_table", "task_run_context")
+        ddl = MODEL_DDL.get(table, RUN_CONTEXT_COLUMNS)
         full = model_fqn(table, ctx.ecosystem)
-        spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({MODEL_DDL[table]}) USING delta")
+        spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({ddl}) USING delta")
         path, job, run = _notebook_identity()
         versions = {k: library_version(k) or "missing" for k in LIBRARIES}
         row = (
@@ -1617,7 +1638,7 @@ def record_task_context(
             detail[:900] if detail else None,
             _dt.datetime.now(_dt.UTC),
         )
-        spark.createDataFrame([row], MODEL_DDL[table]).write.format("delta").mode(
+        spark.createDataFrame([row], ddl).write.format("delta").mode(
             "append"
         ).saveAsTable(full)
     except Exception as exc:
@@ -1671,15 +1692,17 @@ def record_result(
     rows = [(*base, m, None if v is None else _finite(v), *tail) for m, v in items] or [
         (*base, None, None, *tail)
     ]
+    table = getattr(ctx, "results_table", "candidate_results")
     spark.createDataFrame(rows, RESULT_COLUMNS).write.format("delta").mode(
         "append"
-    ).saveAsTable(model_fqn("candidate_results", ctx.ecosystem))
+    ).saveAsTable(model_fqn(table, ctx.ecosystem))
 
 
 def start_task(ctx: TaskContext) -> None:
     """Drop this task's earlier rows of the same kind (smoke or full)."""
+    table = getattr(ctx, "results_table", "candidate_results")
     spark.sql(
-        f"DELETE FROM {model_fqn('candidate_results', ctx.ecosystem)} "
+        f"DELETE FROM {model_fqn(table, ctx.ecosystem)} "
         f"WHERE task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}"
     )
     print(
@@ -1730,6 +1753,88 @@ def log_candidate_to_mlflow(ctx, name, family, params, metrics, bundle):
         return None, f"failed: {type(exc).__name__}: {str(exc)[:200]}"
 
 
+# COMMAND ----------
+
+# DBTITLE 1,Candidate guard -- time limit, stack print, stage times
+CANDIDATE_LIMIT_SECONDS = 1200
+FOUNDATION_LIMIT_SECONDS = 1800
+STACK_PRINT_SECONDS = 300
+STACK_PRINT_ROWS = 12
+
+
+def candidate_limit(family: str) -> int:
+    """Seconds one candidate may run: foundation families get the longer limit."""
+    if str(family).startswith("foundation"):
+        return FOUNDATION_LIMIT_SECONDS
+    return CANDIDATE_LIMIT_SECONDS
+
+
+def _print_main_stack(label: str, waited: float, main_id: int) -> None:
+    frame = _sys._current_frames().get(main_id)
+    rows = _traceback.format_stack(frame)[-STACK_PRINT_ROWS:] if frame else []
+    print(f"STACK {label} after {waited:.0f} s:")
+    for row in rows:
+        for line in row.rstrip().splitlines():
+            print(f"  | {line}")
+
+
+@_contextlib.contextmanager
+def candidate_guard(
+    label: str, limit_seconds: int, stack_seconds: float = STACK_PRINT_SECONDS
+):
+    """Guard for one candidate. Every `stack_seconds` it prints the stack of the
+    calling thread, so a wait shows its line. After `limit_seconds` it raises
+    TimeoutError in the calling thread (SIGALRM, main thread only). A wait inside a
+    native call is interrupted only when that call returns to Python; the stack print
+    still shows where it waits."""
+    stop = _threading.Event()
+    started = _time.time()
+    main_id = _threading.get_ident()
+
+    def watch() -> None:
+        while not stop.wait(stack_seconds):
+            _print_main_stack(label, _time.time() - started, main_id)
+
+    def on_alarm(signum, frame):
+        raise TimeoutError(f"{label}: timeout after {int(limit_seconds)} s")
+
+    watcher = None
+    if stack_seconds and stack_seconds > 0:
+        watcher = _threading.Thread(target=watch, daemon=True)
+        watcher.start()
+    previous = None
+    armed = (
+        int(limit_seconds) > 0
+        and _threading.current_thread() is _threading.main_thread()
+    )
+    if armed:
+        previous = _signal.signal(_signal.SIGALRM, on_alarm)
+        _signal.alarm(int(limit_seconds))
+    try:
+        yield
+    finally:
+        if armed:
+            _signal.alarm(0)
+            _signal.signal(_signal.SIGALRM, previous)
+        stop.set()
+        if watcher is not None:
+            watcher.join(timeout=1)
+
+
+@_contextlib.contextmanager
+def timed_stage(label: str):
+    """Prints the seconds of one stage inside a candidate, for example the checkpoint
+    load, the fit or one prediction batch."""
+    started = _time.time()
+    print(f"  .. {label}")
+    try:
+        yield
+    except BaseException:
+        print(f"  .. {label}: failed after {_time.time() - started:.1f} s")
+        raise
+    print(f"  .. {label}: done in {_time.time() - started:.1f} s")
+
+
 def run_candidate(
     ctx: TaskContext,
     name: str,
@@ -1739,12 +1844,14 @@ def run_candidate(
     requires=(),
     params=None,
     stage: str = "candidate",
+    limit_seconds=None,
 ):
     """Run one candidate in isolation and record exactly what happened.
 
-    fit_fn() returns (bundle, metrics dict, n_rows). A missing library or an
-    exception becomes a recorded row and the notebook goes on; a failing
-    baseline is re-raised because it means the plumbing is wrong."""
+    fit_fn() returns (bundle, metrics dict, n_rows). A missing library, a timeout
+    (`limit_seconds`, default by family) or an exception becomes a recorded row and
+    the notebook goes on; a failing baseline is re-raised because it means the
+    plumbing is wrong."""
     if params is None:
         params = {}
     missing = missing_libraries(requires)
@@ -1764,9 +1871,12 @@ def run_candidate(
         )
         print(f"SKIP {name}: missing {missing}")
         return None
+    limit = candidate_limit(family) if limit_seconds is None else limit_seconds
+    print(f"START {name} [{family}] task={ctx.task_id} limit={limit} s")
     started = _time.time()
     try:
-        bundle, metrics, n_rows = fit_fn()
+        with candidate_guard(f"{name} {ctx.task_id}", limit):
+            bundle, metrics, n_rows = fit_fn()
     except Exception as exc:
         detail = f"{type(exc).__name__}: {str(exc)[:600]}"
         record_result(
@@ -1825,3 +1935,350 @@ def finish_task(ctx: TaskContext) -> None:
         detail=f"task={ctx.task_id}",
         rid=ctx.rid,
     )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings section of one notebook (src/findings/model_findings)
+
+NOTEBOOK_FINDINGS_SUBDIR = "src/findings/model_findings"
+FINDINGS_ROW_LIMIT = 30
+FINDINGS_COLUMNS = {
+    "candidate_results": [
+        "task_id",
+        "model_name",
+        "family",
+        "stage",
+        "partition",
+        "metric",
+        "value",
+        "n_rows",
+        "status",
+        "detail",
+    ],
+    "candidate_selection": [
+        "task_id",
+        "model_name",
+        "rank",
+        "primary_metric",
+        "primary_value",
+        "is_baseline",
+    ],
+    "task_run_context": [
+        "task_id",
+        "status",
+        "smoke",
+        "frozen_delta_version",
+        "detail",
+        "recorded_at",
+    ],
+    "evaluation_run_context": [
+        "task_id",
+        "status",
+        "smoke",
+        "frozen_delta_version",
+        "detail",
+        "recorded_at",
+    ],
+    "evaluation_results": [
+        "task_id",
+        "model_name",
+        "stage",
+        "partition",
+        "metric",
+        "value",
+        "validation_value",
+        "n_rows",
+        "status",
+        "detail",
+    ],
+    "evaluation_flags": [
+        "task_id",
+        "model_name",
+        "stage",
+        "flag",
+        "detail",
+        "value",
+        "threshold",
+    ],
+    "evaluation_spec": ["dataset_id", "spec_key", "spec_value"],
+    "approval_spec": ["rule_id", "rule_class", "parameter", "parameter_value"],
+    "model_approval": [
+        "task_id",
+        "model_name",
+        "role",
+        "decision",
+        "restriction",
+        "overridden",
+        "primary_metric",
+        "validation_value",
+        "evaluated_value",
+    ],
+    "model_registry": [
+        "task_id",
+        "model_name",
+        "role",
+        "version",
+        "lifecycle_status",
+        "decision",
+        "validation_value",
+        "reason",
+    ],
+    "registry_check": [
+        "task_id",
+        "model_name",
+        "role",
+        "registry_version",
+        "processor_type",
+        "reload_status",
+        "rescore_status",
+        "gap_relative",
+        "status",
+        "detail",
+    ],
+    "monitoring_spec": ["parameter", "parameter_value"],
+    "reference_profile": [
+        "task_id",
+        "model_name",
+        "subject",
+        "value_kind",
+        "n_rows",
+        "null_rate",
+    ],
+    "model_predictions": [
+        "task_id",
+        "model_name",
+        "window_id",
+        "row_key",
+        "prediction",
+    ],
+    "monitoring_results": [
+        "task_id",
+        "model_name",
+        "window_id",
+        "check_kind",
+        "subject",
+        "value",
+        "level",
+    ],
+    "monitoring_flags": [
+        "task_id",
+        "model_name",
+        "window_id",
+        "check_kind",
+        "subject",
+        "level",
+        "value",
+        "threshold",
+    ],
+    "monitoring_triggers": [
+        "task_id",
+        "model_name",
+        "trigger_kind",
+        "source",
+        "condition",
+        "value",
+        "threshold",
+    ],
+}
+# tables without a run id are summarised by these columns
+FINDINGS_GROUPED = {"evaluation_split_manifest": ["dataset_id", "partition"]}
+
+
+def _findings_dir() -> str:
+    path = _os.path.abspath(_os.getcwd())
+    for _ in range(12):
+        if _os.path.isdir(_os.path.join(path, "src", "schemas")) and _os.path.isdir(
+            _os.path.join(path, "databricks")
+        ):
+            return _os.path.join(path, NOTEBOOK_FINDINGS_SUBDIR)
+        if _os.path.dirname(path) == path:
+            break
+        path = _os.path.dirname(path)
+    notebook = (
+        dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath()
+    ).get()
+    cut = notebook.rfind("/databricks/")
+    for root in (notebook[:cut], "/Workspace" + notebook[:cut]):
+        if cut > 0 and _os.path.isdir(_os.path.join(root, "src", "schemas")):
+            return _os.path.join(root, NOTEBOOK_FINDINGS_SUBDIR)
+    raise RuntimeError("repo root not found -- run from the Databricks Git folder")
+
+
+def findings_file_name(stem: str, smoke: bool) -> str:
+    return f"{stem}{'_smoke' if smoke else ''}.md"
+
+
+def findings_file_text(heading: str, title: str, body: str, smoke: bool, now) -> str:
+    """One notebook, one file: no other notebook writes it, so parallel tasks of a
+    job cannot overwrite each other."""
+    return scrub_private(
+        "\n".join(
+            [
+                f"# {heading}{' (SMOKE RUN)' if smoke else ''}",
+                "",
+                (
+                    "_Auto-generated by the model notebooks (`databricks/models/`). "
+                    "One file per notebook; a re-run replaces it. "
+                    f"Generated: {now.strftime('%Y-%m-%dT%H:%MZ')}_"
+                ),
+                "",
+                f"## {title}",
+                "",
+                body,
+            ]
+        )
+        + "\n"
+    )
+
+
+def write_findings_section(stem, heading, title, body, smoke, now) -> None:
+    """Write the findings of one notebook run to notebooks/<stem>[_smoke].md."""
+    folder = _os.path.join(_findings_dir(), "notebooks")
+    _os.makedirs(folder, exist_ok=True)
+    path = _os.path.join(folder, findings_file_name(stem, smoke))
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(findings_file_text(heading, title, body, smoke, now))
+    print(f"findings export -> {path}")
+
+
+SECTION_MARK = "<!-- section: "
+
+
+def notebook_findings_group(name: str) -> tuple[str, bool, str]:
+    """(file prefix, smoke run, section key) of a per-notebook findings file name."""
+    stem = name[: -len(".md")]
+    smoke = stem.endswith("_smoke")
+    key = stem[: -len("_smoke")] if smoke else stem
+    return key.split("__", 1)[0], smoke, key
+
+
+def section_of_findings_file(text: str) -> str:
+    """The part of a per-notebook file from its first second-level heading on."""
+    return text[text.index("\n## ") + 1 :].rstrip("\n")
+
+
+def read_merged_sections(text: str) -> dict[str, str]:
+    sections = {}
+    for part in text.split(SECTION_MARK)[1:]:
+        key, _, body = part.partition(" -->\n")
+        sections[key] = body.strip("\n")
+    return sections
+
+
+def merged_findings_text(prefix: str, sections: dict[str, str], smoke, now) -> str:
+    title = prefix.upper().replace("_", " ")
+    lines = [
+        f"# {title} NOTEBOOK FINDINGS{' (SMOKE RUN)' if smoke else ''}",
+        "",
+        (
+            "_Merged by the findings gate from the files of the model notebooks; "
+            "a section is replaced when its notebook runs again. "
+            f"Generated: {now.strftime('%Y-%m-%dT%H:%MZ')}_"
+        ),
+    ]
+    for key in sorted(sections):
+        lines += ["", f"{SECTION_MARK}{key} -->", sections[key]]
+    return "\n".join(lines) + "\n"
+
+
+def merge_notebook_findings() -> list[str]:
+    """Merge notebooks/*.md into <prefix>_notebooks[_smoke].md, then delete them.
+    Only a gate task may call it: it is the single writer of the merged files."""
+    root = _findings_dir()
+    folder = _os.path.join(root, "notebooks")
+    names = (
+        sorted(n for n in _os.listdir(folder) if n.endswith(".md"))
+        if _os.path.isdir(folder)
+        else []
+    )
+    groups: dict[tuple[str, bool], dict[str, str]] = {}
+    for name in names:
+        prefix, smoke, key = notebook_findings_group(name)
+        groups.setdefault((prefix, smoke), {})[key] = name
+    now = _dt.datetime.now(tz=_dt.UTC)
+    written = []
+    for (prefix, smoke), files in sorted(groups.items()):
+        target = f"{prefix}_notebooks{'_smoke' if smoke else ''}.md"
+        path = _os.path.join(root, target)
+        sections = {}
+        if _os.path.isfile(path):
+            with open(path, encoding="utf-8") as fh:
+                sections = read_merged_sections(fh.read())
+        for key, name in files.items():
+            with open(_os.path.join(folder, name), encoding="utf-8") as fh:
+                sections[key] = section_of_findings_file(fh.read())
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(merged_findings_text(prefix, sections, smoke, now))
+        written.append(target)
+        print(f"OK  {target}: {len(files)} section(s) merged")
+    for name in names:
+        _os.remove(_os.path.join(folder, name))
+    print(f"{len(names)} notebook file(s) merged and removed")
+    return written
+
+
+def table_findings(table, ecosystem, run_id, task_ids=None, smoke=None) -> str:
+    """Markdown for the rows one run wrote to a model table."""
+    full = model_fqn(table, ecosystem)
+    if not spark.catalog.tableExists(full):
+        return f"_table `{table}` does not exist_"
+    frame = spark.table(full)
+    columns = frame.columns
+    if table in FINDINGS_GROUPED:
+        keys = FINDINGS_GROUPED[table]
+        rows = frame.groupBy(*keys).count().orderBy(*keys).collect()
+        return markdown_table([*keys, "rows"], [tuple(r) for r in rows])
+    if "run_id" in columns:
+        frame = frame.filter(F.col("run_id") == run_id)
+    if task_ids and "task_id" in columns:
+        frame = frame.filter(F.col("task_id").isin(*task_ids))
+    if smoke is not None and "smoke" in columns:
+        frame = frame.filter(F.col("smoke") == smoke)
+    total = frame.count()
+    if total == 0:
+        return "_no rows for this run_"
+    shown = [c for c in FINDINGS_COLUMNS.get(table, columns) if c in columns]
+    rows = frame.select(*shown).limit(FINDINGS_ROW_LIMIT).collect()
+    note = f"{total} row(s)"
+    if total > FINDINGS_ROW_LIMIT:
+        note += f", first {FINDINGS_ROW_LIMIT} shown"
+    table_text = markdown_table(
+        shown,
+        [tuple(round(v, 4) if isinstance(v, float) else v for v in r) for r in rows],
+    )
+    return f"{note}\n\n{table_text}"
+
+
+def write_model_findings(
+    ecosystems,
+    notebook_key,
+    title,
+    tables,
+    run_id,
+    task_ids=None,
+    smoke=None,
+    notes=None,
+) -> None:
+    """Write what one notebook run recorded in `tables`, one file per ecosystem
+    (notebooks/<ecosystem>__<notebook key>.md; smoke runs: ..._smoke.md).
+    `notes` maps an ecosystem to extra lines for the section."""
+    now = _dt.datetime.now(tz=_dt.UTC)
+    for eco in ecosystems:
+        lines = (notes or {}).get(eco, [])
+        body = [*lines, ""] if lines else []
+        for table in tables:
+            body += [
+                f"### {table}",
+                "",
+                table_findings(table, eco, run_id, task_ids, smoke),
+                "",
+            ]
+        write_findings_section(
+            f"{eco}__{notebook_key}",
+            f"{eco.upper()} MODEL NOTEBOOK FINDINGS",
+            title,
+            "\n".join(body),
+            bool(smoke),
+            now,
+        )

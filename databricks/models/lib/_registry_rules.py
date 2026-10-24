@@ -116,6 +116,41 @@ def registry_entries(approvals, fit_versions) -> list:
 
 # COMMAND ----------
 
+# DBTITLE 1,A foundation model that becomes the selected model of a task
+
+
+def annotate_replacements(wanted, existing, is_foundation) -> list:
+    """Give a first registration of a foundation model as the selected model the
+    reason that it replaces the model registered before; the earlier entry stays
+    in the registry as the fallback beside the baseline."""
+    latest = latest_versions(existing)
+    out = []
+    for w in wanted:
+        if (
+            w["role"] == "selected"
+            and is_foundation(w["model_name"])
+            and _entry_key(w) not in latest
+        ):
+            earlier = sorted(
+                key[1]
+                for key, row in latest.items()
+                if key[0] == w["task_id"]
+                and key[2] == "selected"
+                and key[1] != w["model_name"]
+                and row["lifecycle_status"] != "retired"
+            )
+            if earlier:
+                reason = (
+                    f"replaces {', '.join(earlier)} as the selected model: first on "
+                    "the validation rank and approved (rule R01)"
+                )
+                w = {**w, "reason": reason}
+        out.append(w)
+    return out
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Version planning
 
 
@@ -149,7 +184,7 @@ def plan_versions(existing, wanted, changes, rid, now) -> list:
                     **w,
                     "version": 1,
                     "lifecycle_status": "registered",
-                    "reason": "first registration",
+                    "reason": w.get("reason") or "first registration",
                 }
             )
             continue

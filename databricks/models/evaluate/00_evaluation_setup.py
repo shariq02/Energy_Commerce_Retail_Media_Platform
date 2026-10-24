@@ -101,3 +101,14 @@ for eco, have in recorded.items():
 # DBTITLE 1,The recorded settings load
 for eco in ("energy", "commerce"):
     print(eco, read_thresholds(eco))
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "evaluate__00_evaluation_setup",
+    "Evaluation Setup",
+    ["evaluation_spec"],
+    rid,
+)

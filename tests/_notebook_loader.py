@@ -158,6 +158,25 @@ def load_eval_libs() -> dict:
     return namespace
 
 
+def load_foundation_libs() -> dict:
+    """The model libraries, then the foundation libraries in the order the foundation
+    notebooks `%run` them."""
+    namespace = load_model_libs()
+    for name in (
+        "_fit_foundation_ts",
+        "_fit_foundation_tab",
+        "_fit_foundation_anomaly",
+        "_fit_foundation_survival",
+        "_fit_foundation_rank",
+        "_fit_foundation_rl",
+        "_fit_foundation_stack",
+    ):
+        _exec_notebook(
+            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
+        )
+    return namespace
+
+
 def load_approval_libs() -> dict:
     """The model shared library, then the approval libraries in the order the
     approval notebooks `%run` them."""

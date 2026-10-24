@@ -117,7 +117,9 @@ for eco in ("energy", "commerce"):
 now = now_utc()
 planned = {}
 for eco, (approvals, fit_versions, existing) in evidence.items():
-    wanted = registry_entries(approvals, fit_versions)
+    wanted = annotate_replacements(
+        registry_entries(approvals, fit_versions), existing, is_foundation_model
+    )
     changes = {
         k: v
         for k, v in LIFECYCLE_CHANGES.items()
@@ -175,4 +177,15 @@ check(
     detail=f"entries without a run or a card: {_unlinked}",
     metric_value=float(len(_unlinked)),
     rid=rid,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "register__01_register_models",
+    "Register Models",
+    ["model_registry"],
+    rid,
 )

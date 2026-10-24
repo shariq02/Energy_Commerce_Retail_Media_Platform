@@ -43,3 +43,17 @@ for eco in ("energy", "commerce"):
     for name in ("model_registry", "registry_check"):
         n = read_model(name, ecosystem=eco).count()
         print(f"{eco}.{name}: {n} row(s)")
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "register__00_registry_setup",
+    "Registry Setup",
+    [],
+    rid,
+    notes={
+        eco: ["registry tables created if missing"] for eco in ("energy", "commerce")
+    },
+)

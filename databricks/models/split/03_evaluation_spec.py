@@ -80,3 +80,14 @@ for eco, datasets in _spec.items():
         predicate="dataset_id <> 'evaluation'",
     )
     print(f"OK  {len(rows)} specification row(s) for {eco}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "split__03_evaluation_spec",
+    "Evaluation Specification",
+    ["evaluation_spec"],
+    rid,
+)

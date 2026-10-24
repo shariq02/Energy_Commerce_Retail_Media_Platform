@@ -235,7 +235,10 @@ _OPERATE = [p for p in _NOTEBOOKS if _rel(p).startswith("operate/")]
 _OPERATE_WINDOW_RUNS = [
     p for p in _OPERATE if p.name[:2] in ("01", "02") and p.parent.name == "operate"
 ]
-_OPERATE_RECORD_ONLY = [p for p in _OPERATE if p not in _OPERATE_WINDOW_RUNS]
+_OPERATE_SCORING = [p for p in _OPERATE if p.name.startswith("04_")]
+_OPERATE_RECORD_ONLY = [
+    p for p in _OPERATE if p not in _OPERATE_WINDOW_RUNS and p not in _OPERATE_SCORING
+]
 
 
 @pytest.mark.parametrize("path", _OPERATE, ids=_rel)
@@ -254,6 +257,16 @@ def test_operate_record_notebooks_read_recorded_results_only(path):
     text = path.read_text(encoding="utf-8")
     assert "load_bundle(" not in text and "evaluate_by_id(" not in text
     assert "operate_ecosystem(" not in text and ".toPandas(" not in text
+
+
+@pytest.mark.parametrize("path", _OPERATE_SCORING, ids=_rel)
+def test_score_request_notebooks_take_keys_and_a_window_and_no_feature_values(path):
+    text = path.read_text(encoding="utf-8")
+    for lib in ("_eval_common", "_eval_specs", "_operate_rules", "_operate_windows"):
+        assert f"%run ../lib/{lib}" in text, _rel(path)
+    for widget in ('"task_id"', '"keys"', '"window_start"', '"window_end"'):
+        assert widget in text, _rel(path)
+    assert "key_columns(cfg)" in text and "evaluate_by_id(" not in text
 
 
 @pytest.mark.parametrize("path", _OPERATE_WINDOW_RUNS, ids=_rel)

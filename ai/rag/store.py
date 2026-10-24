@@ -4,9 +4,9 @@ ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-The collection, keyword index and graph exist for the build in the corpus manifest
-only, so a call must name that build. The model files must equal the recorded
-hashes, and the keyword index and the graph must equal the recorded versions.
+The collection, keyword index, graph copy and build record of a build are kept in
+its build folder, so a call may name any kept build. The model files must equal the
+recorded hashes, and the keyword index and the graph must equal the recorded versions.
 Everything is opened for reading; nothing is created or changed. A loaded store is
 kept for the next call of the same build. Library only.
 """
@@ -22,6 +22,8 @@ from ai.embeddings import collection as coll
 from ai.embeddings import embedder as emb
 from ai.embeddings import keyword_index as ki
 from ai.embeddings import knowledge_graph as kg
+from ai.knowledge_quality import integrity
+from ai.knowledge_quality import state as qstate
 from ai.rag import graph as gr
 from ai.rag import keyword_fts as fts
 from ai.rag import query as qy
@@ -60,12 +62,15 @@ def manifest_path(corpus_id: str, corpus_dir: Path) -> Path:
     raise ValueError(f"unknown corpus {corpus_id!r}")
 
 
-def read_record(corpus_id: str, corpus_dir: Path) -> dict:
+def read_manifest(corpus_id: str, corpus_dir: Path) -> dict:
     path = manifest_path(corpus_id, corpus_dir)
     if not path.is_file():
         raise FileNotFoundError(f"{path} not found: run the corpus build first")
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    record = manifest.get(br.RECORD_KEY)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_record(corpus_id: str, corpus_dir: Path) -> dict:
+    record = read_manifest(corpus_id, corpus_dir).get(br.RECORD_KEY)
     if not record:
         raise ValueError(f"{corpus_id}: no build record: run the embedding build")
     return record
@@ -101,7 +106,7 @@ def _open(corpus_id: str, corpus_dir: Path, model_dir: Path, record: dict) -> St
         page = collection.get(include=["metadatas", "documents"])
         metadata = dict(zip(page["ids"], page["metadatas"], strict=True))
         keyword = Bm25Keyword(chunk_ids, bm25, metadata)
-        directory = br.graph_dir(ai_dir)
+        directory = br.build_graph_dir(ai_dir, corpus_id, record["build_id"])
         if kg.graph_version(directory) != record["graph"]["version"]:
             raise ValueError("the graph differs from the build record")
         graph = gr.read_curated(directory)
@@ -112,13 +117,14 @@ def _open(corpus_id: str, corpus_dir: Path, model_dir: Path, record: dict) -> St
         ]
         glossary = qy.glossary_entries(texts)
     else:
-        problem = fts.check_index(
-            fts.index_path(ai_dir), record, record["keyword_index"]["version"]
-        )
+        index = fts.index_path(ai_dir, record["build_id"])
+        problem = fts.check_index(index, record, record["keyword_index"]["version"])
         if problem:
             raise ValueError(problem)
-        keyword = fts.FtsKeyword(fts.index_path(ai_dir))
-        edge_file = corpus_dir / WIKIPEDIA_ID / record["graph"]["file"]
+        keyword = fts.FtsKeyword(index)
+        edge_file = (
+            br.build_graph_dir(ai_dir, corpus_id, record["build_id"]) / kg.EDGES_FILE
+        )
         if uc.sha256_file(edge_file) != record["graph"]["version"]:
             raise ValueError("the graph differs from the build record")
         graph = gr.read_wikipedia(edge_file)
@@ -137,22 +143,64 @@ def _open(corpus_id: str, corpus_dir: Path, model_dir: Path, record: dict) -> St
     )
 
 
+def read_build_record(corpus_id: str, corpus_dir: Path, build_id: str) -> dict:
+    """The record of a kept build, from its build folder."""
+    record = br.read_build_record(corpus_dir.parent, corpus_id, build_id)
+    if record is None:
+        raise ValueError(
+            f"build {build_id} of {corpus_id} is not kept (no build record): "
+            "run python -m ai.embeddings.build migrate, or build it again"
+        )
+    return record
+
+
 def load(
     corpus_id: str, corpus_dir: Path, model_dir: Path, build_id: str | None
 ) -> Store:
-    """The store of the build named by `build_id`, which must be the recorded one."""
-    record = read_record(corpus_id, corpus_dir)
+    """The store of the kept build named by `build_id`."""
     if build_id is None:
         raise ValueError("a build id is required: no collection is designated yet")
-    if build_id != record["build_id"]:
-        raise ValueError(
-            f"build {build_id} is not the recorded build {record['build_id']}: "
-            "the keyword index and the graph exist for the recorded build only"
-        )
+    record = read_build_record(corpus_id, corpus_dir, build_id)
     key = (corpus_id, str(corpus_dir), str(model_dir), build_id)
     if key not in _CACHE:
         _CACHE[key] = _open(corpus_id, corpus_dir, model_dir, record)
     return _CACHE[key]
+
+
+def load_designated(
+    corpus_id: str, corpus_dir: Path, model_dir: Path
+) -> tuple[Store, dict]:
+    """The store of the designated build, after an integrity check at the first open.
+
+    The designated build may differ from the recorded one; its build folder is read.
+    """
+    event = qstate.designated_event(corpus_dir.parent, corpus_id)
+    if event is None:
+        raise ValueError(
+            f"no build of {corpus_id} is designated: run the acceptance gate"
+        )
+    record = read_build_record(corpus_id, corpus_dir, event["build_id"])
+    key = (
+        "designated",
+        corpus_id,
+        str(corpus_dir),
+        str(model_dir),
+        event["event_hash"],
+    )
+    if key not in _CACHE:
+        recorded = read_record(corpus_id, corpus_dir)["build_id"]
+        if event["build_id"] == recorded:
+            report = integrity.check(corpus_id, corpus_dir, model_dir)
+        else:
+            report = integrity.check_kept(
+                corpus_id, corpus_dir, model_dir, event["build_id"]
+            )
+        if not report.ok:
+            raise ValueError(
+                "integrity check failed: " + "; ".join(report.problems[:3])
+            )
+        _CACHE[key] = _open(corpus_id, corpus_dir, model_dir, record)
+    return _CACHE[key], event
 
 
 def clear_cache() -> None:

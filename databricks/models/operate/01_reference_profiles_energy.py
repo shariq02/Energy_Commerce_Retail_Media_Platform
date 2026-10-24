@@ -146,3 +146,14 @@ check(
     metric_value=float(len(failed)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "operate__01_reference_profiles_energy",
+    "Reference Profiles Energy",
+    ["reference_profile"],
+    rid,
+)

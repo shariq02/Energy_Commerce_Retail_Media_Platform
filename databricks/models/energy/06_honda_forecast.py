@@ -68,3 +68,16 @@ SPEC = {
 
 # DBTITLE 1,Run the regression candidates
 run_regression(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__06_honda_forecast",
+    "Model Honda Forecast",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["honda_forecast.increment"],
+    smoke=SMOKE,
+)

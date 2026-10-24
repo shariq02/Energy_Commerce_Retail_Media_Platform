@@ -65,3 +65,16 @@ rid = model_run_id()
 
 # DBTITLE 1,Evaluate weak_supervision.labels
 evaluate_by_id("weak_supervision.labels", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__05_weak_supervision_energy",
+    "Evaluate Weak Supervision Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["weak_supervision.labels"],
+    smoke=SMOKE,
+)

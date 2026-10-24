@@ -99,3 +99,16 @@ SPEC_ENERGY = {
 
 # DBTITLE 1,Run the event-energy regression
 run_regression(ctx_1, df_events, SPEC_ENERGY)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__10_redispatch",
+    "Model Redispatch",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["redispatch.any_event", "redispatch.event_energy"],
+    smoke=SMOKE,
+)

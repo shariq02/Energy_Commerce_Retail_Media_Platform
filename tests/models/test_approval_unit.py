@@ -366,9 +366,10 @@ def test_the_approval_settings_are_typed_and_must_be_recorded(lib):
 
 def test_the_rule_table_has_every_rule_once_with_its_class(lib):
     ids = {r[0] for r in lib["APPROVAL_RULES"]}
-    assert ids == {f"R{i:02d}" for i in range(1, 13)}
+    assert ids == {f"R{i:02d}" for i in range(1, 15)}
     classes = {r[0]: r[1] for r in lib["APPROVAL_RULES"]}
-    assert classes["R03"] == classes["R05"] == "blocking"
+    assert classes["R03"] == classes["R05"] == classes["R14"] == "blocking"
+    assert classes["R13"] == "conditional"
 
 
 def _table_rows(lib, recommended):
