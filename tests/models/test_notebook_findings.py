@@ -82,9 +82,20 @@ def test_the_findings_key_is_the_notebook_path():
 _GATES = (
     "gate/03_export_findings.py",
     "gate/06_foundation_findings.py",
+    "evaluate/gate/03_export_findings.py",
+    "approve/gate/03_export_findings.py",
     "register/gate/03_export_findings.py",
     "operate/gate/03_export_findings.py",
 )
+
+
+def test_every_gate_that_writes_findings_is_listed():
+    writers = {
+        str(p.relative_to(_MODELS))
+        for p in _MODELS.rglob("*.py")
+        if "gate" in p.parts and "FINDINGS_DIR" in p.read_text(encoding="utf-8")
+    }
+    assert writers == set(_GATES)
 
 
 @pytest.mark.parametrize("gate", _GATES)
