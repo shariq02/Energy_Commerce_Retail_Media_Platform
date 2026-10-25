@@ -15,9 +15,10 @@
 # MAGIC **Purpose:** after the foundation notebooks have run, check the foundation record.
 # MAGIC Hard failures: a foundation task without a recorded row, results at a version
 # MAGIC other than the frozen one, a candidate scored on other rows than the accepted
-# MAGIC baseline, a broken forecast rule (a context that reaches past the time minus the
-# MAGIC gap), a regression candidate without skill metric, a model without revision and
-# MAGIC licence in the register. Failed and skipped candidates are reported, not failed.
+# MAGIC baseline (or than the reference rows of a sampled task), a broken forecast rule
+# MAGIC (a context that reaches past the time minus the gap), a regression candidate
+# MAGIC without skill metric, a model without revision and licence in the register.
+# MAGIC Failed and skipped candidates are reported, not failed.
 
 # COMMAND ----------
 
@@ -163,14 +164,21 @@ check(
 # COMMAND ----------
 
 # DBTITLE 1,Candidates are scored on the rows of the accepted baseline
+# A sampled task has reference rows (accepted models on the sample): its candidates
+# must match those rows. Other tasks must match the accepted baseline.
 _other_rows = []
 for t in TASK_IDS:
+    ok_rows = [x for x in by_task.get(t, []) if x["status"] == "ok"]
+    reference_counts = {x["n_rows"] for x in ok_rows if x["stage"] == "reference"}
+    if len(reference_counts) > 1:
+        _other_rows += [(t, "reference", n) for n in sorted(reference_counts)]
+    allowed = reference_counts or ({baseline_rows[t]} if t in baseline_rows else None)
+    if allowed is None:
+        continue
     seen = {
-        (x["model_name"], x["n_rows"])
-        for x in by_task.get(t, [])
-        if x["status"] == "ok"
+        (x["model_name"], x["n_rows"]) for x in ok_rows if x["stage"] != "reference"
     }
-    _other_rows += [(t, m, n) for m, n in sorted(seen) if n != baseline_rows.get(t, n)]
+    _other_rows += [(t, m, n) for m, n in sorted(seen) if n not in allowed]
 check(
     COMPONENT,
     SOURCE,
