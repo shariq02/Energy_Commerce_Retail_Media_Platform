@@ -1,6 +1,6 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T17:42Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T21:51Z_
 
 <!-- section: energy__energy__01_price_daily -->
 ## Model Price Daily
@@ -857,7 +857,7 @@ _no rows for this run_
 
 ### evaluation_results
 
-1125 row(s), first 30 shown
+1198 row(s), first 30 shown
 
 | task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
 |---|---|---|---|---|---|---|---|---|---|
@@ -902,36 +902,36 @@ _no rows for this run_
 
 | task_id | status | smoke | frozen_delta_version | detail | recorded_at |
 |---|---|---|---|---|---|
-| price_daily.price | started | False | 0 |  | 2026-10-25 14:03:43.443995 |
-| price_daily.price | data_ready | False | 0 |  | 2026-10-25 14:04:57.999690 |
-| price_daily.price | finished | False | 0 | baseline_ok=True | 2026-10-25 14:15:35.358070 |
-| price_quarter_hour.price | started | False | 0 |  | 2026-10-25 14:15:59.463865 |
-| price_quarter_hour.price | data_ready | False | 0 |  | 2026-10-25 14:16:10.148217 |
-| price_quarter_hour.price | finished | False | 0 | baseline_ok=True | 2026-10-25 14:16:30.082622 |
-| price_quarter_hour.negative_price | started | False | 0 |  | 2026-10-25 14:16:43.897696 |
-| price_quarter_hour.negative_price | data_ready | False | 0 |  | 2026-10-25 14:16:54.009785 |
-| price_quarter_hour.negative_price | finished | False | 0 | baseline_ok=True | 2026-10-25 14:17:41.771801 |
-| load.load | started | False | 0 |  | 2026-10-25 14:18:01.303836 |
-| load.load | data_ready | False | 0 |  | 2026-10-25 14:18:10.770752 |
-| load.load | finished | False | 0 | baseline_ok=True | 2026-10-25 14:18:38.563149 |
-| bias.bias | started | False | 0 |  | 2026-10-25 14:19:03.646382 |
-| bias.bias | data_ready | False | 0 |  | 2026-10-25 14:19:17.381269 |
-| bias.bias | finished | False | 0 | baseline_ok=True | 2026-10-25 14:19:33.216209 |
-| zone_generation.generation | started | False | 0 |  | 2026-10-25 14:19:45.635835 |
-| zone_generation.generation | data_ready | False | 0 |  | 2026-10-25 14:19:54.510587 |
-| zone_generation.generation | finished | False | 0 | baseline_ok=True | 2026-10-25 14:50:07.422559 |
-| honda_forecast.increment | started | False | 0 |  | 2026-10-25 14:50:26.929783 |
-| honda_forecast.increment | data_ready | False | 0 |  | 2026-10-25 14:50:36.644330 |
-| honda_forecast.increment | finished | False | 0 | baseline_ok=True | 2026-10-25 14:51:07.533184 |
-| ccpp.output | started | False | 0 |  | 2026-10-25 14:51:19.870754 |
-| ccpp.output | data_ready | False | 0 |  | 2026-10-25 14:51:29.552951 |
-| capacity_additions.additions | data_ready | False | 0 |  | 2026-10-25 14:59:46.836405 |
-| redispatch.event_energy | data_ready | False | 2 |  | 2026-10-25 15:01:44.465852 |
-| redispatch.any_event | data_ready | False | 2 |  | 2026-10-25 15:01:06.314024 |
-| capacity_additions.additions | finished | False | 0 | baseline_ok=True | 2026-10-25 15:00:44.807663 |
-| redispatch.event_energy | finished | False | 2 | baseline_ok=True | 2026-10-25 15:01:58.740436 |
-| redispatch.any_event | finished | False | 2 | baseline_ok=True | 2026-10-25 15:01:19.762647 |
-| capacity_additions.additions | started | False | 0 |  | 2026-10-25 14:59:35.942894 |
+| price_daily.price | started | False | 0 |  | 2026-10-25 20:27:50.286705 |
+| price_daily.price | data_ready | False | 0 |  | 2026-10-25 20:29:02.336107 |
+| price_daily.price | finished | False | 0 | baseline_ok=True | 2026-10-25 20:51:51.918194 |
+| price_quarter_hour.price | started | False | 0 |  | 2026-10-25 20:52:06.567981 |
+| price_quarter_hour.price | data_ready | False | 0 |  | 2026-10-25 20:52:19.861412 |
+| price_quarter_hour.price | finished | False | 0 | baseline_ok=True | 2026-10-25 20:52:56.647862 |
+| price_quarter_hour.negative_price | started | False | 0 |  | 2026-10-25 20:53:12.455368 |
+| price_quarter_hour.negative_price | data_ready | False | 0 |  | 2026-10-25 20:53:23.795096 |
+| price_quarter_hour.negative_price | finished | False | 0 | baseline_ok=True | 2026-10-25 20:53:38.047256 |
+| load.load | started | False | 0 |  | 2026-10-25 20:53:59.956195 |
+| load.load | data_ready | False | 0 |  | 2026-10-25 20:54:11.089262 |
+| load.load | finished | False | 0 | baseline_ok=True | 2026-10-25 20:54:39.042599 |
+| bias.bias | started | False | 0 |  | 2026-10-25 20:54:53.458271 |
+| bias.bias | data_ready | False | 0 |  | 2026-10-25 20:55:04.553664 |
+| bias.bias | finished | False | 0 | baseline_ok=True | 2026-10-25 20:55:19.904450 |
+| zone_generation.generation | started | False | 0 |  | 2026-10-25 20:55:33.875816 |
+| zone_generation.generation | data_ready | False | 0 |  | 2026-10-25 20:55:46.599176 |
+| honda_forecast.increment | data_ready | False | 0 |  | 2026-10-25 21:26:32.782887 |
+| capacity_additions.additions | data_ready | False | 0 |  | 2026-10-25 21:32:39.377531 |
+| redispatch.event_energy | data_ready | False | 2 |  | 2026-10-25 21:34:50.846771 |
+| redispatch.any_event | data_ready | False | 2 |  | 2026-10-25 21:34:17.494559 |
+| ccpp.output | data_ready | False | 0 |  | 2026-10-25 21:27:27.156071 |
+| capacity_additions.additions | finished | False | 0 | baseline_ok=True | 2026-10-25 21:33:54.375688 |
+| zone_generation.generation | finished | False | 0 | baseline_ok=True | 2026-10-25 21:26:00.450094 |
+| honda_forecast.increment | finished | False | 0 | baseline_ok=True | 2026-10-25 21:27:02.692656 |
+| redispatch.event_energy | finished | False | 2 | baseline_ok=True | 2026-10-25 21:35:02.785423 |
+| redispatch.any_event | finished | False | 2 | baseline_ok=True | 2026-10-25 21:34:28.875152 |
+| capacity_additions.additions | started | False | 0 |  | 2026-10-25 21:32:29.167980 |
+| honda_forecast.increment | started | False | 0 |  | 2026-10-25 21:26:17.050364 |
+| ccpp.output | finished | False | 0 | baseline_ok=True | 2026-10-25 21:32:15.548226 |
 
 <!-- section: energy__evaluate__02_survival_energy -->
 ## Evaluate Survival Models Energy
@@ -992,40 +992,40 @@ _no rows for this run_
 
 ### evaluation_results
 
-85 row(s), first 30 shown
+114 row(s), first 30 shown
 
 | task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
 |---|---|---|---|---|---|---|---|---|---|
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | precision | 0.3191 | 0.3192 | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | recall | 0.6383 | 0.6853 | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | flag_rate | 0.0304 | 0.0302 | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc | 0.5568 | 0.6483 | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | threshold | 4.3431 | 4.3431 | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | injected_rows | 575.0 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | primary_change_relative | 0.1412 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | skill_primary | 0.1998 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | skill_primary_ci_low | 0.0806 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | skill_primary_ci_high | 0.3062 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | bootstrap_resamples_valid | 200.0 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | bootstrap_blocks | 13.0 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | bootstrap_rows_used | 26277.0 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__channel__combined_heat_and_power | 0.5997 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__channel__solar_photovoltaic | 0.7072 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__channel__total | 0.4345 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-01 | 0.7921 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-02 | 0.6361 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-03 | 0.1061 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-04 | 0.5997 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-05 | 0.8953 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-06 | 0.638 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-07 | 0.4717 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-08 | 0.8529 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-09 | 0.6851 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-10 | 0.6344 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-11 | 0.0446 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-12 | 0.5788 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pred_finite_share | 1.0 |  | 26277 | ok | on test |
-| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pred_std | 1.6594 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | precision | 0.266 | 0.389 | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | recall | 0.5061 | 0.6555 | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | flag_rate | 0.0312 | 0.0213 | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc | 0.357 | 0.442 | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | threshold | 2.5459 | 2.5459 | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | injected_rows | 575.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | primary_change_relative | 0.1923 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__channel__combined_heat_and_power | 0.3343 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__channel__solar_photovoltaic | 0.495 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__channel__total | 0.4525 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-01 | 0.0657 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-02 | 0.2866 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-03 | 0.4677 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-04 | 0.8175 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-05 | 0.6038 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-06 | 0.0554 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-07 | 0.2376 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-08 | 0.6683 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-09 | 0.7972 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-10 | 0.2976 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-11 | 0.0104 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pr_auc__month__2023-12 | 0.3381 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pred_finite_share | 1.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | seasonal_zscore | baseline | test | pred_std | 1804.3733 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_sklearn | candidate | test | precision | 0.3251 | 0.3112 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_sklearn | candidate | test | recall | 0.6435 | 0.6909 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_sklearn | candidate | test | flag_rate | 0.0298 | 0.0316 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_sklearn | candidate | test | pr_auc | 0.5587 | 0.6517 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_sklearn | candidate | test | threshold | 4.3232 | 4.3232 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_sklearn | candidate | test | injected_rows | 575.0 |  | 26277 | ok | on test |
 
 ### evaluation_flags
 
@@ -1037,9 +1037,9 @@ _no rows for this run_
 
 | task_id | status | smoke | frozen_delta_version | detail | recorded_at |
 |---|---|---|---|---|---|
-| honda_anomaly.anomaly | started | False | 0 |  | 2026-10-25 14:03:44.571033 |
-| honda_anomaly.anomaly | data_ready | False | 0 |  | 2026-10-25 14:04:51.586945 |
-| honda_anomaly.anomaly | finished | False | 0 | baseline_ok=True | 2026-10-25 14:13:38.802216 |
+| honda_anomaly.anomaly | started | False | 0 |  | 2026-10-25 20:45:59.828051 |
+| honda_anomaly.anomaly | data_ready | False | 0 |  | 2026-10-25 20:47:01.513125 |
+| honda_anomaly.anomaly | finished | False | 0 | baseline_ok=True | 2026-10-25 20:58:25.446443 |
 
 <!-- section: energy__evaluate__04_reconstruction_energy -->
 ## Evaluate Reconstruction Models Energy
@@ -1050,36 +1050,36 @@ _no rows for this run_
 
 | task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
 |---|---|---|---|---|---|---|---|---|---|
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__air_temperature | 0.2353 | 0.1965 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__air_temperature | 0.9316 | 0.939 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__air_temperature | 0.2319 | 0.1856 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__dew_point_temperature | 0.1547 | 0.1387 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__dew_point_temperature | 0.934 | 0.9393 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__dew_point_temperature | 0.131 | 0.1088 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__relative_humidity | 1.206 | 1.0925 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__relative_humidity | 0.9167 | 0.9155 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__relative_humidity | 1.1476 | 1.0673 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__pressure_station | 3.5489 | 3.7668 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__pressure_station | 0.0915 | 0.1727 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__pressure_station | 3.7663 | 3.4699 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__pressure_sea_level | 3.1807 | 3.331 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__pressure_sea_level | 0.2395 | 0.2819 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__pressure_sea_level | 3.1603 | 4.047 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__wind_speed | 1.2742 | 1.4336 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__wind_speed | 0.223 | 0.2236 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__wind_speed | 1.2924 | 1.2826 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__wind_direction | 59.1239 | 55.866 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__wind_direction | -0.0778 | 0.0214 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__wind_direction | 58.5011 | 60.252 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__cloud_cover | 27.1722 | 25.0479 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__cloud_cover | 0.1107 | 0.0989 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__cloud_cover | 26.2151 | 26.4422 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__visibility | 10405.5081 | 11001.8053 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__visibility | 0.3967 | 0.3934 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__visibility | 10710.8767 | 12142.984 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__soil_temperature | 1.0587 | 1.0233 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__soil_temperature | 0.701 | 0.6919 | 297986 | ok | on test |
-| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__soil_temperature | 1.0934 | 1.1198 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__air_temperature | 3.4425 | 3.2233 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__air_temperature | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__air_temperature | 3.4671 | 3.1278 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__dew_point_temperature | 2.3433 | 2.2868 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__dew_point_temperature | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__dew_point_temperature | 2.2735 | 1.982 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__relative_humidity | 14.4772 | 12.9302 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__relative_humidity | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__relative_humidity | 13.3032 | 15.4846 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__pressure_station | 3.9065 | 4.553 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__pressure_station | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__pressure_station | 4.1996 | 4.8491 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__pressure_sea_level | 4.1822 | 4.6386 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__pressure_sea_level | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__pressure_sea_level | 3.7954 | 4.3688 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__wind_speed | 1.6399 | 1.8464 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__wind_speed | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__wind_speed | 1.7063 | 1.6333 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__wind_direction | 54.8554 | 57.0873 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__wind_direction | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__wind_direction | 52.1164 | 62.6336 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__cloud_cover | 30.5547 | 27.7958 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__cloud_cover | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__cloud_cover | 26.8194 | 29.2885 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__visibility | 17249.0587 | 18137.3741 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__visibility | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__visibility | 18692.116 | 19104.3117 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__soil_temperature | 3.5414 | 3.3207 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__soil_temperature | 0.0 | 0.0 | 297986 | ok | on test |
+| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__soil_temperature | 3.5833 | 4.1321 | 297986 | ok | on test |
 
 ### evaluation_flags
 
@@ -1091,12 +1091,12 @@ _no rows for this run_
 
 | task_id | status | smoke | frozen_delta_version | detail | recorded_at |
 |---|---|---|---|---|---|
-| weather_imputation.reconstruction | started | False | 2 |  | 2026-10-25 14:03:47.524304 |
-| weather_imputation.reconstruction | data_ready | False | 2 |  | 2026-10-25 14:04:48.592788 |
-| self_supervised_other.reconstruction | data_ready | False | 2 |  | 2026-10-25 14:14:04.470748 |
-| self_supervised_other.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 14:14:16.182431 |
-| weather_imputation.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 14:13:38.812478 |
-| self_supervised_other.reconstruction | started | False | 2 |  | 2026-10-25 14:13:55.684206 |
+| weather_imputation.reconstruction | data_ready | False | 2 |  | 2026-10-25 21:08:42.568831 |
+| self_supervised_other.reconstruction | data_ready | False | 2 |  | 2026-10-25 21:39:38.812023 |
+| self_supervised_other.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 21:39:50.036658 |
+| weather_imputation.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 21:39:12.833765 |
+| self_supervised_other.reconstruction | started | False | 2 |  | 2026-10-25 21:39:28.676633 |
+| weather_imputation.reconstruction | started | False | 2 |  | 2026-10-25 21:07:48.814569 |
 
 <!-- section: energy__evaluate__05_weak_supervision_energy -->
 ## Evaluate Weak Supervision Energy

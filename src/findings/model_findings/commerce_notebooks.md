@@ -1,6 +1,6 @@
 # COMMERCE NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T17:42Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T21:51Z_
 
 <!-- section: commerce__commerce__01_session_purchase_ga4 -->
 ## Model Session Purchase Ga4
@@ -409,18 +409,18 @@ _no rows for this run_
 
 | task_id | status | smoke | frozen_delta_version | detail | recorded_at |
 |---|---|---|---|---|---|
-| lapse_rees46.return | data_ready | False | 0 |  | 2026-10-25 14:22:46.552253 |
-| session_purchase_rees46.purchase | data_ready | False | 1 |  | 2026-10-25 14:19:10.792456 |
-| session_purchase_ga4.purchase | data_ready | False | 0 |  | 2026-10-25 14:13:24.891024 |
-| lapse_ga4.return | data_ready | False | 0 |  | 2026-10-25 14:21:46.329377 |
-| session_purchase_rees46.purchase | finished | False | 1 | baseline_ok=True | 2026-10-25 14:21:21.163531 |
-| session_purchase_ga4.purchase | finished | False | 0 | baseline_ok=True | 2026-10-25 14:18:14.201622 |
-| session_purchase_rees46.purchase | started | False | 1 |  | 2026-10-25 14:18:53.072902 |
-| lapse_rees46.return | finished | False | 0 | baseline_ok=True | 2026-10-25 14:23:27.557422 |
-| session_purchase_ga4.purchase | started | False | 0 |  | 2026-10-25 14:12:26.687906 |
-| lapse_ga4.return | finished | False | 0 | baseline_ok=True | 2026-10-25 14:22:01.712387 |
-| lapse_rees46.return | started | False | 0 |  | 2026-10-25 14:22:29.962138 |
-| lapse_ga4.return | started | False | 0 |  | 2026-10-25 14:21:35.553940 |
+| session_purchase_rees46.purchase | data_ready | False | 1 |  | 2026-10-25 21:44:57.948936 |
+| session_purchase_ga4.purchase | data_ready | False | 0 |  | 2026-10-25 21:43:49.888454 |
+| lapse_rees46.return | data_ready | False | 0 |  | 2026-10-25 21:46:45.798437 |
+| lapse_ga4.return | data_ready | False | 0 |  | 2026-10-25 21:46:07.223471 |
+| session_purchase_rees46.purchase | finished | False | 1 | baseline_ok=True | 2026-10-25 21:45:43.820438 |
+| session_purchase_ga4.purchase | finished | False | 0 | baseline_ok=True | 2026-10-25 21:44:16.646951 |
+| session_purchase_rees46.purchase | started | False | 1 |  | 2026-10-25 21:44:46.755103 |
+| lapse_rees46.return | finished | False | 0 | baseline_ok=True | 2026-10-25 21:47:14.374469 |
+| session_purchase_ga4.purchase | started | False | 0 |  | 2026-10-25 21:42:59.496061 |
+| lapse_ga4.return | finished | False | 0 | baseline_ok=True | 2026-10-25 21:46:18.424429 |
+| lapse_rees46.return | started | False | 0 |  | 2026-10-25 21:46:35.838431 |
+| lapse_ga4.return | started | False | 0 |  | 2026-10-25 21:45:57.336859 |
 
 <!-- section: commerce__evaluate__09_ranking_commerce -->
 ## Evaluate Ranking Models Commerce
