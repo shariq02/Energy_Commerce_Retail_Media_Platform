@@ -145,6 +145,7 @@ def note_read(ctx: EvalContext, frame, time_col=None, group_col=None) -> None:
 
 FOUNDATION_SELECTION_TABLE = "foundation_selection"
 FOUNDATION_RESULTS_TABLE = "foundation_results"
+EVALUATION_LIMIT_SECONDS = FOUNDATION_LIMIT_SECONDS
 
 
 def table_rows(table: str, ctx: EvalContext, *, smoke: bool | None = None) -> list:
@@ -628,44 +629,48 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
     scored: dict = {}
     for m in models:
         name = m["model_name"]
-        if name not in bundles and name not in errors:
-            fetch(m)
-        if name in errors:
-            record_evaluation(ctx, m, "failed", {}, None, errors[name])
-            print(f"FAIL {name}: {errors[name]}")
-            if name == base_name:
-                raise RuntimeError(f"{ctx.task_id}: the baseline could not be loaded")
-            continue
-        try:
-            sc = evaluator.score(bundles[name], "eval", bundles)
-            scored[name] = sc
-            base_sc = scored.get(base_name)
-            metrics = enrich(ctx, evaluator, m, bundles[name], sc, base_sc, bundles)
-            if name != base_name:
-                sc.release()
-            record_evaluation(
-                ctx,
-                m,
-                "ok",
-                metrics,
-                sc.n_rows,
-                f"on {ctx.partition}{evaluator.sample_note}",
-            )
-            shown = {
-                k: round(v, 4)
-                for k, v in metrics.items()
-                if "__" not in k and _finite(v) is not None
-            }
-            print(f"OK   {name}: {shown}")
-        except Exception as exc:
-            detail = f"{type(exc).__name__}: {str(exc)[:600]}"
-            record_evaluation(ctx, m, "failed", {}, None, detail)
-            print(f"FAIL {name}: {detail}")
-            if name == base_name:
-                raise
-        if not evaluator.needs_all_bundles and name not in resident:
-            bundles.pop(name, None)
-        _gc.collect()
+        limit = 0 if name == base_name else EVALUATION_LIMIT_SECONDS
+        with candidate_guard(f"{name} {ctx.task_id}", limit):
+            if name not in bundles and name not in errors:
+                fetch(m)
+            if name in errors:
+                record_evaluation(ctx, m, "failed", {}, None, errors[name])
+                print(f"FAIL {name}: {errors[name]}")
+                if name == base_name:
+                    raise RuntimeError(
+                        f"{ctx.task_id}: the baseline could not be loaded"
+                    )
+                continue
+            try:
+                sc = evaluator.score(bundles[name], "eval", bundles)
+                scored[name] = sc
+                base_sc = scored.get(base_name)
+                metrics = enrich(ctx, evaluator, m, bundles[name], sc, base_sc, bundles)
+                if name != base_name:
+                    sc.release()
+                record_evaluation(
+                    ctx,
+                    m,
+                    "ok",
+                    metrics,
+                    sc.n_rows,
+                    f"on {ctx.partition}{evaluator.sample_note}",
+                )
+                shown = {
+                    k: round(v, 4)
+                    for k, v in metrics.items()
+                    if "__" not in k and _finite(v) is not None
+                }
+                print(f"OK   {name}: {shown}")
+            except Exception as exc:
+                detail = f"{type(exc).__name__}: {str(exc)[:600]}"
+                record_evaluation(ctx, m, "failed", {}, None, detail)
+                print(f"FAIL {name}: {detail}")
+                if name == base_name:
+                    raise
+            if not evaluator.needs_all_bundles and name not in resident:
+                bundles.pop(name, None)
+            _gc.collect()
     ok = base_name in scored
     scored.clear()
     bundles.clear()
