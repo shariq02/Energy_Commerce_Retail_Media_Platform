@@ -13,7 +13,8 @@
 # MAGIC **Date:** October 2026
 # MAGIC
 # MAGIC **Purpose:** after the evaluation notebooks have run, check the record. Hard
-# MAGIC failures: a forwarded model without an evaluation, a result recorded twice, a
+# MAGIC failures: a forwarded accepted model without an evaluation (a foundation model
+# MAGIC that failed or was skipped is reported), a result recorded twice, a
 # MAGIC result at another frozen version or on another partition, and settings recorded
 # MAGIC after the first read. The number of held-out reads per task is reported.
 
@@ -42,6 +43,7 @@ rid = model_run_id()
 
 # DBTITLE 1,Read the evaluation record
 record = {}
+accepted_keys, foundation_keys = set(), set()
 for eco in ("energy", "commerce"):
     results = (
         read_model("evaluation_results", ecosystem=eco)
@@ -59,8 +61,11 @@ for eco in ("energy", "commerce"):
         .collect()
     )
     selection = read_model("candidate_selection", ecosystem=eco).collect()
+    accepted_keys |= {(s["task_id"], s["model_name"]) for s in selection}
     if spark.catalog.tableExists(model_fqn("foundation_selection", eco)):
-        selection += read_model("foundation_selection", ecosystem=eco).collect()
+        extra = read_model("foundation_selection", ecosystem=eco).collect()
+        foundation_keys |= {(s["task_id"], s["model_name"]) for s in extra}
+        selection += extra
     context = (
         read_model(EVAL_CONTEXT_TABLE, ecosystem=eco)
         .filter(~F.col("smoke"))
@@ -79,7 +84,8 @@ for eco in ("energy", "commerce"):
 # COMMAND ----------
 
 # DBTITLE 1,Every forwarded model was evaluated
-_missing = []
+# A foundation model that failed or was skipped (no GPU) is reported, not failed.
+_missing, _foundation_missing = [], []
 for eco, (results, selection, _context, _spec) in record.items():
     done = {(r["task_id"], r["model_name"]) for r in results if r["status"] == "ok"}
     other = {(r["task_id"], r["model_name"]): r for r in results}
@@ -89,7 +95,8 @@ for eco, (results, selection, _context, _spec) in record.items():
             continue
         row = other.get(key)
         why = f"{row['status']}: {row['detail']}" if row else "no result row"
-        _missing.append((*key, why[:300]))
+        only_foundation = key in foundation_keys and key not in accepted_keys
+        (_foundation_missing if only_foundation else _missing).append((*key, why[:300]))
 check(
     COMPONENT,
     SOURCE,
@@ -99,6 +106,16 @@ check(
     metric_value=float(len(_missing)),
     rid=rid,
 )
+record_check(
+    COMPONENT,
+    SOURCE,
+    "foundation_models_evaluated",
+    not _foundation_missing,
+    detail=f"not evaluated: {_foundation_missing}",
+    metric_value=float(len(_foundation_missing)),
+    rid=rid,
+)
+print("foundation models not evaluated:", _foundation_missing or "none")
 
 # COMMAND ----------
 

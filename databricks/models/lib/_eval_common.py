@@ -146,6 +146,17 @@ def note_read(ctx: EvalContext, frame, time_col=None, group_col=None) -> None:
 FOUNDATION_SELECTION_TABLE = "foundation_selection"
 FOUNDATION_RESULTS_TABLE = "foundation_results"
 EVALUATION_LIMIT_SECONDS = FOUNDATION_LIMIT_SECONDS
+GPU_ONLY_FAMILIES = ("foundation_surv",)
+GPU_ONLY_REASON = "no GPU: the process is killed by memory on CPU"
+
+
+def gpu_available() -> bool:
+    """True when torch sees a CUDA device; False without torch."""
+    try:
+        import torch
+    except ImportError:
+        return False
+    return bool(torch.cuda.is_available())
 
 
 def table_rows(table: str, ctx: EvalContext, *, smoke: bool | None = None) -> list:
@@ -631,6 +642,10 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
         name = m["model_name"]
         limit = 0 if name == base_name else EVALUATION_LIMIT_SECONDS
         with candidate_guard(f"{name} {ctx.task_id}", limit):
+            if m["family"] in GPU_ONLY_FAMILIES and not gpu_available():
+                record_evaluation(ctx, m, "skipped", {}, None, GPU_ONLY_REASON)
+                print(f"SKIP {name}: {GPU_ONLY_REASON}")
+                continue
             if name not in bundles and name not in errors:
                 fetch(m)
             if name in errors:
