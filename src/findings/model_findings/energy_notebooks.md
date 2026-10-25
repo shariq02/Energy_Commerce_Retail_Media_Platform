@@ -1,6 +1,6 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-23T20:18Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T17:42Z_
 
 <!-- section: energy__energy__01_price_daily -->
 ## Model Price Daily
@@ -844,6 +844,422 @@ _Merged by the findings gate from the files of the model notebooks; a section is
 | rl_redispatch.policy | data_ready | False | 2 |  | 2026-10-23 19:29:22.384043 |
 | rl_redispatch.policy | finished | False | 2 | baseline_ok=True | 2026-10-23 19:31:24.091624 |
 | rl_redispatch.policy | started | False | 2 |  | 2026-10-23 19:29:14.581264 |
+
+<!-- section: energy__evaluate__00_evaluation_setup -->
+## Evaluation Setup
+
+### evaluation_spec
+
+_no rows for this run_
+
+<!-- section: energy__evaluate__01_tabular_energy -->
+## Evaluate Tabular Models Energy
+
+### evaluation_results
+
+1125 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| price_daily.price | seasonal_naive | baseline | test | mae | 28.6236 | 28.0429 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | rmse | 38.4733 | 42.9023 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mean_error | -0.0951 | -1.5877 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mean_error_relative | -0.001 | -0.0202 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_std_ratio | 0.9938 | 1.0185 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pinball_q50 | 14.3118 | 14.0215 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | primary_change_relative | 0.0207 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__market_area_code__de_lu | 28.6236 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-01 | 51.8913 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-03 | 27.4197 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-04 | 18.0803 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-05 | 19.1765 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-06 | 21.5253 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-07 | 11.6842 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-08 | 15.3887 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-09 | 35.4757 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-10 | 38.3406 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-11 | 29.5123 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-12 | 23.8787 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-01 | 23.6926 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-03 | 38.681 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-04 | 42.6217 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-05 | 29.7623 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-06 | 31.2587 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-07 | 32.7994 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-08 | 27.3252 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_finite_share | 1.0 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_std | 33.7505 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_outside_range_share | 0.0 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | reproduced_validation_value | 28.0429 |  | 613 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+33 row(s), first 30 shown
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| price_daily.price | started | False | 0 |  | 2026-10-25 14:03:43.443995 |
+| price_daily.price | data_ready | False | 0 |  | 2026-10-25 14:04:57.999690 |
+| price_daily.price | finished | False | 0 | baseline_ok=True | 2026-10-25 14:15:35.358070 |
+| price_quarter_hour.price | started | False | 0 |  | 2026-10-25 14:15:59.463865 |
+| price_quarter_hour.price | data_ready | False | 0 |  | 2026-10-25 14:16:10.148217 |
+| price_quarter_hour.price | finished | False | 0 | baseline_ok=True | 2026-10-25 14:16:30.082622 |
+| price_quarter_hour.negative_price | started | False | 0 |  | 2026-10-25 14:16:43.897696 |
+| price_quarter_hour.negative_price | data_ready | False | 0 |  | 2026-10-25 14:16:54.009785 |
+| price_quarter_hour.negative_price | finished | False | 0 | baseline_ok=True | 2026-10-25 14:17:41.771801 |
+| load.load | started | False | 0 |  | 2026-10-25 14:18:01.303836 |
+| load.load | data_ready | False | 0 |  | 2026-10-25 14:18:10.770752 |
+| load.load | finished | False | 0 | baseline_ok=True | 2026-10-25 14:18:38.563149 |
+| bias.bias | started | False | 0 |  | 2026-10-25 14:19:03.646382 |
+| bias.bias | data_ready | False | 0 |  | 2026-10-25 14:19:17.381269 |
+| bias.bias | finished | False | 0 | baseline_ok=True | 2026-10-25 14:19:33.216209 |
+| zone_generation.generation | started | False | 0 |  | 2026-10-25 14:19:45.635835 |
+| zone_generation.generation | data_ready | False | 0 |  | 2026-10-25 14:19:54.510587 |
+| zone_generation.generation | finished | False | 0 | baseline_ok=True | 2026-10-25 14:50:07.422559 |
+| honda_forecast.increment | started | False | 0 |  | 2026-10-25 14:50:26.929783 |
+| honda_forecast.increment | data_ready | False | 0 |  | 2026-10-25 14:50:36.644330 |
+| honda_forecast.increment | finished | False | 0 | baseline_ok=True | 2026-10-25 14:51:07.533184 |
+| ccpp.output | started | False | 0 |  | 2026-10-25 14:51:19.870754 |
+| ccpp.output | data_ready | False | 0 |  | 2026-10-25 14:51:29.552951 |
+| capacity_additions.additions | data_ready | False | 0 |  | 2026-10-25 14:59:46.836405 |
+| redispatch.event_energy | data_ready | False | 2 |  | 2026-10-25 15:01:44.465852 |
+| redispatch.any_event | data_ready | False | 2 |  | 2026-10-25 15:01:06.314024 |
+| capacity_additions.additions | finished | False | 0 | baseline_ok=True | 2026-10-25 15:00:44.807663 |
+| redispatch.event_energy | finished | False | 2 | baseline_ok=True | 2026-10-25 15:01:58.740436 |
+| redispatch.any_event | finished | False | 2 | baseline_ok=True | 2026-10-25 15:01:19.762647 |
+| capacity_additions.additions | started | False | 0 |  | 2026-10-25 14:59:35.942894 |
+
+<!-- section: energy__evaluate__02_survival_energy -->
+## Evaluate Survival Models Energy
+
+### evaluation_results
+
+55 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | concordance | 0.959 | 0.9606 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | brier_1y | 0.0008 | 0.0008 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | calibration_gap_1y | 0.0001 | 0.0007 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | brier_3y | 0.0011 | 0.0018 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | calibration_gap_3y | 0.0001 | 0.0007 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | brier_5y | 0.001 | 0.0018 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | calibration_gap_5y | 0.0006 | 0.0004 | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | primary_change_relative | 0.0017 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | skill_primary | 0.4559 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | skill_primary_ci_low | 0.4496 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | skill_primary_ci_high | 0.4626 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | bootstrap_resamples_valid | 200.0 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | bootstrap_blocks | 5244.0 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | bootstrap_rows_used | 5244.0 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | concordance__is_offshore__False | 0.9587 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | concordance__is_offshore__True |  |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | pred_finite_share | 1.0 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | pred_std | 417510.7784 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | reproduced_validation_value | 0.9606 |  | 5244 | ok | on test |
+| survival.unit_lifetime | boosted_cox_xgboost | candidate | test | reproduction_gap_relative | 0.0 |  | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | concordance | 0.9626 | 0.9641 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | brier_1y | 0.0009 | 0.0008 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | calibration_gap_1y | 0.0002 | 0.0008 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | brier_3y | 0.0012 | 0.0018 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | calibration_gap_3y | 0.0026 | 0.0021 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | brier_5y | 0.001 | 0.0017 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | calibration_gap_5y | 0.0035 | 0.0026 | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | primary_change_relative | 0.0016 |  | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | skill_primary | 0.4594 |  | 5244 | ok | on test |
+| survival.unit_lifetime | survival_forest | candidate | test | skill_primary_ci_low | 0.4516 |  | 5244 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+3 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| survival.unit_lifetime | data_ready | False | 0 |  | 2026-10-25 15:20:37.386588 |
+| survival.unit_lifetime | finished | False | 0 | baseline_ok=True | 2026-10-25 15:27:59.712916 |
+| survival.unit_lifetime | started | False | 0 |  | 2026-10-25 15:19:27.397409 |
+
+<!-- section: energy__evaluate__03_anomaly_energy -->
+## Evaluate Anomaly Models Energy
+
+### evaluation_results
+
+85 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | precision | 0.3191 | 0.3192 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | recall | 0.6383 | 0.6853 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | flag_rate | 0.0304 | 0.0302 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc | 0.5568 | 0.6483 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | threshold | 4.3431 | 4.3431 | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | injected_rows | 575.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | primary_change_relative | 0.1412 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | skill_primary | 0.1998 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | skill_primary_ci_low | 0.0806 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | skill_primary_ci_high | 0.3062 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | bootstrap_resamples_valid | 200.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | bootstrap_blocks | 13.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | bootstrap_rows_used | 26277.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__channel__combined_heat_and_power | 0.5997 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__channel__solar_photovoltaic | 0.7072 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__channel__total | 0.4345 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-01 | 0.7921 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-02 | 0.6361 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-03 | 0.1061 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-04 | 0.5997 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-05 | 0.8953 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-06 | 0.638 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-07 | 0.4717 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-08 | 0.8529 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-09 | 0.6851 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-10 | 0.6344 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-11 | 0.0446 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pr_auc__month__2023-12 | 0.5788 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pred_finite_share | 1.0 |  | 26277 | ok | on test |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | candidate | test | pred_std | 1.6594 |  | 26277 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+3 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| honda_anomaly.anomaly | started | False | 0 |  | 2026-10-25 14:03:44.571033 |
+| honda_anomaly.anomaly | data_ready | False | 0 |  | 2026-10-25 14:04:51.586945 |
+| honda_anomaly.anomaly | finished | False | 0 | baseline_ok=True | 2026-10-25 14:13:38.802216 |
+
+<!-- section: energy__evaluate__04_reconstruction_energy -->
+## Evaluate Reconstruction Models Energy
+
+### evaluation_results
+
+139 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__air_temperature | 0.2353 | 0.1965 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__air_temperature | 0.9316 | 0.939 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__air_temperature | 0.2319 | 0.1856 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__dew_point_temperature | 0.1547 | 0.1387 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__dew_point_temperature | 0.934 | 0.9393 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__dew_point_temperature | 0.131 | 0.1088 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__relative_humidity | 1.206 | 1.0925 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__relative_humidity | 0.9167 | 0.9155 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__relative_humidity | 1.1476 | 1.0673 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__pressure_station | 3.5489 | 3.7668 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__pressure_station | 0.0915 | 0.1727 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__pressure_station | 3.7663 | 3.4699 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__pressure_sea_level | 3.1807 | 3.331 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__pressure_sea_level | 0.2395 | 0.2819 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__pressure_sea_level | 3.1603 | 4.047 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__wind_speed | 1.2742 | 1.4336 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__wind_speed | 0.223 | 0.2236 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__wind_speed | 1.2924 | 1.2826 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__wind_direction | 59.1239 | 55.866 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__wind_direction | -0.0778 | 0.0214 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__wind_direction | 58.5011 | 60.252 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__cloud_cover | 27.1722 | 25.0479 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__cloud_cover | 0.1107 | 0.0989 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__cloud_cover | 26.2151 | 26.4422 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__visibility | 10405.5081 | 11001.8053 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__visibility | 0.3967 | 0.3934 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__visibility | 10710.8767 | 12142.984 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__soil_temperature | 1.0587 | 1.0233 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__soil_temperature | 0.701 | 0.6919 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__soil_temperature | 1.0934 | 1.1198 | 297986 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+6 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| weather_imputation.reconstruction | started | False | 2 |  | 2026-10-25 14:03:47.524304 |
+| weather_imputation.reconstruction | data_ready | False | 2 |  | 2026-10-25 14:04:48.592788 |
+| self_supervised_other.reconstruction | data_ready | False | 2 |  | 2026-10-25 14:14:04.470748 |
+| self_supervised_other.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 14:14:16.182431 |
+| weather_imputation.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 14:13:38.812478 |
+| self_supervised_other.reconstruction | started | False | 2 |  | 2026-10-25 14:13:55.684206 |
+
+<!-- section: energy__evaluate__05_weak_supervision_energy -->
+## Evaluate Weak Supervision Energy
+
+### evaluation_results
+
+28 row(s)
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| weak_supervision.labels | label_model | candidate | test | coverage__series | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | conflict_rate__series | 0.0 | 0.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | agreement_rate__series | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | resolved_rate__series | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | coverage__unit | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | resolved_rate__unit | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | coverage | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | accuracy__series__declared_gap_present | 0.99 | 0.99 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | accuracy__series__reconciliation_status | 0.99 | 0.99 | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | primary_change_relative | 0.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | skill_primary | 0.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | skill_primary_ci_low | 0.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | skill_primary_ci_high | 0.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | bootstrap_resamples_valid | 200.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | bootstrap_blocks | 25650.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | bootstrap_rows_used | 25846.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | reproduced_validation_value | 1.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | label_model | candidate | test | reproduction_gap_relative | 0.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | coverage__series | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | conflict_rate__series | 0.0 | 0.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | agreement_rate__series | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | resolved_rate__series | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | coverage__unit | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | resolved_rate__unit | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | coverage | 1.0 | 1.0 | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | primary_change_relative | 0.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | reproduced_validation_value | 1.0 |  | 25846 | ok | on test |
+| weak_supervision.labels | majority_vote | baseline | test | reproduction_gap_relative | 0.0 |  | 25846 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+3 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| weak_supervision.labels | data_ready | False | 2 |  | 2026-10-25 14:05:05.676330 |
+| weak_supervision.labels | finished | False | 2 | baseline_ok=True | 2026-10-25 14:05:24.735965 |
+| weak_supervision.labels | started | False | 2 |  | 2026-10-25 14:03:43.825218 |
+
+<!-- section: energy__evaluate__06_matching_energy -->
+## Evaluate Matching Models Energy
+
+### evaluation_results
+
+74 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | accuracy | 0.972 | 0.9724 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | precision__exact_normalised |  |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | recall__exact_normalised |  |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | n_true__exact_normalised | 4.0 | 4.0 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | estimable__exact_normalised | 0.0 | 0.0 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | precision__unmatched | 0.9787 | 0.979 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | recall__unmatched | 0.9928 | 0.9929 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | n_true__unmatched | 139.0 | 141.0 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | estimable__unmatched | 1.0 | 1.0 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | estimable_tiers | 1.0 | 1.0 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | balanced_accuracy | 0.6214 | 0.6215 | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | primary_change_relative | 0.0001 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | skill_primary | 0.1214 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | skill_primary_ci_low | -0.0073 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | skill_primary_ci_high | 0.4895 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | bootstrap_resamples_valid | 200.0 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | bootstrap_blocks | 143.0 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | bootstrap_rows_used | 143.0 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | reproduced_validation_value | 0.6215 |  | 143 | ok | on test |
+| redispatch_matching.tier | tabicl_v2_in_context | candidate | test | reproduction_gap_relative | 0.0 |  | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | accuracy | 0.9371 | 0.9586 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | precision__exact_normalised |  |  | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | recall__exact_normalised |  |  | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | n_true__exact_normalised | 4.0 | 4.0 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | estimable__exact_normalised | 0.0 | 0.0 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | precision__unmatched | 0.971 | 0.9787 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | recall__unmatched | 0.964 | 0.9787 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | n_true__unmatched | 139.0 | 141.0 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | estimable__unmatched | 1.0 | 1.0 | 143 | ok | on test |
+| redispatch_matching.tier | char_ngram_logistic | candidate | test | estimable_tiers | 1.0 | 1.0 | 143 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+3 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| redispatch_matching.tier | data_ready | False | 2 |  | 2026-10-25 14:07:21.435348 |
+| redispatch_matching.tier | finished | False | 2 | baseline_ok=True | 2026-10-25 14:10:26.187760 |
+| redispatch_matching.tier | started | False | 2 |  | 2026-10-25 14:06:32.801648 |
+
+<!-- section: energy__evaluate__07_offline_rl_energy -->
+## Evaluate Offline Policies Energy
+
+### evaluation_results
+
+140 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | action_mae | 323.3327 | 293.4382 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reward_policy | 50568.9748 | 23647.0254 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reward_timing | 34143.4852 | 16466.4402 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reward_logged | 30807.4353 | 14830.7681 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | sign_agreement | 0.8349 | 0.8016 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reward_gain | 19761.5395 | 8816.2573 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reward_timing_gain | 3336.0499 | 1635.6721 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | episode_net_abs_policy | 21178.9139 | 17459.1605 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | episode_net_abs_logged | 12596.207 | 11265.9143 | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | primary_change_relative | -1.0735 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | skill_primary | -7444.2772 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | skill_primary_ci_low | -9141.2429 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | skill_primary_ci_high | -6103.4485 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | bootstrap_resamples_valid | 200.0 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | bootstrap_blocks | 247.0 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | bootstrap_rows_used | 23693.0 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | pred_finite_share | 1.0 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | pred_std | 785.4829 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | pred_outside_range_share | 0.0 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reproduced_validation_value | 16466.4402 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | reward_weighted_regression_lightgbm | candidate | test | reproduction_gap_relative | 0.0 |  | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | action_mae | 104.0161 | 102.9072 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | reward_policy | 33502.1725 | 19639.9796 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | reward_timing | 30453.455 | 15115.6474 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | reward_logged | 30807.4353 | 14830.7681 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | sign_agreement | 0.9267 | 0.8856 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | reward_gain | 2694.7372 | 4809.2115 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | reward_timing_gain | -353.9803 | 284.8793 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | episode_net_abs_policy | 11708.9273 | 9478.522 | 23693 | ok | on test |
+| rl_pumped_storage.policy | decision_transformer | candidate | test | episode_net_abs_logged | 12596.207 | 11265.9143 | 23693 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+6 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| rl_pumped_storage.policy | started | False | 2 |  | 2026-10-25 14:11:22.637056 |
+| rl_pumped_storage.policy | data_ready | False | 2 |  | 2026-10-25 14:12:11.754515 |
+| rl_redispatch.policy | data_ready | False | 2 |  | 2026-10-25 14:15:23.806884 |
+| rl_pumped_storage.policy | finished | False | 2 | baseline_ok=True | 2026-10-25 14:14:58.078147 |
+| rl_redispatch.policy | finished | False | 2 | baseline_ok=True | 2026-10-25 14:15:50.145330 |
+| rl_redispatch.policy | started | False | 2 |  | 2026-10-25 14:15:12.272554 |
 
 <!-- section: energy__split__01_weak_supervision_split -->
 ## Weak Supervision Split

@@ -1,6 +1,6 @@
 # COMMERCE NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-23T20:18Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T17:42Z_
 
 <!-- section: commerce__commerce__01_session_purchase_ga4 -->
 ## Model Session Purchase Ga4
@@ -351,6 +351,187 @@ _Merged by the findings gate from the files of the model notebooks; a section is
 | rl_session_sequences.policy | data_ready | False | 9 |  | 2026-10-23 19:28:50.490130 |
 | rl_session_sequences.policy | finished | False | 9 | baseline_ok=True | 2026-10-23 20:16:29.623236 |
 | rl_session_sequences.policy | started | False | 9 |  | 2026-10-23 19:28:00.139475 |
+
+<!-- section: commerce__evaluate__00_evaluation_setup -->
+## Evaluation Setup
+
+### evaluation_spec
+
+_no rows for this run_
+
+<!-- section: commerce__evaluate__08_tabular_commerce -->
+## Evaluate Tabular Models Commerce
+
+### evaluation_results
+
+195 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| session_purchase_ga4.purchase | base_rate | baseline | test | pr_auc | 0.2551 | 0.2376 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | log_loss | 0.5682 | 0.5485 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | calibration_error | 0.0112 | 0.0063 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | base_rate | 0.2551 | 0.2376 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | pred_mean | 0.2439 | 0.2439 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | pred_positive_share | 0.0 | 0.0 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | pr_auc_lift | 1.0 | 1.0 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | primary_change_relative | -0.0736 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | pred_finite_share | 1.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | pred_std | 0.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | reproduced_validation_value | 0.2376 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | base_rate | baseline | test | reproduction_gap_relative | 0.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | pr_auc | 0.4584 | 0.3957 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | log_loss | 0.5054 | 0.5002 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | calibration_error | 0.0189 | 0.0185 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | base_rate | 0.2551 | 0.2376 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | pred_mean | 0.2474 | 0.2517 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | pred_positive_share | 0.0569 | 0.0579 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | pr_auc_lift | 1.7968 | 1.6652 | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | primary_change_relative | -0.1585 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | skill_primary | 0.2033 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | skill_primary_ci_low | 0.1731 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | skill_primary_ci_high | 0.2341 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | bootstrap_resamples_valid | 200.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | bootstrap_blocks | 2180.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | bootstrap_rows_used | 2724.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | pred_finite_share | 1.0 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | pred_std | 0.1363 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | reproduced_validation_value | 0.3957 |  | 2724 | ok | on test |
+| session_purchase_ga4.purchase | gbt_sklearn | candidate | test | reproduction_gap_relative | 0.0 |  | 2724 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+12 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| lapse_rees46.return | data_ready | False | 0 |  | 2026-10-25 14:22:46.552253 |
+| session_purchase_rees46.purchase | data_ready | False | 1 |  | 2026-10-25 14:19:10.792456 |
+| session_purchase_ga4.purchase | data_ready | False | 0 |  | 2026-10-25 14:13:24.891024 |
+| lapse_ga4.return | data_ready | False | 0 |  | 2026-10-25 14:21:46.329377 |
+| session_purchase_rees46.purchase | finished | False | 1 | baseline_ok=True | 2026-10-25 14:21:21.163531 |
+| session_purchase_ga4.purchase | finished | False | 0 | baseline_ok=True | 2026-10-25 14:18:14.201622 |
+| session_purchase_rees46.purchase | started | False | 1 |  | 2026-10-25 14:18:53.072902 |
+| lapse_rees46.return | finished | False | 0 | baseline_ok=True | 2026-10-25 14:23:27.557422 |
+| session_purchase_ga4.purchase | started | False | 0 |  | 2026-10-25 14:12:26.687906 |
+| lapse_ga4.return | finished | False | 0 | baseline_ok=True | 2026-10-25 14:22:01.712387 |
+| lapse_rees46.return | started | False | 0 |  | 2026-10-25 14:22:29.962138 |
+| lapse_ga4.return | started | False | 0 |  | 2026-10-25 14:21:35.553940 |
+
+<!-- section: commerce__evaluate__09_ranking_commerce -->
+## Evaluate Ranking Models Commerce
+
+### evaluation_results
+
+116 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| next_item_ga4.next_item | popularity | baseline | test | recall_at_5 | 0.0879 | 0.0895 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | ndcg_at_5 | 0.0538 | 0.0548 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | recall_at_10 | 0.154 | 0.1553 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | ndcg_at_10 | 0.0749 | 0.0758 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | recall_at_20 | 0.2687 | 0.2679 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | ndcg_at_20 | 0.1036 | 0.1039 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | mrr | 0.0706 | 0.0711 | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | primary_change_relative | 0.0114 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | reproduced_validation_value | 0.0758 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | popularity | baseline | test | reproduction_gap_relative | 0.0 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | recall_at_5 | 0.5909 | 0.5921 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | ndcg_at_5 | 0.3989 | 0.4005 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | recall_at_10 | 0.7997 | 0.8014 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | ndcg_at_10 | 0.4667 | 0.4684 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | recall_at_20 | 0.9003 | 0.9015 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | ndcg_at_20 | 0.4926 | 0.4943 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | mrr | 0.3732 | 0.3749 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | primary_change_relative | 0.0038 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | skill_primary | 0.3918 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | skill_primary_ci_low | 0.3899 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | skill_primary_ci_high | 0.4038 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | bootstrap_resamples_valid | 200.0 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | bootstrap_blocks | 1367.0 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | bootstrap_rows_used | 99095.0 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | reproduced_validation_value | 0.4684 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_transformer | candidate | test | reproduction_gap_relative | 0.0 |  | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_gru | candidate | test | recall_at_5 | 0.5694 | 0.5688 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_gru | candidate | test | ndcg_at_5 | 0.3783 | 0.3783 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_gru | candidate | test | recall_at_10 | 0.783 | 0.7842 | 299434 | ok | on test |
+| next_item_ga4.next_item | sequence_gru | candidate | test | ndcg_at_10 | 0.4476 | 0.4482 | 299434 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+6 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| next_item_ga4.next_item | started | False | 8 |  | 2026-10-25 14:14:40.738804 |
+| next_item_ga4.next_item | data_ready | False | 8 |  | 2026-10-25 14:15:37.188729 |
+| next_item_ga4.next_item | finished | False | 8 | baseline_ok=True | 2026-10-25 14:22:03.030938 |
+| next_item_rees46.next_item | started | False | 14 |  | 2026-10-25 14:22:37.164990 |
+| next_item_rees46.next_item | data_ready | False | 14 |  | 2026-10-25 14:22:58.862281 |
+| next_item_rees46.next_item | finished | False | 14 | baseline_ok=True | 2026-10-25 14:29:43.568420 |
+
+<!-- section: commerce__evaluate__10_offline_rl_commerce -->
+## Evaluate Offline Policies Commerce
+
+### evaluation_results
+
+46 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| rl_session_sequences.policy | most_frequent_event | baseline | test | action_agreement | 0.9433 | 0.9442 | 1053871 | ok | on test |
+| rl_session_sequences.policy | most_frequent_event | baseline | test | reward_when_agree | 0.0 | 0.0 | 1053871 | ok | on test |
+| rl_session_sequences.policy | most_frequent_event | baseline | test | reward_when_disagree | 95.2243 | 89.451 | 1053871 | ok | on test |
+| rl_session_sequences.policy | most_frequent_event | baseline | test | reward_weighted_agreement | 0.0 | 0.0 | 1053871 | ok | on test |
+| rl_session_sequences.policy | most_frequent_event | baseline | test | primary_change_relative | 0.001 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | most_frequent_event | baseline | test | reproduced_validation_value | 0.9442 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | most_frequent_event | baseline | test | reproduction_gap_relative | 0.0 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | action_agreement | 0.9439 | 0.9445 | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | reward_when_agree | 2.0187 | 1.7635 | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | reward_when_disagree | 62.2991 | 59.9657 | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | reward_weighted_agreement | 0.3527 | 0.3337 | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | primary_change_relative | 0.0007 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | skill_primary | 0.0006 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | skill_primary_ci_low | -0.0005 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | skill_primary_ci_high | 0.0036 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | bootstrap_resamples_valid | 200.0 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | bootstrap_blocks | 5332.0 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | bootstrap_rows_used | 104886.0 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | reproduced_validation_value | 0.9445 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | sequence_gru | candidate | test | reproduction_gap_relative | 0.0 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | action_agreement | 0.9437 | 0.9443 | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | reward_when_agree | 1.7698 | 1.5519 | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | reward_when_disagree | 66.2789 | 63.3278 | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | reward_weighted_agreement | 0.3092 | 0.2936 | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | primary_change_relative | 0.0006 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | skill_primary | 0.0004 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | skill_primary_ci_low | 0.0001 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | skill_primary_ci_high | 0.002 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | bootstrap_resamples_valid | 200.0 |  | 1053871 | ok | on test |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | candidate | test | bootstrap_blocks | 5332.0 |  | 1053871 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+3 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| rl_session_sequences.policy | data_ready | False | 9 |  | 2026-10-25 14:16:33.691200 |
+| rl_session_sequences.policy | finished | False | 9 | baseline_ok=True | 2026-10-25 14:29:32.352033 |
+| rl_session_sequences.policy | started | False | 9 |  | 2026-10-25 14:15:43.573034 |
 
 <!-- section: commerce__split__03_evaluation_spec -->
 ## Evaluation Specification
