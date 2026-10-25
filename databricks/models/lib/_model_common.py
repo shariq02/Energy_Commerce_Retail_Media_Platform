@@ -617,11 +617,20 @@ def library_folder() -> str:
     )
 
 
+def front_library_folder() -> str:
+    """Packages that must win over the environment's copy (a version check reads the
+    first copy on the path)."""
+    return f"{library_folder()}_front"
+
+
 def use_model_libraries() -> None:
-    """Append the installed-once library folder; packages already present win."""
-    folder = library_folder()
+    """Append the installed-once library folder; packages already present win. The
+    small front folder goes first."""
+    folder, front = library_folder(), front_library_folder()
     if _os.path.isdir(folder) and folder not in _sys.path:
         _sys.path.append(folder)
+    if _os.path.isdir(front) and front not in _sys.path:
+        _sys.path.insert(0, front)
 
 
 use_model_libraries()

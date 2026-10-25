@@ -78,6 +78,9 @@ TRANSFORMERS_HINT = "pip install transformers -U"
 # transformers 5.4 and later need a newer regex than the environment has; 5.18 and later need hub 1.31
 PIN_CONSTRAINTS = ("transformers>=5.0,<5.4", "huggingface-hub>=1.3,<2.0")
 COPY_THREADS = 32
+# the environment has an older copy of these; the front folder holds the pinned one
+FRONT_SPECS = {"huggingface-hub": "huggingface-hub>=1.3,<2.0"}
+FRONT_FOLDER = front_library_folder()
 MARKER = os.path.join(FOLDER, "libraries_ok.json")
 
 # COMMAND ----------
@@ -88,8 +91,10 @@ spark.sql(
 )
 if REFRESH:
     dbutils.fs.rm(FOLDER, True)
+    dbutils.fs.rm(FRONT_FOLDER, True)
 os.makedirs(FOLDER, exist_ok=True)
-print(f"OK  volume ready: {FOLDER}")
+os.makedirs(FRONT_FOLDER, exist_ok=True)
+print(f"OK  volume ready: {FOLDER} and {FRONT_FOLDER}")
 
 # COMMAND ----------
 
@@ -99,7 +104,10 @@ print(f"OK  volume ready: {FOLDER}")
 def fingerprint() -> dict:
     """What the library folder holds now: any install changes it."""
     return {
-        "dist_info": sorted(n for n in os.listdir(FOLDER) if n.endswith(".dist-info"))
+        "dist_info": sorted(n for n in os.listdir(FOLDER) if n.endswith(".dist-info")),
+        "front_dist_info": sorted(
+            n for n in os.listdir(FRONT_FOLDER) if n.endswith(".dist-info")
+        ),
     }
 
 
@@ -198,7 +206,10 @@ def read_importtime(job: dict) -> None:
 
 
 def start_import(module: str) -> dict:
-    code = f"import sys; sys.path.append({FOLDER!r}); import {module}"
+    code = (
+        f"import sys; sys.path.insert(0, {FRONT_FOLDER!r}); "
+        f"sys.path.append({FOLDER!r}); import {module}"
+    )
     cmd = [sys.executable, "-X", "importtime", "-c", code]
     proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True)
     now = time.monotonic()
@@ -267,6 +278,59 @@ def check_imports(modules: list[str]) -> dict:
 def import_error(module: str) -> str | None:
     return check_imports([module])[module]
 
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Install the packages that must come before the environment's copy
+def front_installed() -> dict:
+    """{package: dist-info name} of what the front folder holds."""
+    found = {}
+    for name in os.listdir(FRONT_FOLDER):
+        if name.endswith(".dist-info"):
+            found[name.rsplit("-", 1)[0].replace("_", "-").lower()] = name
+    return found
+
+
+def install_front(package: str, spec: str) -> None:
+    """Install one package without dependencies into a local folder, then copy it."""
+    tmp = tempfile.mkdtemp()
+    cmd = [sys.executable, "-m", "pip", "install", "-q", "--no-compile"]
+    cmd += ["--disable-pip-version-check", "--no-deps", "--target", tmp, spec]
+    if subprocess.run(cmd, check=False).returncode != 0:
+        raise RuntimeError(f"front install failed: {spec}")
+    shutil.copytree(tmp, FRONT_FOLDER, dirs_exist_ok=True)
+    shutil.rmtree(tmp, ignore_errors=True)
+    print(f"OK  {package}: copied to {FRONT_FOLDER}", flush=True)
+
+
+_held = front_installed()
+for _package, _spec in FRONT_SPECS.items():
+    if _package in _held:
+        print(f"OK   {_package}: {_held[_package]} is in the front folder")
+    else:
+        install_front(_package, _spec)
+
+# COMMAND ----------
+
+# DBTITLE 1,Check that the front copy wins in a fresh interpreter
+_check = (
+    "import sys, importlib.metadata as md; "
+    f"sys.path.insert(0, {FRONT_FOLDER!r}); sys.path.append({FOLDER!r}); "
+    "import huggingface_hub as h; "
+    "print(h.__version__, h.__file__, md.version('huggingface-hub')); "
+    f"assert h.__file__.startswith({FRONT_FOLDER!r}), 'the front copy does not win'; "
+    "import importlib.util as u; "
+    "t = u.find_spec('transformers') and __import__('transformers'); "
+    "print('transformers', getattr(t, '__version__', 'not installed'))"
+)
+_run = subprocess.run(
+    [sys.executable, "-c", _check], capture_output=True, text=True, check=False
+)
+print(_run.stdout.strip())
+if _run.returncode != 0:
+    print("\n".join(_run.stderr.strip().splitlines()[-ERROR_ROWS:]))
+    raise RuntimeError("the front copy of huggingface-hub does not import or win")
 
 # COMMAND ----------
 

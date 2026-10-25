@@ -159,6 +159,28 @@ def gpu_available() -> bool:
     return bool(torch.cuda.is_available())
 
 
+CPU_ROW_LIMITED_PREFIXES = ("tabpfn",)
+CPU_ROW_LIMIT = 1000
+CPU_ROW_REASON = f"TabPFN on CPU: more than {CPU_ROW_LIMIT} rows"
+
+
+def skip_reason(model, evaluator) -> str | None:
+    """Why a forwarded model is not scored on this machine, or None. The reason is
+    known before any frame is sampled, so a model that cannot run does not set the
+    sample of the task."""
+    if model.get("family") in GPU_ONLY_FAMILIES and not gpu_available():
+        return GPU_ONLY_REASON
+    frame = evaluator.frames.get("eval")
+    if (
+        str(model.get("model_name", "")).startswith(CPU_ROW_LIMITED_PREFIXES)
+        and isinstance(frame, pd.DataFrame)
+        and len(frame) > CPU_ROW_LIMIT
+        and not gpu_available()
+    ):
+        return CPU_ROW_REASON
+    return None
+
+
 def table_rows(table: str, ctx: EvalContext, *, smoke: bool | None = None) -> list:
     """The rows of one task from a model table; an empty list while the table does
     not exist yet (the foundation tables exist after their setup)."""
@@ -249,7 +271,10 @@ def sample_eval_frames(evaluator, models, max_rows: int = IN_CONTEXT_SAMPLE_ROWS
     """When a context model is forwarded, score every model of the task on the same
     seeded sample of each frame above `max_rows` rows, because a context model reads
     all context rows for each scored row. The note goes to the recorded detail and
-    to the read notes. Frames that are not tables of rows stay as they are."""
+    to the read notes. Frames that are not tables of rows stay as they are. A model
+    that is skipped on this machine does not count. A sampled validation frame stops
+    the reproduction check: the stored value is from all validation rows."""
+    models = [m for m in models if skip_reason(m, evaluator) is None]
     if not uses_context_model(models):
         return
     notes = []
@@ -262,6 +287,9 @@ def sample_eval_frames(evaluator, models, max_rows: int = IN_CONTEXT_SAMPLE_ROWS
         pos = context_positions(len(frame), max_rows, seed)
         evaluator.frames[part] = frame.iloc[pos].reset_index(drop=True)
         notes.append(f"{label} sample {len(pos)} of {len(frame)} rows")
+        if part == "validation":
+            evaluator.validation_sampled = True
+            notes.append("reproduction not checked: validation sampled")
         read = {"partition": label, "sample_rows": len(pos), "of_rows": len(frame)}
         _FRAME_NOTES.append({"read": read})
     evaluator.sampler = None
@@ -425,6 +453,7 @@ class Evaluator:
         self.frames: dict = {"eval": None, "validation": None}
         self.sampler = None
         self.sample_note = ""
+        self.validation_sampled = False
         self.base_name = None
         self.recorded: dict = {}
 
@@ -568,7 +597,11 @@ def enrich(ctx, evaluator, model, bundle, sc, base_sc, bundles) -> dict:
             metrics["bootstrap_rows_used"] = float(rows)
     metrics.update(evaluator.segments(sc))
     metrics.update(prediction_sanity(sc.pred, sc.target))
-    if evaluator.can_reproduce and evaluator.frame("validation") is not None:
+    if (
+        evaluator.can_reproduce
+        and not getattr(evaluator, "validation_sampled", False)
+        and evaluator.frame("validation") is not None
+    ):
         again = evaluator.score(bundle, "validation", bundles).metrics.get(primary)
         if again is not None and recorded is not None and np.isfinite(recorded):
             gap = abs(again - recorded) / max(abs(recorded), 1e-12)
@@ -642,9 +675,10 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
         name = m["model_name"]
         limit = 0 if name == base_name else EVALUATION_LIMIT_SECONDS
         with candidate_guard(f"{name} {ctx.task_id}", limit):
-            if m["family"] in GPU_ONLY_FAMILIES and not gpu_available():
-                record_evaluation(ctx, m, "skipped", {}, None, GPU_ONLY_REASON)
-                print(f"SKIP {name}: {GPU_ONLY_REASON}")
+            reason = skip_reason(m, evaluator)
+            if reason:
+                record_evaluation(ctx, m, "skipped", {}, None, reason)
+                print(f"SKIP {name}: {reason}")
                 continue
             if name not in bundles and name not in errors:
                 fetch(m)

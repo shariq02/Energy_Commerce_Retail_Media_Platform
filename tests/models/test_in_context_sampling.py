@@ -200,3 +200,90 @@ def test_a_frame_that_is_not_a_table_of_rows_stays_as_it_is(ev):
     evaluator.frames["eval"] = {"sessions": list(range(500))}
     ev["sample_eval_frames"](evaluator, [_CONTEXT], max_rows=100)
     assert evaluator.frames["eval"] == {"sessions": list(range(500))}
+
+
+# --- skipped models and the reproduction of a sampled frame ---------------------------
+
+
+_TABPFN = {
+    "model_name": "tabpfn_25_in_context",
+    "family": "foundation_tab",
+    "params": "{'row_fraction': 1.0, 'mode': 'in_context'}",
+}
+
+
+def test_tabpfn_on_cpu_is_skipped_above_the_row_limit(ev, monkeypatch):
+    monkeypatch.setitem(ev, "gpu_available", lambda: False)
+    assert ev["skip_reason"](_TABPFN, _evaluator(1_500, 10)) == ev["CPU_ROW_REASON"]
+    assert ev["skip_reason"](_TABPFN, _evaluator(1_000, 10)) is None
+    other = {**_TABPFN, "model_name": "tabicl_v2_in_context"}
+    assert ev["skip_reason"](other, _evaluator(1_500, 10)) is None
+
+
+def test_tabpfn_with_a_gpu_is_not_skipped(ev, monkeypatch):
+    monkeypatch.setitem(ev, "gpu_available", lambda: True)
+    assert ev["skip_reason"](_TABPFN, _evaluator(1_500, 10)) is None
+
+
+def test_the_survival_context_model_is_skipped_without_a_gpu(ev, monkeypatch):
+    survival = {"model_name": "x", "family": ev["GPU_ONLY_FAMILIES"][0]}
+    monkeypatch.setitem(ev, "gpu_available", lambda: False)
+    assert ev["skip_reason"](survival, _evaluator(10, 10)) == ev["GPU_ONLY_REASON"]
+    monkeypatch.setitem(ev, "gpu_available", lambda: True)
+    assert ev["skip_reason"](survival, _evaluator(10, 10)) is None
+
+
+def test_a_skipped_context_model_does_not_set_the_sample(ev, monkeypatch):
+    monkeypatch.setitem(ev, "gpu_available", lambda: False)
+    evaluator = _evaluator(1_500, 1_200)
+    ev["sample_eval_frames"](evaluator, [_ACCEPTED, _TABPFN], max_rows=100)
+    assert len(evaluator.frames["eval"]) == 1_500
+    assert len(evaluator.frames["validation"]) == 1_200
+    assert evaluator.sample_note == ""
+
+
+def test_a_sampled_validation_frame_is_marked_and_named_in_the_note(ev):
+    evaluator = _evaluator(250, 120)
+    evaluator.validation_sampled = False
+    ev["sample_eval_frames"](evaluator, [_CONTEXT], max_rows=100)
+    assert evaluator.validation_sampled
+    assert "reproduction not checked: validation sampled" in evaluator.sample_note
+
+
+def _enrich_inputs(sampled):
+    class Evaluator:
+        can_reproduce = True
+        validation_sampled = sampled
+        base_name = "base"
+        scored = False
+
+        def frame(self, part):
+            return pd.DataFrame({"a": [1, 2]})
+
+        def segments(self, sc):
+            return {}
+
+        def score(self, bundle, part, bundles):
+            self.scored = True
+            return SimpleNamespace(metrics={"pr_auc": 0.5})
+
+    ctx = SimpleNamespace(primary_metric="pr_auc", higher_is_better=True)
+    model = {"model_name": "m", "validation": {"pr_auc": 0.5}}
+    sc = SimpleNamespace(
+        metrics={"pr_auc": 0.4}, pred=np.array([0.1, 0.2]), target=np.array([0, 1])
+    )
+    return ctx, Evaluator(), model, sc
+
+
+def test_reproduction_is_not_checked_on_a_sampled_validation_frame(ev):
+    ctx, evaluator, model, sc = _enrich_inputs(sampled=True)
+    out = ev["enrich"](ctx, evaluator, model, object(), sc, None, {})
+    assert "reproduction_gap_relative" not in out
+    assert not evaluator.scored
+
+
+def test_reproduction_is_checked_on_a_whole_validation_frame(ev):
+    ctx, evaluator, model, sc = _enrich_inputs(sampled=False)
+    out = ev["enrich"](ctx, evaluator, model, object(), sc, None, {})
+    assert out["reproduction_gap_relative"] == 0.0
+    assert evaluator.scored

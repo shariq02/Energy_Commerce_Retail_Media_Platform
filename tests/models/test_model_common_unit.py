@@ -382,3 +382,23 @@ def test_findings_keep_user_folders_and_emails_out(c):
     assert "/Users/someone" not in text
     assert "databricks/models/energy/03_load" in text
     assert "/Users/<user>/" in text
+
+
+def test_the_front_library_folder_goes_first_and_the_main_folder_last(c, tmp_path):
+    import sys
+
+    main = tmp_path / "libs"
+    front = tmp_path / "libs_front"
+    main.mkdir()
+    front.mkdir()
+    saved = list(sys.path)
+    original = c["library_folder"]
+    try:
+        c["library_folder"] = lambda: str(main)
+        c["use_model_libraries"]()
+        assert sys.path[0] == str(front)
+        assert sys.path[-1] == str(main)
+        assert c["front_library_folder"]() == str(front)
+    finally:
+        c["library_folder"] = original
+        sys.path[:] = saved
