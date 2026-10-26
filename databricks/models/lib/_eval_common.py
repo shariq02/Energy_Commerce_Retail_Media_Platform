@@ -146,6 +146,8 @@ def note_read(ctx: EvalContext, frame, time_col=None, group_col=None) -> None:
 FOUNDATION_SELECTION_TABLE = "foundation_selection"
 FOUNDATION_RESULTS_TABLE = "foundation_results"
 EVALUATION_LIMIT_SECONDS = FOUNDATION_LIMIT_SECONDS
+# models that need longer on CPU than the default limit
+MODEL_LIMIT_SECONDS = {"moment_zero_shot": 5400}
 GPU_ONLY_FAMILIES = ("foundation_surv",)
 GPU_ONLY_REASON = "no GPU: the process is killed by memory on CPU"
 
@@ -673,7 +675,8 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
     scored: dict = {}
     for m in models:
         name = m["model_name"]
-        limit = 0 if name == base_name else EVALUATION_LIMIT_SECONDS
+        limit = MODEL_LIMIT_SECONDS.get(name, EVALUATION_LIMIT_SECONDS)
+        limit = 0 if name == base_name else limit
         with candidate_guard(f"{name} {ctx.task_id}", limit):
             reason = skip_reason(m, evaluator)
             if reason:

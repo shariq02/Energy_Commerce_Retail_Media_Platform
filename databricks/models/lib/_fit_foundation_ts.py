@@ -476,15 +476,20 @@ class Chronos2Backend:
         return out
 
 
+# series per forward pass; the library default is 1 (one series at a time on a CPU)
+TIMESFM_BATCH = 64
+
+
 class TimesFMBackend:
     name = "timesfm25"
     has_quantiles = True
     max_horizon = 1024
 
-    def __init__(self, weights_dir, adapter_dir=None):
+    def __init__(self, weights_dir, adapter_dir=None, batch=TIMESFM_BATCH):
         self.weights_dir = weights_dir
         self.model = None
-        self.compiled = (0, 0)
+        self.compiled = (0, 0, 0)
+        self.batch = batch
         self.device = None
 
     def load(self, horizon, context):
@@ -495,16 +500,21 @@ class TimesFMBackend:
             self.model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
                 self.weights_dir
             )
-        if horizon > self.compiled[0] or context > self.compiled[1]:
+        wanted = (horizon, context, self.batch)
+        if any(a > b for a, b in zip(wanted, self.compiled, strict=True)) or (
+            self.batch != self.compiled[2]
+        ):
             wide = -(-max(context, 32) // 32) * 32
             self.compiled = (
                 max(horizon, self.compiled[0]),
                 max(wide, self.compiled[1]),
+                self.batch,
             )
             self.model.compile(
                 timesfm.ForecastConfig(
                     max_context=self.compiled[1],
                     max_horizon=self.compiled[0],
+                    per_core_batch_size=self.compiled[2],
                     normalize_inputs=True,
                     use_continuous_quantile_head=True,
                     force_flip_invariance=True,

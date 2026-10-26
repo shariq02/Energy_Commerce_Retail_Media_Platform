@@ -46,6 +46,7 @@ LIBRARY_NAMES = (
     "tabicl",
     "momentfm",
     "toto2",
+    "peft",
     "sksurv",
 )
 

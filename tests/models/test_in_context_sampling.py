@@ -287,3 +287,124 @@ def test_reproduction_is_checked_on_a_whole_validation_frame(ev):
     out = ev["enrich"](ctx, evaluator, model, object(), sc, None, {})
     assert out["reproduction_gap_relative"] == 0.0
     assert evaluator.scored
+
+
+# --- event cap, time limit, TimesFM batch and libraries ------------------------------
+
+
+def _events(per_variable, variables=3):
+    return {
+        j: [(j, i, 5 + i % 3) for i in range(per_variable)] for j in range(variables)
+    }
+
+
+def test_the_event_cap_keeps_the_first_events_of_each_variable(ev):
+    events = _events(1500)
+    capped, kept, drawn, digest = ev["cap_events"](events, 500)
+    assert (kept, drawn) == (1500, 4500)
+    assert all(capped[j] == events[j][:500] for j in events)
+    assert len(digest) == 8
+
+
+def test_a_larger_cap_keeps_the_events_of_a_smaller_cap(ev):
+    events = _events(1500)
+    small, *_ = ev["cap_events"](events, 500)
+    large, *_ = ev["cap_events"](events, 1000)
+    assert all(large[j][:500] == small[j] for j in events)
+
+
+def test_the_event_digest_changes_with_the_events_and_is_stable(ev):
+    events = _events(1500)
+    first = ev["cap_events"](events, 500)[3]
+    assert first == ev["cap_events"](events, 500)[3]
+    assert first != ev["cap_events"](events, 400)[3]
+
+
+def test_without_a_cap_the_events_stay_whole(ev):
+    events = _events(1500)
+    same, kept, drawn, digest = ev["cap_events"](events, None)
+    assert same is events and kept == drawn == 4500 and digest == ""
+
+
+def test_only_a_slow_reconstruction_model_sets_the_event_cap(ev):
+    slow = [{"model_name": "causal_baseline"}, {"model_name": "moment_zero_shot"}]
+    fast = [
+        {"model_name": "causal_baseline"},
+        {"model_name": "energy_tspulse_zero_shot"},
+    ]
+    assert ev["recon_event_cap"](slow) == ev["SLOW_RECON_EVENTS_PER_VARIABLE"] == 500
+    assert ev["recon_event_cap"](fast) is None
+    assert ev["ReconstructionEvaluator"].event_cap is None
+
+
+def test_moment_has_a_longer_time_limit_than_the_other_models(ev):
+    assert ev["MODEL_LIMIT_SECONDS"] == {"moment_zero_shot": 5400}
+    assert ev["EVALUATION_LIMIT_SECONDS"] == 1800
+
+
+def _fake_timesfm(monkeypatch):
+    import dataclasses
+    import sys
+    import types
+
+    calls = []
+
+    @dataclasses.dataclass
+    class ForecastConfig:
+        max_context: int = 0
+        max_horizon: int = 0
+        per_core_batch_size: int = 1
+        normalize_inputs: bool = False
+        use_continuous_quantile_head: bool = False
+        force_flip_invariance: bool = True
+        infer_is_positive: bool = True
+        fix_quantile_crossing: bool = False
+
+    class Model:
+        def compile(self, config):
+            calls.append(config)
+
+    class Klass:
+        @staticmethod
+        def from_pretrained(_path):
+            return Model()
+
+    module = types.ModuleType("timesfm")
+    module.ForecastConfig = ForecastConfig
+    module.TimesFM_2p5_200M_torch = Klass
+    monkeypatch.setitem(sys.modules, "timesfm", module)
+    return calls
+
+
+def test_timesfm_compiles_with_a_batch_of_series(lib, monkeypatch):
+    calls = _fake_timesfm(monkeypatch)
+    monkeypatch.setitem(lib, "_device", lambda: "cpu")
+    backend = lib["TimesFMBackend"]("weights")
+    backend.load(2, 512)
+    backend.load(2, 512)
+    assert len(calls) == 1
+    assert calls[0].per_core_batch_size == lib["TIMESFM_BATCH"] == 64
+    assert (calls[0].max_context, calls[0].max_horizon) == (512, 2)
+
+
+def test_timesfm_batch_can_be_set_for_a_probe(lib, monkeypatch):
+    calls = _fake_timesfm(monkeypatch)
+    monkeypatch.setitem(lib, "_device", lambda: "cpu")
+    lib["TimesFMBackend"]("weights", batch=1).load(2, 512)
+    assert calls[0].per_core_batch_size == 1
+
+
+def test_the_library_installer_lists_peft():
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    path = root / "databricks/models/00_model_libraries.py"
+    tree = ast.parse(path.read_text(encoding="utf-8").replace("# MAGIC", "#"))
+    packages = next(
+        n.value
+        for n in tree.body
+        if isinstance(n, ast.Assign)
+        and any(getattr(t, "id", "") == "PACKAGES" for t in n.targets)
+    )
+    assert "peft" in [k.value for k in packages.keys]

@@ -54,6 +54,7 @@ PACKAGES = {
     "tabicl": "tabicl",
     "momentfm": "momentfm",
     "toto-2": "toto2",
+    "peft": "peft",
 }
 # packages whose pinned dependencies cannot be built here: installed without them
 NO_DEPENDENCIES = {"momentfm"}
