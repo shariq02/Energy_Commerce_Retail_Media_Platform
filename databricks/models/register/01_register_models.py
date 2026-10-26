@@ -43,7 +43,12 @@ import os as _os
 COMPONENT = "models/register/01_register_models"
 SOURCE = "models"
 # {(task_id, model_name, role): {"status": "deprecated" | "retired", "reason": "..."}}
-LIFECYCLE_CHANGES = {}
+LIFECYCLE_CHANGES = {
+    ("session_purchase_rees46.purchase", "gbt_lightgbm", "selected"): {
+        "status": "retired",
+        "reason": "replaced by gbt_sklearn as the selected model after the new fit and approval",
+    },
+}
 
 # COMMAND ----------
 
