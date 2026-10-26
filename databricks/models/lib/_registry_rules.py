@@ -121,8 +121,8 @@ def registry_entries(approvals, fit_versions) -> list:
 
 def annotate_replacements(wanted, existing, is_foundation) -> list:
     """Give a first registration of a foundation model as the selected model the
-    reason that it replaces the model registered before; the earlier entry stays
-    in the registry as the fallback beside the baseline."""
+    reason that it replaces the model registered before; `plan_versions` retires
+    the earlier entry."""
     latest = latest_versions(existing)
     out = []
     for w in wanted:
@@ -168,6 +168,36 @@ def latest_versions(rows) -> dict:
     return best
 
 
+def _replaced_entries(latest, wanted) -> list:
+    """A retired version of each entry whose (task, role) the approval gives to
+    another model. Only the registry roles are replaced."""
+    taken = {
+        (w["task_id"], w["role"]): w for w in wanted if w["role"] in REGISTRY_ROLES
+    }
+    out = []
+    for key, cur in sorted(latest.items()):
+        task_id, model_name, role = key
+        new_owner = taken.get((task_id, role))
+        if (
+            new_owner is None
+            or new_owner["model_name"] == model_name
+            or cur["lifecycle_status"] == "retired"
+        ):
+            continue
+        out.append(
+            {
+                **cur,
+                "version": cur["version"] + 1,
+                "lifecycle_status": "retired",
+                "reason": (
+                    f"replaced by {new_owner['model_name']} "
+                    f"(approval run {new_owner['approval_run_id']})"
+                ),
+            }
+        )
+    return out
+
+
 def plan_versions(existing, wanted, changes, rid, now) -> list:
     """New registry rows only. A first entry is version 1. A changed link creates the
     next version with the changed fields as reason. A lifecycle change from `changes`
@@ -198,6 +228,7 @@ def plan_versions(existing, wanted, changes, rid, now) -> list:
                     "reason": f"link changed: {', '.join(diff)}",
                 }
             )
+    new += _replaced_entries(latest, wanted)
     pending = {**latest, **{_entry_key(r): r for r in new}}
     for key, change in sorted(changes.items()):
         cur = pending.get(key)
@@ -219,6 +250,47 @@ def plan_versions(existing, wanted, changes, rid, now) -> list:
         new.append(row)
         pending[key] = row
     return [{**r, "run_id": rid, "registered_at": now} for r in new]
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Check of the planned registry
+
+
+def planned_registry_problems(existing, planned, approvals) -> list:
+    """What the registry guards would find after the planned rows are written:
+    (task, what, detail) for every approved task without exactly one entry in each
+    registry role, every registered entry that differs from its approval row and
+    every registered entry of a task that is not approved."""
+    latest = latest_versions([*existing, *planned])
+    approved = {
+        a["task_id"]
+        for a in approvals
+        if a["role"] == "selected" and a["decision"] in APPROVED
+    }
+    wanted = {_entry_key(w): w for w in registry_entries(approvals, {})}
+    counts: dict = {}
+    for r in latest.values():
+        if r["lifecycle_status"] != "retired":
+            key = (r["task_id"], r["role"])
+            counts[key] = counts.get(key, 0) + 1
+    out = []
+    for task_id in sorted(approved):
+        for role in REGISTRY_ROLES:
+            n = counts.get((task_id, role), 0)
+            if n != 1:
+                out.append((task_id, f"{n} entries in role {role}", ""))
+    for key, r in sorted(latest.items()):
+        if r["lifecycle_status"] != "registered":
+            continue
+        if r["task_id"] not in approved:
+            out.append((r["task_id"], "registered but not approved", r["model_name"]))
+            continue
+        w = wanted.get(key)
+        diff = [f for f in LINK_FIELDS if w is None or r[f] != w[f]]
+        if diff:
+            out.append((r["task_id"], f"differs from the approval: {diff}", key[1]))
+    return out
 
 
 # COMMAND ----------

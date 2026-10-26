@@ -116,6 +116,77 @@ def test_a_changed_link_creates_the_next_version_and_keeps_the_old_row(lib):
     assert first[0]["mlflow_run_id"] == "run-1"
 
 
+def _replaced(lib, selected="newcand", base="base", base_run="run-0"):
+    """The registry after one approval, and the approval that replaces models."""
+    tid = _task(lib)
+    first = lib["plan_versions"](
+        [], lib["registry_entries"](_approvals(lib), {}), {}, "rid-1", NOW
+    )
+    approvals = [
+        _approval(tid, selected, "selected", run="run-8"),
+        _approval(tid, base, "baseline_fallback", run=base_run),
+    ]
+    wanted = lib["registry_entries"](approvals, {})
+    return (
+        first,
+        approvals,
+        wanted,
+        lib["plan_versions"](first, wanted, {}, "rid-2", LATER),
+    )
+
+
+def test_a_new_selected_model_retires_the_entry_of_the_old_one(lib):
+    first, _decided, _wanted, new = _replaced(lib)
+    retired = [r for r in new if r["lifecycle_status"] == "retired"]
+    assert [(r["model_name"], r["role"], r["version"]) for r in retired] == [
+        ("cand", "selected", 2)
+    ]
+    assert retired[0]["reason"] == "replaced by newcand (approval run model-approval-1)"
+    assert [
+        (r["model_name"], r["version"]) for r in new if r["role"] == "selected"
+    ] == [
+        ("newcand", 1),
+        ("cand", 2),
+    ]
+    assert first[0]["lifecycle_status"] == "registered"
+
+
+def test_a_new_baseline_retires_the_entry_of_the_old_baseline(lib):
+    _first, _decided, _wanted, new = _replaced(lib, selected="cand", base="base2")
+    retired = [r for r in new if r["lifecycle_status"] == "retired"]
+    assert [(r["model_name"], r["role"]) for r in retired] == [
+        ("base", "baseline_fallback")
+    ]
+
+
+def test_the_replacement_is_planned_once(lib):
+    first, _decided, wanted, new = _replaced(lib)
+    assert lib["plan_versions"]([*first, *new], wanted, {}, "rid-3", LATER) == []
+
+
+def test_the_planned_registry_of_a_replacement_has_no_problem(lib):
+    first, approvals, _wanted, new = _replaced(lib)
+    assert lib["planned_registry_problems"](first, new, approvals) == []
+
+
+def test_the_registry_without_the_retire_rows_has_problems(lib):
+    first, approvals, wanted, _new = _replaced(lib)
+    only_new = [
+        r
+        for r in lib["plan_versions"](first, wanted, {}, "rid-2", LATER)
+        if r["lifecycle_status"] != "retired"
+    ]
+    problems = lib["planned_registry_problems"](first, only_new, approvals)
+    assert any("2 entries in role selected" in p[1] for p in problems)
+    assert any(p[1].startswith("differs from the approval") for p in problems)
+
+
+def test_a_registered_entry_of_an_unapproved_task_is_a_problem(lib):
+    first, _decided, _wanted, _new = _replaced(lib)
+    problems = lib["planned_registry_problems"](first, [], [])
+    assert {p[1] for p in problems} == {"registered but not approved"}
+
+
 def test_a_lifecycle_change_needs_a_reason_and_a_registered_entry(lib):
     tid = _task(lib)
     first = lib["plan_versions"](

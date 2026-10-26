@@ -43,12 +43,7 @@ import os as _os
 COMPONENT = "models/register/01_register_models"
 SOURCE = "models"
 # {(task_id, model_name, role): {"status": "deprecated" | "retired", "reason": "..."}}
-LIFECYCLE_CHANGES = {
-    ("session_purchase_rees46.purchase", "gbt_lightgbm", "selected"): {
-        "status": "retired",
-        "reason": "replaced by gbt_sklearn as the selected model after the new fit and approval",
-    },
-}
+LIFECYCLE_CHANGES = {}
 
 # COMMAND ----------
 
@@ -147,6 +142,24 @@ for eco, rows in planned.items():
             r["lifecycle_status"],
             r["reason"],
         )
+
+# COMMAND ----------
+
+# DBTITLE 1,The planned registry passes the guards
+_problems = [
+    (eco, *problem)
+    for eco, (approvals, _fit, existing) in evidence.items()
+    for problem in planned_registry_problems(existing, planned[eco], approvals)
+]
+check(
+    COMPONENT,
+    SOURCE,
+    "planned_registry_is_consistent",
+    not _problems,
+    detail=f"ecosystem, task, problem, model: {_problems}",
+    metric_value=float(len(_problems)),
+    rid=rid,
+)
 
 # COMMAND ----------
 
