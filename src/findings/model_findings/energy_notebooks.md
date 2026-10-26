@@ -1,6 +1,6 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T21:51Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-26T17:10Z_
 
 <!-- section: energy__energy__01_price_daily -->
 ## Model Price Daily
@@ -933,6 +933,141 @@ _no rows for this run_
 | honda_forecast.increment | started | False | 0 |  | 2026-10-25 21:26:17.050364 |
 | ccpp.output | finished | False | 0 | baseline_ok=True | 2026-10-25 21:32:15.548226 |
 
+<!-- section: energy__evaluate__01a_forecast_energy -->
+## Evaluate Forecast Models Energy
+
+### evaluation_results
+
+910 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| price_daily.price | seasonal_naive | baseline | test | mae | 28.6236 | 28.0429 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | rmse | 38.4733 | 42.9023 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mean_error | -0.0951 | -1.5877 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mean_error_relative | -0.001 | -0.0202 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_std_ratio | 0.9938 | 1.0185 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pinball_q50 | 14.3118 | 14.0215 | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | primary_change_relative | 0.0207 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__market_area_code__de_lu | 28.6236 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-01 | 51.8913 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-03 | 27.4197 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-04 | 18.0803 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-05 | 19.1765 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-06 | 21.5253 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-07 | 11.6842 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-08 | 15.3887 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-09 | 35.4757 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-10 | 38.3406 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-11 | 29.5123 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-12 | 23.8787 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-01 | 23.6926 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-03 | 38.681 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-04 | 42.6217 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-05 | 29.7623 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-06 | 31.2587 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-07 | 32.7994 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-08 | 27.3252 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_finite_share | 1.0 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_std | 33.7505 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_outside_range_share | 0.0 |  | 613 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | reproduced_validation_value | 28.0429 |  | 613 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+18 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| price_daily.price | started | False | 0 |  | 2026-10-26 13:23:29.547173 |
+| price_daily.price | data_ready | False | 0 |  | 2026-10-26 13:24:40.367682 |
+| price_daily.price | finished | False | 0 | baseline_ok=True | 2026-10-26 13:49:21.303782 |
+| price_quarter_hour.price | started | False | 0 |  | 2026-10-26 13:49:36.174842 |
+| price_quarter_hour.price | data_ready | False | 0 |  | 2026-10-26 13:49:47.341926 |
+| price_quarter_hour.price | finished | False | 0 | baseline_ok=True | 2026-10-26 13:50:36.735164 |
+| load.load | started | False | 0 |  | 2026-10-26 13:50:57.576307 |
+| load.load | data_ready | False | 0 |  | 2026-10-26 13:51:08.443359 |
+| load.load | finished | False | 0 | baseline_ok=True | 2026-10-26 13:59:11.031011 |
+| bias.bias | started | False | 0 |  | 2026-10-26 13:59:26.934051 |
+| bias.bias | data_ready | False | 0 |  | 2026-10-26 13:59:37.518900 |
+| bias.bias | finished | False | 0 | baseline_ok=True | 2026-10-26 14:06:01.697519 |
+| zone_generation.generation | started | False | 0 |  | 2026-10-26 14:06:15.720485 |
+| zone_generation.generation | data_ready | False | 0 |  | 2026-10-26 14:06:26.755550 |
+| zone_generation.generation | finished | False | 0 | baseline_ok=True | 2026-10-26 14:36:40.877543 |
+| honda_forecast.increment | started | False | 0 |  | 2026-10-26 14:36:59.589699 |
+| honda_forecast.increment | data_ready | False | 0 |  | 2026-10-26 14:37:10.099316 |
+| honda_forecast.increment | finished | False | 0 | baseline_ok=True | 2026-10-26 14:46:08.735504 |
+
+<!-- section: energy__evaluate__01b_tabular_energy -->
+## Evaluate Tabular Models Energy
+
+### evaluation_results
+
+410 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc | 0.9002 | 0.8793 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | log_loss | 0.4951 | 0.5215 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | calibration_error | 0.0233 | 0.0345 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | base_rate | 0.7008 | 0.6749 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pred_mean | 0.6875 | 0.6728 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pred_positive_share | 0.7418 | 0.7355 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc_lift | 1.2845 | 1.3028 | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | primary_change_relative | -0.0238 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | skill_primary | 0.1994 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | skill_primary_ci_low | 0.1547 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | skill_primary_ci_high | 0.2364 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | bootstrap_resamples_valid | 200.0 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | bootstrap_blocks | 12.0 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | bootstrap_rows_used | 1464.0 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__market_area_code__amprion | 0.7845 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__market_area_code__fifty_hertz | 0.6376 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__market_area_code__tennet_de | 0.9803 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__market_area_code__transnetbw | 0.8607 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-01 | 0.9514 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-02 | 0.9486 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-03 | 0.7706 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-04 | 0.9219 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-05 | 0.8617 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-06 | 0.9117 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-07 | 0.8496 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-08 | 0.8402 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-09 | 0.9271 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-10 | 0.8284 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-11 | 0.9297 |  | 1464 | ok | on test |
+| redispatch.any_event | gbt_lightgbm | candidate | test | pr_auc__month__2020-12 | 0.9343 |  | 1464 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+15 row(s)
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| price_quarter_hour.negative_price | data_ready | False | 0 |  | 2026-10-26 16:06:07.702871 |
+| capacity_additions.additions | data_ready | False | 0 |  | 2026-10-26 16:12:39.394429 |
+| redispatch.event_energy | data_ready | False | 2 |  | 2026-10-26 16:15:02.131725 |
+| redispatch.any_event | data_ready | False | 2 |  | 2026-10-26 16:14:25.805603 |
+| ccpp.output | data_ready | False | 0 |  | 2026-10-26 16:07:04.631543 |
+| price_quarter_hour.negative_price | finished | False | 0 | baseline_ok=True | 2026-10-26 16:06:36.173816 |
+| capacity_additions.additions | finished | False | 0 | baseline_ok=True | 2026-10-26 16:14:01.155042 |
+| redispatch.event_energy | finished | False | 2 | baseline_ok=True | 2026-10-26 16:15:14.153314 |
+| price_quarter_hour.negative_price | started | False | 0 |  | 2026-10-26 16:05:14.373116 |
+| redispatch.any_event | finished | False | 2 | baseline_ok=True | 2026-10-26 16:14:37.646355 |
+| capacity_additions.additions | started | False | 0 |  | 2026-10-26 16:12:28.300500 |
+| ccpp.output | finished | False | 0 | baseline_ok=True | 2026-10-26 16:12:13.921744 |
+| redispatch.event_energy | started | False | 2 |  | 2026-10-26 16:14:51.301877 |
+| redispatch.any_event | started | False | 2 |  | 2026-10-26 16:14:15.282399 |
+| ccpp.output | started | False | 0 |  | 2026-10-26 16:06:52.320702 |
+
 <!-- section: energy__evaluate__02_survival_energy -->
 ## Evaluate Survival Models Energy
 
@@ -1046,40 +1181,40 @@ _no rows for this run_
 
 ### evaluation_results
 
-139 row(s), first 30 shown
+176 row(s), first 30 shown
 
 | task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
 |---|---|---|---|---|---|---|---|---|---|
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__air_temperature | 3.4425 | 3.2233 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__air_temperature | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__air_temperature | 3.4671 | 3.1278 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__dew_point_temperature | 2.3433 | 2.2868 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__dew_point_temperature | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__dew_point_temperature | 2.2735 | 1.982 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__relative_humidity | 14.4772 | 12.9302 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__relative_humidity | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__relative_humidity | 13.3032 | 15.4846 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__pressure_station | 3.9065 | 4.553 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__pressure_station | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__pressure_station | 4.1996 | 4.8491 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__pressure_sea_level | 4.1822 | 4.6386 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__pressure_sea_level | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__pressure_sea_level | 3.7954 | 4.3688 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__wind_speed | 1.6399 | 1.8464 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__wind_speed | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__wind_speed | 1.7063 | 1.6333 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__wind_direction | 54.8554 | 57.0873 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__wind_direction | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__wind_direction | 52.1164 | 62.6336 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__cloud_cover | 30.5547 | 27.7958 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__cloud_cover | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__cloud_cover | 26.8194 | 29.2885 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__visibility | 17249.0587 | 18137.3741 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__visibility | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__visibility | 18692.116 | 19104.3117 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae__weather__soil_temperature | 3.5414 | 3.3207 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | skill_mae__weather__soil_temperature | 0.0 | 0.0 | 297986 | ok | on test |
-| weather_imputation.reconstruction | causal_baseline | baseline | test | mae_heldout__weather__soil_temperature | 3.5833 | 4.1321 | 297986 | ok | on test |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__air_temperature | 0.2146 | 0.1965 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__air_temperature | 0.9395 | 0.939 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__air_temperature | 0.1981 | 0.1856 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__dew_point_temperature | 0.1797 | 0.1387 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__dew_point_temperature | 0.9318 | 0.9393 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__dew_point_temperature | 0.1345 | 0.1088 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__relative_humidity | 1.2488 | 1.0925 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__relative_humidity | 0.9171 | 0.9155 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__relative_humidity | 1.2892 | 1.0673 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__pressure_station | 3.6415 | 3.7668 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__pressure_station | 0.0002 | 0.1727 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__pressure_station | 2.9697 | 3.4699 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__pressure_sea_level | 3.1962 | 3.331 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__pressure_sea_level | 0.3127 | 0.2819 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__pressure_sea_level | 3.6749 | 4.047 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__wind_speed | 1.2946 | 1.4336 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__wind_speed | 0.1986 | 0.2236 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__wind_speed | 1.3593 | 1.2826 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__wind_direction | 59.0971 | 55.866 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__wind_direction | -0.0766 | 0.0214 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__wind_direction | 59.6494 | 60.252 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__cloud_cover | 27.1567 | 25.0479 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__cloud_cover | 0.0772 | 0.0989 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__cloud_cover | 26.1764 | 26.4422 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__visibility | 9927.4621 | 11001.8053 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__visibility | 0.4102 | 0.3934 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__visibility | 9466.6831 | 12142.984 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae__weather__soil_temperature | 0.999 | 1.0233 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | skill_mae__weather__soil_temperature | 0.718 | 0.6919 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | candidate | test | mae_heldout__weather__soil_temperature | 0.9349 | 1.1198 | 98749 | ok | on test (event sample 5000 of 15000, 500 per variable, hash c145a886) |
 
 ### evaluation_flags
 
@@ -1091,12 +1226,12 @@ _no rows for this run_
 
 | task_id | status | smoke | frozen_delta_version | detail | recorded_at |
 |---|---|---|---|---|---|
-| weather_imputation.reconstruction | data_ready | False | 2 |  | 2026-10-25 21:08:42.568831 |
-| self_supervised_other.reconstruction | data_ready | False | 2 |  | 2026-10-25 21:39:38.812023 |
-| self_supervised_other.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 21:39:50.036658 |
-| weather_imputation.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-25 21:39:12.833765 |
-| self_supervised_other.reconstruction | started | False | 2 |  | 2026-10-25 21:39:28.676633 |
-| weather_imputation.reconstruction | started | False | 2 |  | 2026-10-25 21:07:48.814569 |
+| weather_imputation.reconstruction | data_ready | False | 2 |  | 2026-10-26 16:04:16.325572 |
+| self_supervised_other.reconstruction | data_ready | False | 2 |  | 2026-10-26 16:50:26.787033 |
+| self_supervised_other.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-26 16:50:39.340026 |
+| weather_imputation.reconstruction | finished | False | 2 | baseline_ok=True | 2026-10-26 16:50:02.130666 |
+| self_supervised_other.reconstruction | started | False | 2 |  | 2026-10-26 16:50:17.381321 |
+| weather_imputation.reconstruction | started | False | 2 |  | 2026-10-26 16:03:12.834055 |
 
 <!-- section: energy__evaluate__05_weak_supervision_energy -->
 ## Evaluate Weak Supervision Energy
