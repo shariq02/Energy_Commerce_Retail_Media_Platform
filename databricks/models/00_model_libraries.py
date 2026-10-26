@@ -103,8 +103,9 @@ print(f"OK  volume ready: {FOLDER} and {FRONT_FOLDER}")
 
 
 def fingerprint() -> dict:
-    """What the library folder holds now: any install changes it."""
+    """What the library folder holds now and which packages are wanted."""
     return {
+        "packages": sorted(PACKAGES),
         "dist_info": sorted(n for n in os.listdir(FOLDER) if n.endswith(".dist-info")),
         "front_dist_info": sorted(
             n for n in os.listdir(FRONT_FOLDER) if n.endswith(".dist-info")
@@ -134,7 +135,11 @@ if _marker is None:
     print(f"no marker at {MARKER}; the import check runs")
 else:
     _old, _new = set(_marker["dist_info"]), set(_now["dist_info"])
-    print(f"marker differs: removed {sorted(_old - _new)}, added {sorted(_new - _old)}")
+    _wanted = set(PACKAGES) - set(_marker.get("packages", []))
+    print(
+        f"marker differs: removed {sorted(_old - _new)}, added {sorted(_new - _old)}, "
+        f"new packages {sorted(_wanted)}"
+    )
 
 # COMMAND ----------
 
