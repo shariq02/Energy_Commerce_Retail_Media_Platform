@@ -20,6 +20,8 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import importlib.util as _importlib_util
+
 import numpy as np
 import pandas as pd
 
@@ -159,6 +161,76 @@ def gpu_available() -> bool:
     except ImportError:
         return False
     return bool(torch.cuda.is_available())
+
+
+# (part of the model name, libraries its stored bundle needs); a name without a match
+# needs only the base environment
+MODEL_LIBRARY_PARTS = (
+    ("lightgbm", ("lightgbm",)),
+    ("xgboost", ("xgboost",)),
+    ("lifelines", ("lifelines",)),
+    ("survival_forest", ("sksurv",)),
+    ("sasrec", ("torch",)),
+    ("decision_transformer", ("torch",)),
+    ("chronos2", ("chronos",)),
+    ("timesfm", ("timesfm",)),
+    ("ttm_", ("tsfm_public",)),
+    ("tspulse", ("tsfm_public",)),
+    ("tabpfn", ("tabpfn",)),
+    ("tabicl", ("tabicl",)),
+    ("moment", ("momentfm",)),
+    ("toto2", ("toto2",)),
+    ("_lora", ("peft",)),
+)
+
+
+def model_libraries(model: dict) -> list[str]:
+    """The libraries the stored bundle of a forwarded model needs, from its name."""
+    name = str(model.get("model_name", ""))
+    found: list[str] = []
+    for part, libs in MODEL_LIBRARY_PARTS:
+        if part in name:
+            found.extend(lib for lib in libs if lib not in found)
+    return found
+
+
+def library_origin(name: str) -> str | None:
+    """The folder of an installed library, or None. Found without an import; a
+    half-copied folder is a namespace package without an origin and counts as absent."""
+    top = LIBRARY_PROBES.get(name, name).split(".")[0]
+    try:
+        spec = _importlib_util.find_spec(top)
+    except (ImportError, ValueError):
+        return None
+    if spec is None or not spec.origin:
+        return None
+    return spec.origin.split("/model_libraries/")[-1].rsplit("/", 1)[0]
+
+
+def check_model_libraries(task_id: str, models: list[dict]) -> None:
+    """Print each library the forwarded models need, with version and folder, and stop
+    before any data is read when one is not installed."""
+    needs: dict[str, list[str]] = {}
+    for m in models:
+        if m.get("family") in GPU_ONLY_FAMILIES and not gpu_available():
+            continue
+        for lib in model_libraries(m):
+            needs.setdefault(lib, []).append(m["model_name"])
+    missing = []
+    for lib, names in needs.items():
+        origin = library_origin(lib)
+        if origin is None:
+            missing.append(lib)
+            print(f"MISS {lib}: for {names}")
+        else:
+            print(
+                f"OK   {lib}: {library_version(lib) or '-'} from {origin} for {names}"
+            )
+    if missing:
+        raise RuntimeError(
+            f"{task_id}: libraries missing for the forwarded models: {missing}; "
+            "run 00_model_libraries"
+        )
 
 
 CPU_ROW_LIMITED_PREFIXES = ("tabpfn",)

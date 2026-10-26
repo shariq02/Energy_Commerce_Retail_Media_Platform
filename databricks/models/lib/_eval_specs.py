@@ -523,6 +523,7 @@ def evaluate_by_id(task_id: str, rid: str, smoke: bool) -> None:
     cfg = EVAL_TASKS[task_id]
     evaluator = globals()[EVALUATOR_NAMES[cfg["kind"]]](ctx, cfg)
     models = forwarded_models(ctx)
+    check_model_libraries(task_id, models)
     if hasattr(evaluator, "event_cap"):
         evaluator.event_cap = recon_event_cap(models)
     try:

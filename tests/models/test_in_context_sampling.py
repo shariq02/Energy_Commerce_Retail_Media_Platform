@@ -408,3 +408,53 @@ def test_the_library_installer_lists_peft():
         and any(getattr(t, "id", "") == "PACKAGES" for t in n.targets)
     )
     assert "peft" in [k.value for k in packages.keys]
+
+
+def test_a_model_name_gives_the_libraries_of_its_bundle(ev):
+    libs = ev["model_libraries"]
+    assert libs({"model_name": "gbt_lightgbm"}) == ["lightgbm"]
+    assert libs({"model_name": "chronos2_lora"}) == ["chronos", "peft"]
+    assert libs({"model_name": "ttm_r2_zero_shot"}) == ["tsfm_public"]
+    assert libs({"model_name": "seasonal_naive"}) == []
+
+
+def test_missing_libraries_stop_the_task_before_any_data_is_read(ev, monkeypatch):
+    monkeypatch.setitem(ev, "gpu_available", lambda: False)
+    monkeypatch.setitem(
+        ev, "library_origin", lambda name: None if name == "lightgbm" else "x"
+    )
+    models = [
+        {"model_name": "gbt_lightgbm", "family": "gbt"},
+        {"model_name": "seasonal_naive", "family": "baseline"},
+    ]
+    with pytest.raises(RuntimeError, match=r"x\.y: libraries missing .*lightgbm"):
+        ev["check_model_libraries"]("x.y", models)
+
+
+def test_a_gpu_only_model_needs_no_library_on_cpu(ev, monkeypatch):
+    monkeypatch.setitem(ev, "gpu_available", lambda: False)
+    monkeypatch.setitem(ev, "library_origin", lambda name: None)
+    models = [{"model_name": "tabicl_discrete_in_context", "family": "foundation_surv"}]
+    ev["check_model_libraries"]("x.y", models)
+
+
+def test_available_libraries_are_printed_with_version_and_origin(
+    ev, monkeypatch, capsys
+):
+    monkeypatch.setitem(ev, "gpu_available", lambda: False)
+    monkeypatch.setitem(ev, "library_version", lambda name: "4.7.0")
+    monkeypatch.setitem(
+        ev, "library_origin", lambda name: "site_packages_aarch64/lightgbm"
+    )
+    ev["check_model_libraries"](
+        "x.y", [{"model_name": "gbt_lightgbm", "family": "gbt"}]
+    )
+    assert (
+        "OK   lightgbm: 4.7.0 from site_packages_aarch64/lightgbm"
+        in capsys.readouterr().out
+    )
+
+
+def test_the_library_origin_is_found_without_an_import(ev):
+    assert ev["library_origin"]("json_not_installed_xyz") is None
+    assert ev["library_origin"]("json") is not None
