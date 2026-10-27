@@ -1,6 +1,5 @@
 corpus: curated
-version: 2
-holdout_cohort: extension
+version: 7
 questions:
 - id: q001
   class: definitional_wording
@@ -969,523 +968,2048 @@ questions:
   kind: model_card
   expected_unit_id: model_card.ccpp.output
   text: Show the model card of the task ccpp.output.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4a0e909ff9b9f4abebcb28bb1ada67c81a8cc9b7ebe2acacb843b89debb1d9ed
   cohort: extension
 - id: q098
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.price_daily.price
   text: Which model card covers the forecast of the daily day-ahead electricity price?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4742183c499d9702d6b2b637c4f94809c6d4e88667f9c6597733c8ad40d205fd
   cohort: extension
 - id: q099
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.price_quarter_hour.price
   text: Which model card covers the quarter-hour electricity price forecast?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 42d635ddcef706e7931e72097b1ed92ef877f1be9d06d2f0dd354b536eec2332
   cohort: extension
 - id: q100
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.price_quarter_hour.negative_price
   text: Which model card covers predicting whether a quarter-hour price will be negative?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: a8366e62b2ad7431840a9fabf47686a41c9a3d7b82d42d7e3090877f5c46ebe3
   cohort: extension
 - id: q101
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.load.load
   text: Which model card covers the forecast of the electricity load?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0d4be4147b7dbd950b9719dd5ce4f16d56ec4a93a94b4c8420e7f246a42bba03
   cohort: extension
 - id: q102
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.bias.bias
   text: Which model card covers the bias of the grid operator forecasts?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0ad1928ab06b0f0a2443e03c39b0aeae735cf8560b9e9b849c5220f7baecdab9
   cohort: extension
 - id: q103
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.zone_generation.generation
   text: Which model card covers the generation of a control zone by energy carrier?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 50d4fc3f4ca476a877e837b855c215d16e82c26ccff60caf0b80c45765e39902
   cohort: extension
 - id: q104
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.honda_forecast.increment
   text: Which model card covers the forecast of the energy increment at the Honda site?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 324dec75e168b5cbf837b860167aa71270d70967a148f30a79e02d79602f80a9
   cohort: extension
 - id: q105
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.honda_anomaly.anomaly
   text: Which model card covers anomaly detection on the Honda site energy data?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2b51c700db3f19af3c2d477e12e6314eed3d8f11cfefe5db54606b1d040ae786
   cohort: extension
 - id: q106
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.capacity_additions.additions
   text: Which model card covers the capacity added per carrier and month?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 74f7f337fd722a3b52a329408fb16f13d8903c8a0049bbfe118a30439d51313f
   cohort: extension
 - id: q107
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.redispatch.any_event
   text: Which model card covers whether any redispatch event happens on a day?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 07be98ed16b8cf36c2158876313785840247d15fd867964d36e882d73c818b47
   cohort: extension
 - id: q108
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.redispatch.event_energy
   text: Which model card covers the energy volume of redispatch events?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fa22aee66a577c96a8c1bc24ddc82c3e8f5ff888e8ceb2a6683935dae031b120
   cohort: extension
 - id: q109
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.survival.unit_lifetime
   text: Which model card covers how long a generation unit stays in operation?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e4811eb58d257480aede1f0e8156791e2746a2e619c81f9a865e9d833a54d9b5
   cohort: extension
 - id: q110
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.weather_imputation.reconstruction
   text: Which model card covers filling missing weather measurements?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 68b8fe07273615344bd0716b754be10d88c8b2b3c7d120e19f0aa869c8cce806
   cohort: extension
 - id: q111
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.weak_supervision.labels
   text: Which model card covers labels made by weak supervision?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4b9f605e1c006fc4fb3f13a11ae8e4e8bad5315e4e7d26709221d51ca8a98d24
   cohort: extension
 - id: q112
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.rl_pumped_storage.policy
   text: Which model card covers the pumped storage dispatch policy?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: a229b4e0b3f8289046a839ddcef1a1a78c041daac93662d644d453981701e832
   cohort: extension
 - id: q113
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.rl_redispatch.policy
   text: Which model card covers the offline policy for redispatch decisions?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e5c7d7d0b1b157361673924fe8e8dbde88a57fc3508d3e97c071681bde54cef3
   cohort: extension
 - id: q114
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.session_purchase_ga4.purchase
   text: Which model card covers predicting a purchase in a GA4 web session?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8b156d7498252fd97573d3a74b84ec658e52fb3a627d06dc349494ba88f09f14
   cohort: extension
 - id: q115
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.session_purchase_rees46.purchase
   text: Which model card covers predicting a purchase in a REES46 shop session?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 43d595677ee27dda514b51ef31b1555c401cc728d0fc7d7d536f8dd8218c406a
   cohort: extension
 - id: q116
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.lapse_ga4.return
   text: Which model card covers whether a GA4 visitor returns?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4e65a6a2e6166e5e2795287194a6ff2020f36140313dd297c0c4c6101f217531
   cohort: extension
 - id: q117
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.lapse_rees46.return
   text: Which model card covers whether a REES46 customer returns?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b460833d898af76bce7e7ce3e4353692d7d8c0ebf347922916487656c0016859
   cohort: extension
 - id: q118
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.next_item_ga4.next_item
   text: Which model card covers the next item a GA4 visitor looks at?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2e6e1a7d44960e1479143aa6f61d5a6e246bdc59bd987244ccc72fe900695f4c
   cohort: extension
 - id: q119
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.next_item_rees46.next_item
   text: Which model card covers the next product in a REES46 session?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8be7e19bdad87e3d68fb2ee666071f2c53195dc8adb3734331214881a94f0a80
   cohort: extension
 - id: q120
   class: definitional_wording
   kind: model_card
   expected_unit_id: model_card.rl_session_sequences.policy
   text: Which model card covers the policy learned from session sequences?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 54d212c78ce73f0a152f00cceb2be3d801d5890defe4f7709372711357a89830
   cohort: extension
 - id: q121
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r01
   text: How is the approved model of a task chosen and what stays as fallback?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: acd72dc0e7fedd562790db4feb55491e5b8227d854b65fb74bee73f1a18a5c9b
   cohort: extension
 - id: q122
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r02
   text: What happens to a model when its skill interval includes zero?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 714b534f11453ccb9b070430345f388fa9146bfe5e870446a02227aaf8febea8
   cohort: extension
 - id: q123
   class: identifier_lookup
   kind: approval_rule
   expected_unit_id: approval_rule.r03
   text: Which approval rule blocks a model whose skill interval is wholly below zero?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e185f7f4acacedac9c93a0839e4b0d6459c9584cb880307c33e8ad78e34b97cf
   cohort: extension
 - id: q124
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r04
   text: What is the limit for the degradation from validation to the evaluated error?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 9930a8c5814e3e4fa00374d1d09d6160a91e9ae26d0d1c8d395e4546f13d7612
   cohort: extension
 - id: q125
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r05
   text: What is the evidence floor of an approval, in rows and in blocks?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 71d784061751b29981525f10b51abfe908b8fbc025f8189538a1b3b7ce2148b5
   cohort: extension
 - id: q126
   class: identifier_lookup
   kind: approval_rule
   expected_unit_id: approval_rule.r06
   text: Which approval rule allows only diagnostic use when no ground truth exists?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fa21dd10b6616d55bc23207a2851a64fac27974b52dd9ce6b9bcb24a4ee10b51
   cohort: extension
 - id: q127
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r07
   text: What happens to a segment that has negative skill?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8ec56f0bdd978398aa62af6a4b259dc5597fdda66aca3ba55a0853145dee56c8
   cohort: extension
 - id: q128
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r08
   text: What interval coverage target and tolerance does the approval check?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 5d1882de74b0c308563532f11195dcd5a949b7144a8e14d9bdf9e462590cff72
   cohort: extension
 - id: q129
   class: identifier_lookup
   kind: approval_rule
   expected_unit_id: approval_rule.r09
   text: Which approval rule restricts a model that has offline evidence only?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: d0b190e1aec39b77f3269d58430f587d4dddbc4854137c6aad50f65babd8bf6b
   cohort: extension
 - id: q130
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r10
   text: Which approval rule is a disclosure that the held-out partition was read more than once?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3bba1119769c456545209c21f2f75992c2f92fbad7cefb6f889ac57b197910f4
   cohort: extension
 - id: q131
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r11
   text: What does the approval say about a segment with positive skill but no uncertainty interval?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: c1ae9ed951c58b1ca49396225515e63b48f9e2b2f027ba505f71bf1cbb6d8fdf
   cohort: extension
 - id: q132
   class: cross_reference
   kind: approval_rule
   expected_unit_id: approval_rule.r12
   text: Which approval rule holds the limits that are specific to survival tasks?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4b118d33b65e9b57880fa21582e20428f09d223bd10d26a376febe4e6dfc7f93
   cohort: extension
 - id: q133
   class: definitional_wording
   kind: approval_rule
   expected_unit_id: approval_rule.r13
-  text: What is noted when the pretraining data of a foundation model is not shown to be free of the evaluated data?
-  approval: {}
+  text: What is noted when the pretraining data of a foundation model is not shown to be free of the evaluated
+    data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: f4b6115862116233a4550d897151f8f7f9674bfe9e8a62a903cd7893e66afc25
   cohort: extension
 - id: q134
   class: identifier_lookup
   kind: approval_rule
   expected_unit_id: approval_rule.r14
-  text: Which approval rule blocks a foundation model without a repository, a revision or a licence on record?
-  approval: {}
+  text: Which approval rule blocks a foundation model without a repository, a revision or a licence on
+    record?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6f03fee43a1b80aa8ed9140769b4be36bf260357635a24331b7ea72d32e2f071
   cohort: extension
 - id: q135
   class: definitional_wording
   kind: metric
   expected_unit_id: metric.ga4_sessions
   text: What does the GA4 sessions metric count?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e744417acb6ae257147c05792abe647045c45761c437290f588441ba66886620
   cohort: extension
 - id: q136
   class: definitional_wording
   kind: metric
   expected_unit_id: metric.rees46_event_demand
   text: Which metric gives the daily volume of shop events by category and event type?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4158f01d60b9c1b7bab1f318645ec68ddf74582134c9d372d30c3d7b5ddab4aa
   cohort: extension
 - id: q137
   class: definitional_wording
   kind: metric
   expected_unit_id: metric.site_energy_consumption
   text: At what grain is the site energy consumption metric defined?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 08e3618ea2faf847a107da450ada24f13bc4f006006bf57400e8e744bcff69c9
   cohort: extension
 - id: q138
   class: definitional_wording
   kind: metric
   expected_unit_id: metric.site_energy_weather_context
   text: Which metric puts site energy next to the weather at the same site?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 210931a9a3155e9c01b5f1ac510793a984f4838bdfc415f04f757f4145befb67
   cohort: extension
 - id: q139
   class: identifier_lookup
   kind: metric
   expected_unit_id: metric.ga4_revenue
   text: Show the definition of the metric ga4_revenue.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b392d27e9d09b6e35114865eb9c70d901e56d1c43b056ea53584ab21cb72dfad
   cohort: extension
 - id: q140
   class: identifier_lookup
   kind: metric
   expected_unit_id: metric.generation_by_carrier
   text: Show the grain of the metric generation_by_carrier.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 593908665df08215f16edcd2dc9101e879b383ae4669156538e157eae9dc50b7
   cohort: extension
 - id: q141
   class: definitional_wording
   kind: governance
   expected_unit_id: governance.data_quality_gates
   text: What states can a data quality check have and where is quality enforced?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b1ef97d45142627e3c15dd21cca0cf2862e1876f003d6f785897625bfbcda181
   cohort: extension
 - id: q142
   class: definitional_wording
   kind: governance
   expected_unit_id: governance.lineage
   text: How can a row be traced back to its source system?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4d713096eef13901d573e54e159701f24a6942a885ebaa949d428a0de659f9de
   cohort: extension
 - id: q143
   class: definitional_wording
   kind: governance
   expected_unit_id: governance.licensing_and_attribution
   text: How does the platform handle the licence and attribution of a source?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0bc026126ea033ba4acae3fc0c386c5b49d5fdd05c41bb952684c1536035a140
   cohort: extension
 - id: q144
   class: definitional_wording
   kind: governance
   expected_unit_id: governance.security_and_data_exchange
   text: What does the AI agent tool layer never expose?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3231215d8ce207e23256cd94c97d186be194d7520f47f15812c5e0f564b88de4
   cohort: extension
 - id: q145
   class: definitional_wording
   kind: pipeline
   expected_unit_id: pipeline.idempotency
   text: Why can a Silver or Gold notebook be run again without a change in the result?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 082747e9f81535d1c30c6360e9e48fbdd3b85ba0c8f18f88ee40b5d211ed3f36
   cohort: extension
 - id: q146
   class: definitional_wording
   kind: pipeline
   expected_unit_id: pipeline.batch_ingestion
   text: Which sources need a manual download?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 32ce48782b685301d2d06d655f458d07af343a2f69369f2e3755d967ec16e235
   cohort: extension
 - id: q147
   class: definitional_wording
   kind: pipeline
   expected_unit_id: pipeline.processing_layers
   text: Which layers form the processing chain in Databricks?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 09306d0f5fd84d4b892bc506abc71c1a7632268ac5c45aa73a91ac4d7b8c28f9
   cohort: extension
 - id: q148
   class: glossary_term
   kind: glossary
   expected_unit_id: glossary.grid_and_market_terms
   text: Which names are the four German control areas?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 9454abb0c48d5963860c7a230590d4ed5d09b6f6d149c35304b644dc2ff3d0de
   cohort: extension
 - id: q149
   class: glossary_term
   kind: glossary
   expected_unit_id: glossary.units_and_conventions
   text: In which unit is the electricity price stored?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 239aca2bb0d852c311fb540c07f79b278c48c15db70b4bc41ca044c3a79ddd27
   cohort: extension
 - id: q150
   class: glossary_term
   kind: glossary
   expected_unit_id: glossary.weather_terms
   text: What is the quality level column in DWD weather data?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 1022233eb9338645b343973bc7848a3efe17a276010d3dd797e06a3beaeac03e
   cohort: extension
 - id: q151
   class: identifier_lookup
   kind: contract
   expected_unit_id: contract.smard
   text: Show the data contract of the SMARD source.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 33e23b1dbc9a3d2d505e6756c6823600635ae103a9a5d86ae6330e1775da5237
   cohort: extension
 - id: q152
   class: identifier_lookup
   kind: contract
   expected_unit_id: contract.redispatch
   text: Show the data contract of the redispatch source.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 720668297f75b4000a2b95195b3e57fc7a16ac8d58590e33bfaced86d4dce271
   cohort: extension
 - id: q153
   class: identifier_lookup
   kind: contract
   expected_unit_id: contract.rees46
   text: Show the data contract of the REES46 source.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3d409b4752d7b2adf45efa4ae424a47e89189ed8720cf1092d3e499eced1d2b3
   cohort: extension
 - id: q154
   class: cross_reference
   kind: rule
   expected_unit_id: rule.dwd.coordinate_quarantine
   text: Which quality rule moves DWD stations with bad coordinates to quarantine?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4c3995117b205edcbc31aa2a057fbc4c6373dce1cef4bfd17e9f80fb35fc6c62
   cohort: extension
 - id: q155
   class: cross_reference
   kind: rule
   expected_unit_id: rule.dwd.conflicting_dup_keys
   text: Which quality rule handles DWD rows with the same key and different values?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 366373db2338138cf93c1e74ee544bd80e83639a2db424f2e52d6d030598cb2a
   cohort: extension
 - id: q156
   class: cross_reference
   kind: rule
   expected_unit_id: rule.dwd.cloud_type_qn_defect
   text: Which quality rule covers the quality level of the DWD cloud type?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: cdc25af85ff2662147bf149f3290dbad7c350b91fbe41d892c4510a6c1a0971b
   cohort: extension
 - id: q157
   class: negative
   kind: null
   expected_unit_id: null
   text: What is the current price of a Bitcoin?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: f23524e34d66bdf798cf8df6ffd842c12a35312e81af477d537ec1d5590bff29
   cohort: extension
 - id: q158
   class: negative
   kind: null
   expected_unit_id: null
   text: Who won the football world cup in 2022?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: f0d086357dc296d8fe9b213f96be5638923ba22ac83ef4fd1ad51c4292f35432
   cohort: extension
 - id: q159
   class: negative
   kind: null
   expected_unit_id: null
   text: How do I cook a risotto?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 5982604820d7cbc77a0692c014989f6a839d8c3d7a4e9c2c853f83dcc615138a
   cohort: extension
 - id: q160
   class: negative
   kind: null
   expected_unit_id: null
   text: Which model card covers the forecast of rainfall in Brazil?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 435b3f3b8471bf615a08d99ae4f15853055a9a697447bf488f637b124d496db1
   cohort: extension
 - id: q161
   class: negative
   kind: null
   expected_unit_id: null
   text: What is the interest rate of the central bank in the United States?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 01280e9f4701c5bf1234ef592e501a16a9abc41e9d133e9431712f35bd3e261f
   cohort: extension
 - id: q162
   class: negative
   kind: null
   expected_unit_id: null
   text: Which approval rule covers the speed limit on German motorways?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0fa96a94b5117bbf2ae148935a5306f1e632e2228ac8ab0b4d4943ce76d37721
   cohort: extension
 - id: q163
   class: negative
   kind: null
   expected_unit_id: null
   text: What is the population of Tokyo?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 7dd1179b36e468890bde5752d6aebf71dd5233c69f79ea557c1d8f699f76d6af
   cohort: extension
 - id: q164
   class: negative
   kind: null
   expected_unit_id: null
   text: Which metric measures the number of flights from Frankfurt airport?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6cd1f63af39bea1a160d9d45ec15cb67857c1d7f710bd54220fd003e7925ff30
   cohort: extension
 - id: q165
   class: negative
   kind: null
   expected_unit_id: null
   text: Which model card covers predicting stock prices?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 12bffeb61808055d9ed2da05d67ee446bcc301884044aca46c34b66a3895f98d
   cohort: extension
 - id: q166
   class: negative
   kind: null
   expected_unit_id: null
   text: How does a nuclear power plant in France cool its reactor?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: c0d1e015e59ff878183a256828d991cf84c803953ab18b797757f3ea761af991
   cohort: extension
 - id: q167
   class: negative
   kind: null
   expected_unit_id: null
   text: What is the capital of Australia?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 5341bb88eff2b25fc320d5803175e6f79b38de7dcc8b91c75e6bc688b0d9135f
   cohort: extension
 - id: q168
   class: negative
   kind: null
   expected_unit_id: null
   text: Which governance rule covers medical patient records?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 831fdc898d5da6598e383916bb0ad611cd80aaaac120fadd092bd917f8e535ad
   cohort: extension
 - id: q169
   class: negative
   kind: null
   expected_unit_id: null
   text: Show the data contract of the Twitter source.
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b0da69978e068ceacb9cca02694723d70eb28a42a0f07187d0fd66488618ab54
   cohort: extension
 - id: q170
   class: negative
   kind: null
   expected_unit_id: null
   text: What is the best programming language for web design?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0b8d1a709bdc0858c0b3e83558c977197e583fc4c68b5e3cf2c1a3d0c69da45f
   cohort: extension
 - id: q171
   class: negative
   kind: null
   expected_unit_id: null
   text: Which model predicts the winner of the Eurovision song contest?
-  approval: {}
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4f6fd5d851674910c78ab6290d8d9f92853478d75b21eb8f6de078f9ab9b32bb
   cohort: extension
+- id: q176
+  class: identifier_lookup
+  kind: rule
+  expected_unit_id: rule.dwd.measurement_key_not_unique
+  text: Is the pair STATIONS_ID and MESS_DATUM unique in the weather measurement tables?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: d203a39c96ad55b654472fe39ecbe545029b6dc5881ae26f5ec663dea2a68244
+  cohort: holdout2
+- id: q177
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.dwd.missing_periods_format
+  text: In which format are the start and end dates of the missing value periods written?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 187bff795c90f3eea63570a2b0ad7ad65619cff8de652cbb08f0941610429842
+  cohort: holdout2
+- id: q178
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which metric reports the number of electric vehicle charging sessions per station?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8fbead19206c09f53c5e2c0196fb2eadcbbe1139e4dab9a8d7eee62979707738
+  cohort: holdout2
+- id: q184
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.catalog_vintage_pinned
+  text: Why must the release of the market master data catalogue be pinned before codes are decoded?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 45edcba1d2e2d64114d6f2e629f922ba96f4c9224e7434980ef534927538b670
+  cohort: holdout2
+- id: q185
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.change_logs_append_only
+  text: How must the logs of deleted and deactivated units be modelled in Silver?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 278c8145b970b1b9f6d51f7074d8c1ded0e67183b40b7a887c04cd586c9b85a9
+  cohort: holdout2
+- id: q186
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model card covers the forecast of crop yields?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: ada4d4590d55f4c1b37fb09a055781f1d5b92d68359f5ceaeb0b0519f158248c
+  cohort: holdout2
+- id: q193
+  class: cross_reference
+  kind: rule
+  expected_unit_id: rule.power_plant_list.mastr_link_is_subset
+  text: May the power plant list be joined to the unit register by the register number as an identity
+    join?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 187073860a1133529c7094d0f544d5d740de606c5b0e09fafe1987dd49fdd522
+  cohort: holdout2
+- id: q194
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the data contract of the hospital bed occupancy source?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 273703aaf36959aa4984ae7ecfa308a435e709c4d33d3aee0f7a11cebe978db5
+  cohort: holdout2
+- id: q195
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.rees46.negative_price_carts
+  text: How many cart and view rows of the shop events carry a price of zero or less?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b2b222c6e2a9b1852341219b4c96d6cce5c457069f198866276ac85b91dfd160
+  cohort: holdout2
+- id: q200
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.survival.unit_lifetime
+  text: Which model card gives the probability that a generation unit is still in operation after one,
+    three and five years?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e41a53eceeff707035a6e37d39c006ccb373ff90b987e141b6396c8f33812f14
+  cohort: holdout2
+- id: q204
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which approval rule applies to models that decide credit limits?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 085ce3b799232e829f5cabc8ae9359d77ebe81129f4af23779538a0396546da0
+  cohort: holdout2
+- id: q205
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.rl_pumped_storage.policy
+  text: Which model card is restricted to offline use and proposes the net energy action of a pumped storage
+    plant?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2be7851e21972db3d434b2613fa2396782c9ab9b9e362b8f35694f3c80d81206
+  cohort: holdout2
+- id: q208
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the boiling point of ethanol?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e7ef88f4f22f48982d76b2094a8e721d5d412f652db539fd2b19decbed212923
+  cohort: holdout2
+- id: q209
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r08
+  text: Which approval rule checks how often the 80 percent prediction interval covers the outcome?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0075162533c5ab2ae45d7ba540af0d76e00106a1365bbdecd89987ede587323e
+  cohort: holdout2
+- id: q210
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r04
+  text: By how much may the error rise from validation to the evaluated data before a model becomes conditional?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 121dd5cfafa50b97e0976902d56c3fcc997338b8a7de123d5d150623fe8adc2f
+  cohort: holdout2
+- id: q215
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I install a printer driver on Windows?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 87ede96c12055f5f72c1f5b7bb2aea6cfc5dd0b4ce9cea4993caef728419c34c
+  cohort: holdout2
+- id: q216
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.auditability
+  text: Which fields does a record of the AI tool call log hold?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: dc8e757ea6ca736b0e4ea434d74dce5107a2f837a06637287b0ca93b0a5f8275
+  cohort: holdout2
+- id: q217
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Who painted the ceiling of the Sistine Chapel?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: dc90cb3772b7185bc9ce5bbd70c5fd0c7295744110177b9d393485f5138044b3
+  cohort: holdout2
+- id: q219
+  class: definitional_wording
+  kind: pipeline
+  expected_unit_id: pipeline.bronze_architecture
+  text: How are the Bronze tables named?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 1c3762e4f738ffd7ea04d1f3504d972b5b09ec980b6c3b182c418faa54b5ca2d
+  cohort: holdout2
+- id: q220
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which team won the last Tour de France?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 82240dffb4bf76a79f86c473cd3fc72a04b4d2a0aa8446e2bd6dccb2f80c3c85
+  cohort: holdout2
+- id: q221
+  class: identifier_lookup
+  kind: rule
+  expected_unit_id: rule.dwd.metadata_trailer_and_header_rows
+  text: Which DWD reference tables contain trailer rows from the parser, and which one has a Legende row?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 314ea2880c6d42b15a0d83d8829ce22278c7186accb45743b00b17b16b97b5d4
+  cohort: holdout3
+- id: q223
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which metric reports the number of bicycle rentals per city?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3673a416d1deb9db9a77833a2ddf5e01485d7d4107bd3b6f9b08a20d8db0b7d8
+  cohort: holdout3
+- id: q225
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.honda_iot.p_w_1to1
+  text: On which keys do the power table and the energy table of one Honda metric join one to one?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: dba46e0f87a86fc34f5c36704cc60f0748f8653c42f42942fe0044ffabc47461
+  cohort: holdout3
+- id: q226
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.bundesland_codes_1400_1416
+  text: How should the federal state codes 1400 to 1416 in the unit tables be treated?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 071ed75d44e48a3a624510757167656be66c61cbecadcf50be70e7cb12b3068f
+  cohort: holdout3
+- id: q227
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model card covers the prediction of hospital readmissions?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: eb70bca28b6851b55d8bc4050ff440743efafa04dd265faac4c19f7a2591104d
+  cohort: holdout3
+- id: q232
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.milestone_vs_registration_ordering
+  text: May the commissioning date of a registered unit be earlier than its registration date?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 711fb3985ea20bc4893221deed3ace428b068e02020b40da163588ed41b34cb4
+  cohort: holdout3
+- id: q235
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which approval rule applies to models that price insurance policies?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6943323f83cd3644142fe57b2bf54c34c6131cb0d6377a622e044e83543338fc
+  cohort: holdout3
+- id: q237
+  class: cross_reference
+  kind: rule
+  expected_unit_id: rule.mastr.unit_to_support_cardinality
+  text: How many support records can one unit have in the EEG, KWK, approval and upgrade tables, and how
+    must they be joined?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b26b16c964a3acb23068b0cc6b02b44ff86a471df854026dbbce20618156d3f9
+  cohort: holdout3
+- id: q238
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.power_plant_list.commissioning_before_decommissioning
+  text: What is checked about the year of commissioning and the year of decommissioning in the power plant
+    list?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 9517897830d9ff0a6f5f3f15a03361bbbc1945476f441f566059f9998caeab1d
+  cohort: holdout3
+- id: q239
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the data contract of the railway timetable source?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 9becf2566591674d521291f93011be71fe76f0ad09e6df8b11d6b027a10a6d72
+  cohort: holdout3
+- id: q240
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.time_columns_text
+  text: What type are the begin and end time of day columns of the redispatch data, and how are they converted?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 7e4f05438dca3a96d59053e71c5118dfdcadf58474e6b979e0d9373c90e789dd
+  cohort: holdout3
+- id: q243
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which governance rule covers the retention of customer chat transcripts?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8d6240d6ebaa64e31ef4e360e7c75601fbc809e9b6449de52d2b37f074f68bd3
+  cohort: holdout3
+- id: q244
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.requesting_tso_combinations
+  text: How are requesting grid operator values that are joined with an ampersand handled?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: aa83a1a34cfbb7c2cf15b21ddeffbdcc1cfd18ef48686c2414458e35f0452148
+  cohort: holdout3
+- id: q246
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.rees46.product_attribute_drift
+  text: How many products of the shop events have more than one category or more than one brand?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3a05ecd8218d2d2c17fe4bc392891f4c5440a691a0757083aa72053aa2e1fd12
+  cohort: holdout3
+- id: q247
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which pipeline step loads the airline booking data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6845122ab067b477b73255ae041cc13e2d2f93c0e07b7b4f5c208293f51abe52
+  cohort: holdout3
+- id: q253
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.smard.residual_load_may_be_negative
+  text: Can the residual load of the market data be negative?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fc6de9fa3a510bdaa8351c4bf0cd376b0077445722497db3345d5f032d45f254
+  cohort: holdout3
+- id: q254
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which planet in the solar system has the most moons?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: d56773643a2efbbfdc5cc9568ef903da0fe9ab08f1f331602403dde4497a1b9c
+  cohort: holdout3
+- id: q257
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.lapse_ga4.return
+  text: Which model card gives the probability that a web analytics user comes back?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2009e867be38cb09e58eedba3843e2a27a8a736b8155c8bba52b8990b75e7f59
+  cohort: holdout3
+- id: q258
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.redispatch.event_energy
+  text: Which model card estimates the logarithm of the energy of a redispatch event in MWh?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: ac5467a4ee6e358b61fd2baa09828356e03116012cf7566058ddbac8b076f841
+  cohort: holdout3
+- id: q259
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I convert a Word document to a PDF file?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4928042c8320a61d364b869a5a8328cae084ef8597613e4056888c4297804d33
+  cohort: holdout3
+- id: q260
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r10
+  text: Which approval rule makes a model card state the minimum number of runs that read the held-out
+    data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 74072cc6026cf0d23730b72ca1994a2614e00b74cfbb756330fd5d55df9371b9
+  cohort: holdout3
+- id: q261
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the tallest mountain in South America?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 288a21602da242691302994a3cc622a5d6929ea773fa705a58e313f6c6d1782f
+  cohort: holdout3
+- id: q262
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r12
+  text: Which approval rule limits survival models by their calibration gap and by revalidation?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 40329224c81b2048cb84df90034665358389c285f9de1c673ea8e29633b15109
+  cohort: holdout3
+- id: q268
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.cross_ecosystem_integration
+  text: Is an identity join between an energy source and a commerce source allowed?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 5ce1560cdaf981630e52fc1aff66d9d8a31665c98d39a4337b99a1b3a8035566
+  cohort: holdout3
+- id: q269
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which vitamin is found in citrus fruit?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3c77409d95c77a476dd41106bcca769ebceb3b105de56160e5e3ea6c4349164b
+  cohort: holdout3
+- id: q270
+  class: definitional_wording
+  kind: pipeline
+  expected_unit_id: pipeline.execution_model
+  text: Does the project use a workflow orchestrator to run the notebooks?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 9cb4ebe995337983fedaf166fe233d104a2c84a8815f298c2437604f7fd783ff
+  cohort: holdout3
+- id: q275
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I bake sourdough bread at home?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 4118509457c920e2ddbf6c84ef4c96a9b87055620e8a12e961c973d87139998d
+  cohort: holdout3
+- id: q277
+  class: glossary_term
+  kind: glossary
+  expected_unit_id: glossary.units_and_conventions
+  text: Are years such as the commissioning year stored as timestamps?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 848394d3261b54f95c4ebf7c4a5adde447109c7aa2e58ccd848c4dc6441473e4
+  cohort: holdout3
+- id: q281
+  class: definitional_wording
+  kind: metric
+  expected_unit_id: metric.site_energy_weather_context
+  text: Which metric has the grain of location, day, subsystem and channel and includes the mean air temperature?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: c34a155b4082912a426b411a5c9825d5f0e09cf7cedebd61e64f3b5bffd60563
+  cohort: holdout3
+- id: q283
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Who wrote the novel Pride and Prejudice?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 16e23ee44344cbdb7df5ec4c81ceebaa7a9ef8fda879bc2fe7cd671d0517c74e
+  cohort: holdout3
+- id: q284
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.dwd.missing_periods_reconciliation
+  text: Should rows be deleted where the reported missing periods and the observed missing values do not
+    line up?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 232ed97ba75bca548276e23871ce811d9bdebad558c3f98cd50669adbdea5d97
+  cohort: holdout4
+- id: q285
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which metric reports the number of parking spaces per district?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8f758a4e21d882370ebb4d5659d632212e66fcd3cf8c4e42bb78b254fcfdb675
+  cohort: holdout4
+- id: q286
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.honda_iot.energy_5sigma_spikes
+  text: What is done with the five sigma spikes found on the Honda total columns?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e2e84fc89bb4cd36a9e99d63349dd7ef7289cfb13264e1f4085f9b142e0e433d
+  cohort: holdout4
+- id: q288
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.catalog_reconciliation
+  text: What happens to a coded value that is not found in the MaStR value catalogue?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fac7d6fe150990e9a3392d4cfefb5f925d0ff8b467127d9a1723f289fce5909f
+  cohort: holdout4
+- id: q308
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model card covers the forecast of water demand?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 17d50a4eb4b12b980eb18e5470c7520909552fa2d34bafdce37d435a6eb23e9d
+  cohort: holdout4
+- id: q311
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.einheiten_verbrennung_bruttoleistung_thousandths
+  text: Is a gross capacity of 0.001 kW in the combustion units a decimal error?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8018451942f9c1627248477499620d224b3300bc706f6d3566f18f464744285c
+  cohort: holdout4
+- id: q312
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which approval rule applies to models that screen job applicants?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 9e05c3637a864cf4401e7317b1d189dd0a9b54c87878e312e82c7ff1e0dd3fe9
+  cohort: holdout4
+- id: q314
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.genehmigung_orphans
+  text: What share of the approval keys resolves to no live unit, and how must they be joined?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0d84b7b4fe833c2577d9c62913f550573ea48eca841af7ad98547481f56866da
+  cohort: holdout4
+- id: q316
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.lokationen_link_arrays
+  text: How must the linked unit number lists of the locations table be prepared before a join?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 5d7c3b5a9b9e2279d382e0f7fe4807998852258ba844e67b85002c50bd34e8e0
+  cohort: holdout4
+- id: q320
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the data contract of the taxi trip source?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: bc91f780579f5b708514e69d4513df63b5f61cac98e9b82f52548171e64f1a29
+  cohort: holdout4
+- id: q329
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.partial_scope_orphans_expected
+  text: Why are the high orphan rates of the upgrade table and the operator change table not key mismatches?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 26617df8a476a057cc107b2c29dcf0e7421f3d48406e90efb8704da5fb487097
+  cohort: holdout4
+- id: q336
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which governance rule covers the storage of biometric data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 40fc8292b8511a223163b7b0423edec18961f8a87b50ee866799195c6788459d
+  cohort: holdout4
+- id: q338
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.power_plant_list.capacity_additions_footnote_rows
+  text: Which rows of the capacity additions table are not real carrier values?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 17f6597b593362d3538736c4c33057f43699e0a5e3cd71480607aacbd55f3774
+  cohort: holdout4
+- id: q341
+  class: identifier_lookup
+  kind: rule
+  expected_unit_id: rule.power_plant_list.bundesland_out_of_set
+  text: Which values outside the sixteen German states occur in the Bundesland column of the power plant
+    list?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6c153173c8fd06715ef686cbdad9a5e78ce466aeda49f3b451d8abd8c3a38cab
+  cohort: holdout4
+- id: q343
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which rule describes the cleaning of the telecom call records?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 30460e9d5a691ea8f17a0f1dfa6f6bb4d23c7462f5367fc2088e2521c8b4ef3e
+  cohort: holdout4
+- id: q347
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.collinear_measures
+  text: Why should mean power, maximum power and total energy not all be used as independent features?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 537544331e55d3ecf244961dd91a7972c52ef4a4cd2c2570dbfea1e1c8243291
+  cohort: holdout4
+- id: q348
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How many bones are in the human body?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: aa349df5a05df22b28c9c3b233cc95e702fbffa6ec1786ce50c41363a6d40463
+  cohort: holdout4
+- id: q353
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.mean_le_max_power
+  text: What must hold for the mean power and the maximum power of a redispatch measure?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: bbaaa019567cd932218a812d19741830423aad9d0adfec8806ddc2f9ae9f1ef9
+  cohort: holdout4
+- id: q360
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.rees46.conflicting_dup_keys
+  text: How many candidate key groups of the shop events have conflicting values?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: c21a7cba64720b4e226d9b867ed94d35a20314558965199137d456a85a2029b3
+  cohort: holdout4
+- id: q362
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the chemical symbol of gold?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0717353281531824eb4239c0b60803f5e075890f0150665e394ca8dd7217f2d6
+  cohort: holdout4
+- id: q368
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.smard.forecast_metrics_are_forecasts
+  text: Why must a forecast be paired with its realised value by the availability time of its own series?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 57848ed79ae53a8bcd439bc7c5f149b671db038a15e08fc1ffde6e54474bd3be
+  cohort: holdout4
+- id: q372
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which river flows through Cairo?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2829f28a83ede8ce8ff7cc928f0d63fc716f3225f02bfc5de93a9f52a5abdb10
+  cohort: holdout4
+- id: q375
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.smard.additive_identity_not_clean
+  text: Can the residual load be rebuilt from the other published generation and load series?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 473bb833565e520e731ed1d2d0ab90afc83e86dea99dc944eb60461ef2f65be8
+  cohort: holdout4
+- id: q377
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.price_quarter_hour.negative_price
+  text: Which model card estimates the probability of a negative price in a quarter hour?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6597cffeb64f5c21e5f70b009bb25e662d4865151365aa8b9c2ea49596a9e3f4
+  cohort: holdout4
+- id: q379
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I change a flat bicycle tyre?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2f942e2210ec9a4c6910414e625574d4d8397342641914ae7ac4104ba205134f
+  cohort: holdout4
+- id: q381
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.weak_supervision.labels
+  text: Which model card combines labelling functions into one label and is limited to diagnostic use?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: ce1a1e7de77e2d4947aec99b511370b91d7a405178d24a8459bbef97c6519a5c
+  cohort: holdout4
+- id: q382
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Who composed the Four Seasons?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 597eecf84c36deb7499704a44eb1b52b449079e21486cfcb340145e68276f6ac
+  cohort: holdout4
+- id: q387
+  class: glossary_term
+  kind: glossary
+  expected_unit_id: glossary.grid_and_market_terms
+  text: Which names do the four German control areas have in the data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 1f570def6e1f9e014814b0c67ada2f59796057188340884fa8d2db2cbd170710
+  cohort: holdout4
+- id: q388
+  class: definitional_wording
+  kind: contract
+  expected_unit_id: contract.ga4
+  text: How many daily tables does the web analytics sample export hold, and from which date?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6d3395cde194ab0884788af82d3c075f95fd3bda762ba0f4197608660ac0d28e
+  cohort: holdout4
+- id: q389
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the freezing point of water in Fahrenheit?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8b28e4ead1d3658b3281e68e502a275391da774f05777555b50634fe2333e6e9
+  cohort: holdout4
+- id: q391
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.forward_dated_commissioning_ok
+  text: Are commissioning dates in the future an error in the MaStR unit data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: ba8fcaa37ed7694661aac7806c55dbe204e117b44d4e86cc15e1e152db140606
+  cohort: holdout5
+- id: q392
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which metric reports the number of public swimming pools per town?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 0f0141e04549b8c97e288d19cc31f251282d6cae49da00c14d71dca06dfb16ac
+  cohort: holdout5
+- id: q396
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.mastr.no_validity_windows_in_dimensions
+  text: Where must a point-in-time operator assignment of a unit come from, if the market actor and network
+    tables have no validity windows?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e3ec2c495b2d315c5aed58563846357f003f8fe8a21a1e558f0eaf421ded62ae
+  cohort: holdout5
+- id: q397
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.drop_constants
+  text: Which constant columns of the redispatch data are dropped at Silver?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 048d8909891b7779f01f3536f36536f150152a6cd08fc60b74e40e7da8eb8569
+  cohort: holdout5
+- id: q402
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model card covers the prediction of flight delays?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: c7e0ccb8bb83a4c8eea9a5e346c2f0938fb1c0abc76854f12ccab1af06d670e3
+  cohort: holdout5
+- id: q403
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.german_date_and_decimal
+  text: How are the German date format and the comma decimals of the redispatch data parsed, and what
+    happens to failures?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8ca37dc7bb0eac30ed5cbb0a2fd11c38a3cf2278bc93b6479f486ddff9634920
+  cohort: holdout5
+- id: q405
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which approval rule applies to models that rank university applicants?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: e506c7d80ce924f1851bc1aab4f29c4ee23138463c076bd8cb5e546c367c9e1f
+  cohort: holdout5
+- id: q406
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.redispatch.work_identity_unverifiable
+  text: Could the total work of a redispatch measure be checked against mean power times duration?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 402d5993a2bb71afac1ed7d2786771e8177f0fc3ec3569ba3bb18656caa5968d
+  cohort: holdout5
+- id: q407
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.rees46.category_taxonomy_not_1to1
+  text: Is the category identifier of the shop events matched one to one with the category code?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: cd81c70c0901c029ef59dae288d4feb462455290bc7398dee3ecca689c8102f6
+  cohort: holdout5
+- id: q411
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the data contract of the stock exchange tick source?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 6f26aee472c66d79c6c685781b8e56a075a184a229f98d06aaf40213dac015f2
+  cohort: holdout5
+- id: q413
+  class: definitional_wording
+  kind: rule
+  expected_unit_id: rule.smard.metric_filter_id_consistent
+  text: How is each SMARD metric related to its filter identifier?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 61d111f1be0d203aa575747dfc864ca104f2b64c4ac5728951fa0f257d7ab1cc
+  cohort: holdout5
+- id: q416
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which governance rule covers the transfer of employee payroll data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: b9acf0172a971935be3decb92a50959ff8880b9929562afd8832bb10c29f0efe
+  cohort: holdout5
+- id: q417
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.honda_anomaly.anomaly
+  text: Which model card scores Honda site energy readings for anomalies?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 321da94c34e03c0bcaea013b8014abf0b2278b7162bcedfa0f638567f8f47d62
+  cohort: holdout5
+- id: q418
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.load.load
+  text: Which model card gives the expected electricity load in MWh and uses a seasonal mean as fallback?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 967eef1708f042ad287cf6a40a46760c3de5eb901d6c6208b125f49a118f305d
+  cohort: holdout5
+- id: q420
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which pipeline step loads the satellite image archive?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fffda6da0b5f94c15227fb7ff120ddd191272e929bc80c748de494d2332ef501
+  cohort: holdout5
+- id: q422
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.zone_generation.generation
+  text: Which model card estimates the generation in MWh of a control zone and uses the capacity factor
+    as fallback?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: cf9fdc91565f9971e2cfa16b22d82b7e1553c23f430f96d28f8d373a7d4471f4
+  cohort: holdout5
+- id: q424
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the speed of sound in air?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 75f706c179456014518e8337f15c7d56b0af96095e0e77eec01a0e5aad08934d
+  cohort: holdout5
+- id: q430
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.data_contracts
+  text: What blocks a Silver build, and which values may the ecosystem field of a contract take?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 1d162037aad42b090682158c5e8083776717a75dcadd8aecc542dcaa982922d6
+  cohort: holdout5
+- id: q436
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.ai_security_and_governance
+  text: How are malformed tool arguments and unauthorized access handled in the AI layer?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 1aaf65b93733b7ec37d9e6a1bea28ef0a7eb0ff34a5603f89dc547fa1ad7761e
+  cohort: holdout5
+- id: q440
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I remove a stain from a carpet?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 094d9cafca3c3a98a820addee8a2e6cd148d3d0c8b66972fab77c38fb87815bf
+  cohort: holdout5
+- id: q443
+  class: definitional_wording
+  kind: pipeline
+  expected_unit_id: pipeline.processing_layers
+  text: Which folder of the Databricks layers holds the layer-transition gates?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 61b686acbc3aafdcb6a269b4d173bda85b1d037a43cd1b67f7b23f6c93c0d600
+  cohort: holdout5
+- id: q444
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Who discovered penicillin?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: f6a73d8806a9425c7170ae9329a12930af460c346a0c8ce4abeca6eefe7006d4
+  cohort: holdout5
+- id: q446
+  class: glossary_term
+  kind: glossary
+  expected_unit_id: glossary.weather_terms
+  text: How is the wind direction value 990 treated in the DWD data?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 35b3c6888523070aa7fafe876c6cb82b233d601f90f434731092e5c92dc1d8ae
+  cohort: holdout5
+- id: q448
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.lineage
+  text: Which value traces every downstream row back to its origin?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: a9ab53b7f063bd7bb3f48996a0eee67aa6fd256a8fedfe777dc999f3fc37bcd9
+  cohort: holdout5
+- id: q449
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which ocean is the largest on Earth?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8b6425d1f2437478b2f87b3928007008e543edc0bea6bc1f9a5ff21463e9d34e
+  cohort: holdout5
+- id: q451
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r03
+  text: 'A model has a skill interval that lies completely under zero: what does the approval do?'
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 8ec3c22e7d0abc2eee917e7fb8abade018027eb529b7ab1bc6597c9bdbfeaf9b
+  cohort: holdout5
+- id: q457
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How many players are on a basketball team?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fb37e40cb3fea2e13d99ee24e4e5671d22b79893a5ec336e326b780f114f6323
+  cohort: holdout5
+- id: q471
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r06
+  text: What use is allowed for a model that has no ground truth?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 2832e6d78668b5eb83ba2e40965ab3c6d38faa183e1e7f45fdcbbbdcb16a7293
+  cohort: holdout5
+- id: q473
+  class: definitional_wording
+  kind: contract
+  expected_unit_id: contract.power_plant_list
+  text: Does the power plant list contract include expected retirements of conventional capacity, and
+    for which years?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: 3787f701ceb4b7e134a2d5ee68b11748343baf2a3a5af4ca64bec32c1db3173f
+  cohort: holdout5
+- id: q474
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the capital of Canada?
+  approval:
+    status: approved
+    approver: nobody
+    approved_at: '2026-10-27'
+    approved_hash: fc38ed02188dfc579d9a2cb7a01c6d2b037b351329396c12414a3a43a0325676
+  cohort: holdout5
+holdout_cohort: holdout5
