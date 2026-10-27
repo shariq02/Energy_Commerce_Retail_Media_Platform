@@ -1,6 +1,6 @@
 # COMMERCE NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T14:09Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T16:32Z_
 
 <!-- section: commerce__approve__00_approval_setup -->
 ## Approval Setup
@@ -811,6 +811,46 @@ _no rows for this run_
 |---|---|---|---|---|---|---|
 | session_purchase_rees46.purchase | gbt_sklearn | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.1281 | 0.25 |
 | lapse_ga4.return | gbt_sklearn | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.7674 | 0.25 |
+
+<!-- section: commerce__operate__04_score_request -->
+## Score Request
+
+### scoring_requests
+
+394 row(s), first 30 shown
+
+| request_id | task_id | model_name | registry_version | key_filter | window_start | window_end | row_key | prediction | prediction_q10 | prediction_q90 | frozen_delta_version | run_id | scored_at |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 513575173/54c28966-032a-42d8-978e-74ddc303290f | 0.021 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 513717589/1b9a0a45-f46e-4b17-b676-059bf941f08e | 0.0275 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 513730688/62b8510a-45fb-4e42-bab4-7c04a5bf9744 | 0.2775 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 513734390/32370efe-51fb-4bee-ad31-5265fc766bb3 | 0.029 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 513768887/cbcfe7a2-64d0-4dda-b58b-00a1c68f1e57 | 0.0309 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514012505/3b8f7fa8-6d1c-4e79-b87a-b98f7cdfc3d5 | 0.0336 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514512365/8bc9ce14-9032-4375-90ff-756c2933ed43 | 0.018 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514529169/b33baa04-573e-429a-ad16-94fbea4e5299 | 0.0253 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514693308/f6dc0c87-fabb-495f-a2bc-7417a0d32cb9 | 0.0385 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514719036/7ce3bd85-0f37-45c8-a14e-70305685fe20 | 0.0165 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514724831/cfe76306-9903-42a7-b8d1-bfef2b8b2669 | 0.0169 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 514964712/abb63338-4dff-452d-88a3-36686d5f3ae8 | 0.044 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 515516334/623d8b8b-e1f4-4906-9842-7892898cbbe1 | 0.0224 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 515560986/f3c332a4-7a97-4f7a-9450-c158b6ca75c0 | 0.0452 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 515631067/dd8d9fb7-fef0-4b61-95d7-0ce5b9f7a899 | 0.046 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 515706919/c2ea11de-27a9-473f-872f-d6be8f6adef6 | 0.008 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 516119545/e4878566-1a22-4f74-964e-39998cfd6ad2 | 0.0283 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 516352123/d1ae2165-0d6c-4366-bd4d-829680ce9b50 | 0.0291 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 516539581/3ab77bdb-1bcf-4fcc-babf-7f3de2518f84 | 0.0117 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 516646336/41edf5ec-9649-4a3a-8cfe-d5adaf736ebc | 0.0166 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 516915170/4d18b6aa-2037-4cae-90e3-9b6f2d3f0075 | 0.3756 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 517694782/e7ce72e0-a17e-4e2f-ae0c-7f47ee834b24 | 0.0534 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 518049798/92a67594-3c16-41b2-abf6-eb26b52a662d | 0.0257 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 518634220/dfdc955c-ad6b-44f2-9c3b-36f9897118c8 | 0.0392 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 518735924/377be5d7-a4a2-49c3-b93e-8bf5775b2cfe | 0.0944 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 518739667/693821f2-9c39-44da-848f-48034a7302bd | 0.0527 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 518896750/8a2e8570-6711-4711-b9c8-908ceb73cfa2 | 0.2649 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 519925412/c58762bd-00fb-4f04-b00a-893d575a27b0 | 0.0133 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 520061200/9c1d1a50-a5fa-4a1e-a28a-d109053a6a79 | 0.0446 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
+| ef83fbe4b304 | session_purchase_rees46.purchase | gbt_sklearn | 1 | {} |  |  | 521113122/27fb0d62-fcc6-481e-93f6-098228542bba | 0.0462 |  |  | 1 | model-20261027T154716Z | 2026-10-27 16:01:02.430213 |
 
 <!-- section: commerce__register__00_registry_setup -->
 ## Registry Setup

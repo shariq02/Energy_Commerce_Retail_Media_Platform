@@ -1,6 +1,6 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T14:09Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T16:32Z_
 
 <!-- section: energy__approve__00_approval_setup -->
 ## Approval Setup
@@ -1722,6 +1722,46 @@ _no rows for this run_
 | price_daily.price | quantile_gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.6448 | 0.25 |
 | price_quarter_hour.negative_price | logistic | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.9274 | 0.25 |
 | bias.bias | gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.1953 | 0.25 |
+
+<!-- section: energy__operate__04_score_request -->
+## Score Request
+
+### scoring_requests
+
+422 row(s), first 30 shown
+
+| request_id | task_id | model_name | registry_version | key_filter | window_start | window_end | row_key | prediction | prediction_q10 | prediction_q90 | frozen_delta_version | run_id | scored_at |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 3cc72ecb6278253dd3496c7295809d38b48edaa9b5328a541722fa910ae6568c | 486.3654 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | d61505db045f1927b89419e88e7e08354cafb64cd76d740c18651dd8c8a81d74 | 481.9878 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 456c12a8642a9c4e400ec216f8337638cf35003d19ee978b864e066c31f0bd2a | 482.1699 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | a9b2381ab6e39a76e23b89690c2ad6e0bb3a0ac370ea67b7d4d860e8ab935cdc | 485.796 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 645f8e28247fca02c7f91a67beeae2948f09cd58f2537cc31b520120d7a2cb72 | 480.6137 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 7757c2bea4f40c3570cd87c94def4ea6a3fe435d2c76c3caa5413186cb676c02 | 483.4075 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | d06645a643247f8e6d060b58b4e490d977435eb3d5a8caa0d5545b83e9cc7361 | 481.7943 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | c115bf6799aad0f6df87f0d527e7cd10f1b44b88caf3246d8b9d46c40287e9ba | 485.7016 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | c5396688a1688d6bd65b52ca19b9db4aa892f9e3dbbd00ab3f2b72505a6379bd | 489.5087 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 9b1648868c4eec2c2d78d3cec99d666e42ff56c75506b59d5b0c4e9da5ba3a83 | 484.3326 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 71dd7540fa5b4326f3c210aa266ded4f2c4642797087dfebcb25263f95ee048c | 487.022 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | d0981fe11d1a6d19a51555c6c961b807385decf3c27eab4b8d6d27efdbf99f36 | 484.5849 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 087ff762b2b393494145ce1ca2591f9d66c9714daa351bbe4916d122eb61b1ac | 482.7276 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | f2863bdb98c7b328e92f8513ee561e2a3f91bb6829d92478a23eb250070ac4f9 | 484.0883 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 15e7e264932b800846f4216927f083746af3596a05244c5db5ca187f36cb4216 | 474.7106 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 1cc60100a8144746c0f049c8b02eb3aa8b70f8420d6ca302ab19e93e4e6fbb25 | 485.1849 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | fae48d6f348b833e52f61178b6921d373c2317782ded5df9a2283caf2280c571 | 476.4814 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 4f84900f23c02bd3520eacf3536aa596d556dd310bd315d2c0ee32aab1d2219c | 485.5517 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | f540ef2fae7a49062c83c906664394589d5b3ea4cd8a48232cc9a5d5d03d0303 | 471.0732 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 0353c346da1d038953f417f5b79fa6f87f0123eeb52ceec20ff5cb4e6cd8c566 | 474.01 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | dbe4729345995d9878a21d25624f6806299152b1861b3979b71433f2bc265f58 | 474.138 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 3ccc2f659e9d3d97affa0622a4a9d87e5915402b104428c22d3841f110f40c14 | 470.7511 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | eb2fa5a873ab95087a2c3679c33cfc86928374a57c391304cdc5a007b8f51910 | 472.774 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | b3ab54191d5d896b9d86421fe9499504178cd8af73ed26fe72a354f2273bef94 | 478.4998 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 36d4ad0519a118f4133d8cb7c4c828eb3fdb5d62f50934c4302be789e192618e | 472.1726 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 13976d42a97f67ff380e158f4979c14aa084f0fabce04ff44793557ae714329d | 472.114 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 88e8f615df54981ab796a1b4381661f2263edb9168568a1886314037d68f9cfc | 471.918 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 732d990feeab9a5111bf9f7600c67d71720b9d11d04c78221f2d03c0f8c38104 | 475.304 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 530706043943c22805d51a53965488b8e4fb407ab8bb9157794e581d27667ab7 | 475.4348 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
+| bd834d77cae0 | ccpp.output | tabicl_v2_in_context | 1 | {} |  |  | 2e3708b71dde0d6c468c3a7156cbc4409528fd9301f51ac1267895f07bbd0973 | 464.6128 |  |  | 0 | model-20261027T154716Z | 2026-10-27 15:50:53.666130 |
 
 <!-- section: energy__register__00_registry_setup -->
 ## Registry Setup
