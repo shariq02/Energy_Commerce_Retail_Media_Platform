@@ -1,6 +1,6 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T16:32Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T19:49Z_
 
 <!-- section: energy__approve__00_approval_setup -->
 ## Approval Setup
@@ -1773,13 +1773,7 @@ registry tables created if missing
 
 ### model_registry
 
-3 row(s)
-
-| task_id | model_name | role | version | lifecycle_status | decision | validation_value | reason |
-|---|---|---|---|---|---|---|---|
-| capacity_additions.additions | poisson_gbt_sklearn | selected | 2 | retired | approved_with_conditions | 19.8307 | replaced by tabpfn_25_in_context (approval run model-20261026T175146Z) |
-| ccpp.output | gbt_sklearn | selected | 2 | retired | approved | 2.4962 | replaced by tabicl_v2_in_context (approval run model-20261026T175146Z) |
-| honda_forecast.increment | gbt_lightgbm | selected | 2 | retired | approved_with_conditions | 17.9655 | replaced by chronos2_lora (approval run model-20261026T175146Z) |
+_no rows for this run_
 
 <!-- section: energy__register__02_reproducibility_energy -->
 ## Reproducibility Check Energy
