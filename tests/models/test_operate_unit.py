@@ -570,6 +570,7 @@ def test_a_request_checks_its_keys_and_its_window(lib):
 def test_the_default_request_is_small_and_has_a_short_worst_case(lib):
     assert lib["DEFAULT_WINDOW_DAYS"] == 1 and lib["DEFAULT_ROW_LIMIT"] == 100
     assert 15 * lib["REQUEST_LIMIT_SECONDS"] <= 90 * 60
+    assert lib["REQUEST_STACK_SECONDS"] < lib["REQUEST_LIMIT_SECONDS"]
 
 
 def test_request_positions_keep_the_window_and_the_newest_rows(lib):

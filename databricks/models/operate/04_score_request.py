@@ -16,8 +16,9 @@
 # MAGIC write one row per scored row, with a request id, to `scoring_requests`. A request
 # MAGIC carries keys and a window, never feature values: the rows are read from the
 # MAGIC frozen dataset and prepared as the evaluation does. It is a replay of stored
-# MAGIC data in batch; no endpoint is involved. Without a `task_id`, one default request
-# MAGIC per tabular task scores the newest day (at most 100 rows). Widgets, all
+# MAGIC data in batch; no endpoint is involved. Without keys and a window, the default request
+# MAGIC scores the newest day (at most 100 rows) of the task in `task_id`, or of every
+# MAGIC tabular task when `task_id` is empty. Widgets, all
 # MAGIC optional: `task_id`, `keys` (a JSON object of key columns and values),
 # MAGIC `window_start` and `window_end` (dates, only for a task with a time column),
 # MAGIC `request_id` (empty gives a new one). Run on the compute type of the registered
@@ -108,8 +109,11 @@ rid = model_run_id()
 # COMMAND ----------
 
 # DBTITLE 1,Score the request
-if TASK_ID:
+if TASK_ID and (KEYS or WINDOW_START or WINDOW_END):
     results = [score_request(TASK_ID, KEYS, WINDOW_START, WINDOW_END, REQUEST_ID, rid)]
+    failed = []
+elif TASK_ID:
+    results = [score_default_request(TASK_ID, rid, REQUEST_ID)]
     failed = []
 else:
     results, failed = score_default_requests(rid)

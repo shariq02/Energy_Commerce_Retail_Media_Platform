@@ -31,6 +31,7 @@ import uuid as _uuid
 DEFAULT_WINDOW_DAYS = 1
 DEFAULT_ROW_LIMIT = 100
 REQUEST_LIMIT_SECONDS = 300
+REQUEST_STACK_SECONDS = 60
 REQUEST_ECOSYSTEMS = ("energy", "commerce")
 
 # COMMAND ----------
@@ -187,22 +188,25 @@ def score_request(
     ecosystem, entry = registered_entry(task_id)
     print(f"request {request_id}: {task_id}, keys {keys}, window {start} to {end}")
     print(f"model {entry['model_name']} version {entry['version']}")
-    bundle = load_bundle({"mlflow_run_id": entry["mlflow_run_id"]})
+    with timed_stage("load the model"):
+        bundle = load_bundle({"mlflow_run_id": entry["mlflow_run_id"]})
     ctx = MonitorContext(task_id, rid, "held_out")
     if int(entry["frozen_delta_version"]) != int(ctx.frozen_version):
         raise RuntimeError(
             f"registered at version {entry['frozen_delta_version']}, "
             f"frozen dataset is at {ctx.frozen_version}"
         )
-    df, start, end = request_frame(
-        ctx, cfg, task_id, keys, time_col, start, end, latest_days, row_limit
-    )
-    evaluator = TabularEvaluator(ctx, cfg)
-    evaluator.load(df, None, 1.0)
-    frame = evaluator.frames["eval"].reset_index(drop=True)
+    with timed_stage("read and prepare the rows"):
+        df, start, end = request_frame(
+            ctx, cfg, task_id, keys, time_col, start, end, latest_days, row_limit
+        )
+        evaluator = TabularEvaluator(ctx, cfg)
+        evaluator.load(df, None, 1.0)
+        frame = evaluator.frames["eval"].reset_index(drop=True)
     _take_notes()
     print(f"OK  {len(frame)} row(s) read")
-    raw = bundle.predict(frame)
+    with timed_stage("score the rows"):
+        raw = bundle.predict(frame)
     if isinstance(raw, dict):
         median = np.asarray(raw[0.5], dtype="float64")
         low = np.asarray(raw[0.1], dtype="float64")
@@ -276,6 +280,29 @@ def default_task_ids() -> list:
 
 # COMMAND ----------
 
+# DBTITLE 1,The default request of one task
+
+
+def score_default_request(task_id: str, rid: str, request_id: str = "") -> dict:
+    """The default request of one task: the newest DEFAULT_WINDOW_DAYS days, all keys,
+    at most DEFAULT_ROW_LIMIT rows, REQUEST_LIMIT_SECONDS at most."""
+    with candidate_guard(
+        f"request {task_id}", REQUEST_LIMIT_SECONDS, REQUEST_STACK_SECONDS
+    ):
+        return score_request(
+            task_id,
+            {},
+            "",
+            "",
+            request_id,
+            rid,
+            latest_days=DEFAULT_WINDOW_DAYS,
+            row_limit=DEFAULT_ROW_LIMIT,
+        )
+
+
+# COMMAND ----------
+
 # DBTITLE 1,One default request per tabular task
 
 
@@ -286,17 +313,7 @@ def score_default_requests(rid: str):
     for task_id in default_task_ids():
         started = _time_request.monotonic()
         try:
-            with candidate_guard(f"request {task_id}", REQUEST_LIMIT_SECONDS):
-                out = score_request(
-                    task_id,
-                    {},
-                    "",
-                    "",
-                    "",
-                    rid,
-                    latest_days=DEFAULT_WINDOW_DAYS,
-                    row_limit=DEFAULT_ROW_LIMIT,
-                )
+            out = score_default_request(task_id, rid)
             results.append(out)
             took = _time_request.monotonic() - started
             print(f"OK   {task_id}: {out['rows']} row(s) in {took:.0f} s")
