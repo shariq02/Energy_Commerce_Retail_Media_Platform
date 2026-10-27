@@ -18,6 +18,10 @@ the manifest record with the corpus, the model files and the stored indexes.
 `migrate` moves the keyword file and the FTS index of the recorded build, and copies
 its graph, into the folder of that build (once, for builds made before the folders).
 
+`--embedder gte-modernbert-base` builds or verifies the second dense collection
+(`ai.embeddings.extra`) from the same chunks; the primary MiniLM build must exist and
+match. Only the curated corpus has one for now.
+
 Usage (repository root):
     python -m ai.embeddings.build build [--corpus curated|wikipedia|all]
     python -m ai.embeddings.build verify [--corpus curated|wikipedia|all]
@@ -40,9 +44,9 @@ import numpy as np
 from ai.embeddings import build_record as br
 from ai.embeddings import collection as coll
 from ai.embeddings import embedder as emb
+from ai.embeddings import extra, progress
 from ai.embeddings import keyword_index as ki
 from ai.embeddings import knowledge_graph as kg
-from ai.embeddings import progress
 from ai.embeddings.chunks import (
     CURATED_ID,
     WIKIPEDIA_ID,
@@ -382,6 +386,25 @@ def migrate(names: tuple[str, ...], args: argparse.Namespace, ai_dir: Path) -> i
     return 0
 
 
+def run_extra(args: argparse.Namespace, names: tuple[str, ...], ai_dir: Path) -> int:
+    """Build or verify the collection of a second embedder."""
+    if args.command == "migrate":
+        print("migrate applies to the primary builds only.")
+        return 1
+    profile = emb.PROFILES[args.embedder]
+    if args.corpus == "all":
+        print("wikipedia: no second collection yet (it follows the curated result).")
+        names = (CURATED_ID,)
+    if args.embedder_dir is None:
+        args.embedder_dir = emb.default_model_dir(profile)
+    run = extra.run_verify if args.command == "verify" else extra.run_build
+    try:
+        return run(names, profile, args, ai_dir)
+    except ValueError as error:
+        print(f"Stopped: {error}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("command", choices=("build", "verify", "migrate"))
@@ -393,10 +416,24 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="build with model files that differ from the manifest",
     )
+    parser.add_argument(
+        "--embedder",
+        choices=sorted(emb.PROFILES),
+        default=emb.MINILM.slug,
+        help="the embedder of the collection (the primary is MiniLM)",
+    )
+    parser.add_argument(
+        "--embedder-dir",
+        type=Path,
+        default=None,
+        help="folder with the files of the second embedder",
+    )
     uc.add_write_mode(parser)
     args = parser.parse_args(argv)
     ai_dir = args.corpus_dir.parent
     names = CORPORA if args.corpus == "all" else (args.corpus,)
+    if args.embedder != emb.MINILM.slug:
+        return run_extra(args, names, ai_dir)
     if args.command == "verify":
         return verify_all(names, args, ai_dir)
     if args.command == "migrate":

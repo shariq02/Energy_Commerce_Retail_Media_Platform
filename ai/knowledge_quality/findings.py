@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ai.knowledge_quality import acceptance, runs, state, thresholds
-from ai.knowledge_quality.evaluation import HYBRID_GRAPH, MODES
+from ai.knowledge_quality.evaluation import HYBRID_GRAPH
 from scripts.knowledge import _unit_common as uc
 
 
@@ -42,8 +42,7 @@ def metric_rows(groups: dict, prefix: str | None) -> list[list]:
             continue
         if prefix and not name.startswith(prefix):
             continue
-        for mode in MODES:
-            m = by_mode[mode]
+        for mode, m in by_mode.items():
             n = m["positive"]
             rows.append(
                 [
@@ -93,6 +92,9 @@ def run_section(run: dict | None, title: str) -> str:
             ),
         ],
         ["config", ", ".join(f"{k}={v}" for k, v in sorted(run["config"].items()))],
+        ["extra dense collections", run.get("extra_collections") or "none"],
+        ["reranker scores missing", run.get("rerank_missing", 0)],
+        ["judge", run.get("judge") or "not used"],
     ]
     out += table(["item", "value"], ctx) + "\n### overall\n\n"
     out += table(METRIC_HEADERS, metric_rows(run["metrics"], None)) + "\n"
@@ -124,6 +126,7 @@ def render(ai_dir: Path, corpus_id: str) -> str:
     check = runs.load_check(ai_dir, corpus_id)
     tune = runs.latest_run(ai_dir, corpus_id, "tune")
     holdout = runs.latest_run(ai_dir, corpus_id, "holdout")
+    base = runs.latest_run(ai_dir, corpus_id, "base")
     accepted = state.read(ai_dir, corpus_id)
     out = f"# {corpus_id.upper()} RETRIEVAL QUALITY FINDINGS\n\n"
     out += (
@@ -223,6 +226,9 @@ def render(ai_dir: Path, corpus_id: str) -> str:
             + "\n"
         )
     out += run_section(holdout, "holdout questions")
+    out += run_section(
+        base, "older questions with the stack of the candidate (seen data)"
+    )
     out += "## acceptance\n\n"
     event = accepted["designated"]
     if event is None:

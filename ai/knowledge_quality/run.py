@@ -18,6 +18,12 @@ Without a command the whole flow runs (the command `all`). Commands:
   accept           apply the acceptance rule to the holdout run of the candidate and,
                    when it passes and the owner approves, designate the build
   status           what is designated, the holdout reads and the config versions
+  judge-fit        fit the local judge (calibrated reranker score, answerable gate, domain
+                   router) on the tuning questions; writes `judge.json` in the build folder
+The retrieval stack (second dense retriever, reranker, judge switches) is read from
+`ai/knowledge_quality/config/<corpus>/stack.yml`; the config version written by
+`thresholds` carries it. The split `base` evaluates the older questions again with the
+stack of the candidate; the acceptance compares them with the designated build.
 Every command that writes (also each step of `all`) prints its result first and asks before writing (y or
 yes); --apply writes without asking, --dry-run never writes. The collection and the
 indexes are only read.
@@ -35,7 +41,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ai.embeddings import embedder as emb
-from ai.embeddings import progress
+from ai.embeddings import extra, progress
+from ai.judge import factory, training
 from ai.knowledge_quality import (
     acceptance,
     evaluation,
@@ -47,17 +54,21 @@ from ai.knowledge_quality import (
 )
 from ai.knowledge_quality import integrity as iq
 from ai.knowledge_quality import questions as qs
+from ai.knowledge_quality import stack as qstack
+from ai.rag import rerank as rr
 from ai.rag import store as st
 from ai.rag.config import RetrievalConfig
 from scripts.knowledge import _unit_common as uc
 
 CORPORA = ("curated", "wikipedia")
+BASE = "base"
 COMMANDS = (
     "all",
     "check",
     "approve-questions",
     "evaluate",
     "thresholds",
+    "judge-fit",
     "accept",
     "status",
 )
@@ -157,19 +168,46 @@ def cmd_approve_questions(args: argparse.Namespace) -> int:
     return 0
 
 
-def candidate(args: argparse.Namespace) -> tuple[str, st.Store]:
+def candidate(args: argparse.Namespace, embedders: tuple = ()) -> tuple[str, st.Store]:
     record = st.read_record(args.corpus, args.corpus_dir)
     build_id = record["build_id"]
-    return build_id, st.load(args.corpus, args.corpus_dir, args.model_dir, build_id)
+    store = st.load(args.corpus, args.corpus_dir, args.model_dir, build_id, embedders)
+    return build_id, store
+
+
+def with_stack(args: argparse.Namespace, config: RetrievalConfig) -> RetrievalConfig:
+    """The config with the switches of the stack file of the corpus."""
+    return qstack.apply(config, qstack.load(args.ai_dir, args.corpus))
+
+
+def make_judge(args: argparse.Namespace, config: RetrievalConfig, store, build_id: str):
+    """The local judge when a switch is on and it was fitted, else None."""
+    embedder = store.dense.embedder
+    embed = getattr(embedder, "embed_queries", embedder.embed)
+    return factory.make_judge(config, args.ai_dir, args.corpus, build_id, embed)
+
+
+def rerank_scores(args: argparse.Namespace, config: RetrievalConfig):
+    return rr.load_scores(rr.cache_path(args.ai_dir)) if config.rerank else None
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
     question_set = load_questions(args)
-    chosen = question_set.of_split(args.split)
+    if args.split == BASE:
+        chosen = question_set.of_cohort("base")
+    else:
+        chosen = question_set.of_split(args.split)
     if not chosen:
         print(f"There is no approved {args.split} question.")
         return 1
-    build_id, store = candidate(args)
+    number, config = thresholds.latest(args.ai_dir, args.corpus)
+    if args.config_version is not None:
+        number = args.config_version
+        config = RetrievalConfig.from_dict(
+            thresholds.read_version(args.ai_dir, args.corpus, number)["config"]
+        )
+    config = with_stack(args, config)
+    build_id, store = candidate(args, config.embedders)
     if args.split == qs.HOLDOUT:
         if args.dry_run:
             print("The holdout read is always recorded, so it cannot be a dry run.")
@@ -184,15 +222,19 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         if not writing(args):
             print("Nothing read.")
             return 0
-    number, config = thresholds.latest(args.ai_dir, args.corpus)
-    if args.config_version is not None:
-        number = args.config_version
-        config = RetrievalConfig.from_dict(
-            thresholds.read_version(args.ai_dir, args.corpus, number)["config"]
-        )
-    outcomes = evaluation.evaluate(store, chosen, config, progress.show)
+    judge = make_judge(args, config, store, build_id)
+    outcomes = evaluation.evaluate(
+        store, chosen, config, progress.show, rerank_scores(args, config), judge
+    )
     record = evaluation.run_record(
-        store, args.corpus, args.split, outcomes, question_set, config, number
+        store,
+        args.corpus,
+        args.split,
+        outcomes,
+        question_set,
+        config,
+        number,
+        judge.summary() if judge else None,
     )
     print(
         f"Run {record['run_id']}: {len(outcomes)} question(s), config version {number}"
@@ -224,16 +266,27 @@ def cmd_thresholds(args: argparse.Namespace) -> int:
     if not chosen:
         print("There is no approved tuning question.")
         return 1
-    _, store = candidate(args)
     _, latest = thresholds.latest(args.ai_dir, args.corpus)
     base = RetrievalConfig.from_dict(
-        {**latest.as_dict(), "dense_min_score": None, "keyword_min_score": None}
+        {
+            **with_stack(args, latest).as_dict(),
+            "dense_min_score": None,
+            "keyword_min_score": None,
+            "extra_min_scores": None,
+        }
     )
-    outcomes = evaluation.evaluate(store, chosen, base, progress.show)
+    build_id, store = candidate(args, base.embedders)
+    judge = make_judge(args, base, store, build_id)
+    outcomes = evaluation.evaluate(
+        store, chosen, base, progress.show, rerank_scores(args, base), judge
+    )
     overrides = {
         "dense": args.dense_min_score,
         "keyword": args.keyword_min_score,
     }
+    for item in args.extra_min_score or []:
+        slug, _, value = item.partition("=")
+        overrides[f"dense:{slug}"] = float(value)
     found = thresholds.establish(outcomes, overrides)
     for name, item in found.items():
         print(
@@ -251,7 +304,14 @@ def cmd_thresholds(args: argparse.Namespace) -> int:
         print(uc.NOT_WRITTEN)
         return 0
     record = evaluation.run_record(
-        store, args.corpus, qs.TUNE, outcomes, question_set, base, None
+        store,
+        args.corpus,
+        qs.TUNE,
+        outcomes,
+        question_set,
+        base,
+        None,
+        judge.summary() if judge else None,
     )
     runs.save_run(args.ai_dir, record)
     meta = {
@@ -263,6 +323,58 @@ def cmd_thresholds(args: argparse.Namespace) -> int:
     number, _ = thresholds.write_version(args.ai_dir, args.corpus, base, found, meta)
     print(f"Retrieval config version {number} written.")
     finish(args)
+    return 0
+
+
+def cmd_judge_fit(args: argparse.Namespace) -> int:
+    """Fit the local judge on the tuning questions of the candidate build."""
+    question_set = load_questions(args)
+    chosen = question_set.of_split(qs.TUNE)
+    if not chosen:
+        print("There is no approved tuning question.")
+        return 1
+    _, latest = thresholds.latest(args.ai_dir, args.corpus)
+    base = RetrievalConfig.from_dict(
+        {
+            **with_stack(args, latest).as_dict(),
+            "dense_min_score": None,
+            "keyword_min_score": None,
+            "extra_min_scores": None,
+            "judge_filter": False,
+            "judge_gate": False,
+            "judge_relevance": False,
+        }
+    )
+    build_id, store = candidate(args, base.embedders)
+    outcomes = evaluation.evaluate(
+        store, chosen, base, progress.show, rerank_scores(args, base), None
+    )
+    embedder = store.dense.embedder
+    embed = getattr(embedder, "embed_queries", embedder.embed)
+    params, skipped = training.fit_all(outcomes, chosen, store, embed)
+    shown = ("n_positive", "n_negative", "n", "log_loss", "auc", "accuracy")
+    for part, item in params.items():
+        print(f"{part}: fitted { ({k: item[k] for k in shown if k in item}) }")
+    for part, reason in skipped.items():
+        print(f"{part}: not fitted ({reason})")
+    if not params:
+        print("Nothing could be fitted.")
+        return 1
+    if not writing(args):
+        print(uc.NOT_WRITTEN)
+        return 0
+    body = {
+        **params,
+        "skipped": skipped,
+        "build_id": build_id,
+        "corpus_id": args.corpus,
+        "question_set_hash": question_set.set_hash,
+        "embedders": list(base.embedders),
+        "rerank": base.rerank,
+        "created": today(),
+    }
+    path = factory.save_params(args.ai_dir, args.corpus, build_id, body)
+    print(f"Judge parameters written: {path}")
     return 0
 
 
@@ -292,13 +404,29 @@ def cmd_accept(args: argparse.Namespace) -> int:
         )
         return 1
     report = iq.check(args.corpus, args.corpus_dir, args.model_dir, progress.show)
+    problems = list(report.problems)
+    embedders = tuple(run["config"].get("embedders", []))
+    for slug in embedders:
+        problems += extra.check_for_designation(
+            args.corpus_dir, slug, args.model_dir, progress.show
+        )
     event = state.designated_event(args.ai_dir, args.corpus)
     previous = (
         runs.load_run(args.ai_dir, args.corpus, event["evaluation_run_id"])
         if event
         else None
     )
-    decision = acceptance.decide(run, previous, report.problems)
+    base_run = runs.latest_run(args.ai_dir, args.corpus, BASE)
+    if base_run is not None and base_run["build_id"] != build_id:
+        base_run = None
+    baselines = ()
+    if event and base_run is not None:
+        found = [
+            runs.latest_run_of_build(args.ai_dir, args.corpus, split, event["build_id"])
+            for split in (qs.TUNE, qs.HOLDOUT)
+        ]
+        baselines = tuple(r for r in found if r)
+    decision = acceptance.decide(run, previous, problems, base_run, baselines)
     print(f"Build {build_id}, holdout run {run['run_id']}")
     for item in decision.checks:
         mark = {True: "PASS", False: "FAIL", None: "n/a"}[item["passed"]]
@@ -331,6 +459,13 @@ def cmd_accept(args: argparse.Namespace) -> int:
         "config_version": run["config_version"],
         "checks": decision.checks,
         "unit_snapshot": snapshot(args),
+        "dense_extra": [
+            extra.extra_record(
+                st.read_manifest(args.corpus, args.corpus_dir), emb.PROFILES[slug]
+            )["collection"]
+            for slug in embedders
+        ],
+        "base_run_id": base_run["run_id"] if base_run else None,
     }
     designated = state.designate(args.ai_dir, args.corpus, body)
     print(f"Designated build {build_id} (event {designated['event_hash'][:12]}).")
@@ -387,6 +522,12 @@ def cmd_all(args: argparse.Namespace) -> int:
             waiting = waiting_questions(args)
         else:
             print(f"{len(waiting)} question(s) wait for approval; no approver name.")
+    if qstack.judge_on(qstack.load(ai_dir, corpus)):
+        print("== step: judge-fit ==")
+        code = step(args, cmd_judge_fit)
+        if code:
+            print(f"Stopped at step judge-fit (exit code {code}).")
+            return code
     for name, handler, changes in (
         ("evaluate (tune)", cmd_evaluate, {"split": qs.TUNE}),
         ("thresholds", cmd_thresholds, {}),
@@ -400,6 +541,11 @@ def cmd_all(args: argparse.Namespace) -> int:
     if args.dry_run:
         print("Dry run: nothing written; the holdout and the acceptance are not run.")
         return 0
+    print("== step: evaluate (base) ==")
+    code = step(args, cmd_evaluate, split=BASE)
+    if code:
+        print(f"Stopped at step evaluate (base) (exit code {code}).")
+        return code
     found = thresholds.versions(ai_dir, corpus)
     if found == before:
         print("No retrieval config version was written, so the run stops here.")
@@ -436,7 +582,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--corpus-dir", type=Path, default=uc.CORPUS_DIR)
     parser.add_argument("--model-dir", type=Path, default=emb.DEFAULT_MODEL_DIR)
     parser.add_argument("--root", type=Path, default=uc.ROOT)
-    parser.add_argument("--split", choices=(qs.TUNE, qs.HOLDOUT), default=qs.TUNE)
+    parser.add_argument("--split", choices=(qs.TUNE, qs.HOLDOUT, BASE), default=qs.TUNE)
+    parser.add_argument(
+        "--extra-min-score",
+        action="append",
+        metavar="SLUG=VALUE",
+        help="thresholds step: the threshold of an extra dense retriever",
+    )
     parser.add_argument("--config-version", type=int, default=None)
     parser.add_argument(
         "--dense-min-score",
@@ -462,6 +614,7 @@ def main(argv: list[str] | None = None) -> int:
         "approve-questions": cmd_approve_questions,
         "evaluate": cmd_evaluate,
         "thresholds": cmd_thresholds,
+        "judge-fit": cmd_judge_fit,
         "accept": cmd_accept,
         "status": cmd_status,
     }[args.command]

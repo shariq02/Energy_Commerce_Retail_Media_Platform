@@ -58,7 +58,10 @@ def establish(outcomes: list[Outcome], overrides: dict | None = None) -> dict:
     result = {}
     positive = [o for o in outcomes if o.expected_unit_id]
     negative = [o for o in outcomes if not o.expected_unit_id]
-    for retriever in (DENSE, KEYWORD):
+    names = [DENSE, KEYWORD]
+    for outcome in outcomes:
+        names += [n for n in outcome.expected_score if n not in names]
+    for retriever in names:
         scores = [
             o.expected_score[retriever]
             for o in positive
@@ -116,6 +119,13 @@ def write_version(
 ) -> tuple[int, dict]:
     """Write the next config version: `base` with the established thresholds."""
     values = {FIELDS[name]: found[name]["threshold"] for name in FIELDS}
+    extra = {
+        name.split(":", 1)[1]: item["threshold"]
+        for name, item in found.items()
+        if name.startswith("dense:") and item["threshold"] is not None
+    }
+    if extra:
+        values["extra_min_scores"] = extra
     config = RetrievalConfig.from_dict({**base.as_dict(), **values})
     number = (versions(ai_dir, corpus_id) or [0])[-1] + 1
     data = {

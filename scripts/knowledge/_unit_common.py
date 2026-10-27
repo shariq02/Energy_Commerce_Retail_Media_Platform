@@ -30,8 +30,10 @@ KIND_DIRS = {
     "governance": "governance",
     "pipeline": "pipeline",
     "glossary": "glossary",
+    "model_card": "model_cards",
+    "approval_rule": "approval_rules",
 }
-DERIVED_KINDS = ("metric", "contract", "rule")
+DERIVED_KINDS = ("metric", "contract", "rule", "model_card", "approval_rule")
 REQUIRED_HEADER = (
     "unit_id",
     "kind",

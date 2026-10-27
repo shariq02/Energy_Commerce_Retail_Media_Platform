@@ -38,6 +38,14 @@ for eco in ("energy", "commerce"):
 
 # COMMAND ----------
 
+# DBTITLE 1,Add the columns that an older registry table lacks
+for eco in ("energy", "commerce"):
+    for name in ("model_registry", "registry_check"):
+        added = add_missing_columns(name, ecosystem=eco, ddl=MODEL_DDL[name])
+        print(f"{eco}.{name}: {len(added)} column(s) added")
+
+# COMMAND ----------
+
 # DBTITLE 1,Rows recorded so far
 for eco in ("energy", "commerce"):
     for name in ("model_registry", "registry_check"):

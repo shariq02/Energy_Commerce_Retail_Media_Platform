@@ -14,7 +14,19 @@ from collections import Counter
 import pytest
 
 from scripts.knowledge import _unit_common as uc
+from scripts.knowledge import build_units as bu
 from scripts.knowledge import run_all as ra
+
+CARDS = len(list((uc.ROOT / "src" / "model_cards").glob("*/*.md")))
+RULE_UNITS = len(bu.read_approval_rules(uc.ROOT / bu.APPROVAL_RULES_FILE))
+TOTAL = 92 + CARDS + RULE_UNITS
+ALL_KINDS = {
+    "metric": 8,
+    "contract": 8,
+    "rule": 76,
+    "model_card": CARDS,
+    "approval_rule": RULE_UNITS,
+}
 
 pytestmark = [pytest.mark.unit, pytest.mark.ai]
 
@@ -26,6 +38,7 @@ def test_steps_run_in_order():
         "tokens",
         "wikipedia_fetch",
         "wikipedia",
+        "embedder_download",
         "embeddings",
     ]
 
@@ -50,7 +63,7 @@ def test_dry_run_lists_the_units_and_writes_nothing(monkeypatch, tmp_path, capsy
     assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
     assert not any(tmp_path.rglob("*"))
     output = capsys.readouterr().out
-    assert "Created (92):" in output
+    assert f"Created ({TOTAL}):" in output
     assert "  metric.ga4_sessions  version 1" in output
     assert "Dry run: nothing was written" in output
 
@@ -75,11 +88,11 @@ def test_yes_runs_the_steps_again_to_write_then_offers_approval(
     monkeypatch, tmp_path, answer
 ):
     asked = only_step(
-        monkeypatch, "units", ra.step_units, [answer, "5"], interactive=True
+        monkeypatch, "units", ra.step_units, [answer, "7"], interactive=True
     )
     assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
     assert len(asked) == 2
-    assert len(uc.scan_units(tmp_path)) == 92
+    assert len(uc.scan_units(tmp_path)) == TOTAL
     assert approved_kinds(tmp_path) == {}
 
 
@@ -93,7 +106,7 @@ def test_the_dry_run_checks_the_size_of_the_planned_bodies(
     argv = ["--corpus-dir", str(tmp_path), "--authored-dir", str(tmp_path / "none")]
     assert ra.main(argv) == 0
     assert not any(tmp_path.rglob("*"))
-    assert "Units: 92" in capsys.readouterr().out
+    assert f"Units: {TOTAL}" in capsys.readouterr().out
 
 
 def test_a_failing_step_stops_the_run(monkeypatch, tmp_path, capsys):
@@ -128,7 +141,7 @@ def test_apply_builds_units_and_stops_when_the_tokenizer_is_missing(tmp_path, ca
         "--apply",
     ]
     assert ra.main(argv) == 2
-    assert len(uc.scan_units(tmp_path)) == 92
+    assert len(uc.scan_units(tmp_path)) == TOTAL
     assert "Stopped at step tokens (exit code 2)" in capsys.readouterr().out
 
 
@@ -159,7 +172,7 @@ def test_without_a_terminal_the_hint_is_printed_and_nothing_is_approved(
     assert code == 0
     assert asked == []
     output = capsys.readouterr().out
-    assert "waiting for approval: 92" in output
+    assert f"waiting for approval: {TOTAL}" in output
     assert "scripts.knowledge.approve_units" in output
     assert approved_kinds(tmp_path) == {}
 
@@ -167,11 +180,13 @@ def test_without_a_terminal_the_hint_is_printed_and_nothing_is_approved(
 @pytest.mark.parametrize(
     ("choice", "expected"),
     [
-        ("1", {"metric": 8, "contract": 8, "rule": 76}),
+        ("1", ALL_KINDS),
         ("2", {"metric": 8}),
         ("3", {"contract": 8}),
         ("4", {"rule": 76}),
-        ("5", {}),
+        ("5", {"model_card": CARDS}),
+        ("6", {"approval_rule": RULE_UNITS}),
+        ("7", {}),
         ("all", {}),
         ("x", {}),
     ],
@@ -190,7 +205,7 @@ def test_approval_records_the_name_and_the_version(monkeypatch, tmp_path):
     assert approval["approver"] == "Owner"
     assert approval["approved_version"] == unit.header["version"]
     manifest = uc.write_manifest(tmp_path)
-    assert manifest["approval"] == {"approved": 8, "pending": 84, "stale": 0}
+    assert manifest["approval"] == {"approved": 8, "pending": TOTAL - 8, "stale": 0}
 
 
 def test_an_empty_name_means_no_approval(monkeypatch, tmp_path):

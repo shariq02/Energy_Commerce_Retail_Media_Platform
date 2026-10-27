@@ -358,3 +358,90 @@ def test_the_findings_carry_the_registry_the_checks_and_the_environment(lib):
 def test_the_findings_hold_no_private_path_or_address(lib):
     _eco, text = _findings(lib)
     assert "someone@example.com" not in text and "/Users/someone" not in text
+
+
+# --- version fields of a registered model ------------------------------------------
+
+
+def test_the_registry_table_ends_with_the_version_columns(lib):
+    names = [
+        name for name, _type in lib["ddl_columns"](lib["MODEL_DDL"]["model_registry"])
+    ]
+    assert names[-5:] == [
+        "code_version",
+        "data_fingerprint",
+        "artifact_sha256",
+        "replaces",
+        "task_spec_hash",
+    ]
+    assert set(lib["VERSION_FIELDS"]) <= set(names) and "replaces" in names
+
+
+def test_an_entry_takes_the_version_fields_given_for_it_and_none_otherwise(lib):
+    tid = _task(lib)
+    given = {
+        (tid, "cand", "selected"): {
+            "code_version": "abc",
+            "data_fingerprint": "f" * 32,
+            "artifact_sha256": "a" * 64,
+            "task_spec_hash": "t" * 64,
+        }
+    }
+    entries = lib["registry_entries"](_approvals(lib), {}, given)
+    selected = next(e for e in entries if e["role"] == "selected")
+    fallback = next(e for e in entries if e["role"] == "baseline_fallback")
+    assert (
+        selected["data_fingerprint"] == "f" * 32 and selected["code_version"] == "abc"
+    )
+    assert all(fallback[f] is None for f in lib["VERSION_FIELDS"])
+    assert selected["replaces"] is None
+
+
+def test_the_task_definition_hash_is_stable_and_differs_between_tasks(lib):
+    first, second = (t["task_id"] for t in lib["TASKS"][:2])
+    assert lib["task_spec_hash"](first) == lib["task_spec_hash"](first)
+    assert lib["task_spec_hash"](first) != lib["task_spec_hash"](second)
+    assert len(lib["task_spec_hash"](first)) == 64
+
+
+def test_a_new_selected_model_records_which_version_it_replaces(lib):
+    tid = _task(lib)
+    old = lib["registry_entries"](
+        [
+            _approval(tid, "old", "selected"),
+            _approval(tid, "base", "baseline_fallback", run="run-0"),
+        ],
+        {},
+    )
+    existing = lib["plan_versions"]([], old, {}, "rid-1", NOW)
+    new_wanted = lib["registry_entries"](
+        [
+            _approval(tid, "new", "selected", run="run-9"),
+            _approval(tid, "base", "baseline_fallback", run="run-0"),
+        ],
+        {},
+    )
+    planned = lib["plan_versions"](existing, new_wanted, {}, "rid-2", LATER)
+    created = next(r for r in planned if r["model_name"] == "new")
+    retired = next(r for r in planned if r["model_name"] == "old")
+    assert created["replaces"] == "old@v1" and created["version"] == 1
+    assert retired["lifecycle_status"] == "retired" and retired["version"] == 2
+    assert created["lifecycle_status"] == "registered"
+
+
+def test_a_row_has_all_the_required_version_fields_or_none(lib):
+    base = {"task_id": "t", "model_name": "m", "role": "selected", "version": 1}
+    none = {**base}
+    full = {
+        **base,
+        "data_fingerprint": "f",
+        "artifact_sha256": "a",
+        "task_spec_hash": "h",
+    }
+    partial = {**base, "data_fingerprint": "f"}
+    assert lib["version_field_problems"]([none, full]) == []
+    problems = lib["version_field_problems"]([partial])
+    assert problems == [
+        ("t", "m", "selected", 1, ["artifact_sha256", "task_spec_hash"])
+    ]
+    assert lib["versions_not_recorded"]([none, full, partial]) == 1

@@ -1,5 +1,6 @@
 corpus: curated
 version: 2
+holdout_cohort: extension
 questions:
 - id: q001
   class: definitional_wording
@@ -963,3 +964,528 @@ questions:
     approver: nobody
     approved_at: '2026-10-14'
     approved_hash: 419c3b7d39812444c71a560e82516509b60c85815f9283b19af628a3bec23919
+- id: q097
+  class: identifier_lookup
+  kind: model_card
+  expected_unit_id: model_card.ccpp.output
+  text: Show the model card of the task ccpp.output.
+  approval: {}
+  cohort: extension
+- id: q098
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.price_daily.price
+  text: Which model card covers the forecast of the daily day-ahead electricity price?
+  approval: {}
+  cohort: extension
+- id: q099
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.price_quarter_hour.price
+  text: Which model card covers the quarter-hour electricity price forecast?
+  approval: {}
+  cohort: extension
+- id: q100
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.price_quarter_hour.negative_price
+  text: Which model card covers predicting whether a quarter-hour price will be negative?
+  approval: {}
+  cohort: extension
+- id: q101
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.load.load
+  text: Which model card covers the forecast of the electricity load?
+  approval: {}
+  cohort: extension
+- id: q102
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.bias.bias
+  text: Which model card covers the bias of the grid operator forecasts?
+  approval: {}
+  cohort: extension
+- id: q103
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.zone_generation.generation
+  text: Which model card covers the generation of a control zone by energy carrier?
+  approval: {}
+  cohort: extension
+- id: q104
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.honda_forecast.increment
+  text: Which model card covers the forecast of the energy increment at the Honda site?
+  approval: {}
+  cohort: extension
+- id: q105
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.honda_anomaly.anomaly
+  text: Which model card covers anomaly detection on the Honda site energy data?
+  approval: {}
+  cohort: extension
+- id: q106
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.capacity_additions.additions
+  text: Which model card covers the capacity added per carrier and month?
+  approval: {}
+  cohort: extension
+- id: q107
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.redispatch.any_event
+  text: Which model card covers whether any redispatch event happens on a day?
+  approval: {}
+  cohort: extension
+- id: q108
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.redispatch.event_energy
+  text: Which model card covers the energy volume of redispatch events?
+  approval: {}
+  cohort: extension
+- id: q109
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.survival.unit_lifetime
+  text: Which model card covers how long a generation unit stays in operation?
+  approval: {}
+  cohort: extension
+- id: q110
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.weather_imputation.reconstruction
+  text: Which model card covers filling missing weather measurements?
+  approval: {}
+  cohort: extension
+- id: q111
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.weak_supervision.labels
+  text: Which model card covers labels made by weak supervision?
+  approval: {}
+  cohort: extension
+- id: q112
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.rl_pumped_storage.policy
+  text: Which model card covers the pumped storage dispatch policy?
+  approval: {}
+  cohort: extension
+- id: q113
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.rl_redispatch.policy
+  text: Which model card covers the offline policy for redispatch decisions?
+  approval: {}
+  cohort: extension
+- id: q114
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.session_purchase_ga4.purchase
+  text: Which model card covers predicting a purchase in a GA4 web session?
+  approval: {}
+  cohort: extension
+- id: q115
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.session_purchase_rees46.purchase
+  text: Which model card covers predicting a purchase in a REES46 shop session?
+  approval: {}
+  cohort: extension
+- id: q116
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.lapse_ga4.return
+  text: Which model card covers whether a GA4 visitor returns?
+  approval: {}
+  cohort: extension
+- id: q117
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.lapse_rees46.return
+  text: Which model card covers whether a REES46 customer returns?
+  approval: {}
+  cohort: extension
+- id: q118
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.next_item_ga4.next_item
+  text: Which model card covers the next item a GA4 visitor looks at?
+  approval: {}
+  cohort: extension
+- id: q119
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.next_item_rees46.next_item
+  text: Which model card covers the next product in a REES46 session?
+  approval: {}
+  cohort: extension
+- id: q120
+  class: definitional_wording
+  kind: model_card
+  expected_unit_id: model_card.rl_session_sequences.policy
+  text: Which model card covers the policy learned from session sequences?
+  approval: {}
+  cohort: extension
+- id: q121
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r01
+  text: How is the approved model of a task chosen and what stays as fallback?
+  approval: {}
+  cohort: extension
+- id: q122
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r02
+  text: What happens to a model when its skill interval includes zero?
+  approval: {}
+  cohort: extension
+- id: q123
+  class: identifier_lookup
+  kind: approval_rule
+  expected_unit_id: approval_rule.r03
+  text: Which approval rule blocks a model whose skill interval is wholly below zero?
+  approval: {}
+  cohort: extension
+- id: q124
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r04
+  text: What is the limit for the degradation from validation to the evaluated error?
+  approval: {}
+  cohort: extension
+- id: q125
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r05
+  text: What is the evidence floor of an approval, in rows and in blocks?
+  approval: {}
+  cohort: extension
+- id: q126
+  class: identifier_lookup
+  kind: approval_rule
+  expected_unit_id: approval_rule.r06
+  text: Which approval rule allows only diagnostic use when no ground truth exists?
+  approval: {}
+  cohort: extension
+- id: q127
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r07
+  text: What happens to a segment that has negative skill?
+  approval: {}
+  cohort: extension
+- id: q128
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r08
+  text: What interval coverage target and tolerance does the approval check?
+  approval: {}
+  cohort: extension
+- id: q129
+  class: identifier_lookup
+  kind: approval_rule
+  expected_unit_id: approval_rule.r09
+  text: Which approval rule restricts a model that has offline evidence only?
+  approval: {}
+  cohort: extension
+- id: q130
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r10
+  text: Which approval rule is a disclosure that the held-out partition was read more than once?
+  approval: {}
+  cohort: extension
+- id: q131
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r11
+  text: What does the approval say about a segment with positive skill but no uncertainty interval?
+  approval: {}
+  cohort: extension
+- id: q132
+  class: cross_reference
+  kind: approval_rule
+  expected_unit_id: approval_rule.r12
+  text: Which approval rule holds the limits that are specific to survival tasks?
+  approval: {}
+  cohort: extension
+- id: q133
+  class: definitional_wording
+  kind: approval_rule
+  expected_unit_id: approval_rule.r13
+  text: What is noted when the pretraining data of a foundation model is not shown to be free of the evaluated data?
+  approval: {}
+  cohort: extension
+- id: q134
+  class: identifier_lookup
+  kind: approval_rule
+  expected_unit_id: approval_rule.r14
+  text: Which approval rule blocks a foundation model without a repository, a revision or a licence on record?
+  approval: {}
+  cohort: extension
+- id: q135
+  class: definitional_wording
+  kind: metric
+  expected_unit_id: metric.ga4_sessions
+  text: What does the GA4 sessions metric count?
+  approval: {}
+  cohort: extension
+- id: q136
+  class: definitional_wording
+  kind: metric
+  expected_unit_id: metric.rees46_event_demand
+  text: Which metric gives the daily volume of shop events by category and event type?
+  approval: {}
+  cohort: extension
+- id: q137
+  class: definitional_wording
+  kind: metric
+  expected_unit_id: metric.site_energy_consumption
+  text: At what grain is the site energy consumption metric defined?
+  approval: {}
+  cohort: extension
+- id: q138
+  class: definitional_wording
+  kind: metric
+  expected_unit_id: metric.site_energy_weather_context
+  text: Which metric puts site energy next to the weather at the same site?
+  approval: {}
+  cohort: extension
+- id: q139
+  class: identifier_lookup
+  kind: metric
+  expected_unit_id: metric.ga4_revenue
+  text: Show the definition of the metric ga4_revenue.
+  approval: {}
+  cohort: extension
+- id: q140
+  class: identifier_lookup
+  kind: metric
+  expected_unit_id: metric.generation_by_carrier
+  text: Show the grain of the metric generation_by_carrier.
+  approval: {}
+  cohort: extension
+- id: q141
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.data_quality_gates
+  text: What states can a data quality check have and where is quality enforced?
+  approval: {}
+  cohort: extension
+- id: q142
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.lineage
+  text: How can a row be traced back to its source system?
+  approval: {}
+  cohort: extension
+- id: q143
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.licensing_and_attribution
+  text: How does the platform handle the licence and attribution of a source?
+  approval: {}
+  cohort: extension
+- id: q144
+  class: definitional_wording
+  kind: governance
+  expected_unit_id: governance.security_and_data_exchange
+  text: What does the AI agent tool layer never expose?
+  approval: {}
+  cohort: extension
+- id: q145
+  class: definitional_wording
+  kind: pipeline
+  expected_unit_id: pipeline.idempotency
+  text: Why can a Silver or Gold notebook be run again without a change in the result?
+  approval: {}
+  cohort: extension
+- id: q146
+  class: definitional_wording
+  kind: pipeline
+  expected_unit_id: pipeline.batch_ingestion
+  text: Which sources need a manual download?
+  approval: {}
+  cohort: extension
+- id: q147
+  class: definitional_wording
+  kind: pipeline
+  expected_unit_id: pipeline.processing_layers
+  text: Which layers form the processing chain in Databricks?
+  approval: {}
+  cohort: extension
+- id: q148
+  class: glossary_term
+  kind: glossary
+  expected_unit_id: glossary.grid_and_market_terms
+  text: Which names are the four German control areas?
+  approval: {}
+  cohort: extension
+- id: q149
+  class: glossary_term
+  kind: glossary
+  expected_unit_id: glossary.units_and_conventions
+  text: In which unit is the electricity price stored?
+  approval: {}
+  cohort: extension
+- id: q150
+  class: glossary_term
+  kind: glossary
+  expected_unit_id: glossary.weather_terms
+  text: What is the quality level column in DWD weather data?
+  approval: {}
+  cohort: extension
+- id: q151
+  class: identifier_lookup
+  kind: contract
+  expected_unit_id: contract.smard
+  text: Show the data contract of the SMARD source.
+  approval: {}
+  cohort: extension
+- id: q152
+  class: identifier_lookup
+  kind: contract
+  expected_unit_id: contract.redispatch
+  text: Show the data contract of the redispatch source.
+  approval: {}
+  cohort: extension
+- id: q153
+  class: identifier_lookup
+  kind: contract
+  expected_unit_id: contract.rees46
+  text: Show the data contract of the REES46 source.
+  approval: {}
+  cohort: extension
+- id: q154
+  class: cross_reference
+  kind: rule
+  expected_unit_id: rule.dwd.coordinate_quarantine
+  text: Which quality rule moves DWD stations with bad coordinates to quarantine?
+  approval: {}
+  cohort: extension
+- id: q155
+  class: cross_reference
+  kind: rule
+  expected_unit_id: rule.dwd.conflicting_dup_keys
+  text: Which quality rule handles DWD rows with the same key and different values?
+  approval: {}
+  cohort: extension
+- id: q156
+  class: cross_reference
+  kind: rule
+  expected_unit_id: rule.dwd.cloud_type_qn_defect
+  text: Which quality rule covers the quality level of the DWD cloud type?
+  approval: {}
+  cohort: extension
+- id: q157
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the current price of a Bitcoin?
+  approval: {}
+  cohort: extension
+- id: q158
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Who won the football world cup in 2022?
+  approval: {}
+  cohort: extension
+- id: q159
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I cook a risotto?
+  approval: {}
+  cohort: extension
+- id: q160
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model card covers the forecast of rainfall in Brazil?
+  approval: {}
+  cohort: extension
+- id: q161
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the interest rate of the central bank in the United States?
+  approval: {}
+  cohort: extension
+- id: q162
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which approval rule covers the speed limit on German motorways?
+  approval: {}
+  cohort: extension
+- id: q163
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the population of Tokyo?
+  approval: {}
+  cohort: extension
+- id: q164
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which metric measures the number of flights from Frankfurt airport?
+  approval: {}
+  cohort: extension
+- id: q165
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model card covers predicting stock prices?
+  approval: {}
+  cohort: extension
+- id: q166
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How does a nuclear power plant in France cool its reactor?
+  approval: {}
+  cohort: extension
+- id: q167
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the capital of Australia?
+  approval: {}
+  cohort: extension
+- id: q168
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which governance rule covers medical patient records?
+  approval: {}
+  cohort: extension
+- id: q169
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Show the data contract of the Twitter source.
+  approval: {}
+  cohort: extension
+- id: q170
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the best programming language for web design?
+  approval: {}
+  cohort: extension
+- id: q171
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which model predicts the winner of the Eurovision song contest?
+  approval: {}
+  cohort: extension

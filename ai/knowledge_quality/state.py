@@ -72,7 +72,11 @@ def keep_collections(ai_dir: Path, corpus_id: str) -> set[str]:
     """Collections that must not be pruned: the designated and the previous one."""
     state = read(ai_dir, corpus_id)
     events = (state["designated"], state["previous"])
-    return {event["collection"] for event in events if event}
+    kept = {event["collection"] for event in events if event}
+    # a designation may also name the collections of the other embedders
+    for event in events:
+        kept |= set((event or {}).get("dense_extra", []))
+    return kept
 
 
 def holdout_read(ai_dir: Path, corpus_id: str, build_id: str) -> dict | None:

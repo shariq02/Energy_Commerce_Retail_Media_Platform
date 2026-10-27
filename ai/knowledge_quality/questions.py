@@ -8,7 +8,10 @@ A positive question names the unit that answers it; a negative question is one t
 corpus cannot answer. Each question carries an approval with the hash of its
 content, so a changed question is `stale` until it is approved again. Only approved
 questions are evaluated. A question is a holdout question when the hash of its id
-modulo 3 is 2, so the split does not move when questions are added. Library only.
+modulo 3 is 2, so the split does not move when questions are added. A question has a
+cohort (default `base`) that is not part of its content hash. When the file names a
+`holdout_cohort`, only the questions of that cohort can be holdout questions; the
+others are tuning questions, because their holdout was read before. Library only.
 """
 
 from __future__ import annotations
@@ -45,6 +48,9 @@ class Question:
     kind: str | None
     expected_unit_id: str | None
     approval: dict = field(default_factory=dict)
+    cohort: str = "base"
+    # Set by `load` when the file has a holdout cohort that this question is not in.
+    tune_only: bool = False
 
     @property
     def negative(self) -> bool:
@@ -72,6 +78,8 @@ class Question:
 
     @property
     def split(self) -> str:
+        if self.tune_only:
+            return TUNE
         return HOLDOUT if int(uc.sha256_text(self.id)[:8], 16) % 3 == 2 else TUNE
 
 
@@ -80,6 +88,10 @@ class QuestionSet:
     corpus_id: str
     version: int
     questions: list[Question]
+    holdout_cohort: str | None = None
+
+    def of_cohort(self, cohort: str) -> list[Question]:
+        return [q for q in self.approved() if q.cohort == cohort]
 
     def approved(self) -> list[Question]:
         return [q for q in self.questions if q.status == "approved"]
@@ -119,9 +131,13 @@ def load(path: Path, unit_ids: set[str] | None = None) -> QuestionSet:
             kind=row.get("kind"),
             expected_unit_id=row.get("expected_unit_id"),
             approval=row.get("approval") or {},
+            cohort=str(row.get("cohort", "base")),
         )
         for row in data.get("questions", [])
     ]
+    holdout_cohort = data.get("holdout_cohort")
+    for question in questions:
+        question.tune_only = bool(holdout_cohort) and question.cohort != holdout_cohort
     kinds = uc.KIND_DIRS if data["corpus"] == "curated" else ("wikipedia_article",)
     seen = set()
     for question in questions:
@@ -129,12 +145,13 @@ def load(path: Path, unit_ids: set[str] | None = None) -> QuestionSet:
             raise ValueError(f"{question.id}: appears twice")
         seen.add(question.id)
         validate(question, unit_ids, kinds)
-    return QuestionSet(data["corpus"], int(data["version"]), questions)
+    return QuestionSet(data["corpus"], int(data["version"]), questions, holdout_cohort)
 
 
 def save(path: Path, question_set: QuestionSet) -> None:
-    rows = [
-        {
+    rows = []
+    for q in question_set.questions:
+        row = {
             "id": q.id,
             "class": q.cls,
             "kind": q.kind,
@@ -142,13 +159,16 @@ def save(path: Path, question_set: QuestionSet) -> None:
             "text": q.text,
             "approval": q.approval,
         }
-        for q in question_set.questions
-    ]
+        if q.cohort != "base":
+            row["cohort"] = q.cohort
+        rows.append(row)
     data = {
         "corpus": question_set.corpus_id,
         "version": question_set.version,
         "questions": rows,
     }
+    if question_set.holdout_cohort:
+        data["holdout_cohort"] = question_set.holdout_cohort
     text = yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=100)
     uc.write_text(path, text)
 

@@ -149,7 +149,8 @@ MODEL_DDL = {
         "frozen_delta_version bigint, mlflow_run_id string, artifact_uri string, "
         "approval_run_id string, approval_decided_at timestamp, card_path string, "
         "fit_library_versions string, reason string, run_id string, "
-        "registered_at timestamp"
+        "registered_at timestamp, code_version string, data_fingerprint string, "
+        "artifact_sha256 string, replaces string, task_spec_hash string"
     ),
     "registry_check": (
         "task_id string, model_name string, role string, registry_version int, "
@@ -586,6 +587,24 @@ def model_run_id() -> str:
 
 def read_model(table: str, *, ecosystem: str) -> DataFrame:
     return spark.table(model_fqn(table, ecosystem))
+
+
+def ddl_columns(ddl: str) -> list[tuple[str, str]]:
+    """(name, type) of each column of a DDL text."""
+    return [tuple(part.split(" ", 1)) for part in ddl.split(", ")]
+
+
+def add_missing_columns(table: str, *, ecosystem: str, ddl: str) -> list[str]:
+    """Add the DDL columns that the table lacks, at its end; old rows hold NULL.
+    Returns the names added."""
+    full = model_fqn(table, ecosystem)
+    have = {name.lower() for name in spark.table(full).columns}
+    missing = [(n, t) for n, t in ddl_columns(ddl) if n.lower() not in have]
+    if missing:
+        columns = ", ".join(f"{name} {kind}" for name, kind in missing)
+        spark.sql(f"ALTER TABLE {full} ADD COLUMNS ({columns})")
+        print(f"OK  {full}: columns added: {[n for n, _ in missing]}")
+    return [name for name, _ in missing]
 
 
 def replace_model_rows(

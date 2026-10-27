@@ -131,3 +131,14 @@ models:
   include:
   - src/*
   - pyproject.toml
+- key: bge_reranker_v2_m3
+  repo_id: BAAI/bge-reranker-v2-m3
+  ref: main
+  revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: named on the model card; the cross-encoder of the knowledge retrieval, not a forecaster
+  include:
+  - '*.json'
+  - model.safetensors
+  - sentencepiece.bpe.model

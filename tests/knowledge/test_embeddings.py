@@ -24,9 +24,11 @@ from ai.embeddings import build_record as br
 from ai.embeddings import chunks as ch
 from ai.embeddings import collection as coll
 from ai.embeddings import embedder as emb
+from ai.embeddings import extra
 from ai.embeddings import keyword_index as ki
 from ai.embeddings import knowledge_graph as kg
 from ai.embeddings import progress as pg
+from ai.knowledge_quality import state as qstate
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import approve_units as au
 from scripts.knowledge import run_all as ra
@@ -601,3 +603,154 @@ def test_verify_finds_a_changed_shard_file(tmp_path, capsys):
     shard.write_text(shard.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     assert eb.main(["verify", "--corpus", "wikipedia", *args_for(wiki.parent)]) == 1
     assert f"shard {shard.name} differs from the manifest" in capsys.readouterr().out
+
+
+# --- second dense collection (another embedder, same chunks) -----------------------
+
+GTE = emb.GTE_MODERNBERT
+GTE_HASHES = {
+    "archive_sha256": None,
+    "model_onnx_sha256": "1" * 64,
+    "tokenizer_sha256": "2" * 64,
+}
+
+
+class FakeGteEmbedder:
+    def __init__(self, profile=None, model_dir=None):
+        pass
+
+    def vectors_for(self, chunks):
+        vectors = []
+        for chunk in chunks:
+            seed = int.from_bytes(
+                hashlib.sha256(chunk.text.encode()).digest()[:8], "big"
+            )
+            vector = np.random.default_rng(seed + 1).standard_normal(GTE.dimension)
+            vectors.append(vector / np.linalg.norm(vector))
+        return np.array(vectors, dtype=np.float32)
+
+
+@pytest.fixture
+def second_model(monkeypatch):
+    monkeypatch.setattr(
+        emb, "profile_hashes", lambda profile, model_dir=None: dict(GTE_HASHES)
+    )
+    monkeypatch.setattr(
+        emb, "profile_embedder", lambda profile, model_dir=None: FakeGteEmbedder()
+    )
+
+
+def second_argv(corpus_dir, *extra_args):
+    return [
+        "--corpus",
+        "curated",
+        "--embedder",
+        GTE.slug,
+        *args_for(corpus_dir, *extra_args),
+    ]
+
+
+def build_primary(corpus_dir):
+    assert (
+        eb.main(["build", "--corpus", "curated", *args_for(corpus_dir, "--apply")]) == 0
+    )
+
+
+def test_the_second_collection_needs_the_primary_build(curated, second_model, capsys):
+    assert eb.main(["build", *second_argv(curated, "--apply")]) == 1
+    assert "primary (MiniLM) build does not exist" in capsys.readouterr().out
+    assert not (curated.parent / "vector_store").exists()
+
+
+def test_second_collection_is_built_beside_the_primary_and_verified(
+    curated, second_model, capsys
+):
+    build_primary(curated)
+    primary = read_manifest(curated / uc.MANIFEST_NAME)[br.RECORD_KEY]
+    assert eb.main(["build", *second_argv(curated, "--apply")]) == 0
+    manifest = read_manifest(curated / uc.MANIFEST_NAME)
+    record = manifest[extra.EXTRA_KEY][GTE.slug]
+    assert manifest[br.RECORD_KEY] == primary
+    assert record["collection"].startswith("curated.gte-modernbert-base_")
+    assert record["chunk_count"] == primary["chunk_count"] == 5
+    assert record["primary_build_id"] == primary["build_id"]
+    assert record["embedder"]["dimension"] == 768 and record["embedder"]["revision"]
+    client = coll.open_client(br.chroma_dir(curated.parent))
+    assert coll.names(client, "curated") == [primary["collection"]]
+    assert coll.names(client, "curated.gte-modernbert-base") == [record["collection"]]
+    folder = br.build_dir(curated.parent, record["corpus_id"], record["build_id"])
+    assert (
+        br.read_build_record(curated.parent, record["corpus_id"], record["build_id"])
+        == record
+    )
+    assert folder.parent == br.builds_root(
+        curated.parent, "curated.gte-modernbert-base"
+    )
+    assert eb.main(["verify", *second_argv(curated)]) == 0
+    capsys.readouterr()
+    assert eb.main(["build", *second_argv(curated, "--apply")]) == 0
+    assert "Nothing to build." in capsys.readouterr().out
+
+
+def test_a_changed_primary_build_makes_the_second_one_stale_and_both_are_kept(
+    curated, second_model, capsys
+):
+    build_primary(curated)
+    assert eb.main(["build", *second_argv(curated, "--apply")]) == 0
+    first = read_manifest(curated / uc.MANIFEST_NAME)[extra.EXTRA_KEY][GTE.slug]
+    make_units(
+        curated, [("rule.dwd.one", "rule", "# Rule: one\n\nA changed rule.", SOURCE)]
+    )
+    capsys.readouterr()
+    assert eb.main(["build", *second_argv(curated, "--apply")]) == 1
+    assert "chunks differ from the primary build" in capsys.readouterr().out
+    build_primary(curated)
+    assert eb.main(["verify", *second_argv(curated)]) == 1
+    assert eb.main(["build", *second_argv(curated, "--apply")]) == 0
+    second = read_manifest(curated / uc.MANIFEST_NAME)[extra.EXTRA_KEY][GTE.slug]
+    assert second["collection"] != first["collection"]
+    assert second["last_known_good"] == first["collection"]
+    client = coll.open_client(br.chroma_dir(curated.parent))
+    assert len(coll.names(client, "curated.gte-modernbert-base")) == 2
+    assert len(coll.names(client, "curated")) == 2
+
+
+def test_the_second_collection_does_not_exist_for_wikipedia_yet(
+    curated, second_model, capsys
+):
+    argv = [
+        "--corpus",
+        "wikipedia",
+        "--embedder",
+        GTE.slug,
+        *args_for(curated, "--apply"),
+    ]
+    assert eb.main(["build", *argv]) == 1
+    assert "only the curated corpus" in capsys.readouterr().out
+    all_argv = [
+        "--corpus",
+        "all",
+        "--embedder",
+        GTE.slug,
+        *args_for(curated, "--dry-run"),
+    ]
+    build_primary(curated)
+    capsys.readouterr()
+    assert eb.main(["build", *all_argv]) == 0
+    assert "wikipedia: no second collection yet" in capsys.readouterr().out
+
+
+def test_a_designation_keeps_the_extra_dense_collections(monkeypatch, tmp_path):
+    event = {
+        "collection": "curated_a",
+        "dense_extra": ["curated.gte-modernbert-base_b"],
+    }
+    monkeypatch.setattr(
+        qstate,
+        "read",
+        lambda ai_dir, corpus_id: {"designated": event, "previous": None},
+    )
+    assert qstate.keep_collections(tmp_path, "curated") == {
+        "curated_a",
+        "curated.gte-modernbert-base_b",
+    }

@@ -168,8 +168,9 @@ def build_manifest_data(wiki_dir: Path, previous: dict, progress=None) -> dict:
         "approval": record,
     }
     # The embedding build owns this key; a rebuild of the manifest keeps it.
-    if "embedding" in previous:
-        data["embedding"] = previous["embedding"]
+    for key in ("embedding", "embedding_extra"):
+        if key in previous:
+            data[key] = previous[key]
     return data
 
 

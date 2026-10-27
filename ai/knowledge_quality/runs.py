@@ -47,6 +47,18 @@ def latest_run(ai_dir: Path, corpus_id: str, split: str) -> dict | None:
     return json.loads(files[-1].read_text(encoding="utf-8")) if files else None
 
 
+def latest_run_of_build(
+    ai_dir: Path, corpus_id: str, split: str, build_id: str
+) -> dict | None:
+    """The newest run of a split that was made on the build."""
+    files = sorted(runs_dir(ai_dir, corpus_id).glob(f"{corpus_id}-{split}-*.json"))
+    for path in reversed(files):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if record["build_id"] == build_id:
+            return record
+    return None
+
+
 def save_check(ai_dir: Path, corpus_id: str, integrity, freshness) -> dict:
     record = {
         "created": datetime.now(UTC).isoformat(timespec="seconds"),

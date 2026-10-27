@@ -11,7 +11,9 @@ question is a hit at rank r when its unit is the r-th unit of the list. The metr
 are Recall@1, Recall@5, Recall@context (the unit is anywhere in what is served),
 MRR and nDCG@5 (one relevant unit), counted per type, per unit kind and per query
 class. A negative question is answered `no_match` by a type that serves nothing.
-The candidate collection is only read. Library only.
+The candidate collection is only read. With extra embedders in the config each one
+also gets its own type `dense:<slug>` (its first `final_k` chunks), and the hybrid
+types fuse it. Library only.
 """
 
 from __future__ import annotations
@@ -66,13 +68,25 @@ class Outcome:
     # Best score of the expected unit, and of any chunk, per retriever (no threshold).
     expected_score: dict = field(default_factory=dict)
     top_score: dict = field(default_factory=dict)
+    cohort: str = "base"
+    # What the reranker and the judge steps recorded for this question.
+    notes: dict = field(default_factory=dict)
 
 
 def evaluate_question(
-    store: st.Store, question: Question, config: RetrievalConfig
+    store: st.Store,
+    question: Question,
+    config: RetrievalConfig,
+    scores=None,
+    judge=None,
 ) -> Outcome:
-    searched = rv.search_all(store, question.text, {}, config)
-    direct, related, _ = rv.serve(store, searched, config)
+    filters, notes = rv.judge_filters(judge, config, question.text, {})
+    searched = rv.search_all(store, question.text, filters, config)
+    direct, related, _ = rv.serve(store, searched, config, scores)
+    direct, related, after = rv.judge_after(
+        judge, config, question.text, direct, related, searched
+    )
+    notes = {**searched.notes, **notes, **after}
     expected = question.expected_unit_id
     top = config.final_k
     hybrid = units_in_order(hit.chunk_id for hit in direct)
@@ -87,7 +101,11 @@ def evaluate_question(
         HYBRID: hybrid,
         HYBRID_GRAPH: graph,
     }
-    scores = {DENSE: searched.dense, KEYWORD: searched.keyword}
+    found = {DENSE: searched.dense, KEYWORD: searched.keyword}
+    for slug, (_status, hits) in searched.extra.items():
+        name = rv.extra_name(slug)
+        served[name] = units_in_order(c for c, _ in hits[:top])
+        found[name] = hits
     return Outcome(
         question_id=question.id,
         cls=question.cls,
@@ -97,17 +115,24 @@ def evaluate_question(
         ranks={mode: rank_of(units, expected) for mode, units in served.items()},
         served={mode: units[:8] for mode, units in served.items()},
         no_match={mode: not units for mode, units in served.items()},
-        expected_score={n: best_score(p, expected) for n, p in scores.items()},
-        top_score={n: max((s for _, s in p), default=None) for n, p in scores.items()},
+        expected_score={n: best_score(p, expected) for n, p in found.items()},
+        top_score={n: max((s for _, s in p), default=None) for n, p in found.items()},
+        cohort=question.cohort,
+        notes=notes,
     )
 
 
 def evaluate(
-    store: st.Store, questions: list[Question], config: RetrievalConfig, progress=None
+    store: st.Store,
+    questions: list[Question],
+    config: RetrievalConfig,
+    progress=None,
+    scores=None,
+    judge=None,
 ) -> list[Outcome]:
     outcomes = []
     for number, question in enumerate(questions, 1):
-        outcomes.append(evaluate_question(store, question, config))
+        outcomes.append(evaluate_question(store, question, config, scores, judge))
         if progress and number % 10 == 0:
             progress(f"  [questions] {number}/{len(questions)}")
     return outcomes
@@ -137,8 +162,9 @@ def grouped(outcomes: list[Outcome]) -> dict:
         if outcome.expected_unit_id:
             groups.setdefault(f"kind:{outcome.kind}", []).append(outcome)
         groups.setdefault(f"class:{outcome.cls}", []).append(outcome)
+    modes = list(outcomes[0].ranks) if outcomes else list(MODES)
     return {
-        name: {mode: metrics(items, mode) for mode in MODES}
+        name: {mode: metrics(items, mode) for mode in modes}
         for name, items in sorted(groups.items())
     }
 
@@ -156,6 +182,7 @@ def run_record(
     question_set,
     config: RetrievalConfig,
     config_version: int | None,
+    judge: dict | None = None,
 ) -> dict:
     """The stored record of an evaluation run; it holds every outcome."""
     record = store.record
@@ -177,6 +204,13 @@ def run_record(
             "hash": question_set.set_hash,
             "questions": len(outcomes),
         },
+        "extra_collections": {
+            slug: found["collection"] for slug, found in store.extra_records.items()
+        },
+        "judge": judge,
+        "rerank_missing": sum(
+            o.notes.get("rerank", {}).get("missing", 0) for o in outcomes
+        ),
         "metrics": grouped(outcomes),
         "outcomes": [asdict(o) for o in outcomes],
     }

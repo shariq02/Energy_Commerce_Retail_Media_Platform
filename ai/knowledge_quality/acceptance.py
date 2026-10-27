@@ -55,7 +55,11 @@ def misses(run: dict) -> set[str]:
 
 
 def decide(
-    run: dict, previous_run: dict | None, integrity_problems: list[str]
+    run: dict,
+    previous_run: dict | None,
+    integrity_problems: list[str],
+    base_run: dict | None = None,
+    baseline_runs: tuple = (),
 ) -> Decision:
     decision = Decision()
     total = run["metrics"]["all"][MODE]
@@ -92,6 +96,22 @@ def decide(
             len(extra) <= MAX_EXTRA_MISSES,
             f"{len(extra)} additional miss(es), at most {MAX_EXTRA_MISSES} allowed"
             + (f": {extra}" if extra else ""),
+        )
+    if base_run is not None and baseline_runs:
+        before = set().union(*(misses(r) for r in baseline_runs))
+        extra = sorted(misses(base_run) - before)
+        decision.add(
+            "old questions: additional misses against the designated build",
+            len(extra) <= MAX_EXTRA_MISSES,
+            f"{len(extra)} additional miss(es) on {len(base_run['outcomes'])} old "
+            f"questions (seen data), at most {MAX_EXTRA_MISSES} allowed"
+            + (f": {extra}" if extra else ""),
+        )
+    elif base_run is not None:
+        decision.add(
+            "old questions: additional misses against the designated build",
+            None,
+            "not applicable: no designated build to compare with",
         )
     decision.add(
         "integrity checks",

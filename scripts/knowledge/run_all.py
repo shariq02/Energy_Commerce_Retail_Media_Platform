@@ -8,8 +8,10 @@ Steps: units (build), authored (written bodies, skipped when there is no index),
 tokens (size check), wikipedia_fetch (the selected articles, edges and chunks
 with vectors from Databricks; each part only when its local files are missing or --refresh-wikipedia
 is given, and when the Databricks settings are in .env), wikipedia (corpus manifest),
-embeddings (collection, keyword index and graph of each approved corpus, in the
-write pass only; a corpus that waits for approval is skipped); stops at the first failure. It first runs every step as a
+embedder_download (the model files of the extra embedders named in the stack file, in the
+write pass only), embeddings (collection, keyword index and graph of each approved corpus,
+and the second dense collection of the curated corpus, in the write pass only; a corpus
+that waits for approval is skipped); stops at the first failure. It first runs every step as a
 dry run and prints the plan. In an interactive terminal it then asks whether to
 apply (y or yes), runs the steps again to write, and asks what to approve.
 --apply skips the question; without a terminal nothing is written.
@@ -27,10 +29,13 @@ from collections import Counter
 from pathlib import Path
 
 from ai.embeddings import build as eb
+from ai.embeddings import embedder as emb
+from ai.knowledge_quality import stack as qstack
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import approve_units as au
 from scripts.knowledge import author_units as auth
 from scripts.knowledge import build_units as bu
+from scripts.knowledge import embedder_model_download as dl
 from scripts.knowledge import report_tokens as rt
 from scripts.knowledge import wikipedia_corpus as wc
 from scripts.knowledge import wikipedia_fetch as wf
@@ -140,6 +145,35 @@ def step_wikipedia(args: argparse.Namespace) -> int:
     return wc.main(["build", "--wiki-dir", str(wiki_dir(args)), *write_mode(args)])
 
 
+def wanted_embedders(args: argparse.Namespace) -> list:
+    """The profiles of the extra dense retrievers that the stack file names."""
+    stack = qstack.load(args.corpus_dir.parent, "curated")
+    return [emb.PROFILES[slug] for slug in stack["embedders"]]
+
+
+def model_files_ready(profile: emb.Profile) -> bool:
+    folder = emb.default_model_dir(profile)
+    return all(row[4] == "ok" for row in dl.plan(profile, folder))
+
+
+def step_embedder_download(args: argparse.Namespace) -> int:
+    """Fetch the model files of each extra embedder of the stack that are not there."""
+    for profile in wanted_embedders(args):
+        folder = emb.default_model_dir(profile)
+        todo = [row for row in dl.plan(profile, folder) if row[4] != "ok"]
+        if not todo:
+            print(f"{profile.id}: the model files are there and match.")
+            continue
+        megabytes = sum(row[2] for row in todo) / 1e6
+        if not args.apply:
+            print(f"{profile.id}: {megabytes:.0f} MB to download in the write pass.")
+            continue
+        code = dl.main(["--embedder", profile.slug, "--apply"])
+        if code != 0:
+            return code
+    return 0
+
+
 def step_embeddings(args: argparse.Namespace) -> int:
     ready = []
     for name in eb.CORPORA:
@@ -160,6 +194,18 @@ def step_embeddings(args: argparse.Namespace) -> int:
         code = eb.main(["build", "--corpus", name, *argv])
         if code != 0:
             return code
+    if eb.CURATED_ID in ready:
+        for profile in wanted_embedders(args):
+            if not model_files_ready(profile):
+                print(
+                    f"{profile.id}: the model files are not ready, so its collection is skipped."
+                )
+                continue
+            code = eb.main(
+                ["build", "--corpus", eb.CURATED_ID, "--embedder", profile.slug, *argv]
+            )
+            if code != 0:
+                return code
     return 0
 
 
@@ -169,11 +215,18 @@ STEPS = [
     ("tokens", step_tokens),
     ("wikipedia_fetch", step_wikipedia_fetch),
     ("wikipedia", step_wikipedia),
+    ("embedder_download", step_embedder_download),
     ("embeddings", step_embeddings),
 ]
 
 
-KIND_CHOICES = {"2": "metric", "3": "contract", "4": "rule"}
+KIND_CHOICES = {
+    "2": "metric",
+    "3": "contract",
+    "4": "rule",
+    "5": "model_card",
+    "6": "approval_rule",
+}
 
 
 def ask(question: str) -> str:
@@ -204,11 +257,11 @@ def approval_step(args: argparse.Namespace, waiting: list[uc.Unit]) -> None:
     print(f"  1  every waiting unit ({len(waiting)})")
     for number, kind in KIND_CHOICES.items():
         print(f"  {number}  {kind} units ({counts[kind]} waiting)")
-    print("  5  do not approve")
+    print("  7  do not approve")
     try:
-        choice = ask("Choice (1, 2, 3, 4 or 5): ")
+        choice = ask("Choice (1 to 7): ")
     except EOFError:
-        choice = "5"
+        choice = "7"
     if choice == "1":
         chosen = waiting
     elif choice in KIND_CHOICES:

@@ -27,6 +27,10 @@ from scripts.knowledge import report_tokens as rt
 pytestmark = [pytest.mark.unit, pytest.mark.ai]
 
 ROOT = uc.ROOT
+# The units of the model cards and of the approval rules follow the files in the repository.
+CARDS = len(list((ROOT / "src" / "model_cards").glob("*/*.md")))
+RULE_UNITS = len(bu.read_approval_rules(ROOT / bu.APPROVAL_RULES_FILE))
+TOTAL = 92 + CARDS + RULE_UNITS
 RULES_PER_SOURCE = {
     "dwd": 14,
     "honda_iot": 5,
@@ -60,7 +64,13 @@ def create_unit(corpus_dir, unit_id="rule.x.a", body="# A\n\nbody", sources=SOUR
 
 def test_unit_counts(derived):
     kinds = Counter(u["kind"] for u in derived)
-    assert kinds == {"metric": 8, "contract": 8, "rule": 76}
+    assert kinds == {
+        "metric": 8,
+        "contract": 8,
+        "rule": 76,
+        "model_card": CARDS,
+        "approval_rule": RULE_UNITS,
+    }
     metrics = [u for u in derived if u["kind"] == "metric"]
     assert Counter(u["ecosystem"] for u in metrics) == {"energy": 5, "commerce": 3}
     for source, count in RULES_PER_SOURCE.items():
@@ -72,7 +82,9 @@ def test_unit_counts(derived):
 def test_unit_ids_are_unique_and_safe_file_names(derived):
     ids = [u["unit_id"] for u in derived]
     assert len(ids) == len(set(ids))
-    pattern = re.compile(r"^(metric|contract|rule)\.[^\s/\\]+$")
+    pattern = re.compile(
+        r"^(metric|contract|rule|model_card|approval_rule)\.[^\s/\\]+$"
+    )
     assert [i for i in ids if not pattern.match(i)] == []
 
 
@@ -105,17 +117,17 @@ def test_excluded_fields_are_not_in_any_unit(derived):
 def test_build_writes_units_and_manifest(tmp_path):
     build(tmp_path)
     units = uc.scan_units(tmp_path)
-    assert len(units) == 92
+    assert len(units) == TOTAL
     for unit in units:
         assert set(uc.REQUIRED_HEADER) <= set(unit.header)
         assert unit.header["version"] == 1
         assert unit.approval_status == "pending"
         assert all(len(s["sha256"]) == 64 for s in unit.header["source"])
     manifest = json.loads((tmp_path / uc.MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert manifest["unit_count"] == 92
+    assert manifest["unit_count"] == TOTAL
     assert manifest["corpus_version"] == 1
     assert manifest["units_by_kind"]["rule"] == 76
-    assert manifest["approval"] == {"approved": 0, "pending": 92, "stale": 0}
+    assert manifest["approval"] == {"approved": 0, "pending": TOTAL, "stale": 0}
 
 
 def test_second_build_changes_nothing(tmp_path):
@@ -134,7 +146,7 @@ def test_dry_run_writes_nothing(tmp_path):
 def test_the_dry_run_lists_every_new_unit(tmp_path, capsys):
     assert bu.main(["--corpus-dir", str(tmp_path), "--dry-run"]) == 0
     output = capsys.readouterr().out
-    assert "Created (92):" in output
+    assert f"Created ({TOTAL}):" in output
     assert "  rule.dwd.station_set  version 1, body " in output
     assert uc.NOT_WRITTEN in output
 
@@ -233,7 +245,7 @@ def test_approval_covers_only_the_chosen_kind(tmp_path):
     assert {u.kind for u in approved} == {"metric"}
     assert all(u.header["approval"]["approved_version"] == 1 for u in approved)
     manifest = json.loads((tmp_path / uc.MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert manifest["approval"] == {"approved": 8, "pending": 84, "stale": 0}
+    assert manifest["approval"] == {"approved": 8, "pending": TOTAL - 8, "stale": 0}
     assert manifest["corpus_version"] == 1
     assert au.select_units(units, ["metric"], [], False) == []
 
@@ -416,7 +428,7 @@ def test_a_hand_edited_body_makes_the_approval_stale(tmp_path):
     assert edited.approval_status == "stale"
     assert au.needs_approval(edited)
     manifest = uc.write_manifest(tmp_path)
-    assert manifest["approval"] == {"approved": 7, "pending": 84, "stale": 1}
+    assert manifest["approval"] == {"approved": 7, "pending": TOTAL - 8, "stale": 1}
 
 
 def test_an_approval_without_a_body_hash_is_stale(tmp_path):
