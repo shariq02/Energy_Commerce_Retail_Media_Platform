@@ -567,6 +567,11 @@ def test_a_request_checks_its_keys_and_its_window(lib):
     assert (start.isoformat(), end.isoformat()) == ("2025-01-01", "2025-01-31")
 
 
+def test_the_default_request_is_small_and_has_a_short_worst_case(lib):
+    assert lib["DEFAULT_WINDOW_DAYS"] == 1 and lib["DEFAULT_ROW_LIMIT"] == 100
+    assert 15 * lib["REQUEST_LIMIT_SECONDS"] <= 90 * 60
+
+
 def test_request_positions_keep_the_window_and_the_newest_rows(lib):
     import datetime
 

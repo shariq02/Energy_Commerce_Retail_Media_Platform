@@ -28,9 +28,9 @@ import uuid as _uuid
 # COMMAND ----------
 
 # DBTITLE 1,Default request settings
-DEFAULT_WINDOW_DAYS = 31
-DEFAULT_ROW_LIMIT = 1000
-REQUEST_LIMIT_SECONDS = 900
+DEFAULT_WINDOW_DAYS = 1
+DEFAULT_ROW_LIMIT = 100
+REQUEST_LIMIT_SECONDS = 300
 REQUEST_ECOSYSTEMS = ("energy", "commerce")
 
 # COMMAND ----------
@@ -93,17 +93,40 @@ def registered_entry(task_id: str):
 
 # COMMAND ----------
 
+# DBTITLE 1,A stable sample of the rows before the model scores them
+
+
+def key_sample(df, key_cols: list, rows: int):
+    """About `rows` rows chosen by a stable hash of the key columns."""
+    if not key_cols or not set(key_cols) <= set(df.columns):
+        return df.limit(rows)
+    total = df.count()
+    if total <= rows:
+        return df
+    bucket = F.pmod(
+        F.xxhash64(*[F.col(c).cast("string") for c in key_cols]), F.lit(1_000_000)
+    )
+    return df.filter(bucket < _math_request.ceil(rows / total * 1_000_000))
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Read the rows of the request from the frozen dataset
 
 
-def request_frame(ctx, cfg, task_id, keys, time_col, start, end, latest_days):
+def request_frame(
+    ctx, cfg, task_id, keys, time_col, start, end, latest_days, row_limit=None
+):
     """The Spark frame of the request and its window. With `latest_days` and no
-    window, the window is the newest days of the data."""
+    window, the window is the newest days of the data. A task without a time column
+    and without keys is sampled to `row_limit` rows before it is scored."""
     df = read_partitions(ctx, None)
     if cfg.get("history"):
         df = complete_load_features(df, ctx)
     for col, value in keys.items():
         df = df.filter(F.col(col).cast("string") == str(value))
+    if row_limit and not time_col and not keys:
+        df = key_sample(df, key_columns(cfg), row_limit)
     if latest_days and time_col and not (start or end):
         end = df.agg(F.max(F.to_date(F.col(time_col)))).first()[0]
         if end is not None:
@@ -172,7 +195,7 @@ def score_request(
             f"frozen dataset is at {ctx.frozen_version}"
         )
     df, start, end = request_frame(
-        ctx, cfg, task_id, keys, time_col, start, end, latest_days
+        ctx, cfg, task_id, keys, time_col, start, end, latest_days, row_limit
     )
     evaluator = TabularEvaluator(ctx, cfg)
     evaluator.load(df, None, 1.0)

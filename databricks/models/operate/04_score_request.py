@@ -17,7 +17,7 @@
 # MAGIC carries keys and a window, never feature values: the rows are read from the
 # MAGIC frozen dataset and prepared as the evaluation does. It is a replay of stored
 # MAGIC data in batch; no endpoint is involved. Without a `task_id`, one default request
-# MAGIC per tabular task scores the newest 31 days (at most 1,000 rows). Widgets, all
+# MAGIC per tabular task scores the newest day (at most 100 rows). Widgets, all
 # MAGIC optional: `task_id`, `keys` (a JSON object of key columns and values),
 # MAGIC `window_start` and `window_end` (dates, only for a task with a time column),
 # MAGIC `request_id` (empty gives a new one). Run on the compute type of the registered
