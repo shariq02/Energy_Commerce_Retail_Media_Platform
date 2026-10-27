@@ -1,6 +1,6 @@
 # Model card: honda_anomaly.anomaly
 
-_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R09
+- rules applied: R09, R10
 
 ## Purpose and task
 
@@ -36,7 +36,7 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 
 ## Training
 
-- model family: forecast_residual_sklearn; MLflow run `41c192648f6441488d6897f624d75b48`
+- model family: forecast_residual_sklearn; MLflow run `eccc9fbf34ce4f998c5c715fc60a5535`
 - parameters: {'inject_rate': 0.02, 'flag_quantile': 0.99, 'injected_rows': 537, 'row_fraction': 1.0}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -66,7 +66,7 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

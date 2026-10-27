@@ -1,6 +1,117 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-26T17:10Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T14:09Z_
+
+<!-- section: energy__approve__00_approval_setup -->
+## Approval Setup
+
+### approval_spec
+
+16 row(s)
+
+| rule_id | rule_class | parameter | parameter_value |
+|---|---|---|---|
+| R01 | selection |  |  |
+| R02 | conditional |  |  |
+| R03 | blocking |  |  |
+| R04 | conditional | degradation_relative | 0.2 |
+| R05 | blocking | min_rows | 30 |
+| R05 | blocking | min_blocks | 5 |
+| R06 | restriction |  |  |
+| R07 | segment |  |  |
+| R08 | conditional | coverage_target | 0.8 |
+| R08 | conditional | coverage_tolerance | 0.1 |
+| R09 | restriction |  |  |
+| R10 | disclosure |  |  |
+| R11 | conditional |  |  |
+| R12 | conditional |  |  |
+| R13 | conditional |  |  |
+| R14 | blocking |  |  |
+
+<!-- section: energy__approve__01_recommend -->
+## Approval Recommendation
+
+### model_approval
+
+73 row(s), first 30 shown
+
+| task_id | model_name | role | decision | restriction | overridden | primary_metric | validation_value | evaluated_value |
+|---|---|---|---|---|---|---|---|---|
+| price_daily.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 11.8123 | 15.947 |
+| price_daily.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 12.0123 | 15.5598 |
+| price_daily.price | toto2_zero_shot | runner_up | not_approved |  | False | mae | 19.9697 | 20.4462 |
+| price_daily.price | seasonal_naive | baseline_fallback | approved |  | False | mae | 28.0429 | 28.6236 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 17.7397 | 29.4453 |
+| price_quarter_hour.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 17.8868 | 29.4854 |
+| price_quarter_hour.price | ttm_r2_zero_shot | runner_up | not_approved |  | False | mae | 28.3344 | 32.6938 |
+| price_quarter_hour.price | persistence | baseline_fallback | approved |  | False | mae | 33.1459 | 37.3036 |
+| price_quarter_hour.negative_price | logistic | selected | approved |  | False | pr_auc | 0.6168 | 0.7205 |
+| price_quarter_hour.negative_price | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6014 | 0.7098 |
+| price_quarter_hour.negative_price | tabpfn_v2_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0425 | 0.0738 |
+| load.load | gbt_sklearn | selected | approved |  | False | mae | 24860.3053 | 26838.3958 |
+| load.load | gbt_lightgbm | runner_up | not_approved |  | False | mae | 25128.0502 | 26943.748 |
+| load.load | chronos2_lora | runner_up | not_approved |  | False | mae | 39286.5963 | 40774.5511 |
+| load.load | seasonal_mean | baseline_fallback | approved |  | False | mae | 57004.7223 | 64187.8077 |
+| bias.bias | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 15334.1454 | 16247.296 |
+| bias.bias | gbt_sklearn | runner_up | not_approved |  | False | mae | 15426.0679 | 16532.2186 |
+| bias.bias | chronos2_lora | runner_up | not_approved |  | False | mae | 28836.0141 | 29572.7339 |
+| bias.bias | zero_correction | baseline_fallback | approved |  | False | mae | 93650.1115 | 102494.0979 |
+| zone_generation.generation | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 10930.1759 | 16172.1206 |
+| zone_generation.generation | gbt_sklearn | runner_up | not_approved |  | False | mae | 12541.1318 | 17187.8828 |
+| zone_generation.generation | timesfm25_zero_shot | runner_up | not_approved |  | False | mae |  |  |
+| zone_generation.generation | capacity_factor | baseline_fallback | approved |  | False | mae | 25712.8807 | 31443.7748 |
+| honda_forecast.increment | chronos2_lora | selected | approved_with_conditions |  | False | mae | 16.1482 | 18.1303 |
+| honda_forecast.increment | gbt_lightgbm | runner_up | not_approved |  | False | mae | 17.9655 | 20.4706 |
+| honda_forecast.increment | gbt_sklearn | runner_up | not_approved |  | False | mae | 18.0254 | 20.4469 |
+| honda_forecast.increment | persistence | baseline_fallback | approved |  | False | mae | 20.3038 | 23.2843 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | selected | approved_with_conditions | offline_only | False | pr_auc | 0.6517 | 0.5587 |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6483 | 0.5568 |
+
+<!-- section: energy__approve__02_record_decisions -->
+## Approval Decisions
+
+### model_approval
+
+73 row(s), first 30 shown
+
+| task_id | model_name | role | decision | restriction | overridden | primary_metric | validation_value | evaluated_value |
+|---|---|---|---|---|---|---|---|---|
+| price_daily.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 11.8123 | 15.947 |
+| price_daily.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 12.0123 | 15.5598 |
+| price_daily.price | toto2_zero_shot | runner_up | not_approved |  | False | mae | 19.9697 | 20.4462 |
+| price_daily.price | seasonal_naive | baseline_fallback | approved |  | False | mae | 28.0429 | 28.6236 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 17.7397 | 29.4453 |
+| price_quarter_hour.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 17.8868 | 29.4854 |
+| price_quarter_hour.price | ttm_r2_zero_shot | runner_up | not_approved |  | False | mae | 28.3344 | 32.6938 |
+| price_quarter_hour.price | persistence | baseline_fallback | approved |  | False | mae | 33.1459 | 37.3036 |
+| price_quarter_hour.negative_price | logistic | selected | approved |  | False | pr_auc | 0.6168 | 0.7205 |
+| price_quarter_hour.negative_price | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6014 | 0.7098 |
+| price_quarter_hour.negative_price | tabpfn_v2_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0425 | 0.0738 |
+| load.load | gbt_sklearn | selected | approved |  | False | mae | 24860.3053 | 26838.3958 |
+| load.load | gbt_lightgbm | runner_up | not_approved |  | False | mae | 25128.0502 | 26943.748 |
+| load.load | chronos2_lora | runner_up | not_approved |  | False | mae | 39286.5963 | 40774.5511 |
+| load.load | seasonal_mean | baseline_fallback | approved |  | False | mae | 57004.7223 | 64187.8077 |
+| bias.bias | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 15334.1454 | 16247.296 |
+| bias.bias | gbt_sklearn | runner_up | not_approved |  | False | mae | 15426.0679 | 16532.2186 |
+| bias.bias | chronos2_lora | runner_up | not_approved |  | False | mae | 28836.0141 | 29572.7339 |
+| bias.bias | zero_correction | baseline_fallback | approved |  | False | mae | 93650.1115 | 102494.0979 |
+| zone_generation.generation | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 10930.1759 | 16172.1206 |
+| zone_generation.generation | gbt_sklearn | runner_up | not_approved |  | False | mae | 12541.1318 | 17187.8828 |
+| zone_generation.generation | timesfm25_zero_shot | runner_up | not_approved |  | False | mae |  |  |
+| zone_generation.generation | capacity_factor | baseline_fallback | approved |  | False | mae | 25712.8807 | 31443.7748 |
+| honda_forecast.increment | chronos2_lora | selected | approved_with_conditions |  | False | mae | 16.1482 | 18.1303 |
+| honda_forecast.increment | gbt_lightgbm | runner_up | not_approved |  | False | mae | 17.9655 | 20.4706 |
+| honda_forecast.increment | gbt_sklearn | runner_up | not_approved |  | False | mae | 18.0254 | 20.4469 |
+| honda_forecast.increment | persistence | baseline_fallback | approved |  | False | mae | 20.3038 | 23.2843 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | selected | approved_with_conditions | offline_only | False | pr_auc | 0.6517 | 0.5587 |
+| honda_anomaly.anomaly | forecast_residual_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6483 | 0.5568 |
+
+<!-- section: energy__approve__03_model_cards -->
+## Model Cards
+
+17 card(s) written to src/model_cards/energy
 
 <!-- section: energy__energy__01_price_daily -->
 ## Model Price Daily
@@ -1395,6 +1506,287 @@ _no rows for this run_
 | rl_pumped_storage.policy | finished | False | 2 | baseline_ok=True | 2026-10-25 14:14:58.078147 |
 | rl_redispatch.policy | finished | False | 2 | baseline_ok=True | 2026-10-25 14:15:50.145330 |
 | rl_redispatch.policy | started | False | 2 |  | 2026-10-25 14:15:12.272554 |
+
+<!-- section: energy__operate__00_operate_setup -->
+## Operate Setup
+
+### monitoring_spec
+
+_no rows for this run_
+
+<!-- section: energy__operate__01_reference_profiles_energy -->
+## Reference Profiles Energy
+
+### reference_profile
+
+152 row(s), first 30 shown
+
+| task_id | model_name | subject | value_kind | n_rows | null_rate |
+|---|---|---|---|---|---|
+| survival.unit_lifetime | survival_forest | capacity_net_kw | numeric | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | capacity_gross_kw | numeric | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | manufacturer | numeric | 24469 | 0.0172 |
+| survival.unit_lifetime | survival_forest | model_designation | categorical | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | federal_state | categorical | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | operator_id | categorical | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | is_offshore | numeric | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | commissioning_year | numeric | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | control_zone_code | categorical | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | zone_status | categorical | 24469 | 0.0 |
+| survival.unit_lifetime | survival_forest | __prediction__ | numeric | 24469 | 0.0 |
+| capacity_additions.additions | tabpfn_25_in_context | year | numeric | 972 | 0.0 |
+| capacity_additions.additions | tabpfn_25_in_context | month | numeric | 972 | 0.0 |
+| capacity_additions.additions | tabpfn_25_in_context | carrier_key | categorical | 972 | 0.0 |
+| capacity_additions.additions | tabpfn_25_in_context | __prediction__ | numeric | 972 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | capacity_net_mw_imputed | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | capacity_net_mw_is_missing | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | onshore_wind_speed_adjusted_mean | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | onshore_wind_speed_cubed_adjusted_mean | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | global_radiation_mean_w_per_m2 | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | covered_weight_share | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | day_of_week | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | is_weekend | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | month | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | day_of_year | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | is_holiday | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | trend_years | numeric | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | market_area_code | categorical | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | carrier | categorical | 19160 | 0.0 |
+| zone_generation.generation | gbt_lightgbm | __prediction__ | numeric | 19160 | 0.0 |
+
+<!-- section: energy__operate__02_monitor_energy -->
+## Monitor Energy
+
+### monitoring_results
+
+916 row(s), first 30 shown
+
+| task_id | model_name | window_id | check_kind | subject | value | level |
+|---|---|---|---|---|---|---|
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_mwh | 0.4007 | flag |
+| bias.bias | gbt_lightgbm | validation | null_rate | forecast_mwh | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | forecast_mwh | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | day_of_week | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | day_of_week | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | day_of_week | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | is_weekend | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | is_weekend | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | is_weekend | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | month | 0.0134 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | month | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | month | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | day_of_year | 0.0111 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | day_of_year | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | day_of_year | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | iso_week | 0.0111 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | iso_week | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | iso_week | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | year | 16.8096 | info |
+| bias.bias | gbt_lightgbm | validation | null_rate | year | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | year | 1.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | is_holiday | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | is_holiday | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | is_holiday | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | is_bridge_day | 0.0007 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | is_bridge_day | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | is_bridge_day | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | local_day_hours | 0.0002 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | local_day_hours | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | local_day_hours | 0.0 | info |
+
+### monitoring_flags
+
+42 row(s), first 30 shown
+
+| task_id | model_name | window_id | check_kind | subject | level | value | threshold |
+|---|---|---|---|---|---|---|---|
+| zone_generation.generation | gbt_lightgbm | held_out | feature_drift | capacity_net_mw_imputed | flag | 1.7963 | 0.25 |
+| zone_generation.generation | gbt_lightgbm | held_out | null_rate | global_radiation_mean_w_per_m2 | flag | 5.5646 | 5.0 |
+| zone_generation.generation | gbt_lightgbm | held_out | feature_drift | covered_weight_share | flag | 1.6151 | 0.25 |
+| zone_generation.generation | gbt_lightgbm | held_out | prediction_drift | __prediction__ | warning | 0.1703 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | validation | feature_drift | price_eur_per_mwh_lag2d_imputed | warning | 0.1464 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | validation | feature_drift | forecast_offshore_wind_mwh | warning | 0.203 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | validation | feature_drift | forecast_wind_and_photovoltaic_mwh | warning | 0.135 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | held_out | feature_drift | price_eur_per_mwh_lag2d_imputed | warning | 0.1548 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | held_out | feature_drift | forecast_offshore_wind_mwh | warning | 0.1099 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | held_out | feature_drift | forecast_wind_and_photovoltaic_mwh | flag | 0.9274 | 0.25 |
+| price_daily.price | quantile_gbt_lightgbm | held_out | feature_drift | price_eur_per_mwh_lag7_imputed | flag | 1.5541 | 0.25 |
+| price_daily.price | quantile_gbt_lightgbm | held_out | feature_drift | forecast_wind_and_photovoltaic_mwh | flag | 0.422 | 0.25 |
+| price_daily.price | quantile_gbt_lightgbm | held_out | prediction_drift | __prediction__ | flag | 1.6448 | 0.25 |
+| price_daily.price | quantile_gbt_lightgbm | validation | feature_drift | price_eur_per_mwh_lag7_imputed | flag | 1.0104 | 0.25 |
+| price_daily.price | quantile_gbt_lightgbm | validation | feature_drift | forecast_wind_and_photovoltaic_mwh | warning | 0.2146 | 0.1 |
+| price_daily.price | quantile_gbt_lightgbm | validation | prediction_drift | __prediction__ | flag | 1.3798 | 0.25 |
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_mwh | flag | 0.4007 | 0.25 |
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_wind_and_photovoltaic_mwh | warning | 0.2274 | 0.1 |
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_scope | flag | 0.3505 | 0.25 |
+| bias.bias | gbt_lightgbm | validation | prediction_drift | __prediction__ | flag | 0.4768 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | forecast_mwh | flag | 0.7932 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | forecast_wind_and_photovoltaic_mwh | flag | 0.422 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | forecast_scope | flag | 1.1953 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | prediction_drift | __prediction__ | flag | 1.0072 | 0.25 |
+| price_quarter_hour.negative_price | logistic | validation | feature_drift | forecast_offshore_wind_mwh | warning | 0.203 | 0.1 |
+| price_quarter_hour.negative_price | logistic | validation | feature_drift | forecast_wind_and_photovoltaic_mwh | warning | 0.135 | 0.1 |
+| price_quarter_hour.negative_price | logistic | held_out | feature_drift | forecast_offshore_wind_mwh | warning | 0.1099 | 0.1 |
+| price_quarter_hour.negative_price | logistic | held_out | feature_drift | forecast_wind_and_photovoltaic_mwh | flag | 0.9274 | 0.25 |
+| rl_pumped_storage.policy | conservative_q | held_out | feature_drift | state_residual_load_mwh | warning | 0.106 | 0.1 |
+| rl_pumped_storage.policy | conservative_q | held_out | feature_drift | state_price_eur_per_mwh | warning | 0.1628 | 0.1 |
+
+### model_predictions
+
+679975 row(s), first 30 shown
+
+| task_id | model_name | window_id | row_key | prediction |
+|---|---|---|---|---|
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-08-11/onshore_wind | -8278.2013 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-02-23/onshore_wind | 8583.1406 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-10-28/onshore_wind | 4065.1545 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-04-13/onshore_wind | -17967.9457 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-09-02/onshore_wind | 1862.8372 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-04-25/onshore_wind | 5482.4625 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-01-21/onshore_wind | 14402.8598 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-10-08/onshore_wind | -134.5104 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-04-06/onshore_wind | -11096.6003 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-01-07/onshore_wind | 8284.0047 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-09-23/onshore_wind | 2625.9994 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-10-03/onshore_wind | 6665.3135 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-03-15/onshore_wind | 6392.4657 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-06-12/onshore_wind | 829.6437 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-12-12/onshore_wind | -2364.968 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-10-02/onshore_wind | 2520.5267 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-03-18/onshore_wind | 3437.5377 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-10-31/onshore_wind | 5640.0338 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-11-23/onshore_wind | 3397.3644 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-07-02/onshore_wind | -1117.6092 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-08-01/onshore_wind | 2116.6436 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-12-22/onshore_wind | 2420.981 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-07-22/onshore_wind | 878.542 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-11-30/onshore_wind | 3122.7622 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-06-25/onshore_wind | 2233.4576 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-03-28/onshore_wind | 1983.9355 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-05-09/onshore_wind | 2105.2845 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-03-14/onshore_wind | 10071.0859 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-12-04/onshore_wind | 2851.0582 |
+| bias.bias | gbt_lightgbm | validation | de_lu/2024-05-10/onshore_wind | 3027.8908 |
+
+<!-- section: energy__operate__03_performance_and_triggers -->
+## Performance And Triggers
+
+### monitoring_results
+
+17 row(s)
+
+| task_id | model_name | window_id | check_kind | subject | value | level |
+|---|---|---|---|---|---|---|
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | held_out | performance | skill_mae_mean | 0.0532 | ok |
+| rl_redispatch.policy | reward_weighted_gbt_sklearn | held_out | performance | action_agreement | 0.0972 | ok |
+| rl_pumped_storage.policy | conservative_q | held_out | performance | reward_timing | -0.7931 | ok |
+| survival.unit_lifetime | survival_forest | held_out | performance | concordance | 0.0016 | ok |
+| honda_anomaly.anomaly | forecast_residual_sklearn | held_out | performance | pr_auc | 0.1428 | ok |
+| capacity_additions.additions | tabpfn_25_in_context | held_out | performance | mae | 1.2446 | flag |
+| price_quarter_hour.negative_price | logistic | held_out | performance | pr_auc | -0.1681 | ok |
+| price_quarter_hour.price | quantile_gbt_lightgbm | held_out | performance | mae | 0.6599 | flag |
+| price_daily.price | quantile_gbt_lightgbm | held_out | performance | mae | 0.35 | flag |
+| zone_generation.generation | gbt_lightgbm | held_out | performance | mae | 0.4796 | flag |
+| honda_forecast.increment | chronos2_lora | held_out | performance | mae | 0.1227 | ok |
+| redispatch.event_energy | gbt_sklearn | held_out | performance | mae | 0.0429 | ok |
+| redispatch.any_event | logistic | held_out | performance | pr_auc | -0.0167 | ok |
+| ccpp.output | tabicl_v2_in_context | held_out | performance | mae | -0.0233 | ok |
+| load.load | gbt_sklearn | held_out | performance | mae | 0.0796 | ok |
+| bias.bias | gbt_lightgbm | held_out | performance | mae | 0.0596 | ok |
+| weak_supervision.labels | label_model | held_out | performance | coverage | 0.0 | ok |
+
+### monitoring_flags
+
+4 row(s)
+
+| task_id | model_name | window_id | check_kind | subject | level | value | threshold |
+|---|---|---|---|---|---|---|---|
+| capacity_additions.additions | tabpfn_25_in_context | held_out | performance | mae | flag | 1.2446 | 0.2 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | held_out | performance | mae | flag | 0.6599 | 0.2 |
+| price_daily.price | quantile_gbt_lightgbm | held_out | performance | mae | flag | 0.35 | 0.2 |
+| zone_generation.generation | gbt_lightgbm | held_out | performance | mae | flag | 0.4796 | 0.2 |
+
+### monitoring_triggers
+
+10 row(s)
+
+| task_id | model_name | trigger_kind | source | condition | value | threshold |
+|---|---|---|---|---|---|---|
+| price_quarter_hour.price | quantile_gbt_lightgbm | performance_degradation | R04 | primary metric +66.0% worse than on validation; revalidate on newer data before relying on it | 0.6599 | 0.2 |
+| price_quarter_hour.price | quantile_gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.9274 | 0.25 |
+| capacity_additions.additions | tabpfn_25_in_context | performance_degradation | R04 | primary metric +124.5% worse than on validation; revalidate on newer data before relying on it | 1.2446 | 0.2 |
+| capacity_additions.additions | tabpfn_25_in_context | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.5091 | 0.25 |
+| zone_generation.generation | gbt_lightgbm | performance_degradation | R04 | primary metric +48.0% worse than on validation; revalidate on newer data before relying on it | 0.4796 | 0.2 |
+| zone_generation.generation | gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 5.5646 | 5.0 |
+| price_daily.price | quantile_gbt_lightgbm | performance_degradation | R04 | primary metric +35.0% worse than on validation; revalidate on newer data before relying on it | 0.35 | 0.2 |
+| price_daily.price | quantile_gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.6448 | 0.25 |
+| price_quarter_hour.negative_price | logistic | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.9274 | 0.25 |
+| bias.bias | gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.1953 | 0.25 |
+
+<!-- section: energy__register__00_registry_setup -->
+## Registry Setup
+
+registry tables created if missing
+
+<!-- section: energy__register__01_register_models -->
+## Register Models
+
+### model_registry
+
+3 row(s)
+
+| task_id | model_name | role | version | lifecycle_status | decision | validation_value | reason |
+|---|---|---|---|---|---|---|---|
+| capacity_additions.additions | poisson_gbt_sklearn | selected | 2 | retired | approved_with_conditions | 19.8307 | replaced by tabpfn_25_in_context (approval run model-20261026T175146Z) |
+| ccpp.output | gbt_sklearn | selected | 2 | retired | approved | 2.4962 | replaced by tabicl_v2_in_context (approval run model-20261026T175146Z) |
+| honda_forecast.increment | gbt_lightgbm | selected | 2 | retired | approved_with_conditions | 17.9655 | replaced by chronos2_lora (approval run model-20261026T175146Z) |
+
+<!-- section: energy__register__02_reproducibility_energy -->
+## Reproducibility Check Energy
+
+### registry_check
+
+34 row(s), first 30 shown
+
+| task_id | model_name | role | registry_version | processor_type | reload_status | rescore_status | gap_relative | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| price_daily.price | quantile_gbt_lightgbm | selected | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_daily.price | seasonal_naive | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_quarter_hour.price | quantile_gbt_lightgbm | selected | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_quarter_hour.price | persistence | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_quarter_hour.negative_price | logistic | selected | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| load.load | gbt_sklearn | selected | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| load.load | seasonal_mean | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| bias.bias | gbt_lightgbm | selected | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| bias.bias | zero_correction | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| zone_generation.generation | gbt_lightgbm | selected | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| zone_generation.generation | capacity_factor | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| honda_forecast.increment | chronos2_lora | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| honda_forecast.increment | persistence | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| honda_anomaly.anomaly | forecast_residual_sklearn | selected | 2 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| honda_anomaly.anomaly | seasonal_zscore | baseline_fallback | 2 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| ccpp.output | tabicl_v2_in_context | selected | 1 | aarch64 | ok | matched | 0.0003 | passed | mae on validation |
+| ccpp.output | train_mean | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| capacity_additions.additions | tabpfn_25_in_context | selected | 1 | aarch64 | ok | matched | 0.0003 | passed | mae on validation |
+| capacity_additions.additions | seasonal_mean | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| redispatch.any_event | logistic | selected | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| redispatch.any_event | base_rate | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| redispatch.event_energy | gbt_sklearn | selected | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| redispatch.event_energy | zone_mean | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| survival.unit_lifetime | survival_forest | selected | 2 | aarch64 | ok | matched | 0.0 | passed | concordance on validation |
+| survival.unit_lifetime | kaplan_meier | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | concordance on validation |
+| weak_supervision.labels | label_model | selected | 2 | aarch64 | ok | matched | 0.0 | passed | coverage on validation |
+| weak_supervision.labels | majority_vote | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | coverage on validation |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | selected | 2 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| weather_imputation.reconstruction | causal_baseline | baseline_fallback | 2 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+
+<!-- section: energy__register__03_foundation_references -->
+## Foundation References
+
+### foundation_registry_entry
+
+_no rows for this run_
 
 <!-- section: energy__split__01_weak_supervision_split -->
 ## Weak Supervision Split

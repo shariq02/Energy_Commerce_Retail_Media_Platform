@@ -1,6 +1,6 @@
 # Model card: lapse_rees46.return
 
-_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -36,9 +36,9 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 
 ## Training
 
-- model family: gbt_lightgbm; MLflow run `8bd902503c664e05a8252492f9cbec52`
+- model family: gbt_lightgbm; MLflow run `6bc0856f0b314ce5acfd4574961bb3a3`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.7.0
+- library versions: lightgbm 4.6.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -65,7 +65,7 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

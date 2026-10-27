@@ -1,6 +1,111 @@
 # COMMERCE NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-25T21:51Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T14:09Z_
+
+<!-- section: commerce__approve__00_approval_setup -->
+## Approval Setup
+
+### approval_spec
+
+16 row(s)
+
+| rule_id | rule_class | parameter | parameter_value |
+|---|---|---|---|
+| R01 | selection |  |  |
+| R02 | conditional |  |  |
+| R03 | blocking |  |  |
+| R04 | conditional | degradation_relative | 0.2 |
+| R05 | blocking | min_rows | 30 |
+| R05 | blocking | min_blocks | 5 |
+| R06 | restriction |  |  |
+| R07 | segment |  |  |
+| R08 | conditional | coverage_target | 0.8 |
+| R08 | conditional | coverage_tolerance | 0.1 |
+| R09 | restriction |  |  |
+| R10 | disclosure |  |  |
+| R11 | conditional |  |  |
+| R12 | conditional |  |  |
+| R13 | conditional |  |  |
+| R14 | blocking |  |  |
+
+<!-- section: commerce__approve__01_recommend -->
+## Approval Recommendation
+
+### model_approval
+
+27 row(s)
+
+| task_id | model_name | role | decision | restriction | overridden | primary_metric | validation_value | evaluated_value |
+|---|---|---|---|---|---|---|---|---|
+| session_purchase_ga4.purchase | gbt_sklearn | selected | approved |  | False | pr_auc | 0.3957 | 0.4584 |
+| session_purchase_ga4.purchase | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.3917 | 0.4579 |
+| session_purchase_ga4.purchase | tabpfn_25_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| session_purchase_ga4.purchase | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.2376 | 0.2551 |
+| session_purchase_rees46.purchase | gbt_sklearn | selected | approved |  | False | pr_auc | 0.4378 | 0.4398 |
+| session_purchase_rees46.purchase | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.4376 | 0.4393 |
+| session_purchase_rees46.purchase | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0813 | 0.0817 |
+| lapse_ga4.return | gbt_sklearn | selected | approved |  | False | pr_auc | 0.2147 | 0.1933 |
+| lapse_ga4.return | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.2095 | 0.1871 |
+| lapse_ga4.return | tabpfn_v2_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| lapse_ga4.return | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0786 | 0.0781 |
+| lapse_rees46.return | gbt_lightgbm | selected | approved |  | False | pr_auc | 0.7318 | 0.7321 |
+| lapse_rees46.return | gbt_sklearn | runner_up | not_approved |  | False | pr_auc | 0.7317 | 0.732 |
+| lapse_rees46.return | tabpfn_25_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| lapse_rees46.return | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.4634 | 0.463 |
+| next_item_ga4.next_item | sequence_transformer | selected | approved |  | False | ndcg_at_10 | 0.4684 | 0.4667 |
+| next_item_ga4.next_item | sequence_gru | runner_up | not_approved |  | False | ndcg_at_10 | 0.4482 | 0.4476 |
+| next_item_ga4.next_item | sasrec_sequence | runner_up | not_approved |  | False | ndcg_at_10 | 0.2381 | 0.2371 |
+| next_item_ga4.next_item | popularity | baseline_fallback | approved |  | False | ndcg_at_10 | 0.0758 | 0.0749 |
+| next_item_rees46.next_item | sequence_transformer | selected | approved |  | False | ndcg_at_10 | 0.0965 | 0.0988 |
+| next_item_rees46.next_item | cooccurrence | runner_up | not_approved |  | False | ndcg_at_10 | 0.0877 | 0.0902 |
+| next_item_rees46.next_item | sasrec_sequence | runner_up | not_approved |  | False | ndcg_at_10 | 0.0167 | 0.0178 |
+| next_item_rees46.next_item | popularity | baseline_fallback | approved |  | False | ndcg_at_10 | 0.0162 | 0.0169 |
+| rl_session_sequences.policy | sequence_gru | selected | approved_with_conditions | offline_only | False | action_agreement | 0.9445 | 0.9439 |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | runner_up | not_approved |  | False | action_agreement | 0.9443 | 0.9437 |
+| rl_session_sequences.policy | decision_transformer | runner_up | not_approved |  | False | action_agreement | 0.9442 | 0.9433 |
+| rl_session_sequences.policy | most_frequent_event | baseline_fallback | approved |  | False | action_agreement | 0.9442 | 0.9433 |
+
+<!-- section: commerce__approve__02_record_decisions -->
+## Approval Decisions
+
+### model_approval
+
+27 row(s)
+
+| task_id | model_name | role | decision | restriction | overridden | primary_metric | validation_value | evaluated_value |
+|---|---|---|---|---|---|---|---|---|
+| session_purchase_ga4.purchase | gbt_sklearn | selected | approved |  | False | pr_auc | 0.3957 | 0.4584 |
+| session_purchase_ga4.purchase | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.3917 | 0.4579 |
+| session_purchase_ga4.purchase | tabpfn_25_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| session_purchase_ga4.purchase | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.2376 | 0.2551 |
+| session_purchase_rees46.purchase | gbt_sklearn | selected | approved |  | False | pr_auc | 0.4378 | 0.4398 |
+| session_purchase_rees46.purchase | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.4376 | 0.4393 |
+| session_purchase_rees46.purchase | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0813 | 0.0817 |
+| lapse_ga4.return | gbt_sklearn | selected | approved |  | False | pr_auc | 0.2147 | 0.1933 |
+| lapse_ga4.return | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.2095 | 0.1871 |
+| lapse_ga4.return | tabpfn_v2_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| lapse_ga4.return | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0786 | 0.0781 |
+| lapse_rees46.return | gbt_lightgbm | selected | approved |  | False | pr_auc | 0.7318 | 0.7321 |
+| lapse_rees46.return | gbt_sklearn | runner_up | not_approved |  | False | pr_auc | 0.7317 | 0.732 |
+| lapse_rees46.return | tabpfn_25_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
+| lapse_rees46.return | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.4634 | 0.463 |
+| next_item_ga4.next_item | sequence_transformer | selected | approved |  | False | ndcg_at_10 | 0.4684 | 0.4667 |
+| next_item_ga4.next_item | sequence_gru | runner_up | not_approved |  | False | ndcg_at_10 | 0.4482 | 0.4476 |
+| next_item_ga4.next_item | sasrec_sequence | runner_up | not_approved |  | False | ndcg_at_10 | 0.2381 | 0.2371 |
+| next_item_ga4.next_item | popularity | baseline_fallback | approved |  | False | ndcg_at_10 | 0.0758 | 0.0749 |
+| next_item_rees46.next_item | sequence_transformer | selected | approved |  | False | ndcg_at_10 | 0.0965 | 0.0988 |
+| next_item_rees46.next_item | cooccurrence | runner_up | not_approved |  | False | ndcg_at_10 | 0.0877 | 0.0902 |
+| next_item_rees46.next_item | sasrec_sequence | runner_up | not_approved |  | False | ndcg_at_10 | 0.0167 | 0.0178 |
+| next_item_rees46.next_item | popularity | baseline_fallback | approved |  | False | ndcg_at_10 | 0.0162 | 0.0169 |
+| rl_session_sequences.policy | sequence_gru | selected | approved_with_conditions | offline_only | False | action_agreement | 0.9445 | 0.9439 |
+| rl_session_sequences.policy | behaviour_cloning_gbt_lightgbm | runner_up | not_approved |  | False | action_agreement | 0.9443 | 0.9437 |
+| rl_session_sequences.policy | decision_transformer | runner_up | not_approved |  | False | action_agreement | 0.9442 | 0.9433 |
+| rl_session_sequences.policy | most_frequent_event | baseline_fallback | approved |  | False | action_agreement | 0.9442 | 0.9433 |
+
+<!-- section: commerce__approve__03_model_cards -->
+## Model Cards
+
+7 card(s) written to src/model_cards/commerce
 
 <!-- section: commerce__commerce__01_session_purchase_ga4 -->
 ## Model Session Purchase Ga4
@@ -532,6 +637,223 @@ _no rows for this run_
 | rl_session_sequences.policy | data_ready | False | 9 |  | 2026-10-25 14:16:33.691200 |
 | rl_session_sequences.policy | finished | False | 9 | baseline_ok=True | 2026-10-25 14:29:32.352033 |
 | rl_session_sequences.policy | started | False | 9 |  | 2026-10-25 14:15:43.573034 |
+
+<!-- section: commerce__operate__00_operate_setup -->
+## Operate Setup
+
+### monitoring_spec
+
+_no rows for this run_
+
+<!-- section: commerce__operate__01_reference_profiles_commerce -->
+## Reference Profiles Commerce
+
+### reference_profile
+
+57 row(s), first 30 shown
+
+| task_id | model_name | subject | value_kind | n_rows | null_rate |
+|---|---|---|---|---|---|
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_event_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_page_view_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_view_item_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_add_to_cart_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_search_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_distinct_pages | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_session_number | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_geo_country | categorical | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_span_seconds | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_hour_of_day | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | prefix_day_of_week | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | user_hist_session_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | user_hist_transaction_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | user_hist_revenue | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | user_hist_event_count | numeric | 11885 | 0.0 |
+| session_purchase_ga4.purchase | gbt_sklearn | __prediction__ | numeric | 11885 | 0.0 |
+| next_item_ga4.next_item | sequence_transformer | seq_product_id | categorical | 100000 | 0.0 |
+| next_item_ga4.next_item | sequence_transformer | __prediction__ | categorical | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_event_count | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_view_count | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_cart_count | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_distinct_products | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_first_category | categorical | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_first_brand | categorical | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_first_price | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_mean_price | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_span_seconds | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_hour_of_day | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | prefix_day_of_week | numeric | 100000 | 0.0 |
+| session_purchase_rees46.purchase | gbt_sklearn | user_hist_session_count | numeric | 100000 | 0.0 |
+
+<!-- section: commerce__operate__02_monitor_commerce -->
+## Monitor Commerce
+
+### monitoring_results
+
+342 row(s), first 30 shown
+
+| task_id | model_name | window_id | check_kind | subject | value | level |
+|---|---|---|---|---|---|---|
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_event_count | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_event_count | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_event_count | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_view_count | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_view_count | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_view_count | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_cart_count | 0.0251 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_cart_count | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_cart_count | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_distinct_products | 0.0105 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_distinct_products | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_distinct_products | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_first_category | 0.0045 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_first_category | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | unseen_category | prefix_first_category | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_first_brand | 0.0114 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_first_brand | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | unseen_category | prefix_first_brand | 0.3674 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_first_price | 0.0086 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_first_price | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_first_price | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_mean_price | 0.0007 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_mean_price | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_mean_price | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_span_seconds | 0.0028 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_span_seconds | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_span_seconds | 0.0 | info |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | prefix_hour_of_day | 0.025 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | null_rate | prefix_hour_of_day | 0.0 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | out_of_range | prefix_hour_of_day | 0.0 | info |
+
+### monitoring_flags
+
+13 row(s)
+
+| task_id | model_name | window_id | check_kind | subject | level | value | threshold |
+|---|---|---|---|---|---|---|---|
+| session_purchase_rees46.purchase | gbt_sklearn | validation | feature_drift | user_hist_session_count | flag | 0.3637 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | validation | feature_drift | user_hist_event_count | flag | 0.3076 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | validation | feature_drift | user_hist_product_views | flag | 0.3075 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | validation | feature_drift | user_hist_days_since_first_session | flag | 1.1201 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | user_hist_session_count | flag | 0.3731 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | user_hist_event_count | flag | 0.3156 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | user_hist_product_views | flag | 0.3156 | 0.25 |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | feature_drift | user_hist_days_since_first_session | flag | 1.1281 | 0.25 |
+| lapse_ga4.return | gbt_sklearn | validation | feature_drift | lapse_days_since_last_session | flag | 0.7674 | 0.25 |
+| lapse_ga4.return | gbt_sklearn | validation | prediction_drift | __prediction__ | flag | 0.3989 | 0.25 |
+| lapse_ga4.return | gbt_sklearn | held_out | feature_drift | lapse_days_since_last_session | flag | 0.7491 | 0.25 |
+| lapse_ga4.return | gbt_sklearn | held_out | prediction_drift | __prediction__ | flag | 0.38 | 0.25 |
+| next_item_rees46.next_item | sequence_transformer | validation | prediction_drift | __prediction__ | warning | 0.106 | 0.1 |
+
+### model_predictions
+
+1018729 row(s), first 30 shown
+
+| task_id | model_name | window_id | row_key | prediction |
+|---|---|---|---|---|
+| lapse_ga4.return | gbt_sklearn | validation | 10025069.3848916196/2020-12-01 | 0.0757 |
+| lapse_ga4.return | gbt_sklearn | validation | 10165145.4337231556/2020-12-01 | 0.0965 |
+| lapse_ga4.return | gbt_sklearn | validation | 1037526.8209256161/2020-12-01 | 0.026 |
+| lapse_ga4.return | gbt_sklearn | validation | 1042546.6434588808/2020-12-01 | 0.0599 |
+| lapse_ga4.return | gbt_sklearn | validation | 10489887.5646596416/2020-12-01 | 0.1625 |
+| lapse_ga4.return | gbt_sklearn | validation | 1080618.1751497567/2020-12-01 | 0.0427 |
+| lapse_ga4.return | gbt_sklearn | validation | 11070217.6371774168/2020-12-01 | 0.026 |
+| lapse_ga4.return | gbt_sklearn | validation | 11417436.5771744883/2020-12-01 | 0.0374 |
+| lapse_ga4.return | gbt_sklearn | validation | 1147207202.5999340710/2020-12-01 | 0.0374 |
+| lapse_ga4.return | gbt_sklearn | validation | 12199079.0538038952/2020-12-01 | 0.039 |
+| lapse_ga4.return | gbt_sklearn | validation | 12517664.5607605531/2020-12-01 | 0.1978 |
+| lapse_ga4.return | gbt_sklearn | validation | 1253937422.4478893229/2020-12-01 | 0.0664 |
+| lapse_ga4.return | gbt_sklearn | validation | 12572552.9153069105/2020-12-01 | 0.0664 |
+| lapse_ga4.return | gbt_sklearn | validation | 12668704.0857038297/2020-12-01 | 0.0429 |
+| lapse_ga4.return | gbt_sklearn | validation | 1275347607.8532359305/2020-12-01 | 0.0374 |
+| lapse_ga4.return | gbt_sklearn | validation | 130335109.4276822537/2020-12-01 | 0.049 |
+| lapse_ga4.return | gbt_sklearn | validation | 13099105.7061861161/2020-12-01 | 0.0322 |
+| lapse_ga4.return | gbt_sklearn | validation | 1339345.9247260376/2020-12-01 | 0.026 |
+| lapse_ga4.return | gbt_sklearn | validation | 13450576.3026228207/2020-12-01 | 0.0374 |
+| lapse_ga4.return | gbt_sklearn | validation | 1395551.2258891388/2020-12-01 | 0.0413 |
+| lapse_ga4.return | gbt_sklearn | validation | 14303493.7721314103/2020-12-01 | 0.026 |
+| lapse_ga4.return | gbt_sklearn | validation | 1489043.3420273286/2020-12-01 | 0.0358 |
+| lapse_ga4.return | gbt_sklearn | validation | 1497446.9972252618/2020-12-01 | 0.0421 |
+| lapse_ga4.return | gbt_sklearn | validation | 15146875.7859580763/2020-12-01 | 0.026 |
+| lapse_ga4.return | gbt_sklearn | validation | 15316815.5257701616/2020-12-01 | 0.0512 |
+| lapse_ga4.return | gbt_sklearn | validation | 1540308157.4120074434/2020-12-01 | 0.3878 |
+| lapse_ga4.return | gbt_sklearn | validation | 15466766.1264639777/2020-12-01 | 0.026 |
+| lapse_ga4.return | gbt_sklearn | validation | 1556324.6435835198/2020-12-01 | 0.0663 |
+| lapse_ga4.return | gbt_sklearn | validation | 16183198.4336443456/2020-12-01 | 0.1266 |
+| lapse_ga4.return | gbt_sklearn | validation | 16617695.8488058760/2020-12-01 | 0.0351 |
+
+<!-- section: commerce__operate__03_performance_and_triggers -->
+## Performance And Triggers
+
+### monitoring_results
+
+7 row(s)
+
+| task_id | model_name | window_id | check_kind | subject | value | level |
+|---|---|---|---|---|---|---|
+| rl_session_sequences.policy | sequence_gru | held_out | performance | action_agreement | 0.0007 | ok |
+| next_item_rees46.next_item | sequence_transformer | held_out | performance | ndcg_at_10 | -0.0236 | ok |
+| next_item_ga4.next_item | sequence_transformer | held_out | performance | ndcg_at_10 | 0.0038 | ok |
+| session_purchase_rees46.purchase | gbt_sklearn | held_out | performance | pr_auc | -0.0045 | ok |
+| session_purchase_ga4.purchase | gbt_sklearn | held_out | performance | pr_auc | -0.1585 | ok |
+| lapse_rees46.return | gbt_lightgbm | held_out | performance | pr_auc | -0.0004 | ok |
+| lapse_ga4.return | gbt_sklearn | held_out | performance | pr_auc | 0.0999 | ok |
+
+### monitoring_flags
+
+_no rows for this run_
+
+### monitoring_triggers
+
+2 row(s)
+
+| task_id | model_name | trigger_kind | source | condition | value | threshold |
+|---|---|---|---|---|---|---|
+| session_purchase_rees46.purchase | gbt_sklearn | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.1281 | 0.25 |
+| lapse_ga4.return | gbt_sklearn | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.7674 | 0.25 |
+
+<!-- section: commerce__register__00_registry_setup -->
+## Registry Setup
+
+registry tables created if missing
+
+<!-- section: commerce__register__01_register_models -->
+## Register Models
+
+### model_registry
+
+_no rows for this run_
+
+<!-- section: commerce__register__02_reproducibility_commerce -->
+## Reproducibility Check Commerce
+
+### registry_check
+
+14 row(s)
+
+| task_id | model_name | role | registry_version | processor_type | reload_status | rescore_status | gap_relative | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| session_purchase_ga4.purchase | gbt_sklearn | selected | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| session_purchase_ga4.purchase | base_rate | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| session_purchase_rees46.purchase | gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| session_purchase_rees46.purchase | base_rate | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| lapse_ga4.return | gbt_sklearn | selected | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| lapse_ga4.return | base_rate | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| lapse_rees46.return | gbt_lightgbm | selected | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| lapse_rees46.return | base_rate | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| next_item_ga4.next_item | sequence_transformer | selected | 2 | aarch64 | ok | matched | 0.0 | passed | ndcg_at_10 on validation |
+| next_item_ga4.next_item | popularity | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | ndcg_at_10 on validation |
+| next_item_rees46.next_item | sequence_transformer | selected | 2 | aarch64 | ok | matched | 0.0 | passed | ndcg_at_10 on validation |
+| next_item_rees46.next_item | popularity | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | ndcg_at_10 on validation |
+| rl_session_sequences.policy | sequence_gru | selected | 2 | aarch64 | ok | matched | 0.0 | passed | action_agreement on validation |
+| rl_session_sequences.policy | most_frequent_event | baseline_fallback | 2 | aarch64 | ok | matched | 0.0 | passed | action_agreement on validation |
+
+<!-- section: commerce__register__03_foundation_references -->
+## Foundation References
+
+### foundation_registry_entry
+
+_no rows for this run_
 
 <!-- section: commerce__split__03_evaluation_spec -->
 ## Evaluation Specification

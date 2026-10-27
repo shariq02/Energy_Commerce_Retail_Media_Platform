@@ -1,6 +1,6 @@
 # Model card: price_daily.price
 
-_model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -36,9 +36,9 @@ _model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary
 
 ## Training
 
-- model family: quantile_gbt_lightgbm; MLflow run `db846a81684e45939e4584e2c5eb9c10`
+- model family: quantile_gbt_lightgbm; MLflow run `4a29b9e294cc4206a9a066f59d207e40`
 - parameters: {'quantiles': [0.1, 0.5, 0.9], 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.7.0
+- library versions: lightgbm 4.6.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -74,7 +74,7 @@ _model `quantile_gbt_lightgbm`, dataset `price_daily`, frozen version 0, primary
 
 ## Disclosures
 
-- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

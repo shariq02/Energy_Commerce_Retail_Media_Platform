@@ -1,6 +1,6 @@
 # Model card: redispatch.event_energy
 
-_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -36,7 +36,7 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `958132873ea4435fa0b4a1841c8508fa`
+- model family: gbt_sklearn; MLflow run `9d323816f4a0439188e2031fb455dd6e`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -66,7 +66,7 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

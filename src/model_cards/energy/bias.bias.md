@@ -1,6 +1,6 @@
 # Model card: bias.bias
 
-_model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R07, R11
+- rules applied: R07, R10, R11
 
 ## Purpose and task
 
@@ -36,9 +36,9 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 
 ## Training
 
-- model family: gbt_lightgbm; MLflow run `c41cb25a0b3343969578f27cc0b55883`
+- model family: gbt_lightgbm; MLflow run `102821b7f908456f81356dac947b148c`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.7.0
+- library versions: lightgbm 4.6.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -77,7 +77,7 @@ _model `gbt_lightgbm`, dataset `bias`, frozen version 0, primary metric `mae` (l
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 4 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 
