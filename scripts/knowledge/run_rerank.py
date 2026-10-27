@@ -30,7 +30,7 @@ from scripts.knowledge import wikipedia_fetch as wf
 from scripts.knowledge import wikipedia_model_upload as mu
 from scripts.models import foundation_model_upload as fmu
 
-WEIGHTS_KEY = "bge_reranker_v2_m3"
+WEIGHTS_KEY = "ms_marco_minilm_l6_v2"
 NOTEBOOK = "databricks/knowledge/extension/01_rerank_scores"
 
 
@@ -85,8 +85,8 @@ def main(argv: list[str] | None = None) -> int:
         code = command(args)
         if code:
             return code
-    print(f"Now run the notebook {NOTEBOOK} on serverless GPU compute in Databricks,")
-    print("then run this command again to read the scores.")
+    print(f"Now run the notebook {NOTEBOOK} on standard serverless compute")
+    print("in Databricks, then run this command again to read the scores.")
     return 0
 
 

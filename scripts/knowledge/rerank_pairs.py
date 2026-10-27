@@ -4,7 +4,7 @@ ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: October 2026
 
-The cross-encoder `bge-reranker-v2-m3` runs only in a Databricks notebook
+The cross-encoder `ms-marco-MiniLM-L6-v2` runs only in a Databricks notebook
 (`databricks/knowledge/extension/01_rerank_scores`). `export` lists the pairs (an
 approved question and a candidate chunk of the fused top `rerank_candidates`) that
 have no stored score and writes them to `pairs.jsonl`; `upload` sends the file to the

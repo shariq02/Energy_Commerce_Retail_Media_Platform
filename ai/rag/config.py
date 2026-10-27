@@ -31,7 +31,7 @@ class RetrievalConfig:
     extra_min_scores: dict | None = None  # slug -> score threshold
     rerank: bool = False
     rerank_candidates: int = 20
-    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2"
     # The local judge, fitted on the build; each switch is off by default.
     judge_filter: bool = False
     judge_filter_min: float = 0.7

@@ -131,14 +131,14 @@ models:
   include:
   - src/*
   - pyproject.toml
-- key: bge_reranker_v2_m3
-  repo_id: BAAI/bge-reranker-v2-m3
+- key: ms_marco_minilm_l6_v2
+  repo_id: cross-encoder/ms-marco-MiniLM-L6-v2
   ref: main
-  revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+  revision: 233902d25c440f23af6f7d6e94d2946bac0bee0a
   licence: apache-2.0
-  licence_restriction: none
-  pretraining_data: named on the model card; the cross-encoder of the knowledge retrieval, not a forecaster
+  licence_restriction: Apache 2.0 weights; trained on MS MARCO, read its data terms
+  pretraining_data: MS MARCO passage ranking, named on the model card; the cross-encoder of the knowledge retrieval, not a forecaster
   include:
   - '*.json'
   - model.safetensors
-  - sentencepiece.bpe.model
+  - vocab.txt

@@ -147,7 +147,7 @@ def test_the_reranker_command_sends_weights_and_pairs_then_asks_for_the_notebook
 ):
     monkeypatch.setattr(rk.rp, "pending_pairs", lambda args: (171, [{"key": "k"}]))
     monkeypatch.setattr(
-        rk, "weights_to_send", lambda session=None, api=None: 2_270_000_000
+        rk, "weights_to_send", lambda session=None, api=None: 91_000_000
     )
     assert rk.main([]) == 0
     assert rerank_run == [
