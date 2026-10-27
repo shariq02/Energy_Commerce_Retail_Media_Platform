@@ -25,6 +25,8 @@
 # kinds whose rows cannot be sampled without breaking the unit that is scored
 NO_CAP_KINDS = ("weak", "matching", "reconstruction")
 SPARK_CAP_FACTOR = 10
+# the survival forest builds one array of rows x event times per tree
+SURVIVAL_CHUNK_ROWS = 2000
 
 
 class MonitorContext(EvalContext):
@@ -172,6 +174,17 @@ def _reconstruction_predictions(evaluator, bundle):
     return joined, None, keys
 
 
+def chunked_risk(bundle, frame: pd.DataFrame) -> np.ndarray:
+    """Risk of every row, scored SURVIVAL_CHUNK_ROWS rows at a time."""
+    parts = [
+        np.asarray(
+            bundle.risk(frame.iloc[i : i + SURVIVAL_CHUNK_ROWS]), dtype="float64"
+        )
+        for i in range(0, len(frame), SURVIVAL_CHUNK_ROWS)
+    ]
+    return np.concatenate(parts) if parts else np.zeros(0)
+
+
 def predict_window(kind: str, evaluator, bundle):
     """(numeric predictions, text predictions, row keys) of the window frame. One of
     the first two is None. Row keys are None where the frame rows carry them."""
@@ -190,7 +203,7 @@ def predict_window(kind: str, evaluator, bundle):
         else:
             values = bundle.predict(frame)
     elif kind == "survival":
-        values = bundle.risk(frame)
+        values = chunked_risk(bundle, frame)
     elif kind == "anomaly":
         values = bundle.score(frame)
     elif kind == "pumped":

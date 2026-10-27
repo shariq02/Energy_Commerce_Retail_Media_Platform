@@ -508,6 +508,22 @@ def test_survival_anomaly_and_numeric_policy_predictions(lib):
         assert list(values) == [2.0, 3.0] and labels is None
 
 
+def test_survival_risk_is_scored_in_chunks_in_row_order(lib):
+    sizes = []
+
+    def risk(f):
+        sizes.append(len(f))
+        return f.x * 2
+
+    n = lib["SURVIVAL_CHUNK_ROWS"] * 2 + 5
+    ev = _Evaluator(pd.DataFrame({"x": np.arange(n, dtype="float64")}))
+    values, labels, keys = lib["predict_window"]("survival", ev, _Bundle(risk=risk))
+    assert sizes == [lib["SURVIVAL_CHUNK_ROWS"], lib["SURVIVAL_CHUNK_ROWS"], 5]
+    assert (
+        list(values) == [2.0 * i for i in range(n)] and labels is None and keys is None
+    )
+
+
 def test_a_categorical_policy_gives_text_labels(lib):
     ev = _Evaluator(pd.DataFrame({"x": [1, 2]}))
     values, labels, keys = lib["predict_window"](
