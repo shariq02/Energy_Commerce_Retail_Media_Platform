@@ -14,7 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** create the prediction, reference, monitoring and trigger tables and record the
 # MAGIC monitoring settings before the first window is read. Once a monitoring result
-# MAGIC exists the settings cannot change.
+# MAGIC exists the settings cannot change. The rows of a model that the registry retired
+# MAGIC are removed from the operate tables.
 
 # COMMAND ----------
 
@@ -114,6 +115,13 @@ for eco, have in recorded.items():
 for eco in ("energy", "commerce"):
     rows = read_model("monitoring_spec", ecosystem=eco).collect()
     print(eco, operate_spec_from_rows([r.asDict() for r in rows]))
+
+# COMMAND ----------
+
+# DBTITLE 1,Remove the rows of models that are not registered
+for eco in ("energy", "commerce"):
+    removed = remove_rows_without_entry(eco)
+    print(f"{eco}: rows of {len(removed)} model(s) removed")
 
 # COMMAND ----------
 

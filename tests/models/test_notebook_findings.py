@@ -62,9 +62,8 @@ def test_findings_call_names_known_tables_and_tasks(path, lib):
     keywords = {k.arg: k.value for k in call.keywords}
     if "task_ids" in keywords:
         wanted = {t["task_id"] for t in lib["TASKS"]}
-        named = {
-            e.value for e in keywords["task_ids"].elts if isinstance(e, ast.Constant)
-        }
+        listed = getattr(keywords["task_ids"], "elts", [])  # a computed list is skipped
+        named = {e.value for e in listed if isinstance(e, ast.Constant)}
         assert named <= wanted
 
 

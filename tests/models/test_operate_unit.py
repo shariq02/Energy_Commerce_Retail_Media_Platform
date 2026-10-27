@@ -524,6 +524,73 @@ def test_survival_risk_is_scored_in_chunks_in_row_order(lib):
     )
 
 
+def test_models_without_an_entry_are_the_stored_models_nobody_registers(lib):
+    entries = [
+        {"task_id": "t1", "model_name": "a"},
+        {"task_id": "t2", "model_name": "b"},
+    ]
+    stored = {("t1", "a"), ("t1", "old"), ("t2", "b"), ("t3", "c")}
+    assert lib["models_without_entry"](stored, entries) == [("t1", "old"), ("t3", "c")]
+    assert lib["models_without_entry"]({("t1", "a")}, entries) == []
+
+
+def test_every_record_table_is_an_operate_table_with_task_and_model_columns(lib):
+    for table in lib["RECORD_TABLES"]:
+        ddl = lib["MODEL_DDL"][table]
+        assert "task_id string" in ddl and "model_name string" in ddl, table
+
+
+def test_a_request_without_a_task_or_with_another_kind_is_refused(lib):
+    with pytest.raises(ValueError, match="not a task that this request can score"):
+        lib["check_request"]("", {}, "", "")
+    with pytest.raises(ValueError, match="not a task that this request can score"):
+        lib["check_request"]("survival.unit_lifetime", {}, "", "")
+
+
+def test_a_request_needs_keys_or_a_window_unless_it_is_the_default(lib):
+    with pytest.raises(ValueError, match="give keys or a window"):
+        lib["check_request"]("price_daily.price", {}, "", "")
+    _cfg, time_col, start, end = lib["check_request"](
+        "price_daily.price", {}, "", "", latest_days=31
+    )
+    assert time_col == "local_date" and start is None and end is None
+
+
+def test_a_request_checks_its_keys_and_its_window(lib):
+    with pytest.raises(ValueError, match="keys must be key columns"):
+        lib["check_request"]("price_daily.price", {"carrier": "x"}, "", "")
+    with pytest.raises(ValueError, match="no time column"):
+        lib["check_request"]("ccpp.output", {}, "2025-01-01", "")
+    _cfg, _col, start, end = lib["check_request"](
+        "price_daily.price", {"market_area_code": "de_lu"}, "2025-01-01", "2025-01-31"
+    )
+    assert (start.isoformat(), end.isoformat()) == ("2025-01-01", "2025-01-31")
+
+
+def test_request_positions_keep_the_window_and_the_newest_rows(lib):
+    import datetime
+
+    frame = pd.DataFrame(
+        {"local_date": pd.date_range("2025-01-01", periods=10, freq="D")}
+    ).sample(frac=1, random_state=3)
+    frame = frame.reset_index(drop=True)
+    keys = [str(i) for i in range(len(frame))]
+    start, end = datetime.date(2025, 1, 3), datetime.date(2025, 1, 8)
+    inside = lib["request_positions"](frame, keys, "local_date", start, end, None)
+    days = sorted(frame.loc[inside, "local_date"].dt.day)
+    assert days == [3, 4, 5, 6, 7, 8]
+    newest = lib["request_positions"](frame, keys, "local_date", start, end, 2)
+    assert sorted(frame.loc[newest, "local_date"].dt.day) == [7, 8]
+
+
+def test_request_positions_without_a_time_column_keep_the_last_keys(lib):
+    frame = pd.DataFrame({"x": range(5)})
+    keys = ["e", "a", "d", "b", "c"]
+    picked = lib["request_positions"](frame, keys, None, None, None, 2)
+    assert sorted(keys[i] for i in picked) == ["d", "e"]
+    assert len(lib["request_positions"](frame, keys, None, None, None, None)) == 5
+
+
 def test_a_categorical_policy_gives_text_labels(lib):
     ev = _Evaluator(pd.DataFrame({"x": [1, 2]}))
     values, labels, keys = lib["predict_window"](

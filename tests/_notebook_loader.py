@@ -200,10 +200,15 @@ def load_registry_libs() -> dict:
 
 
 def load_operate_libs() -> dict:
-    """The evaluation libraries, then the registry, operate-rules and
-    operate-windows libraries in the order the operate notebooks `%run` them."""
+    """The evaluation libraries, then the registry, operate-rules, operate-windows
+    and operate-requests libraries in the order the operate notebooks `%run` them."""
     namespace = load_eval_libs()
-    for name in ("_registry_rules", "_operate_rules", "_operate_windows"):
+    for name in (
+        "_registry_rules",
+        "_operate_rules",
+        "_operate_windows",
+        "_operate_requests",
+    ):
         _exec_notebook(
             REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
         )

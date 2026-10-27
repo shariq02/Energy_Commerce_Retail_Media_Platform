@@ -44,6 +44,14 @@ OPERATE_DEFAULTS = (
 OPERATE_PARAMETERS = tuple(p for p, _v, _d in OPERATE_DEFAULTS)
 REFERENCE_WINDOW = "train"
 MONITOR_WINDOWS = ("validation", "held_out")
+# the tables that hold rows of one registered model
+RECORD_TABLES = (
+    "reference_profile",
+    "model_predictions",
+    "monitoring_results",
+    "monitoring_flags",
+    "monitoring_triggers",
+)
 PREDICTION_SUBJECT = "__prediction__"
 NO_SUBJECT = "__none__"
 LEVELS = ("ok", "warning", "flag", "info", "not_applicable")
@@ -535,6 +543,47 @@ def operate_entries(ecosystem: str) -> list:
         for r in latest.values()
         if r["role"] == "selected" and r["lifecycle_status"] != "retired"
     ]
+
+
+def models_without_entry(stored, entries) -> list:
+    """The (task, model) pairs of `stored` that no operate entry covers."""
+    wanted = {(e["task_id"], e["model_name"]) for e in entries}
+    return sorted(set(stored) - wanted)
+
+
+def stored_models(ecosystem: str) -> set:
+    """The (task, model) pairs that hold a row in any operate record table."""
+    found = set()
+    for table in RECORD_TABLES:
+        rows = (
+            read_model(table, ecosystem=ecosystem)
+            .select("task_id", "model_name")
+            .distinct()
+            .collect()
+        )
+        found |= {(r["task_id"], r["model_name"]) for r in rows}
+    return found
+
+
+def remove_rows_without_entry(ecosystem: str) -> list:
+    """Delete the rows of every model that is not a current operate entry (a model
+    that the registry retired). Returns the (task, model) pairs removed."""
+    entries = operate_entries(ecosystem)
+    if not entries:
+        raise RuntimeError(
+            f"{ecosystem}: no registered selected model, nothing removed"
+        )
+    stale = models_without_entry(stored_models(ecosystem), entries)
+    for task_id, model_name in stale:
+        for table in RECORD_TABLES:
+            spark.sql(
+                f"DELETE FROM {model_fqn(table, ecosystem)} "
+                f"WHERE task_id = '{task_id}' AND model_name = '{model_name}'"
+            )
+        print(
+            f"OK  {ecosystem}: rows of {task_id} {model_name} removed (not registered)"
+        )
+    return stale
 
 
 def table_tuples(rows, ddl: str) -> list:

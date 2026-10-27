@@ -174,6 +174,7 @@ def test_setup_preflight_splits_and_gates_exist():
         "operate/gate/03_export_findings.py",
         "lib/_operate_rules.py",
         "lib/_operate_windows.py",
+        "lib/_operate_requests.py",
     ):
         assert (_MODELS / rel).exists(), rel
     assert (
@@ -262,11 +263,18 @@ def test_operate_record_notebooks_read_recorded_results_only(path):
 @pytest.mark.parametrize("path", _OPERATE_SCORING, ids=_rel)
 def test_score_request_notebooks_take_keys_and_a_window_and_no_feature_values(path):
     text = path.read_text(encoding="utf-8")
-    for lib in ("_eval_common", "_eval_specs", "_operate_rules", "_operate_windows"):
+    for lib in (
+        "_eval_common",
+        "_eval_specs",
+        "_operate_rules",
+        "_operate_windows",
+        "_operate_requests",
+    ):
         assert f"%run ../lib/{lib}" in text, _rel(path)
     for widget in ('"task_id"', '"keys"', '"window_start"', '"window_end"'):
         assert widget in text, _rel(path)
-    assert "key_columns(cfg)" in text and "evaluate_by_id(" not in text
+    library = (_MODELS / "lib" / "_operate_requests.py").read_text(encoding="utf-8")
+    assert "key_columns(cfg)" in library and "evaluate_by_id(" not in text
 
 
 @pytest.mark.parametrize("path", _OPERATE_WINDOW_RUNS, ids=_rel)
