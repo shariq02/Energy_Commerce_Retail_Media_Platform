@@ -1,6 +1,6 @@
 # COMMERCE NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T16:32Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T19:49Z_
 
 <!-- section: commerce__approve__00_approval_setup -->
 ## Approval Setup
