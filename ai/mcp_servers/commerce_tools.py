@@ -15,6 +15,7 @@ from datetime import date
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from ai.mcp_servers.strict import make_strict
 from ai.tools import commerce
 from ai.tools import common as cm
 from ai.tools import metrics as mt
@@ -51,6 +52,9 @@ def commerce_get_metric(
     rees46_event_demand) with the unit. filters maps a dimension of the metric to a
     value; '*' means all values. Without dates it uses the last 30 days of the data."""
     return commerce.get_metric(metric_key, filters, start, end, limit)
+
+
+make_strict(app)
 
 
 if __name__ == "__main__":

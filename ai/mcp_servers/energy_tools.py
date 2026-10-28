@@ -15,6 +15,7 @@ from datetime import date
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from ai.mcp_servers.strict import make_strict
 from ai.tools import common as cm
 from ai.tools import energy
 from ai.tools import metrics as mt
@@ -78,6 +79,9 @@ def energy_get_metric(
     unit. filters maps a dimension of the metric to a value; '*' means all values.
     Without dates it uses the last 30 days of the data."""
     return energy.get_metric(metric_key, filters, start, end, limit)
+
+
+make_strict(app)
 
 
 if __name__ == "__main__":
