@@ -1,0 +1,81 @@
+# Tool servers: scope, tools and the agents that may start each server.
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: October 2026
+#
+# Purpose: the single source for the scope of every tool server. ai/tools/common.py
+# reads it; a test compares it with the code. A server reads only the listed
+# schemas (and the listed single tables); a tool name is unique across all servers
+# and the tools of a server are sorted by name.
+
+catalog: energy_commerce_retail_media
+
+agents:
+  - orchestrator
+  - energy_specialist
+  - commerce_specialist
+  - ml_forecasting
+  - dq_trust
+  - guardrail_check          # the graph node that may read the quality tools
+
+servers:
+  energy_tools:
+    ecosystem: energy
+    schemas: [energy_analytics, energy_semantic]
+    extra_tables: [quality.quality_audit_log]   # only for the trust annotation
+    allowed_agents: [energy_specialist]
+    tools:
+      - energy_analyse_market_conditions
+      - energy_analyse_weather_conditions
+      - energy_compare_periods
+      - energy_get_metric
+
+  commerce_tools:
+    ecosystem: commerce
+    schemas: [commerce_analytics, commerce_semantic]
+    extra_tables: [quality.quality_audit_log]   # only for the trust annotation
+    allowed_agents: [commerce_specialist]
+    tools:
+      - commerce_compare_periods
+      - commerce_get_metric
+
+  ml_tools:
+    ecosystem: both
+    schemas: [ml_models]
+    extra_tables: []
+    allowed_agents: [ml_forecasting]
+    tools:
+      - ml_read_model_card
+      - ml_read_monitoring
+      - ml_read_predictions
+
+  dq_tools:
+    ecosystem: both
+    schemas: [quality]
+    extra_tables: []
+    allowed_agents: [dq_trust, guardrail_check]
+    tools:
+      - dq_read_field_class
+      - dq_read_quality_log
+      - dq_read_quarantine
+      - dq_read_watermarks
+
+  cross_ecosystem_tools:
+    ecosystem: both
+    schemas: []
+    extra_tables: []
+    allowed_agents: [orchestrator]
+    tools: []                # no method and no mart yet; the server stays empty
+
+  knowledge_tools:
+    ecosystem: both
+    schemas: []              # local files only, no Databricks
+    extra_tables: []
+    allowed_agents:
+      - orchestrator
+      - energy_specialist
+      - commerce_specialist
+      - ml_forecasting
+      - dq_trust
+    tools:
+      - knowledge_retrieve
