@@ -227,7 +227,7 @@ def record_checks(ecosystem: str, rows: list) -> None:
     stay."""
     if not rows:
         return
-    cols = read_model("registry_check", ecosystem=ecosystem).columns
+    cols = row_columns("registry_check", ecosystem=ecosystem)
     tuples = [tuple(r[c] for c in cols) for r in rows]
     replace_model_rows(
         spark.createDataFrame(tuples, MODEL_DDL["registry_check"]),

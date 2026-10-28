@@ -150,11 +150,32 @@ def test_task_registry_is_complete_and_points_at_real_notebooks(c):
         assert t["notebook"].startswith(t["ecosystem"] + "/")
 
 
-def test_model_schemas_are_the_agreed_names(c):
-    assert c["MODEL_SCHEMAS"] == {
-        "energy": "energy_ml_models",
-        "commerce": "commerce_ml_models",
-    }
+def test_both_ecosystems_share_one_model_schema(c):
+    assert c["MODEL_SCHEMAS"] == {"energy": "ml_models", "commerce": "ml_models"}
+    assert c["MODEL_SCHEMA"] == "ml_models"
+    assert c["VOLUME_SCHEMA"] == "energy_ml_models"
+    assert c["model_schema_for"]("commerce") == "ml_models"
+
+
+def test_model_table_ddl_adds_the_ecosystem_column_once(c):
+    ddl = c["MODEL_DDL"]
+    for name, text in ddl.items():
+        names = [n for n, _ in c["ddl_columns"](c["model_table_ddl"](text))]
+        assert names.count("ecosystem") == 1, name
+        assert names[-1] == "ecosystem" or name == "task_registry", name
+    plain = c["model_table_ddl"]("a string, b int")
+    assert plain == "a string, b int, ecosystem string"
+
+
+def test_ecosystem_predicate_scopes_every_row_predicate(c):
+    assert c["ecosystem_predicate"]("energy") == "ecosystem = 'energy'"
+    assert (
+        c["ecosystem_predicate"]("commerce", "task_id = 'x' OR smoke")
+        == "ecosystem = 'commerce' AND (task_id = 'x' OR smoke)"
+    )
+
+
+def test_model_ddl_holds_the_agreed_tables(c):
     assert set(c["MODEL_DDL"]) == {
         "task_registry",
         "evaluation_split_manifest",

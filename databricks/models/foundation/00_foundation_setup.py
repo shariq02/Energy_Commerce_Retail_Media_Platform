@@ -58,9 +58,8 @@ rid = model_run_id()
 # COMMAND ----------
 
 # DBTITLE 1,Create the weights volume
-spark.sql(
-    f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{MODEL_SCHEMAS['energy']}.{FOUNDATION_VOLUME}"
-)
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}.{FOUNDATION_VOLUME}")
 print(f"OK  volume ready: {foundation_root()}")
 
 # COMMAND ----------
@@ -68,10 +67,7 @@ print(f"OK  volume ready: {foundation_root()}")
 # DBTITLE 1,Create the foundation tables
 for eco in FOUNDATION_ECOSYSTEMS:
     for name, ddl in FOUNDATION_DDL.items():
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} ({ddl}) USING delta"
-        )
-        print(f"OK  foundation table ready: {model_fqn(name, eco)}")
+        print(f"OK  foundation table ready: {create_model_table(name, ddl, eco)}")
 
 # COMMAND ----------
 

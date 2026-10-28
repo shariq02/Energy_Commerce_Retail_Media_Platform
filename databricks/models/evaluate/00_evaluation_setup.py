@@ -37,11 +37,8 @@ rid = model_run_id()
 EVALUATION_TABLES = ("evaluation_results", "evaluation_flags", EVAL_CONTEXT_TABLE)
 for eco in ("energy", "commerce"):
     for name in EVALUATION_TABLES:
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  evaluation table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  evaluation table ready: {full}")
 
 # COMMAND ----------
 

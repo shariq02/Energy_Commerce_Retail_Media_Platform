@@ -599,9 +599,12 @@ class Evaluator:
 
 def start_evaluation(ctx: EvalContext) -> None:
     """Drop this task's earlier rows of the same kind, then note the data read."""
+    where = ecosystem_predicate(
+        ctx.ecosystem,
+        f"task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}",
+    )
     spark.sql(
-        f"DELETE FROM {model_fqn('evaluation_results', ctx.ecosystem)} "
-        f"WHERE task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}"
+        f"DELETE FROM {model_fqn('evaluation_results', ctx.ecosystem)} WHERE {where}"
     )
     print(f"task {ctx.task_id} on {ctx.partition}, frozen version {ctx.frozen_version}")
     record_task_context(
@@ -640,9 +643,11 @@ def record_evaluation(ctx: EvalContext, model, status, metrics, n_rows, detail) 
         )
         for m, v in items
     ]
-    spark.createDataFrame(rows, MODEL_DDL["evaluation_results"]).write.format(
-        "delta"
-    ).mode("append").saveAsTable(model_fqn("evaluation_results", ctx.ecosystem))
+    append_model_rows(
+        spark.createDataFrame(rows, MODEL_DDL["evaluation_results"]),
+        "evaluation_results",
+        ecosystem=ctx.ecosystem,
+    )
 
 
 # COMMAND ----------

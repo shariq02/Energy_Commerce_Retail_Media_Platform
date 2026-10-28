@@ -58,10 +58,7 @@ rid = model_run_id()
 
 # DBTITLE 1,Create the reference table
 for eco in ECOSYSTEMS:
-    spark.sql(
-        f"CREATE TABLE IF NOT EXISTS {model_fqn(FOUNDATION_REGISTRY, eco)} "
-        f"({FOUNDATION_DDL[FOUNDATION_REGISTRY]}) USING delta"
-    )
+    create_model_table(FOUNDATION_REGISTRY, FOUNDATION_DDL[FOUNDATION_REGISTRY], eco)
 
 # COMMAND ----------
 
@@ -131,11 +128,10 @@ for eco, items in rows.items():
     if not items:
         print(f"OK  {eco}: nothing new")
         continue
-    (
-        spark.createDataFrame(items, FOUNDATION_DDL[FOUNDATION_REGISTRY])
-        .write.format("delta")
-        .mode("append")
-        .saveAsTable(model_fqn(FOUNDATION_REGISTRY, eco))
+    append_model_rows(
+        spark.createDataFrame(items, FOUNDATION_DDL[FOUNDATION_REGISTRY]),
+        FOUNDATION_REGISTRY,
+        ecosystem=eco,
     )
     print(f"OK  {eco}: {len(items)} row(s) appended")
 

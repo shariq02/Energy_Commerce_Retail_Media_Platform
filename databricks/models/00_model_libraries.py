@@ -87,9 +87,8 @@ MARKER = os.path.join(FOLDER, "libraries_ok.json")
 # COMMAND ----------
 
 # DBTITLE 1,Create the volume
-spark.sql(
-    f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{MODEL_SCHEMAS['energy']}.{LIBRARY_VOLUME}"
-)
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}.{LIBRARY_VOLUME}")
 if REFRESH:
     dbutils.fs.rm(FOLDER, True)
     dbutils.fs.rm(FRONT_FOLDER, True)

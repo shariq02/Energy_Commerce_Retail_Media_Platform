@@ -56,11 +56,8 @@ rid = model_run_id()
 # DBTITLE 1,Create the operate tables
 for eco in ("energy", "commerce"):
     for name in OPERATE_TABLES:
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  operate table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  operate table ready: {full}")
 
 # COMMAND ----------
 

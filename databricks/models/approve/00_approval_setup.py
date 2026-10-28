@@ -36,11 +36,8 @@ rid = model_run_id()
 # DBTITLE 1,Create the approval tables
 for eco in ("energy", "commerce"):
     for name in ("approval_spec", "model_approval"):
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  approval table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  approval table ready: {full}")
 
 # COMMAND ----------
 

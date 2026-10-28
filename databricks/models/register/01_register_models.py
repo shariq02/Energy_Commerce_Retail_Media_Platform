@@ -178,13 +178,12 @@ for eco, rows in planned.items():
     if not rows:
         print(f"OK  {eco}: registry unchanged")
         continue
-    cols = read_model("model_registry", ecosystem=eco).columns
+    cols = row_columns("model_registry", ecosystem=eco)
     tuples = [tuple(r.get(c) for c in cols) for r in rows]
-    (
-        spark.createDataFrame(tuples, MODEL_DDL["model_registry"])
-        .write.format("delta")
-        .mode("append")
-        .saveAsTable(model_fqn("model_registry", eco))
+    append_model_rows(
+        spark.createDataFrame(tuples, MODEL_DDL["model_registry"]),
+        "model_registry",
+        ecosystem=eco,
     )
     print(f"OK  {eco}: {len(rows)} row(s) appended")
 

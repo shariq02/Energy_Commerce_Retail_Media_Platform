@@ -94,7 +94,7 @@ print({eco: sum(r["overridden"] for r in v) for eco, v in decided.items()})
 
 # DBTITLE 1,Write the decisions
 for eco, items in decided.items():
-    cols = read_model("model_approval", ecosystem=eco).columns
+    cols = row_columns("model_approval", ecosystem=eco)
     tuples = [tuple(r[c] for c in cols) for r in items]
     replace_model_rows(
         spark.createDataFrame(tuples, MODEL_DDL["model_approval"]),

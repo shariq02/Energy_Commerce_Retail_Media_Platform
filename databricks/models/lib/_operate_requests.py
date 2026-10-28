@@ -241,18 +241,19 @@ def score_request(
         for i in picked
     ]
     print(f"{len(request_rows)} row(s) in the window")
-    table = model_fqn(FOUNDATION_REQUESTS, ecosystem)
-    spark.sql(
-        f"CREATE TABLE IF NOT EXISTS {table} ({FOUNDATION_DDL[FOUNDATION_REQUESTS]}) "
-        "USING delta"
+    table = create_model_table(
+        FOUNDATION_REQUESTS, FOUNDATION_DDL[FOUNDATION_REQUESTS], ecosystem
     )
-    (
-        spark.createDataFrame(request_rows, FOUNDATION_DDL[FOUNDATION_REQUESTS])
-        .write.format("delta")
-        .mode("append")
-        .saveAsTable(table)
+    append_model_rows(
+        spark.createDataFrame(request_rows, FOUNDATION_DDL[FOUNDATION_REQUESTS]),
+        FOUNDATION_REQUESTS,
+        ecosystem=ecosystem,
     )
-    stored = spark.table(table).filter(F.col("request_id") == request_id).count()
+    stored = (
+        read_model(FOUNDATION_REQUESTS, ecosystem=ecosystem)
+        .filter(F.col("request_id") == request_id)
+        .count()
+    )
     print(f"OK  request {request_id} written to {table}")
     return {
         "request_id": request_id,

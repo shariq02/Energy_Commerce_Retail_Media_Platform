@@ -576,10 +576,10 @@ def remove_rows_without_entry(ecosystem: str) -> list:
     stale = models_without_entry(stored_models(ecosystem), entries)
     for task_id, model_name in stale:
         for table in RECORD_TABLES:
-            spark.sql(
-                f"DELETE FROM {model_fqn(table, ecosystem)} "
-                f"WHERE task_id = '{task_id}' AND model_name = '{model_name}'"
+            where = ecosystem_predicate(
+                ecosystem, f"task_id = '{task_id}' AND model_name = '{model_name}'"
             )
+            spark.sql(f"DELETE FROM {model_fqn(table, ecosystem)} WHERE {where}")
         print(
             f"OK  {ecosystem}: rows of {task_id} {model_name} removed (not registered)"
         )

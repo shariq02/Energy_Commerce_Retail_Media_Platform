@@ -56,7 +56,10 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration constants
 MODEL_STAGE = "models"
-MODEL_SCHEMAS = {"energy": "energy_ml_models", "commerce": "commerce_ml_models"}
+MODEL_SCHEMA = "ml_models"
+MODEL_SCHEMAS = {"energy": MODEL_SCHEMA, "commerce": MODEL_SCHEMA}
+VOLUME_SCHEMA = "energy_ml_models"
+ECOSYSTEM_COLUMN = "ecosystem"
 MODEL_SEED = 42
 LIBRARY_VOLUME = "model_libraries"
 MODEL_SPLIT_VERSION = "e1"
@@ -586,12 +589,61 @@ def model_run_id() -> str:
 
 
 def read_model(table: str, *, ecosystem: str) -> DataFrame:
-    return spark.table(model_fqn(table, ecosystem))
+    """The rows of one ecosystem; both ecosystems share each model table."""
+    return spark.table(model_fqn(table, ecosystem)).filter(
+        F.col(ECOSYSTEM_COLUMN) == ecosystem
+    )
+
+
+def row_columns(table: str, *, ecosystem: str) -> list[str]:
+    """The columns of a model table that a row tuple holds (no ecosystem column)."""
+    return [
+        c
+        for c in spark.table(model_fqn(table, ecosystem)).columns
+        if c != ECOSYSTEM_COLUMN
+    ]
 
 
 def ddl_columns(ddl: str) -> list[tuple[str, str]]:
     """(name, type) of each column of a DDL text."""
     return [tuple(part.split(" ", 1)) for part in ddl.split(", ")]
+
+
+def model_table_ddl(ddl: str) -> str:
+    """The table DDL: the columns of the DDL text plus the ecosystem column at the
+    end, unless the DDL already holds it."""
+    if ECOSYSTEM_COLUMN in {name for name, _ in ddl_columns(ddl)}:
+        return ddl
+    return f"{ddl}, {ECOSYSTEM_COLUMN} string"
+
+
+def ecosystem_predicate(ecosystem: str, predicate: str | None = None) -> str:
+    """A row predicate that reaches only the rows of one ecosystem."""
+    own = f"{ECOSYSTEM_COLUMN} = '{ecosystem}'"
+    return own if not predicate else f"{own} AND ({predicate})"
+
+
+def with_ecosystem(df: DataFrame, ecosystem: str) -> DataFrame:
+    """The rows with the ecosystem column; a column that exists is kept."""
+    if ECOSYSTEM_COLUMN in df.columns:
+        return df
+    return df.withColumn(ECOSYSTEM_COLUMN, F.lit(ecosystem))
+
+
+def create_model_table(table: str, ddl: str, ecosystem: str) -> str:
+    """Create the shared model table if it is missing; returns its full name."""
+    full = model_fqn(table, ecosystem)
+    spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({model_table_ddl(ddl)}) USING delta")
+    return full
+
+
+def append_model_rows(df: DataFrame, table: str, *, ecosystem: str) -> None:
+    """Append rows to a shared model table, in the column order of the table."""
+    full = model_fqn(table, ecosystem)
+    cols = spark.table(full).columns
+    with_ecosystem(df, ecosystem).select(*cols).write.format("delta").mode(
+        "append"
+    ).saveAsTable(full)
 
 
 def add_missing_columns(table: str, *, ecosystem: str, ddl: str) -> list[str]:
@@ -610,17 +662,19 @@ def add_missing_columns(table: str, *, ecosystem: str, ddl: str) -> list[str]:
 def replace_model_rows(
     df: DataFrame, table: str, *, ecosystem: str, predicate: str
 ) -> None:
-    """Replace only the registry rows matching the predicate."""
+    """Replace only the registry rows of this ecosystem matching the predicate."""
     full = model_fqn(table, ecosystem)
     cols = spark.table(full).columns
+    where = ecosystem_predicate(ecosystem, predicate)
     (
-        df.select(*cols)
+        with_ecosystem(df, ecosystem)
+        .select(*cols)
         .write.format("delta")
         .mode("overwrite")
-        .option("replaceWhere", predicate)
+        .option("replaceWhere", where)
         .saveAsTable(full)
     )
-    print(f"OK  {full}: rows replaced where {predicate}")
+    print(f"OK  {full}: rows replaced where {where}")
 
 
 # COMMAND ----------
@@ -631,7 +685,7 @@ def replace_model_rows(
 def library_folder() -> str:
     """One folder per processor type: compiled packages only import on their own."""
     return (
-        f"/Volumes/{CATALOG}/{MODEL_SCHEMAS['energy']}/{LIBRARY_VOLUME}"
+        f"/Volumes/{CATALOG}/{VOLUME_SCHEMA}/{LIBRARY_VOLUME}"
         f"/site_packages_{_platform.machine()}"
     )
 
@@ -1646,8 +1700,7 @@ def record_task_context(
     try:
         table = table or getattr(ctx, "context_table", "task_run_context")
         ddl = MODEL_DDL.get(table, RUN_CONTEXT_COLUMNS)
-        full = model_fqn(table, ctx.ecosystem)
-        spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({ddl}) USING delta")
+        create_model_table(table, ddl, ctx.ecosystem)
         path, job, run = _notebook_identity()
         versions = {k: library_version(k) or "missing" for k in LIBRARIES}
         row = (
@@ -1666,9 +1719,9 @@ def record_task_context(
             detail[:900] if detail else None,
             _dt.datetime.now(_dt.UTC),
         )
-        spark.createDataFrame([row], ddl).write.format("delta").mode(
-            "append"
-        ).saveAsTable(full)
+        append_model_rows(
+            spark.createDataFrame([row], ddl), table, ecosystem=ctx.ecosystem
+        )
     except Exception as exc:
         print(f"WARN run context not recorded: {type(exc).__name__}: {exc}")
 
@@ -1721,18 +1774,19 @@ def record_result(
         (*base, None, None, *tail)
     ]
     table = getattr(ctx, "results_table", "candidate_results")
-    spark.createDataFrame(rows, RESULT_COLUMNS).write.format("delta").mode(
-        "append"
-    ).saveAsTable(model_fqn(table, ctx.ecosystem))
+    append_model_rows(
+        spark.createDataFrame(rows, RESULT_COLUMNS), table, ecosystem=ctx.ecosystem
+    )
 
 
 def start_task(ctx: TaskContext) -> None:
     """Drop this task's earlier rows of the same kind (smoke or full)."""
     table = getattr(ctx, "results_table", "candidate_results")
-    spark.sql(
-        f"DELETE FROM {model_fqn(table, ctx.ecosystem)} "
-        f"WHERE task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}"
+    where = ecosystem_predicate(
+        ctx.ecosystem,
+        f"task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}",
     )
+    spark.sql(f"DELETE FROM {model_fqn(table, ctx.ecosystem)} WHERE {where}")
     print(
         f"task {ctx.task_id} (smoke={ctx.smoke}) at frozen version {ctx.frozen_version}"
     )
@@ -2294,8 +2348,8 @@ def table_findings(table, ecosystem, run_id, task_ids=None, smoke=None) -> str:
     full = model_fqn(table, ecosystem)
     if not spark.catalog.tableExists(full):
         return f"_table `{table}` does not exist_"
-    frame = spark.table(full)
-    columns = frame.columns
+    frame = read_model(table, ecosystem=ecosystem)
+    columns = [c for c in frame.columns if c != ECOSYSTEM_COLUMN]
     if table in FINDINGS_GROUPED:
         keys = FINDINGS_GROUPED[table]
         rows = frame.groupBy(*keys).count().orderBy(*keys).collect()

@@ -267,7 +267,7 @@ def foundation_task_ids() -> list:
 
 
 def foundation_root() -> str:
-    return f"/Volumes/{CATALOG}/{MODEL_SCHEMAS['energy']}/{FOUNDATION_VOLUME}"
+    return f"/Volumes/{CATALOG}/{VOLUME_SCHEMA}/{FOUNDATION_VOLUME}"
 
 
 def read_foundation_manifest() -> dict:

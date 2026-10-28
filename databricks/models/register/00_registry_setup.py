@@ -30,11 +30,8 @@ rid = model_run_id()
 # DBTITLE 1,Create the registry tables
 for eco in ("energy", "commerce"):
     for name in ("model_registry", "registry_check"):
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  registry table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  registry table ready: {full}")
 
 # COMMAND ----------
 

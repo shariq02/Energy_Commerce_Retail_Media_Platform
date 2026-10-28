@@ -122,10 +122,35 @@ def test_evaluation_notebooks_use_the_evaluation_entry_point(path):
     assert "%run ../lib/_eval_common" in text and "%run ../lib/_eval_specs" in text
 
 
-def test_model_schemas_are_only_the_two_agreed_names():
+def test_only_the_volume_schema_keeps_an_ecosystem_name():
     for p in _FILES:
         names = set(re.findall(r"\b(\w+_ml_models)\b", p.read_text(encoding="utf-8")))
-        assert names <= {"energy_ml_models", "commerce_ml_models"}, _rel(p)
+        assert names <= {"energy_ml_models"}, _rel(p)
+
+
+_MODEL_TABLE_ACCESS = [
+    r"saveAsTable\(model_fqn\(",
+    r"CREATE TABLE IF NOT EXISTS \{model_fqn\(",
+    r"spark\.table\(model_fqn\(",
+]
+
+
+@pytest.mark.parametrize("path", _FILES, ids=_rel)
+def test_model_tables_are_reached_only_through_the_shared_helpers(path):
+    """Both ecosystems share each model table, so every read, create and append goes
+    through `read_model`, `create_model_table` and `append_model_rows`."""
+    if path.name == "_model_common.py":
+        return
+    text = path.read_text(encoding="utf-8")
+    for pattern in _MODEL_TABLE_ACCESS:
+        assert not re.search(pattern, text), f"{_rel(path)}: {pattern}"
+
+
+@pytest.mark.parametrize("path", _FILES, ids=_rel)
+def test_a_delete_on_a_model_table_names_the_ecosystem(path):
+    text = path.read_text(encoding="utf-8")
+    if "DELETE FROM {model_fqn(" in text:
+        assert "ecosystem_predicate(" in text, _rel(path)
 
 
 def test_setup_preflight_splits_and_gates_exist():
