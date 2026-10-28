@@ -93,10 +93,11 @@ for eco in ECOSYSTEMS:
                     (eco, ds, f"version {int(version)} unreadable: {read_error}")
                 )
                 continue
+            where = ecosystem_predicate(eco, f"dataset_id = '{ds}'")
             spark.sql(
                 f"UPDATE {ml_fqn('dataset_manifest', eco)} SET status = 'frozen', "
                 f"freeze_status = 'frozen', frozen_delta_version = {int(version)}, "
-                f"updated_at = current_timestamp() WHERE dataset_id = '{ds}'"
+                f"updated_at = current_timestamp() WHERE {where}"
             )
             _frozen.append((eco, ds, int(version)))
         else:

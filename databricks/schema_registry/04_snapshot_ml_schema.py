@@ -75,11 +75,13 @@ print(f"OK  registry directory: {REGISTRY_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Discover the ML schemas -- every *_ml_datasets schema
+# DBTITLE 1,Discover the ML schemas -- the shared schema and every *_ml_datasets schema
 _all_schemas = sorted(
     r["databaseName"] for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
 )
-ML_SCHEMAS = tuple(s for s in _all_schemas if s.endswith("_ml_datasets"))
+ML_SCHEMAS = tuple(
+    s for s in _all_schemas if s == "ml_datasets_shared" or s.endswith("_ml_datasets")
+)
 print(f"discovered {len(ML_SCHEMAS)} ML schema(s): {list(ML_SCHEMAS)}")
 
 # COMMAND ----------

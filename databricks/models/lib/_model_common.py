@@ -59,7 +59,6 @@ MODEL_STAGE = "models"
 MODEL_SCHEMA = "ml_models"
 MODEL_SCHEMAS = {"energy": MODEL_SCHEMA, "commerce": MODEL_SCHEMA}
 VOLUME_SCHEMA = "energy_ml_models"
-ECOSYSTEM_COLUMN = "ecosystem"
 MODEL_SEED = 42
 LIBRARY_VOLUME = "model_libraries"
 MODEL_SPLIT_VERSION = "e1"
@@ -609,31 +608,11 @@ def ddl_columns(ddl: str) -> list[tuple[str, str]]:
     return [tuple(part.split(" ", 1)) for part in ddl.split(", ")]
 
 
-def model_table_ddl(ddl: str) -> str:
-    """The table DDL: the columns of the DDL text plus the ecosystem column at the
-    end, unless the DDL already holds it."""
-    if ECOSYSTEM_COLUMN in {name for name, _ in ddl_columns(ddl)}:
-        return ddl
-    return f"{ddl}, {ECOSYSTEM_COLUMN} string"
-
-
-def ecosystem_predicate(ecosystem: str, predicate: str | None = None) -> str:
-    """A row predicate that reaches only the rows of one ecosystem."""
-    own = f"{ECOSYSTEM_COLUMN} = '{ecosystem}'"
-    return own if not predicate else f"{own} AND ({predicate})"
-
-
-def with_ecosystem(df: DataFrame, ecosystem: str) -> DataFrame:
-    """The rows with the ecosystem column; a column that exists is kept."""
-    if ECOSYSTEM_COLUMN in df.columns:
-        return df
-    return df.withColumn(ECOSYSTEM_COLUMN, F.lit(ecosystem))
-
-
 def create_model_table(table: str, ddl: str, ecosystem: str) -> str:
     """Create the shared model table if it is missing; returns its full name."""
     full = model_fqn(table, ecosystem)
-    spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({model_table_ddl(ddl)}) USING delta")
+    columns = ddl_with_ecosystem(ddl)
+    spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({columns}) USING delta")
     return full
 
 

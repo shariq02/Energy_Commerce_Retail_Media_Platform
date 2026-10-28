@@ -157,13 +157,13 @@ def test_both_ecosystems_share_one_model_schema(c):
     assert c["model_schema_for"]("commerce") == "ml_models"
 
 
-def test_model_table_ddl_adds_the_ecosystem_column_once(c):
+def test_ddl_with_ecosystem_adds_the_column_once(c):
     ddl = c["MODEL_DDL"]
     for name, text in ddl.items():
-        names = [n for n, _ in c["ddl_columns"](c["model_table_ddl"](text))]
+        names = [n for n, _ in c["ddl_columns"](c["ddl_with_ecosystem"](text))]
         assert names.count("ecosystem") == 1, name
         assert names[-1] == "ecosystem" or name == "task_registry", name
-    plain = c["model_table_ddl"]("a string, b int")
+    plain = c["ddl_with_ecosystem"]("a string, b int")
     assert plain == "a string, b int, ecosystem string"
 
 
