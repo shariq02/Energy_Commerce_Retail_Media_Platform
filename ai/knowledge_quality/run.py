@@ -59,6 +59,7 @@ from ai.rag import rerank as rr
 from ai.rag import store as st
 from ai.rag.config import RetrievalConfig
 from scripts.knowledge import _unit_common as uc
+from scripts.knowledge import rerank_pairs as rp
 
 CORPORA = ("curated", "wikipedia")
 BASE = "base"
@@ -187,6 +188,25 @@ def make_judge(args: argparse.Namespace, config: RetrievalConfig, store, build_i
     return factory.make_judge(config, args.ai_dir, args.corpus, build_id, embed)
 
 
+RERANK_STOP = (
+    "{n} pair(s) of the approved questions have no stored reranker score, so nothing "
+    "was evaluated and no holdout was read. Run python3 -m scripts.knowledge.run_rerank, "
+    "then the notebook databricks/knowledge/extension/01_rerank_scores, then "
+    "python3 -m scripts.knowledge.run_rerank again, then this command again."
+)
+
+
+def reranker_gap(args: argparse.Namespace) -> int:
+    """Pairs without a stored score when the stack of the curated corpus has the
+    reranker on."""
+    if args.corpus != "curated":
+        return 0
+    _, latest = thresholds.latest(args.ai_dir, args.corpus)
+    if not with_stack(args, latest).rerank:
+        return 0
+    return len(rp.pending_pairs(args)[1])
+
+
 def rerank_scores(args: argparse.Namespace, config: RetrievalConfig):
     return rr.load_scores(rr.cache_path(args.ai_dir)) if config.rerank else None
 
@@ -212,9 +232,12 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         if args.dry_run:
             print("The holdout read is always recorded, so it cannot be a dry run.")
             return 1
-        if state.holdout_read(args.ai_dir, args.corpus, build_id):
+        if state.holdout_read(
+            args.ai_dir, args.corpus, build_id, question_set.holdout_hash
+        ):
             print(
-                f"The holdout was already read for build {build_id}; once per candidate."
+                f"These holdout questions were already read for build {build_id}; "
+                "once per candidate and set of holdout questions."
             )
             return 1
         print(f"{len(chosen)} holdout question(s) will be read for build {build_id}.")
@@ -226,6 +249,9 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     outcomes = evaluation.evaluate(
         store, chosen, config, progress.show, rerank_scores(args, config), judge
     )
+    if args.split == qs.HOLDOUT and evaluation.missing_scores(outcomes):
+        print(RERANK_STOP.format(n=evaluation.missing_scores(outcomes)))
+        return 1
     record = evaluation.run_record(
         store,
         args.corpus,
@@ -250,6 +276,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
                     "build_id": build_id,
                     "run_id": record["run_id"],
                     "question_set_hash": question_set.set_hash,
+                    "holdout_hash": question_set.holdout_hash,
                     "read_on": today(),
                     "questions": len(outcomes),
                 },
@@ -298,8 +325,20 @@ def cmd_thresholds(args: argparse.Namespace) -> int:
             print(
                 f"  set by the owner; the retention rule gives {item['computed_threshold']}"
             )
+        if item["set_by"] == "search":
+            print(
+                f"  found by the search together with the other retrievers; "
+                f"the retention rule gives {item['computed_threshold']}"
+            )
         if item["conflict"]:
             print("  CONFLICT: the negative goal is not met; the owner decides.")
+    hybrid = next((i["hybrid"] for i in found.values() if i["hybrid"]), None)
+    if hybrid:
+        print(
+            f"hybrid with these thresholds: {hybrid['hits']} of "
+            f"{hybrid['hits_without_thresholds']} hits kept, "
+            f"{hybrid['negatives_no_match']} negative questions no_match"
+        )
     if not writing(args):
         print(uc.NOT_WRITTEN)
         return 0
@@ -392,12 +431,14 @@ def snapshot(args: argparse.Namespace) -> object:
 def cmd_accept(args: argparse.Namespace) -> int:
     record = st.read_record(args.corpus, args.corpus_dir)
     build_id = record["build_id"]
-    read = state.holdout_read(args.ai_dir, args.corpus, build_id)
+    question_set = load_questions(args)
+    read = state.holdout_read(
+        args.ai_dir, args.corpus, build_id, question_set.holdout_hash
+    )
     if read is None:
         print(f"Build {build_id} has no holdout run: run evaluate --split holdout.")
         return 1
     run = runs.load_run(args.ai_dir, args.corpus, read["run_id"])
-    question_set = load_questions(args)
     if run is None or run["question_set"]["hash"] != question_set.set_hash:
         print(
             "The question set changed since the holdout run, so the run does not count."
@@ -522,6 +563,11 @@ def cmd_all(args: argparse.Namespace) -> int:
             waiting = waiting_questions(args)
         else:
             print(f"{len(waiting)} question(s) wait for approval; no approver name.")
+    gap = reranker_gap(args)
+    if gap:
+        print("== step: reranker scores ==")
+        print(RERANK_STOP.format(n=gap))
+        return 1
     if qstack.judge_on(qstack.load(ai_dir, corpus)):
         print("== step: judge-fit ==")
         code = step(args, cmd_judge_fit)
@@ -563,12 +609,16 @@ def cmd_all(args: argparse.Namespace) -> int:
         )
         return 0
     build_id, _ = candidate(args)
-    if state.holdout_read(ai_dir, corpus, build_id):
-        print(f"The holdout was already read for build {build_id}; its run is used.")
+    holdout_hash = load_questions(args).holdout_hash
+    if state.holdout_read(ai_dir, corpus, build_id, holdout_hash):
+        print(
+            f"These holdout questions were already read for build {build_id}; "
+            "its run is used."
+        )
     else:
         print("== step: evaluate (holdout) ==")
         code = step(args, cmd_evaluate, split=qs.HOLDOUT)
-        if code or not state.holdout_read(ai_dir, corpus, build_id):
+        if code or not state.holdout_read(ai_dir, corpus, build_id, holdout_hash):
             print("Stopped: the holdout was not read.")
             return code
     print("== step: accept ==")

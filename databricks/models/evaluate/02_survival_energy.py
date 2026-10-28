@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "6"
+# environment_version = "5"
 # ///
 # MAGIC %md
 # MAGIC # EVALUATE SURVIVAL MODELS ENERGY

@@ -73,6 +73,11 @@ class Outcome:
     notes: dict = field(default_factory=dict)
 
 
+def missing_scores(outcomes: list[Outcome]) -> int:
+    """Reranker scores that the questions of a run needed and did not find."""
+    return sum(o.notes.get("rerank", {}).get("missing", 0) for o in outcomes)
+
+
 def evaluate_question(
     store: st.Store,
     question: Question,
@@ -202,6 +207,7 @@ def run_record(
         "question_set": {
             "version": question_set.version,
             "hash": question_set.set_hash,
+            "holdout_hash": question_set.holdout_hash,
             "questions": len(outcomes),
         },
         "extra_collections": {

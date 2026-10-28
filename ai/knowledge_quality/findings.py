@@ -202,6 +202,8 @@ def render(ai_dir: Path, corpus_id: str) -> str:
                 goals = "CONFLICT: the owner decides"
             elif t.get("set_by") == "owner":
                 goals = f"set by the owner (rule: {t.get('computed_threshold')})"
+            elif t.get("set_by") == "search":
+                goals = f"found by the search (rule: {t.get('computed_threshold')})"
             rows.append(
                 [
                     name,
@@ -225,6 +227,15 @@ def render(ai_dir: Path, corpus_id: str) -> str:
             )
             + "\n"
         )
+        hybrid = next(
+            (v["hybrid"] for v in data["thresholds"].values() if v.get("hybrid")), None
+        )
+        if hybrid:
+            out += (
+                f"Hybrid with these thresholds on the tuning questions: {hybrid['hits']} of "
+                f"{hybrid['hits_without_thresholds']} hits kept, "
+                f"{hybrid['negatives_no_match']} negative questions no_match.\n\n"
+            )
     out += run_section(holdout, "holdout questions")
     out += run_section(
         base, "older questions with the stack of the candidate (seen data)"

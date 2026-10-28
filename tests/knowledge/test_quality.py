@@ -12,6 +12,7 @@ chunk text finds that chunk. ChromaDB and SQLite are the real libraries.
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 
@@ -100,6 +101,67 @@ def test_a_wrong_pointer_is_found_and_holdout_reads_are_recorded(tmp_path):
     assert state.holdout_read(tmp_path, "curated", "b1") is None
     state.record_holdout_read(tmp_path, "curated", {"build_id": "b1", "run_id": "r"})
     assert state.holdout_read(tmp_path, "curated", "b1")["run_id"] == "r"
+
+
+def test_missing_reranker_scores_are_counted_over_the_questions_of_a_run():
+    rows = [outcome("q001", "u.1", {}), outcome("q002", None, {})]
+    assert evaluation.missing_scores(rows) == 0
+    rows[0].notes = {"rerank": {"missing": 3, "status": "rerank_missing"}}
+    rows[1].notes = {"rerank": {"missing": 2, "status": "rerank_missing"}}
+    assert evaluation.missing_scores(rows) == 5
+
+
+def test_the_flow_stops_before_any_run_when_reranker_scores_are_missing(
+    monkeypatch, tmp_path
+):
+    args = argparse.Namespace(ai_dir=tmp_path, corpus="curated")
+    monkeypatch.setattr(
+        rq, "with_stack", lambda a, config: RetrievalConfig(rerank=True)
+    )
+    monkeypatch.setattr(
+        rq.rp, "pending_pairs", lambda a: (3, [{"key": "a"}, {"key": "b"}])
+    )
+    assert rq.reranker_gap(args) == 2
+    monkeypatch.setattr(rq, "with_stack", lambda a, config: RetrievalConfig())
+    assert rq.reranker_gap(args) == 0
+    monkeypatch.setattr(
+        rq, "with_stack", lambda a, config: RetrievalConfig(rerank=True)
+    )
+    assert rq.reranker_gap(argparse.Namespace(ai_dir=tmp_path, corpus="wikipedia")) == 0
+
+
+def test_a_holdout_read_counts_for_one_set_of_holdout_questions(tmp_path):
+    state.designate(tmp_path, "curated", event_body())
+    entry = {"build_id": "b1", "run_id": "old"}
+    state.record_holdout_read(tmp_path, "curated", entry)
+    assert state.holdout_read(tmp_path, "curated", "b1", "h1") is None
+    state.record_holdout_read(
+        tmp_path, "curated", {"build_id": "b1", "run_id": "new", "holdout_hash": "h1"}
+    )
+    assert state.holdout_read(tmp_path, "curated", "b1", "h1")["run_id"] == "new"
+    assert state.holdout_read(tmp_path, "curated", "b1", "h2") is None
+    assert state.holdout_read(tmp_path, "curated", "b1")["run_id"] == "old"
+    assert state.holdout_read(tmp_path, "curated", "b2", "h1") is None
+
+
+def test_the_holdout_hash_follows_the_holdout_questions_only():
+    def make(n):
+        return qs.Question(
+            f"q{n:03d}", f"Lead text {n}.", "definitional_wording", "rule", "r.a"
+        )
+
+    items = [make(n) for n in range(1, 13)]
+    question_set = qs.QuestionSet("curated", 1, items)
+    qs.approve(question_set, [q.id for q in items], "Owner", "2026-10-27")
+    first = question_set.holdout_hash
+    tune = next(make(n) for n in range(100, 200) if make(n).split == qs.TUNE)
+    holdout = next(make(n) for n in range(100, 200) if make(n).split == qs.HOLDOUT)
+    question_set.questions.append(tune)
+    qs.approve(question_set, [tune.id], "Owner", "2026-10-27")
+    assert question_set.holdout_hash == first
+    question_set.questions.append(holdout)
+    qs.approve(question_set, [holdout.id], "Owner", "2026-10-27")
+    assert question_set.holdout_hash != first
 
 
 # --- integrity ---------------------------------------------------------------
@@ -465,13 +527,25 @@ def tuning_outcomes():
     pairs = [(0.9, 9.0), (0.8, 8.0), (0.7, 7.0), (0.6, 6.0)]
     rows = [
         outcome(
-            f"q{n:03d}", f"u.{n}", {}, scores={"expected": {"dense": d, "keyword": k}}
+            f"q{n:03d}",
+            f"u.{n}",
+            {"hybrid_graph": 1},
+            scores={
+                "expected": {"dense": d, "keyword": k},
+                "top": {"dense": d, "keyword": k},
+            },
         )
         for n, (d, k) in enumerate(pairs, 1)
     ]
     rows.append(
         outcome(
-            "q010", "u.9", {}, scores={"expected": {"dense": None, "keyword": None}}
+            "q010",
+            "u.9",
+            {"hybrid_graph": 1},
+            scores={
+                "expected": {"dense": None, "keyword": None},
+                "top": {"dense": 0.5, "keyword": 5.0},
+            },
         )
     )
     for n, (dense, keyword) in enumerate([(0.3, 4.0), (0.65, 3.0)], 11):
@@ -486,19 +560,84 @@ def tuning_outcomes():
     return rows
 
 
-def test_thresholds_report_the_hits_kept_and_the_negatives_stopped():
+def test_thresholds_are_searched_together_and_report_the_hits_and_negatives():
     found = thresholds.establish(tuning_outcomes())
     dense = found["dense"]
-    assert dense["threshold"] == 0.6 and dense["expected_hits"] == 4
+    assert dense["threshold"] == 0.3 and dense["set_by"] == "search"
+    assert dense["computed_threshold"] == 0.6 and dense["expected_hits"] == 4
     assert (dense["hits_kept"], dense["negatives"], dense["negatives_no_match"]) == (
         4,
         2,
-        1,
+        0,
     )
-    assert dense["negative_rate"] == 0.5 and dense["conflict"] is True
     keyword = found["keyword"]
-    assert keyword["threshold"] == 6.0 and keyword["negatives_no_match"] == 2
-    assert keyword["conflict"] is False
+    assert keyword["threshold"] == 4.0001 and keyword["negatives_no_match"] == 2
+    assert keyword["hits_kept"] == 4 and not keyword["conflict"]
+    assert not dense["conflict"]
+    assert dense["hybrid"] == {
+        "hits": 5,
+        "hits_without_thresholds": 5,
+        "negatives_no_match": 2,
+    }
+
+
+def conflicting_outcomes():
+    """Every negative question scores higher than every positive question."""
+    rows = [
+        outcome(
+            f"q{n:03d}",
+            f"u.{n}",
+            {"hybrid_graph": 1},
+            scores={
+                "expected": {"dense": 0.5, "keyword": 5.0},
+                "top": {"dense": 0.5, "keyword": 5.0},
+            },
+        )
+        for n in range(1, 5)
+    ]
+    rows += [
+        outcome(f"q{n:03d}", None, {}, scores={"top": {"dense": 0.9, "keyword": 9.0}})
+        for n in (11, 12)
+    ]
+    return rows
+
+
+def test_a_conflict_keeps_the_rule_values_when_the_hits_fall_under_the_floor():
+    found = thresholds.establish(conflicting_outcomes())
+    dense = found["dense"]
+    assert dense["set_by"] == "rule" and dense["threshold"] == 0.5
+    assert dense["conflict"] is True and found["keyword"]["conflict"] is True
+    relaxed = thresholds.establish(conflicting_outcomes(), floor=0.0)
+    assert relaxed["dense"]["set_by"] == "search" and not relaxed["dense"]["conflict"]
+    assert relaxed["dense"]["hybrid"]["hits"] == 0
+
+
+def test_without_negative_questions_the_rule_value_is_used():
+    rows = [row for row in tuning_outcomes() if row.expected_unit_id]
+    found = thresholds.establish(rows)
+    assert found["dense"]["set_by"] == "rule" and found["dense"]["hybrid"] is None
+    assert found["dense"]["threshold"] == 0.6 and not found["dense"]["conflict"]
+
+
+def test_a_positive_question_that_a_retriever_withholds_counts_as_lost():
+    rows = tuning_outcomes()
+    rows[0].top_score["dense"] = None
+    joint = thresholds.search_thresholds(
+        [r for r in rows if r.expected_unit_id],
+        [r for r in rows if not r.expected_unit_id],
+        ["dense", "keyword"],
+        {},
+    )
+    assert joint.base_hits == 5 and joint.hits == 4
+    assert joint.failed is True  # 4 of 5 hits is under the floor of 85%
+    relaxed = thresholds.search_thresholds(
+        [r for r in rows if r.expected_unit_id],
+        [r for r in rows if not r.expected_unit_id],
+        ["dense", "keyword"],
+        {},
+        floor=0.7,
+    )
+    assert relaxed.hits == 4 and relaxed.failed is False
 
 
 def test_config_versions_are_written_never_edited_and_the_latest_is_read(tmp_path):
@@ -515,9 +654,9 @@ def test_config_versions_are_written_never_edited_and_the_latest_is_read(tmp_pat
         1,
         2,
     ]
-    assert data["config"]["dense_min_score"] == 0.6 and data["tuning_run_id"] == "r1"
+    assert data["config"]["dense_min_score"] == 0.3 and data["tuning_run_id"] == "r1"
     number, config = thresholds.latest(ai_dir, "curated")
-    assert number == 2 and config.final_k == 4 and config.keyword_min_score == 6.0
+    assert number == 2 and config.final_k == 4 and config.keyword_min_score == 4.0001
     assert thresholds.read_version(ai_dir, "curated", 1)["config"]["final_k"] == 5
     with pytest.raises(TypeError):
         RetrievalConfig.from_dict({"unknown": 1})
@@ -791,7 +930,8 @@ def test_the_question_set_must_not_change_between_the_holdout_run_and_the_gate(
     command(corpus_dir, tmp_path, "evaluate", "--split", "holdout", "--apply")
     path = qs.questions_path(corpus_dir.parent, "wikipedia")
     question_set = qs.load(path)
-    question_set.questions[0].text = "Lead text 1. Changed."
+    tuning = next(q for q in question_set.questions if q.split == qs.TUNE)
+    tuning.text = f"{tuning.text} Changed."
     qs.save(path, question_set)
     capsys.readouterr()
     assert (
@@ -991,15 +1131,15 @@ def test_without_a_command_the_whole_flow_runs(tmp_path, capsys):
     )
 
 
-def test_an_owner_value_replaces_the_rule_and_ends_the_conflict():
+def test_an_owner_value_replaces_the_search_for_that_retriever():
     rows = tuning_outcomes()
     found = thresholds.establish(rows, {"dense": 0.31})
     dense = found["dense"]
     assert dense["threshold"] == 0.31 and dense["computed_threshold"] == 0.6
     assert dense["set_by"] == "owner" and dense["conflict"] is False
     assert (dense["hits_kept"], dense["negatives_no_match"]) == (4, 1)
-    assert found["keyword"]["set_by"] == "rule"
-    assert thresholds.establish(rows)["dense"]["conflict"] is True
+    assert found["keyword"]["set_by"] == "search"
+    assert found["keyword"]["threshold"] == 3.0001
 
 
 def test_the_threshold_step_takes_a_value_from_the_owner(tmp_path):
@@ -1024,4 +1164,4 @@ def test_the_threshold_step_takes_a_value_from_the_owner(tmp_path):
     data = thresholds.read_version(corpus_dir.parent, "wikipedia", number)
     assert config.dense_min_score == 0.5 and config.keyword_min_score is not None
     assert data["thresholds"]["dense"]["set_by"] == "owner"
-    assert data["thresholds"]["keyword"]["set_by"] == "rule"
+    assert data["thresholds"]["keyword"]["set_by"] in ("search", "rule")

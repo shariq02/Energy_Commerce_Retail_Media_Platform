@@ -100,6 +100,13 @@ class QuestionSet:
         return [q for q in self.approved() if q.split == split]
 
     @property
+    def holdout_hash(self) -> str:
+        """Hash of the approved holdout questions only: a holdout read is once per build
+        and per set of holdout questions."""
+        rows = sorted(f"{q.id}\t{q.content_hash}" for q in self.of_split(HOLDOUT))
+        return uc.sha256_text("\n".join(rows))
+
+    @property
     def set_hash(self) -> str:
         rows = sorted(f"{q.id}\t{q.content_hash}" for q in self.approved())
         return uc.sha256_text("\n".join(rows))

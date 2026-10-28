@@ -220,6 +220,30 @@ def test_the_approver_argument_skips_the_name_question(monkeypatch, tmp_path):
     assert approved_kinds(tmp_path) == {"metric": 8}
 
 
+def embeddings_calls(monkeypatch, tmp_path, answers):
+    calls = []
+
+    def embeddings(args):
+        calls.append(args.apply)
+        return 0
+
+    only_step(monkeypatch, "units", ra.step_units, answers, interactive=True)
+    steps = [("units", ra.step_units), ("embeddings", embeddings)]
+    monkeypatch.setattr(ra, "STEPS", steps)
+    assert ra.main(["--corpus-dir", str(tmp_path)]) == 0
+    return calls
+
+
+def test_an_approval_runs_the_embeddings_step_once_more(monkeypatch, tmp_path, capsys):
+    calls = embeddings_calls(monkeypatch, tmp_path, ["y", "2", "Owner"])
+    assert calls == [False, True, True]
+    assert "(after the approval)" in capsys.readouterr().out
+
+
+def test_no_approval_does_not_run_the_embeddings_step_again(monkeypatch, tmp_path):
+    assert embeddings_calls(monkeypatch, tmp_path, ["y", "7"]) == [False, True]
+
+
 def wiki_args(tmp_path, refresh=False, apply=False, approver=None):
     return argparse.Namespace(
         corpus_dir=tmp_path,

@@ -79,9 +79,16 @@ def keep_collections(ai_dir: Path, corpus_id: str) -> set[str]:
     return kept
 
 
-def holdout_read(ai_dir: Path, corpus_id: str, build_id: str) -> dict | None:
+def holdout_read(
+    ai_dir: Path, corpus_id: str, build_id: str, holdout_hash: str | None = None
+) -> dict | None:
+    """The recorded holdout read of a build. With `holdout_hash`, only the read of
+    exactly these holdout questions counts; an entry without a hash read an older
+    set of questions."""
     for entry in read(ai_dir, corpus_id)["holdout_reads"]:
-        if entry["build_id"] == build_id:
+        if entry["build_id"] != build_id:
+            continue
+        if holdout_hash is None or entry.get("holdout_hash") == holdout_hash:
             return entry
     return None
 
