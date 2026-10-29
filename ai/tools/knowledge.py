@@ -75,6 +75,7 @@ def run_retrieve(query: str, filters: dict | None, config: Any) -> Any:
     return rt.retrieve(query, filters=filters, config=config, production=True)
 
 
+@cm.guarded
 def retrieve(
     query: str, k: int = 5, filters: dict[str, str] | None = None
 ) -> KnowledgeResult:

@@ -13,8 +13,8 @@ compares `metrics.yml` with the live `metric_definition` rows and writes the tab
 Cost of a healthy run: 14 tool calls, about 25 small queries on the SQL warehouse
 (each cut off at 30 s), one model load for the knowledge server. Limits: 60 s to start
 a server, 90 s per call; the worst case is 6 servers times 150 s, because a server is
-dropped after its first failure. The Databricks keys of `.env` go only to the four
-servers that read Databricks.
+dropped after its first failure. Each of the four servers that read Databricks gets its own
+token from `.env` (ECRMAP_TOOLS_<SERVER>_TOKEN), and no other secret.
 
 Usage (repository root):
     python3 -m ai.mcp_servers.check
@@ -29,10 +29,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import anyio
-from dotenv import dotenv_values
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
+from ai.mcp_servers import credentials
 from ai.tools import commerce, energy
 from ai.tools import common as cm
 
@@ -40,13 +40,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FINDINGS = REPO_ROOT / "src" / "findings" / "tools_findings" / "smoke_check.md"
 START_SECONDS = 60
 CALL_SECONDS = 90
-DATABRICKS_KEYS = (
-    "DATABRICKS_HOST",
-    "DATABRICKS_HTTP_PATH",
-    "DATABRICKS_TOKEN_SQL",
-    "DATABRICKS_CATALOG",
-)
-USES_DATABRICKS = ("energy_tools", "commerce_tools", "ml_tools", "dq_tools")
 DEFAULT_CALLS: dict[str, list[tuple[str, dict]]] = {
     "energy_tools": [
         (
@@ -112,10 +105,9 @@ class Line:
 
 
 def server_env(server: str, values: dict[str, str]) -> dict[str, str]:
-    env = {"PYTHONPATH": str(REPO_ROOT)}
-    if server in USES_DATABRICKS:
-        env.update({k: values[k] for k in DATABRICKS_KEYS if values.get(k)})
-    return env
+    """The environment of a server, for the first agent that has a grant to it."""
+    agent = cm.load_scopes()[server].allowed_agents[0]
+    return credentials.spawn_env(agent, server, values)
 
 
 def describe(result) -> tuple[str, str, str]:
@@ -185,11 +177,13 @@ async def check_server(server: str, values: dict[str, str]) -> list[Line]:
 
 
 def bindings(values: dict[str, str]) -> list[str]:
-    cm.set_warehouse(cm.warehouse_from_env(values))
-    return [
-        *[f"energy {p}" for p in energy.DOMAIN.verify_bindings()],
-        *[f"commerce {p}" for p in commerce.DOMAIN.verify_bindings()],
-    ]
+    """metrics.yml against the live definitions, read with the token of each server."""
+    problems: list[str] = []
+    for name, domain in (("energy", energy.DOMAIN), ("commerce", commerce.DOMAIN)):
+        key = cm.TOKEN_KEYS[f"{name}_tools"]
+        cm.set_warehouse(cm.warehouse_from_env(values, key))
+        problems += [f"{name} {p}" for p in domain.verify_bindings()]
+    return problems
 
 
 def write_findings(lines: list[Line], problems: list[str]) -> None:
@@ -211,14 +205,19 @@ def write_findings(lines: list[Line], problems: list[str]) -> None:
 
 
 async def main_async() -> int:
-    values = {k: v for k, v in dotenv_values(REPO_ROOT / ".env").items() if v}
+    values = credentials.load_values()
     lines: list[Line] = []
     for server in cm.load_scopes():
         print(f"== {server}", flush=True)
         try:
             lines += await check_server(server, values)
         except Exception as exc:
-            lines.append(Line(server, "(start)", "FAIL", "-", 0.0, type(exc).__name__))
+            note = (
+                str(exc)
+                if isinstance(exc, credentials.MissingCredential)
+                else (type(exc).__name__)
+            )
+            lines.append(Line(server, "(start)", "FAIL", "-", 0.0, note))
             print(lines[-1].text(), flush=True)
     print("== metrics.yml against metric_definition", flush=True)
     try:

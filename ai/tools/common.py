@@ -14,11 +14,13 @@ connection opens on the first query. Library only.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
+import sys
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -33,6 +35,20 @@ ROW_CAP = 200
 ROW_CAP_MAX = 1000
 QUERY_TIMEOUT_SECONDS = 30
 TOKEN_KEY = "DATABRICKS_TOKEN_SQL"
+SERVER_KEY = "ECRMAP_SERVER"
+AGENT_KEY = "ECRMAP_AGENT_ID"
+TOKEN_KEYS = {
+    "energy_tools": "ECRMAP_TOOLS_ENERGY_TOKEN",
+    "commerce_tools": "ECRMAP_TOOLS_COMMERCE_TOKEN",
+    "ml_tools": "ECRMAP_TOOLS_ML_TOKEN",
+    "dq_tools": "ECRMAP_TOOLS_DQ_TOKEN",
+}
+SECRET_NAMES = (
+    *TOKEN_KEYS.values(),
+    "DATABRICKS_TOKEN",
+    "DATABRICKS_TOKEN_SQL",
+    "DATABRICKS_TOKEN_ADMIN",
+)
 ERROR_CODES = (
     "unknown_metric",
     "wrong_ecosystem",
@@ -320,10 +336,15 @@ _WAREHOUSE: Warehouse | None = None
 
 
 def get_warehouse() -> Warehouse:
-    """The warehouse of this server process, made from the environment on first use."""
+    """The warehouse of this server process, made from the environment on first use.
+
+    A server that the loader started has its own token key; a named server whose key
+    is missing fails, it does not fall back. Without a server name the shared SQL key
+    is used (development and tests)."""
     global _WAREHOUSE
     if _WAREHOUSE is None:
-        _WAREHOUSE = warehouse_from_env(os.environ)
+        server = os.environ.get(SERVER_KEY)
+        _WAREHOUSE = warehouse_from_env(os.environ, TOKEN_KEYS.get(server, TOKEN_KEY))
     return _WAREHOUSE
 
 
@@ -331,3 +352,40 @@ def set_warehouse(warehouse: Warehouse | None) -> None:
     """Replace the warehouse of the process; the tests use it."""
     global _WAREHOUSE
     _WAREHOUSE = warehouse
+
+
+_TOKEN_PATTERNS = (
+    re.compile(r"dapi[A-Za-z0-9]{16,}"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/\-]{8,}=*"),
+)
+
+
+def redact(text: str, secrets: Iterable[str] = ()) -> str:
+    """The text with token patterns, the given secrets and the secrets of the
+    environment replaced by '***'."""
+    known = {v for v in (*secrets, *(os.environ.get(n, "") for n in SECRET_NAMES))}
+    for value in sorted((v for v in known if len(v) >= 8), key=len, reverse=True):
+        text = text.replace(value, "***")
+    for pattern in _TOKEN_PATTERNS:
+        text = pattern.sub("***", text)
+    return text
+
+
+def guarded(function: Callable[..., Any]) -> Callable[..., Any]:
+    """A tool function that raises only typed failures. Any other exception becomes
+    internal_error; its text, with secrets removed, goes to stderr only."""
+
+    @functools.wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return function(*args, **kwargs)
+        except ToolFailure:
+            raise
+        except Exception as exc:
+            detail = redact(f"{type(exc).__name__}: {exc}")
+            sys.stderr.write(f"tool {function.__name__} failed: {detail}\n")
+            raise ToolFailure(
+                "internal_error", "the tool failed", "the detail is in the server log"
+            ) from None
+
+    return wrapper

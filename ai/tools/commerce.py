@@ -20,6 +20,7 @@ SCOPE = cm.load_scopes()[SERVER]
 DOMAIN = mt.Domain("commerce", SCOPE, mt.load_metrics())
 
 
+@cm.guarded
 def get_metric(
     metric_key: str,
     filters: dict[str, str] | None = None,
@@ -30,6 +31,7 @@ def get_metric(
     return DOMAIN.series(metric_key, filters, start, end, limit)
 
 
+@cm.guarded
 def compare_periods(
     metric_key: str,
     filters: dict[str, str] | None = None,

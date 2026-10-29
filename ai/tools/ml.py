@@ -104,6 +104,7 @@ def _task(task_id: str) -> str:
     return task_id
 
 
+@cm.guarded
 def read_model_card(task_id: str) -> CardResult:
     path = card_paths()[_task(task_id)]
     text = path.read_text(encoding="utf-8")
@@ -147,6 +148,7 @@ def _rows(
     )
 
 
+@cm.guarded
 def read_monitoring(
     task_id: str,
     kind: Literal["results", "flags", "triggers"] = "results",
@@ -166,6 +168,7 @@ def read_monitoring(
     return _rows(template, params, f"ml_models.monitoring_{kind}", limit)
 
 
+@cm.guarded
 def read_predictions(
     task_id: str,
     row_key: str = "*",

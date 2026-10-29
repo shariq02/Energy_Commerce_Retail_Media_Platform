@@ -15,6 +15,7 @@ from datetime import date
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from ai.mcp_servers import grants
 from ai.mcp_servers.strict import make_strict
 from ai.tools import commerce
 from ai.tools import common as cm
@@ -58,4 +59,5 @@ make_strict(app)
 
 
 if __name__ == "__main__":
+    grants.check_start("commerce_tools")
     app.run(transport="stdio")

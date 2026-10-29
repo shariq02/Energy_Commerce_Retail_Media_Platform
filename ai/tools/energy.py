@@ -142,6 +142,7 @@ class WeatherConditionsResult(cm.TrustedToolResult):
     data: WeatherConditions
 
 
+@cm.guarded
 def get_metric(
     metric_key: str,
     filters: dict[str, str] | None = None,
@@ -152,6 +153,7 @@ def get_metric(
     return DOMAIN.series(metric_key, filters, start, end, limit)
 
 
+@cm.guarded
 def compare_periods(
     metric_key: str,
     filters: dict[str, str] | None = None,
@@ -163,6 +165,7 @@ def compare_periods(
     return DOMAIN.compare(metric_key, filters, (a_start, a_end), (b_start, b_end))
 
 
+@cm.guarded
 def analyse_market_conditions(
     market_area_code: str = "de_lu",
     start: date | None = None,
@@ -220,6 +223,7 @@ def analyse_market_conditions(
     )
 
 
+@cm.guarded
 def analyse_weather_conditions(
     location_key: str = "*",
     start: date | None = None,

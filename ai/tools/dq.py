@@ -100,6 +100,7 @@ def _rows(
     )
 
 
+@cm.guarded
 def read_quality_log(
     source: str = "*", stage: str = "*", status: str = "*", limit: int = 50
 ) -> cm.RowsResult:
@@ -107,6 +108,7 @@ def read_quality_log(
     return _rows(LOG_T, params, "quality.quality_audit_log", limit)
 
 
+@cm.guarded
 def read_quarantine(
     source_system: str = "*", rule_id: str = "*", limit: int = 20
 ) -> cm.RowsResult:
@@ -114,6 +116,7 @@ def read_quarantine(
     return _rows(QUARANTINE_T, params, "quality.quarantine", limit)
 
 
+@cm.guarded
 def read_watermarks(
     source: str = "*", stage: str = "*", limit: int = 50
 ) -> cm.RowsResult:
@@ -125,6 +128,7 @@ def read_watermarks(
     )
 
 
+@cm.guarded
 def read_field_class(table_name: str = "*", limit: int = 100) -> cm.RowsResult:
     return _rows(
         FIELD_CLASS_T,

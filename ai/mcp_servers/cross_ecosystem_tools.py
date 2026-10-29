@@ -13,8 +13,11 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from ai.mcp_servers import grants
+
 app = FastMCP("cross_ecosystem_tools")
 
 
 if __name__ == "__main__":
+    grants.check_start("cross_ecosystem_tools")
     app.run(transport="stdio")
