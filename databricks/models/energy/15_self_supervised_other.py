@@ -98,3 +98,16 @@ SPEC = {
 
 # DBTITLE 1,Run the reconstruction candidates
 run_reconstruction(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__15_self_supervised_other",
+    "Model Self Supervised Series",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["self_supervised_other.reconstruction"],
+    smoke=SMOKE,
+)

@@ -1,6 +1,6 @@
 # Model card: honda_forecast.increment
 
-_model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `chronos2_lora`, dataset `honda_forecast`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metri
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R07, R11
+- rules applied: R10, R11, R13
 
 ## Purpose and task
 
@@ -36,33 +36,33 @@ _model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metri
 
 ## Training
 
-- model family: gbt_lightgbm; MLflow run `b64ee8daf1244c1bb74f2aab87532d51`
-- parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
-- library versions: lightgbm 4.7.0
+- model family: chronos2_lora; MLflow run `600096b94e724f10b5f0e2cd15b76b07`
+- parameters: {'row_fraction': 1.0, 'lora_learning_rate': 1e-05, 'lora_num_steps': 500, 'lora_batch_size': 32, 'lora_context_length': 512, 'lora_max_series': 200, 'model_key': 'chronos2', 'repo_id': 'amazon/chronos-2', 'revision': '29ec3766d36d6f73f0696f85560a422f50e8498c', 'licence': 'apache-2.0', 'adapter_dir': '/Volumes/energy_commerce_retail_media/energy_ml_models/foundation_models/adapters/honda_forecast.increment/model-20261024T112829Z', 'mode': 'lora', 'context': 672, 'gap_days': 1, 'seed': 42}
+- library versions: torch 2.9.0+cu129, chronos 2.3.2
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
-| metric | gbt_lightgbm held-out | gbt_lightgbm validation | persistence held-out |
+| metric | chronos2_lora held-out | chronos2_lora validation | persistence held-out |
 |---|---|---|---|
-| mae | 20.47 | 17.97 | 23.28 |
-| mean_error | 2.656 | 1.544 | 0.02136 |
-| mean_error_relative | 0.06998 | 0.03938 | 0.0005626 |
-| primary_change_relative | 0.1394 |  | 0.1468 |
-| rmse | 37.82 | 35.3 | 49.99 |
-| skill_mae | 0.1208 | 0.1152 |  |
-| skill_primary | 0.1208 |  |  |
-| skill_primary_ci_high | 0.2058 |  |  |
-| skill_primary_ci_low | 0.0336 |  |  |
-| skill_rmse | 0.2435 | 0.2329 |  |
+| mae | 18.13 | 16.15 | 23.28 |
+| mean_error | -0.9812 | -1.637 | 0.02136 |
+| mean_error_relative | -0.02585 | -0.04175 | 0.0005626 |
+| primary_change_relative | 0.1227 |  | 0.1468 |
+| rmse | 37.48 | 35.44 | 49.99 |
+| skill_mae | 0.2214 | 0.2047 |  |
+| skill_primary | 0.2214 |  |  |
+| skill_primary_ci_high | 0.2784 |  |  |
+| skill_primary_ci_low | 0.1768 |  |  |
+| skill_rmse | 0.2503 | 0.2299 |  |
 
 ## Segments
 
 | segment | skill | decision | detail |
 |---|---|---|---|
-| combined_heat_and_power | -0.02877 | not_approved | negative skill |
-| solar_photovoltaic | 0.04022 | approved_with_conditions | no segment interval |
-| total | 0.2168 | approved_with_conditions | no segment interval |
+| combined_heat_and_power | 0.1858 | approved_with_conditions | no segment interval |
+| solar_photovoltaic | 0.1163 | approved_with_conditions | no segment interval |
+| total | 0.2711 | approved_with_conditions | no segment interval |
 
 ## Flags
 
@@ -70,12 +70,13 @@ _model `gbt_lightgbm`, dataset `honda_forecast`, frozen version 0, primary metri
 
 ## Conditions and known limits
 
-- segments not approved: combined_heat_and_power
-- segments with positive skill but no uncertainty interval, conditional until an interval is recorded: solar_photovoltaic (0.0402), total (0.217)
+- contamination flag unresolved: the pretraining data of the model was not shown to be free of the evaluated data; revision 29ec3766d36d; pretraining data per register: named on the model card; read before the contamination check; task data names found: none
+- segments with positive skill but no uncertainty interval, conditional until an interval is recorded: combined_heat_and_power (0.186), solar_photovoltaic (0.116), total (0.271)
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 4 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- foundation model amazon/chronos-2 at revision 29ec3766d36d, licence apache-2.0, ran lora
 
 ## Revalidation trigger
 

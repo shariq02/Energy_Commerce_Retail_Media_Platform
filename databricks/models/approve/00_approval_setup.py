@@ -36,11 +36,8 @@ rid = model_run_id()
 # DBTITLE 1,Create the approval tables
 for eco in ("energy", "commerce"):
     for name in ("approval_spec", "model_approval"):
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  approval table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  approval table ready: {full}")
 
 # COMMAND ----------
 
@@ -89,3 +86,14 @@ for eco, have in recorded.items():
 # DBTITLE 1,The recorded settings load
 for eco in ("energy", "commerce"):
     print(eco, spec_from_rows(read_model("approval_spec", ecosystem=eco).collect()))
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__00_approval_setup",
+    "Approval Setup",
+    ["approval_spec"],
+    rid,
+)

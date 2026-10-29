@@ -60,7 +60,7 @@
       "version": "6969f49ecc0d9ab447ee3c12cd81263829d10acb843b12e59d0bdf17dacbbb9e"
     },
     "keyword_index": {
-      "file": "vector_store/data/keyword/wikipedia.json",
+      "file": "vector_store/data/builds/wikipedia/49256c69116e/keyword.json",
       "version": "7de9d94b98f63506b4d46f765460918d492b54cfc09f1216b601d6dc20764823"
     },
     "last_known_good": null,

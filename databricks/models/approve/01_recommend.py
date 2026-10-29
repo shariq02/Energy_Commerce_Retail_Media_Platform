@@ -28,6 +28,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Imports
+import ast as _ast
+
+# COMMAND ----------
+
 # DBTITLE 1,Configuration
 COMPONENT = "models/approve/01_recommend"
 SOURCE = "models"
@@ -47,6 +52,7 @@ RESULT_FIELDS = (
 SELECTION_FIELDS = (
     "task_id",
     "model_name",
+    "family",
     "rank",
     "is_baseline",
     "mlflow_run_id",
@@ -77,6 +83,42 @@ for eco in ("energy", "commerce"):
         .select(*SELECTION_FIELDS)
         .collect()
     ]
+    facts = {}
+    if spark.catalog.tableExists(model_fqn("foundation_selection", eco)):
+        foundation_selected = [
+            r.asDict()
+            for r in read_model("foundation_selection", ecosystem=eco)
+            .select(*SELECTION_FIELDS)
+            .collect()
+        ]
+        selection += foundation_selected
+        params = {
+            (r["task_id"], r["model_name"]): _ast.literal_eval(r["params"] or "{}")
+            for r in read_model("foundation_results", ecosystem=eco)
+            .filter(~F.col("smoke") & (F.col("status") == "ok"))
+            .select("task_id", "model_name", "params")
+            .distinct()
+            .collect()
+        }
+        register = {
+            r["model_key"]: r.asDict()
+            for r in read_model("foundation_model_register", ecosystem=eco).collect()
+        }
+        flags = {}
+        if spark.catalog.tableExists(model_fqn("foundation_contamination", eco)):
+            flags = {
+                (r["model_key"], r["task_id"]): r.asDict()
+                for r in read_model("foundation_contamination", ecosystem=eco).collect()
+            }
+        for task in (t for t in TASKS if t["ecosystem"] == eco):
+            tid = task["task_id"]
+            mine = [s for s in foundation_selected if s["task_id"] == tid]
+            facts[tid] = foundation_facts(
+                mine,
+                {m: p for (t, m), p in params.items() if t == tid},
+                register,
+                {k: v for (k, t), v in flags.items() if t == tid},
+            )
     context = (
         read_model(APPROVAL_CONTEXT_TABLE, ecosystem=eco)
         .filter(~F.col("smoke"))
@@ -87,7 +129,7 @@ for eco in ("energy", "commerce"):
     reads = {}
     for c in context:
         reads[c["task_id"]] = reads.get(c["task_id"], 0) + 1
-    evidence[eco] = (spec, results, selection, reads)
+    evidence[eco] = (spec, results, selection, reads, facts)
     print(f"{eco}: {len(results)} result row(s), {len(selection)} selection row(s)")
 
 # COMMAND ----------
@@ -96,7 +138,7 @@ for eco in ("energy", "commerce"):
 recommended = {eco: [] for eco in evidence}
 for task in TASKS:
     eco = task["ecosystem"]
-    spec, results, selection, reads = evidence[eco]
+    spec, results, selection, reads, facts = evidence[eco]
     tid = task["task_id"]
     recommended[eco] += recommend_task(
         task,
@@ -104,6 +146,7 @@ for task in TASKS:
         [r for r in results if r["task_id"] == tid],
         spec,
         reads.get(tid, 0),
+        facts.get(tid),
     )
 print({eco: len(rows) for eco, rows in recommended.items()})
 
@@ -148,4 +191,15 @@ check(
     detail=f"no recommendation: {_missing}",
     metric_value=float(len(_missing)),
     rid=rid,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__01_recommend",
+    "Approval Recommendation",
+    ["model_approval"],
+    rid,
 )

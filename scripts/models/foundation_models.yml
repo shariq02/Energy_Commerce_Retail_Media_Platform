@@ -1,0 +1,144 @@
+models:
+- key: chronos2
+  repo_id: amazon/chronos-2
+  ref: main
+  revision: 29ec3766d36d6f73f0696f85560a422f50e8498c
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: named on the model card; read before the contamination check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: timesfm25
+  repo_id: google/timesfm-2.5-200m-pytorch
+  ref: main
+  revision: 1d952420fba87f3c6dee4f240de0f1a0fbc790e3
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: named on the model card; read before the contamination check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: ttm_r2
+  repo_id: ibm-granite/granite-timeseries-ttm-r2
+  ref: 512-720-r2
+  revision: bcfc4a497430a228afcbaf378f18f316642ece2a
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: named on the model card; read before the contamination check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: tabicl_v2
+  repo_id: jingang/TabICL
+  ref: main
+  revision: 4dcd344ece2c00be9e831fdd35bed57b5ad83e19
+  licence: bsd-3-clause
+  licence_restriction: none
+  pretraining_data: synthetic tables from the TabICL prior; read the model card
+  include:
+  - tabicl-classifier-v2-20260212.ckpt
+  - tabicl-regressor-v2-20260212.ckpt
+- key: tabpfn_v2_clf
+  repo_id: Prior-Labs/TabPFN-v2-clf
+  ref: main
+  revision: f851f2a3c941544733b712d8c0f96dfae9b28862
+  licence: priorlabs-1-1
+  licence_restriction: Apache 2.0 with an attribution requirement
+  pretraining_data: synthetic tables from the TabPFN prior; read the model card
+  include:
+  - tabpfn-v2-classifier.ckpt
+- key: tabpfn_v2_reg
+  repo_id: Prior-Labs/TabPFN-v2-reg
+  ref: main
+  revision: 4972a65a1b30806315c6f92499959ffbfc69a673
+  licence: priorlabs-1-1
+  licence_restriction: Apache 2.0 with an attribution requirement
+  pretraining_data: synthetic tables from the TabPFN prior; read the model card
+  include:
+  - tabpfn-v2-regressor.ckpt
+- key: tabpfn_25
+  repo_id: Prior-Labs/tabpfn_2_5
+  ref: main
+  revision: 6c45f3a6d0d07c6c5f62572e04a0c2929de91b8b
+  licence: tabpfn-2.5-non-commercial
+  licence_restriction: non-commercial use only; gated (accept the terms, set HF_TOKEN)
+  pretraining_data: synthetic tables from the TabPFN prior; read the model card
+  include:
+  - tabpfn-v2.5-classifier-v2.5_default.ckpt
+  - tabpfn-v2.5-regressor-v2.5_default.ckpt
+- key: toto2
+  repo_id: Datadog/Toto-2.0-1B
+  ref: main
+  revision: 1604e1a5242884fb9848f88c4ced14f4dc62d9d3
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: named on the model card; read before the contamination check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: energy_ttm
+  repo_id: EnergyFM/energy-ttm
+  ref: main
+  revision: 63acc54104d46c284e54ef92812b3d2aa533cdea
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: energy load data named on the model card; read before the contamination
+    check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: energy_tspulse
+  repo_id: EnergyFM/energy-tspulse
+  ref: main
+  revision: 86442e1851fbc0e49fdd2e3573281491a76b73a9
+  licence: apache-2.0
+  licence_restriction: none
+  pretraining_data: energy data named on the model card; read before the contamination
+    check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: moment
+  repo_id: AutonLab/MOMENT-1-large
+  ref: main
+  revision: ca58581bc7bea2ebed4e80dc0a3e4b8b609c6ecc
+  licence: hub
+  licence_restriction: read the model card
+  pretraining_data: the Time-series Pile, named on the model card; read before the
+    contamination check
+  include:
+  - '*.json'
+  - '*.safetensors'
+- key: survpfn_weights
+  repo_id: samuelboehm/SurvPFN
+  ref: main
+  revision: 6225cc4c8ccbc3c4c0114d29beb45e7ff88230f9
+  licence: hub
+  licence_restriction: read the model card
+  pretraining_data: synthetic survival data from the SurvPFN prior; read the model
+    card
+  include:
+  - survpfn_nr.pt
+- key: survpfn_code
+  repo_id: genepi-freiburg/SurvPFN
+  source: github
+  ref: main
+  revision: 4f26fe31efd811f546a6a3a12acd28293828ca7e
+  licence: mit
+  licence_restriction: none
+  pretraining_data: none (code only)
+  include:
+  - src/*
+  - pyproject.toml
+- key: ms_marco_minilm_l6_v2
+  repo_id: cross-encoder/ms-marco-MiniLM-L6-v2
+  ref: main
+  revision: 233902d25c440f23af6f7d6e94d2946bac0bee0a
+  licence: apache-2.0
+  licence_restriction: Apache 2.0 weights; trained on MS MARCO, read its data terms
+  pretraining_data: MS MARCO passage ranking, named on the model card; the cross-encoder of the knowledge retrieval, not a forecaster
+  include:
+  - '*.json'
+  - model.safetensors
+  - vocab.txt

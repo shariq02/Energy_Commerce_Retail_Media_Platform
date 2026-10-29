@@ -40,6 +40,19 @@ from pyspark.sql.window import Window
 # DBTITLE 1,Configuration constants
 ML_STAGE = "ml"
 ML_SCHEMAS = {"energy": "energy_ml_datasets", "commerce": "commerce_ml_datasets"}
+ML_SHARED_SCHEMA = "ml_datasets_shared"
+ML_SHARED_TABLES = (
+    "dataset_manifest",
+    "split_specification",
+    "partition_manifest",
+    "null_class_registry",
+    "imputer_parameters",
+    "mask_specification",
+    "null_rate_profile",
+    "feature_contract",
+    "gate_results",
+)
+ECOSYSTEM_COLUMN = "ecosystem"
 SCHEMA_OBJECT_QUOTA = 100
 SCHEMA_OBJECT_WARN = 80
 SCHEMA_OBJECT_STOP = 95
@@ -157,7 +170,37 @@ def ml_schema_for(ecosystem: str) -> str:
 
 
 def ml_fqn(table: str, ecosystem: str) -> str:
-    return f"{CATALOG}.{ml_schema_for(ecosystem)}.{table}"
+    """A registry table that both ecosystems share lives once in the shared schema."""
+    schema = ML_SHARED_SCHEMA if table in ML_SHARED_TABLES else ml_schema_for(ecosystem)
+    return f"{CATALOG}.{schema}.{table}"
+
+
+def ddl_with_ecosystem(ddl: str) -> str:
+    """The table DDL plus the ecosystem column at the end, unless the DDL has it."""
+    if ECOSYSTEM_COLUMN in {part.split(" ", 1)[0] for part in ddl.split(", ")}:
+        return ddl
+    return f"{ddl}, {ECOSYSTEM_COLUMN} string"
+
+
+def ecosystem_predicate(ecosystem: str, predicate: str | None = None) -> str:
+    """A row predicate that reaches only the rows of one ecosystem."""
+    own = f"{ECOSYSTEM_COLUMN} = '{ecosystem}'"
+    return own if not predicate else f"{own} AND ({predicate})"
+
+
+def with_ecosystem(df: DataFrame, ecosystem: str) -> DataFrame:
+    """The rows with the ecosystem column; a column that exists is kept."""
+    if ECOSYSTEM_COLUMN in df.columns:
+        return df
+    return df.withColumn(ECOSYSTEM_COLUMN, F.lit(ecosystem))
+
+
+def create_ml_registry_table(name: str, ddl: str, ecosystem: str) -> str:
+    """Create a registry table if it is missing; returns its full name."""
+    full = ml_fqn(name, ecosystem)
+    table_ddl = ddl_with_ecosystem(ddl) if name in ML_SHARED_TABLES else ddl
+    spark.sql(f"CREATE TABLE IF NOT EXISTS {full} ({table_ddl}) USING delta")
+    return full
 
 
 def ml_run_id() -> str:
@@ -400,6 +443,28 @@ def _quota_guard(full: str, ecosystem: str) -> None:
         print(f"WARN {ml_schema_for(ecosystem)} holds {n} of {SCHEMA_OBJECT_QUOTA}")
 
 
+def _frozen_guard(table: str, ecosystem: str) -> None:
+    """A frozen dataset table is never overwritten; reopen it first."""
+    manifest = ml_fqn("dataset_manifest", ecosystem)
+    if table == "dataset_manifest" or not spark.catalog.tableExists(manifest):
+        return
+    if not table.startswith("dataset_"):
+        return
+    frozen = (
+        read_ml("dataset_manifest", ecosystem=ecosystem)
+        .filter(
+            (F.col("dataset_id") == table.removeprefix("dataset_"))
+            & (F.col("freeze_status") == "frozen")
+        )
+        .count()
+    )
+    if frozen:
+        raise RuntimeError(
+            f"{ml_fqn(table, ecosystem)} is frozen; run its assembled notebook "
+            "to reopen it"
+        )
+
+
 def _ml_delta_rows(table: str) -> int | None:
     try:
         m = (
@@ -424,6 +489,7 @@ def write_ml(
     """Deterministic full overwrite into the ecosystem's ML schema."""
     started = now_utc()
     full = ml_fqn(table, ecosystem)
+    _frozen_guard(table, ecosystem)
     _quota_guard(full, ecosystem)
     if spark.catalog.tableExists(full):
         v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
@@ -468,21 +534,30 @@ def write_ml_view(select_sql: str, table: str, *, ecosystem: str) -> None:
 
 
 def read_ml(table: str, *, ecosystem: str) -> DataFrame:
-    return spark.table(ml_fqn(table, ecosystem))
+    """The rows of one ecosystem; a shared registry table holds both."""
+    df = spark.table(ml_fqn(table, ecosystem))
+    if table in ML_SHARED_TABLES:
+        df = df.filter(F.col(ECOSYSTEM_COLUMN) == ecosystem)
+    return df
 
 
 def replace_rows(df: DataFrame, table: str, *, ecosystem: str, predicate: str) -> None:
-    """Replace only the registry rows matching the predicate."""
+    """Replace only the registry rows matching the predicate (of this ecosystem in a
+    shared table)."""
     full = ml_fqn(table, ecosystem)
     cols = spark.table(full).columns
+    where = predicate
+    if table in ML_SHARED_TABLES:
+        df = with_ecosystem(df, ecosystem)
+        where = ecosystem_predicate(ecosystem, predicate)
     (
         df.select(*cols)
         .write.format("delta")
         .mode("overwrite")
-        .option("replaceWhere", predicate)
+        .option("replaceWhere", where)
         .saveAsTable(full)
     )
-    print(f"OK  {full}: rows replaced where {predicate}")
+    print(f"OK  {full}: rows replaced where {where}")
 
 
 # COMMAND ----------
@@ -532,9 +607,10 @@ def register_dataset(
 
 def set_dataset_status(dataset_id: str, ecosystem: str, status: str) -> None:
     full = ml_fqn("dataset_manifest", ecosystem)
+    where = ecosystem_predicate(ecosystem, f"dataset_id = '{dataset_id}'")
     spark.sql(
         f"UPDATE {full} SET status = '{status}', updated_at = current_timestamp() "
-        f"WHERE dataset_id = '{dataset_id}'"
+        f"WHERE {where}"
     )
 
 

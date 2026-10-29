@@ -1,6 +1,6 @@
 # Model card: price_quarter_hour.price
 
-_model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -36,9 +36,9 @@ _model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, 
 
 ## Training
 
-- model family: quantile_gbt_lightgbm; MLflow run `cb36ec00aad54e7c8bf831ffed77c6d5`
+- model family: quantile_gbt_lightgbm; MLflow run `fc28aed86c354975836d1bfb119f8194`
 - parameters: {'quantiles': [0.1, 0.5, 0.9], 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.7.0
+- library versions: lightgbm 4.6.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -76,7 +76,7 @@ _model `quantile_gbt_lightgbm`, dataset `price_quarter_hour`, frozen version 0, 
 
 ## Disclosures
 
-- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

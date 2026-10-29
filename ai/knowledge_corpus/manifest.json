@@ -1,30 +1,30 @@
 {
   "approval": {
-    "approved": 109,
+    "approved": 147,
     "pending": 0,
     "stale": 0
   },
-  "corpus_version": 2,
+  "corpus_version": 3,
   "embedding": {
     "articles_without_chunks": 0,
-    "build_id": "5e70ab63ba7c",
-    "built_on": "2026-10-13",
-    "chunk_count": 112,
-    "collection": "curated_5e70ab63ba7c",
-    "corpus_fingerprint": "aa36e951c9478e84e4675ca3ca7a4e90375a4e6cfb483f1e25b3d10fcddb9fc1",
+    "build_id": "5ba0f58d3f7d",
+    "built_on": "2026-10-27",
+    "chunk_count": 184,
+    "collection": "curated_5ba0f58d3f7d",
+    "corpus_fingerprint": "ef07bb6fcc2612f9ad134c7be9ddc6624c2ebfc01af67a12eedf5be902b2ab90",
     "corpus_id": "curated",
-    "corpus_version": 2,
+    "corpus_version": 3,
     "graph": {
       "directory": "knowledge_graph",
-      "edges": 651,
-      "nodes": 109,
-      "version": "8b2f3d2934de77deb5fa77b84b71a75687776c77184c21d9a92069febdbd6414"
+      "edges": 742,
+      "nodes": 147,
+      "version": "266f812867557ff984baa6facfee419df5223d57e33f781f4bce4ed7620541a2"
     },
     "keyword_index": {
-      "file": "vector_store/data/keyword/curated.json",
-      "version": "ee615adf9d73921492cc13a11c66ecaa07ced0556b205cb37c6dc3b4f8627e6e"
+      "file": "vector_store/data/builds/curated/5ba0f58d3f7d/keyword.json",
+      "version": "4278ac1f47815e56edd922a56d47fa591e8942bff8d3cf48bafc3f400417b853"
     },
-    "last_known_good": "curated_e5b3d84bb934",
+    "last_known_good": "curated_5e70ab63ba7c",
     "mode": "production",
     "model": {
       "archive_sha256": "913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3",
@@ -36,15 +36,180 @@
       "tokenizer_sha256": "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0"
     },
     "skipped_sentences": 0,
-    "split_units": 3,
-    "unit_count": 109,
+    "split_units": 27,
+    "unit_count": 147,
     "vectors": {
       "made_in": "local"
     }
   },
-  "fingerprint": "aa36e951c9478e84e4675ca3ca7a4e90375a4e6cfb483f1e25b3d10fcddb9fc1",
-  "unit_count": 109,
+  "embedding_extra": {
+    "gte-modernbert-base": {
+      "base_corpus_id": "curated",
+      "build_id": "b6efed83bc47",
+      "built_on": "2026-10-27",
+      "chunk_count": 184,
+      "chunks_digest": "5e18f42ebbc8a9d82d76d0311ab9dbfcfa89484e49e21b27b0fe49cfa63427b4",
+      "collection": "curated.gte-modernbert-base_b6efed83bc47",
+      "corpus_fingerprint": "ef07bb6fcc2612f9ad134c7be9ddc6624c2ebfc01af67a12eedf5be902b2ab90",
+      "corpus_id": "curated.gte-modernbert-base",
+      "corpus_version": 3,
+      "embedder": {
+        "archive_sha256": null,
+        "dimension": 768,
+        "document_prefix": "",
+        "id": "gte-modernbert-base",
+        "max_tokens": 8192,
+        "model_onnx_sha256": "947f31df7effaeec4edb57c50e4ed7e0f2034d9336063f92615b92e3e0d24d78",
+        "pooling": "cls",
+        "query_prefix": "",
+        "revision": "e7f32e3c00f91d699e8c43b53106206bcc72bb22",
+        "similarity": "cosine",
+        "source": "Alibaba-NLP/gte-modernbert-base",
+        "tokenizer_sha256": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30"
+      },
+      "graph": {
+        "build_id": "5ba0f58d3f7d"
+      },
+      "keyword_index": {
+        "build_id": "5ba0f58d3f7d"
+      },
+      "last_known_good": null,
+      "mode": "production",
+      "primary_build_id": "5ba0f58d3f7d",
+      "vectors": {
+        "made_in": "local"
+      }
+    }
+  },
+  "fingerprint": "ef07bb6fcc2612f9ad134c7be9ddc6624c2ebfc01af67a12eedf5be902b2ab90",
+  "unit_count": 147,
   "units": [
+    {
+      "approval_status": "approved",
+      "content_hash": "245ef7e9232bf8a5efee4152d6f63b9bdb9b2ff77cc9795c9ad9cd5b2331bc6c",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r01.md",
+      "unit_id": "approval_rule.r01",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "1d9156362ab6c7ce36121028d792ae6791066569575f5919bce76ba3c805b457",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r02.md",
+      "unit_id": "approval_rule.r02",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6b3697de5bf954cbe04c997af206174ad07820d1d96615f9c8df2c462c55ecc2",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r03.md",
+      "unit_id": "approval_rule.r03",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5839107dc9f28d33b6aa86702418c1c0436c41d0e6b84ec622d3fa5ee281903d",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r04.md",
+      "unit_id": "approval_rule.r04",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "bb67759c50277e88277c6dd7e27affc0b0a5d6b730dec8e46c9a9bdcd2dac06e",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r05.md",
+      "unit_id": "approval_rule.r05",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c8e315ecd815d28aecbf83c99efe11de9b2a0effb6405ff84a9f44d189196db2",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r06.md",
+      "unit_id": "approval_rule.r06",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "8bdc983f4ead9960af8d18297b3a8f86404010107a95672a1f70b1f389032ac3",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r07.md",
+      "unit_id": "approval_rule.r07",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "6554eb3a28cd04cc492265009bcc55ca5fafcfcd547ce6c0b760001f2980003a",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r08.md",
+      "unit_id": "approval_rule.r08",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "55858a42a1184c6652c3bbf948ec88fef12442c403f34fa0d6651ea00b7f94cb",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r09.md",
+      "unit_id": "approval_rule.r09",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "821685df650cb61f3c0bb435edeff098050aa69560ecf07439fe3382237c3847",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r10.md",
+      "unit_id": "approval_rule.r10",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "9e92bf01d08145732acb8d3fa9cf8288b49c31adf503c883ec8c12f0575f2f55",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r11.md",
+      "unit_id": "approval_rule.r11",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "2d16ff8c566fec4ebf8c61372ceec1a62839000301d60d8524c1e867a9aeabba",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r12.md",
+      "unit_id": "approval_rule.r12",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "580277f3b609d8d3f2715d82a2f8a4559afa37564f061209e566c1b2500e53d8",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r13.md",
+      "unit_id": "approval_rule.r13",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "c0b619705db42a5894aa5f3e42d1d9ba2cd4e87fa87e2da912efa89f7c30a49c",
+      "ecosystem": "shared",
+      "kind": "approval_rule",
+      "path": "approval_rules/approval_rule.r14.md",
+      "unit_id": "approval_rule.r14",
+      "version": 1
+    },
     {
       "approval_status": "approved",
       "content_hash": "cf53738ebd8334754d8a0987422919d6fcd81fbeef2c87375be7ae00825f5191",
@@ -295,6 +460,222 @@
       "kind": "metric",
       "path": "metrics/metric.site_energy_weather_context.md",
       "unit_id": "metric.site_energy_weather_context",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b5f1810d1b7ce8bd8b3a51cd38bf5f794209e5a3d2e97d24f1d79456e5a67568",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.bias.bias.md",
+      "unit_id": "model_card.bias.bias",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "ae75199a4cf4ae4427161706f55954835f45c68cad9cfa444f7dda2623220839",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.capacity_additions.additions.md",
+      "unit_id": "model_card.capacity_additions.additions",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "e583c8f854c74d470256b1e815e9ea618746ac1e1d81bee8714a79d15eef659d",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.ccpp.output.md",
+      "unit_id": "model_card.ccpp.output",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "08898d3acbf90a526b5bebef3e68291ac069d4b137dcadbbdd89248df03b4d25",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.honda_anomaly.anomaly.md",
+      "unit_id": "model_card.honda_anomaly.anomaly",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "3f3c5ac7139f9c91bb6c9e99bd2b50790d99261e013dffd7c98484ae853f0bd5",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.honda_forecast.increment.md",
+      "unit_id": "model_card.honda_forecast.increment",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "01c79c4d183e6e9c421c8fe733451d82c5d351352a72272dd939e31a6b2f39ce",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.lapse_ga4.return.md",
+      "unit_id": "model_card.lapse_ga4.return",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "050e3fb183801f1cb89050d98f33d21206d2dd84999dad085d76dbfbb31b4d8f",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.lapse_rees46.return.md",
+      "unit_id": "model_card.lapse_rees46.return",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "dfd596e52055db22657b42b63eef869cb8ba5336c2be79152ab50e070c0ab237",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.load.load.md",
+      "unit_id": "model_card.load.load",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "a3490c3e3cc5533a7b8f4672f887d029872fdacd0a982de5d5ffa63b29adcdde",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.next_item_ga4.next_item.md",
+      "unit_id": "model_card.next_item_ga4.next_item",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "4a0456f97dbff310a5e5ea3aceb02ec8cb3f486bf8a2d8850ad25d1c9ad334b5",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.next_item_rees46.next_item.md",
+      "unit_id": "model_card.next_item_rees46.next_item",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "eeb58678a5a18de0c0242058209eee2c3c717568e98cc57832a864fce151d6bf",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.price_daily.price.md",
+      "unit_id": "model_card.price_daily.price",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "7c658ad16a225613bf88fecee8ce3e0212051ce4cdb8b444f9f0b76a4b28caef",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.price_quarter_hour.negative_price.md",
+      "unit_id": "model_card.price_quarter_hour.negative_price",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "587a9894b346ed0e41d8197c6219b083932f7dcf1fb70ecf9adf3c3a3356776f",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.price_quarter_hour.price.md",
+      "unit_id": "model_card.price_quarter_hour.price",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "58c2c396e2af0ea828c67cb9be6e01dc0b8da88f8823491e86ba07fc2710ce06",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.redispatch.any_event.md",
+      "unit_id": "model_card.redispatch.any_event",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "cb60cd636a874ad530b77a23d31ab99d5c7c4f6126296a9f3acb7cf62ed0e200",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.redispatch.event_energy.md",
+      "unit_id": "model_card.redispatch.event_energy",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "7cc30e27f4eaba1d24706984af3c75d01378aebf8feb0e332fbb7b0576db7801",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.rl_pumped_storage.policy.md",
+      "unit_id": "model_card.rl_pumped_storage.policy",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "f282b386de643399aaf3e2eaf8c039d785d2371a44041a6d6774c72810e053fb",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.rl_redispatch.policy.md",
+      "unit_id": "model_card.rl_redispatch.policy",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "4755ac87d09960301b3a8f755972c5b549ed457c323614c239ffe76ef3163686",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.rl_session_sequences.policy.md",
+      "unit_id": "model_card.rl_session_sequences.policy",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "b1af3d596eefd356fd3f08151ab8abb29864d6210d7d9767acfca10f3fa35b4c",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.session_purchase_ga4.purchase.md",
+      "unit_id": "model_card.session_purchase_ga4.purchase",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "2320b8395b6d20b98c99803536b01fc12938d707f5715eca531881604907156d",
+      "ecosystem": "commerce",
+      "kind": "model_card",
+      "path": "model_cards/model_card.session_purchase_rees46.purchase.md",
+      "unit_id": "model_card.session_purchase_rees46.purchase",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "5a720b4e58a2c9b9a15da8839ef9f75259868f078e6f7d532ddbb9fdb04d3c10",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.survival.unit_lifetime.md",
+      "unit_id": "model_card.survival.unit_lifetime",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "bc5a6b95ef3cdc699bfa3898d82a511677bae1597d9a2dffea09cf7c7bca8e4e",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.weak_supervision.labels.md",
+      "unit_id": "model_card.weak_supervision.labels",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "f71a0678edbcbdc72bb0029f5ca5fed418000fe6818a1e014ff181df3a0e64ac",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.weather_imputation.reconstruction.md",
+      "unit_id": "model_card.weather_imputation.reconstruction",
+      "version": 1
+    },
+    {
+      "approval_status": "approved",
+      "content_hash": "a1be059595c6f4f40856e0cb689a36b55cddf8e17583b05e2fbef4c9721fa1c2",
+      "ecosystem": "energy",
+      "kind": "model_card",
+      "path": "model_cards/model_card.zone_generation.generation.md",
+      "unit_id": "model_card.zone_generation.generation",
       "version": 1
     },
     {
@@ -1028,10 +1409,12 @@
     }
   ],
   "units_by_kind": {
+    "approval_rule": 14,
     "contract": 8,
     "glossary": 4,
     "governance": 8,
     "metric": 8,
+    "model_card": 24,
     "pipeline": 5,
     "rule": 76
   }

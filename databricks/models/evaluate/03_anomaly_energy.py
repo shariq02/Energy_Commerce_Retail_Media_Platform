@@ -65,3 +65,16 @@ rid = model_run_id()
 
 # DBTITLE 1,Evaluate honda_anomaly.anomaly
 evaluate_by_id("honda_anomaly.anomaly", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__03_anomaly_energy",
+    "Evaluate Anomaly Models Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["honda_anomaly.anomaly"],
+    smoke=SMOKE,
+)

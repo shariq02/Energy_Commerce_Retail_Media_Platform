@@ -24,6 +24,7 @@ dependencies = [
     "networkx>=3.6.1",
     "onnxruntime>=1.28.0",
     "tokenizers>=0.23.1",
+    "mcp>=1.28,<2",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "requests>=2.31.0",
@@ -98,6 +99,8 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
 "databricks/utility/07_gold_legacy_retirement.py" = ["F821"]
 "databricks/utility/09_update_model_card_paths.py" = ["F821"]
+"databricks/utility/11_frozen_dataset_retention.py" = ["F821"]
+"databricks/utility/12_cpu_speed_probe.py" = ["F821"]
 # Analytics notebooks pull `%run ../gold/_gold_common` then `%run ./_analytics_common`
 # (Databricks runtime magic), same chain shape as Gold's own. _analytics_common.py
 # and _analytics_inspect.py are the second/third links, depending on _gold_common's

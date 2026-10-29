@@ -134,6 +134,22 @@ def test_registry_tables_are_defined_and_used():
     assert used & registry
 
 
+_SHARED_NAME_ALLOWED = {"_ml_common.py", "00_ml_setup.py", "03_freeze_gate.py"}
+
+
+@pytest.mark.parametrize("path", _FILES, ids=_rel)
+def test_shared_registry_tables_are_reached_through_the_helpers(path):
+    """Both ecosystems share these tables, so a read goes through `read_ml` and a
+    write through `replace_rows`; only the setup, the freeze gate and the library
+    name the full table."""
+    if path.name in _SHARED_NAME_ALLOWED:
+        return
+    text = path.read_text(encoding="utf-8")
+    for name in load_ml_common()["ML_SHARED_TABLES"]:
+        assert f'ml_fqn("{name}"' not in text, f"{_rel(path)}: {name}"
+        assert f"ml_fqn('{name}'" not in text, f"{_rel(path)}: {name}"
+
+
 def test_gate_notebooks_and_freeze_gate_exist():
     for name in (
         "01_leakage_audit.py",
@@ -141,3 +157,18 @@ def test_gate_notebooks_and_freeze_gate_exist():
         "03_freeze_gate.py",
     ):
         assert (_ML / "gate" / name).exists()
+
+
+def test_write_ml_refuses_a_frozen_dataset_before_any_write():
+    text = (_ML / "_ml_common.py").read_text()
+    body = text[text.index("def write_ml(") :]
+    assert body.index("_frozen_guard(table, ecosystem)") < body.index(".saveAsTable(")
+
+
+def test_freeze_gate_protects_and_reads_the_version_before_freezing():
+    text = (_ML / "gate" / "03_freeze_gate.py").read_text()
+    assert "delta.deletedFileRetentionDuration" in text
+    assert "delta.logRetentionDuration" in text
+    assert 'format("noop")' in text
+    call = text.index("read_error = protect_and_read(full")
+    assert call < text.index("SET status = 'frozen'")

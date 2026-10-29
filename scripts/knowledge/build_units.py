@@ -1,4 +1,4 @@
-"""Build the metric, contract and rule units from their sources.
+"""Build the metric, contract, rule, model card and approval rule units.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import re
 import sys
 from collections import Counter
 from datetime import UTC, datetime
@@ -30,6 +31,30 @@ METRIC_FILES = {
 }
 CONTRACTS_DIR = Path("src/schemas/contracts")
 ECOSYSTEM_MAP = Path("src/schemas/reference/source_ecosystem_map.yml")
+MODEL_CARDS_DIR = Path("src/model_cards")
+APPROVAL_RULES_FILE = Path("databricks/models/lib/_approval_rules.py")
+# Sections of a model card that become part of its unit, in card order. The sections
+# Training and Data (run ids, parameters, row counts, libraries, processor) stay out.
+CARD_SECTIONS = (
+    "Decision",
+    "Purpose and task",
+    "Intended use",
+    "Out of scope",
+    "Flags",
+    "Conditions and known limits",
+    "Disclosures",
+    "Revalidation trigger",
+    "Baseline fallback",
+)
+CARD_METRIC_ROWS = (
+    "skill_primary",
+    "skill_primary_ci_low",
+    "skill_primary_ci_high",
+)
+_CARD_TITLE = re.compile(r"^# Model card: (\S+)", re.MULTILINE)
+_CARD_MODEL = re.compile(
+    r"^_model `([^`]+)`.*?primary metric `([^`]+)` \(([^)]*)\)", re.MULTILINE
+)
 
 
 def read_metrics(path: Path) -> list[dict]:
@@ -84,6 +109,124 @@ def rule_body(source: str, rule: dict) -> str:
     )
 
 
+def card_sections(text: str) -> dict[str, str]:
+    """The text of each `## ` section of a model card, keyed by its heading."""
+    parts = re.split(r"^## (.+)$", text, flags=re.MULTILINE)
+    return {parts[i].strip(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
+
+
+def card_metric_lines(section: str, primary: str) -> list[str]:
+    """One line per row of the primary metric and of its skill and interval, from
+    the first metric table of the card."""
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in section.splitlines()
+        if line.startswith("|")
+    ]
+    if len(rows) < 3:
+        return []
+    header = rows[0]
+    lines = []
+    for row in rows[2:]:
+        if row[0] not in (primary, *CARD_METRIC_ROWS):
+            continue
+        cells = [f"{header[i]} {row[i]}" for i in range(1, len(row)) if row[i]]
+        lines.append(f"- {row[0]}: " + "; ".join(cells))
+    return lines
+
+
+def model_card_body(text: str) -> tuple[str, str]:
+    """(task id, unit body) of one model card file."""
+    title = _CARD_TITLE.search(text)
+    meta = _CARD_MODEL.search(text)
+    if not title or not meta:
+        raise ValueError("a model card has no title or no model line")
+    task, (model, primary, direction) = title.group(1), meta.groups()
+    sections = card_sections(text)
+    paragraphs = [
+        f"# Model card: {task}",
+        f"_model `{model}`, primary metric `{primary}` ({direction})_",
+    ]
+    for name in CARD_SECTIONS[:4]:
+        if name in sections:
+            paragraphs.append(f"## {name}\n{sections[name]}")
+    metrics = card_metric_lines(sections.get("Metrics", ""), primary)
+    if metrics:
+        paragraphs.append("## Primary metric\n" + "\n".join(metrics))
+    for name in CARD_SECTIONS[4:]:
+        if name in sections:
+            paragraphs.append(f"## {name}\n{sections[name]}")
+    return task, "\n\n".join(paragraphs)
+
+
+def read_approval_rules(path: Path) -> list[dict]:
+    """The rules of APPROVAL_RULES read without running the notebook library: one
+    dict per rule id, with the class, the description and the parameters."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else []
+        if any(isinstance(t, ast.Name) and t.id == "APPROVAL_RULES" for t in targets):
+            rows = ast.literal_eval(node.value)
+            break
+    else:
+        raise ValueError(f"no APPROVAL_RULES in {path}")
+    rules: dict[str, dict] = {}
+    for rule_id, rule_class, description, parameter, value in rows:
+        rule = rules.setdefault(
+            rule_id,
+            {
+                "rule_id": rule_id,
+                "class": rule_class,
+                "description": description,
+                "parameters": [],
+            },
+        )
+        if parameter:
+            rule["parameters"].append(f"{parameter} {value}")
+    return list(rules.values())
+
+
+def approval_rule_body(rule: dict) -> str:
+    body = (
+        f"# Approval rule: {rule['rule_id']}\n\n"
+        f"**Class:** {rule['class']}\n\n"
+        f"**Description:** {clean_text(rule['description'])}"
+    )
+    if rule["parameters"]:
+        body += "\n\n**Parameters:** " + ", ".join(rule["parameters"])
+    return body
+
+
+def model_card_units(root: Path) -> list[dict]:
+    units = []
+    for path in sorted((root / MODEL_CARDS_DIR).glob("*/*.md")):
+        task, body = model_card_body(path.read_text(encoding="utf-8"))
+        units.append(
+            {
+                "unit_id": f"model_card.{task}",
+                "kind": "model_card",
+                "ecosystem": path.parent.name,
+                "sources": [source_entry(root, path.relative_to(root))],
+                "body": body,
+            }
+        )
+    return units
+
+
+def approval_rule_units(root: Path) -> list[dict]:
+    sources = [source_entry(root, APPROVAL_RULES_FILE)]
+    return [
+        {
+            "unit_id": f"approval_rule.{rule['rule_id'].lower()}",
+            "kind": "approval_rule",
+            "ecosystem": "shared",
+            "sources": sources,
+            "body": approval_rule_body(rule),
+        }
+        for rule in read_approval_rules(root / APPROVAL_RULES_FILE)
+    ]
+
+
 def source_entry(root: Path, relative: Path) -> dict:
     return {"path": relative.as_posix(), "sha256": uc.sha256_file(root / relative)}
 
@@ -130,6 +273,7 @@ def derived_units(root: Path) -> list[dict]:
                     "body": rule_body(source, rule),
                 }
             )
+    units += model_card_units(root) + approval_rule_units(root)
     ids = [unit["unit_id"] for unit in units]
     duplicates = sorted(i for i, n in Counter(ids).items() if n > 1)
     if duplicates:

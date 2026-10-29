@@ -1,6 +1,6 @@
 # Model card: price_quarter_hour.negative_price
 
-_model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -36,7 +36,7 @@ _model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metri
 
 ## Training
 
-- model family: logistic; MLflow run `cdad4ea678a1436b9c3f730f3a634d3a`
+- model family: logistic; MLflow run `6377a475299b4cc7ad1d2dd17af5300a`
 - parameters: {'row_fraction': 1.0, 'C': 0.1}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -65,7 +65,7 @@ _model `logistic`, dataset `price_quarter_hour`, frozen version 0, primary metri
 
 ## Disclosures
 
-- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 6 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

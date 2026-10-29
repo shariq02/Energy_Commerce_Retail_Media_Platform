@@ -21,6 +21,19 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Tolerance of the re-score
+# GPU and CPU inference of a foundation model can differ in the last digits
+FOUNDATION_TOLERANCE_RELATIVE = 1e-3
+
+
+def tolerance_for(model_name: str, thresholds: dict) -> float:
+    if is_foundation_model(model_name):
+        return FOUNDATION_TOLERANCE_RELATIVE
+    return thresholds["reproduction_tolerance_relative"]
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Check context and the validation frame
 
 
@@ -96,7 +109,7 @@ def _score_entry(evaluator, ctx, bundles, entry, make) -> dict:
             rescore_status="score_failed",
             detail=_fail_text(exc),
         )
-    tolerance = ctx.thresholds["reproduction_tolerance_relative"]
+    tolerance = tolerance_for(entry["model_name"], ctx.thresholds)
     status, gap = reproduction_outcome(entry["validation_value"], value, tolerance)
     return make(
         entry,
@@ -113,10 +126,11 @@ def reproduce_task(task_id: str, entries: list, rid: str) -> list:
     """One check row per registered entry of the task."""
     env, now = environment_record(), now_utc()
     ctx = ReproContext(task_id, rid)
-    tolerance = ctx.thresholds["reproduction_tolerance_relative"]
 
     def make(entry, **fields):
-        return check_row(entry, env, rid, now, tolerance=tolerance, **fields)
+        limit = tolerance_for(entry["model_name"], ctx.thresholds)
+        fields.setdefault("tolerance", limit)
+        return check_row(entry, env, rid, now, **fields)
 
     cfg = EVAL_TASKS[task_id]
     evaluator = globals()[EVALUATOR_NAMES[cfg["kind"]]](ctx, cfg)
@@ -213,7 +227,7 @@ def record_checks(ecosystem: str, rows: list) -> None:
     stay."""
     if not rows:
         return
-    cols = read_model("registry_check", ecosystem=ecosystem).columns
+    cols = row_columns("registry_check", ecosystem=ecosystem)
     tuples = [tuple(r[c] for c in cols) for r in rows]
     replace_model_rows(
         spark.createDataFrame(tuples, MODEL_DDL["registry_check"]),

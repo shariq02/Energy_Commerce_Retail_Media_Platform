@@ -53,9 +53,9 @@ _REQUIRED_GOLD = (
 # COMMAND ----------
 
 # DBTITLE 1,Create the ML schemas
-for eco in ML_ECOSYSTEMS:
-    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{ml_schema_for(eco)}")
-    print(f"OK  schema ready: {CATALOG}.{ml_schema_for(eco)}")
+for schema in (*(ml_schema_for(eco) for eco in ML_ECOSYSTEMS), ML_SHARED_SCHEMA):
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{schema}")
+    print(f"OK  schema ready: {CATALOG}.{schema}")
 
 # COMMAND ----------
 
@@ -64,8 +64,7 @@ for eco in ML_ECOSYSTEMS:
     for name, ddl in REGISTRY_DDL.items():
         if name in ENERGY_ONLY_REGISTRY and eco != "energy":
             continue
-        spark.sql(f"CREATE TABLE IF NOT EXISTS {ml_fqn(name, eco)} ({ddl}) USING delta")
-        print(f"OK  registry table ready: {ml_fqn(name, eco)}")
+        print(f"OK  registry table ready: {create_ml_registry_table(name, ddl, eco)}")
 
 # COMMAND ----------
 

@@ -65,3 +65,16 @@ rid = model_run_id()
 
 # DBTITLE 1,Evaluate redispatch_matching.tier
 evaluate_by_id("redispatch_matching.tier", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__06_matching_energy",
+    "Evaluate Matching Models Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["redispatch_matching.tier"],
+    smoke=SMOKE,
+)

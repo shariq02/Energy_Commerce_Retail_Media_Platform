@@ -1,0 +1,81 @@
+# Metric bindings of the energy and commerce tool servers.
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: October 2026
+#
+# Purpose: the `formula` column of metric_definition is text, so each metric is
+# bound here to a mart, a value column and the way a period is aggregated. The
+# keys and marts must equal the live metric_definition rows (python -m
+# ai.mcp_servers.check compares them).
+#
+#   period: sum | mean | weighted_mean (weight: the column that weights the mean)
+#   dimensions: the columns a caller may filter on, besides local_date
+#   default_filters: a dimension that is filtered unless the caller sets it ('*' = all)
+#   one_row_per + prefer_largest: the mart holds several rows per key; the row with the
+#     largest value of prefer_largest is used (the daily row of a source, not the sum
+#     of its quarter-hour rows, which the mart also holds)
+
+energy:
+  generation_by_carrier:
+    mart: energy_analytics.generation_by_carrier_daily
+    value: generation_mwh
+    unit: MWh
+    period: sum
+    dimensions: [market_area_code, carrier_key]
+    one_row_per: [market_area_code, local_date, carrier_key]
+    prefer_largest: resolution_seconds
+    source_system: smard
+  average_market_price:
+    mart: energy_analytics.market_price_daily
+    value: mean_price_eur_per_mwh
+    unit: EUR/MWh
+    period: weighted_mean
+    weight: interval_count
+    dimensions: [market_area_code]
+    source_system: smard
+  price_volatility:
+    mart: energy_analytics.market_price_daily
+    value: price_volatility_eur_per_mwh
+    unit: EUR/MWh
+    period: mean
+    dimensions: [market_area_code]
+    source_system: smard
+  site_energy_consumption:
+    mart: energy_analytics.site_energy_daily
+    value: daily_energy
+    unit: kWh
+    period: sum
+    dimensions: [location_key, subsystem, channel]
+    default_filters: {channel: total}
+    source_system: honda_iot
+  site_energy_weather_context:
+    mart: energy_analytics.site_energy_weather_daily
+    value: daily_energy
+    unit: kWh
+    period: sum
+    dimensions: [location_key, subsystem, channel]
+    default_filters: {channel: total}
+    source_system: honda_iot
+
+commerce:
+  ga4_sessions:
+    mart: commerce_analytics.ga4_demand_daily
+    value: session_count
+    unit: sessions
+    period: sum
+    dimensions: [geo_country]
+    source_system: ga4
+  ga4_revenue:
+    mart: commerce_analytics.ga4_demand_daily
+    value: revenue
+    unit: revenue as stored in the source
+    period: sum
+    dimensions: [geo_country]
+    source_system: ga4
+  rees46_event_demand:
+    mart: commerce_analytics.rees46_demand_daily
+    value: event_count
+    unit: events
+    period: sum
+    dimensions: [category_l1, event_type]
+    source_system: rees46

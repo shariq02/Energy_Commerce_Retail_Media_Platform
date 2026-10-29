@@ -80,3 +80,16 @@ SPEC = {
 
 # DBTITLE 1,Run the matching candidates
 run_matching(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__12_redispatch_matching",
+    "Model Redispatch Matching",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["redispatch_matching.tier"],
+    smoke=SMOKE,
+)

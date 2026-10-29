@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # EVALUATE TABULAR MODELS ENERGY
+# MAGIC # EVALUATE FORECAST MODELS ENERGY
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -12,7 +12,8 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** score the stored regression, quantile and classification models of the energy tasks
+# MAGIC **Purpose:** score the stored forecast models of the energy time-series tasks (price, load,
+# MAGIC bias, zone generation, Honda forecast), including the pretrained time-series models,
 # MAGIC on the held-out partition, exactly as stored.
 
 # COMMAND ----------
@@ -68,11 +69,6 @@ evaluate_by_id("price_quarter_hour.price", rid, SMOKE)
 
 # COMMAND ----------
 
-# DBTITLE 1,Evaluate price_quarter_hour.negative_price
-evaluate_by_id("price_quarter_hour.negative_price", rid, SMOKE)
-
-# COMMAND ----------
-
 # DBTITLE 1,Evaluate load.load
 evaluate_by_id("load.load", rid, SMOKE)
 
@@ -93,20 +89,20 @@ evaluate_by_id("honda_forecast.increment", rid, SMOKE)
 
 # COMMAND ----------
 
-# DBTITLE 1,Evaluate ccpp.output
-evaluate_by_id("ccpp.output", rid, SMOKE)
-
-# COMMAND ----------
-
-# DBTITLE 1,Evaluate capacity_additions.additions
-evaluate_by_id("capacity_additions.additions", rid, SMOKE)
-
-# COMMAND ----------
-
-# DBTITLE 1,Evaluate redispatch.any_event
-evaluate_by_id("redispatch.any_event", rid, SMOKE)
-
-# COMMAND ----------
-
-# DBTITLE 1,Evaluate redispatch.event_energy
-evaluate_by_id("redispatch.event_energy", rid, SMOKE)
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__01a_forecast_energy",
+    "Evaluate Forecast Models Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=[
+        "price_daily.price",
+        "price_quarter_hour.price",
+        "load.load",
+        "bias.bias",
+        "zone_generation.generation",
+        "honda_forecast.increment",
+    ],
+    smoke=SMOKE,
+)

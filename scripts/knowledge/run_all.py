@@ -8,11 +8,14 @@ Steps: units (build), authored (written bodies, skipped when there is no index),
 tokens (size check), wikipedia_fetch (the selected articles, edges and chunks
 with vectors from Databricks; each part only when its local files are missing or --refresh-wikipedia
 is given, and when the Databricks settings are in .env), wikipedia (corpus manifest),
-embeddings (collection, keyword index and graph of each approved corpus, in the
-write pass only; a corpus that waits for approval is skipped); stops at the first failure. It first runs every step as a
+embedder_download (the model files of the extra embedders named in the stack file, in the
+write pass only), embeddings (collection, keyword index and graph of each approved corpus,
+and the second dense collection of the curated corpus, in the write pass only; a corpus
+that waits for approval is skipped); stops at the first failure. It first runs every step as a
 dry run and prints the plan. In an interactive terminal it then asks whether to
-apply (y or yes), runs the steps again to write, and asks what to approve.
---apply skips the question; without a terminal nothing is written.
+apply (y or yes), runs the steps again to write, and asks what to approve. After an
+approval it runs the embeddings step once more, so the approved units are built in the
+same command. --apply skips the question; without a terminal nothing is written.
 
 Usage (repository root):
     python -m scripts.knowledge.run_all [--apply]
@@ -27,10 +30,13 @@ from collections import Counter
 from pathlib import Path
 
 from ai.embeddings import build as eb
+from ai.embeddings import embedder as emb
+from ai.knowledge_quality import stack as qstack
 from scripts.knowledge import _unit_common as uc
 from scripts.knowledge import approve_units as au
 from scripts.knowledge import author_units as auth
 from scripts.knowledge import build_units as bu
+from scripts.knowledge import embedder_model_download as dl
 from scripts.knowledge import report_tokens as rt
 from scripts.knowledge import wikipedia_corpus as wc
 from scripts.knowledge import wikipedia_fetch as wf
@@ -140,6 +146,35 @@ def step_wikipedia(args: argparse.Namespace) -> int:
     return wc.main(["build", "--wiki-dir", str(wiki_dir(args)), *write_mode(args)])
 
 
+def wanted_embedders(args: argparse.Namespace) -> list:
+    """The profiles of the extra dense retrievers that the stack file names."""
+    stack = qstack.load(args.corpus_dir.parent, "curated")
+    return [emb.PROFILES[slug] for slug in stack["embedders"]]
+
+
+def model_files_ready(profile: emb.Profile) -> bool:
+    folder = emb.default_model_dir(profile)
+    return all(row[4] == "ok" for row in dl.plan(profile, folder))
+
+
+def step_embedder_download(args: argparse.Namespace) -> int:
+    """Fetch the model files of each extra embedder of the stack that are not there."""
+    for profile in wanted_embedders(args):
+        folder = emb.default_model_dir(profile)
+        todo = [row for row in dl.plan(profile, folder) if row[4] != "ok"]
+        if not todo:
+            print(f"{profile.id}: the model files are there and match.")
+            continue
+        megabytes = sum(row[2] for row in todo) / 1e6
+        if not args.apply:
+            print(f"{profile.id}: {megabytes:.0f} MB to download in the write pass.")
+            continue
+        code = dl.main(["--embedder", profile.slug, "--apply"])
+        if code != 0:
+            return code
+    return 0
+
+
 def step_embeddings(args: argparse.Namespace) -> int:
     ready = []
     for name in eb.CORPORA:
@@ -160,6 +195,18 @@ def step_embeddings(args: argparse.Namespace) -> int:
         code = eb.main(["build", "--corpus", name, *argv])
         if code != 0:
             return code
+    if eb.CURATED_ID in ready:
+        for profile in wanted_embedders(args):
+            if not model_files_ready(profile):
+                print(
+                    f"{profile.id}: the model files are not ready, so its collection is skipped."
+                )
+                continue
+            code = eb.main(
+                ["build", "--corpus", eb.CURATED_ID, "--embedder", profile.slug, *argv]
+            )
+            if code != 0:
+                return code
     return 0
 
 
@@ -169,11 +216,20 @@ STEPS = [
     ("tokens", step_tokens),
     ("wikipedia_fetch", step_wikipedia_fetch),
     ("wikipedia", step_wikipedia),
+    ("embedder_download", step_embedder_download),
     ("embeddings", step_embeddings),
 ]
 
 
-KIND_CHOICES = {"2": "metric", "3": "contract", "4": "rule"}
+AFTER_APPROVAL = ("embeddings",)
+
+KIND_CHOICES = {
+    "2": "metric",
+    "3": "contract",
+    "4": "rule",
+    "5": "model_card",
+    "6": "approval_rule",
+}
 
 
 def ask(question: str) -> str:
@@ -198,45 +254,48 @@ def print_approval_hint() -> None:
     print("  (add --apply to write; --all-pending selects every waiting unit)")
 
 
-def approval_step(args: argparse.Namespace, waiting: list[uc.Unit]) -> None:
+def approval_step(args: argparse.Namespace, waiting: list[uc.Unit]) -> int:
+    """Ask what to approve; the number of units approved."""
     counts = Counter(unit.kind for unit in waiting)
     print("Approve units now?")
     print(f"  1  every waiting unit ({len(waiting)})")
     for number, kind in KIND_CHOICES.items():
         print(f"  {number}  {kind} units ({counts[kind]} waiting)")
-    print("  5  do not approve")
+    print("  7  do not approve")
     try:
-        choice = ask("Choice (1, 2, 3, 4 or 5): ")
+        choice = ask("Choice (1 to 7): ")
     except EOFError:
-        choice = "5"
+        choice = "7"
     if choice == "1":
         chosen = waiting
     elif choice in KIND_CHOICES:
         chosen = [unit for unit in waiting if unit.kind == KIND_CHOICES[choice]]
     else:
         print("No approval.")
-        return
+        return 0
     if not chosen:
         print("No unit of that kind waits for approval.")
-        return
+        return 0
     approver = (args.approver or "").strip() or ask("Approver name: ")
     if not approver:
         print("No name given, so no approval.")
-        return
+        return 0
     manifest = au.approve_chosen(args.corpus_dir, chosen, approver)
     print(f"Approved {len(chosen)} unit(s) as {approver}.")
     print(f"Manifest approval: {manifest['approval']}")
+    return len(chosen)
 
 
-def wikipedia_approval_step(args: argparse.Namespace) -> None:
-    """Offer the corpus-level approval of the Wikipedia selection rule and id list."""
+def wikipedia_approval_step(args: argparse.Namespace) -> bool:
+    """Offer the corpus-level approval of the Wikipedia selection rule and id list;
+    True when it was approved."""
     path = wiki_dir(args) / wc.MANIFEST_NAME
     if not path.is_file():
-        return
+        return False
     manifest = wc.read_previous(wiki_dir(args))
     status = manifest["approval"]["status"]
     if status == "approved":
-        return
+        return False
     selection = manifest["selection"]
     print(
         f"Wikipedia corpus approval is {status}: rule version "
@@ -244,16 +303,17 @@ def wikipedia_approval_step(args: argparse.Namespace) -> None:
     )
     if not is_interactive():
         print("  python -m scripts.knowledge.wikipedia_corpus approve --approver NAME")
-        return
+        return False
     try:
         if not uc.is_yes(ask("Approve the Wikipedia corpus now? (y/yes or n/no): ")):
-            return
+            return False
         approver = (args.approver or "").strip() or ask("Approver name: ")
     except EOFError:
-        return
-    if approver:
-        argv = ["approve", "--approver", approver, "--wiki-dir", str(wiki_dir(args))]
-        wc.main([*argv, "--apply"])
+        return False
+    if not approver:
+        return False
+    argv = ["approve", "--approver", approver, "--wiki-dir", str(wiki_dir(args))]
+    return wc.main([*argv, "--apply"]) == 0
 
 
 def run_steps(args: argparse.Namespace) -> int:
@@ -263,6 +323,18 @@ def run_steps(args: argparse.Namespace) -> int:
         if code != 0:
             print(f"Stopped at step {name} (exit code {code}).")
             return code
+    return 0
+
+
+def run_after_approval(args: argparse.Namespace) -> int:
+    """Run again the steps that skip a corpus with unapproved units."""
+    for name, step in STEPS:
+        if name in AFTER_APPROVAL:
+            print(f"== step: {name} (after the approval) ==")
+            code = step(args)
+            if code != 0:
+                print(f"Stopped at step {name} (exit code {code}).")
+                return code
     return 0
 
 
@@ -299,11 +371,14 @@ def main(argv: list[str] | None = None) -> int:
     units = uc.scan_units(args.corpus_dir)
     waiting = [unit for unit in units if au.needs_approval(unit)]
     print(f"Units: {len(units)}, waiting for approval: {len(waiting)}")
+    approved = 0
     if waiting and is_interactive():
-        approval_step(args, waiting)
+        approved = approval_step(args, waiting)
     elif waiting:
         print_approval_hint()
-    wikipedia_approval_step(args)
+    approved += wikipedia_approval_step(args)
+    if approved and args.apply:
+        return run_after_approval(args)
     return 0
 
 

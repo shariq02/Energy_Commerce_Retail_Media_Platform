@@ -94,7 +94,7 @@ print({eco: sum(r["overridden"] for r in v) for eco, v in decided.items()})
 
 # DBTITLE 1,Write the decisions
 for eco, items in decided.items():
-    cols = read_model("model_approval", ecosystem=eco).columns
+    cols = row_columns("model_approval", ecosystem=eco)
     tuples = [tuple(r[c] for c in cols) for r in items]
     replace_model_rows(
         spark.createDataFrame(tuples, MODEL_DDL["model_approval"]),
@@ -120,4 +120,15 @@ check(
     detail=f"not decided by the owner: {_open[:10]}",
     metric_value=float(len(_open)),
     rid=rid,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__02_record_decisions",
+    "Approval Decisions",
+    ["model_approval"],
+    rid,
 )

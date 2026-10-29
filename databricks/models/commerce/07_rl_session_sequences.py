@@ -94,3 +94,16 @@ SPEC = {
 
 # DBTITLE 1,Run the policy candidates
 run_session_policy(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "commerce__07_rl_session_sequences",
+    "Model Session Policy",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["rl_session_sequences.policy"],
+    smoke=SMOKE,
+)

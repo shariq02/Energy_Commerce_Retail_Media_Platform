@@ -75,3 +75,21 @@ evaluate_by_id("lapse_ga4.return", rid, SMOKE)
 
 # DBTITLE 1,Evaluate lapse_rees46.return
 evaluate_by_id("lapse_rees46.return", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "evaluate__08_tabular_commerce",
+    "Evaluate Tabular Models Commerce",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=[
+        "session_purchase_ga4.purchase",
+        "session_purchase_rees46.purchase",
+        "lapse_ga4.return",
+        "lapse_rees46.return",
+    ],
+    smoke=SMOKE,
+)
