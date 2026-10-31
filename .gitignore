@@ -41,6 +41,9 @@ data/processed/
 *.parquet
 *.json.gz
 *.json
+# The tool contract lock and the schema of the tool call log are code, not data: committed.
+!ai/mcp_servers/tools.lock.json
+!ai/mcp_servers/tool_call_log.schema.json
 # The approved knowledge corpus manifest is committed.
 !ai/knowledge_corpus/manifest.json
 # The Wikipedia corpus manifest and selection rule are committed; its shards are not.

@@ -174,6 +174,10 @@ class RunContext:
         self.sleep = sleep
         self.scopes = scopes or cm.load_scopes()
         self.lock = (lock if lock is not None else contracts.read_lock())["tools"]
+        if not self.lock:
+            raise ValueError(
+                "the contract lock holds no tool: tools.lock.json is missing or empty"
+            )
         self._opener = opener
         self._sessions: dict[str, Any] = {}
         self._stacks: dict[str, AsyncExitStack] = {}

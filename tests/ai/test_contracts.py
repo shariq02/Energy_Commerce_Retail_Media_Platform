@@ -17,6 +17,8 @@ import hashlib
 import importlib
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -475,14 +477,38 @@ def test_the_declared_error_codes_cover_the_codes_the_modules_raise():
         assert declared <= set(cm.ERROR_CODES)
 
 
-def test_the_lock_matches_the_servers_when_it_exists():
-    if not ct.LOCK_FILE.exists():
-        pytest.skip("no lock yet: run python3 -m ai.mcp_servers.contracts_write")
+def test_the_lock_exists_and_matches_the_servers():
+    """A missing lock fails here. It was a skip once, and a clean checkout without
+    the file passed the contract check without checking anything."""
+    assert ct.LOCK_FILE.exists(), (
+        "tools.lock.json is missing: run python3 -m ai.mcp_servers.contracts_write "
+        "and commit the file"
+    )
     analysis = ct.analyse_repository()
     assert analysis.errors == [] and analysis.pending == [], (
         analysis.errors,
         analysis.pending,
     )
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+@pytest.mark.parametrize("name", [ct.LOCK_FILE.name, "tool_call_log.schema.json"])
+def test_the_json_files_that_the_code_reads_are_not_ignored_by_git(name):
+    """The ignore rule for *.json once hid both files from git and from CI."""
+    path = ROOT / "ai" / "mcp_servers" / name
+    inside = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if inside.returncode != 0:
+        pytest.skip("not a git work tree")
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", str(path)], cwd=ROOT, check=False
+    )
+    assert ignored.returncode == 1, f"{name} is ignored by .gitignore"
 
 
 def test_the_servers_file_is_the_only_place_that_lists_versions():

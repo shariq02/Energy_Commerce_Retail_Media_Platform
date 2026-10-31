@@ -975,3 +975,10 @@ def test_the_knowledge_tool_gets_a_longer_call_limit_than_the_others(tmp_path):
     _, script = call_once(tmp_path, [good()])
     assert script.timeouts == [timedelta(seconds=invoke.CALL_SECONDS)]
     assert set(invoke.CALL_SECONDS_BY_TOOL) <= set(LOCK)
+
+
+def test_a_context_without_a_contract_lock_is_refused_at_once(tmp_path):
+    with pytest.raises(ValueError, match="tools.lock.json"):
+        invoke.RunContext(
+            "energy_specialist", log_dir=tmp_path, lock={"format": 1, "tools": {}}
+        )
