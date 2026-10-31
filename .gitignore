@@ -143,3 +143,6 @@ desktop.ini
 graphify-out/
 # Claude Code local settings and hooks
 .claude/
+
+# access matrix of the tool servers (which table each server may read): kept private
+src/findings/tools_findings/boundary.md

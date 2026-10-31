@@ -210,6 +210,25 @@ def test_without_a_server_name_the_shared_key_is_used(monkeypatch):
     assert cm.get_warehouse()._token == "shared"
 
 
+def test_a_process_with_an_agent_but_no_server_name_does_not_use_the_shared_key(
+    monkeypatch,
+):
+    server_environment(monkeypatch, None, **{cm.TOKEN_KEY: "shared"})
+    monkeypatch.setenv(cm.AGENT_KEY, "energy_specialist")
+    cm.set_warehouse(None)
+    with pytest.raises(RuntimeError, match=cm.SERVER_KEY):
+        cm.get_warehouse()
+
+
+def test_a_server_without_a_token_key_of_its_own_does_not_use_the_shared_key(
+    monkeypatch,
+):
+    server_environment(monkeypatch, "knowledge_tools", **{cm.TOKEN_KEY: "shared"})
+    cm.set_warehouse(None)
+    with pytest.raises(RuntimeError, match="no token key"):
+        cm.get_warehouse()
+
+
 # --- redaction and typed failures -----------------------------------------------
 
 

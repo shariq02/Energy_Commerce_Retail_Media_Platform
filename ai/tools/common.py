@@ -59,6 +59,27 @@ ERROR_CODES = (
 )
 DEFAULT_DAYS = 30
 TEXT_LIMIT = 200
+# Result fields that carry text from source data or from generated files. The
+# invocation layer cleans them, cuts them (UNTRUSTED_LIMITS, default TEXT_LIMIT) and
+# returns them inside a marked data block, so a graph reads them as data.
+UNTRUSTED_FIELDS: dict[str, tuple[str, ...]] = {
+    "dq_read_field_class": ("derivation_rule", "source_reference"),
+    "dq_read_quality_log": ("error_detail",),
+    "dq_read_quarantine": ("offending_value", "reason"),
+    "ml_read_model_card": ("text",),
+    "ml_read_monitoring": ("detail", "subject"),
+    "ml_read_predictions": ("prediction_label", "row_key"),
+}
+UNTRUSTED_LIMITS: dict[tuple[str, str], int] = {
+    ("dq_read_field_class", "derivation_rule"): 500,
+    ("dq_read_field_class", "source_reference"): 500,
+    ("ml_read_model_card", "text"): 20_000,
+    ("ml_read_monitoring", "detail"): 500,
+}
+# Arguments that take free text. The call log keeps only a hash of them.
+FREE_TEXT_ARGUMENTS: dict[str, tuple[str, ...]] = {
+    "knowledge_retrieve": ("query",),
+}
 Value = str | int | float | bool | date | datetime
 
 _TABLE_REF = re.compile(r"\[\[(\w+)\.(\w+)\]\]")
@@ -339,11 +360,16 @@ def get_warehouse() -> Warehouse:
     """The warehouse of this server process, made from the environment on first use.
 
     A server that the loader started has its own token key; a named server whose key
-    is missing fails, it does not fall back. Without a server name the shared SQL key
-    is used (development and tests)."""
+    is missing fails, it does not fall back. A process that has an agent id but no
+    server name, or a server name without a token key, fails too. Without both the
+    shared SQL key is used (development and tests)."""
     global _WAREHOUSE
     if _WAREHOUSE is None:
         server = os.environ.get(SERVER_KEY)
+        if server is None and os.environ.get(AGENT_KEY):
+            raise RuntimeError(f"the environment has an agent but no {SERVER_KEY}")
+        if server is not None and server not in TOKEN_KEYS:
+            raise RuntimeError(f"the server {server} has no token key of its own")
         _WAREHOUSE = warehouse_from_env(os.environ, TOKEN_KEYS.get(server, TOKEN_KEY))
     return _WAREHOUSE
 

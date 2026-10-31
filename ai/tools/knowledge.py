@@ -8,11 +8,15 @@ The tool calls `ai.rag.retrieve()` in production mode, so it reads only the cura
 corpus at its designated build. It uses the retrieval config of the designation and
 changes only the number of results. The text of a hit is platform-owned and comes
 inside the marked blocks of `context`. The retrieval libraries load on the first
-call, not at import. Library only.
+call, not at import. Each call writes its stage times to stderr (config, imports,
+store, search): the store stage holds the integrity check and the opening of the
+build and is about zero after the first call of a process. Library only.
 """
 
 from __future__ import annotations
 
+import sys
+import time
 from dataclasses import replace
 from typing import Any
 
@@ -70,9 +74,24 @@ def designated_config(k: int) -> Any:
 
 
 def run_retrieve(query: str, filters: dict | None, config: Any) -> Any:
+    started = time.monotonic()
+    from ai.embeddings import embedder as emb
     from ai.rag import retrieve as rt
+    from ai.rag import store as st
+    from scripts.knowledge import _unit_common as uc
 
-    return rt.retrieve(query, filters=filters, config=config, production=True)
+    imported = time.monotonic()
+    st.load_designated(
+        st.CURATED_ID, uc.CORPUS_DIR, emb.DEFAULT_MODEL_DIR, config.embedders
+    )
+    opened = time.monotonic()
+    result = rt.retrieve(query, filters=filters, config=config, production=True)
+    done = time.monotonic()
+    sys.stderr.write(
+        f"knowledge_retrieve stages: imports {imported - started:.1f} s, "
+        f"store {opened - imported:.1f} s, search {done - opened:.1f} s\n"
+    )
+    return result
 
 
 @cm.guarded
@@ -87,7 +106,11 @@ def retrieve(
     if not 1 <= k <= K_MAX:
         raise cm.ToolFailure("invalid_argument", f"k is outside 1 to {K_MAX}", "")
     try:
-        result = run_retrieve(text, filters, designated_config(k))
+        began = time.monotonic()
+        config = designated_config(k)
+        spent = time.monotonic() - began
+        sys.stderr.write(f"knowledge_retrieve config {spent:.1f} s\n")
+        result = run_retrieve(text, filters, config)
     except ValueError as exc:
         raise cm.ToolFailure(
             "invalid_argument", cm.clean_text(exc), "filters: kind, ecosystem, source"

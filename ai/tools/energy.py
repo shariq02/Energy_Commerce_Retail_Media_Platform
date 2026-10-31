@@ -27,6 +27,9 @@ PRICE_MART = "energy_analytics.market_price_daily"
 GENERATION_MART = "energy_analytics.generation_by_carrier_daily"
 SITE_MART = "energy_analytics.site_energy_daily"
 WEATHER_MART = "energy_analytics.site_weather_daily"
+# The source systems whose quality results give the trust of each analysis.
+MARKET_SOURCES = ("smard",)
+WEATHER_SOURCES = ("honda_iot",)
 
 PRICE_SQL = (
     "SELECT COUNT(*) AS days, "
@@ -201,12 +204,13 @@ def analyse_market_conditions(
             "the daily row of the generation mart is used where the mart also "
             "holds quarter-hour rows"
         ),
-        mt.TRUST_PENDING,
     ]
     if price is None:
         notes.append("no price rows for this market area and range")
     if not carriers:
         notes.append("no generation rows for this market area and range")
+    trust, trust_notes = DOMAIN.trust.get_many(MARKET_SOURCES)
+    notes += trust_notes
     return MarketConditionsResult(
         data=MarketConditions(
             market_area_code=market_area_code,
@@ -219,7 +223,7 @@ def analyse_market_conditions(
         as_of=str(last),
         row_count=len(carriers) + (1 if price else 0),
         warnings=notes,
-        trust=cm.Trust(status="unknown"),
+        trust=trust,
     )
 
 
@@ -260,12 +264,13 @@ def analyse_weather_conditions(
             "energy is the 'total' channel of each subsystem; the other channels "
             "are parts of it"
         ),
-        mt.TRUST_PENDING,
     ]
     if locations > 1:
         notes.append("more than one location is included; give a location_key")
     if not energy:
         notes.append("no energy rows for this location and range")
+    trust, trust_notes = DOMAIN.trust.get_many(WEATHER_SOURCES)
+    notes += trust_notes
     return WeatherConditionsResult(
         data=WeatherConditions(
             location_key=location_key,
@@ -279,5 +284,5 @@ def analyse_weather_conditions(
         as_of=str(last),
         row_count=len(energy) + (1 if temperature else 0),
         warnings=notes,
-        trust=cm.Trust(status="unknown"),
+        trust=trust,
     )

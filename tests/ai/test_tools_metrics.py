@@ -177,11 +177,11 @@ def test_a_series_without_dates_uses_the_last_thirty_days_of_the_mart(fresh_ener
     assert result.source_tables == ["energy_analytics.market_price_daily"]
 
 
-def test_a_series_carries_an_unknown_trust_and_says_so(fresh_energy):
+def test_a_series_whose_trust_cannot_be_read_is_unknown_and_says_so(fresh_energy):
     install(series_answers())
     result = fresh_energy.series("average_market_price", None, None, None, 10)
     assert result.trust.status == "unknown"
-    assert mt.TRUST_PENDING in result.warnings
+    assert any("could not be read" in w for w in result.warnings)
 
 
 def test_the_range_of_a_mart_is_read_once(fresh_energy):

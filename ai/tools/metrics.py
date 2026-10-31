@@ -23,11 +23,11 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from ai.tools import common as cm
+from ai.tools import trust as tr
 
 METRICS_FILE = Path(__file__).with_name("metrics.yml")
 PERIODS = ("sum", "mean", "weighted_mean")
 ANY = "*"
-TRUST_PENDING = "trust is not computed yet; it is added with the invocation layer"
 _IDENT = re.compile(r"^[a-z][a-z0-9_]*$")
 _VALUE = re.compile(r"^(?:\*|[A-Za-z0-9_.:|\- ]{1,100})$")
 
@@ -228,6 +228,7 @@ class Domain:
     ) -> None:
         self.ecosystem = ecosystem
         self.scope = scope
+        self.trust = tr.TrustLookup(scope)
         self.metrics = bindings[ecosystem]
         self._other = {
             key for eco, items in bindings.items() if eco != ecosystem for key in items
@@ -344,7 +345,6 @@ class Domain:
                 "where the mart holds a daily row and quarter-hour rows for the same "
                 "day, the daily row is used"
             )
-        notes.append(TRUST_PENDING)
         return notes
 
     def series(
@@ -381,6 +381,8 @@ class Domain:
             notes.append(f"the result is cut at {limit} rows; narrow the filter")
         if not points:
             notes.append("no rows for this filter and range")
+        trust, trust_notes = self.trust.get(metric.source_system)
+        notes += trust_notes
         return MetricSeries(
             metric_key=key,
             unit=metric.unit,
@@ -390,7 +392,7 @@ class Domain:
             row_count=len(points),
             truncated=result.truncated,
             warnings=notes,
-            trust=cm.Trust(status="unknown"),
+            trust=trust,
         )
 
     def compare(
@@ -445,6 +447,8 @@ class Domain:
             notes.append("each period value is the mean of the daily values")
         if all(item.days == 0 for item in data):
             notes.append("no rows in either period for this filter")
+        trust, trust_notes = self.trust.get(metric.source_system)
+        notes += trust_notes
         value_a, value_b = data[0].value, data[1].value
         change = None if value_a is None or value_b is None else value_b - value_a
         relative = None if change is None or not value_a else change / abs(value_a)
@@ -459,7 +463,7 @@ class Domain:
             as_of=str(last),
             row_count=len(data),
             warnings=notes,
-            trust=cm.Trust(status="unknown"),
+            trust=trust,
         )
 
     def verify_bindings(self) -> list[str]:
