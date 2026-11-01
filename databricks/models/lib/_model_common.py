@@ -1868,15 +1868,37 @@ def candidate_guard(
         int(limit_seconds) > 0
         and _threading.current_thread() is _threading.main_thread()
     )
-    if armed:
+    # Without SIGALRM (Windows) a timer thread raises SIGINT in the main thread
+    # instead; this also wakes a sleep. The guard turns the interrupt into the timeout.
+    use_alarm = armed and hasattr(_signal, "SIGALRM")
+    fired = _threading.Event()
+    timer = None
+
+    def on_timer() -> None:
+        fired.set()
+        _signal.raise_signal(_signal.SIGINT)
+
+    if use_alarm:
         previous = _signal.signal(_signal.SIGALRM, on_alarm)
         _signal.alarm(int(limit_seconds))
+    elif armed:
+        timer = _threading.Timer(int(limit_seconds), on_timer)
+        timer.daemon = True
+        timer.start()
     try:
         yield
+    except KeyboardInterrupt:
+        if fired.is_set():
+            message = f"{label}: timeout after {int(limit_seconds)} s"
+            raise TimeoutError(message) from None
+        raise
     finally:
-        if armed:
+        if use_alarm:
             _signal.alarm(0)
             _signal.signal(_signal.SIGALRM, previous)
+        if timer is not None:
+            timer.cancel()
+            timer.join(timeout=1)
         stop.set()
         if watcher is not None:
             watcher.join(timeout=1)

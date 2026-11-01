@@ -15,6 +15,7 @@ connection opens on the first query. Library only.
 from __future__ import annotations
 
 import functools
+import importlib
 import json
 import os
 import re
@@ -372,6 +373,15 @@ def get_warehouse() -> Warehouse:
             raise RuntimeError(f"the server {server} has no token key of its own")
         _WAREHOUSE = warehouse_from_env(os.environ, TOKEN_KEYS.get(server, TOKEN_KEY))
     return _WAREHOUSE
+
+
+def preload_connector() -> None:
+    """Import the SQL connector in full before the server loop starts.
+
+    `databricks.sql.connect()` imports `databricks.sql.client` (pandas, numpy) on its
+    first call. Inside a running stdio server on Windows that import never returns
+    (a tool call waits until the client times out); at server start it takes seconds."""
+    importlib.import_module("databricks.sql.client")
 
 
 def set_warehouse(warehouse: Warehouse | None) -> None:

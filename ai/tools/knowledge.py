@@ -15,6 +15,7 @@ build and is about zero after the first call of a process. Library only.
 
 from __future__ import annotations
 
+import importlib
 import sys
 import time
 from dataclasses import replace
@@ -71,6 +72,26 @@ def designated_config(k: int) -> Any:
             "run the acceptance gate",
         )
     return replace(RetrievalConfig.from_dict(event["config"]), final_k=k)
+
+
+PRELOADED_MODULES = (
+    "ai.knowledge_quality.state",
+    "ai.rag.config",
+    "ai.rag.store",
+    "ai.rag.retrieve",
+    "ai.embeddings.embedder",
+    "scripts.knowledge._unit_common",
+)
+
+
+def preload_libraries() -> None:
+    """Import the modules that a call imports lazily, before the server loop starts.
+
+    A heavy import (numpy and the libraries above it) inside a running stdio server
+    on Windows never returns, so the first call waits until the client times out. At
+    server start the same imports take seconds. No model or store is opened here."""
+    for name in PRELOADED_MODULES:
+        importlib.import_module(name)
 
 
 def run_retrieve(query: str, filters: dict | None, config: Any) -> Any:

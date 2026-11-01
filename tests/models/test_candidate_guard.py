@@ -12,6 +12,7 @@ session and no model is used.
 from __future__ import annotations
 
 import signal
+import threading
 import time
 from types import SimpleNamespace
 
@@ -67,12 +68,16 @@ def test_a_wait_over_the_limit_raises_a_timeout_with_the_label(lib):
 
 
 def test_a_fast_candidate_passes_and_leaves_no_alarm_behind(lib):
-    before = signal.getsignal(signal.SIGALRM)
+    has_alarm = hasattr(signal, "SIGALRM")
+    before = signal.getsignal(signal.SIGALRM) if has_alarm else None
     with lib["candidate_guard"]("fast one", 5, stack_seconds=0):
         value = 1 + 1
     assert value == 2
-    assert signal.alarm(0) == 0
-    assert signal.getsignal(signal.SIGALRM) == before
+    if has_alarm:
+        assert signal.alarm(0) == 0
+        assert signal.getsignal(signal.SIGALRM) == before
+    else:
+        assert not [t for t in threading.enumerate() if isinstance(t, threading.Timer)]
 
 
 def test_the_stack_of_a_waiting_candidate_is_printed(lib, capsys):

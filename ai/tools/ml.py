@@ -113,7 +113,7 @@ def read_model_card(task_id: str) -> CardResult:
         text, notes = text[:CARD_LIMIT], [f"the card is cut at {CARD_LIMIT} characters"]
     return CardResult(
         data=CardText(task_id=task_id, ecosystem=path.parent.name, text=text),
-        source_tables=[str(path.relative_to(CARD_DIR.parents[1]))],
+        source_tables=[path.relative_to(CARD_DIR.parents[1]).as_posix()],
         row_count=1,
         truncated=bool(notes),
         warnings=notes,

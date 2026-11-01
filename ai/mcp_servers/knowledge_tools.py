@@ -5,8 +5,8 @@ Author: Sharique Mohammad
 Date: October 2026
 
 Start: python -m ai.mcp_servers.knowledge_tools. The server reads local files only
-and prints nothing on stdout; logs go to stderr. The retrieval libraries load on the
-first call.
+and prints nothing on stdout; logs go to stderr. The retrieval libraries are imported
+when the server starts; the store and the models open on the first call.
 """
 
 from __future__ import annotations
@@ -38,4 +38,5 @@ make_strict(app)
 
 if __name__ == "__main__":
     grants.check_start("knowledge_tools")
+    knowledge.preload_libraries()
     app.run(transport="stdio")

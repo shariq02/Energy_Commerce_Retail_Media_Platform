@@ -87,4 +87,5 @@ make_strict(app)
 
 if __name__ == "__main__":
     grants.check_start("energy_tools")
+    cm.preload_connector()
     app.run(transport="stdio")

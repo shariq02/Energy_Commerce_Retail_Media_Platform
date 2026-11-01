@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import date
+from pathlib import Path
 
 import pytest
 import yaml
@@ -427,3 +428,34 @@ def test_the_process_warehouse_can_be_replaced_and_cleared():
     cm.set_warehouse(warehouse)
     assert cm.get_warehouse() is warehouse
     cm.set_warehouse(None)
+
+
+def test_the_connector_is_imported_in_full_before_a_server_runs(monkeypatch):
+    imported = []
+    monkeypatch.setattr(cm.importlib, "import_module", imported.append)
+    cm.preload_connector()
+    assert imported == ["databricks.sql.client"]
+
+
+@pytest.mark.parametrize("server", ["energy", "commerce", "ml", "dq"])
+def test_each_server_that_reads_databricks_preloads_the_connector(server):
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "ai"
+        / "mcp_servers"
+        / f"{server}_tools.py"
+    )
+    text = path.read_text(encoding="utf-8")
+    assert text.index("cm.preload_connector()") < text.index("app.run(")
+
+
+def test_the_knowledge_server_imports_its_libraries_before_it_runs(monkeypatch):
+    from ai.tools import knowledge
+
+    imported = []
+    monkeypatch.setattr(knowledge.importlib, "import_module", imported.append)
+    knowledge.preload_libraries()
+    assert imported == list(knowledge.PRELOADED_MODULES)
+    path = Path(__file__).resolve().parents[2] / "ai" / "mcp_servers"
+    text = (path / "knowledge_tools.py").read_text(encoding="utf-8")
+    assert text.index("knowledge.preload_libraries()") < text.index("app.run(")

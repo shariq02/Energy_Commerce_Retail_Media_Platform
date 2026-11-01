@@ -95,6 +95,7 @@ def test_both_term_loaders_agree_and_ignore_line_endings(tmp_path):
         local.file_hash,
     )
     windows = tmp_path / "w.yml"
-    windows.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    unix_bytes = path.read_bytes().replace(b"\r\n", b"\n")
+    windows.write_bytes(unix_bytes.replace(b"\n", b"\r\n"))
     assert wp.load_terms(windows).file_hash == local.file_hash
     assert LIB["load_terms"](windows).file_hash == local.file_hash

@@ -33,6 +33,8 @@ _spec.loader.exec_module(gate)
 
 @pytest.fixture(scope="module")
 def scratch():
+    if not Path("/tmp").is_dir():
+        pytest.skip("the scratchpad rule is for /tmp/claude-*, which this system lacks")
     folder = Path(tempfile.mkdtemp(prefix="claude-", dir="/tmp"))
     (folder / "reads.py").write_text("import sys\nprint(sys.argv)\n", encoding="utf-8")
     (folder / "writes.py").write_text(

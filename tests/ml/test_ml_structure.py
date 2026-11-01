@@ -46,7 +46,7 @@ _DOC_REFERENCES = re.compile(r"docs/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
 
 
 def _rel(p: Path) -> str:
-    return str(p.relative_to(_ML))
+    return p.relative_to(_ML).as_posix()
 
 
 def _calls(tree):

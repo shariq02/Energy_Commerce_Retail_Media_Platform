@@ -33,7 +33,7 @@ _DOC_REFERENCES = re.compile(r"docs/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
 
 
 def _rel(p: Path) -> str:
-    return str(p.relative_to(_MODELS))
+    return p.relative_to(_MODELS).as_posix()
 
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)

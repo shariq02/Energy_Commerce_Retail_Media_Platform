@@ -29,7 +29,7 @@ _NOTEBOOKS = sorted(
     and p.name != "00_foundation_setup.py"
 )
 _CALLS = ("write_model_findings", "write_foundation_findings")
-_NAMES = [str(p.relative_to(_MODELS)) for p in _NOTEBOOKS]
+_NAMES = [p.relative_to(_MODELS).as_posix() for p in _NOTEBOOKS]
 
 
 def _last_call(path):
@@ -73,7 +73,7 @@ def test_the_findings_key_is_the_notebook_path():
         call = _last_call(path)
         key = ast.literal_eval(call.args[1])
         if call.func.id == "write_model_findings":
-            assert key == str(path.relative_to(_MODELS))[:-3].replace("/", "__")
+            assert key == path.relative_to(_MODELS).as_posix()[:-3].replace("/", "__")
         keys.add(key)
     assert len(keys) == len(_NOTEBOOKS)
 
@@ -90,7 +90,7 @@ _GATES = (
 
 def test_every_gate_that_writes_findings_is_listed():
     writers = {
-        str(p.relative_to(_MODELS))
+        p.relative_to(_MODELS).as_posix()
         for p in _MODELS.rglob("*.py")
         if "gate" in p.parts and "FINDINGS_DIR" in p.read_text(encoding="utf-8")
     }

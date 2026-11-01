@@ -83,19 +83,6 @@ config/credentials.json
 .config/gcloud/
 gcloud-service-key.json
 
-# Terraform
-.terraform/
-.terraform.lock.hcl
-*.tfstate
-*.tfstate.backup
-*.tfvars
-terraform/modules/*/.terraform/
-crash.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-
 # Databricks
 .databricks/
 databricks/.databricks/

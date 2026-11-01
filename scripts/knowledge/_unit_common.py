@@ -90,6 +90,7 @@ def validate_sources(sources: object, where: str) -> None:
             path = Path(str(entry["path"]))
             if (
                 path.is_absolute()
+                or str(entry["path"]).startswith("/")
                 or "\\" in str(entry["path"])
                 or {"docs", ".."} & set(path.parts)
             ):
