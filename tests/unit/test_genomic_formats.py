@@ -200,6 +200,6 @@ def test_nested_parquet_values_become_text_and_scalars_stay(tmp_path):
     assert frame.loc[0, "idx"] == "[1, 2]"
     assert json.loads(frame.loc[0, "detail"]) == {"x": 1, "y": [3]}
     assert frame.loc[0, "blob"] == "AAE="
-    assert frame.loc[1, "idx"] is None
+    assert pd.isna(frame.loc[1, "idx"])
     assert frame.loc[0, "score"] == 1.5
     assert list(frame["id"]) == ["a", "b"]
