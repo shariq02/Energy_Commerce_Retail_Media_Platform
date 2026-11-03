@@ -170,7 +170,6 @@ DATABRICKS_CONFIG = {
         "energy_gold": "energy_gold",
         "shared_conformed": "shared_conformed",
         "quality": "quality",
-        "eda": "eda",
     },
 }
 

@@ -14,7 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** consolidate the Bronze tables that share one schema, drop the
 # MAGIC Search Visibility Bronze tables and Volumes, and drop any leftover upload
-# MAGIC Volumes (the loaders normally delete their own, so most will already be gone).
+# MAGIC Volumes (the loaders normally delete their own, so most will already be gone),
+# MAGIC and drop the empty schemas of an older layout (`silver`, `gold`, `eda`).
 # MAGIC
 # MAGIC - `honda_iot_{electricity,heating,cooling}_{p,w}` (6 tables) become
 # MAGIC   `honda_iot_{electricity,heating,cooling}` (3 tables) with a
@@ -91,17 +92,22 @@ LEFTOVER_VOLUMES = [
     "cdc_operational_landing",
 ]
 
+# Schemas of an older layout; each is dropped only if it holds no table and no Volume.
+EMPTY_SCHEMAS = ["silver", "gold", "eda"]
+
 # Destructive steps stay off until the validation output has been read.
 DROP_MERGED_SOURCES = True  # False
 # Set True only after confirming the external raw copy of the Search Visibility data.
 DROP_SEARCH_VISIBILITY = True  # False
 DROP_LEFTOVER_VOLUMES = True  # False
+DROP_EMPTY_SCHEMAS = True  # False
 
 print(f"Catalog / schema : {BRONZE}")
 print(f"Merged tables    : {list(MERGES)}")
 print(f"Drop merged sources : {DROP_MERGED_SOURCES}")
 print(f"Drop Search Visibility : {DROP_SEARCH_VISIBILITY}")
 print(f"Drop leftover Volumes : {DROP_LEFTOVER_VOLUMES}")
+print(f"Drop empty schemas : {DROP_EMPTY_SCHEMAS} {EMPTY_SCHEMAS}")
 
 # COMMAND ----------
 
@@ -338,6 +344,41 @@ for volume in LEFTOVER_VOLUMES:
         print(f"DROP  volume {volume}")
     else:
         print(f"WOULD DROP  volume {volume}  (DROP_LEFTOVER_VOLUMES is False)")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Empty schemas (off by default)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect the empty-schema candidates
+found_schemas = {
+    r["databaseName"] for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
+}
+schema_content = {}
+for schema in EMPTY_SCHEMAS:
+    if schema not in found_schemas:
+        print(f"{schema}: not present")
+        continue
+    n_tables = len(spark.sql(f"SHOW TABLES IN {CATALOG}.{schema}").collect())
+    n_volumes = len(spark.sql(f"SHOW VOLUMES IN {CATALOG}.{schema}").collect())
+    schema_content[schema] = n_tables + n_volumes
+    print(f"{schema}: tables={n_tables} volumes={n_volumes}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Drop the schemas that are still empty
+for schema in EMPTY_SCHEMAS:
+    if schema not in schema_content:
+        continue
+    if schema_content[schema]:
+        print(f"KEEP  {schema}: not empty")
+    elif DROP_EMPTY_SCHEMAS:
+        spark.sql(f"DROP SCHEMA IF EXISTS {CATALOG}.{schema}")
+        print(f"DROP  schema {schema}")
+    else:
+        print(f"WOULD DROP  schema {schema}  (DROP_EMPTY_SCHEMAS is False)")
 
 # COMMAND ----------
 
