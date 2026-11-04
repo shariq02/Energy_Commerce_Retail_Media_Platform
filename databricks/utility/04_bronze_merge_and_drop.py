@@ -15,7 +15,8 @@
 # MAGIC **Purpose:** merge the Bronze tables of identical schema (the six `honda_iot_*_{p,w}`
 # MAGIC tables into three with `measurement_type`, the four MaStR code tables into
 # MAGIC `mastr_code_lookup` with `catalog_kind`), drop the Search Visibility tables and
-# MAGIC Volumes, drop leftover upload Volumes, and drop the empty schemas `silver`,
+# MAGIC Volumes, drop leftover upload Volumes (including the `genomics_bronze` Volume of
+# MAGIC each source whose tables are all loaded), and drop the empty schemas `silver`,
 # MAGIC `gold` and `eda`.
 # MAGIC
 # MAGIC A source table is dropped only after a row-for-row check of the merged table. The
@@ -87,6 +88,7 @@ DROP_MERGED_SOURCES = True  # False
 # Set True only after confirming the external raw copy of the Search Visibility data.
 DROP_SEARCH_VISIBILITY = True  # False
 DROP_LEFTOVER_VOLUMES = True  # False
+DROP_GENOMICS_VOLUMES = True  # False
 DROP_EMPTY_SCHEMAS = True  # False
 
 print(f"Catalog / schema : {BRONZE}")
@@ -94,6 +96,7 @@ print(f"Merged tables    : {list(MERGES)}")
 print(f"Drop merged sources : {DROP_MERGED_SOURCES}")
 print(f"Drop Search Visibility : {DROP_SEARCH_VISIBILITY}")
 print(f"Drop leftover Volumes : {DROP_LEFTOVER_VOLUMES}")
+print(f"Drop genomics Volumes : {DROP_GENOMICS_VOLUMES}")
 print(f"Drop empty schemas : {DROP_EMPTY_SCHEMAS} {EMPTY_SCHEMAS}")
 
 # COMMAND ----------
@@ -331,6 +334,50 @@ for volume in LEFTOVER_VOLUMES:
         print(f"DROP  volume {volume}")
     else:
         print(f"WOULD DROP  volume {volume}  (DROP_LEFTOVER_VOLUMES is False)")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Genomics upload Volumes (off by default)
+
+# COMMAND ----------
+
+# DBTITLE 1,Shared genomics config
+# MAGIC %run ../bronze/_genomics_bronze_common
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect the genomics Volumes and the tables loaded from them
+genomics_volumes = {
+    r["volume_name"] for r in spark.sql(f"SHOW VOLUMES IN {CATALOG}.{SCHEMA}").collect()
+}
+genomics_tables = {
+    r["tableName"] for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{SCHEMA}").collect()
+}
+genomics_loaded = {
+    source: all(table_name(source, dataset) in genomics_tables for dataset in datasets)
+    for source, datasets in SOURCES.items()
+}
+print(f"Volumes in {CATALOG}.{SCHEMA}: {sorted(genomics_volumes)}")
+print(
+    f"Sources with every table loaded: {sum(genomics_loaded.values())} of {len(SOURCES)}"
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Drop the Volume of every genomics source that is fully loaded
+for source in SOURCES:
+    if source not in genomics_volumes:
+        print(f"{source}: not present")
+        continue
+    if not genomics_loaded[source]:
+        print(f"KEEP  volume {source}: not every table is loaded")
+        continue
+    if DROP_GENOMICS_VOLUMES:
+        spark.sql(f"DROP VOLUME IF EXISTS {CATALOG}.{SCHEMA}.{source}")
+        print(f"DROP  volume {source}")
+    else:
+        print(f"WOULD DROP  volume {source}  (DROP_GENOMICS_VOLUMES is False)")
 
 # COMMAND ----------
 

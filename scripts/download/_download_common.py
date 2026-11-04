@@ -336,6 +336,72 @@ def clinvar_positions() -> dict[str, np.ndarray]:
     return positions
 
 
+BASE_CODES = {"A": 0, "C": 1, "G": 2, "T": 3}
+CHROMOSOME_CODES = {
+    **{str(number): number for number in range(1, 23)},
+    "X": 23,
+    "Y": 24,
+    "MT": 25,
+    "M": 25,
+}
+POSITION_BITS = 30
+
+
+def variant_codes(
+    chromosome: pd.Series, position: pd.Series, ref: pd.Series, alt: pd.Series
+) -> np.ndarray:
+    """One int64 per row for a single-nucleotide variant, -1 for any other row.
+
+    The code packs chromosome, position, reference and alternate base; a `chr`
+    prefix and the letter case of the input are ignored."""
+    chromosome_code = (
+        chromosome.str.replace(r"^chr", "", case=False, regex=True)
+        .str.upper()
+        .map(CHROMOSOME_CODES)
+    )
+    values = (
+        chromosome_code.to_numpy(dtype="float64") * 2**POSITION_BITS
+        + pd.to_numeric(position, errors="coerce").to_numpy(dtype="float64")
+    ) * 16 + (
+        ref.str.upper().map(BASE_CODES).to_numpy(dtype="float64") * 4
+        + alt.str.upper().map(BASE_CODES).to_numpy(dtype="float64")
+    )
+    return np.where(np.isnan(values), -1, values).astype(np.int64)
+
+
+@cache
+def clinvar_variant_codes() -> np.ndarray:
+    """Sorted, distinct codes of the staged ClinVar single-nucleotide variants."""
+    chunks = sorted(
+        (DATA_STAGING_DIR / "clinvar").glob("clinvar_variant_summary_chunk_*.csv")
+    )
+    if not chunks:
+        raise RuntimeError("Stage clinvar/variant_summary first: no ClinVar variants")
+    parts = []
+    for chunk in chunks:
+        frame = pd.read_csv(
+            chunk,
+            usecols=[
+                "Chromosome",
+                "PositionVCF",
+                "ReferenceAlleleVCF",
+                "AlternateAlleleVCF",
+            ],
+            dtype=str,
+            keep_default_na=False,
+        )
+        codes = variant_codes(
+            frame["Chromosome"],
+            frame["PositionVCF"],
+            frame["ReferenceAlleleVCF"],
+            frame["AlternateAlleleVCF"],
+        )
+        parts.append(codes[codes >= 0])
+    codes = np.unique(np.concatenate(parts))
+    logger.info(f"ClinVar single-nucleotide variants: {len(codes):,}")
+    return codes
+
+
 def unpack(source, target: Path) -> bool:
     """Copy the open file object `source` to `target`, with a progress line
     every GB. False, and `target` deleted, when the disk would run below

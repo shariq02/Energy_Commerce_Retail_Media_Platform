@@ -117,6 +117,8 @@ scripts/utilities/make_tool_tokens.py
 scripts/utilities/run_acquisition.py
 scripts/utilities/verify_energy_weather_deepening_acquisition.py
 scripts/utilities/verify_acquisition.py
+scripts/utilities/genomics_bronze_samples.py
+scripts/utilities/genomics_bronze_checks.py
 # Local paths of the files that authored knowledge units were written from.
 scripts/knowledge/local_sources.yml
 

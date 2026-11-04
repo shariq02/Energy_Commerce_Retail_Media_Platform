@@ -3,21 +3,29 @@
 # Author: Sharique Mohammad
 # Date: November 2026
 #
-# Purpose: download AlphaMissense, the MAPS embedding metadata and CADD (rows
-# at the ClinVar positions), and stage them in data/staging/<source>/; each
-# downloaded file is deleted after its parse.
+# Purpose: download AlphaMissense (rows of the ClinVar variants), the MAPS
+# embedding metadata and CADD (rows at the ClinVar positions), and stage them in
+# data/staging/<source>/; each downloaded file is deleted after its parse.
 
 import gzip
 import sqlite3
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ingestion"))
 
-from _download_common import clinvar_positions, stage, table_parser, unpack
+from _download_common import (
+    clinvar_positions,
+    clinvar_variant_codes,
+    stage,
+    table_parser,
+    unpack,
+    variant_codes,
+)
 from _genomic_formats import read_parquet, stringify_nested
 
 from config import get_logger
@@ -39,6 +47,15 @@ CADD_URL = (
     "resolve/main/cadd.sqlite.gz"
 )
 CADD_QUERY_POSITIONS = 900
+
+
+def keep_clinvar_variants(frame: pd.DataFrame) -> pd.Series:
+    """Rows whose chromosome, position, reference and alternate base are a
+    staged ClinVar single-nucleotide variant."""
+    codes = variant_codes(frame["CHROM"], frame["POS"], frame["REF"], frame["ALT"])
+    wanted = clinvar_variant_codes()
+    at = np.minimum(np.searchsorted(wanted, codes), len(wanted) - 1)
+    return pd.Series((codes >= 0) & (wanted[at] == codes), index=frame.index)
 
 
 def parse_maps(path: Path, tag: str):
@@ -82,7 +99,7 @@ def main() -> None:
         "alphamissense",
         ["variant_scores"],
         [("", ALPHAMISSENSE_URL, "AlphaMissense_hg38.tsv.gz")],
-        table_parser("variant_scores"),
+        table_parser("variant_scores", keep=keep_clinvar_variants),
         capped=("variant_scores",),
     )
     stage(
