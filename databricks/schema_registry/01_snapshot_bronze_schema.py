@@ -13,11 +13,12 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** Capture the current schema (table, column, datatype,
-# MAGIC nullable, ordinal position) of every table in the Bronze schema and
-# MAGIC store it as a versioned Markdown file. `v001` is the baseline; a later
-# MAGIC run that finds an unchanged schema does nothing, and a changed schema
-# MAGIC is written as the next version (`v002`, ...) with a short summary of
-# MAGIC what changed. Previous versions are never overwritten.
+# MAGIC nullable, ordinal position) of every table in each Bronze schema (`bronze`
+# MAGIC and `genomics_bronze`) and store it as a versioned Markdown file. Each
+# MAGIC schema has its own series: `v001` is the baseline; a later run that finds an
+# MAGIC unchanged schema does nothing, and a changed schema is written as the next
+# MAGIC version (`v002`, ...) with a short summary of what changed. Previous
+# MAGIC versions are never overwritten.
 
 # COMMAND ----------
 
@@ -30,7 +31,11 @@ import os as _os
 
 # DBTITLE 1,Configuration
 CATALOG = "energy_commerce_retail_media"
-BRONZE_SCHEMA = "bronze"
+# Bronze schema -> file prefix of its own snapshot series
+BRONZE_SERIES = {
+    "bronze": "bronze_schema",
+    "genomics_bronze": "genomics_bronze_schema",
+}
 REGISTRY_SUBDIR = "src/schemas/bronze_registry"
 
 # COMMAND ----------
@@ -76,55 +81,57 @@ print(f"OK  registry directory: {REGISTRY_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Capture the current Bronze schema
-rows = []  # (table, ordinal, column, datatype, nullable)
-tables = sorted(
-    r["tableName"]
-    for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{BRONZE_SCHEMA}").collect()
-    if not r["isTemporary"]
-)
-for t in tables:
-    try:
-        schema = spark.table(f"{CATALOG}.{BRONZE_SCHEMA}.{t}").schema
-    except Exception as exc:
-        print(f"  SKIP {t}: {exc}")
-        continue
-    for i, f in enumerate(schema.fields, start=1):
-        rows.append((t, i, f.name, f.dataType.simpleString(), bool(f.nullable)))
+# DBTITLE 1,Define the schema capture
 
-print(f"captured {len(rows)} column(s) across {len({r[0] for r in rows})} table(s)")
+
+def capture_rows(schema):
+    """(table, ordinal, column, datatype, nullable) for every table of the schema."""
+    out = []
+    tables = sorted(
+        r["tableName"]
+        for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{schema}").collect()
+        if not r["isTemporary"]
+    )
+    for t in tables:
+        try:
+            fields = spark.table(f"{CATALOG}.{schema}.{t}").schema.fields
+        except Exception as exc:
+            print(f"  SKIP {schema}.{t}: {exc}")
+            continue
+        for i, f in enumerate(fields, start=1):
+            out.append((t, i, f.name, f.dataType.simpleString(), bool(f.nullable)))
+    return out
+
 
 # COMMAND ----------
 
-# DBTITLE 1,Schema fingerprint
+# DBTITLE 1,Define the schema fingerprint
 
 
-def _canonical(schema_rows):
-    return "\n".join(
+def schema_hash(schema_rows):
+    text = "\n".join(
         f"{t}\t{o}\t{c}\t{d}\t{int(n)}" for t, o, c, d, n in sorted(schema_rows)
     )
+    return _hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-
-current_hash = _hashlib.sha256(_canonical(rows).encode("utf-8")).hexdigest()
-print(f"current schema hash: {current_hash}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Locate the latest existing snapshot
+# DBTITLE 1,Define the snapshot file readers
 
 
-def _version_files():
+def version_files(prefix):
     out = []
     for name in _os.listdir(REGISTRY_DIR):
-        if name.startswith("bronze_schema_v") and name.endswith(".md"):
+        if name.startswith(f"{prefix}_v") and name.endswith(".md"):
             try:
-                out.append((int(name[len("bronze_schema_v") : -len(".md")]), name))
+                out.append((int(name[len(prefix) + 2 : -len(".md")]), name))
             except ValueError:
                 continue
     return sorted(out)
 
 
-def _parse_snapshot(path):
+def parse_snapshot(path):
     """Return (hash, [(table, ordinal, column, datatype, nullable)]) from a
     previously written snapshot Markdown file."""
     with open(path, encoding="utf-8") as fh:
@@ -147,23 +154,12 @@ def _parse_snapshot(path):
     return h, parsed
 
 
-_versions = _version_files()
-_latest = _versions[-1] if _versions else None
-if _latest:
-    _latest_hash, _latest_rows = _parse_snapshot(
-        _os.path.join(REGISTRY_DIR, _latest[1])
-    )
-    print(f"latest snapshot: {_latest[1]}  (hash {_latest_hash})")
-else:
-    _latest_hash, _latest_rows = None, []
-    print("no existing snapshot -- this run writes the v001 baseline")
-
 # COMMAND ----------
 
-# DBTITLE 1,Diff current vs latest
+# DBTITLE 1,Define the diff
 
 
-def _diff(prev, curr):
+def diff_schemas(prev, curr):
     prev_by_t = {}
     curr_by_t = {}
     for t, o, c, d, n in prev:
@@ -200,76 +196,104 @@ def _diff(prev, curr):
     return added_t, removed_t, per_table
 
 
-_added_t, _removed_t, _per_table = _diff(_latest_rows, rows)
-_changed = bool(_added_t or _removed_t or _per_table)
+# COMMAND ----------
+
+# DBTITLE 1,Define the change summary
+
+
+def build_summary(next_version, latest, diff):
+    added_t, removed_t, per_table = diff
+    if next_version == 1:
+        return ["First snapshot -- baseline."]
+    if not (added_t or removed_t or per_table):
+        # hash differed but the structural diff found nothing (e.g. whitespace in a
+        # prior file) -- record it plainly rather than inventing a change.
+        return [
+            (
+                f"Schema fingerprint differs from v{latest[0]:03d} but no table/column/"
+                "type/nullable/ordinal difference was found."
+            )
+        ]
+    summary = [
+        f"Compared with v{latest[0]:03d}.",
+        "",
+        f"**Tables added:** {', '.join(added_t) or '(none)'}",
+        f"**Tables removed:** {', '.join(removed_t) or '(none)'}",
+    ]
+    for t, notes in per_table:
+        summary += ["", f"**{t}**", *[f"- {nline}" for nline in notes]]
+    return summary
+
 
 # COMMAND ----------
 
-# DBTITLE 1,Decide: no-op, baseline, or new version
-if _latest and _latest_hash == current_hash:
-    print(f"schema unchanged vs {_latest[1]} -- nothing written.")
-    dbutils.notebook.exit(f"unchanged:{_latest[1]}")
+# DBTITLE 1,Define the snapshot of one Bronze schema
 
-next_version = (_latest[0] + 1) if _latest else 1
-out_name = f"bronze_schema_v{next_version:03d}.md"
-out_path = _os.path.join(REGISTRY_DIR, out_name)
-if _os.path.exists(out_path):
-    raise RuntimeError(f"refusing to overwrite existing snapshot {out_path}")
+
+def snapshot(schema, prefix):
+    rows = capture_rows(schema)
+    table_count = len({r[0] for r in rows})
+    print(f"{schema}: captured {len(rows)} column(s) across {table_count} table(s)")
+    current_hash = schema_hash(rows)
+
+    versions = version_files(prefix)
+    latest = versions[-1] if versions else None
+    if latest:
+        latest_hash, latest_rows = parse_snapshot(
+            _os.path.join(REGISTRY_DIR, latest[1])
+        )
+        print(f"{schema}: latest snapshot {latest[1]} (hash {latest_hash})")
+    else:
+        latest_hash, latest_rows = None, []
+        print(f"{schema}: no existing snapshot -- this run writes the v001 baseline")
+
+    if latest and latest_hash == current_hash:
+        print(f"{schema}: schema unchanged vs {latest[1]} -- nothing written.")
+        return f"unchanged:{latest[1]}"
+
+    next_version = (latest[0] + 1) if latest else 1
+    out_name = f"{prefix}_v{next_version:03d}.md"
+    out_path = _os.path.join(REGISTRY_DIR, out_name)
+    if _os.path.exists(out_path):
+        raise RuntimeError(f"refusing to overwrite existing snapshot {out_path}")
+
+    summary = build_summary(next_version, latest, diff_schemas(latest_rows, rows))
+    captured = _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    lines = [
+        f"# Bronze schema snapshot v{next_version:03d}",
+        "",
+        f"<!-- bronze-schema-hash: {current_hash} -->",
+        "",
+        f"**Captured:** {captured}",
+        f"**Catalog / schema:** `{CATALOG}.{schema}`",
+        f"**Tables:** {table_count}  |  **Columns:** {len(rows)}",
+        "",
+        "## Change summary",
+        "",
+        *summary,
+        "",
+        "## Schema",
+        "",
+        "| table | # | column | type | nullable |",
+        "|---|---|---|---|---|",
+    ]
+    for t, o, c, d, n in sorted(rows):
+        lines.append(f"| {t} | {o} | {c} | {d} | {'true' if n else 'false'} |")
+    lines.append("")
+
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+    print(f"{schema}: wrote {out_path} ({table_count} tables, {len(rows)} columns)")
+    return f"written:{out_name}"
+
 
 # COMMAND ----------
 
-# DBTITLE 1,Build the change summary
-_summary = []
-if next_version == 1:
-    _summary.append("First snapshot -- baseline.")
-elif not _changed:
-    # hash differed but the structural diff found nothing (e.g. whitespace in a
-    # prior file) -- record it plainly rather than inventing a change.
-    _summary.append(
-        f"Schema fingerprint differs from v{_latest[0]:03d} but no table/column/"
-        "type/nullable/ordinal difference was found."
-    )
-else:
-    _summary.append(f"Compared with v{_latest[0]:03d}.")
-    _summary.append("")
-    _summary.append(f"**Tables added:** {', '.join(_added_t) or '(none)'}")
-    _summary.append(f"**Tables removed:** {', '.join(_removed_t) or '(none)'}")
-    for t, notes in _per_table:
-        _summary.append("")
-        _summary.append(f"**{t}**")
-        for nline in notes:
-            _summary.append(f"- {nline}")
+# DBTITLE 1,Snapshot each Bronze schema
+results = {schema: snapshot(schema, prefix) for schema, prefix in BRONZE_SERIES.items()}
 
 # COMMAND ----------
 
-# DBTITLE 1,Write the new snapshot Markdown
-_captured = _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-_table_count = len({r[0] for r in rows})
-
-lines = [
-    f"# Bronze schema snapshot v{next_version:03d}",
-    "",
-    f"<!-- bronze-schema-hash: {current_hash} -->",
-    "",
-    f"**Captured:** {_captured}",
-    f"**Catalog / schema:** `{CATALOG}.{BRONZE_SCHEMA}`",
-    f"**Tables:** {_table_count}  |  **Columns:** {len(rows)}",
-    "",
-    "## Change summary",
-    "",
-    *_summary,
-    "",
-    "## Schema",
-    "",
-    "| table | # | column | type | nullable |",
-    "|---|---|---|---|---|",
-]
-for t, o, c, d, n in sorted(rows):
-    lines.append(f"| {t} | {o} | {c} | {d} | {'true' if n else 'false'} |")
-lines.append("")
-
-with open(out_path, "w", encoding="utf-8") as fh:
-    fh.write("\n".join(lines))
-
-print(f"wrote {out_path}  ({_table_count} tables, {len(rows)} columns)")
-dbutils.notebook.exit(f"written:{out_name}")
+# DBTITLE 1,Summary
+for schema, status in results.items():
+    print(f"{schema:<18} {status}")
