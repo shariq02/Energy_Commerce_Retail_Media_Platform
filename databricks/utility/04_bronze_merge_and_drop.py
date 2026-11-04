@@ -12,27 +12,14 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** consolidate the Bronze tables that share one schema, drop the
-# MAGIC Search Visibility Bronze tables and Volumes, and drop any leftover upload
-# MAGIC Volumes (the loaders normally delete their own, so most will already be gone),
-# MAGIC and drop the empty schemas of an older layout (`silver`, `gold`, `eda`).
+# MAGIC **Purpose:** merge the Bronze tables of identical schema (the six `honda_iot_*_{p,w}`
+# MAGIC tables into three with `measurement_type`, the four MaStR code tables into
+# MAGIC `mastr_code_lookup` with `catalog_kind`), drop the Search Visibility tables and
+# MAGIC Volumes, drop leftover upload Volumes, and drop the empty schemas `silver`,
+# MAGIC `gold` and `eda`.
 # MAGIC
-# MAGIC - `honda_iot_{electricity,heating,cooling}_{p,w}` (6 tables) become
-# MAGIC   `honda_iot_{electricity,heating,cooling}` (3 tables) with a
-# MAGIC   `measurement_type` column (`p` / `w`).
-# MAGIC - `mastr_{einheitentypen,lokationstypen,marktfunktionen,marktrollen}`
-# MAGIC   (4 tables) become `mastr_code_lookup` (1 table) with a `catalog_kind`
-# MAGIC   column.
-# MAGIC - `search_visibility_events` and `search_visibility_repository` are dropped.
-# MAGIC
-# MAGIC Bronze is the only persisted copy of these rows (the loaders delete their
-# MAGIC source Volumes), so nothing is dropped until the merged table has been
-# MAGIC checked against its sources row-for-row. The drop steps are switched off in
-# MAGIC the configuration cell; read the validation output first, then switch them
-# MAGIC on and re-run only the matching cell.
-# MAGIC
-# MAGIC Every source table is only read. A merged table is created only if it does
-# MAGIC not exist yet, so the notebook is safe to re-run.
+# MAGIC A source table is dropped only after a row-for-row check of the merged table. The
+# MAGIC drop steps are switches in the configuration cell. Safe to re-run.
 
 # COMMAND ----------
 

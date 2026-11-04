@@ -12,19 +12,11 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** create the four Silver schemas (`energy_silver`,
-# MAGIC `energy_silver_reference`, `commerce_silver`,
-# MAGIC `commerce_silver_reference`), the shared `quality.quarantine` table, and
-# MAGIC compute + load the shared `quality.field_class_registry` directly from
-# MAGIC `src/schemas/_generate_field_classes.py`'s `build_rows()` -- no committed
-# MAGIC CSV is read or required; a newly added Silver table is picked up the next
-# MAGIC time this notebook runs, and setup hard-fails immediately (before any
-# MAGIC Silver notebook runs) if a real `write_silver()` call has no declared
-# MAGIC classification anywhere. Idempotent -- safe to re-run.
-# MAGIC
-# MAGIC The `quality.pipeline_watermarks` and `quality.quality_audit_log` tables
-# MAGIC already exist (`databricks/setup/00_create_schemas.py`); this notebook
-# MAGIC only asserts them.
+# MAGIC **Purpose:** create the four Silver schemas and the shared `quality.quarantine`
+# MAGIC table, and load `quality.field_class_registry` from `build_rows()` in
+# MAGIC `src/schemas/_generate_field_classes.py`. Setup fails at once if a
+# MAGIC `write_silver()` call has no declared classification. It asserts the `quality`
+# MAGIC tables from `00_create_schemas.py`. Safe to re-run.
 
 # COMMAND ----------
 

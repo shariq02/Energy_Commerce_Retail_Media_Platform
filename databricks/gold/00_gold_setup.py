@@ -12,21 +12,11 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** create the two Gold schemas (`energy_gold`, `commerce_gold`).
-# MAGIC Gold has no per-table registry like Silver's field_class_registry -- one
-# MAGIC schema per ecosystem is the whole rule. `shared_conformed` is
-# MAGIC created separately by `databricks/setup/03_create_shared_conformed.py`.
-# MAGIC Idempotent -- safe to re-run.
-# MAGIC
-# MAGIC The `quality.pipeline_watermarks` and `quality.quality_audit_log` tables
-# MAGIC already exist (`databricks/setup/00_create_schemas.py`); this notebook
-# MAGIC only asserts them, same as `databricks/silver/00_silver_setup.py`.
-# MAGIC
-# MAGIC Also runs a fast preflight: every Silver table any Gold notebook's
-# MAGIC `read_silver()` call names must already be registered (schema-routable)
-# MAGIC in `quality.field_class_registry` -- a metadata-only check, so a missing
-# MAGIC registration fails here, before any actual Gold processing, not deep into
-# MAGIC an expensive run.
+# MAGIC **Purpose:** create the two Gold schemas (`energy_gold`, `commerce_gold`) and
+# MAGIC assert that the `quality` tables exist. Preflight: every Silver table named in a
+# MAGIC Gold `read_silver()` call must be registered in `quality.field_class_registry`;
+# MAGIC a missing one fails here, before any Gold run. `shared_conformed` comes from
+# MAGIC `03_create_shared_conformed.py`. Safe to re-run.
 
 # COMMAND ----------
 

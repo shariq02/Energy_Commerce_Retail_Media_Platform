@@ -12,34 +12,14 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** inspect, then optionally delete, the Unity Catalog Bronze
-# MAGIC objects produced by the retired CDC pipeline -- every `bronze.cdc_*_current`
-# MAGIC / `bronze.cdc_*_history` table and the `cdc_operational_landing` Volume. The
-# MAGIC repo-side code/config cleanup (generators, CDC ingestion, Kafka/Debezium,
-# MAGIC streaming notebooks, operational DDL) is already done; this notebook is the
-# MAGIC corresponding Databricks-side cleanup, run manually and deliberately.
+# MAGIC **Purpose:** inspect, then optionally delete, the Bronze objects of the retired
+# MAGIC CDC pipeline: every `bronze.cdc_<entity>_current` and `_history` table (up to
+# MAGIC 20: 7 operational entities plus `advertisers`, `campaigns`, `campaign_budgets`)
+# MAGIC and the `cdc_operational_landing` Volume. Section 2 confirms which are live.
 # MAGIC
-# MAGIC **DO NOT "Run All".** Read every inspection cell's output first. Every
-# MAGIC deletion cell is isolated, individually labelled, and safe to skip. Nothing
-# MAGIC in this notebook runs automatically or on a schedule.
-# MAGIC
-# MAGIC **Explicitly out of scope for this notebook:** every current-scope source
-# MAGIC table (DWD, SMARD, MaStR, power plant list, redispatch, Honda IoT, REES46,
-# MAGIC Search Visibility). None of those tables carries a `cdc_` prefix, but the
-# MAGIC inspection cells below confirm that rather than assume it.
-# MAGIC
-# MAGIC **Candidate CDC entities (from the pipeline's own table-naming
-# MAGIC convention), to be confirmed live by the inspection cells below, not
-# MAGIC assumed:** 7 operational -- `tariffs`, `products`, `customers`,
-# MAGIC `customer_contracts`, `meters`, `orders`, `order_items` -- plus 3 retail-media
-# MAGIC entities the pipeline also captured earlier in its history -- `advertisers`,
-# MAGIC `campaigns`, `campaign_budgets`. Each entity has up to two tables
-# MAGIC (`cdc_<entity>_current`, `cdc_<entity>_history`), so up to 20 tables total.
-# MAGIC Whether all, some, or none of these are still live is exactly what Section 2
-# MAGIC determines -- the pipeline may already have been narrowed to the 7
-# MAGIC operational entities only.
-# MAGIC
-# MAGIC No Silver, Gold, or other downstream object was ever built on these tables.
+# MAGIC **DO NOT "Run All".** Read every inspection cell first. Each deletion cell is
+# MAGIC separate and safe to skip. No current-scope table carries a `cdc_` prefix; the
+# MAGIC inspection cells confirm it.
 
 # COMMAND ----------
 

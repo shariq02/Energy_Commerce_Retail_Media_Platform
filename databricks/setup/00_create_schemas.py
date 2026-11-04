@@ -12,28 +12,8 @@
 # MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
-# MAGIC **Purpose:** Create and verify the Unity Catalog structure required
-# MAGIC for the project.
-# MAGIC
-# MAGIC This notebook creates structure only:
-# MAGIC - the project schemas (`bronze`, `energy_silver`, `energy_silver_reference`,
-# MAGIC   `commerce_silver`, `commerce_silver_reference`, `energy_gold`,
-# MAGIC   `shared_conformed`, `quality`, `genomics_bronze`). Silver is split per the
-# MAGIC   100-table-per-schema quota and per ecosystem; domain separation stays at
-# MAGIC   folder level. `shared_conformed`'s tables are built by
-# MAGIC   `03_create_shared_conformed.py`.
-# MAGIC - the 2 quality/control Delta tables (`pipeline_watermarks`, `quality_audit_log`)
-# MAGIC
-# MAGIC It does **not** create any Bronze business/data table and no Volume.
-# MAGIC Bronze tables are created later by the Bronze loading notebooks. An upload
-# MAGIC Volume lives only between the upload and the passed load, so each wave
-# MAGIC creates its own Volumes (`02_create_energy_weather_deepening_volumes.py`,
-# MAGIC `04_create_commerce_volumes.py`) and its loaders drop them. A fixed Volume
-# MAGIC list here would bring back empty Volumes on every re-run.
-# MAGIC
-# MAGIC This notebook is safe to run repeatedly -- every statement uses
-# MAGIC `IF NOT EXISTS`. It never drops a schema/volume/table and never deletes
-# MAGIC Volume contents.
+# MAGIC **Purpose:** Create the project schemas and the two quality tables. It creates
+# MAGIC no Volume and no data table, and it drops nothing. Safe to run again.
 
 # COMMAND ----------
 

@@ -12,21 +12,16 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** each tool server that reads Databricks has its own service principal
-# MAGIC (`ecrmap_tools_energy`, `ecrmap_tools_commerce`, `ecrmap_tools_ml`,
-# MAGIC `ecrmap_tools_dq`). This notebook gives each one `SELECT` on the schemas of its
-# MAGIC server and on nothing else, so Databricks refuses a read of any other layer.
-# MAGIC The energy and commerce principals also read the one table
-# MAGIC `quality.quality_audit_log`.
+# MAGIC **Purpose:** give the service principal of each tool server (`ecrmap_tools_energy`,
+# MAGIC `_commerce`, `_ml`, `_dq`) `SELECT` on its own schemas and nothing else. The
+# MAGIC energy and commerce principals also read `quality.quality_audit_log`.
 # MAGIC
-# MAGIC The principals, the permission to use tokens and the permission to use the SQL
-# MAGIC warehouse are set by hand in the workspace. The notebook finds the Application ID of
-# MAGIC each principal by its name; nothing is stored in the repository. The grants are the same
-# MAGIC as the scope lists of `ai/mcp_servers/servers.yml` (a test compares them).
+# MAGIC The principals and their token and warehouse permissions are set by hand. The
+# MAGIC notebook finds each Application ID by name. The grants match the scope lists in
+# MAGIC `ai/mcp_servers/servers.yml` (a test compares them).
 # MAGIC
-# MAGIC The writes are switched off in the configuration cell (`APPLY`). Run once with
-# MAGIC `APPLY = False` to read the plan, then with `APPLY = True`. A `GRANT` that is
-# MAGIC run again changes nothing.
+# MAGIC Writes are off in the configuration cell (`APPLY`). Run with `APPLY = False` to
+# MAGIC read the plan, then with `True`. A repeated `GRANT` changes nothing.
 
 # COMMAND ----------
 
