@@ -12,8 +12,7 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** gene-disease, phenotype, drug-gene, pharmacogenomic, pathway and protein
-# MAGIC interaction relations.
+# MAGIC **Purpose:** gene-disease, phenotype, drug-gene and pharmacogenomic relations.
 # MAGIC
 # MAGIC **Run:** `TABLES` lists the tables to build (default `all`); the others are skipped.
 
@@ -39,14 +38,11 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
+# DBTITLE 1,Configuration
 from pyspark.sql import functions as F
 
-# COMMAND ----------
-
-# DBTITLE 1,Configuration
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/05_relations"
+COMPONENT = "silver/genomics/07_relations"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
@@ -55,8 +51,6 @@ AVAILABLE = [
     "phenotype_annotation",
     "drug_gene_relation",
     "pharmacogenomic_association",
-    "pathway_membership",
-    "protein_interaction",
 ]
 dbutils.widgets.text("TABLES", "all")
 SELECTED = {
@@ -74,55 +68,25 @@ def selected(table):
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- id maps
+# DBTITLE 1,Build -- gene_disease_association
 if selected("gene_disease_association"):
+    # -- Read Silver -- id maps
     xwalk = read_silver("entity_id_crosswalk")
     gene_map = entity_id_map(xwalk, "gene")
     disease_map = entity_id_map(xwalk, "disease")
     COLUMNS = GENOMICS_STRUCTURES["gene_disease_association"]
 
-# COMMAND ----------
+    # -- Helpers -- typed columns, links and the common row shape
 
-# DBTITLE 1,Helpers -- typed columns, links and the common row shape
-if selected("gene_disease_association"):
+    text = source_text
 
-    def text(column, dataset):
-        return clean_placeholders(column, RULES, f"{dataset}.{column}")
+    number = source_number
 
-    def number(column, kind, dataset):
-        return typed_number(column, kind, RULES, f"{dataset}.{column}")
+    linked = pair_linker(gene_map, "gene", disease_map, "disease")
 
-    def linked(df, gene_specs, disease_specs):
-        df = link_entities(df, gene_specs, gene_map, "gene_key", "gene_link_method")
-        return link_entities(
-            df, disease_specs, disease_map, "disease_key", "disease_link_method"
-        )
+    rows = rows_factory(COLUMNS, label_column="record_kind", from_source=True)
 
-    def rows(df, kind, dataset, **given):
-        """The frame in the table's columns; a column not given is null."""
-        return df.select(
-            *[
-                (
-                    F.lit(kind)
-                    if name == "record_kind"
-                    else F.lit(dataset)
-                    if name == "source_dataset"
-                    else given[name]
-                    if name in given
-                    else F.col(name)
-                    if name in df.columns
-                    else F.lit(None)
-                )
-                .cast(kind_)
-                .alias(name)
-                for name, kind_ in COLUMNS
-            ]
-        )
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- OMIM gene links and ClinGen
-if selected("gene_disease_association"):
+    # -- Transform -- OMIM gene links and ClinGen
     OMIM = "ncbi_gene.mim2gene_medgen"
     omim = linked(
         read_genomics_bronze("ncbi_gene_mim2gene_medgen"),
@@ -198,10 +162,7 @@ if selected("gene_disease_association"):
             )
         )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- Open Targets overall, by datasource and GWAS
-if selected("gene_disease_association"):
+    # -- Transform -- Open Targets overall, by datasource and GWAS
     TARGETS = [
         (
             "opentargets_association_overall_direct",
@@ -253,10 +214,7 @@ if selected("gene_disease_association"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- ClinVar conditions from Silver and HPO
-if selected("gene_disease_association"):
+    # -- Transform -- ClinVar conditions from Silver and HPO
     variants = (
         read_silver("variant")
         .filter((F.col("assembly") == "GRCh38") & F.col("gene_key").isNotNull())
@@ -314,10 +272,7 @@ if selected("gene_disease_association"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- union and provenance
-if selected("gene_disease_association"):
+    # -- Transform -- union and provenance
     association = (
         _union(parts)
         .distinct()
@@ -344,7 +299,7 @@ if selected("gene_disease_association"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- gene_disease_association
+# DBTITLE 1,Write, inspect and export -- gene_disease_association
 if selected("gene_disease_association"):
     write_silver(
         association,
@@ -354,10 +309,6 @@ if selected("gene_disease_association"):
         rid=RID,
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- gene_disease_association
-if selected("gene_disease_association"):
     written = spark.table(genomics_table("gene_disease_association"))
     blocks = inspect_table(
         written,
@@ -392,10 +343,6 @@ if selected("gene_disease_association"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- gene_disease_association
-if selected("gene_disease_association"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__gene_disease_association",
@@ -405,20 +352,17 @@ if selected("gene_disease_association"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- id maps
+# DBTITLE 1,Build -- phenotype_annotation
 if selected("phenotype_annotation"):
+    # -- Read Silver -- id maps
     xwalk = read_silver("entity_id_crosswalk")
     gene_map = entity_id_map(xwalk, "gene")
     disease_map = entity_id_map(xwalk, "disease")
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- disease annotations
-if selected("phenotype_annotation"):
+    # -- Transform -- disease annotations
     ANN = "hpo.phenotype_annotations"
 
-    def text(column, dataset):
-        return clean_placeholders(column, RULES, f"{dataset}.{column}")
+    text = source_text
 
     id_type, id_value = split_curie(text("database_id", ANN), RULES)
     annotations = link_entities(
@@ -447,10 +391,7 @@ if selected("phenotype_annotation"):
         F.lit(ANN).alias("source_dataset"),
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- gene annotations
-if selected("phenotype_annotation"):
+    # -- Transform -- gene annotations
     GENES = "hpo.genes_to_phenotype"
     genes = link_entities(
         read_genomics_bronze("hpo_genes_to_phenotype"),
@@ -479,10 +420,7 @@ if selected("phenotype_annotation"):
         F.lit(GENES).alias("source_dataset"),
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- union and provenance
-if selected("phenotype_annotation"):
+    # -- Transform -- union and provenance
     annotation = (
         disease_rows.unionByName(gene_rows)
         .filter(F.col("phenotype_key").isNotNull())
@@ -510,16 +448,12 @@ if selected("phenotype_annotation"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- phenotype_annotation
+# DBTITLE 1,Write, inspect and export -- phenotype_annotation
 if selected("phenotype_annotation"):
     write_silver(
         annotation, "phenotype_annotation", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- phenotype_annotation
-if selected("phenotype_annotation"):
     written = spark.table(genomics_table("phenotype_annotation"))
     blocks = inspect_table(
         written,
@@ -552,10 +486,6 @@ if selected("phenotype_annotation"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- phenotype_annotation
-if selected("phenotype_annotation"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__phenotype_annotation",
@@ -565,8 +495,9 @@ if selected("phenotype_annotation"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- id maps and name maps
+# DBTITLE 1,Build -- drug_gene_relation
 if selected("drug_gene_relation"):
+    # -- Read Silver -- id maps and name maps
     xwalk = read_silver("entity_id_crosswalk")
     names = read_silver("entity_name")
     gene_map = (
@@ -593,13 +524,9 @@ if selected("drug_gene_relation"):
     )
     COLUMNS = GENOMICS_STRUCTURES["drug_gene_relation"]
 
-# COMMAND ----------
+    # -- Helpers -- typed columns, links and the common row shape
 
-# DBTITLE 1,Helpers -- typed columns, links and the common row shape
-if selected("drug_gene_relation"):
-
-    def text(column, dataset):
-        return clean_placeholders(column, RULES, f"{dataset}.{column}")
+    text = source_text
 
     def upper(column):
         return F.upper(F.trim(column))
@@ -607,33 +534,11 @@ if selected("drug_gene_relation"):
     def symbol_specs(value):
         return [(upper(value), "gene_symbol"), (upper(value), "gene_alias")]
 
-    def linked(df, drug_specs, gene_specs):
-        df = link_entities(df, drug_specs, drug_map, "drug_key", "drug_link_method")
-        return link_entities(df, gene_specs, gene_map, "gene_key", "gene_link_method")
+    linked = pair_linker(drug_map, "drug", gene_map, "gene")
 
-    def rows(df, dataset, **given):
-        """The frame in the table's columns; a column not given is null."""
-        return df.select(
-            *[
-                (
-                    F.lit(dataset)
-                    if name == "source_dataset"
-                    else given[name]
-                    if name in given
-                    else F.col(name)
-                    if name in df.columns
-                    else F.lit(None)
-                )
-                .cast(kind)
-                .alias(name)
-                for name, kind in COLUMNS
-            ]
-        )
+    rows = rows_factory(COLUMNS, from_source=True)
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- PharmGKB chemical-gene relationships
-if selected("drug_gene_relation"):
+    # -- Transform -- PharmGKB chemical-gene relationships
     REL = "pharmgkb.relationships"
     rel = read_genomics_bronze("pharmgkb_relationships")
     chemical_gene = (F.col("Entity1_type") == "Chemical") & (
@@ -669,10 +574,7 @@ if selected("drug_gene_relation"):
         )
     ]
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- CPIC pairs and FDA biomarkers
-if selected("drug_gene_relation"):
+    # -- Transform -- CPIC pairs and FDA biomarkers
     CPIC = "cpic.pairs"
     id_type, id_value = split_curie(text("drugid", CPIC), RULES)
     cpic = linked(
@@ -711,10 +613,7 @@ if selected("drug_gene_relation"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- Open Targets mechanisms and Tahoe targets
-if selected("drug_gene_relation"):
+    # -- Transform -- Open Targets mechanisms and Tahoe targets
     MOA = "opentargets.drug_mechanism_of_action"
     moa = (
         read_genomics_bronze("opentargets_drug_mechanism_of_action")
@@ -760,10 +659,7 @@ if selected("drug_gene_relation"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- union and provenance
-if selected("drug_gene_relation"):
+    # -- Transform -- union and provenance
     relation = (
         _union(parts)
         .distinct()
@@ -785,16 +681,12 @@ if selected("drug_gene_relation"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- drug_gene_relation
+# DBTITLE 1,Write, inspect and export -- drug_gene_relation
 if selected("drug_gene_relation"):
     write_silver(
         relation, "drug_gene_relation", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- drug_gene_relation
-if selected("drug_gene_relation"):
     written = spark.table(genomics_table("drug_gene_relation"))
     blocks = inspect_table(
         written,
@@ -832,10 +724,6 @@ if selected("drug_gene_relation"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- drug_gene_relation
-if selected("drug_gene_relation"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__drug_gene_relation",
@@ -845,21 +733,18 @@ if selected("drug_gene_relation"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- id maps
+# DBTITLE 1,Build -- pharmacogenomic_association
 if selected("pharmacogenomic_association"):
+    # -- Read Silver -- id maps
     xwalk = read_silver("entity_id_crosswalk")
     gene_map = entity_id_map(xwalk, "gene")
     drug_map = entity_id_map(xwalk, "drug")
     variant_map = entity_id_map(xwalk, "variant")
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- relationships and keys of each end
-if selected("pharmacogenomic_association"):
+    # -- Transform -- relationships and keys of each end
     REL = "pharmgkb.relationships"
 
-    def text(column):
-        return clean_placeholders(column, RULES, f"{REL}.{column}")
+    text = text_for(REL)
 
     rel = read_genomics_bronze("pharmgkb_relationships")
     chemical_gene = (F.col("Entity1_type") == "Chemical") & (
@@ -900,10 +785,7 @@ if selected("pharmacogenomic_association"):
         "object",
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- columns and provenance
-if selected("pharmacogenomic_association"):
+    # -- Transform -- columns and provenance
     association = (
         other.select(
             text("Entity1_type").alias("subject_type"),
@@ -942,7 +824,7 @@ if selected("pharmacogenomic_association"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- pharmacogenomic_association
+# DBTITLE 1,Write, inspect and export -- pharmacogenomic_association
 if selected("pharmacogenomic_association"):
     write_silver(
         association,
@@ -952,10 +834,6 @@ if selected("pharmacogenomic_association"):
         rid=RID,
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- pharmacogenomic_association
-if selected("pharmacogenomic_association"):
     written = spark.table(genomics_table("pharmacogenomic_association"))
     blocks = inspect_table(
         written,
@@ -990,385 +868,9 @@ if selected("pharmacogenomic_association"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- pharmacogenomic_association
-if selected("pharmacogenomic_association"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__pharmacogenomic_association",
         "pharmacogenomic_association",
-        blocks,
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Read Silver -- id maps
-if selected("pathway_membership"):
-    xwalk = read_silver("entity_id_crosswalk")
-    gene_map = entity_id_map(xwalk, "gene")
-    protein_map = entity_id_map(xwalk, "protein")
-    transcript_map = entity_id_map(xwalk, "transcript")
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- member type and links
-if selected("pathway_membership"):
-    DATASET = "reactome.pathway_mappings"
-
-    def text(column):
-        return clean_placeholders(column, RULES, f"{DATASET}.{column}")
-
-    identifier = text("identifier")
-    label = F.lower(F.coalesce(text("id_type"), F.lit("")))
-    member_type = (
-        F.when(identifier.rlike(r"^ENSG\d+"), "gene")
-        .when(identifier.rlike(r"^ENST\d+"), "transcript")
-        .when(identifier.rlike(r"^ENSP\d+"), "protein")
-        .when(label.contains("uniprot"), "protein")
-        .when(label.rlike("ncbi|entrez"), "gene")
-        .otherwise("other")
-    )
-    unversioned = ensembl_unversioned_expr(identifier)
-    mappings = read_genomics_bronze("reactome_pathway_mappings").withColumn(
-        "member_type", member_type
-    )
-    mappings = link_entities(
-        mappings,
-        [
-            (F.when(identifier.rlike(r"^ENSP\d+"), unversioned), "ensembl_protein"),
-            (
-                F.when(
-                    (F.col("member_type") == "protein")
-                    & ~identifier.rlike(r"^ENSP\d+"),
-                    identifier,
-                ),
-                "uniprot",
-            ),
-        ],
-        protein_map,
-        "protein_key",
-        "protein_method",
-    )
-    mappings = link_entities(
-        mappings,
-        [
-            (F.when(identifier.rlike(r"^ENSG\d+"), unversioned), "ensembl"),
-            (
-                F.when(
-                    (F.col("member_type") == "gene") & identifier.rlike(r"^\d+$"),
-                    identifier,
-                ),
-                "ncbi_gene",
-            ),
-        ],
-        gene_map,
-        "gene_key",
-        "gene_method",
-    )
-    mappings = link_entities(
-        mappings,
-        [(F.when(identifier.rlike(r"^ENST\d+"), unversioned), "ensembl_transcript")],
-        transcript_map,
-        "transcript_key",
-        "transcript_method",
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- columns and provenance
-if selected("pathway_membership"):
-    membership = (
-        mappings.select(
-            "member_type",
-            F.coalesce("protein_key", "gene_key", "transcript_key").alias("member_key"),
-            text("id_type").alias("member_id_type"),
-            identifier.alias("member_id"),
-            F.coalesce(
-                F.when(F.col("protein_key").isNotNull(), F.col("protein_method")),
-                F.when(F.col("gene_key").isNotNull(), F.col("gene_method")),
-                F.when(F.col("transcript_key").isNotNull(), F.col("transcript_method")),
-                F.lit("unlinked"),
-            ).alias("member_link_method"),
-            text("pathway_id").alias("pathway_key"),
-            text("evidence").alias("evidence"),
-            text("species").alias("species"),
-            F.lit(DATASET).alias("source_dataset"),
-        )
-        .filter(F.col("pathway_key").isNotNull() & F.col("member_id").isNotNull())
-        .distinct()
-        .withColumn(
-            "_srid",
-            sha_key(
-                "member_id_type", "member_id", "pathway_key", "evidence", "species"
-            ),
-        )
-    )
-    membership = conform_genomics(
-        add_genomics_provenance(membership, "_srid", RID), TABLE
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Write Silver -- pathway_membership
-if selected("pathway_membership"):
-    write_silver(
-        membership, "pathway_membership", source=SOURCE, component=COMPONENT, rid=RID
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- pathway_membership
-if selected("pathway_membership"):
-    written = spark.table(genomics_table("pathway_membership"))
-    blocks = inspect_table(
-        written,
-        "pathway_membership",
-        source=FINDINGS,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["source_record_id"],
-        extra_checks={
-            "member_types": str(
-                {
-                    r["member_type"]: r["count"]
-                    for r in written.groupBy("member_type").count().collect()
-                }
-            ),
-            "species": written.select("species").distinct().count(),
-            "members_without_a_key": written.filter(
-                F.col("member_key").isNull()
-            ).count(),
-            **{
-                f"{column}_counts": str(
-                    {
-                        r[column]: r["count"]
-                        for r in written.groupBy(column).count().collect()
-                    }
-                )
-                for column in written.columns
-                if column.endswith("_link_method")
-            },
-        },
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- pathway_membership
-if selected("pathway_membership"):
-    write_silver_findings(
-        FINDINGS,
-        f"{COMPONENT.split('/')[-1]}__pathway_membership",
-        "pathway_membership",
-        blocks,
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Read Silver -- id maps
-if selected("protein_interaction"):
-    xwalk = read_silver("entity_id_crosswalk")
-    gene_map = entity_id_map(xwalk, "gene")
-    protein_map = entity_id_map(xwalk, "protein")
-    COLUMNS = GENOMICS_STRUCTURES["protein_interaction"]
-
-# COMMAND ----------
-
-# DBTITLE 1,Helpers -- the common row shape
-if selected("protein_interaction"):
-
-    def rows(df, dataset, **given):
-        """The frame in the table's columns; a column not given is null."""
-        return df.select(
-            *[
-                (
-                    F.lit(dataset)
-                    if name == "source_dataset"
-                    else given[name]
-                    if name in given
-                    else F.lit(None)
-                )
-                .cast(kind)
-                .alias(name)
-                for name, kind in COLUMNS
-            ]
-        )
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- BioGRID
-if selected("protein_interaction"):
-    BIOGRID = "biogrid.interactions"
-
-    def text(column):
-        return clean_placeholders(column, RULES, f"{BIOGRID}.{column}")
-
-    def first_accession(column):
-        return F.nullif(F.regexp_extract(text(column), r"^([^|]+)", 1), F.lit(""))
-
-    biogrid = read_genomics_bronze("biogrid_interactions")
-    for side in ("A", "B"):
-        biogrid = link_entities(
-            biogrid,
-            [(text(f"Entrez_Gene_Interactor_{side}"), "ncbi_gene")],
-            gene_map,
-            f"gene_{side}",
-            f"gene_{side}_method",
-        )
-        biogrid = link_entities(
-            biogrid,
-            [(first_accession(f"SWISS_PROT_Accessions_Interactor_{side}"), "uniprot")],
-            protein_map,
-            f"protein_{side}",
-            f"protein_{side}_method",
-        )
-    biogrid_rows = rows(
-        biogrid,
-        BIOGRID,
-        interaction_source=F.lit("biogrid"),
-        interaction_id=text("BioGRID_Interaction_ID"),
-        interactor_a_id=text("BioGRID_ID_Interactor_A"),
-        interactor_b_id=text("BioGRID_ID_Interactor_B"),
-        protein_a_key=F.col("protein_A"),
-        protein_b_key=F.col("protein_B"),
-        gene_a_key=F.col("gene_A"),
-        gene_b_key=F.col("gene_B"),
-        experimental_system=text("Experimental_System"),
-        experimental_system_type=text("Experimental_System_Type"),
-        throughput=text("Throughput"),
-        score=typed_number("Score", "double", RULES, f"{BIOGRID}.Score"),
-        author=text("Author"),
-        publication_source=text("Publication_Source"),
-        modification=text("Modification"),
-        qualifications=text("Qualifications"),
-        tags=text("Tags"),
-        source_database=text("Source_Database"),
-        organism_a=text("Organism_ID_Interactor_A"),
-        organism_b=text("Organism_ID_Interactor_B"),
-        ontology_term_ids=text("Ontology_Term_IDs"),
-        ontology_term_names=text("Ontology_Term_Names"),
-        ontology_term_categories=text("Ontology_Term_Categories"),
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- STRING links
-if selected("protein_interaction"):
-    STRING = "string.protein_links"
-
-    def number(column):
-        return typed_number(column, "int", RULES, f"{STRING}.{column}")
-
-    def ensp(column):
-        return F.regexp_replace(F.trim(F.col(column)), r"^\d+\.", "")
-
-    string = read_genomics_bronze("string_protein_links")
-    for side, column in (("A", "protein1"), ("B", "protein2")):
-        string = link_entities(
-            string,
-            [(ensp(column), "ensembl_protein")],
-            protein_map,
-            f"protein_{side}",
-            f"protein_{side}_method",
-        )
-    CHANNELS = [
-        "neighborhood",
-        "fusion",
-        "cooccurence",
-        "coexpression",
-        "experimental",
-        "database",
-        "textmining",
-    ]
-    string_rows = rows(
-        string,
-        STRING,
-        interaction_source=F.lit("string"),
-        interactor_a_id=F.col("protein1"),
-        interactor_b_id=F.col("protein2"),
-        protein_a_key=F.col("protein_A"),
-        protein_b_key=F.col("protein_B"),
-        channel_scores=F.array(*[number(name) for name in CHANNELS]),
-        combined_score=number("combined_score"),
-        organism_a=F.regexp_extract("protein1", r"^(\d+)\.", 1),
-        organism_b=F.regexp_extract("protein2", r"^(\d+)\.", 1),
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- union and provenance
-if selected("protein_interaction"):
-    interaction = (
-        biogrid_rows.unionByName(string_rows)
-        .distinct()
-        .withColumn(
-            "_srid",
-            sha_key(
-                "interaction_source",
-                "interaction_id",
-                "interactor_a_id",
-                "interactor_b_id",
-                "experimental_system",
-                "author",
-                "publication_source",
-                "combined_score",
-            ),
-        )
-    )
-    interaction = conform_genomics(
-        add_genomics_provenance(interaction, "_srid", RID), TABLE
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Write Silver -- protein_interaction
-if selected("protein_interaction"):
-    write_silver(
-        interaction, "protein_interaction", source=SOURCE, component=COMPONENT, rid=RID
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- protein_interaction
-if selected("protein_interaction"):
-    written = spark.table(genomics_table("protein_interaction"))
-    blocks = inspect_table(
-        written,
-        "protein_interaction",
-        source=FINDINGS,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["source_record_id"],
-        extra_checks={
-            "sources": str(
-                {
-                    r["interaction_source"]: r["count"]
-                    for r in written.groupBy("interaction_source").count().collect()
-                }
-            ),
-            "records_without_a_protein_key": written.filter(
-                F.col("protein_a_key").isNull() | F.col("protein_b_key").isNull()
-            ).count(),
-            **{
-                f"{column}_counts": str(
-                    {
-                        r[column]: r["count"]
-                        for r in written.groupBy(column).count().collect()
-                    }
-                )
-                for column in written.columns
-                if column.endswith("_link_method")
-            },
-        },
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- protein_interaction
-if selected("protein_interaction"):
-    write_silver_findings(
-        FINDINGS,
-        f"{COMPONENT.split('/')[-1]}__protein_interaction",
-        "protein_interaction",
         blocks,
     )

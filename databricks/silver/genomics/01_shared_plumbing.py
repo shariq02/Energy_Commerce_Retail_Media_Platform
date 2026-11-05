@@ -12,8 +12,8 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** every id, name, claim and interval of every genomics entity: the base of
-# MAGIC all other tables.
+# MAGIC **Purpose:** every id, name, claim and interval of every genomics entity: the base
+# MAGIC of all other tables.
 # MAGIC
 # MAGIC **Run:** `TABLES` lists the tables to build (default `all`); the others are skipped.
 
@@ -39,13 +39,10 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
+# DBTITLE 1,Configuration
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
-# COMMAND ----------
-
-# DBTITLE 1,Configuration
 SOURCE = "genomics"
 COMPONENT = "silver/genomics/01_shared_plumbing"
 RID = run_id()
@@ -2038,14 +2035,12 @@ def opentargets_nested_claims(rules, xwalk):
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- ids of every entity type
+# DBTITLE 1,Build -- entity_id_crosswalk
 if selected("entity_id_crosswalk"):
+    # -- Transform -- ids of every entity type
     crosswalk = finish_crosswalk(crosswalk_all(RULES))
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- keys and provenance
-if selected("entity_id_crosswalk"):
+    # -- Transform -- keys and provenance
     crosswalk = crosswalk.withColumn(
         "_srid",
         sha_key(
@@ -2063,16 +2058,12 @@ if selected("entity_id_crosswalk"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- entity_id_crosswalk
+# DBTITLE 1,Write, inspect and export -- entity_id_crosswalk
 if selected("entity_id_crosswalk"):
     write_silver(
         crosswalk, "entity_id_crosswalk", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- entity_id_crosswalk
-if selected("entity_id_crosswalk"):
     written = spark.table(genomics_table("entity_id_crosswalk"))
     blocks = inspect_table(
         written,
@@ -2115,10 +2106,6 @@ if selected("entity_id_crosswalk"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- entity_id_crosswalk
-if selected("entity_id_crosswalk"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__entity_id_crosswalk",
@@ -2126,10 +2113,6 @@ if selected("entity_id_crosswalk"):
         blocks,
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- STRING alias sources
-if selected("entity_id_crosswalk"):
     print(
         "STRING alias sources (add the ones that hold UniProt ids to string_alias_id_types):"
     )
@@ -2139,14 +2122,12 @@ if selected("entity_id_crosswalk"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- id crosswalk
+# DBTITLE 1,Build -- entity_name
 if selected("entity_name"):
+    # -- Read Silver -- id crosswalk
     xwalk = read_silver("entity_id_crosswalk")
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- names, sharing count and provenance
-if selected("entity_name"):
+    # -- Transform -- names, sharing count and provenance
     names = finish_names(names_all(RULES, xwalk)).withColumn(
         "_srid",
         sha_key(
@@ -2162,14 +2143,10 @@ if selected("entity_name"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- entity_name
+# DBTITLE 1,Write, inspect and export -- entity_name
 if selected("entity_name"):
     write_silver(names, "entity_name", source=SOURCE, component=COMPONENT, rid=RID)
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- entity_name
-if selected("entity_name"):
     written = spark.table(genomics_table("entity_name"))
     blocks = inspect_table(
         written,
@@ -2199,25 +2176,19 @@ if selected("entity_name"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- entity_name
-if selected("entity_name"):
     write_silver_findings(
         FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_name", "entity_name", blocks
     )
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- crosswalk and names
+# DBTITLE 1,Build -- entity_claim
 if selected("entity_claim"):
+    # -- Read Silver -- crosswalk and names
     xwalk = read_silver("entity_id_crosswalk")
     names = read_silver("entity_name")
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- transcript genes for the variant claims
-if selected("entity_claim"):
+    # -- Transform -- transcript genes for the variant claims
     tx_claims = transcript_claims(RULES, xwalk, names)
     transcript_genes = (
         tx_claims.filter(F.col("field") == "gene_key")
@@ -2230,10 +2201,7 @@ if selected("entity_claim"):
         .select("transcript_key", "gene_key")
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- claims of every entity type
-if selected("entity_claim"):
+    # -- Transform -- claims of every entity type
     claims = _union(
         [
             gene_claims(RULES, xwalk),
@@ -2247,10 +2215,7 @@ if selected("entity_claim"):
         ]
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- keys and provenance
-if selected("entity_claim"):
+    # -- Transform -- keys and provenance
     claims = claims.distinct().withColumn(
         "_srid",
         sha_key(
@@ -2266,14 +2231,10 @@ if selected("entity_claim"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- entity_claim
+# DBTITLE 1,Write, inspect and export -- entity_claim
 if selected("entity_claim"):
     write_silver(claims, "entity_claim", source=SOURCE, component=COMPONENT, rid=RID)
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- entity_claim
-if selected("entity_claim"):
     written = spark.table(genomics_table("entity_claim"))
     blocks = inspect_table(
         written,
@@ -2303,24 +2264,18 @@ if selected("entity_claim"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- entity_claim
-if selected("entity_claim"):
     write_silver_findings(
         FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_claim", "entity_claim", blocks
     )
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- id crosswalk
+# DBTITLE 1,Build -- entity_coordinate
 if selected("entity_coordinate"):
+    # -- Read Silver -- id crosswalk
     xwalk = read_silver("entity_id_crosswalk")
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- intervals, length, primary interval and provenance
-if selected("entity_coordinate"):
+    # -- Transform -- intervals, length, primary interval and provenance
     # one primary interval per entity and assembly, by the coordinate source order
     primary = Window.partitionBy("entity_type", "entity_key", "assembly").orderBy(
         dataset_rank_expr(RULES).asc_nulls_last(),
@@ -2356,16 +2311,12 @@ if selected("entity_coordinate"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- entity_coordinate
+# DBTITLE 1,Write, inspect and export -- entity_coordinate
 if selected("entity_coordinate"):
     write_silver(
         coordinates, "entity_coordinate", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- entity_coordinate
-if selected("entity_coordinate"):
     written = spark.table(genomics_table("entity_coordinate"))
     blocks = inspect_table(
         written,
@@ -2407,10 +2358,6 @@ if selected("entity_coordinate"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- entity_coordinate
-if selected("entity_coordinate"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__entity_coordinate",

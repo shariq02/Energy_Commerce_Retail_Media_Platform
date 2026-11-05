@@ -12,9 +12,9 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** every computed attribute (flags, labels, scores, bands, counts) with its
-# MAGIC rule, matched text and as-of date; the rules are in the versioned rules
-# MAGIC file.
+# MAGIC **Purpose:** every computed attribute (flags, labels, scores, bands, counts) with
+# MAGIC its rule, matched text and as-of date; the rules are in the versioned
+# MAGIC rules file.
 # MAGIC
 # MAGIC **Run:** `TABLES` lists the tables to build (default `all`); the others are skipped.
 
@@ -40,15 +40,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
+# DBTITLE 1,Configuration
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
-# COMMAND ----------
-
-# DBTITLE 1,Configuration
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/07_derived_attributes"
+COMPONENT = "silver/genomics/11_derived_attributes"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
@@ -1722,16 +1719,12 @@ if selected("entity_derived_attribute"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- entity_derived_attribute
+# DBTITLE 1,Write, inspect and export -- entity_derived_attribute
 if selected("entity_derived_attribute"):
     write_silver(
         derived, "entity_derived_attribute", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- entity_derived_attribute
-if selected("entity_derived_attribute"):
     written = spark.table(genomics_table("entity_derived_attribute"))
     blocks = inspect_table(
         written,
@@ -1764,10 +1757,6 @@ if selected("entity_derived_attribute"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- entity_derived_attribute
-if selected("entity_derived_attribute"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__entity_derived_attribute",

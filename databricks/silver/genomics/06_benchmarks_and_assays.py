@@ -12,8 +12,8 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** benchmark variant sets, MAPS embedding splits and ProteinGym assays with
-# MAGIC their mutants.
+# MAGIC **Purpose:** benchmark variant sets, MAPS embedding splits and ProteinGym assays
+# MAGIC with their mutants.
 # MAGIC
 # MAGIC **Run:** `TABLES` lists the tables to build (default `all`); the others are skipped.
 
@@ -39,14 +39,11 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
+# DBTITLE 1,Configuration
 from pyspark.sql import functions as F
 
-# COMMAND ----------
-
-# DBTITLE 1,Configuration
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/04_benchmarks_and_assays"
+COMPONENT = "silver/genomics/06_benchmarks_and_assays"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
@@ -67,34 +64,16 @@ def selected(table):
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers -- typed columns and the common row shape
+# DBTITLE 1,Build -- benchmark_variant
 if selected("benchmark_variant"):
+    # -- Helpers -- typed columns and the common row shape
     COLUMNS = GENOMICS_STRUCTURES["benchmark_variant"]
 
-    def text(column, dataset):
-        return clean_placeholders(column, RULES, f"{dataset}.{column}")
+    text = source_text
 
-    def number(column, kind, dataset):
-        return typed_number(column, kind, RULES, f"{dataset}.{column}")
+    number = source_number
 
-    def rows(df, benchmark_set, dataset, **given):
-        """The frame in the table's columns; a column not given is null."""
-        return df.select(
-            *[
-                (
-                    F.lit(benchmark_set)
-                    if name == "benchmark_set"
-                    else F.lit(dataset)
-                    if name == "source_dataset"
-                    else given[name]
-                    if name in given
-                    else F.lit(None)
-                )
-                .cast(kind)
-                .alias(name)
-                for name, kind in COLUMNS
-            ]
-        )
+    rows = rows_factory(COLUMNS, label_column="benchmark_set")
 
     def coordinates(dataset, chrom, pos, ref, alt):
         """Variant columns of a set with VCF alleles (GRCh38 assumed)."""
@@ -113,10 +92,7 @@ if selected("benchmark_variant"):
             "alternate_allele": F.upper(text(alt, dataset)),
         }
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- long-range pathogenic sets and eQTL
-if selected("benchmark_variant"):
+    # -- Transform -- long-range pathogenic sets and eQTL
     parts = []
     for table, dataset in (
         ("long_range_benchmark_pathogenic_coding", LR_CODING),
@@ -165,10 +141,7 @@ if selected("benchmark_variant"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- gnomAD balanced and ClinVar versus benign
-if selected("benchmark_variant"):
+    # -- Transform -- gnomAD balanced and ClinVar versus benign
     parts.append(
         rows(
             read_genomics_bronze("gnomad_balanced_variants"),
@@ -195,10 +168,7 @@ if selected("benchmark_variant"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- SpectralBio, ProteinGym clinical and MAPS
-if selected("benchmark_variant"):
+    # -- Transform -- SpectralBio, ProteinGym clinical and MAPS
     SPECTRALBIO = "spectralbio.variants"
     parts.append(
         rows(
@@ -254,10 +224,7 @@ if selected("benchmark_variant"):
         )
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- union and provenance
-if selected("benchmark_variant"):
+    # -- Transform -- union and provenance
     benchmark = (
         _union(parts)
         .distinct()
@@ -291,16 +258,12 @@ if selected("benchmark_variant"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- benchmark_variant
+# DBTITLE 1,Write, inspect and export -- benchmark_variant
 if selected("benchmark_variant"):
     write_silver(
         benchmark, "benchmark_variant", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- benchmark_variant
-if selected("benchmark_variant"):
     written = spark.table(genomics_table("benchmark_variant"))
     blocks = inspect_table(
         written,
@@ -332,10 +295,6 @@ if selected("benchmark_variant"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- benchmark_variant
-if selected("benchmark_variant"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__benchmark_variant",
@@ -345,12 +304,12 @@ if selected("benchmark_variant"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- one row per split file
+# DBTITLE 1,Build -- embedding_split
 if selected("embedding_split"):
+    # -- Transform -- one row per split file
     DATASET = "maps_embeddings.metadata"
 
-    def text(column):
-        return clean_placeholders(column, RULES, f"{DATASET}.{column}")
+    text = text_for(DATASET)
 
     meta = read_genomics_bronze("maps_embeddings_metadata")
     split = (
@@ -377,14 +336,10 @@ if selected("embedding_split"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- embedding_split
+# DBTITLE 1,Write, inspect and export -- embedding_split
 if selected("embedding_split"):
     write_silver(split, "embedding_split", source=SOURCE, component=COMPONENT, rid=RID)
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- embedding_split
-if selected("embedding_split"):
     written = spark.table(genomics_table("embedding_split"))
     blocks = inspect_table(
         written,
@@ -414,10 +369,6 @@ if selected("embedding_split"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- embedding_split
-if selected("embedding_split"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__embedding_split",
@@ -427,16 +378,14 @@ if selected("embedding_split"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- protein ids
+# DBTITLE 1,Build -- dms_assay
 if selected("dms_assay"):
+    # -- Read Silver -- protein ids
     xwalk = read_silver("entity_id_crosswalk")
     protein_map = entity_id_map(xwalk, "protein")
     COLUMNS = GENOMICS_STRUCTURES["dms_assay"]
 
-# COMMAND ----------
-
-# DBTITLE 1,Helpers -- source columns by target column
-if selected("dms_assay"):
+    # -- Helpers -- source columns by target column
     DMS = {
         "assay_id": "DMS_id",
         "assay_index": "DMS_index",
@@ -499,38 +448,9 @@ if selected("dms_assay"):
         "alignment_length": "MSA_len",
     }
 
-# COMMAND ----------
+    # -- Transform -- typed rows of both reference tables
 
-# DBTITLE 1,Transform -- typed rows of both reference tables
-if selected("dms_assay"):
-
-    def typed(source, kind, dataset):
-        text = clean_placeholders(source, RULES, f"{dataset}.{source}")
-        if kind == "boolean":
-            return F.when(text.isNotNull(), F.lower(text) == "true")
-        if kind in ("int", "bigint", "double"):
-            return typed_number(source, kind, RULES, f"{dataset}.{source}")
-        return text
-
-    def rows(df, assay_set, dataset, mapping):
-        return df.select(
-            *[
-                (
-                    F.lit(assay_set)
-                    if name == "assay_set"
-                    else F.lit(dataset)
-                    if name == "source_dataset"
-                    else typed(mapping[name], kind, dataset)
-                    if name in mapping
-                    else F.col(name)
-                    if name in df.columns
-                    else F.lit(None)
-                )
-                .cast(kind)
-                .alias(name)
-                for name, kind in COLUMNS
-            ]
-        )
+    rows = mapped_rows_factory(COLUMNS, "assay_set")
 
     DMS_SET = "proteingym.dms_reference"
     CLINICAL_SET = "proteingym.clinical_reference"
@@ -563,14 +483,10 @@ if selected("dms_assay"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- dms_assay
+# DBTITLE 1,Write, inspect and export -- dms_assay
 if selected("dms_assay"):
     write_silver(assay, "dms_assay", source=SOURCE, component=COMPONENT, rid=RID)
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- dms_assay
-if selected("dms_assay"):
     written = spark.table(genomics_table("dms_assay"))
     blocks = inspect_table(
         written,
@@ -602,18 +518,15 @@ if selected("dms_assay"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- dms_assay
-if selected("dms_assay"):
     write_silver_findings(
         FINDINGS, f"{COMPONENT.split('/')[-1]}__dms_assay", "dms_assay", blocks
     )
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- substitutions of both sets
+# DBTITLE 1,Build -- dms_assay_mutant
 if selected("dms_assay_mutant"):
+    # -- Transform -- substitutions of both sets
     SINGLE = r"^([A-Z*])(\d+)([A-Z*])$"
     DMS = "proteingym.dms_substitutions"
     CLINICAL = "proteingym.clinical_substitutions"
@@ -633,8 +546,7 @@ if selected("dms_assay_mutant"):
             ),
         }
 
-    def text(column, dataset):
-        return clean_placeholders(column, RULES, f"{dataset}.{column}")
+    text = source_text
 
     dms_mutant = text("mutant", DMS)
     dms = read_genomics_bronze("proteingym_dms_substitutions").select(
@@ -664,10 +576,7 @@ if selected("dms_assay_mutant"):
     )
     mutant = dms.unionByName(clinical).filter(F.col("mutant").isNotNull())
 
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- keys and provenance
-if selected("dms_assay_mutant"):
+    # -- Transform -- keys and provenance
     mutant = mutant.distinct().withColumn(
         "_srid",
         sha_key(
@@ -678,16 +587,12 @@ if selected("dms_assay_mutant"):
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- dms_assay_mutant
+# DBTITLE 1,Write, inspect and export -- dms_assay_mutant
 if selected("dms_assay_mutant"):
     write_silver(
         mutant, "dms_assay_mutant", source=SOURCE, component=COMPONENT, rid=RID
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Inspect -- dms_assay_mutant
-if selected("dms_assay_mutant"):
     written = spark.table(genomics_table("dms_assay_mutant"))
     blocks = inspect_table(
         written,
@@ -720,10 +625,6 @@ if selected("dms_assay_mutant"):
         },
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Export findings -- dms_assay_mutant
-if selected("dms_assay_mutant"):
     write_silver_findings(
         FINDINGS,
         f"{COMPONENT.split('/')[-1]}__dms_assay_mutant",

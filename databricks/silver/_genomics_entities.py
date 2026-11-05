@@ -870,3 +870,118 @@ def any_match_expr(entries, flags, test_names, default):
             condition = condition | F.array_contains(flags, test_names(test))
         expr = F.when(condition, F.lit(entry["label"])).otherwise(expr)
     return expr
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Source column helpers and row shaping (use the notebook's RULES)
+
+
+def source_text(column, dataset):
+    """Trimmed text of a Bronze column; null for a placeholder."""
+    return clean_placeholders(column, RULES, f"{dataset}.{column}")
+
+
+def source_number(column, kind, dataset):
+    """A Bronze column as a number (`int`, `bigint` or `double`)."""
+    return typed_number(column, kind, RULES, f"{dataset}.{column}")
+
+
+def source_double(column, dataset):
+    return source_number(column, "double", dataset)
+
+
+def source_typed(source, kind, dataset):
+    """A Bronze column as the declared Spark type (text, number or boolean)."""
+    text = source_text(source, dataset)
+    if kind == "boolean":
+        return F.when(text.isNotNull(), F.lower(text) == "true")
+    if kind in ("int", "bigint", "double"):
+        return source_number(source, kind, dataset)
+    return text
+
+
+def text_for(dataset):
+    """`text(column)` of one dataset."""
+    return lambda column: source_text(column, dataset)
+
+
+def number_for(dataset, default_kind="double"):
+    """`number(column, kind)` of one dataset."""
+    return lambda column, kind=default_kind: source_number(column, kind, dataset)
+
+
+def shape_rows(df, columns, dataset, fixed=None, from_source=False, **given):
+    """The frame in the declared columns of a table: `fixed` literals, `given`
+    Columns, else the same-named column of `df` (when `from_source`), else null."""
+    fixed = fixed or {}
+    values = []
+    for name, kind in columns:
+        if name == "source_dataset":
+            value = F.lit(dataset)
+        elif name in fixed:
+            value = F.lit(fixed[name])
+        elif name in given:
+            value = given[name]
+        elif from_source and name in df.columns:
+            value = F.col(name)
+        else:
+            value = F.lit(None)
+        values.append(value.cast(kind).alias(name))
+    return df.select(*values)
+
+
+def rows_factory(columns, label_column=None, from_source=False):
+    """`rows(df, [label,] dataset, **given)` of one table."""
+
+    def rows(df, *args, **given):
+        if label_column is None:
+            (dataset,) = args
+            fixed = {}
+        else:
+            label, dataset = args
+            fixed = {label_column: label}
+        return shape_rows(df, columns, dataset, fixed, from_source, **given)
+
+    return rows
+
+
+def mapped_rows_factory(columns, label_column):
+    """`rows(df, label, dataset, mapping)`: `mapping` gives the source column of a target column."""
+
+    def rows(df, label, dataset, mapping):
+        values = []
+        for name, kind in columns:
+            if name == label_column:
+                value = F.lit(label)
+            elif name == "source_dataset":
+                value = F.lit(dataset)
+            elif name in mapping:
+                value = source_typed(mapping[name], kind, dataset)
+            elif name in df.columns:
+                value = F.col(name)
+            else:
+                value = F.lit(None)
+            values.append(value.cast(kind).alias(name))
+        return df.select(*values)
+
+    return rows
+
+
+def pair_linker(first_map, first_name, second_map, second_name):
+    """`linked(df, first_specs, second_specs)`: two entity links, each with its key
+    and its link method column."""
+
+    def linked(df, first_specs, second_specs):
+        df = link_entities(
+            df, first_specs, first_map, f"{first_name}_key", f"{first_name}_link_method"
+        )
+        return link_entities(
+            df,
+            second_specs,
+            second_map,
+            f"{second_name}_key",
+            f"{second_name}_link_method",
+        )
+
+    return linked
