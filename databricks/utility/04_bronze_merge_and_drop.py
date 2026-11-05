@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # BRONZE CLEANUP -- MERGE IDENTICAL-SCHEMA TABLES, DROP SEARCH VISIBILITY
+# MAGIC # BRONZE CLEANUP -- MERGE SAME-SHAPE TABLES, DROP LOADED UPLOAD VOLUMES
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -12,30 +12,21 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** consolidate the Bronze tables that share one schema, drop the
-# MAGIC Search Visibility Bronze tables and Volumes, and drop any leftover upload
-# MAGIC Volumes (the loaders normally delete their own, so most will already be gone).
+# MAGIC **Purpose:** for every Bronze schema found in the catalog, (1) find the tables of
+# MAGIC identical columns whose names differ in one part and merge them into one table
+# MAGIC with a `source_variant` column, (2) drop the upload Volumes whose files were all
+# MAGIC read by a load, (3) list the tables and Volumes of every Bronze schema against
+# MAGIC the Unity Catalog limits. Nothing is named in this notebook: tables, Volumes and
+# MAGIC schemas come from the catalog.
 # MAGIC
-# MAGIC - `honda_iot_{electricity,heating,cooling}_{p,w}` (6 tables) become
-# MAGIC   `honda_iot_{electricity,heating,cooling}` (3 tables) with a
-# MAGIC   `measurement_type` column (`p` / `w`).
-# MAGIC - `mastr_{einheitentypen,lokationstypen,marktfunktionen,marktrollen}`
-# MAGIC   (4 tables) become `mastr_code_lookup` (1 table) with a `catalog_kind`
-# MAGIC   column.
-# MAGIC - `search_visibility_events` and `search_visibility_repository` are dropped.
-# MAGIC
-# MAGIC Bronze is the only persisted copy of these rows (the loaders delete their
-# MAGIC source Volumes), so nothing is dropped until the merged table has been
-# MAGIC checked against its sources row-for-row. The drop steps are switched off in
-# MAGIC the configuration cell; read the validation output first, then switch them
-# MAGIC on and re-run only the matching cell.
-# MAGIC
-# MAGIC Every source table is only read. A merged table is created only if it does
-# MAGIC not exist yet, so the notebook is safe to re-run.
+# MAGIC A source table is dropped only after a row-for-row check of the merged table. A
+# MAGIC Volume is dropped only when the lineage shows that every file in it was read.
+# MAGIC The destructive steps are switches in the configuration cell. Safe to re-run.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+from collections import defaultdict
 from functools import reduce
 
 from pyspark.sql import functions as F
@@ -44,64 +35,23 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration
 CATALOG = "energy_commerce_retail_media"
-BRONZE_SCHEMA = "bronze"
-BRONZE = f"{CATALOG}.{BRONZE_SCHEMA}"
+DISCRIMINATOR = "source_variant"
 
-# merged table -> (discriminator column, {discriminator value: source table})
-MERGES = {
-    "honda_iot_electricity": (
-        "measurement_type",
-        {"p": "honda_iot_electricity_p", "w": "honda_iot_electricity_w"},
-    ),
-    "honda_iot_heating": (
-        "measurement_type",
-        {"p": "honda_iot_heating_p", "w": "honda_iot_heating_w"},
-    ),
-    "honda_iot_cooling": (
-        "measurement_type",
-        {"p": "honda_iot_cooling_p", "w": "honda_iot_cooling_w"},
-    ),
-    "mastr_code_lookup": (
-        "catalog_kind",
-        {
-            "einheitentypen": "mastr_einheitentypen",
-            "lokationstypen": "mastr_lokationstypen",
-            "marktfunktionen": "mastr_marktfunktionen",
-            "marktrollen": "mastr_marktrollen",
-        },
-    ),
-}
+# Unity Catalog limits: tables per schema (guard below the warning mail at 90) and
+# Volumes per metastore (warning at 40, limit 50).
+TABLE_GUARD = 90
+VOLUME_WARNING = 40
+VOLUME_LIMIT = 50
 
-SEARCH_VISIBILITY_TABLES = ["search_visibility_events", "search_visibility_repository"]
-SEARCH_VISIBILITY_VOLUMES = ["search_visibility_events", "search_visibility_reference"]
+# Destructive steps stay off until the report has been read.
+MERGE_SAME_SHAPE = False  # True
+DROP_MERGED_SOURCES = False  # True
+DROP_UPLOAD_VOLUMES = True  # False
 
-# Upload Volumes no longer needed once their tables are loaded; the retired
-# change-capture landing Volume is included.
-LEFTOVER_VOLUMES = [
-    "dwd_analytical",
-    "dwd_metadata",
-    "smard_analytical",
-    "honda_iot_analytical",
-    "rees46_events",
-    "mastr_analytical",
-    "mastr_reference",
-    "power_plant_list_analytical",
-    "redispatch_analytical",
-    "ga4_events",
-    "cdc_operational_landing",
-]
-
-# Destructive steps stay off until the validation output has been read.
-DROP_MERGED_SOURCES = True  # False
-# Set True only after confirming the external raw copy of the Search Visibility data.
-DROP_SEARCH_VISIBILITY = True  # False
-DROP_LEFTOVER_VOLUMES = True  # False
-
-print(f"Catalog / schema : {BRONZE}")
-print(f"Merged tables    : {list(MERGES)}")
-print(f"Drop merged sources : {DROP_MERGED_SOURCES}")
-print(f"Drop Search Visibility : {DROP_SEARCH_VISIBILITY}")
-print(f"Drop leftover Volumes : {DROP_LEFTOVER_VOLUMES}")
+print(f"Catalog : {CATALOG}")
+print(f"Merge same-shape tables : {MERGE_SAME_SHAPE}")
+print(f"Drop merged source tables : {DROP_MERGED_SOURCES}")
+print(f"Drop upload Volumes : {DROP_UPLOAD_VOLUMES}")
 
 # COMMAND ----------
 
@@ -118,226 +68,263 @@ def fingerprint(df, cols):
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- merged frame for one group
+# DBTITLE 1,Helper -- merged name and value of each table, from the words the names share
 
 
-def merged_frame(disc_col, sources):
-    parts = [
-        spark.table(f"{BRONZE}.{table}").withColumn(disc_col, F.lit(value))
-        for value, table in sources.items()
-    ]
-    cols = spark.table(f"{BRONZE}.{next(iter(sources.values()))}").columns
-    return reduce(lambda a, b: a.unionByName(b), parts).select(disc_col, *cols)
-
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Inspection (read-only)
-
-# COMMAND ----------
-
-# DBTITLE 1,Tables currently in the bronze schema
-existing_tables = {
-    r["tableName"] for r in spark.sql(f"SHOW TABLES IN {BRONZE}").collect()
-}
-print(f"Tables in {BRONZE}: {len(existing_tables)}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Status of each merge group
-group_state = {}
-for target, (_, sources) in MERGES.items():
-    present = [t for t in sources.values() if t in existing_tables]
-    group_state[target] = {
-        "sources_present": len(present) == len(sources),
-        "sources_missing": sorted(set(sources.values()) - set(present)),
-        "target_present": target in existing_tables,
+def name_parts(names):
+    """(merged name, {table: value}) from the words that the table names share at the
+    start and at the end; None when the names share no word."""
+    words = [name.split("_") for name in names]
+    shortest = min(len(w) for w in words)
+    head = 0
+    while head < shortest and len({w[head] for w in words}) == 1:
+        head += 1
+    tail = 0
+    while tail < shortest - head and len({w[-1 - tail] for w in words}) == 1:
+        tail += 1
+    # every table needs a non-empty value between the shared words
+    while any(len(w) - head - tail < 1 for w in words) and (head or tail):
+        if tail:
+            tail -= 1
+        else:
+            head -= 1
+    if not (head or tail):
+        return None
+    values = {
+        name: "_".join(w[head : len(w) - tail])
+        for name, w in zip(names, words, strict=True)
     }
-    print(f"{target}: {group_state[target]}")
+    merged = "_".join(words[0][:head] + words[0][len(words[0]) - tail :])
+    return merged, values
+
 
 # COMMAND ----------
 
-# DBTITLE 1,Check that every group's source tables share one schema
-schema_ok = {}
-for target, (_, sources) in MERGES.items():
-    if not group_state[target]["sources_present"]:
+# DBTITLE 1,Helper -- walk a Volume for its files
+
+
+def volume_files(path):
+    files = []
+    for entry in dbutils.fs.ls(path):
+        if entry.isDir():
+            files += volume_files(entry.path)
+        else:
+            files.append(entry.path.removeprefix("dbfs:"))
+    return files
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Bronze schemas
+
+# COMMAND ----------
+
+# DBTITLE 1,Find the Bronze schemas and count their tables
+bronze_schemas = sorted(
+    r["databaseName"]
+    for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
+    if r["databaseName"].endswith("bronze")
+)
+tables_before = {}
+for schema in bronze_schemas:
+    tables_before[schema] = {
+        r["tableName"]
+        for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{schema}").collect()
+    }
+    print(f"{schema}: {len(tables_before[schema])} tables")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Same-shape tables
+
+# COMMAND ----------
+
+# DBTITLE 1,Read the columns of every Bronze table
+schema_list = ", ".join(f"'{schema}'" for schema in bronze_schemas)
+column_rows = spark.sql(
+    f"""
+    SELECT table_schema, table_name, column_name, data_type
+    FROM {CATALOG}.information_schema.columns
+    WHERE table_schema IN ({schema_list})
+    """
+).collect()
+shapes = defaultdict(set)
+for r in column_rows:
+    shapes[(r["table_schema"], r["table_name"])].add((r["column_name"], r["data_type"]))
+print(f"Tables read: {len(shapes)}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Find the groups of tables with identical columns
+by_shape = defaultdict(list)
+for (schema, table), shape in shapes.items():
+    by_shape[(schema, frozenset(shape))].append(table)
+
+candidates = []
+for (schema, _shape), tables in sorted(by_shape.items(), key=lambda item: item[0][0]):
+    if len(tables) < 2:
         continue
-    col_sets = {t: spark.table(f"{BRONZE}.{t}").columns for t in sources.values()}
-    first = next(iter(col_sets.values()))
-    schema_ok[target] = all(cols == first for cols in col_sets.values())
-    print(f"{target}: identical schema = {schema_ok[target]}")
-    if not schema_ok[target]:
-        for t, cols in col_sets.items():
-            print(f"  {t}: {cols}")
-
-bad = [t for t, ok in schema_ok.items() if not ok]
-if bad:
-    raise RuntimeError(f"schemas differ within group(s): {bad} -- stop, do not merge")
+    parts = name_parts(sorted(tables))
+    if parts is None:
+        print(f"SKIP  {schema}: {sorted(tables)} share no word in their names")
+        continue
+    merged, values = parts
+    if merged in tables_before[schema]:
+        print(f"SKIP  {schema}.{merged}: a table of this name exists")
+        continue
+    candidates.append({"schema": schema, "merged": merged, "values": values})
+    print(f"FOUND {schema}: {values} -> {merged}")
+if not candidates:
+    print("No same-shape tables found.")
 
 # COMMAND ----------
 
-# DBTITLE 1,Fingerprint every source table
+# MAGIC %md
+# MAGIC ## Merge (off by default)
+
+# COMMAND ----------
+
+# DBTITLE 1,Create the merged tables
 source_fp = {}
-for target, (_, sources) in MERGES.items():
-    if not group_state[target]["sources_present"]:
+created = []
+for c in candidates:
+    schema, merged, values = c["schema"], c["merged"], c["values"]
+    if not MERGE_SAME_SHAPE:
+        print(
+            f"WOULD MERGE  {schema}: {sorted(values)} -> {merged}  "
+            "(MERGE_SAME_SHAPE is False)"
+        )
         continue
-    for table in sources.values():
-        df = spark.table(f"{BRONZE}.{table}")
-        source_fp[table] = fingerprint(df, df.columns)
-        print(f"{table}: rows={source_fp[table][0]}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Build merged tables
-
-# COMMAND ----------
-
-# DBTITLE 1,Create each merged table if it does not exist yet
-for target, (disc_col, sources) in MERGES.items():
-    state = group_state[target]
-    if state["target_present"]:
-        print(f"SKIP  {target}: already exists")
-        continue
-    if not state["sources_present"]:
-        print(f"FAIL  {target}: missing sources {state['sources_missing']}")
-        continue
+    columns = spark.table(f"{CATALOG}.{schema}.{next(iter(values))}").columns
+    parts = []
+    for table, value in values.items():
+        frame = spark.table(f"{CATALOG}.{schema}.{table}")
+        source_fp[(schema, table)] = fingerprint(frame, sorted(columns))
+        parts.append(frame.withColumn(DISCRIMINATOR, F.lit(value)))
     (
-        merged_frame(disc_col, sources)
+        reduce(lambda a, b: a.unionByName(b), parts)
+        .select(DISCRIMINATOR, *columns)
         .write.format("delta")
-        .mode("overwrite")
-        .saveAsTable(f"{BRONZE}.{target}")
+        .saveAsTable(f"{CATALOG}.{schema}.{merged}")
     )
-    print(f"OK    {target}: created from {list(sources.values())}")
+    created.append(c)
+    print(f"OK    {schema}.{merged}: created from {sorted(values)}")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Validate merged tables against their sources
-
-# COMMAND ----------
-
-# DBTITLE 1,Compare row count and content hash per discriminator value
-validated = {}
-for target, (disc_col, sources) in MERGES.items():
-    if not group_state[target]["sources_present"]:
-        print(f"SKIP  {target}: sources already gone")
-        continue
-    df_target = spark.table(f"{BRONZE}.{target}")
-    src_cols = spark.table(f"{BRONZE}.{next(iter(sources.values()))}").columns
+# DBTITLE 1,Compare row count and content hash per value
+validated = []
+for c in created:
+    schema, merged, values = c["schema"], c["merged"], c["values"]
+    columns = [
+        name
+        for name in spark.table(f"{CATALOG}.{schema}.{merged}").columns
+        if name != DISCRIMINATOR
+    ]
     rows = (
-        df_target.groupBy(disc_col)
+        spark.table(f"{CATALOG}.{schema}.{merged}")
+        .groupBy(DISCRIMINATOR)
         .agg(
             F.count(F.lit(1)).alias("n"),
             F.sum(
-                F.xxhash64(*[F.col(c) for c in src_cols]).cast("decimal(38,0)")
+                F.xxhash64(*[F.col(name) for name in sorted(columns)]).cast(
+                    "decimal(38,0)"
+                )
             ).alias("h"),
         )
         .collect()
     )
-    found = {r[disc_col]: (r["n"], r["h"]) for r in rows}
-    ok = set(found) == set(sources)
-    for value, table in sources.items():
-        match = found.get(value) == source_fp[table]
+    found = {r[DISCRIMINATOR]: (r["n"], r["h"]) for r in rows}
+    ok = set(found) == set(values.values())
+    for table, value in values.items():
+        match = found.get(value) == source_fp[(schema, table)]
         ok = ok and match
         print(
-            f"  {target}[{value}] vs {table}: rows={found.get(value, (None,))[0]}"
-            f" / {source_fp[table][0]} match={match}"
+            f"  {merged}[{value}] vs {table}: rows={found.get(value, (None,))[0]}"
+            f" / {source_fp[(schema, table)][0]} match={match}"
         )
-    validated[target] = ok
-    print(f"{'PASS' if ok else 'FAIL'}  {target}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Drop merged source tables (off by default)
+    print(f"{'PASS' if ok else 'FAIL'}  {schema}.{merged}")
+    if ok:
+        validated.append(c)
 
 # COMMAND ----------
 
 # DBTITLE 1,Drop the source tables of every validated group
-for target, (_, sources) in MERGES.items():
-    if not validated.get(target):
-        print(f"KEEP  {target}: not validated in this run")
-        continue
-    for table in sources.values():
+for c in validated:
+    for table in c["values"]:
         if DROP_MERGED_SOURCES:
-            spark.sql(f"DROP TABLE IF EXISTS {BRONZE}.{table}")
-            print(f"DROP  {table}")
+            spark.sql(f"DROP TABLE IF EXISTS {CATALOG}.{c['schema']}.{table}")
+            print(f"DROP  {c['schema']}.{table}")
         else:
-            print(f"WOULD DROP  {table}  (DROP_MERGED_SOURCES is False)")
+            print(f"WOULD DROP  {c['schema']}.{table}  (DROP_MERGED_SOURCES is False)")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Search Visibility (off by default)
+# MAGIC ## Upload Volumes (off by default)
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect the Search Visibility tables and Volumes
-for table in SEARCH_VISIBILITY_TABLES:
-    if table in existing_tables:
-        print(f"{table}: rows={spark.table(f'{BRONZE}.{table}').count()}")
+# DBTITLE 1,Read the lineage of the loads (which paths were read to write a table)
+try:
+    read_paths = [
+        (r["source_path"].removeprefix("dbfs:"), r["target_table_full_name"])
+        for r in spark.sql(
+            f"""
+            SELECT DISTINCT source_path, target_table_full_name
+            FROM system.access.table_lineage
+            WHERE source_path LIKE '%/Volumes/{CATALOG}/%'
+              AND target_table_full_name IS NOT NULL
+            """
+        ).collect()
+    ]
+except Exception as exc:
+    read_paths = []
+    print(f"Lineage not available: {str(exc)[:150]}")
+print(f"Lineage rows for Volume paths: {len(read_paths)}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Decide for every Volume whether all its files were read
+volume_plan = {}
+for schema in bronze_schemas:
+    for r in spark.sql(f"SHOW VOLUMES IN {CATALOG}.{schema}").collect():
+        volume = r["volume_name"]
+        root = f"/Volumes/{CATALOG}/{schema}/{volume}"
+        files = volume_files(root)
+        read = {
+            path.rstrip("/"): table
+            for path, table in read_paths
+            if path == root or path.startswith(root + "/")
+        }
+        unread = [
+            f for f in files if not any(f == p or f.startswith(p + "/") for p in read)
+        ]
+        if not files:
+            decision = "empty"
+        elif not read:
+            decision = "no lineage rows for this Volume"
+        elif unread:
+            decision = f"{len(unread)} of {len(files)} files not read by a load"
+        else:
+            decision = ""
+        volume_plan[(schema, volume)] = decision
+        fed = sorted(set(read.values()))
+        print(f"{schema}.{volume}: {len(files)} files, fed {len(fed)} tables")
+
+# COMMAND ----------
+
+# DBTITLE 1,Drop the Volumes that are empty or fully read
+for (schema, volume), decision in volume_plan.items():
+    if decision not in ("", "empty"):
+        print(f"KEEP  volume {schema}.{volume}: {decision}")
+    elif DROP_UPLOAD_VOLUMES:
+        spark.sql(f"DROP VOLUME IF EXISTS {CATALOG}.{schema}.{volume}")
+        print(f"DROP  volume {schema}.{volume}  ({decision or 'every file was read'})")
     else:
-        print(f"{table}: not present")
-
-display(spark.sql(f"SHOW VOLUMES IN {BRONZE}"))
-
-# COMMAND ----------
-
-# DBTITLE 1,Drop the Search Visibility tables
-for table in SEARCH_VISIBILITY_TABLES:
-    if DROP_SEARCH_VISIBILITY:
-        spark.sql(f"DROP TABLE IF EXISTS {BRONZE}.{table}")
-        print(f"DROP  table {table}")
-    else:
-        print(f"WOULD DROP  table {table}  (DROP_SEARCH_VISIBILITY is False)")
-
-# COMMAND ----------
-
-# DBTITLE 1,Drop the Search Visibility Volumes
-for volume in SEARCH_VISIBILITY_VOLUMES:
-    if DROP_SEARCH_VISIBILITY:
-        spark.sql(f"DROP VOLUME IF EXISTS {BRONZE}.{volume}")
-        print(f"DROP  volume {volume}")
-    else:
-        print(f"WOULD DROP  volume {volume}  (DROP_SEARCH_VISIBILITY is False)")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Leftover Volumes (off by default)
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspect the Volumes that exist
-live_volumes = sorted(
-    r["volume_name"] for r in spark.sql(f"SHOW VOLUMES IN {BRONZE}").collect()
-)
-print(f"Volumes in {BRONZE}: {live_volumes}")
-print(
-    f"Not in the drop list (kept): {sorted(set(live_volumes) - set(LEFTOVER_VOLUMES))}"
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Show what each leftover Volume still holds
-for volume in LEFTOVER_VOLUMES:
-    if volume not in live_volumes:
-        print(f"{volume}: not present")
-        continue
-    entries = dbutils.fs.ls(f"/Volumes/{CATALOG}/{BRONZE_SCHEMA}/{volume}")
-    print(f"{volume}: {len(entries)} top-level entries")
-
-# COMMAND ----------
-
-# DBTITLE 1,Drop the leftover Volumes
-for volume in LEFTOVER_VOLUMES:
-    if DROP_LEFTOVER_VOLUMES:
-        spark.sql(f"DROP VOLUME IF EXISTS {BRONZE}.{volume}")
-        print(f"DROP  volume {volume}")
-    else:
-        print(f"WOULD DROP  volume {volume}  (DROP_LEFTOVER_VOLUMES is False)")
+        print(f"WOULD DROP  volume {schema}.{volume}  (DROP_UPLOAD_VOLUMES is False)")
 
 # COMMAND ----------
 
@@ -346,18 +333,48 @@ for volume in LEFTOVER_VOLUMES:
 
 # COMMAND ----------
 
-# DBTITLE 1,Bronze inventory after this run
-final_tables = sorted(
-    r["tableName"] for r in spark.sql(f"SHOW TABLES IN {BRONZE}").collect()
-)
-print(f"Tables before: {len(existing_tables)}")
-print(f"Tables after : {len(final_tables)}")
-for table in final_tables:
-    print(f"  {table}")
+# DBTITLE 1,Tables and Volumes of every Bronze schema after this run
+for schema in bronze_schemas:
+    tables_after = sorted(
+        r["tableName"]
+        for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{schema}").collect()
+    )
+    volumes_after = sorted(
+        r["volume_name"]
+        for r in spark.sql(f"SHOW VOLUMES IN {CATALOG}.{schema}").collect()
+    )
+    over = "  OVER THE GUARD" if len(tables_after) > TABLE_GUARD else ""
+    empty = "  EMPTY SCHEMA" if not (tables_after or volumes_after) else ""
+    print(
+        f"{schema}: tables {len(tables_before[schema])} -> {len(tables_after)} "
+        f"(guard {TABLE_GUARD}){over}; Volumes left {len(volumes_after)}{empty}"
+    )
+    for table in tables_after:
+        print(f"  {table}")
+    if volumes_after:
+        print(f"  Volumes: {volumes_after}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Volumes in the metastore
+try:
+    metastore_volumes = spark.sql(
+        "SELECT count(*) AS n FROM system.information_schema.volumes"
+    ).first()["n"]
+except Exception as exc:
+    print(f"Metastore Volume count not available: {str(exc)[:150]}")
+else:
+    status = "OVER THE LIMIT" if metastore_volumes > VOLUME_LIMIT else "ok"
+    if status == "ok" and metastore_volumes >= VOLUME_WARNING:
+        status = "at or above the warning"
+    print(
+        f"Volumes in the metastore: {metastore_volumes} "
+        f"(warning {VOLUME_WARNING}, limit {VOLUME_LIMIT}): {status}"
+    )
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC Once the table drop steps have been run, take a new Bronze schema snapshot with
-# MAGIC `databricks/schema_registry/01_snapshot_bronze_schema.py`. The expected
-# MAGIC table count after both steps is 55.
+# MAGIC `databricks/schema_registry/01_snapshot_bronze_schema.py`. It covers every
+# MAGIC Bronze schema.

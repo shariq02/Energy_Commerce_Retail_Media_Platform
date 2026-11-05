@@ -48,6 +48,7 @@ for eco in ECOSYSTEMS:
           SUM(CASE WHEN card_path LIKE '{OLD_PREFIX}%' THEN 1 ELSE 0 END) AS old_prefix,
           SUM(CASE WHEN card_path LIKE '{NEW_PREFIX}%' THEN 1 ELSE 0 END) AS new_prefix
         FROM {table}
+        WHERE {ecosystem_predicate(eco)}
         """
     ).first()
     print(
@@ -60,6 +61,7 @@ for eco in ECOSYSTEMS:
 # DBTITLE 1,Update the card path prefix
 for eco in ECOSYSTEMS:
     table = model_fqn("model_registry", eco)
+    old_rows = f"card_path LIKE '{OLD_PREFIX}%'"
     if not APPLY:
         print(f"SKIP  {table}: APPLY is False")
         continue
@@ -67,17 +69,18 @@ for eco in ECOSYSTEMS:
         f"""
         UPDATE {table}
         SET card_path = CONCAT('{NEW_PREFIX}', SUBSTRING(card_path, {len(OLD_PREFIX) + 1}))
-        WHERE card_path LIKE '{OLD_PREFIX}%'
+        WHERE {ecosystem_predicate(eco, old_rows)}
         """
     )
-    print(f"OK  updated {table}")
+    print(f"OK  updated {table} for {eco}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Rows still on the old prefix
 for eco in ECOSYSTEMS:
     table = model_fqn("model_registry", eco)
+    old_rows = f"card_path LIKE '{OLD_PREFIX}%'"
     left = spark.sql(
-        f"SELECT COUNT(*) AS n FROM {table} WHERE card_path LIKE '{OLD_PREFIX}%'"
+        f"SELECT COUNT(*) AS n FROM {table} WHERE {ecosystem_predicate(eco, old_rows)}"
     ).first()["n"]
     print(f"{table}: {left} row(s) still on the old prefix")

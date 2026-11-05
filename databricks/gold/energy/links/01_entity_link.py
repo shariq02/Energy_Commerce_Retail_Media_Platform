@@ -12,22 +12,14 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** `energy_gold.entity_link` -- Silver's own `register_link`
-# MAGIC rows plus every real, non-fuzzy FK already present as a plain attribute
-# MAGIC column elsewhere (unit-operator, unit-location, unit-support, unit-
-# MAGIC authorisation, plant-unit, connection-point-location/network/operator,
-# MAGIC operator-change previous/new operator, redispatch event-to-plant).
-# MAGIC `redispatch`'s intervention-to-plant link resolves Silver's already-
-# MAGIC decided exact-normalised name match (`affected_unit_match_name`/
-# MAGIC `_confidence`) to `power_plant_register`'s key by re-applying the exact
-# MAGIC same normalisation, not by re-deriving the match itself -- no fuzzy
-# MAGIC logic lives here. `parent_resolved`/`linked_resolved` check against
-# MAGIC this notebook's own entity-kind labels ("unit", "market_actor", ...);
-# MAGIC `register_link`'s own `parent_type`/`linked_type` values are carried
-# MAGIC through as-is and only resolve if they already match that vocabulary --
-# MAGIC verify against a real run before trusting a False there. Grain:
-# MAGIC relationship type x parent x linked (with an ordinal for any exact
-# MAGIC repeats).
+# MAGIC **Purpose:** `energy_gold.entity_link`: Silver's `register_link` rows plus every
+# MAGIC non-fuzzy FK that is already an attribute column (unit-operator, unit-location,
+# MAGIC unit-support, unit-authorisation, plant-unit, connection-point links,
+# MAGIC operator-change, redispatch event-to-plant). The redispatch intervention-to-plant
+# MAGIC link reuses Silver's exact-normalised name match; no fuzzy logic lives here.
+# MAGIC `parent_resolved` and `linked_resolved` check against this notebook's entity-kind
+# MAGIC labels; verify a False against a real run. Grain: relationship type x parent x
+# MAGIC linked, with an ordinal for exact repeats.
 
 # COMMAND ----------
 

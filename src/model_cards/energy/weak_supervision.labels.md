@@ -1,6 +1,6 @@
 # Model card: weak_supervision.labels
 
-_model `label_model`, dataset `weak_supervision`, frozen version 2, primary metric `coverage` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `label_model`, dataset `weak_supervision`, frozen version 2, primary metric `coverage` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `label_model`, dataset `weak_supervision`, frozen version 2, primary metr
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R02, R06
+- rules applied: R02, R06, R10
 
 ## Purpose and task
 
@@ -36,7 +36,7 @@ _model `label_model`, dataset `weak_supervision`, frozen version 2, primary metr
 
 ## Training
 
-- model family: label_model; MLflow run `285b09e3bb8f44fa966137b42024a406`
+- model family: label_model; MLflow run `9123d4462f9a420394df50b6cf0c9de8`
 - parameters: {'em_iterations': 50, 'note': 'two correlated functions; accuracies not identifiable', 'applies_to': 'entity types with two or more functions'}
 - library versions: none beyond the standard numerical stack
 - processor type: not recorded for the training and evaluation runs
@@ -63,7 +63,7 @@ _model `label_model`, dataset `weak_supervision`, frozen version 2, primary metr
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

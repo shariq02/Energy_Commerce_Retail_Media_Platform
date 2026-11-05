@@ -1,6 +1,6 @@
 # Model card: load.load
 
-_model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lo
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -36,7 +36,7 @@ _model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lo
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `e45bd9d3d2c244ed80b585739d3283e5`
+- model family: gbt_sklearn; MLflow run `57c0356d875540bf9a3dbd5f1ffc54b2`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -66,7 +66,7 @@ _model `gbt_sklearn`, dataset `load`, frozen version 0, primary metric `mae` (lo
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 4 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

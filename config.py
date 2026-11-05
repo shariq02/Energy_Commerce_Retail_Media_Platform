@@ -52,7 +52,6 @@ QUALITY_DIR = SRC_DIR / "quality"
 # Application directories
 FASTAPI_DIR = PROJECT_ROOT / "fastapi"
 DATABRICKS_DIR = PROJECT_ROOT / "databricks"
-TERRAFORM_DIR = PROJECT_ROOT / "terraform"
 GRAFANA_DIR = PROJECT_ROOT / "grafana"
 AI_DIR = PROJECT_ROOT / "ai"
 POSTGRES_DIR = PROJECT_ROOT / "postgres"
@@ -171,7 +170,6 @@ DATABRICKS_CONFIG = {
         "energy_gold": "energy_gold",
         "shared_conformed": "shared_conformed",
         "quality": "quality",
-        "eda": "eda",
     },
 }
 

@@ -1,0 +1,10 @@
+# The retrieval stack of the curated corpus. The parent commands read this file.
+# embedders: extra dense retrievers (built by run_all, from the same chunks)
+# rerank: reorder the fused top by the cached reranker scores (run_rerank makes them)
+# judge_*: the local judge (fitted by the quality flow); each is a switch
+embedders: [gte-modernbert-base]
+rerank: false
+rerank_candidates: null
+judge_filter: false
+judge_gate: false
+judge_relevance: false

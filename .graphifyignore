@@ -1,0 +1,4 @@
+# graphify: keep every archive folder out of the graph
+archive/
+docs/archive/
+docs

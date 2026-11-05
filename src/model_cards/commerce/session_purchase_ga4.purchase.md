@@ -1,6 +1,6 @@
 # Model card: session_purchase_ga4.purchase
 
-_model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary 
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -36,9 +36,9 @@ _model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary 
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `ca4d9bf7143b4fe78c0f684e7dcc2f15`
+- model family: gbt_sklearn; MLflow run `7929859b36e8498da155cfae64d5ed12`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
-- library versions: sklearn 1.6.1
+- library versions: sklearn 1.7.2
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -65,7 +65,7 @@ _model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary 
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

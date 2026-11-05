@@ -88,3 +88,15 @@ def test_missing_settings_stop_with_a_message(model_dir, monkeypatch, capsys):
     monkeypatch.setattr(mu, "file_settings", lambda env=None: None)
     assert mu.main(["--model-dir", str(model_dir), "--apply"]) == 1
     assert "DATABRICKS_TOKEN" in capsys.readouterr().out
+
+
+def test_the_target_folder_follows_the_embedder(model_dir, monkeypatch):
+    profile = emb.GTE_MODERNBERT
+    assert mu.remote_dir(profile).endswith(f"/models/{profile.id}")
+    assert mu.REMOTE_DIR.endswith(f"/models/{emb.MODEL_ID}")
+    monkeypatch.setattr(emb, "profile_hashes", lambda p, d=None: emb.model_hashes(d))
+    api = FakeApi()
+    argv = ["--embedder", profile.slug, "--model-dir", str(model_dir), "--apply"]
+    assert mu.main(argv, api=api, make_volume=lambda: None) == 0
+    assert f"{mu.remote_dir(profile)}/{emb.MODEL_FILE}" in api.files
+    assert not any(path.startswith(mu.REMOTE_DIR) for path in api.files)

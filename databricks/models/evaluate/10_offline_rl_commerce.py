@@ -65,3 +65,16 @@ rid = model_run_id()
 
 # DBTITLE 1,Evaluate rl_session_sequences.policy
 evaluate_by_id("rl_session_sequences.policy", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "evaluate__10_offline_rl_commerce",
+    "Evaluate Offline Policies Commerce",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["rl_session_sequences.policy"],
+    smoke=SMOKE,
+)

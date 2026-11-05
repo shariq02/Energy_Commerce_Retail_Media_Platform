@@ -73,3 +73,16 @@ SPEC = {
 
 # DBTITLE 1,Run the regression candidates
 run_regression(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__09_capacity_additions",
+    "Model Capacity Additions",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["capacity_additions.additions"],
+    smoke=SMOKE,
+)

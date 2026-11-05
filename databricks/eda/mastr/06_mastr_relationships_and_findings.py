@@ -12,18 +12,12 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** Cross-table checks across all 28 MaStR Bronze tables. The
-# MAGIC own-entity key of each table is taken from an exact distinct-count (not
-# MAGIC the HLL estimate), and every join is checked against an EXPLICIT
-# MAGIC relationship spec -- child key column, parent key column, both resolved
-# MAGIC case-insensitively because MaStR's field names drift in case
-# MAGIC (EegMaStRNummer vs EegMastrNummer). For each relationship: orphan rate,
-# MAGIC unused-parent count, and a full cardinality profile (child rows, distinct
-# MAGIC child keys, parents referenced, child-rows-per-parent distribution, max
-# MAGIC fan-out). Also: every coded column in 01-04 reconciled against the
-# MAGIC reference catalogs (05), cross-table event-date ordering on the shared
-# MAGIC EinheitMastrNummer, and cross-carrier coordinate agreement. Key sets are
-# MAGIC collected and reconciled with Python set math.
+# MAGIC **Purpose:** cross-table checks over the 28 MaStR Bronze tables. Keys come from
+# MAGIC an exact distinct-count. Each join follows an explicit relationship spec (columns
+# MAGIC matched case-insensitively) and reports orphan rate, unused parents and the
+# MAGIC cardinality profile. It also reconciles the coded columns of 01-04 with the
+# MAGIC reference catalogs (05), checks event-date order on `EinheitMastrNummer`, and
+# MAGIC compares coordinates across carriers.
 
 # COMMAND ----------
 

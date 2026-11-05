@@ -8,7 +8,8 @@ Curated corpus: one node per unit; edges follow from the unit headers by rule, w
 no model. `rule_of` runs from a rule to the contract of its source. `same_source`
 joins units that share a source entry. `same_grain` joins metrics with the same
 grain line. The graph is written as two text files, one record per line, sorted.
-Wikipedia corpus: the edge file of the corpus is the graph; only a record is made.
+Wikipedia corpus: the edge file of the corpus is the graph; a record is made and the
+file is copied into the folder of the build.
 Library only.
 """
 
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from collections import defaultdict
 from itertools import combinations
 from pathlib import Path
@@ -88,6 +90,12 @@ def write_graph(directory: Path, nodes: list[dict], edges: list[dict]) -> dict:
         "directory": directory.name,
         "version": graph_version(directory),
     }
+
+
+def copy_edges(source: Path, directory: Path) -> None:
+    """Keep a copy of the Wikipedia edge file in the folder of a build."""
+    directory.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, directory / EDGES_FILE)
 
 
 def wikipedia_graph_record(article_count: int, edges: dict) -> dict:

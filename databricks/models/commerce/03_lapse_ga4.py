@@ -65,3 +65,16 @@ SPEC = {
 
 # DBTITLE 1,Run the classification candidates
 run_classification(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "commerce__03_lapse_ga4",
+    "Model Lapse Ga4",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["lapse_ga4.return"],
+    smoke=SMOKE,
+)

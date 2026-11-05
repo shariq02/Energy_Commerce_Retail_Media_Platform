@@ -4,7 +4,7 @@
 # Keep __pycache__ out of the tree for every recipe below.
 export PYTHONDONTWRITEBYTECODE := 1
 
-.PHONY: help setup setup-dev test test-unit test-integration test-regression test-performance lint lint-fix terraform-init terraform-plan terraform-apply terraform-destroy grafana-start api-start gcp-auth clean
+.PHONY: help setup setup-dev test test-unit test-integration test-regression test-performance lint lint-fix grafana-start api-start gcp-auth clean
 
 help:
 	@echo "ECRMAP - Ecosystem-Centric Real-World Multi-Domain Analytics Platform - Available Commands"
@@ -25,12 +25,8 @@ help:
 	@echo "  lint               - Run ruff linter"
 	@echo "  lint-fix           - Auto-fix ruff errors"
 	@echo ""
-	@echo "GCP / TERRAFORM"
+	@echo "GCP"
 	@echo "  gcp-auth           - Authenticate gcloud application-default credentials"
-	@echo "  terraform-init     - Initialise Terraform"
-	@echo "  terraform-plan     - Show Terraform execution plan"
-	@echo "  terraform-apply    - Apply Terraform changes to GCP"
-	@echo "  terraform-destroy  - Destroy all Terraform-managed GCP resources"
 	@echo ""
 	@echo "SERVICES"
 	@echo "  grafana-start      - Start Grafana"
@@ -83,24 +79,12 @@ lint-fix:
 	ruff check --fix --unsafe-fixes .
 
 # ====================================================================
-# GCP / TERRAFORM
+# GCP
 # ====================================================================
 
 gcp-auth:
 	gcloud auth login
 	gcloud auth application-default login
-
-terraform-init:
-	cd terraform && terraform init
-
-terraform-plan:
-	cd terraform && terraform plan
-
-terraform-apply:
-	cd terraform && terraform apply
-
-terraform-destroy:
-	cd terraform && terraform destroy
 
 # ====================================================================
 # SERVICES

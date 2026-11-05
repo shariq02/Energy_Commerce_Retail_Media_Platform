@@ -37,10 +37,7 @@ for eco in MODEL_ECOSYSTEMS:
 # DBTITLE 1,Create the registry tables
 for eco in MODEL_ECOSYSTEMS:
     for name, ddl in MODEL_DDL.items():
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} ({ddl}) USING delta"
-        )
-        print(f"OK  registry table ready: {model_fqn(name, eco)}")
+        print(f"OK  registry table ready: {create_model_table(name, ddl, eco)}")
 
 # COMMAND ----------
 

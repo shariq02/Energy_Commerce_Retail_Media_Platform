@@ -1,6 +1,6 @@
 # Model card: zone_generation.generation
 
-_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R04
+- rules applied: R04, R10
 
 ## Purpose and task
 
@@ -36,9 +36,9 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 
 ## Training
 
-- model family: gbt_lightgbm; MLflow run `5cc0cef088374428907bef305222d7ae`
+- model family: gbt_lightgbm; MLflow run `69c957537b174bae888a5bc912f45ebb`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.7.0
+- library versions: lightgbm 4.6.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -66,7 +66,7 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 4 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

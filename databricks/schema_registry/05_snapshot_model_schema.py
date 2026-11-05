@@ -75,11 +75,13 @@ print(f"OK  registry directory: {REGISTRY_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Discover the model schemas -- every *_ml_models schema
+# DBTITLE 1,Discover the model schemas -- ml_models and every *_ml_models schema
 _all_schemas = sorted(
     r["databaseName"] for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
 )
-MODEL_SCHEMA_LIST = tuple(s for s in _all_schemas if s.endswith("_ml_models"))
+MODEL_SCHEMA_LIST = tuple(
+    s for s in _all_schemas if s == "ml_models" or s.endswith("_ml_models")
+)
 print(f"discovered {len(MODEL_SCHEMA_LIST)} model schema(s): {list(MODEL_SCHEMA_LIST)}")
 
 # COMMAND ----------

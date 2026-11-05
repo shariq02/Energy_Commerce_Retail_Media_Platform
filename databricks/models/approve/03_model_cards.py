@@ -162,14 +162,28 @@ for eco in ("energy", "commerce"):
         .select(*CONTEXT_FIELDS)
         .collect()
     ]
-    params = {
-        (r["task_id"], r["model_name"]): r["params"]
-        for r in read_model("candidate_results", ecosystem=eco)
-        .filter(~F.col("smoke") & (F.col("status") == "ok"))
-        .select("task_id", "model_name", "params")
-        .distinct()
-        .collect()
-    }
+    params = {}
+    for table in ("candidate_results", "foundation_results"):
+        if not spark.catalog.tableExists(model_fqn(table, eco)):
+            continue
+        params.update(
+            {
+                (r["task_id"], r["model_name"]): r["params"]
+                for r in read_model(table, ecosystem=eco)
+                .filter(~F.col("smoke") & (F.col("status") == "ok"))
+                .select("task_id", "model_name", "params")
+                .distinct()
+                .collect()
+            }
+        )
+    if spark.catalog.tableExists(model_fqn("foundation_run_context", eco)):
+        fit_context += [
+            r.asDict()
+            for r in read_model("foundation_run_context", ecosystem=eco)
+            .filter(~F.col("smoke") & (F.col("status") == "finished"))
+            .select(*CONTEXT_FIELDS)
+            .collect()
+        ]
     evidence[eco] = (spec, approvals, results, flags, eval_context, fit_context, params)
     print(f"{eco}: {len(approvals)} decision row(s)")
 
@@ -228,3 +242,18 @@ for eco, items in cards.items():
         with open(_os.path.join(folder, f"{tid}.md"), "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"OK  {eco}/{tid}.md")
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "approve__03_model_cards",
+    "Model Cards",
+    [],
+    rid,
+    notes={
+        eco: [f"{len(items)} card(s) written to src/model_cards/{eco}"]
+        for eco, items in cards.items()
+    },
+)

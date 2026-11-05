@@ -39,6 +39,38 @@ def abs_error_full(variable, circular, truth, pred):
 
 # COMMAND ----------
 
+# DBTITLE 1,Event cap settings for a slow reconstruction model
+
+# MOMENT reads one 512-value window per mask event, about 0.2 to 0.5 s on a CPU, so a
+# task that forwards it scores the first events of each variable, for every model
+SLOW_RECON_MODELS = ("moment_zero_shot",)
+SLOW_RECON_EVENTS_PER_VARIABLE = 500
+
+# COMMAND ----------
+
+# DBTITLE 1,Event cap functions
+
+
+def recon_event_cap(models):
+    """Events per variable when a slow reconstruction model is forwarded, else None."""
+    names = {m.get("model_name") for m in models}
+    return SLOW_RECON_EVENTS_PER_VARIABLE if names & set(SLOW_RECON_MODELS) else None
+
+
+def cap_events(events: dict, cap) -> tuple:
+    """(events, kept, drawn, digest). The draw is random, so the first `cap` events of
+    a variable are a random subset, and a larger cap keeps them."""
+    drawn = sum(len(v) for v in events.values())
+    if not cap:
+        return events, drawn, drawn, ""
+    out = {j: list(v[:cap]) for j, v in events.items()}
+    text = repr(sorted((j, tuple(v)) for j, v in out.items()))
+    digest = _hashlib.sha256(text.encode()).hexdigest()[:8]
+    return out, sum(len(v) for v in out.values()), drawn, digest
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Reconstruction evaluator
 
 
@@ -47,6 +79,7 @@ class ReconstructionEvaluator(Evaluator):
     events are drawn again, so the validation result cannot be reproduced."""
 
     can_reproduce = False
+    event_cap = None
 
     def _series(self, df, cfg):
         d = df
@@ -73,6 +106,7 @@ class ReconstructionEvaluator(Evaluator):
         )
         rng = np.random.default_rng(self.ctx.thresholds["reconstruction_event_seed"])
         self.sets, self.data = [], {}
+        kept_total, drawn_total, digests = 0, 0, []
         for cfg in self.spec["sets"]:
             steps = _lengths_in_steps(lengths, cfg["step_hours"])
             sset = self._series(df_eval, cfg)
@@ -87,13 +121,26 @@ class ReconstructionEvaluator(Evaluator):
                     np.arange(len(lens)),
                     EVAL_EVENTS_PER_VARIABLE,
                 )
+            events, kept, drawn, digest = cap_events(events, self.event_cap)
+            kept_total, drawn_total = kept_total + kept, drawn_total + drawn
+            digests.append(digest)
+            for j in events:
                 self.data[(cfg["name"], j)] = build_examples(sset, j, events[j])
             self.sets.append((cfg, sset, events))
         total = sum(len(v[1]) for v in self.data.values())
-        _FRAME_NOTES.append(
-            {"read": {"partition": self.ctx.partition, "events": int(total)}}
-        )
-        self.frames["eval"] = pd.DataFrame({"events": [total]})
+        read = {
+            "partition": self.ctx.partition,
+            "mask_events": kept_total,
+            "of_mask_events": drawn_total,
+            "masked_steps": int(total),
+        }
+        _FRAME_NOTES.append({"read": read})
+        if self.event_cap:
+            self.sample_note = (
+                f" (event sample {kept_total} of {drawn_total}, {self.event_cap} per "
+                f"variable, hash {'-'.join(digests)})"
+            )
+        self.frames["eval"] = pd.DataFrame({"masked_steps": [total]})
 
     def _predict(self, bundle, cfg, sset, events, j, x):
         name = cfg["name"]

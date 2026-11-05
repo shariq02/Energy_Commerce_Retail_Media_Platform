@@ -12,19 +12,11 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** create the four Silver schemas (`energy_silver`,
-# MAGIC `energy_silver_reference`, `commerce_silver`,
-# MAGIC `commerce_silver_reference`), the shared `quality.quarantine` table, and
-# MAGIC compute + load the shared `quality.field_class_registry` directly from
-# MAGIC `src/schemas/_generate_field_classes.py`'s `build_rows()` -- no committed
-# MAGIC CSV is read or required; a newly added Silver table is picked up the next
-# MAGIC time this notebook runs, and setup hard-fails immediately (before any
-# MAGIC Silver notebook runs) if a real `write_silver()` call has no declared
-# MAGIC classification anywhere. Idempotent -- safe to re-run.
-# MAGIC
-# MAGIC The `quality.pipeline_watermarks` and `quality.quality_audit_log` tables
-# MAGIC already exist (`databricks/setup/00_create_schemas.py`); this notebook
-# MAGIC only asserts them.
+# MAGIC **Purpose:** create the six Silver schemas and the shared `quality.quarantine`
+# MAGIC table, and load `quality.field_class_registry` from `build_rows()` in
+# MAGIC `src/schemas/_generate_field_classes.py`. Setup fails at once if a
+# MAGIC `write_silver()` call has no declared classification. It asserts the `quality`
+# MAGIC tables from `00_create_schemas.py`. Safe to re-run.
 
 # COMMAND ----------
 
@@ -44,6 +36,8 @@ SILVER_SCHEMAS = (
     "energy_silver_reference",
     "commerce_silver",
     "commerce_silver_reference",
+    "genomics_silver",
+    "genomics_silver_reference",
 )
 VALID_TARGET_SCHEMAS = set(SILVER_SCHEMAS)
 
@@ -87,7 +81,7 @@ CREATE TABLE IF NOT EXISTS {FIELD_CLASS_TABLE} (
     target_schema    STRING NOT NULL
 )
 USING DELTA
-COMMENT 'One central registry for every Silver table across every ecosystem. Seeded from the source contracts + mappings + the fixed Silver governance column set; target_schema resolves which of the four Silver schemas each table belongs to. Silver notebooks validate against it; they never author it.'
+COMMENT 'One central registry for every Silver table across every ecosystem. Seeded from the source contracts + mappings + the fixed Silver governance column set; target_schema resolves which of the six Silver schemas each table belongs to. Silver notebooks validate against it; they never author it.'
 """)
 print(f"OK  table ready: {FIELD_CLASS_TABLE}")
 
@@ -97,6 +91,7 @@ print(f"OK  table ready: {FIELD_CLASS_TABLE}")
 if repo_root() not in _sys.path:
     _sys.path.insert(0, repo_root())
 from src.schemas._generate_field_classes import (
+    _genomics_namespace,
     _semantic_namespace,
     assert_registry_complete,
     build_rows,
@@ -148,10 +143,15 @@ print(f"OK  {FIELD_CLASS_TABLE}: loaded {len(rows)} rows (generated in-process)"
 # Unity Catalog allows 100 tables per schema; stop here rather than mid-run.
 SCHEMA_TABLE_QUOTA = 100
 _ns = _semantic_namespace()
+_gns = _genomics_namespace()
 _planned = {*_ns["SEMANTIC_STRUCTURES"], *_ns["SEMANTIC_MEMBER_STRUCTURES"]}
+_planned_genomics = _gns["GENOMICS_REFERENCE_TABLES"] | _gns["GENOMICS_MAIN_TABLES"]
 for _schema in SILVER_SCHEMAS:
     _existing = {t.name for t in spark.catalog.listTables(f"{CATALOG}.{_schema}")}
     _new = {t for t in _planned if _ns["semantic_target_schema"](t) == _schema}
+    _new |= {
+        t for t in _planned_genomics if _gns["genomics_target_schema"](t) == _schema
+    }
     _total = len(_existing | _new)
     print(f"{_schema}: {_total} tables once every Silver structure exists")
     if _total > SCHEMA_TABLE_QUOTA:

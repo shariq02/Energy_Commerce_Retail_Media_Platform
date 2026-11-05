@@ -69,3 +69,16 @@ evaluate_by_id("rl_pumped_storage.policy", rid, SMOKE)
 
 # DBTITLE 1,Evaluate rl_redispatch.policy
 evaluate_by_id("rl_redispatch.policy", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__07_offline_rl_energy",
+    "Evaluate Offline Policies Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["rl_pumped_storage.policy", "rl_redispatch.policy"],
+    smoke=SMOKE,
+)

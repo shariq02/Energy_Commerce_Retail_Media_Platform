@@ -10,7 +10,7 @@
 #
 # Rules (do not violate when editing):
 # - Allowed `ecosystem` values are a closed, governed vocabulary -- currently
-#   `energy` and `commerce` are populated. `mobility` / `healthcare` /
+#   `energy`, `commerce` and `genomics` are populated. `mobility` / `healthcare` /
 #   `agriculture` are added here only once that ecosystem's sources are
 #   actually acquired -- adding a new ecosystem value to this file is a
 #   governed change requiring an architecture decision and review.
@@ -32,6 +32,7 @@ schema:
 allowed_ecosystems:
   - energy
   - commerce
+  - genomics        # added 2026-11-05
   # - mobility      # add only when Mobility & Electrification sources are acquired, as a governed change
   # - healthcare    # add only when Healthcare sources are acquired, as a governed change
   # - agriculture   # add only when Agriculture sources are acquired, as a governed change
@@ -61,6 +62,106 @@ mappings:
   - source_system: ga4
     ecosystem: commerce
     first_mapped: "2026-09-15"
+  # genomics: one entry per source folder of genomics_bronze
+  - source_system: alphamissense
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: biogrid
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: cadd
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: chembl
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: clingen
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: clinvar
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: clinvar_vs_benign
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: cpic
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: dbvar
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: encode
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: faers
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: fda
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: gencode
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: gnomad
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: gnomad_balanced
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: gtex
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: gtr
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: hpo
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: long_range_benchmark
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: maps_embeddings
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: medgen
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: ncbi_gene
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: opentargets
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: pharmgkb
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: proteingym
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: reactome
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: refseq
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: spectralbio
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: string
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: tahoe
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: tcga
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: ucsc_conservation
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
+  - source_system: uniprot
+    ecosystem: genomics
+    first_mapped: "2026-11-05"
 
 # `rees46` was provisionally mapped to `energy` before `commerce` existed as an
 # ecosystem; corrected above now that Commerce Bronze (ga4) has landed.

@@ -81,6 +81,15 @@ def load_silver_common() -> dict:
     )
 
 
+def load_genomics_common() -> dict:
+    """`_silver_common.py`, then `_genomics_common.py`: the `%run` chain of the
+    genomics Silver notebooks (pure functions only, as in `load_silver_common`)."""
+    namespace = load_silver_common()
+    return _exec_notebook(
+        REPO_ROOT / "databricks" / "silver" / "_genomics_common.py", namespace
+    )
+
+
 def load_gold_common() -> dict:
     """Same as `load_silver_common`, then layers `_gold_common.py` on top --
     reproducing the real notebook's own `%run ../silver/_silver_common` before
@@ -158,6 +167,25 @@ def load_eval_libs() -> dict:
     return namespace
 
 
+def load_foundation_libs() -> dict:
+    """The model libraries, then the foundation libraries in the order the foundation
+    notebooks `%run` them."""
+    namespace = load_model_libs()
+    for name in (
+        "_fit_foundation_ts",
+        "_fit_foundation_tab",
+        "_fit_foundation_anomaly",
+        "_fit_foundation_survival",
+        "_fit_foundation_rank",
+        "_fit_foundation_rl",
+        "_fit_foundation_stack",
+    ):
+        _exec_notebook(
+            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
+        )
+    return namespace
+
+
 def load_approval_libs() -> dict:
     """The model shared library, then the approval libraries in the order the
     approval notebooks `%run` them."""
@@ -181,10 +209,15 @@ def load_registry_libs() -> dict:
 
 
 def load_operate_libs() -> dict:
-    """The evaluation libraries, then the registry, operate-rules and
-    operate-windows libraries in the order the operate notebooks `%run` them."""
+    """The evaluation libraries, then the registry, operate-rules, operate-windows
+    and operate-requests libraries in the order the operate notebooks `%run` them."""
     namespace = load_eval_libs()
-    for name in ("_registry_rules", "_operate_rules", "_operate_windows"):
+    for name in (
+        "_registry_rules",
+        "_operate_rules",
+        "_operate_windows",
+        "_operate_requests",
+    ):
         _exec_notebook(
             REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
         )

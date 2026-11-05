@@ -78,3 +78,16 @@ SPEC = {
 
 # DBTITLE 1,Run the policy candidates
 run_action_policy(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__17_rl_redispatch",
+    "Model Redispatch Policy",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["rl_redispatch.policy"],
+    smoke=SMOKE,
+)

@@ -15,7 +15,9 @@
 # MAGIC **Purpose:** check the registry record. Hard failures: an approved task without its
 # MAGIC registered model and fallback, an entry for a task that is not approved,
 # MAGIC an entry that differs from its approval row, an entry without a run, at
-# MAGIC another frozen version or without a card, and version numbers with a gap.
+# MAGIC another frozen version or without a card, version numbers with a gap, a row that
+# MAGIC holds only some of the code, data, file and task versions, and a recorded version
+# MAGIC that no longer matches.
 
 # COMMAND ----------
 
@@ -248,5 +250,48 @@ check(
     not _gaps,
     detail=f"entry, versions: {_gaps}",
     metric_value=float(len(_gaps)),
+    rid=rid,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,A version row holds all the version fields or none
+_partial = [
+    problem
+    for registry, _a in record.values()
+    for problem in version_field_problems(registry)
+]
+print(
+    "version rows without recorded versions: "
+    f"{sum(versions_not_recorded(registry) for registry, _a in record.values())}"
+)
+check(
+    COMPONENT,
+    SOURCE,
+    "version_fields_are_complete_or_absent",
+    not _partial,
+    detail=f"task, model, role, version, lacking: {_partial}",
+    metric_value=float(len(_partial)),
+    rid=rid,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,The recorded version fields still match the task, the data and the file
+_changed = []
+for registry, _a in record.values():
+    live = [
+        r
+        for r in latest_versions(registry).values()
+        if r["lifecycle_status"] != "retired"
+    ]
+    _changed += version_field_mismatches(live)
+check(
+    COMPONENT,
+    SOURCE,
+    "recorded_version_fields_match",
+    not _changed,
+    detail=f"task, model, version, field: {_changed}",
+    metric_value=float(len(_changed)),
     rid=rid,
 )

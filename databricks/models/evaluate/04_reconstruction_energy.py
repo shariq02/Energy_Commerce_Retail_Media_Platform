@@ -70,3 +70,19 @@ evaluate_by_id("weather_imputation.reconstruction", rid, SMOKE)
 
 # DBTITLE 1,Evaluate self_supervised_other.reconstruction
 evaluate_by_id("self_supervised_other.reconstruction", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__04_reconstruction_energy",
+    "Evaluate Reconstruction Models Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=[
+        "weather_imputation.reconstruction",
+        "self_supervised_other.reconstruction",
+    ],
+    smoke=SMOKE,
+)

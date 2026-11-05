@@ -1,6 +1,6 @@
 # Model card: rl_redispatch.policy
 
-_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 - recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: R09
+- rules applied: R09, R10
 
 ## Purpose and task
 
@@ -37,7 +37,7 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 
 ## Training
 
-- model family: reward_weighted_gbt_sklearn; MLflow run `953f1c391ea3456c9356c1ac7e831d4a`
+- model family: reward_weighted_gbt_sklearn; MLflow run `80a0ff0069054e87bebf4b1ec903de8c`
 - parameters: {'row_fraction': 1.0}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -65,7 +65,7 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

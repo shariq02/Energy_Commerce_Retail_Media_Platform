@@ -1,0 +1,502 @@
+# Genomics Silver rules: placeholders, assembly labels, review stars, precedence
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: November 2026
+#
+# Read by databricks/silver/_genomics_common.py. Precedence entries are
+# "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
+
+version: 1
+
+placeholders:
+  general: ["", "-", "na", "NA", "N/A", "n/a", "[]"]
+  # Per column; a TCGA allele "-" is a real empty allele, so it is not listed.
+  by_column:
+    "tcga.mc3_somatic_mutations.Entrez_Gene_Id": ["0"]
+    "tcga.mc3_somatic_mutations.dbSNP_RS": ["novel"]
+    "tcga.mc3_somatic_mutations.HGVSp_Short": ["."]
+    # ClinVar writes -1 where a variant has no dbSNP id or no gene.
+    "clinvar.variant_summary.RS_dbSNP": ["-1"]
+    "clinvar.variant_summary.GeneID": ["-1"]
+
+# gene2refseq names the assembly in free text; the first matching pattern wins.
+assembly_labels:
+  - pattern: "^Reference GRCh38.*Primary Assembly$"
+    label: "GRCh38"
+  - pattern: "T2T-CHM13"
+    label: "T2T-CHM13v2.0"
+
+# UCSC genome names -> assembly labels (AlphaMissense writes `hg38`).
+ucsc_assembly_names:
+  hg38: GRCh38
+  hg19: GRCh37
+
+# ClinVar review status -> stars (ClinVar's own scale; conflicting = 1).
+clinvar_review_stars:
+  "practice guideline": 4
+  "reviewed by expert panel": 3
+  "criteria provided, multiple submitters, no conflicts": 2
+  "criteria provided, single submitter": 1
+  "criteria provided, conflicting classifications": 1
+  "no assertion criteria provided": 0
+  "no classification provided": 0
+  "no classification for the single variant": 0
+
+# Id type labels that name one database (keys lower case, "_" for spaces).
+id_type_aliases:
+  mim: omim
+  geneid: ncbi_gene
+  uniprotkb: uniprot
+  ordo: orphanet
+  orpha: orphanet
+  msh: mesh
+  hp: hpo
+  umls_cui: umls
+
+# STRING alias sources that hold another database's protein id: the first
+# matching pattern gives the id type. The first run lists every alias source
+# with its count; add the ones that hold ids here.
+string_alias_id_types:
+  - pattern: "(?i)uniprot.*(_ac|accession)$"
+    id_type: uniprot
+
+# Keyword rules of the text-derived attributes (case-insensitive patterns).
+text_rules:
+  gene_function:
+    is_kinase: "kinase"
+    is_receptor: "receptor"
+    is_enzyme: "enzyme|dehydrogenase|oxidase|reductase|synthase|synthetase|transferase|ligase|isomerase|hydrolase|protease|peptidase|phosphatase|atpase|gtpase"
+    is_phosphatase: "phosphatase"
+    is_transporter: "transport"
+    is_gpcr: "g protein.coupled receptor|gpcr"
+    is_transcription_factor: "transcription factor|dna.binding protein"
+    is_channel: "channel|pore"
+    is_membrane_protein: "membrane|transmembrane"
+    is_growth_factor: "growth factor"
+    is_structural: "structural|cytoskeleton|collagen|tubulin|actin"
+    is_regulatory: "regulat|modulat"
+    is_metabolic: "metabol"
+    is_dna_binding: "dna binding"
+    is_rna_binding: "rna binding"
+    is_ubiquitin_related: "ubiquitin"
+    is_protease: "protease|peptidase"
+    has_glycoprotein: "glycoprotein"
+    has_binding_keyword: "binding"
+  gene_location:
+    nuclear: "nuclear|nucleus"
+    mitochondrial: "mitochondri"
+    cytoplasmic: "cytoplasm|cytosol|cytoplasmic"
+    membrane: "membrane|transmembrane"
+    extracellular: "extracellular|secreted|plasma"
+    endoplasmic_reticulum: "endoplasmic|reticulum|\\ber\\b"
+    golgi: "golgi"
+    lysosomal: "lysosom"
+    peroxisomal: "peroxisom"
+  gene_process:
+    cell_signaling: "signal transduction|signaling"
+    metabolism: "metabol"
+    transport: "transport|carrier"
+    transcription_regulation: "transcription factor|dna binding"
+    dna_repair_replication: "repair|replication"
+    immune_response: "immun|defense"
+    apoptosis: "apoptosis|cell death"
+    cell_cycle: "cell cycle|mitosis"
+    cell_growth: "growth|proliferation"
+  # Keywords of the `Other_designations` text (old gene notebook).
+  gene_designation:
+    has_glycoprotein: "glycoprotein"
+    has_receptor_keyword: "receptor"
+    has_enzyme_keyword: "enzyme"
+    has_kinase_keyword: "kinase"
+    has_binding_keyword: "binding"
+  # Keywords of the gene description text (old description enrichment notebook).
+  gene_description_keywords:
+    has_cancer_keyword: "cancer|carcinoma|tumor|tumour|oncogene|malignancy|neoplasm"
+    has_syndrome_keyword: "syndrome|disorder|disease"
+    has_deficiency_keyword: "deficiency|defect|insufficiency"
+    has_kinase_in_description: "kinase|phosphorylat"
+    has_receptor_in_description: "receptor|binding protein"
+    has_enzyme_in_description: "dehydrogenase|oxidase|reductase|synthase|synthetase|transferase|ligase|isomerase|hydrolase|protease|peptidase|phosphatase|atpase|gtpase"
+    has_transcription_in_description: "transcription|zinc finger|homeobox|forkhead|helix-loop|hox"
+    has_transporter_in_description: "transporter|channel|carrier|solute|pump|abc"
+    has_signaling_in_description: "signal|gtpase|g protein|ras |rac |rho |mapk"
+    has_structural_in_description: "structural|cytoskeleton|actin|tubulin|collagen|laminin"
+    has_membrane_in_description: "membrane|transmembrane|surface"
+    has_nuclear_in_description: "nuclear|nucleus|chromatin|histone"
+    has_mitochondrial_in_description: "mitochondrial|mitochondr"
+  gene_category_text:
+    pseudogene: "pseudogene"
+    uncharacterized: "uncharacterized"
+    regulatory: "enhancer|lincRNA|antisense"
+  gene_description:
+    has_domain_in_description: "domain|repeat|motif"
+    has_subunit_info: "subunit"
+  gene_description_value:
+    protein_family: "(\\w+) family"
+    chain_type: "(alpha|beta|gamma|delta|epsilon|zeta)"
+    member_number: "member (\\d+)"
+    type_number: "type (\\d+)"
+  protein_name:
+    has_zinc_finger: "zinc finger"
+    has_kinase_in_name: "kinase"
+    has_receptor_in_name: "receptor"
+    has_sh2_domain: "SH2"
+    has_sh3_domain: "SH3"
+    has_ph_domain: "PH domain|pleckstrin"
+    has_death_domain: "death domain"
+    has_leucine_zipper: "leucine zipper"
+    has_helix_loop_helix: "helix-loop-helix"
+    has_immunoglobulin: "immunoglobulin"
+  disease_category:
+    cancer: "cancer|carcinoma|tumor|leukemia|lymphoma|melanoma|sarcoma|oncolog|neoplasm|malignancy"
+    neurological: "ataxia|dystonia|neuropathy|encephalopathy|dementia|parkinson|alzheimer|epilepsy|seizure|spastic|cerebral|neural|neurodegenerative|motor neuron"
+    metabolic: "diabetes|glycogen|lipid|metabolic|aciduria|deficiency|storage disease|mitochondrial"
+    cardiovascular: "cardiomyopathy|arrhythmia|hypertension|heart|cardiac|vascular|qt syndrome"
+    developmental: "syndrome|developmental|congenital|dysmorphia|malformation|anomalies|intellectual disability"
+    immune: "immunodeficiency|autoimmune|immune|inflammatory|lupus|arthritis"
+    muscular: "muscular dystrophy|myopathy|myasthenia|skeletal|bone"
+    hereditary: "hereditary|familial|inherited|genetic|autosomal"
+
+# Cytoband limits on the band number (digits after the arm): telomeric from
+# `telomeric_from`, centromeric up to `centromeric_to`, pericentromeric between
+# `pericentromeric_from` and `pericentromeric_to`.
+cytoband_limits:
+  telomeric_from: 20
+  centromeric_to: 5
+  pericentromeric_from: 6
+  pericentromeric_to: 12
+
+# First match wins; `all` flags must be true and `none` flags false.
+primary_function:
+  - {label: kinase, all: [is_kinase]}
+  - {label: phosphatase, all: [is_phosphatase]}
+  - {label: gpcr, all: [is_gpcr]}
+  - {label: transcription_factor, all: [is_transcription_factor]}
+  - {label: receptor, all: [is_receptor]}
+  - {label: channel, all: [is_channel]}
+  - {label: protease, all: [is_protease]}
+  - {label: growth_factor, all: [is_growth_factor]}
+  - {label: enzyme, all: [is_enzyme], none: [is_kinase, is_phosphatase, is_protease]}
+  - {label: transporter, all: [is_transporter]}
+  - {label: membrane_protein, all: [is_membrane_protein], none: [is_receptor, is_channel]}
+  - {label: structural, all: [is_structural]}
+  - {label: regulatory, all: [is_regulatory]}
+  - {label: metabolic, all: [is_metabolic]}
+  - {label: dna_binding, all: [is_dna_binding]}
+  - {label: rna_binding, all: [is_rna_binding]}
+  - {label: ubiquitin_related, all: [is_ubiquitin_related]}
+primary_function_default: other
+
+# First match wins over the function and location flags; the default is the last score.
+druggability:
+  - {score: 4.0, all: [is_kinase]}
+  - {score: 4.0, all: [is_gpcr]}
+  - {score: 3.5, all: [is_receptor, is_growth_factor]}
+  - {score: 3.0, all: [is_receptor]}
+  - {score: 3.5, all: [is_enzyme, is_protease]}
+  - {score: 3.0, all: [is_enzyme]}
+  - {score: 2.5, all: [is_phosphatase]}
+  - {score: 2.5, all: [is_transporter]}
+  - {score: 3.0, all: [is_channel]}
+  - {score: 3.5, all: [is_protease]}
+  - {score: 3.0, all: [is_growth_factor]}
+  - {score: 2.0, all: [membrane]}
+  - {score: 2.5, all: [extracellular]}
+  - {score: 1.0, all: [nuclear]}
+  - {score: 1.5, all: [cytoplasmic]}
+druggability_default: 0.5
+
+precedence:
+  gene:
+    symbol:
+      - ncbi_gene.gene_info.Symbol_from_nomenclature_authority
+      - ncbi_gene.gene_info.Symbol
+      - opentargets.target.approvedSymbol
+      - gencode.annotation.gene_name
+      - refseq.annotation.gene_name
+    full_name:
+      - ncbi_gene.gene_info.Full_name_from_nomenclature_authority
+      - opentargets.target.approvedName
+      - pharmgkb.genes.Name
+      - uniprot.entries.protein_name
+    gene_type:
+      - ncbi_gene.gene_info.type_of_gene
+      - opentargets.target.biotype
+      - gencode.annotation.gene_type
+      - refseq.annotation.gene_type
+    ensembl_id:
+      - ncbi_gene.gene_info.dbXrefs
+      - opentargets.target.id
+      - pharmgkb.genes.Ensembl_Id
+      - gencode.annotation.gene_id
+    hgnc_id:
+      - ncbi_gene.gene_info.dbXrefs
+      - pharmgkb.genes.HGNC_ID
+      - gencode.annotation.attributes
+      - opentargets.target.dbXrefs
+    description:
+      - ncbi_gene.gene_info.description
+      - opentargets.target.functionDescriptions
+  # Source order of the GRCh38 coordinate of a gene or transcript.
+  coordinate:
+    - gencode.annotation
+    - refseq.annotation
+    - ncbi_gene.gene2refseq
+    - pharmgkb.genes
+  transcript:
+    gene_key:
+      - gencode.annotation.gene_id
+      - ncbi_gene.gene2refseq.GeneID
+      - refseq.annotation.gene_id
+    protein_key:
+      - gencode.annotation.protein_id
+      - ncbi_gene.gene2refseq.protein_accession_version
+    transcript_type:
+      - gencode.annotation.transcript_type
+      - refseq.annotation.transcript_type
+    transcript_name:
+      - gencode.annotation.transcript_name
+  protein:
+    name:
+      - uniprot.entries.protein_name
+      - chembl.uniprot_mapping.target_name
+    description:
+      - string.protein_info.annotation
+    length:
+      - uniprot.entries.sequence_length
+      - string.protein_info.protein_size
+    gene_symbol:
+      - uniprot.entries.gene_name
+      - string.protein_info.preferred_name
+  disease:
+    name:
+      - medgen.concepts.STR
+      - opentargets.disease.name
+    description:
+      - opentargets.disease.description
+  drug:
+    name:
+      - pharmgkb.drugs.Name
+      - opentargets.drug_molecule.name
+      - tahoe.drug_metadata.drug
+    type:
+      - pharmgkb.drugs.Type
+      - opentargets.drug_molecule.drugType
+    smiles:
+      - chembl.compounds.canonical_smiles
+      - opentargets.drug_molecule.canonicalSmiles
+      - pharmgkb.drugs.SMILES
+      - tahoe.drug_metadata.canonical_smiles
+    inchi:
+      - chembl.compounds.standard_inchi
+      - pharmgkb.drugs.InChI
+    inchi_key:
+      - chembl.compounds.standard_inchi_key
+      - opentargets.drug_molecule.inchiKey
+    max_clinical_stage:
+      - opentargets.drug_molecule.maximumClinicalStage
+    description:
+      - opentargets.drug_molecule.description
+    parent_chembl_id:
+      - opentargets.drug_molecule.parentId
+  variant:
+    variant_type:
+      - clinvar.variant_summary.Type
+      - dbvar.variants.SVTYPE
+    origin:
+      - clinvar.variant_summary.OriginSimple
+    name:
+      - clinvar.variant_summary.Name
+      - pharmgkb.variants.Variant_Name
+    # Coordinates of every source are kept; TCGA (GRCh37) has no variant row.
+    coordinate:
+      - clinvar.variant_summary.PositionVCF
+      - gnomad.variants.pos
+      - alphamissense.variant_scores.POS
+      - cadd.scores.pos
+    rsid:
+      - clinvar.variant_summary.RS_dbSNP
+      - tcga.mc3_somatic_mutations.dbSNP_RS
+    gene_key:
+      - clinvar.variant_summary.GeneID
+      - alphamissense.variant_scores.transcript_id
+
+# Condition labels that name no disease (compared in lower case).
+generic_condition_labels:
+  - not provided
+  - not specified
+  - see cases
+  - none provided
+
+# ClinVar germline terms counted as pathogenic.
+pathogenic_terms:
+  - Pathogenic
+  - Likely pathogenic
+  - Pathogenic/Likely pathogenic
+
+# Bands of the highest population allele frequency (the old cutoffs): the first
+# band whose `below` is above the value; the default band holds the rest.
+frequency_bands:
+  - {label: ultra_rare, below: 0.001}
+  - {label: rare, below: 0.01}
+  - {label: low_frequency, below: 0.05}
+frequency_band_default: common
+
+# ---------------------------------------------------------------------------
+# Old-project rules (cutoffs, weights, label rules) kept as versioned rules.
+# ---------------------------------------------------------------------------
+
+# Values of a source flag column that mean yes.
+truthy_values: ["yes", "true", "1", "y"]
+
+# Id types counted as "databases" of a gene (NCBI `dbXrefs`) and of a variant condition.
+gene_database_id_types: [omim, hgnc, ensembl, alliancegenome, uniprot, refseq, ncbi_gene]
+gene_well_annotated_minimum: 4
+condition_database_id_types: [omim, orphanet, mondo, medgen, hpo, snomedct_us]
+variant_well_annotated_minimum: 3
+
+# Gene description enrichment: points of the importance score.
+function_keyword_flags:
+  - has_kinase_in_description
+  - has_receptor_in_description
+  - has_enzyme_in_description
+  - has_transcription_in_description
+  - has_transporter_in_description
+  - has_signaling_in_description
+  - has_structural_in_description
+well_characterized_minimum: 2
+detailed_description_length: 50
+gene_importance:
+  disease_count_points:
+    - {from: 50, points: 10}
+    - {from: 20, points: 8}
+    - {from: 10, points: 5}
+    - {from: 5, points: 3}
+    - {from: 1, points: 2}
+  function_keyword_points: 2
+  detailed_description_points: 2
+  cancer_points: 3
+  # Gene-disease record kinds whose distinct diseases are counted and summed.
+  disease_record_kinds: [omim_gene_link, clinvar_variant_condition]
+gene_annotation_quality:
+  - {from: 15, label: Excellent}
+  - {from: 10, label: Good}
+  - {from: 5, label: Moderate}
+gene_annotation_quality_default: Basic
+# First match wins. `disease:` names a disease category flag, `flag:` a description
+# keyword flag, `text:` a gene category text rule.
+primary_gene_category:
+  - {label: Cancer_Related, any: [{disease: cancer}, {flag: has_cancer_keyword}]}
+  - {label: Neurological, any: [{disease: neurological}]}
+  - {label: Metabolic, any: [{disease: metabolic}]}
+  - {label: Kinase, any: [{flag: has_kinase_in_description}]}
+  - {label: Receptor, any: [{flag: has_receptor_in_description}]}
+  - {label: Transcription_Factor, any: [{flag: has_transcription_in_description}]}
+  - {label: Enzyme, any: [{flag: has_enzyme_in_description}]}
+  - {label: Pseudogene, any: [{text: pseudogene}]}
+  - {label: Uncharacterized, any: [{text: uncharacterized}]}
+  - {label: Regulatory, any: [{text: regulatory}]}
+primary_gene_category_default: Other
+
+# ClinVar germline term -> label; first match wins. `contains` and `excludes` are
+# lower-case words of the term.
+clinical_significance_labels:
+  - {label: Pathogenic, contains: [pathogenic], excludes: [likely, conflict]}
+  - {label: Likely Pathogenic, contains: [likely pathogenic], excludes: []}
+  - {label: Benign, contains: [benign], excludes: [likely, conflict]}
+  - {label: Likely Benign, contains: [likely benign], excludes: []}
+  - {label: VUS, contains: [uncertain], excludes: []}
+  - {label: Conflicting, contains: [conflict], excludes: []}
+  - {label: Risk Factor, contains: [risk], excludes: []}
+  - {label: Drug Response, contains: [drug], excludes: []}
+clinical_significance_label_default: Other
+pathogenic_labels: [Pathogenic, Likely Pathogenic]
+benign_labels: [Benign, Likely Benign]
+vus_labels: [VUS]
+
+origin_flags:
+  is_germline: "germline"
+  is_somatic: "somatic"
+  is_de_novo: "de novo"
+  is_inherited: "inherited|maternal|paternal"
+  is_maternal: "maternal"
+  is_paternal: "paternal"
+variant_type_flags:
+  is_snv: "single nucleotide"
+  is_deletion: "deletion"
+  is_insertion: "insertion"
+  is_duplication: "duplication"
+  is_indel: "indel"
+  is_cnv: "copy number|cnv"
+  is_microsatellite: "microsatellite"
+
+# ClinVar review stars -> tier; recency in days.
+review_quality_tiers:
+  - {from: 3, label: High Quality}
+  - {from: 2, label: Medium Quality}
+  - {from: 1, label: Low Quality}
+review_quality_tier_default: No Criteria
+recent_evaluation_days: 730
+
+# Conservation and frequency cutoffs of the old conservation notebooks.
+conservation:
+  phylop_conserved_above: 2.7
+  gerp_constrained_above: 4.0
+  cadd_deleterious_above: 20.0
+  allele_frequency_common_above: 0.01
+  allele_frequency_rare_below: 0.001
+frequency_flags:
+  rare_below: 0.01
+  ultra_rare_below: 0.001
+  common_from: 0.05
+
+# Protein impact of a variant (old protein impact notebook).
+mutation_severity:
+  loss_of_function: 3
+  splice: 2
+  missense: 1
+  other: 0
+loss_of_function_edit_types: [frameshift, nonsense]
+splice_affecting_regions: [intronic]
+protein_impact_categories:
+  loss_of_function: Loss_of_Function
+  splice: Splicing_Altered
+  domain: Domain_Disrupted
+  missense: Amino_Acid_Change
+  default: Unknown
+# Predicted pathogenicity bands of the pathogenicity score, with and without a
+# conservation level; the first band whose `from` the score reaches wins.
+predicted_pathogenicity_with_conservation:
+  - {from: 5, label: Likely_Pathogenic}
+  - {from: 3, label: Possibly_Pathogenic}
+  - {from: 1, label: Uncertain}
+predicted_pathogenicity_without_conservation:
+  - {from: 3, label: Likely_Pathogenic}
+  - {from: 2, label: Possibly_Pathogenic}
+  - {from: 1, label: Uncertain}
+predicted_pathogenicity_default: Likely_Benign
+high_impact_from: {with_conservation: 3, without_conservation: 2}
+very_high_impact_from: {with_conservation: 5, without_conservation: 3}
+
+# GTEx tissue specificity: number of tissues with expression above zero.
+tissue_specificity:
+  highly_specific_up_to: 3
+  moderately_specific_up_to: 10
+tissue_specificity_default: broadly_expressed
+
+# TCGA mutation classes.
+cancer_mutation:
+  high_impact: [Nonsense_Mutation, Frame_Shift_Del, Frame_Shift_Ins]
+  moderate_impact: [Missense_Mutation, In_Frame_Del, In_Frame_Ins, Splice_Site, Splice_Region]
+  truncating: [Nonsense_Mutation, Frame_Shift_Del, Frame_Shift_Ins, Splice_Site]
+  missense: [Missense_Mutation]
+  silent: [Silent]
+  snv_types: [SNP]
+  indel_types: [INS, DEL]
+frequently_mutated_minimum: 100
+frequently_tested_minimum: 10
+
+# Pharmacogene evidence (the evidence sources of the new Bronze tables).
+pharmacogene:
+  level_high_from: 3
+  level_medium_from: 2

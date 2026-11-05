@@ -1,6 +1,6 @@
 # Model card: survival.unit_lifetime
 
-_model `survival_forest`, dataset `survival`, frozen version 0, primary metric `concordance` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `survival_forest`, dataset `survival`, frozen version 0, primary metric `concordance` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -39,7 +39,7 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 
 ## Training
 
-- model family: survival_forest; MLflow run `04ffcdafa746415b93443fa14253e54b`
+- model family: survival_forest; MLflow run `3332ab155b1d436f951615cfe5d892b1`
 - parameters: {'entry': 'ignored', 'row_fraction': 1.0}
 - library versions: sksurv 0.25.0
 - processor type: not recorded for the training and evaluation runs
@@ -48,16 +48,16 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 
 | metric | survival_forest held-out | survival_forest validation | kaplan_meier held-out |
 |---|---|---|---|
-| brier_1y | 0.0008775 | 0.0007608 | 0.001169 |
-| brier_3y | 0.001194 | 0.001825 | 0.001779 |
-| brier_5y | 0.0009867 | 0.001729 | 0.001779 |
-| calibration_gap_1y | 0.000237 | 0.0007636 | 3.065e-05 |
-| calibration_gap_3y | 0.002679 | 0.002123 | 0.0003227 |
-| calibration_gap_5y | 0.00359 | 0.002643 | 4.052e-05 |
-| concordance | 0.9626 | 0.9642 | 0.5031 |
-| primary_change_relative | 0.001632 |  | 0.001769 |
-| skill_primary | 0.4595 |  |  |
-| skill_primary_ci_high | 0.4673 |  |  |
+| brier_1y | 0.000884 | 0.0007629 | 0.001169 |
+| brier_3y | 0.001205 | 0.001829 | 0.001779 |
+| brier_5y | 0.0009927 | 0.001733 | 0.001779 |
+| calibration_gap_1y | 0.0002344 | 0.0007641 | 3.065e-05 |
+| calibration_gap_3y | 0.002611 | 0.002075 | 0.0003227 |
+| calibration_gap_5y | 0.00354 | 0.002614 | 4.052e-05 |
+| concordance | 0.9626 | 0.9641 | 0.5031 |
+| primary_change_relative | 0.001587 |  | 0.001769 |
+| skill_primary | 0.4594 |  |  |
+| skill_primary_ci_high | 0.4672 |  |  |
 | skill_primary_ci_low | 0.4516 |  |  |
 
 ## Flags
@@ -66,13 +66,13 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 
 ## Conditions and known limits
 
-- 5-year calibration gap 0.00359 against 4.05e-05 for the baseline; predicted risk is less well calibrated than the baseline
+- 5-year calibration gap 0.00354 against 4.05e-05 for the baseline; predicted risk is less well calibrated than the baseline
 - the number of events in the held-out partition was not recorded; the concordance and Brier scores rest on an unknown number of events
 - revalidate on a new frozen dataset version, with the held-out event count recorded, before relying on the risk values
 
 ## Disclosures
 
-- the held-out partition was read in at least 7 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 10 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

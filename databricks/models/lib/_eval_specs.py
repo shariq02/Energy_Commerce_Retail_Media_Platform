@@ -523,12 +523,16 @@ def evaluate_by_id(task_id: str, rid: str, smoke: bool) -> None:
     cfg = EVAL_TASKS[task_id]
     evaluator = globals()[EVALUATOR_NAMES[cfg["kind"]]](ctx, cfg)
     models = forwarded_models(ctx)
+    check_model_libraries(task_id, models)
+    if hasattr(evaluator, "event_cap"):
+        evaluator.event_cap = recon_event_cap(models)
     try:
         evaluator.load(
             task_frame(ctx, ctx.partition),
             task_frame(ctx, "validation"),
             row_fraction_of(models),
         )
+        sample_eval_frames(evaluator, models)
         evaluate_task(ctx, evaluator)
     finally:
         evaluator.frames = {"eval": None, "validation": None}

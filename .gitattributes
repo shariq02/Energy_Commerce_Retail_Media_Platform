@@ -1,0 +1,4 @@
+# Text files are stored and checked out with LF on every system. Without this, Git for
+# Windows (autocrlf = true) writes CRLF into the working tree, which changes the byte
+# hashes that the knowledge corpus and the build records hold.
+* text=auto eol=lf

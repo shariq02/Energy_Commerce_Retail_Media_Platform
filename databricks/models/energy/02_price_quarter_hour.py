@@ -95,3 +95,16 @@ SPEC_NEGATIVE = {
 
 # DBTITLE 1,Run the negative-price classification
 run_classification(ctx_1, df, SPEC_NEGATIVE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__02_price_quarter_hour",
+    "Model Price Quarter Hour",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["price_quarter_hour.price", "price_quarter_hour.negative_price"],
+    smoke=SMOKE,
+)

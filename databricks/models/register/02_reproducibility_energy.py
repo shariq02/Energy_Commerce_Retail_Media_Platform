@@ -175,3 +175,14 @@ check(
     metric_value=float(len(_failed)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "register__02_reproducibility_energy",
+    "Reproducibility Check Energy",
+    ["registry_check"],
+    rid,
+)

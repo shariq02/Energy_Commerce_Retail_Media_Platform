@@ -67,3 +67,16 @@ SPEC = {
 
 # DBTITLE 1,Run the ranking candidates
 run_ranking(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "commerce__06_next_item_rees46",
+    "Model Next Item Rees46",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["next_item_rees46.next_item"],
+    smoke=SMOKE,
+)

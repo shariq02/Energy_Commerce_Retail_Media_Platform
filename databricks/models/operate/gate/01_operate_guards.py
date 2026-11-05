@@ -15,8 +15,9 @@
 # MAGIC **Purpose:** check the reference and prediction record. Hard failures: a registered model
 # MAGIC without a reference profile at its registered version, a reference recorded after
 # MAGIC a window was scored, a model without predictions in every window, a prediction at
-# MAGIC another registry or frozen version, a row for a model that is not registered, and
-# MAGIC more stored rows than the limit.
+# MAGIC another registry or frozen version, a row in any operate table for a model that
+# MAGIC is not a registered, not retired selected model, and more stored rows than the
+# MAGIC limit.
 
 # COMMAND ----------
 
@@ -51,11 +52,6 @@ rid = model_run_id()
 record = {}
 for eco in ("energy", "commerce"):
     entries = operate_entries(eco)
-    selected = {
-        (r["task_id"], r["model_name"])
-        for r in registry_rows(eco)
-        if r["role"] == "selected"
-    }
     reference = [
         r.asDict() for r in read_model("reference_profile", ecosystem=eco).collect()
     ]
@@ -75,7 +71,7 @@ for eco in ("energy", "commerce"):
     spec_rows = read_model("monitoring_spec", ecosystem=eco).collect()
     spec = operate_spec_from_rows([r.asDict() for r in spec_rows])
     spec_at = min((r["recorded_at"] for r in spec_rows), default=None)
-    record[eco] = (entries, selected, reference, predictions, spec, spec_at)
+    record[eco] = (entries, reference, predictions, spec, spec_at)
     print(
         f"{eco}: {len(entries)} registered model(s), {len(reference)} reference row(s)"
     )
@@ -84,7 +80,7 @@ for eco in ("energy", "commerce"):
 
 # DBTITLE 1,Every registered model has a reference profile at its registered version
 _none = []
-for eco, (entries, _s, reference, _p, _spec, _at) in record.items():
+for eco, (entries, reference, _p, _spec, _at) in record.items():
     for e in entries:
         mine = [
             r
@@ -109,7 +105,7 @@ check(
 
 # DBTITLE 1,Settings and reference were recorded before any window was scored
 _late = []
-for eco, (entries, _s, reference, predictions, _spec, spec_at) in record.items():
+for eco, (entries, reference, predictions, _spec, spec_at) in record.items():
     first_reference = min((r["recorded_at"] for r in reference), default=None)
     if spec_at is None or (first_reference is not None and spec_at > first_reference):
         _late.append((eco, "settings after the reference"))
@@ -145,7 +141,7 @@ check(
 
 # DBTITLE 1,Every registered model has predictions in every window
 _gaps = []
-for eco, (entries, _s, _r, predictions, _spec, _at) in record.items():
+for eco, (entries, _r, predictions, _spec, _at) in record.items():
     for e in entries:
         have = {
             p["window_id"]
@@ -170,7 +166,7 @@ check(
 
 # DBTITLE 1,Predictions are at the registered version
 _moved = []
-for eco, (entries, _s, _r, predictions, _spec, _at) in record.items():
+for eco, (entries, _r, predictions, _spec, _at) in record.items():
     current = {(e["task_id"], e["model_name"]): e for e in entries}
     for p in predictions:
         e = current.get((p["task_id"], p["model_name"]))
@@ -196,10 +192,8 @@ check(
 
 # DBTITLE 1,Nothing is stored for a model that is not registered
 _stray = []
-for eco, (_e, selected, reference, predictions, _spec, _at) in record.items():
-    seen = {(r["task_id"], r["model_name"]) for r in reference}
-    seen |= {(p["task_id"], p["model_name"]) for p in predictions}
-    _stray += [(eco, *k) for k in sorted(seen - selected)]
+for eco, (entries, _r, _p, _spec, _at) in record.items():
+    _stray += [(eco, *k) for k in models_without_entry(stored_models(eco), entries)]
 check(
     COMPONENT,
     SOURCE,
@@ -215,7 +209,7 @@ check(
 # DBTITLE 1,No window stores more rows than the limit
 _over = [
     (eco, p["task_id"], p["window_id"], p["rows"])
-    for eco, (_e, _s, _r, predictions, spec, _at) in record.items()
+    for eco, (_e, _r, predictions, spec, _at) in record.items()
     for p in predictions
     if p["rows"] > spec["max_window_rows"]
 ]

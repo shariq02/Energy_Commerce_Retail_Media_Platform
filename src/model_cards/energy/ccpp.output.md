@@ -1,15 +1,15 @@
 # Model card: ccpp.output
 
-_model `gbt_sklearn`, dataset `ccpp`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-04T18:03Z_
+_model `tabicl_v2_in_context`, dataset `ccpp`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
-- decision: `approved`
+- decision: `approved_with_conditions`
 - restriction: `none`
-- recommended by the rules: `approved`
+- recommended by the rules: `approved_with_conditions`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10, R13
 
 ## Purpose and task
 
@@ -36,37 +36,38 @@ _model `gbt_sklearn`, dataset `ccpp`, frozen version 0, primary metric `mae` (lo
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `1f647868a89c4313ae8b7a4b7cffb41a`
-- parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: sklearn 1.6.1
+- model family: tabicl_v2_in_context; MLflow run `a1d3a2b1b3f9434788b65c8788ca2a04`
+- parameters: {'row_fraction': 1.0, 'model_key': 'tabicl_v2', 'repo_id': 'jingang/TabICL', 'revision': '4dcd344ece2c00be9e831fdd35bed57b5ad83e19', 'licence': 'bsd-3-clause', 'mode': 'in_context', 'context_rows': 6711, 'train_rows': 6711, 'features': 4, 'seed': 42}
+- library versions: torch 2.9.0+cu129, tabicl 2.2.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
-| metric | gbt_sklearn held-out | gbt_sklearn validation | train_mean held-out |
+| metric | tabicl_v2_in_context held-out | tabicl_v2_in_context validation | train_mean held-out |
 |---|---|---|---|
-| mae | 2.287 | 2.496 | 15.03 |
-| mean_error | -0.1176 | -0.07375 | 0.01432 |
-| mean_error_relative | -0.0002588 | -0.0001621 | 3.152e-05 |
-| primary_change_relative | -0.08374 |  | 0.01593 |
-| rmse | 3.125 | 3.463 | 17.28 |
-| skill_mae | 0.8478 | 0.8313 |  |
-| skill_primary | 0.8478 |  |  |
-| skill_primary_ci_high | 0.8558 |  |  |
-| skill_primary_ci_low | 0.8384 |  |  |
-| skill_rmse | 0.8192 | 0.7965 |  |
+| mae | 1.882 | 1.927 | 15.03 |
+| mean_error | -0.05196 | -0.08142 | 0.01432 |
+| mean_error_relative | -0.0001144 | -0.000179 | 3.152e-05 |
+| primary_change_relative | -0.02328 |  | 0.01593 |
+| rmse | 2.804 | 2.989 | 17.28 |
+| skill_mae | 0.8748 | 0.8698 |  |
+| skill_primary | 0.8748 |  |  |
+| skill_primary_ci_high | 0.8832 |  |  |
+| skill_primary_ci_low | 0.8659 |  |  |
+| skill_rmse | 0.8378 | 0.8243 |  |
 
 ## Flags
 
-- none
+- stored model does not reproduce its validation result: relative gap 0.000317
 
 ## Conditions and known limits
 
-- none
+- contamination flag unresolved: the pretraining data of the model was not shown to be free of the evaluated data; revision 4dcd344ece2c; pretraining data per register: synthetic tables from the TabICL prior; read the model card; task data names found: none
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- foundation model jingang/TabICL at revision 4dcd344ece2c, licence bsd-3-clause, ran in context
 
 ## Revalidation trigger
 

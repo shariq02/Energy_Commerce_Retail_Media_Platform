@@ -26,6 +26,9 @@ docs/
 # Retired code (superseded implementations) - kept locally only
 archive/
 
+# Prompts given to Genie to build the Databricks jobs - kept locally only
+databricks/genie_prompts/
+
 # Local-only acquisition notes - not tracked
 scripts/download/README.md
 
@@ -38,6 +41,9 @@ data/processed/
 *.parquet
 *.json.gz
 *.json
+# The tool contract lock and the schema of the tool call log are code, not data: committed.
+!ai/mcp_servers/tools.lock.json
+!ai/mcp_servers/tool_call_log.schema.json
 # The approved knowledge corpus manifest is committed.
 !ai/knowledge_corpus/manifest.json
 # The Wikipedia corpus manifest and selection rule are committed; its shards are not.
@@ -50,6 +56,17 @@ ai/knowledge_corpus/wikipedia/chunks.tmp
 # Logs
 logs/
 *.log
+
+# Model training byproducts -- written into the working folder by training libraries
+chronos-2-finetuned/
+lightning_logs/
+mlruns/
+mlartifacts/
+wandb/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
 
 # Database
 *.db
@@ -65,19 +82,6 @@ config/credentials.json
 # GCP
 .config/gcloud/
 gcloud-service-key.json
-
-# Terraform
-.terraform/
-.terraform.lock.hcl
-*.tfstate
-*.tfstate.backup
-*.tfvars
-terraform/modules/*/.terraform/
-crash.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
 
 # Databricks
 .databricks/
@@ -108,8 +112,13 @@ htmlcov/
 scripts/utilities/lint.py
 scripts/utilities/clean_cache.py
 scripts/utilities/check_curated_retrieval.py
-scripts/utilities/run_energy_weather_deepening_acquisition.py
+scripts/utilities/check_service_principal.py
+scripts/utilities/make_tool_tokens.py
+scripts/utilities/run_acquisition.py
 scripts/utilities/verify_energy_weather_deepening_acquisition.py
+scripts/utilities/verify_acquisition.py
+scripts/utilities/genomics_bronze_samples.py
+scripts/utilities/genomics_bronze_checks.py
 # Local paths of the files that authored knowledge units were written from.
 scripts/knowledge/local_sources.yml
 
@@ -127,3 +136,6 @@ desktop.ini
 graphify-out/
 # Claude Code local settings and hooks
 .claude/
+
+# access matrix of the tool servers (which table each server may read): kept private
+src/findings/tools_findings/boundary.md

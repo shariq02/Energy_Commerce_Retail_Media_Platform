@@ -145,3 +145,14 @@ check(
     metric_value=float(len(_missing)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "operate__03_performance_and_triggers",
+    "Performance And Triggers",
+    ["monitoring_results", "monitoring_flags", "monitoring_triggers"],
+    rid,
+)

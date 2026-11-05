@@ -37,11 +37,8 @@ rid = model_run_id()
 EVALUATION_TABLES = ("evaluation_results", "evaluation_flags", EVAL_CONTEXT_TABLE)
 for eco in ("energy", "commerce"):
     for name in EVALUATION_TABLES:
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  evaluation table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  evaluation table ready: {full}")
 
 # COMMAND ----------
 
@@ -101,3 +98,14 @@ for eco, have in recorded.items():
 # DBTITLE 1,The recorded settings load
 for eco in ("energy", "commerce"):
     print(eco, read_thresholds(eco))
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "evaluate__00_evaluation_setup",
+    "Evaluation Setup",
+    ["evaluation_spec"],
+    rid,
+)

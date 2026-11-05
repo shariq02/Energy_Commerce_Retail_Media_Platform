@@ -1,0 +1,173 @@
+# Tool servers: scope, tools and the agents that may start each server.
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: October 2026
+#
+# Purpose: the single source for the scope of every tool server. ai/tools/common.py
+# reads it; a test compares it with the code. A server reads only the listed
+# schemas (and the listed single tables); a tool name is unique across all servers
+# and the tools of a server are sorted by name.
+#
+# Per tool (the contract, checked by python -m ai.mcp_servers.contracts):
+#   version      counts compatible revisions; a breaking change is a new tool name
+#   status       active | deprecated (a deprecated tool names replaced_by)
+#   errors       the error codes the tool may return; internal_error is always listed
+#   changes      one entry per version: date, version, kind (new | compatible |
+#                description | deprecated) and a note
+# The generated definitions and their hashes are in tools.lock.json.
+
+catalog: energy_commerce_retail_media
+
+agents:
+  - orchestrator
+  - energy_specialist
+  - commerce_specialist
+  - ml_forecasting
+  - dq_trust
+  - guardrail_check          # the graph node that may read the quality tools
+
+servers:
+  energy_tools:
+    ecosystem: energy
+    schemas: [energy_analytics, energy_semantic]
+    extra_tables: [quality.quality_audit_log]   # only for the trust annotation
+    allowed_agents: [energy_specialist]
+    tools:
+      energy_analyse_market_conditions:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, range_outside_data, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      energy_analyse_weather_conditions:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, range_outside_data, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      energy_compare_periods:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [unknown_metric, wrong_ecosystem, invalid_argument, range_outside_data, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      energy_get_metric:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [unknown_metric, wrong_ecosystem, invalid_argument, range_outside_data, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+
+  commerce_tools:
+    ecosystem: commerce
+    schemas: [commerce_analytics, commerce_semantic]
+    extra_tables: [quality.quality_audit_log]   # only for the trust annotation
+    allowed_agents: [commerce_specialist]
+    tools:
+      commerce_compare_periods:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [unknown_metric, wrong_ecosystem, invalid_argument, range_outside_data, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      commerce_get_metric:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [unknown_metric, wrong_ecosystem, invalid_argument, range_outside_data, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+
+  ml_tools:
+    ecosystem: both
+    schemas: [ml_models]
+    extra_tables: []
+    allowed_agents: [ml_forecasting]
+    tools:
+      ml_read_model_card:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      ml_read_monitoring:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      ml_read_predictions:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+
+  dq_tools:
+    ecosystem: both
+    schemas: [quality]
+    extra_tables: []
+    allowed_agents: [dq_trust, guardrail_check]
+    tools:
+      dq_read_field_class:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      dq_read_quality_log:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      dq_read_quarantine:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+      dq_read_watermarks:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}
+
+  cross_ecosystem_tools:
+    ecosystem: both
+    schemas: []
+    extra_tables: []
+    allowed_agents: [orchestrator]
+    tools: []                # no method and no mart yet; the server stays empty
+
+  knowledge_tools:
+    ecosystem: both
+    schemas: []              # local files only, no Databricks
+    extra_tables: []
+    allowed_agents:
+      - orchestrator
+      - energy_specialist
+      - commerce_specialist
+      - ml_forecasting
+      - dq_trust
+    tools:
+      knowledge_retrieve:
+        version: 1
+        status: active
+        replaced_by: null
+        errors: [invalid_argument, internal_error]
+        changes:
+          - {date: "2026-10-28", version: 1, kind: new, note: first version}

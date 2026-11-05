@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # CREATE UNITY CATALOG SCHEMAS AND VOLUMES
+# MAGIC # CREATE UNITY CATALOG SCHEMAS
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -12,30 +12,8 @@
 # MAGIC
 # MAGIC **Date:** August 2026
 # MAGIC
-# MAGIC **Purpose:** Create and verify the Unity Catalog structure required
-# MAGIC for the project.
-# MAGIC
-# MAGIC This notebook creates structure only:
-# MAGIC - the project schemas (`bronze`, `energy_silver`, `energy_silver_reference`,
-# MAGIC   `commerce_silver`, `commerce_silver_reference`, `energy_gold`,
-# MAGIC   `shared_conformed`, `quality`, `eda`). Silver is split per the
-# MAGIC   100-table-per-schema quota and per ecosystem; domain separation stays
-# MAGIC   at folder level. `shared_conformed`'s tables are built by
-# MAGIC   `03_create_shared_conformed.py`.
-# MAGIC - the frozen Bronze upload-unit Volumes (staging -> Volume -> Bronze)
-# MAGIC - the 2 quality/control Delta tables (`pipeline_watermarks`, `quality_audit_log`)
-# MAGIC
-# MAGIC It does **not** create any Bronze business/data table. Bronze tables are
-# MAGIC created later by the Bronze loading notebooks, which read chunks out of
-# MAGIC these Volumes.
-# MAGIC
-# MAGIC Three counts are never the same number and none derives from another:
-# MAGIC the staging dataset count, the Volume upload-unit count (fixed
-# MAGIC below), and the Bronze table count.
-# MAGIC
-# MAGIC This notebook is safe to run repeatedly -- every statement uses
-# MAGIC `IF NOT EXISTS`. It never drops a schema/volume/table and never deletes
-# MAGIC Volume contents.
+# MAGIC **Purpose:** Create the project schemas and the two quality tables. It creates
+# MAGIC no Volume and no data table, and it drops nothing. Safe to run again.
 
 # COMMAND ----------
 
@@ -53,12 +31,6 @@ from pyspark.sql.utils import AnalysisException
 # MAGIC
 # MAGIC `CATALOG` is the single Unity Catalog catalog for this project.
 # MAGIC `SCHEMAS` are the schemas created below.
-# MAGIC `VOLUME_UNITS` are the first-wave Bronze upload units -- one Volume per
-# MAGIC upload unit, never one Volume per physical chunk. Chunks are files
-# MAGIC stored inside their upload unit's Volume. The energy/weather deepening
-# MAGIC wave's Volumes are created by `02_create_energy_weather_deepening_volumes.py`;
-# MAGIC the Commerce wave's net-new Volume is created by
-# MAGIC `04_create_commerce_volumes.py`.
 
 # COMMAND ----------
 
@@ -70,24 +42,13 @@ SCHEMAS = [
     "energy_silver_reference",
     "commerce_silver",
     "commerce_silver_reference",
+    "genomics_silver",
+    "genomics_silver_reference",
     "energy_gold",
     "shared_conformed",
     "quality",
-    "eda",
+    "genomics_bronze",
 ]
-
-# First-wave Volume upload units, fixed by the frozen staging -> Volume ->
-# Bronze architecture. Grouped here by source for readability only -- the
-# schema each Volume lives under is `bronze` in every case.
-VOLUME_UNITS = [
-    "dwd_analytical",
-    "dwd_metadata",
-    "smard_analytical",
-    "honda_iot_analytical",
-    "rees46_events",
-]
-
-VOLUME_SCHEMA = "bronze"
 
 QUALITY_SCHEMA = "quality"
 QUALITY_TABLES = ["pipeline_watermarks", "quality_audit_log"]
@@ -107,24 +68,7 @@ for schema in SCHEMAS:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Create Volume Upload Units
-# MAGIC
-# MAGIC One managed Volume per Bronze upload unit, under
-# MAGIC `energy_commerce_retail_media.bronze`. This is the physical target for
-# MAGIC the manual upload step (`data/staging/{source}/{dataset}/` -> here),
-# MAGIC not a data table.
-
-# COMMAND ----------
-
-# DBTITLE 1,Create Bronze upload-unit volumes
-for volume in VOLUME_UNITS:
-    spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}.{volume}")
-    print(f"OK  volume ready: /Volumes/{CATALOG}/{VOLUME_SCHEMA}/{volume}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 5. Create Quality / Control Tables
+# MAGIC ## 4. Create Quality / Control Tables
 # MAGIC
 # MAGIC Both tables live in `energy_commerce_retail_media.quality` and are
 # MAGIC generic control tables, not source-specific -- every pipeline run
@@ -174,7 +118,7 @@ print(f"OK  table ready: {CATALOG}.{QUALITY_SCHEMA}.quality_audit_log")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6. Verify Schemas
+# MAGIC ## 5. Verify Schemas
 
 # COMMAND ----------
 
@@ -194,44 +138,7 @@ print(f"OK  all {len(SCHEMAS)} required schemas present")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 7. Verify Volumes
-
-# COMMAND ----------
-
-# DBTITLE 1,Verify volumes
-found_volumes = {
-    row.volume_name
-    for row in spark.sql(f"SHOW VOLUMES IN {CATALOG}.{VOLUME_SCHEMA}").collect()
-}
-missing_volumes = [v for v in VOLUME_UNITS if v not in found_volumes]
-
-print(f"Volumes found in {CATALOG}.{VOLUME_SCHEMA}: {sorted(found_volumes)}")
-
-if missing_volumes:
-    raise RuntimeError(f"FAIL  missing volumes after creation: {missing_volumes}")
-print(f"OK  all {len(VOLUME_UNITS)} required volumes present")
-
-# COMMAND ----------
-
-# DBTITLE 1,Verify volume accessibility
-inaccessible_volumes = []
-for volume in VOLUME_UNITS:
-    volume_path = f"/Volumes/{CATALOG}/{VOLUME_SCHEMA}/{volume}"
-    try:
-        dbutils.fs.ls(volume_path)
-        print(f"OK  accessible: {volume_path}")
-    except Exception as exc:
-        inaccessible_volumes.append((volume_path, str(exc)))
-
-if inaccessible_volumes:
-    detail = "; ".join(f"{path} -> {err}" for path, err in inaccessible_volumes)
-    raise RuntimeError(f"FAIL  inaccessible volumes: {detail}")
-print(f"OK  all {len(VOLUME_UNITS)} volumes accessible")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 8. Verify Quality Tables
+# MAGIC ## 6. Verify Quality Tables
 
 # COMMAND ----------
 
@@ -261,7 +168,7 @@ print(f"OK  all {len(QUALITY_TABLES)} required quality tables present")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 9. Final Summary
+# MAGIC ## 7. Final Summary
 
 # COMMAND ----------
 
@@ -271,9 +178,6 @@ print("UNITY CATALOG SETUP SUMMARY")
 print("=" * 70)
 print(f"Catalog             : {CATALOG}")
 print(f"Schemas created     : {len(SCHEMAS)}  -> {SCHEMAS}")
-print(f"Volumes created     : {len(VOLUME_UNITS)}  (under {CATALOG}.{VOLUME_SCHEMA})")
-for volume in VOLUME_UNITS:
-    print(f"                       /Volumes/{CATALOG}/{VOLUME_SCHEMA}/{volume}")
 print(f"Quality tables ready: {len(QUALITY_TABLES)}  -> {QUALITY_TABLES}")
 print("-" * 70)
 print("RESULT: PASS -- Unity Catalog structure created and verified.")

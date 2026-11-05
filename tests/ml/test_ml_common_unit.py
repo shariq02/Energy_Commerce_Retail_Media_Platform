@@ -179,6 +179,31 @@ def test_assembled_select_drops_provenance_and_label_inputs(ml):
     assert "energy_ml_datasets.target_demo" in sql
 
 
+def test_shared_registry_tables_live_once_in_the_shared_schema(ml):
+    for name in ml["ML_SHARED_TABLES"]:
+        energy, commerce = ml["ml_fqn"](name, "energy"), ml["ml_fqn"](name, "commerce")
+        assert energy == commerce
+        assert energy.endswith(f".ml_datasets_shared.{name}")
+    assert ".energy_ml_datasets." in ml["ml_fqn"]("target_demo", "energy")
+    assert ".commerce_ml_datasets." in ml["ml_fqn"]("dataset_demo", "commerce")
+    assert ".energy_ml_datasets." in ml["ml_fqn"]("gap_limits", "energy")
+
+
+def test_only_registry_tables_are_shared_and_gap_limits_stays_per_ecosystem(ml):
+    assert set(ml["ML_SHARED_TABLES"]) <= set(ml["REGISTRY_DDL"])
+    assert "gap_limits" not in ml["ML_SHARED_TABLES"]
+
+
+def test_ecosystem_helpers_scope_a_shared_table(ml):
+    assert ml["ddl_with_ecosystem"]("a string") == "a string, ecosystem string"
+    assert ml["ddl_with_ecosystem"]("a string, ecosystem string") == (
+        "a string, ecosystem string"
+    )
+    assert ml["ecosystem_predicate"]("energy", "dataset_id = 'x'") == (
+        "ecosystem = 'energy' AND (dataset_id = 'x')"
+    )
+
+
 def test_columns_to_drop_uses_the_threshold_and_the_exemptions(ml):
     rates = {"a": 0.5, "b": 0.95, "c": 1.0, "d": 0.99, "e": 0.0}
     assert ml["columns_to_drop"](rates, exempt={"d"}) == ["b", "c"]

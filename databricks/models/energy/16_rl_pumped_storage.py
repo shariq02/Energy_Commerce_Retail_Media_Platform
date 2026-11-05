@@ -84,3 +84,16 @@ SPEC = {
 
 # DBTITLE 1,Run the policy candidates
 run_pumped_storage(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__16_rl_pumped_storage",
+    "Model Pumped Storage Policy",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["rl_pumped_storage.policy"],
+    smoke=SMOKE,
+)

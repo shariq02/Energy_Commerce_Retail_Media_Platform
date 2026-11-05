@@ -1,6 +1,6 @@
 # Model card: redispatch.any_event
 
-_model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_au
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -36,7 +36,7 @@ _model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_au
 
 ## Training
 
-- model family: logistic; MLflow run `18a8365730ef481797230770cf89b5ec`
+- model family: logistic; MLflow run `5601cf4c687249099439aaf0c544c2bf`
 - parameters: {'row_fraction': 1.0, 'C': 1.0}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -65,7 +65,7 @@ _model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_au
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

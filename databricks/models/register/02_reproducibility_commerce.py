@@ -145,3 +145,14 @@ check(
     metric_value=float(len(_failed)),
     rid=rid,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("commerce",),
+    "register__02_reproducibility_commerce",
+    "Reproducibility Check Commerce",
+    ["registry_check"],
+    rid,
+)

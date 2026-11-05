@@ -162,3 +162,8 @@ for eco, (results, flags, context, spec) in record.items():
         with open(_os.path.join(FINDINGS_DIR, name), "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
         print(f"OK  {name}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Merge the findings of the notebooks
+merge_notebook_findings()

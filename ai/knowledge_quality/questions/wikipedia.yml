@@ -1,0 +1,930 @@
+corpus: wikipedia
+version: 2
+questions:
+- id: q001
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.12560306
+  text: Which retailer was the exclusive seller of the Funko Pop! Tees at first?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a076f5d7dce638cb124e708216cd70542433a3e39e86ea04fff86c8f9226a189
+- id: q002
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.38839649
+  text: What was the Waseet.net partnership with Google AdWords meant to achieve for small and medium
+    businesses in MENA?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 9c8d2cf9e89e40035f470fcf08192299ce7e93eda1256dac7e45404c696d7387
+- id: q003
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.936205
+  text: Which nutrition diploma of Gillian McKeith was questioned, and what was the same diploma awarded
+    to?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 7d5f0e72963cfc5bcf11f842673d22f5ae8e86f2877cd6be1197d966b61cd3bb
+- id: q004
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.23414320
+  text: What order did Sakonju give about the survivors of the Behar in the Indian Ocean raid of 1944?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 9225ca57ce3bead485650040aab2298b770ad0a2a1e4d4f5f99ef0896fe6fcfd
+- id: q005
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.15226103
+  text: What happened to the ship SS Scharnhorst (1934) after the Imperial Japanese Navy acquired it in
+    1942?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 5f8f947f99ff440c1deb73b006243fbce4e383c99f2a08f835210d1a8004a52f
+- id: q006
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.46272548
+  text: Which engine does the Hillberg EH1-01 RotorMouse use?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 29f1148a7d12f9715171615185107267643b0bc0619b87a07b13eeac4a0bcc30
+- id: q007
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.198526
+  text: Which frequent flyer program does Widerøe take part in as part of the SAS Group?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: d73b31441aa4c5e091218eb173947149f1eb61f38228a7213a9603c8e55aca81
+- id: q008
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.5009196
+  text: Who owned the airline Jet4you when it started operations in 2006?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: bde058fec17868bf08dff367fa36d527e43ee323e91a561feb3ae8b8466d029a
+- id: q009
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.15925154
+  text: When did the airline Air Charter International stop its services?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 9c234f8a4d7cb9e460ce567121759eb9477d6e939acbd6d1c3ef6a4745f262ba
+- id: q010
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.4904127
+  text: Which air force wing is based at Udon Thani International Airport?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: eebbc98d596ae6d1ee9bc7fa7cee484d1247f0d7335d6373ceb7b274a76d01db
+- id: q011
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.2150455
+  text: Which kinds of boats are prohibited on the lake in Ricketts Glen State Park?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: dc89995e99fd2f15e254f79b2a627725153089f22c9ccc7bab8f89de991a4f09
+- id: q012
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.274257
+  text: Which two companies formed in 1946 are the origin of DynCorp?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 61b8cc85c00f2dac22533065650972e6d849549d4dca7361c11e3fd2d1d8465b
+- id: q013
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.39466449
+  text: What kind of wing and engine layout does the AVIC Lucky Bird have?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: fcb13ac89fc0452052bc61a88555fdeee718065c5f49095ddfcecb961c75a02b
+- id: q014
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.19076414
+  text: Why was the Vickers VC5 airliner design dropped, according to the article on the Vickers V-1000?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: ba9d680ffee67abc89dabcb1c94760bac693db0e76a7251a05cc3fffffe58c55
+- id: q015
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.1472929
+  text: What was the Stawy Ammunition Depot near Dęblin called before it was named Stawy?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: be6257b92d8bf8c4d143900145bd313ff64b841b7ca643996416ee7e2d935a46
+- id: q016
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.9500734
+  text: Which company acquired Epyon on 30 June 2011?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 2fe8d6d326885378d5d9d4ec1709b3f357a3247df8c322c0ee5a7d4a4ec4118c
+- id: q017
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.47281265
+  text: Which company chose Phoenix in 1948 for a military electronics research and development center?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 582e685fb2786d84b62269a8b80eae97b5549244c736a7e2479a8df631fd68d1
+- id: q018
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.32481645
+  text: Which research vessels does the Leibniz Institute of Marine Sciences operate?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 9be080ded71acb7b29518580075c0e6a895921e3858e512defa9dac9c48d4413
+- id: q019
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.11160009
+  text: How much electricity could Wave Hub generate each year?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 6ba636437769c40540e62df39de67b77137ec9f85b123f194b9df078161dbf86
+- id: q020
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.31908310
+  text: Why was it unclear who had to fix faulty chargepoints in the Source London network?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 5d746c0a7bbbd9d1a7f9992648528dadae54ef3d987f0bd47f077ce47a46fe40
+- id: q021
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.35644474
+  text: What is the installed capacity of the Udupi Power Plant, and who agreed to buy it in 2014?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 8d7377f442b255bb070e029db4e4649d99cfd23823640f41d0b5d24dba6e5b23
+- id: q022
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.1835713
+  text: How many years beyond its design lifetime could the Paks Nuclear Power Plant stay in operation?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 348f06d9f2cb711b4cf945f818cf66cd597ee13cbff7e6e6e1c738696562e351
+- id: q023
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.23950883
+  text: Which settlement did Hoosier Energy reach with the US Environmental Protection Agency in July
+    2010?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 1e2671d1fa47f50a39327b6b8ce841702527b1544dbfd6a7d0759cfcf9a12918
+- id: q024
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.1921667
+  text: Which viaduct collapsed in January 1846 during the building of the Rouen and Le Havre line?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 2ca75c6963d93609980fbb0544b90bda65dd20fa22c7f8f61c386ecf8d782f25
+- id: q025
+  class: identifier_lookup
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.10908738
+  text: What damage did Hurricane Anna cause in Grenada in 1961?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: bfe99b927ade70780cb8292c12d485d88b419a56cd8b86aaf4cdc4ce10a977e0
+- id: q026
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.41383877
+  text: Which model started her career after a designer asked her to walk the ramp at age 18 while she
+    studied at Miranda House?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: e1c0b69a04e758e8b6caa0d0fcbce7e2fec23f9bc7222632cfbda60aecd101d5
+- id: q027
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.27290938
+  text: Which project donated 104 solar water heating systems in 2008 to hospitals, orphanages and similar
+    centers?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a220ef4c156e0c2578879fd42960b587c5c70dc7b17473dd2e7612b66c8e7343
+- id: q028
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.40185892
+  text: Which solar panel scam in Kerala led to the arrest of the Chief Minister's personal aide?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 3245e38dd2904d3818ffa86013b1f7fcf08a2c7c45545ed7c7d996ba407d73ef
+- id: q029
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.27838889
+  text: Which company sells 2.3 MW wind turbines with product codes from SWT-2.3-82 to SWT-2.3-113?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: f629fa7a18b787cd8f5ef1311ebf73de719a6a40c8d5ee5f38fd51665b2cbb44
+- id: q030
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.39888819
+  text: Which port project received Army Corps of Engineers approval in 2011 for extra dredging to get
+    deep water berths?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 55627e2ad4b727d989ffb3d851018c4088695c2cea32bd2f17185bd9cbe22b34
+- id: q031
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.81326
+  text: Which space station kept a supply of cognac and vodka for its crews, unlike the International
+    Space Station?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 0fd194c4beffa1389424e7aeb3441b84fff088bc59fce7238301cbd576ec5d9b
+- id: q032
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.848695
+  text: Which 1978 mission carried the Polish cosmonaut Hermaszewski to the Salyut 6 station?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: f2c728796595cc5fa7bf277b3cbcffe015f694f1215e6900060adad4cb4da2ed
+- id: q033
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.38267353
+  text: Which article describes the car fires at Port Newark during the flooding of Hurricane Sandy?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 1b5b21b2f2131fbfb7920979d6bffdc965ac4b04f82e030a45c20c7551de3a1a
+- id: q034
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.31067595
+  text: Which power stations built between 1919 and 1966 were replaced by the City Garden flats and the
+    Maxim Mall?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 3c73ff37e32431fc028f5f9dafe88caec8e9878b52ee29b22e9a84f2b096f8b3
+- id: q035
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.3502232
+  text: Which nuclear plant site on Lake Michigan could become a state park after the plant closed?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 446e40a7db99bf6b46112f3fd545fdf245cec4f4e41a4610040d8cd7850c38e4
+- id: q036
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.12234096
+  text: Which film was test-screened in unadvertised sneak previews and distributed by American International
+    Pictures?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 779f3c6b0955b509f0543449788684a845e9033dcf2652479cf95b96152cda62
+- id: q037
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.27948433
+  text: Which meteorologist did his Ph.D. at Moscow State University under Andrey Kolmogorov?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 48e8cc73dfc005974bdd216e6cf47f3da5fc354f21283bf9a3ada9b64520728e
+- id: q038
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.45152386
+  text: Which creek in Luzerne County has its mouth in the Nanticoke quadrangle and its source near Harveys
+    Lake?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 10de1ac46193d15e513f0533a6d8b5577ae3d01f23067da2c97a209f0abc3f4f
+- id: q039
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.21250557
+  text: Which regional train service in Baden-Württemberg uses tilting diesel classes 611 and 612 and
+    double-decker coaches?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 04cc34a5b0c942f9695d5b22a29d0a0961b33b46675ff582b50a19d287ee40cd
+- id: q040
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.367388
+  text: Which Amsterdam transport company runs a metro line that switches from third rail to overhead
+    wire at Station Zuid?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 43f2accd90c78e7d821dfe1cc4ba80c42a0a9abb1cae883aa39d5adaba5833f9
+- id: q041
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.2591342
+  text: Which suburb in Western Australia has the Somerly housing development around its railway station?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 05031a144e6f34605c2d93daa2bdd5081959d5a7f26fcfaa658100e21dbcc8e4
+- id: q042
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.17828730
+  text: Which railway station was opened by the Strathendrick and Aberfoyle Railway and became part of
+    the London and North Eastern Railway in 1923?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: fe7fb19100cf8af6161e0fc738e53a8f1e617a17762bcbf64acb3129bb20629e
+- id: q043
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.33945816
+  text: Which railway is owned and run by the Guizhou Shuihong Railway Company?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 4d09b669ef7505fbeb05c4b48ef0ee7608a1cd2fc8b0357b21155dad20375f71
+- id: q044
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.2531433
+  text: Which northeastern emissions initiative is described together with a plan to cut emissions to
+    10% below 1990 levels by 2020?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a356897cd9bb8311af49de039bfd90070976e1486b8631e19d2285910e0b5255
+- id: q045
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.23127931
+  text: How much municipal solid waste is generated every year in the urban areas of India?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 4f2f260248ab31f24ba7c280fea084bb129392a47741cfe355c05b0b9ffb998b
+- id: q046
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.28580670
+  text: Which company describes single crystal solar panels with vented aluminum panel pans?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: deb5b94e81f8042e5f1365709199101ebe1cb2d359b3128702d5d99d4b3414ab
+- id: q047
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.11326364
+  text: Which state park has mostly nocturnal animals that leave tracks as clues of their presence?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 8a2eee0df144196d3245135597da8a9297a48b996a3b4d758aa2c1d1a2f7756a
+- id: q048
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.3687749
+  text: Which Dutch emergency radio service was founded in 2003 after the World Radio Conference?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 6dd43e688e811bbe1190016ae6a7518a7bfb2d8532119f48b79b1153bc68fcdb
+- id: q049
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.8451101
+  text: Which organisation did Juliet Davenport and Dale Vince accuse of using a misleading name?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 6591d75c003616b76fb0da71d0e9f5403658a2f770c0e7002b90f66c7d423dcf
+- id: q050
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.21803627
+  text: Which online store lets its community vote on T-shirt designs from 1 to 5 and pays the winning
+    designer?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a43d13986fbd04fbc7c14724736b2f67b6819c2c9794a40844e8d8e80e93a9f8
+- id: q051
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.40400247
+  text: Which web application rewards its users for purchases at partnered online merchants?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 21a94c7d2a5a1fadc50bfa6967c17c0630ac9bc8f79ed895f79057e7acc04745
+- id: q052
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.3939034
+  text: Which newspaper company tends to buy smaller dailies with circulations around or below 20,000?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 606065f5e06bc7ad26f6ddc204838c425b534f5703924a461e6d9bfba9467e16
+- id: q053
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.23923456
+  text: Which flight simulation game sells new cockpits and field mods in an online store?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 60a5c6ca96f61a02d7d1f379e5321db26a03c40999623e2893a5a393db4cf73d
+- id: q054
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.309921
+  text: Which European car manufacturers association rotated its presidency among French, Italian and
+    German companies?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 8741098234ab39b23f5e479c682d1a74a874cfdfc0444180cfc31c1264f77e95
+- id: q055
+  class: definitional_wording
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.4024765
+  text: Which vehicle maker was sold to the Rootes Group in 1950 and stopped making complete vehicles
+    in 1953?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: d5372e9ff5bd6a30fa190ebbdf7b730921b3052809a029f2720819e13ba71044
+- id: q056
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.2103026
+  text: What is a heat burst?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 7b6b0e94a273d9da962de65a4735b20fffb41170c62d6d031d7c273357f2bf52
+- id: q057
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.6349042
+  text: What is inductive charging, and what are its advantages?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 81ce86c2f842529ff69334d3eb2824e4315910d13a332bbac583a12291a99fa9
+- id: q058
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.4916121
+  text: When does the ownership of consignment stock pass to the buyer?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 2c1f6b038088f4f604443765e072f0fefb36ab41a68260c19b0e3b0c0f5928b2
+- id: q059
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.13329709
+  text: How does a shopping directory earn money?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 35cf7c999ee86b232a7020b1bc8739f841a9fc4665e6938a677d26b647863baf
+- id: q060
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.6165293
+  text: What is antecedent moisture in hydrology?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 86c9faf4285c0440fb515c8a4ea39e5a8a62b621c627b9a6c62f46b13c41074f
+- id: q061
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.245181
+  text: How does travertine form, and why is it less porous than tufa?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: ae19cef64d93b759850cfcfc974348bddabf8b1444533dd83480fc2129180b26
+- id: q062
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.384491
+  text: What is a bobble hat?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: dbbd471b729510fd1c3fde1403305255b9ed429c1c25d3d3e78dd984114654c6
+- id: q063
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.27295071
+  text: What does the calibrated simulation option mean in the international performance measurement and
+    verification protocol?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: af247d43ecd45ee1e672697e812ce944b10b722081eef9e0f07b330e6200bd42
+- id: q064
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.37513579
+  text: How do sea salt aerosols change the Earth radiation budget?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 318f6c02b8a9b0747710fed13ab51e5984d329975c94e8da2f86a467b5f51dd9
+- id: q065
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.40359985
+  text: What are the benefits of the Open Charge Point Protocol for charging station owners?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: e8509fb8efb380d1e4663442552c157e8cdc8f362a5629c51e3bd050ce7be342
+- id: q066
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.19219297
+  text: How does an uninterruptible power supply differ from a standby generator?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 845a5a6037068afa88ef217f01b5542e3acbf05bdd98f32e76e25b461568ccf5
+- id: q067
+  class: glossary_term
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.27279360
+  text: Which sites are the major dedicated customer review sites?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 82b7d73bb3c265d0226e174ad82e24b0c5d190f8cc2e03f05290c32c250068b1
+- id: q068
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.18215937
+  text: The Tesla Motors article links to a car made in Fremont; which linked article explains how its
+    European cars are assembled in Tilburg?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 9df37f11e2c4da859567d18f7e8b65ce17c617fa585028c77c734bb00daa9c22
+- id: q069
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.31162817
+  text: From the article on the Chernobyl disaster, which linked article explains the cooling that a reactor
+    needs after shutdown because of decay heat?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 86804209772094ba83e88a42b73cd5166220aaaa829e617ded3b315403593ba5
+- id: q070
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.3354
+  text: From the article on Germany, which linked article describes the maritime temperate climate of
+    the capital city?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 19a207d3a610f48b95dcac53f6b6466e3d9c04b569519d99b38c4769c9477d85
+- id: q071
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.42182160
+  text: The Flipkart article links to a co-founder; which linked article tells how he dropped out of IIT
+    in 2005 and joined Amazon.com India?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: c6ed2c08622e28f8db4882d546541b7fdea3b899c23f8a1e24ac34f6b2a0cad9
+- id: q072
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.15043
+  text: From the article on the space station Mir, which linked article says the station was meant to
+    be a laboratory, observatory and factory in low Earth orbit?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: c8f527dfe1037ddd787b698a33930f92bc8db3d8d2bb9b6827c5ef66682280ac
+- id: q073
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.6087161
+  text: From the article on thundersnow, which linked article explains how snow crystals collect supercooled
+    water droplets in accretion?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: ef76fb9657cf82219b66574b6b119e819b2adda1b898ffd047d799355d071658
+- id: q074
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.844110
+  text: From the article on the F-22 Raptor, which linked article describes the roll-out of the aircraft
+    named Spirit of America on 9 April 1997?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a9855acbaaeb74fba083f6db4df81e461d8058ffc6c669849800fe15e6c73cdb
+- id: q075
+  class: cross_reference
+  kind: wikipedia_article
+  expected_unit_id: wikipedia.93258
+  text: From the article on Airbus, which linked article describes the Airbus Defence and Space division
+    formed in January 2014?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: ff35e1609a8970b974b5f044935a9639c4f461a5cb62b918936bb09b120f4c4e
+- id: q076
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What are the new features of the iPhone 15?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: fed73b484400736edf954ab9bf55d3a9cf3c8c9c44539ef6c99ffd3090c7ced3
+- id: q077
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How does ChatGPT use reinforcement learning from human feedback?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 92e91750fd44c2d6804f55cb329b9301c334b4f7457df71da1d1f4606352ddf1
+- id: q078
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How many COVID-19 cases were reported in Germany in 2020?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 73a097b2db9511b0934c0f7b8a6c453676d8e24215c4ab19f13f05073d592a38
+- id: q079
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How does the walrus operator work in Python 3.8?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 70a9112df180905d39ecd27930065fd1a86340378d0c73fc10e6c4134cfb1edc
+- id: q080
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I scale a Kubernetes deployment with a horizontal pod autoscaler?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 520f5bff1cb4e0535cc8774a67fbc46e4e1e9f7fa7dad935460e13ffdf3b89d1
+- id: q081
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What did the Brexit withdrawal agreement say about the Irish border?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a854573622b8690984cbab5ddfebf10599c0b05d5b5d24f6398c1bb8ee36503c
+- id: q082
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What are the system requirements of Windows 11?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: c4a94dc9bbb5a170e5f343c7da798f9c9130545361670981f61d22b5b087cba7
+- id: q083
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: Which launch games were available for the PlayStation 5?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: e1df4f9162229fb966fe292249fc319ea333f0b4f014690dcb7470a4ab45fcd1
+- id: q084
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How did the container ship Ever Given block the Suez Canal in 2021?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: f8f254f6d69c3eb304f044ad83d83cb1cdd7a82fa9655c9abca1e11dafc762ef
+- id: q085
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the current price of electricity per kilowatt hour today?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 2ae7a73aa81fa2fc729abefdd186a4bfb94a8fe5b124ff53105ff5cfa0b7fa9f
+- id: q086
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the weather forecast for Hamburg tomorrow?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: d0bf807845d641da21de2ce18ef64a3ca4187d753ed7ce45d70b5594015d5655
+- id: q087
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the plot of the film Barbie that was released in 2023?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 50899acfa0d84acbbe1e03c3d0d320c6e1825516c5eecccf8e51cac68faa9adb
+- id: q088
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: What is the share price of Tesla today?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: a4e4a84a43e53c9ed1e9aeebf335b35f926f16d932d86abae921f877b638c4cb
+- id: q089
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I reset a forgotten password on a Wi-Fi router?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: 34cdbf94acc36c4fbbec65d8b405e0ceefe192676a81d5ebe5c59a4a41d4cb81
+- id: q090
+  class: negative
+  kind: null
+  expected_unit_id: null
+  text: How do I change the chain on a road bicycle?
+  approval:
+    status: approved
+    approver: sharique
+    approved_at: '2026-10-15'
+    approved_hash: c9d7531d2b55de033d61a2f3ae3be4acd17bfad9958a204a63b1ce3ad8e334b1

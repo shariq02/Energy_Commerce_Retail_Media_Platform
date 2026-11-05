@@ -77,3 +77,16 @@ SPEC = {
 
 # DBTITLE 1,Run the anomaly candidates
 run_anomaly(ctx, df, SPEC)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "energy__07_honda_anomaly",
+    "Model Honda Anomaly",
+    ["candidate_results", "task_run_context"],
+    rid,
+    task_ids=["honda_anomaly.anomaly"],
+    smoke=SMOKE,
+)

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "One line of the tool call log",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "trace_id",
+    "timestamp",
+    "agent",
+    "mcp_server",
+    "tool_name",
+    "argument_hash",
+    "arguments",
+    "result_status",
+    "duration_ms",
+    "retry_attempt",
+    "tool_version",
+    "definition_hash",
+    "error_code",
+    "row_count"
+  ],
+  "properties": {
+    "trace_id": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "minLength": 20},
+    "agent": {"type": "string"},
+    "mcp_server": {"type": "string"},
+    "tool_name": {"type": "string", "pattern": "^[A-Za-z0-9_]+$"},
+    "argument_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "arguments": {"type": "string", "maxLength": 500},
+    "result_status": {
+      "enum": [
+        "ok",
+        "tool_error",
+        "invalid_arguments",
+        "denied",
+        "timeout",
+        "server_failed",
+        "contract_violation",
+        "budget_exhausted"
+      ]
+    },
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "retry_attempt": {"type": "integer", "minimum": 0},
+    "tool_version": {"type": ["integer", "null"]},
+    "definition_hash": {"type": ["string", "null"]},
+    "error_code": {"type": ["string", "null"]},
+    "row_count": {"type": ["integer", "null"]}
+  }
+}

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +30,9 @@ from scripts.knowledge import wikipedia_corpus as wc
 from scripts.knowledge import wikipedia_prepare as wp
 
 RECORD_KEY = "embedding"
+RECORD_FILE = "record.json"
+KEYWORD_FILE = "keyword.json"
+FTS_FILE = "fts.sqlite"
 SAMPLE_SIZE = 1000
 SAMPLE_BATCH = 250
 HASH_BLOCK = 8 * 1024 * 1024
@@ -38,12 +42,65 @@ def chroma_dir(ai_dir: Path) -> Path:
     return ai_dir / "vector_store" / "data" / "chroma"
 
 
-def keyword_path(ai_dir: Path, corpus_id: str) -> Path:
-    return ai_dir / "vector_store" / "data" / "keyword" / f"{corpus_id}.json"
+def builds_root(ai_dir: Path, corpus_id: str) -> Path:
+    return ai_dir / "vector_store" / "data" / "builds" / corpus_id
+
+
+def build_dir(ai_dir: Path, corpus_id: str, build_id: str) -> Path:
+    """Folder of one build: its record, keyword file, FTS index and graph copy."""
+    return builds_root(ai_dir, corpus_id) / build_id
+
+
+def keyword_file(corpus_id: str, build_id: str) -> str:
+    """The keyword file as the record names it, relative to `ai_dir`."""
+    return f"vector_store/data/builds/{corpus_id}/{build_id}/{KEYWORD_FILE}"
+
+
+def keyword_path(ai_dir: Path, corpus_id: str, build_id: str) -> Path:
+    return build_dir(ai_dir, corpus_id, build_id) / KEYWORD_FILE
+
+
+def fts_path(ai_dir: Path, corpus_id: str, build_id: str) -> Path:
+    return build_dir(ai_dir, corpus_id, build_id) / FTS_FILE
+
+
+def build_graph_dir(ai_dir: Path, corpus_id: str, build_id: str) -> Path:
+    return build_dir(ai_dir, corpus_id, build_id) / "graph"
 
 
 def graph_dir(ai_dir: Path) -> Path:
+    """The readable copy of the curated graph of the recorded build (tracked)."""
     return ai_dir / "knowledge_graph"
+
+
+def is_migrated(record: dict) -> bool:
+    return record["keyword_index"]["file"] == keyword_file(
+        record["corpus_id"], record["build_id"]
+    )
+
+
+def save_build_record(ai_dir: Path, record: dict) -> None:
+    text = json.dumps(record, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    path = build_dir(ai_dir, record["corpus_id"], record["build_id"]) / RECORD_FILE
+    uc.write_text(path, text)
+
+
+def read_build_record(ai_dir: Path, corpus_id: str, build_id: str) -> dict | None:
+    path = build_dir(ai_dir, corpus_id, build_id) / RECORD_FILE
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def prune_builds(ai_dir: Path, corpus_id: str, keep: set[str]) -> list[str]:
+    """Delete the build folders of this corpus that are not in `keep`."""
+    root = builds_root(ai_dir, corpus_id)
+    if not root.is_dir():
+        return []
+    removed = sorted(d.name for d in root.iterdir() if d.name not in keep)
+    for name in removed:
+        shutil.rmtree(root / name)
+    return removed
 
 
 def chunks_hash_from_pairs(pairs) -> str:
@@ -115,19 +172,23 @@ def make_record(
         "articles_without_chunks": corpus.without_chunks,
         "vectors": vectors,
         "keyword_index": {
-            "file": f"vector_store/data/keyword/{corpus.corpus_id}.json",
+            "file": keyword_file(corpus.corpus_id, new_id),
             "version": keyword_version,
         },
         "graph": graph,
     }
 
 
-def write_record(corpus: Corpus, record: dict) -> None:
+def write_manifest_record(path: Path, record: dict) -> None:
     """Set the `embedding` key in the manifest file; the other keys stay."""
-    manifest = json.loads(corpus.manifest_path.read_text(encoding="utf-8"))
+    manifest = json.loads(path.read_text(encoding="utf-8"))
     manifest[RECORD_KEY] = record
     text = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-    uc.write_text(corpus.manifest_path, text)
+    uc.write_text(path, text)
+
+
+def write_record(corpus: Corpus, record: dict) -> None:
+    write_manifest_record(corpus.manifest_path, record)
 
 
 def file_sha256_progress(path: Path, label: str, say=show) -> str:
@@ -323,6 +384,16 @@ def verify(
                 f"collection {name} holds {count} chunks, not {record['chunk_count']}"
             )
         problems += check_sample(collection, data.sample, corpus_id, say)
+    problems += index_problems(corpus_id, record, ai_dir, say)
+    say("  step: graph")
+    if data.graph_version != record["graph"]["version"]:
+        problems.append("the graph differs from the manifest")
+    return problems
+
+
+def index_problems(corpus_id: str, record: dict, ai_dir: Path, say=show) -> list[str]:
+    """The keyword file and the graph copy of the build folder against the record."""
+    problems = []
     say("  step: keyword file")
     keyword = ai_dir / record["keyword_index"]["file"]
     if (
@@ -330,8 +401,21 @@ def verify(
         or file_sha256_progress(keyword, "keyword file", say)
         != record["keyword_index"]["version"]
     ):
-        problems.append("the keyword index file differs from the manifest")
-    say("  step: graph")
-    if data.graph_version != record["graph"]["version"]:
-        problems.append("the graph differs from the manifest")
+        problems.append("the keyword index file differs from the record")
+    say("  step: graph copy of the build")
+    copy = build_graph_dir(ai_dir, corpus_id, record["build_id"])
+    if corpus_id == wc.CORPUS_ID:
+        edges = copy / kg.EDGES_FILE
+        found = uc.sha256_file(edges) if edges.is_file() else None
+    else:
+        found = (
+            kg.graph_version(copy)
+            if (copy / kg.EDGES_FILE).is_file() and (copy / kg.NODES_FILE).is_file()
+            else None
+        )
+    if found != record["graph"]["version"]:
+        problems.append(
+            "the graph copy of the build folder differs from the record: "
+            "run python -m ai.embeddings.build migrate"
+        )
     return problems

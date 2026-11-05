@@ -14,7 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** create the prediction, reference, monitoring and trigger tables and record the
 # MAGIC monitoring settings before the first window is read. Once a monitoring result
-# MAGIC exists the settings cannot change.
+# MAGIC exists the settings cannot change. The rows of a model that the registry retired
+# MAGIC are removed from the operate tables.
 
 # COMMAND ----------
 
@@ -55,11 +56,8 @@ rid = model_run_id()
 # DBTITLE 1,Create the operate tables
 for eco in ("energy", "commerce"):
     for name in OPERATE_TABLES:
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {model_fqn(name, eco)} "
-            f"({MODEL_DDL[name]}) USING delta"
-        )
-        print(f"OK  operate table ready: {model_fqn(name, eco)}")
+        full = create_model_table(name, MODEL_DDL[name], eco)
+        print(f"OK  operate table ready: {full}")
 
 # COMMAND ----------
 
@@ -114,3 +112,21 @@ for eco, have in recorded.items():
 for eco in ("energy", "commerce"):
     rows = read_model("monitoring_spec", ecosystem=eco).collect()
     print(eco, operate_spec_from_rows([r.asDict() for r in rows]))
+
+# COMMAND ----------
+
+# DBTITLE 1,Remove the rows of models that are not registered
+for eco in ("energy", "commerce"):
+    removed = remove_rows_without_entry(eco)
+    print(f"{eco}: rows of {len(removed)} model(s) removed")
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "operate__00_operate_setup",
+    "Operate Setup",
+    ["monitoring_spec"],
+    rid,
+)

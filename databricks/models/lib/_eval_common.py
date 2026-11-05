@@ -20,6 +20,8 @@
 # COMMAND ----------
 
 # DBTITLE 1,Imports
+import importlib.util as _importlib_util
+
 import numpy as np
 import pandas as pd
 
@@ -143,12 +145,133 @@ def note_read(ctx: EvalContext, frame, time_col=None, group_col=None) -> None:
 # DBTITLE 1,Forwarded models and their stored artifacts
 
 
+FOUNDATION_SELECTION_TABLE = "foundation_selection"
+FOUNDATION_RESULTS_TABLE = "foundation_results"
+EVALUATION_LIMIT_SECONDS = FOUNDATION_LIMIT_SECONDS
+# models that need longer on CPU than the default limit
+MODEL_LIMIT_SECONDS = {"moment_zero_shot": 5400}
+GPU_ONLY_FAMILIES = ("foundation_surv",)
+GPU_ONLY_REASON = "no GPU: the process is killed by memory on CPU"
+
+
+def gpu_available() -> bool:
+    """True when torch sees a CUDA device; False without torch."""
+    try:
+        import torch
+    except ImportError:
+        return False
+    return bool(torch.cuda.is_available())
+
+
+# (part of the model name, libraries its stored bundle needs); a name without a match
+# needs only the base environment
+MODEL_LIBRARY_PARTS = (
+    ("lightgbm", ("lightgbm",)),
+    ("xgboost", ("xgboost",)),
+    ("lifelines", ("lifelines",)),
+    ("survival_forest", ("sksurv",)),
+    ("sasrec", ("torch",)),
+    ("decision_transformer", ("torch",)),
+    ("chronos2", ("chronos",)),
+    ("timesfm", ("timesfm",)),
+    ("ttm_", ("tsfm_public",)),
+    ("tspulse", ("tsfm_public",)),
+    ("tabpfn", ("tabpfn",)),
+    ("tabicl", ("tabicl",)),
+    ("moment", ("momentfm",)),
+    ("toto2", ("toto2",)),
+    ("_lora", ("peft",)),
+)
+
+
+def model_libraries(model: dict) -> list[str]:
+    """The libraries the stored bundle of a forwarded model needs, from its name."""
+    name = str(model.get("model_name", ""))
+    found: list[str] = []
+    for part, libs in MODEL_LIBRARY_PARTS:
+        if part in name:
+            found.extend(lib for lib in libs if lib not in found)
+    return found
+
+
+def library_origin(name: str) -> str | None:
+    """The folder of an installed library, or None. Found without an import; a
+    half-copied folder is a namespace package without an origin and counts as absent."""
+    top = LIBRARY_PROBES.get(name, name).split(".")[0]
+    try:
+        spec = _importlib_util.find_spec(top)
+    except (ImportError, ValueError):
+        return None
+    if spec is None or not spec.origin:
+        return None
+    return spec.origin.split("/model_libraries/")[-1].rsplit("/", 1)[0]
+
+
+def check_model_libraries(task_id: str, models: list[dict]) -> None:
+    """Print each library the forwarded models need, with version and folder, and stop
+    before any data is read when one is not installed."""
+    needs: dict[str, list[str]] = {}
+    for m in models:
+        if m.get("family") in GPU_ONLY_FAMILIES and not gpu_available():
+            continue
+        for lib in model_libraries(m):
+            needs.setdefault(lib, []).append(m["model_name"])
+    missing = []
+    for lib, names in needs.items():
+        origin = library_origin(lib)
+        if origin is None:
+            missing.append(lib)
+            print(f"MISS {lib}: for {names}")
+        else:
+            print(
+                f"OK   {lib}: {library_version(lib) or '-'} from {origin} for {names}"
+            )
+    if missing:
+        raise RuntimeError(
+            f"{task_id}: libraries missing for the forwarded models: {missing}; "
+            "run 00_model_libraries"
+        )
+
+
+CPU_ROW_LIMITED_PREFIXES = ("tabpfn",)
+CPU_ROW_LIMIT = 1000
+CPU_ROW_REASON = f"TabPFN on CPU: more than {CPU_ROW_LIMIT} rows"
+
+
+def skip_reason(model, evaluator) -> str | None:
+    """Why a forwarded model is not scored on this machine, or None. The reason is
+    known before any frame is sampled, so a model that cannot run does not set the
+    sample of the task."""
+    if model.get("family") in GPU_ONLY_FAMILIES and not gpu_available():
+        return GPU_ONLY_REASON
+    frame = evaluator.frames.get("eval")
+    if (
+        str(model.get("model_name", "")).startswith(CPU_ROW_LIMITED_PREFIXES)
+        and isinstance(frame, pd.DataFrame)
+        and len(frame) > CPU_ROW_LIMIT
+        and not gpu_available()
+    ):
+        return CPU_ROW_REASON
+    return None
+
+
+def table_rows(table: str, ctx: EvalContext, *, smoke: bool | None = None) -> list:
+    """The rows of one task from a model table; an empty list while the table does
+    not exist yet (the foundation tables exist after their setup)."""
+    if not spark.catalog.tableExists(model_fqn(table, ctx.ecosystem)):
+        return []
+    df = read_model(table, ecosystem=ctx.ecosystem).filter(
+        F.col("task_id") == ctx.task_id
+    )
+    if smoke is not None:
+        df = df.filter(F.col("smoke") == smoke)
+    return [r.asDict() for r in df.collect()]
+
+
 def _selection_rows(ctx: EvalContext) -> list[dict]:
     sel = [
-        r.asDict()
-        for r in read_model("candidate_selection", ecosystem=ctx.ecosystem)
-        .filter(F.col("task_id") == ctx.task_id)
-        .collect()
+        *table_rows("candidate_selection", ctx),
+        *table_rows(FOUNDATION_SELECTION_TABLE, ctx),
     ]
     if not sel:
         raise RuntimeError(f"{ctx.task_id}: no models forwarded by the selection")
@@ -166,24 +289,12 @@ def forwarded_models(ctx: EvalContext) -> list[dict]:
     """The selected models of the task (baseline first), each with its stored run id
     and recorded validation metrics, plus any other baseline kept for its metrics."""
     sel = _selection_rows(ctx)
-    rows = (
-        read_model("candidate_results", ecosystem=ctx.ecosystem)
-        .filter(
-            (F.col("task_id") == ctx.task_id)
-            & ~F.col("smoke")
-            & (F.col("status") == "ok")
-        )
-        .select(
-            "model_name",
-            "family",
-            "stage",
-            "metric",
-            "value",
-            "mlflow_run_id",
-            "params",
-        )
-        .collect()
-    )
+    rows = [
+        r
+        for table in ("candidate_results", FOUNDATION_RESULTS_TABLE)
+        for r in table_rows(table, ctx, smoke=False)
+        if r["status"] == "ok"
+    ]
     by: dict = {}
     for r in rows:
         d = by.setdefault(
@@ -224,18 +335,39 @@ def row_fraction_of(models) -> float:
     return 1.0
 
 
-def load_bundle(model: dict):
-    """The stored fitted model of one candidate; the artifacts are our own runs."""
-    if not model["mlflow_run_id"]:
-        raise RuntimeError("no stored artifact for this model")
-    import cloudpickle
-    import mlflow
+def uses_context_model(models) -> bool:
+    """True when a forwarded model predicts from stored context rows (its recorded
+    parameters say `mode: in_context`)."""
+    return any("'mode': 'in_context'" in (m.get("params") or "") for m in models)
 
-    path = mlflow.artifacts.download_artifacts(
-        artifact_uri=f"runs:/{model['mlflow_run_id']}/candidate/candidate.pkl"
-    )
-    with open(path, "rb") as fh:
-        return cloudpickle.load(fh)
+
+def sample_eval_frames(evaluator, models, max_rows: int = IN_CONTEXT_SAMPLE_ROWS):
+    """When a context model is forwarded, score every model of the task on the same
+    seeded sample of each frame above `max_rows` rows, because a context model reads
+    all context rows for each scored row. The note goes to the recorded detail and
+    to the read notes. Frames that are not tables of rows stay as they are. A model
+    that is skipped on this machine does not count. A sampled validation frame stops
+    the reproduction check: the stored value is from all validation rows."""
+    models = [m for m in models if skip_reason(m, evaluator) is None]
+    if not uses_context_model(models):
+        return
+    notes = []
+    parts = (("eval", evaluator.ctx.partition), ("validation", "validation"))
+    for part, label in parts:
+        frame = evaluator.frames.get(part)
+        if not isinstance(frame, pd.DataFrame) or len(frame) <= max_rows:
+            continue
+        seed = evaluator.ctx.thresholds["bootstrap_seed"]
+        pos = context_positions(len(frame), max_rows, seed)
+        evaluator.frames[part] = frame.iloc[pos].reset_index(drop=True)
+        notes.append(f"{label} sample {len(pos)} of {len(frame)} rows")
+        if part == "validation":
+            evaluator.validation_sampled = True
+            notes.append("reproduction not checked: validation sampled")
+        read = {"partition": label, "sample_rows": len(pos), "of_rows": len(frame)}
+        _FRAME_NOTES.append({"read": read})
+    evaluator.sampler = None
+    evaluator.sample_note = f" ({'; '.join(notes)})" if notes else ""
 
 
 # COMMAND ----------
@@ -394,6 +526,8 @@ class Evaluator:
         self.spec = cfg["spec"]
         self.frames: dict = {"eval": None, "validation": None}
         self.sampler = None
+        self.sample_note = ""
+        self.validation_sampled = False
         self.base_name = None
         self.recorded: dict = {}
 
@@ -465,9 +599,12 @@ class Evaluator:
 
 def start_evaluation(ctx: EvalContext) -> None:
     """Drop this task's earlier rows of the same kind, then note the data read."""
+    where = ecosystem_predicate(
+        ctx.ecosystem,
+        f"task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}",
+    )
     spark.sql(
-        f"DELETE FROM {model_fqn('evaluation_results', ctx.ecosystem)} "
-        f"WHERE task_id = '{ctx.task_id}' AND smoke = {str(ctx.smoke).lower()}"
+        f"DELETE FROM {model_fqn('evaluation_results', ctx.ecosystem)} WHERE {where}"
     )
     print(f"task {ctx.task_id} on {ctx.partition}, frozen version {ctx.frozen_version}")
     record_task_context(
@@ -506,9 +643,11 @@ def record_evaluation(ctx: EvalContext, model, status, metrics, n_rows, detail) 
         )
         for m, v in items
     ]
-    spark.createDataFrame(rows, MODEL_DDL["evaluation_results"]).write.format(
-        "delta"
-    ).mode("append").saveAsTable(model_fqn("evaluation_results", ctx.ecosystem))
+    append_model_rows(
+        spark.createDataFrame(rows, MODEL_DDL["evaluation_results"]),
+        "evaluation_results",
+        ecosystem=ctx.ecosystem,
+    )
 
 
 # COMMAND ----------
@@ -537,7 +676,11 @@ def enrich(ctx, evaluator, model, bundle, sc, base_sc, bundles) -> dict:
             metrics["bootstrap_rows_used"] = float(rows)
     metrics.update(evaluator.segments(sc))
     metrics.update(prediction_sanity(sc.pred, sc.target))
-    if evaluator.can_reproduce and evaluator.frame("validation") is not None:
+    if (
+        evaluator.can_reproduce
+        and not getattr(evaluator, "validation_sampled", False)
+        and evaluator.frame("validation") is not None
+    ):
         again = evaluator.score(bundle, "validation", bundles).metrics.get(primary)
         if again is not None and recorded is not None and np.isfinite(recorded):
             gap = abs(again - recorded) / max(abs(recorded), 1e-12)
@@ -609,37 +752,54 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
     scored: dict = {}
     for m in models:
         name = m["model_name"]
-        if name not in bundles and name not in errors:
-            fetch(m)
-        if name in errors:
-            record_evaluation(ctx, m, "failed", {}, None, errors[name])
-            print(f"FAIL {name}: {errors[name]}")
-            if name == base_name:
-                raise RuntimeError(f"{ctx.task_id}: the baseline could not be loaded")
-            continue
-        try:
-            sc = evaluator.score(bundles[name], "eval", bundles)
-            scored[name] = sc
-            base_sc = scored.get(base_name)
-            metrics = enrich(ctx, evaluator, m, bundles[name], sc, base_sc, bundles)
-            if name != base_name:
-                sc.release()
-            record_evaluation(ctx, m, "ok", metrics, sc.n_rows, f"on {ctx.partition}")
-            shown = {
-                k: round(v, 4)
-                for k, v in metrics.items()
-                if "__" not in k and _finite(v) is not None
-            }
-            print(f"OK   {name}: {shown}")
-        except Exception as exc:
-            detail = f"{type(exc).__name__}: {str(exc)[:600]}"
-            record_evaluation(ctx, m, "failed", {}, None, detail)
-            print(f"FAIL {name}: {detail}")
-            if name == base_name:
-                raise
-        if not evaluator.needs_all_bundles and name not in resident:
-            bundles.pop(name, None)
-        _gc.collect()
+        limit = MODEL_LIMIT_SECONDS.get(name, EVALUATION_LIMIT_SECONDS)
+        limit = 0 if name == base_name else limit
+        with candidate_guard(f"{name} {ctx.task_id}", limit):
+            reason = skip_reason(m, evaluator)
+            if reason:
+                record_evaluation(ctx, m, "skipped", {}, None, reason)
+                print(f"SKIP {name}: {reason}")
+                continue
+            if name not in bundles and name not in errors:
+                fetch(m)
+            if name in errors:
+                record_evaluation(ctx, m, "failed", {}, None, errors[name])
+                print(f"FAIL {name}: {errors[name]}")
+                if name == base_name:
+                    raise RuntimeError(
+                        f"{ctx.task_id}: the baseline could not be loaded"
+                    )
+                continue
+            try:
+                sc = evaluator.score(bundles[name], "eval", bundles)
+                scored[name] = sc
+                base_sc = scored.get(base_name)
+                metrics = enrich(ctx, evaluator, m, bundles[name], sc, base_sc, bundles)
+                if name != base_name:
+                    sc.release()
+                record_evaluation(
+                    ctx,
+                    m,
+                    "ok",
+                    metrics,
+                    sc.n_rows,
+                    f"on {ctx.partition}{evaluator.sample_note}",
+                )
+                shown = {
+                    k: round(v, 4)
+                    for k, v in metrics.items()
+                    if "__" not in k and _finite(v) is not None
+                }
+                print(f"OK   {name}: {shown}")
+            except Exception as exc:
+                detail = f"{type(exc).__name__}: {str(exc)[:600]}"
+                record_evaluation(ctx, m, "failed", {}, None, detail)
+                print(f"FAIL {name}: {detail}")
+                if name == base_name:
+                    raise
+            if not evaluator.needs_all_bundles and name not in resident:
+                bundles.pop(name, None)
+            _gc.collect()
     ok = base_name in scored
     scored.clear()
     bundles.clear()

@@ -117,7 +117,9 @@ for eco in ("energy", "commerce"):
 now = now_utc()
 planned = {}
 for eco, (approvals, fit_versions, existing) in evidence.items():
-    wanted = registry_entries(approvals, fit_versions)
+    wanted = annotate_replacements(
+        registry_entries(approvals, fit_versions), existing, is_foundation_model
+    )
     changes = {
         k: v
         for k, v in LIFECYCLE_CHANGES.items()
@@ -143,18 +145,45 @@ for eco, rows in planned.items():
 
 # COMMAND ----------
 
+# DBTITLE 1,The version fields of the new entries
+# A new registered version records its code, data, file and task definition. Old
+# versions keep NULL (not recorded); a retired or deprecated row keeps what it had.
+for eco, rows in planned.items():
+    for r in rows:
+        if r["lifecycle_status"] == "registered" and not r.get("data_fingerprint"):
+            r.update(version_fields_of(r))
+
+# COMMAND ----------
+
+# DBTITLE 1,The planned registry passes the guards
+_problems = [
+    (eco, *problem)
+    for eco, (approvals, _fit, existing) in evidence.items()
+    for problem in planned_registry_problems(existing, planned[eco], approvals)
+]
+check(
+    COMPONENT,
+    SOURCE,
+    "planned_registry_is_consistent",
+    not _problems,
+    detail=f"ecosystem, task, problem, model: {_problems}",
+    metric_value=float(len(_problems)),
+    rid=rid,
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Write the new version rows
 for eco, rows in planned.items():
     if not rows:
         print(f"OK  {eco}: registry unchanged")
         continue
-    cols = read_model("model_registry", ecosystem=eco).columns
-    tuples = [tuple(r[c] for c in cols) for r in rows]
-    (
-        spark.createDataFrame(tuples, MODEL_DDL["model_registry"])
-        .write.format("delta")
-        .mode("append")
-        .saveAsTable(model_fqn("model_registry", eco))
+    cols = row_columns("model_registry", ecosystem=eco)
+    tuples = [tuple(r.get(c) for c in cols) for r in rows]
+    append_model_rows(
+        spark.createDataFrame(tuples, MODEL_DDL["model_registry"]),
+        "model_registry",
+        ecosystem=eco,
     )
     print(f"OK  {eco}: {len(rows)} row(s) appended")
 
@@ -175,4 +204,15 @@ check(
     detail=f"entries without a run or a card: {_unlinked}",
     metric_value=float(len(_unlinked)),
     rid=rid,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy", "commerce"),
+    "register__01_register_models",
+    "Register Models",
+    ["model_registry"],
+    rid,
 )

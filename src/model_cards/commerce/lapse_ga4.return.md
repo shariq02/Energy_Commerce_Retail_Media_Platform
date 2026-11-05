@@ -1,6 +1,6 @@
 # Model card: lapse_ga4.return
 
-_model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -36,7 +36,7 @@ _model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `a9f81375379840ab9a2826a8d57f723b`
+- model family: gbt_sklearn; MLflow run `186e4a8c3f874bd296d317ce1ac6d3a1`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
 - library versions: sklearn 1.6.1
 - processor type: not recorded for the training and evaluation runs
@@ -65,7 +65,7 @@ _model `gbt_sklearn`, dataset `lapse_ga4`, frozen version 0, primary metric `pr_
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

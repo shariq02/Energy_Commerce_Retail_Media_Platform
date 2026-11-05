@@ -1,6 +1,6 @@
 # Model card: next_item_rees46.next_item
 
-_model `sequence_transformer`, dataset `next_item_rees46`, frozen version 0, primary metric `ndcg_at_10` (higher is better). Generated: 2026-10-04T18:03Z_
+_model `sequence_transformer`, dataset `next_item_rees46`, frozen version 14, primary metric `ndcg_at_10` (higher is better). Generated: 2026-10-26T17:52Z_
 
 ## Decision
 
@@ -9,7 +9,7 @@ _model `sequence_transformer`, dataset `next_item_rees46`, frozen version 0, pri
 - recommended by the rules: `approved`
 - overridden by the owner: no
 - decided by: owner
-- rules applied: none
+- rules applied: R10
 
 ## Purpose and task
 
@@ -31,31 +31,31 @@ _model `sequence_transformer`, dataset `next_item_rees46`, frozen version 0, pri
 ## Data
 
 - frame: 695419 rows, columns 6, rows by partition {'test': 695419}
-- held-out read: partition test, frozen_delta_version 0, rows 300524, groups 21853
+- held-out read: partition test, frozen_delta_version 14, rows 300524, groups 21853
 - frame: 688463 rows, columns 6, rows by partition {'validation': 688463}
 
 ## Training
 
-- model family: sequence_transformer; MLflow run `89a463347113438b8668f68a7311a214`
+- model family: sequence_transformer; MLflow run `6970d3c7580c4c5f89acb86fb5e01953`
 - parameters: {'vocab': 20000, 'dim': 64, 'epochs': 2, 'history': 10, 'train_rows': 1000000, 'eval_rows': 302614, 'row_fraction': 1.0}
-- library versions: torch 2.14.1+cpu
+- library versions: torch 2.9.0+cu129
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | sequence_transformer held-out | sequence_transformer validation | popularity held-out |
 |---|---|---|---|
-| mrr | 0.08339 | 0.0816 | 0.01557 |
-| ndcg_at_10 | 0.09874 | 0.09657 | 0.01693 |
-| ndcg_at_20 | 0.1142 | 0.1119 | 0.02188 |
-| ndcg_at_5 | 0.08145 | 0.07938 | 0.01251 |
-| primary_change_relative | -0.02249 |  | -0.04211 |
+| mrr | 0.08346 | 0.08154 | 0.01557 |
+| ndcg_at_10 | 0.09879 | 0.09651 | 0.01693 |
+| ndcg_at_20 | 0.1142 | 0.1118 | 0.02188 |
+| ndcg_at_5 | 0.08146 | 0.07921 | 0.01251 |
+| primary_change_relative | -0.02363 |  | -0.04211 |
 | recall_at_10 | 0.1758 | 0.1722 | 0.03409 |
-| recall_at_20 | 0.2368 | 0.2329 | 0.05386 |
-| recall_at_5 | 0.1222 | 0.1189 | 0.02032 |
-| skill_primary | 0.08181 |  |  |
-| skill_primary_ci_high | 0.08632 |  |  |
-| skill_primary_ci_low | 0.07951 |  |  |
+| recall_at_20 | 0.2367 | 0.2328 | 0.05386 |
+| recall_at_5 | 0.1221 | 0.1185 | 0.02032 |
+| skill_primary | 0.08186 |  |  |
+| skill_primary_ci_high | 0.08646 |  |  |
+| skill_primary_ci_low | 0.07954 |  |  |
 
 ## Flags
 
@@ -67,7 +67,7 @@ _model `sequence_transformer`, dataset `next_item_rees46`, frozen version 0, pri
 
 ## Disclosures
 
-- none
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

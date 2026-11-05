@@ -24,6 +24,7 @@ dependencies = [
     "networkx>=3.6.1",
     "onnxruntime>=1.28.0",
     "tokenizers>=0.23.1",
+    "mcp>=1.28,<2",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "requests>=2.31.0",
@@ -85,7 +86,15 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
 "databricks/silver/_semantic_common.py" = ["F821"]
+# _genomics_common.py is %run after _silver_common and uses its names.
+"databricks/silver/_genomics_common.py" = ["F821"]
+"databricks/silver/_genomics_entities.py" = ["F821"]
+"databricks/silver/genomics/**/*.py" = ["F821"]
 "databricks/utility/06_silver_legacy_retirement.py" = ["F821"]
+# The genomics Bronze notebooks pull `%run ./_genomics_bronze_common` (Databricks
+# runtime magic). The common file itself is NOT exempted.
+"databricks/bronze/10_load_genomics_bronze.py" = ["F821"]
+"databricks/setup/06_create_genomics_volumes.py" = ["F821"]
 # Gold notebooks pull `%run ../silver/_silver_common` then `%run ../../_gold_common`
 # (Databricks runtime magic). _gold_common.py itself is the second link in that
 # chain (like _silver_inspect.py) and legitimately depends on _silver_common's
@@ -98,6 +107,8 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
 "databricks/utility/07_gold_legacy_retirement.py" = ["F821"]
 "databricks/utility/09_update_model_card_paths.py" = ["F821"]
+"databricks/utility/11_frozen_dataset_retention.py" = ["F821"]
+"databricks/utility/12_cpu_speed_probe.py" = ["F821"]
 # Analytics notebooks pull `%run ../gold/_gold_common` then `%run ./_analytics_common`
 # (Databricks runtime magic), same chain shape as Gold's own. _analytics_common.py
 # and _analytics_inspect.py are the second/third links, depending on _gold_common's

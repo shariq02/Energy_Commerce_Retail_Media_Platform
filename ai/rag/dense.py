@@ -20,10 +20,12 @@ QUERY_TOO_LONG = "query_too_long"
 
 
 class DenseRetriever:
-    def __init__(self, collection, embedder, count_tokens):
+    def __init__(self, collection, embedder, count_tokens, max_tokens=None):
         self.collection = collection
         self.embedder = embedder
         self.count_tokens = count_tokens
+        # The limit of the embedder that built the collection; None is the MiniLM limit.
+        self.max_tokens = max_tokens
 
     def search(
         self, text: str, where: dict | None, k: int, min_score: float | None
@@ -31,12 +33,13 @@ class DenseRetriever:
         """Return (status, [(chunk id, score)]) best first; ties by chunk id."""
         if not text:
             return EMPTY_QUERY, []
-        if self.count_tokens(text) > emb.MAX_TOKENS:
+        if self.count_tokens(text) > (self.max_tokens or emb.MAX_TOKENS):
             return QUERY_TOO_LONG, []
         total = self.collection.count()
         if total == 0:
             return OK, []
-        vector = self.embedder.embed([text])[0]
+        embed = getattr(self.embedder, "embed_queries", None) or self.embedder.embed
+        vector = embed([text])[0]
         found = self.collection.query(
             query_embeddings=[vector.tolist()],
             n_results=min(k, total),

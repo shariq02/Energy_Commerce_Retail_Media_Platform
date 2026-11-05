@@ -6,10 +6,10 @@ Date: September 2026
 
 Purpose: one authoritative place that enumerates every column every Silver
 notebook emits, with its class -- source_provided / derived / synthetic --
-and its target_schema (energy_silver / energy_silver_reference /
-commerce_silver / commerce_silver_reference), resolved from
-source_ecosystem_map.yml plus the fixed reference-table set. The Silver
-notebooks validate against this; they never author it.
+and its target_schema (the energy, commerce and genomics Silver and Silver
+reference schemas), resolved from source_ecosystem_map.yml plus the fixed
+reference-table set. The Silver notebooks validate against this; they never
+author it.
 
 Reads: src/schemas/contracts/*.yml + src/schemas/mappings/*.yml +
 src/schemas/reference/source_ecosystem_map.yml.
@@ -546,6 +546,17 @@ def _semantic_namespace() -> dict:
     return ns
 
 
+GENOMICS_COMMON = SILVER_ROOT / "_genomics_common.py"
+
+
+def _genomics_namespace() -> dict:
+    """The genomics library's module-level names (runs without Spark)."""
+    ns: dict = {}
+    text = GENOMICS_COMMON.read_text(encoding="utf-8")
+    exec(compile(text, str(GENOMICS_COMMON), "exec"), ns)  # noqa: S102
+    return ns
+
+
 def _semantic_structures() -> tuple[dict, str]:
     """(table -> [(column, type)], default target schema)."""
     ns = _semantic_namespace()
@@ -893,6 +904,25 @@ def build_rows() -> list[dict]:
                     "semantic",
                 )
 
+    # --- genomics Silver structures (declared in _genomics_common.py) ---
+    gns = _genomics_namespace()
+    genomics_tables = gns["GENOMICS_REFERENCE_TABLES"] | gns["GENOMICS_MAIN_TABLES"]
+    for table in sorted(genomics_tables):
+        for col, _ in gns["GENOMICS_STRUCTURES"].get(table, []):
+            derived = (
+                table in gns["GENOMICS_DERIVED_TABLES"]
+                or col in gns["GENOMICS_DERIVED_COLUMNS"]
+                or col.endswith(("_source", "_method"))
+            )
+            add(
+                table,
+                col,
+                "derived" if derived else "source_provided",
+                "derived in Silver" if derived else "typed; source value",
+                "genomics",
+            )
+        add_governance(table)
+
     # de-dup (a column can be added twice by overlapping rules)
     seen: set[tuple[str, str]] = set()
     uniq: list[dict] = []
@@ -905,11 +935,12 @@ def build_rows() -> list[dict]:
 
     ecosystem_map = _ecosystem_by_source_system()
     for r in uniq:
-        r["target_schema"] = (
-            ns["semantic_target_schema"](r["table_name"])
-            if r["table_name"] in semantic or r["table_name"] in members
-            else target_schema_for(r["table_name"], ecosystem_map)
-        )
+        if r["table_name"] in genomics_tables:
+            r["target_schema"] = gns["genomics_target_schema"](r["table_name"])
+        elif r["table_name"] in semantic or r["table_name"] in members:
+            r["target_schema"] = ns["semantic_target_schema"](r["table_name"])
+        else:
+            r["target_schema"] = target_schema_for(r["table_name"], ecosystem_map)
 
     return sorted(uniq, key=lambda r: (r["table_name"], r["column_name"]))
 

@@ -12,33 +12,15 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** inspect, then optionally delete, the Unity Catalog Bronze objects
-# MAGIC belonging to the three historical, out-of-target-scope sources -- iPinYou,
-# MAGIC Criteo Attribution, and KDD Cup 2012 Track 2. The
-# MAGIC repo-side code/config/contract cleanup for these sources is already done
-# MAGIC (moved to `archive/historical/`); this notebook is the corresponding
-# MAGIC Databricks-side cleanup, run manually and deliberately.
+# MAGIC **Purpose:** inspect, then optionally delete, the Bronze objects of the three
+# MAGIC historical out-of-scope sources: iPinYou, Criteo Attribution and KDD Cup 2012
+# MAGIC Track 2 (`bronze.kddcup2012_click_prediction`, `bronze.criteo_attribution_events`,
+# MAGIC `bronze.ipinyou_training`, `_leaderboard`, `_reference`). The inspection cells
+# MAGIC confirm them live.
 # MAGIC
-# MAGIC **DO NOT "Run All".** Read every inspection cell's output first. Every
-# MAGIC deletion cell is isolated, individually labelled, and safe to skip. Nothing
-# MAGIC in this notebook runs automatically or on a schedule.
-# MAGIC
-# MAGIC **Explicitly out of scope for this notebook:** Search Visibility, and every
-# MAGIC other current-scope source/table. If an inspection cell below ever shows a
-# MAGIC Search Visibility object matching a historical-source filter, stop and do
-# MAGIC not delete it -- report it instead.
-# MAGIC
-# MAGIC **Known historical Bronze objects (from the repo's own storage/deletion
-# MAGIC records), to be confirmed live by the inspection cells below, not
-# MAGIC assumed:**
-# MAGIC - `bronze.kddcup2012_click_prediction`
-# MAGIC - `bronze.criteo_attribution_events`
-# MAGIC - `bronze.ipinyou_training`
-# MAGIC - `bronze.ipinyou_leaderboard`
-# MAGIC - `bronze.ipinyou_reference`
-# MAGIC
-# MAGIC No CDC, Silver, Gold, or streaming objects exist for these three sources --
-# MAGIC they were batch-only, Bronze-stage sources with no further build.
+# MAGIC **DO NOT "Run All".** Read every inspection cell first. Each deletion cell is
+# MAGIC separate and safe to skip. No current-scope source or table is touched; if an
+# MAGIC inspection cell shows one, stop and report it.
 
 # COMMAND ----------
 

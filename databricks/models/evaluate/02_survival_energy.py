@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "6"
+# environment_version = "5"
 # ///
 # MAGIC %md
 # MAGIC # EVALUATE SURVIVAL MODELS ENERGY
@@ -65,3 +65,16 @@ rid = model_run_id()
 
 # DBTITLE 1,Evaluate survival.unit_lifetime
 evaluate_by_id("survival.unit_lifetime", rid, SMOKE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "evaluate__02_survival_energy",
+    "Evaluate Survival Models Energy",
+    ["evaluation_results", "evaluation_flags", "evaluation_run_context"],
+    rid,
+    task_ids=["survival.unit_lifetime"],
+    smoke=SMOKE,
+)

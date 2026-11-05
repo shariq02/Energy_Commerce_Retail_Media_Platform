@@ -6,8 +6,8 @@ Date: October 2026
 
 Copies model.onnx and tokenizer.json from the local model folder, with a
 model_hashes.json of their SHA-256, to
-/Volumes/energy_commerce_retail_media/knowledge/models/all-MiniLM-L6-v2/ through
-the Databricks Files API. Notebook 05 embeds only with files that match those
+/Volumes/energy_commerce_retail_media/knowledge/models/<embedder id>/ through
+the Databricks Files API (`--embedder`, default MiniLM). Notebook 05 embeds only with files that match those
 hashes, so the Wikipedia vectors come from the same files as the local query
 vectors. A file is sent only when it is missing there or its size differs;
 --force sends all. The volume is created through the SQL warehouse when it is
@@ -18,7 +18,7 @@ DATABRICKS_TOKEN for the files; DATABRICKS_TOKEN_SQL and DATABRICKS_HTTP_PATH fo
 the volume.
 
 Usage (repository root):
-    python -m scripts.knowledge.wikipedia_model_upload [--force]
+    python -m scripts.knowledge.wikipedia_model_upload [--embedder SLUG] [--force]
 """
 
 from __future__ import annotations
@@ -35,6 +35,12 @@ from scripts.knowledge import wikipedia_fetch as wf
 
 VOLUME = f"{wf.CATALOG}.knowledge.models"
 REMOTE_DIR = f"/Volumes/{wf.CATALOG}/knowledge/models/{emb.MODEL_ID}"
+
+
+def remote_dir(profile: emb.Profile) -> str:
+    return f"/Volumes/{wf.CATALOG}/knowledge/models/{profile.id}"
+
+
 HASHES_NAME = "model_hashes.json"
 PINNED_FILES = ("model_onnx_sha256", "tokenizer_sha256")
 TIMEOUT = (30, 900)
@@ -52,8 +58,8 @@ def file_settings(env=None) -> dict | None:
     return {"host": host.removeprefix("https://").rstrip("/"), "token": token}
 
 
-def hashes_text(model_dir: Path) -> str:
-    hashes = emb.model_hashes(model_dir)
+def hashes_text(model_dir: Path, profile: emb.Profile = emb.MINILM) -> str:
+    hashes = emb.profile_hashes(profile, model_dir)
     pinned = {key: hashes[key] for key in PINNED_FILES}
     return json.dumps(pinned, indent=2, sort_keys=True) + "\n"
 
@@ -103,15 +109,17 @@ def create_volume() -> None:
         cursor.execute(f"CREATE VOLUME IF NOT EXISTS {VOLUME}")
 
 
-def plan(api: FilesApi, model_dir: Path, text: str, force: bool) -> list[str]:
+def plan(
+    api: FilesApi, model_dir: Path, text: str, force: bool, target: str = REMOTE_DIR
+) -> list[str]:
     """The names of the files to send."""
     todo = []
     for name in (emb.MODEL_FILE, emb.TOKENIZER_FILE):
         local = (model_dir / name).stat().st_size
-        remote = api.size(f"{REMOTE_DIR}/{name}")
+        remote = api.size(f"{target}/{name}")
         if force or remote != local:
             todo.append(name)
-    if force or todo or api.read_text(f"{REMOTE_DIR}/{HASHES_NAME}") != text:
+    if force or todo or api.read_text(f"{target}/{HASHES_NAME}") != text:
         todo.append(HASHES_NAME)
     return todo
 
@@ -120,10 +128,17 @@ def main(
     argv: list[str] | None = None, api: FilesApi | None = None, make_volume=None
 ) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--model-dir", type=Path, default=emb.DEFAULT_MODEL_DIR)
+    parser.add_argument(
+        "--embedder", choices=sorted(emb.PROFILES), default=emb.MINILM.slug
+    )
+    parser.add_argument("--model-dir", type=Path, default=None)
     parser.add_argument("--force", action="store_true", help="send every file")
     uc.add_write_mode(parser)
     args = parser.parse_args(argv)
+    profile = emb.PROFILES[args.embedder]
+    target = remote_dir(profile)
+    if args.model_dir is None:
+        args.model_dir = emb.default_model_dir(profile)
 
     if api is None:
         settings = file_settings()
@@ -133,9 +148,9 @@ def main(
             )
             return 1
         api = FilesApi(settings)
-    text = hashes_text(args.model_dir)
-    todo = plan(api, args.model_dir, text, args.force)
-    print(f"Target: {REMOTE_DIR}")
+    text = hashes_text(args.model_dir, profile)
+    todo = plan(api, args.model_dir, text, args.force, target)
+    print(f"Target: {target}")
     if not todo:
         print("The model files are already there and match. Nothing to send.")
         return 0
@@ -144,13 +159,13 @@ def main(
         print(uc.NOT_WRITTEN)
         return 0
     (make_volume or create_volume)()
-    api.make_dir(REMOTE_DIR)
+    api.make_dir(target)
     for name in todo:
         if name == HASHES_NAME:
-            api.upload(f"{REMOTE_DIR}/{name}", text.encode("utf-8"))
+            api.upload(f"{target}/{name}", text.encode("utf-8"))
         else:
             with (args.model_dir / name).open("rb") as handle:
-                api.upload(f"{REMOTE_DIR}/{name}", handle)
+                api.upload(f"{target}/{name}", handle)
         print(f"Sent: {name}")
     return 0
 

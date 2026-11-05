@@ -139,3 +139,8 @@ for eco in ("energy", "commerce"):
     ) as fh:
         fh.write(text + "\n")
     print(f"OK  {eco}_monitoring.md")
+
+# COMMAND ----------
+
+# DBTITLE 1,Merge the findings of the notebooks
+merge_notebook_findings()

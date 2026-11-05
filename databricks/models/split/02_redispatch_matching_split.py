@@ -155,3 +155,14 @@ for r in _per.collect():
         print(
             f"NOT ESTIMABLE  tier={r['stratum']} partition={r['partition']} rows={r['count']}"
         )
+
+# COMMAND ----------
+
+# DBTITLE 1,Write the findings of this notebook
+write_model_findings(
+    ("energy",),
+    "split__02_redispatch_matching_split",
+    "Redispatch Matching Split",
+    ["evaluation_split_manifest"],
+    rid,
+)

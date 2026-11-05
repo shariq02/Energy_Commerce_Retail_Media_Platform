@@ -12,23 +12,13 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** create the platform-level `shared_conformed` schema and its
-# MAGIC five conformed dimension tables, and populate the two that need no
-# MAGIC acquired-source evidence:
+# MAGIC **Purpose:** create the `shared_conformed` schema and its five conformed
+# MAGIC dimension tables. Seeded here: `dim_date`, `dim_time` and `dim_geography`
+# MAGIC (Nation and 16 Bundeslaender; finer levels need an acquired boundary dataset).
+# MAGIC Structure only: `geo_plz_gemeinde_xref` and `dim_weather_context`.
 # MAGIC
-# MAGIC - `dim_date` -- one row per calendar day, generated here (pure calendar math)
-# MAGIC - `dim_time` -- one row per minute of day (0..1439), generated here
-# MAGIC - `dim_geography` -- Nation + 16 Bundeslaender, fixed official AGS codes
-# MAGIC   (inline below). Regierungsbezirk / Kreis / Gemeinde rows are NOT loaded
-# MAGIC   -- they need an acquired BKG/Destatis boundary dataset.
-# MAGIC - `geo_plz_gemeinde_xref` -- structure only, no rows (needs an acquired
-# MAGIC   PLZ crosswalk)
-# MAGIC - `dim_weather_context` -- structure only, no rows (published later from
-# MAGIC   the energy weather Gold layer once it exists)
-# MAGIC
-# MAGIC Idempotent: schemas/tables use `IF NOT EXISTS`; the three seeded tables
-# MAGIC are deterministically overwritten. Delta tables carry no enforced
-# MAGIC PK/FK/index -- the key and reference intent is in each table `COMMENT`.
+# MAGIC Safe to re-run: `IF NOT EXISTS`, and the seeded tables are overwritten. Key
+# MAGIC intent is in each table `COMMENT`.
 
 # COMMAND ----------
 
