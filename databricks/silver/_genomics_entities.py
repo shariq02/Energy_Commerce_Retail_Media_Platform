@@ -28,6 +28,13 @@ def _union(frames):
     return _reduce(lambda left, right: left.unionByName(right), frames)
 
 
+def genetic_test(rules=None):
+    """GTR rows with `test_key` (the accession without its version)."""
+    return _bronze("gtr_test_condition_gene").withColumn(
+        "test_key", F.regexp_replace(F.trim(F.col("accession_version")), r"\.\d+$", "")
+    )
+
+
 # COMMAND ----------
 
 # DBTITLE 1,Derived attribute rows

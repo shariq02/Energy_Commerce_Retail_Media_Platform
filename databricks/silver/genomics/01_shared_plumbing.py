@@ -680,13 +680,6 @@ def cell_line_crosswalk(rules):
     )
 
 
-def genetic_test(rules=None):
-    """GTR rows with `test_key` (the accession without its version)."""
-    return _bronze("gtr_test_condition_gene").withColumn(
-        "test_key", F.regexp_replace(F.trim(F.col("accession_version")), r"\.\d+$", "")
-    )
-
-
 def test_crosswalk(rules):
     return _id_rows(
         genetic_test(),
