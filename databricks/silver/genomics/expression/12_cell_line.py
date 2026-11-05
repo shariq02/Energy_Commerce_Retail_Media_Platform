@@ -39,7 +39,7 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/reference/12_cell_line"
+COMPONENT = "silver/genomics/expression/12_cell_line"
 RID = run_id()
 FINDINGS = "genomics"
 TABLE = "cell_line"

@@ -44,7 +44,7 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/reference/15_entity_derived_attribute"
+COMPONENT = "silver/genomics/entity/15_entity_derived_attribute"
 RID = run_id()
 FINDINGS = "genomics"
 TABLE = "entity_derived_attribute"

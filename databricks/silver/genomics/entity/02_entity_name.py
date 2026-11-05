@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # MAGIC %md
-# MAGIC # SILVER -- ENTITY CLAIM (GENOMICS)
+# MAGIC # SILVER -- ENTITY NAME (GENOMICS)
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -12,8 +12,8 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** every source value of every genomics entity, one row per entity,
-# MAGIC field and source column; the masters pick from these.
+# MAGIC **Purpose:** every name, synonym and designation of every genomics entity,
+# MAGIC one row per entity, term, term type and source column.
 
 # COMMAND ----------
 
@@ -44,56 +44,41 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/reference/03_entity_claim"
+COMPONENT = "silver/genomics/entity/02_entity_name"
 RID = run_id()
 FINDINGS = "genomics"
-TABLE = "entity_claim"
+TABLE = "entity_name"
 RULES = load_genomics_rules()
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Silver -- crosswalk and names
+# DBTITLE 1,Read Silver -- id crosswalk
 xwalk = read_silver("entity_id_crosswalk")
-names = read_silver("entity_name")
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- claims of every entity type
-claims = _union(
-    [
-        gene_claims(RULES, xwalk),
-        transcript_claims(RULES, xwalk, names),
-        protein_claims(RULES, xwalk),
-        disease_claims(RULES, xwalk),
-        drug_claims(RULES, xwalk),
-        small_claims(RULES),
-    ]
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- keys and provenance
-claims = claims.distinct().withColumn(
+# DBTITLE 1,Transform -- names, sharing count and provenance
+names = finish_names(names_all(RULES, xwalk)).withColumn(
     "_srid",
     sha_key(
         "entity_type",
         "entity_key",
-        "field",
+        "term",
+        "term_type",
         "source_dataset",
         "source_field",
-        "value_text",
     ),
 )
-claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), TABLE)
+names = conform_genomics(add_genomics_provenance(names, "_srid", RID), TABLE)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write Silver -- entity_claim
-write_silver(claims, TABLE, source=SOURCE, component=COMPONENT, rid=RID)
+# DBTITLE 1,Write Silver -- entity_name
+write_silver(names, TABLE, source=SOURCE, component=COMPONENT, rid=RID)
 
 # COMMAND ----------
 
-# DBTITLE 1,Inspect -- entity_claim
+# DBTITLE 1,Inspect -- entity_name
 written = spark.table(genomics_table(TABLE))
 blocks = inspect_table(
     written,
@@ -104,14 +89,16 @@ blocks = inspect_table(
     key_cols=["source_record_id"],
     extra_checks={
         "entity_types": written.select("entity_type").distinct().count(),
-        "claims_without_rank": written.filter(F.col("source_rank").isNull()).count(),
-        "llm_generated_claims": written.filter(
-            F.col("source_type") == "llm_generated"
-        ).count(),
+        "terms_held_by_several_entities": written.filter(
+            F.col("entities_sharing_term") > 1
+        )
+        .select("entity_type", F.upper("term"))
+        .distinct()
+        .count(),
     },
 )
 
 # COMMAND ----------
 
-# DBTITLE 1,Export findings -- entity_claim
+# DBTITLE 1,Export findings -- entity_name
 write_silver_findings(FINDINGS, f"{COMPONENT.split('/')[-1]}__{TABLE}", TABLE, blocks)
