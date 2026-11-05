@@ -364,6 +364,441 @@ GENOMICS_STRUCTURES.update(
     }
 )
 
+VARIANT_FIELDS = ("variant_type", "rsid", "gene_key", "origin", "name")
+
+
+def _text(*names):
+    return [(name, "string") for name in names]
+
+
+def _number(kind, *names):
+    return [(name, kind) for name in names]
+
+
+GENOMICS_STRUCTURES.update(
+    {
+        "variant": [
+            ("variant_key", "string"),
+            ("key_source", "string"),
+            *_text("assembly", "contig"),
+            ("position", "bigint"),
+            *_text("reference_allele", "alternate_allele"),
+            ("end_position", "bigint"),
+            ("source_datasets", "array<string>"),
+            *_resolved(VARIANT_FIELDS),
+        ],
+        "variant_hgvs": [
+            *_text("variant_key", "transcript_accession"),
+            ("transcript_version", "int"),
+            *_text("transcript_key", "gene_symbol", "coding_notation", "coding_region"),
+            *_number(
+                "int",
+                "coding_start",
+                "coding_start_offset",
+                "coding_end",
+                "coding_end_offset",
+            ),
+            *_text(
+                "coding_edit_type",
+                "coding_reference_base",
+                "coding_alternate_base",
+                "coding_inserted_bases",
+            ),
+            *_text("protein_notation", "protein_reference_amino_acid"),
+            ("protein_position", "int"),
+            ("protein_end_reference_amino_acid", "string"),
+            ("protein_end_position", "int"),
+            *_text(
+                "protein_edit_type",
+                "protein_alternate_amino_acid",
+                "protein_inserted_amino_acids",
+                "parse_status",
+            ),
+            *_text("source_dataset", "source_field"),
+        ],
+        "variant_condition": [
+            ("variant_key", "string"),
+            ("condition_position", "int"),
+            *_text("condition_name", "clinvar_condition_accession"),
+            ("condition_ids", "array<string>"),
+            *_text("disease_key", "disease_link_method"),
+            ("is_generic_label", "boolean"),
+            *_text("pairing_status", "source_dataset"),
+        ],
+        "variant_classification": [
+            *_text("variant_key", "classification_type", "term", "review_status"),
+            ("review_stars", "int"),
+            ("last_evaluated", "date"),
+            ("number_submitters", "int"),
+            ("clinical_significance_simple", "string"),
+            ("clinvar_submission_accessions", "array<string>"),
+            ("source_dataset", "string"),
+        ],
+        "variant_score": [
+            *_text("variant_key", "score_name"),
+            ("score_value", "double"),
+            *_text("score_label", "context", "source_dataset", "source_field"),
+        ],
+        "position_score": [
+            *_text("assembly", "contig"),
+            ("position", "bigint"),
+            ("score_name", "string"),
+            ("score_value", "double"),
+            ("source_dataset", "string"),
+        ],
+        "variant_population_frequency": [
+            *_text("variant_key", "population", "measure"),
+            ("allele_frequency", "double"),
+            *_number("bigint", "allele_count", "allele_number", "homozygote_count"),
+            *_text("filter_status", "source_dataset"),
+        ],
+        "variant_feature_overlap": [
+            *_text(
+                "variant_key",
+                "feature_kind",
+                "feature_key",
+                "feature_type",
+                "overlap_method",
+                "source_dataset",
+            ),
+        ],
+        "benchmark_variant": [
+            *_text(
+                "benchmark_set",
+                "genomic_mutation_id",
+                "variant_key",
+                "assembly_basis",
+                "contig",
+            ),
+            ("position", "bigint"),
+            *_text("reference_allele", "alternate_allele", "label"),
+            ("label_integer", "int"),
+            *_text(
+                "split",
+                "source_label",
+                "consequence",
+                "review_status",
+                "record_id",
+                "gene",
+                "omim",
+                "pubmed_id",
+            ),
+            *_number("bigint", "sample_count", "total_sample_count"),
+            *_number(
+                "double",
+                "frequency",
+                "allele_count",
+                "allele_number",
+                "allele_frequency",
+                "minor_allele_frequency",
+                "minor_allele_count",
+            ),
+            ("tissue", "string"),
+            *_number(
+                "double",
+                "distance_to_nearest_transcription_start_site",
+                "gpn_star_v100",
+                "gpn_star_p243",
+                "gpn_star_m447",
+            ),
+            *_text("protein_id", "mutant"),
+            ("protein_position", "int"),
+            *_text("wild_type_aa", "mutant_aa"),
+            ("sequence_length", "int"),
+            ("stars", "int"),
+            *_text("cluster", "shuffle_rank", "split_file", "source_dataset"),
+        ],
+        "embedding_split": [
+            ("split_file", "string"),
+            ("matrix_rows", "int"),
+            ("matrix_columns", "int"),
+            *_text("index_values", "mean_embedding"),
+            ("variant_rows", "bigint"),
+            *_number("int", "distinct_index_values", "distinct_mean_embedding_values"),
+        ],
+        "gene_disease_association": [
+            *_text("gene_key", "disease_key", "record_kind", "source_dataset"),
+            *_text("source_gene_id", "source_disease_id"),
+            *_text("gene_link_method", "disease_link_method"),
+            ("score", "double"),
+            *_number("bigint", "evidence_count", "supporting_count"),
+            *_text(
+                "relation_type",
+                "classification",
+                "mode_of_inheritance",
+                "evaluation_date",
+                "study_id",
+                "aggregation_value",
+                "report_url",
+                "comment",
+            ),
+        ],
+        "drug_gene_relation": [
+            *_text("drug_key", "gene_key", "relation_type", "relation_detail"),
+            *_text(
+                "evidence_level", "source_dataset", "source_drug_id", "source_gene_id"
+            ),
+            *_text("drug_link_method", "gene_link_method"),
+            ("pmids", "array<string>"),
+            *_text("labeling_sections", "therapeutic_area"),
+        ],
+        "pharmacogenomic_association": [
+            *_text("subject_type", "subject_id", "subject_name", "subject_key"),
+            *_text("object_type", "object_id", "object_name", "object_key"),
+            *_text("evidence", "association", "pharmacokinetic", "pharmacodynamic"),
+            ("pmids", "array<string>"),
+            ("source_dataset", "string"),
+        ],
+        "phenotype_annotation": [
+            *_text("subject_type", "subject_key", "subject_source_id"),
+            *_text("subject_link_method", "subject_name", "phenotype_key"),
+            ("is_negated", "boolean"),
+            *_text(
+                "frequency",
+                "onset",
+                "sex",
+                "modifier",
+                "aspect",
+                "evidence",
+                "reference",
+                "biocuration",
+                "source_dataset",
+            ),
+        ],
+        "pathway_membership": [
+            *_text("member_type", "member_key", "member_id_type", "member_id"),
+            *_text("member_link_method", "pathway_key", "evidence", "species"),
+            ("source_dataset", "string"),
+        ],
+        "protein_interaction": [
+            *_text("interaction_source", "interaction_id"),
+            *_text("interactor_a_id", "interactor_b_id"),
+            *_text("protein_a_key", "protein_b_key", "gene_a_key", "gene_b_key"),
+            *_text("experimental_system", "experimental_system_type", "throughput"),
+            ("score", "double"),
+            ("channel_scores", "array<int>"),
+            ("combined_score", "int"),
+            *_text(
+                "author",
+                "publication_source",
+                "modification",
+                "qualifications",
+                "tags",
+                "source_database",
+                "organism_a",
+                "organism_b",
+                "ontology_term_ids",
+                "ontology_term_names",
+                "ontology_term_categories",
+                "source_dataset",
+            ),
+        ],
+        "gene_expression_median": [
+            *_text("gene_key", "gene_ensembl_id", "gene_symbol", "tissue_key"),
+            ("median_transcripts_per_million", "double"),
+            *_text("gene_link_method", "source_dataset"),
+        ],
+        "tumor_sample": [
+            *_text(
+                "sample_barcode",
+                "participant_barcode",
+                "project",
+                "tissue_source_site",
+                "sample_type_code",
+                "vial",
+                "portion",
+                "analyte",
+                "plate",
+                "center",
+                "parse_status",
+            ),
+            ("mutation_records", "bigint"),
+            ("source_dataset", "string"),
+        ],
+        "somatic_mutation": [
+            *_text("sample_barcode", "gene_symbol", "gene_key", "gene_link_method"),
+            *_text("ensembl_gene_id", "assembly", "contig"),
+            *_number("bigint", "start_position", "end_position"),
+            *_text("strand", "variant_classification", "variant_type"),
+            *_text("reference_allele", "tumor_allele1", "tumor_allele2", "rsid"),
+            *_text(
+                "coding_change_notation",
+                "protein_change_short_notation",
+                "protein_reference_amino_acid",
+            ),
+            ("protein_position", "int"),
+            *_text(
+                "protein_alternate_amino_acid",
+                "protein_edit_type",
+                "transcript_key",
+                "transcript_source_id",
+            ),
+            ("exon_number", "string"),
+            *_number("int", "exon_index", "exon_count"),
+            *_number("int", "tumor_depth", "tumor_ref_count", "tumor_alt_count"),
+            *_text(
+                "impact",
+                "filter_status",
+                "variant_key",
+                "variant_link_method",
+                "source_dataset",
+            ),
+        ],
+        "dms_assay": [
+            *_text("assay_set", "assay_id"),
+            ("assay_index", "int"),
+            *_text("assay_filename", "uniprot_id", "protein_key", "taxon"),
+            *_text("source_organism", "target_sequence"),
+            ("sequence_length", "int"),
+            ("includes_multiple_mutants", "boolean"),
+            *_number("int", "total_mutants", "single_mutants", "multiple_mutants"),
+            ("binarization_cutoff", "double"),
+            *_text("binarization_method", "first_author", "title"),
+            ("publication_year", "int"),
+            *_text(
+                "journal",
+                "region_mutated",
+                "molecule_name",
+                "selection_assay",
+                "selection_type",
+                "coarse_selection_type",
+                "alignment_filename",
+            ),
+            *_number("int", "alignment_start", "alignment_end", "alignment_length"),
+            *_number("double", "alignment_bit_score", "alignment_theta"),
+            ("alignment_sequence_count", "int"),
+            ("alignment_percent_coverage", "double"),
+            ("alignment_coverage_count", "int"),
+            ("alignment_effective_sequences", "double"),
+            ("alignment_effective_sequences_per_length", "double"),
+            ("alignment_effective_sequences_per_length_category", "string"),
+            ("alignment_significant_count", "int"),
+            ("alignment_significant_per_length", "double"),
+            *_text(
+                "raw_scan_filename",
+                "raw_scan_phenotype_name",
+                "raw_scan_directionality",
+                "raw_scan_mutant_column",
+                "weight_file_name",
+                "protein_structure_file",
+                "protein_structure_range",
+                "proteingym_version",
+            ),
+            ("raw_mutation_offset", "int"),
+            ("eve_model_path", "string"),
+            ("file_length", "int"),
+            *_text("alignment_source", "source_dataset"),
+        ],
+        "dms_assay_mutant": [
+            *_text("assay_set", "assay_id", "mutant"),
+            ("mutation_count", "int"),
+            ("wild_type_aa", "string"),
+            ("position", "int"),
+            ("mutant_aa", "string"),
+            ("scan_score", "double"),
+            ("scan_score_binarized", "int"),
+            ("source_dataset", "string"),
+        ],
+        "perturbation_sample": [
+            *_text("sample_id", "plate"),
+            *_number(
+                "double",
+                "mean_gene_count",
+                "mean_tscp_count",
+                "mean_mread_count",
+                "mean_pcnt_mito",
+            ),
+            *_text("drug_name", "drug_key", "drug_link_method", "drugname_drugconc"),
+        ],
+        "perturbation_expression": [
+            *_text("gene_symbol", "gene_key", "gene_link_method"),
+            *_number(
+                "double",
+                "base_mean",
+                "log2_fold_change",
+                "log2_fold_change_standard_error",
+                "statistic",
+            ),
+            *_number("double", "p_value", "adjusted_p_value"),
+            ("plate", "string"),
+            *_number("int", "n_cells_treated", "n_cells_control"),
+            *_text("cell_line_key", "cellosaur_id", "cell_name_vevo"),
+            *_text("drug_name", "drug_key", "drug_link_method"),
+            ("concentration", "double"),
+            ("concentration_unit", "string"),
+        ],
+        "faers_case": [
+            *_text(
+                "quarter",
+                "primary_id",
+                "case_id",
+                "case_version",
+                "initial_or_followup",
+            ),
+            *_text(
+                "event_date_raw",
+                "manufacturer_date_raw",
+                "initial_fda_date_raw",
+                "fda_date_raw",
+                "report_date_raw",
+            ),
+            ("event_date", "date"),
+            ("manufacturer_date", "date"),
+            ("initial_fda_date", "date"),
+            ("fda_date", "date"),
+            ("report_date", "date"),
+            *_text("report_code", "manufacturer_number", "manufacturer_sender"),
+            ("age", "double"),
+            *_text("age_unit", "age_group", "sex", "electronic_submission"),
+            ("weight", "double"),
+            *_text(
+                "weight_unit",
+                "occupation_code",
+                "reporter_country",
+                "occurrence_country",
+            ),
+            (
+                "reactions",
+                "array<struct<reaction:string,drug_recurrence_action:string>>",
+            ),
+            ("outcomes", "array<string>"),
+            ("report_sources", "array<string>"),
+        ],
+        "faers_case_drug": [
+            *_text(
+                "quarter",
+                "primary_id",
+                "case_id",
+                "drug_sequence",
+                "role_code",
+                "drug_name",
+            ),
+            *_text(
+                "active_ingredient",
+                "drug_name_validation_code",
+                "route",
+                "dose_verbatim_text",
+            ),
+            ("cumulative_dose", "double"),
+            *_text("cumulative_dose_unit", "dechallenge", "rechallenge", "lot_number"),
+            *_text("expiry_date_raw", "new_drug_application_number"),
+            ("dose_amount", "double"),
+            *_text(
+                "dose_unit",
+                "dose_form",
+                "dose_frequency",
+                "drug_key",
+                "drug_link_method",
+            ),
+            ("indications", "array<string>"),
+            (
+                "therapies",
+                "array<struct<start_dt:string,end_dt:string,duration:string,duration_unit:string>>",
+            ),
+        ],
+    }
+)
+
 # Tables whose domain columns are all computed in Silver.
 GENOMICS_DERIVED_TABLES = {"entity_derived_attribute"}
 # Computed columns of the other declared tables (and every `_source`/`_method`).
@@ -392,6 +827,22 @@ GENOMICS_DERIVED_COLUMNS = {
     "evidence_codes",
     "pubmed_ids",
     "dbsnp_ids",
+    "source_datasets",
+    "disease_link_method",
+    "gene_link_method",
+    "drug_link_method",
+    "member_link_method",
+    "subject_link_method",
+    "variant_link_method",
+    "is_generic_label",
+    "pairing_status",
+    "parse_status",
+    "review_stars",
+    "is_negated",
+    "variant_rows",
+    "distinct_index_values",
+    "distinct_mean_embedding_values",
+    "mutation_records",
 }
 
 
@@ -433,6 +884,7 @@ _RULE_SECTIONS = (
     "version",
     "placeholders",
     "assembly_labels",
+    "ucsc_assembly_names",
     "clinvar_review_stars",
     "id_type_aliases",
     "string_alias_id_types",
@@ -441,6 +893,50 @@ _RULE_SECTIONS = (
     "primary_function",
     "druggability",
     "precedence",
+    "generic_condition_labels",
+    "pathogenic_terms",
+    "frequency_bands",
+    "frequency_band_default",
+    "truthy_values",
+    "gene_database_id_types",
+    "gene_well_annotated_minimum",
+    "condition_database_id_types",
+    "variant_well_annotated_minimum",
+    "function_keyword_flags",
+    "well_characterized_minimum",
+    "detailed_description_length",
+    "gene_importance",
+    "gene_annotation_quality",
+    "gene_annotation_quality_default",
+    "primary_gene_category",
+    "primary_gene_category_default",
+    "clinical_significance_labels",
+    "clinical_significance_label_default",
+    "pathogenic_labels",
+    "benign_labels",
+    "vus_labels",
+    "origin_flags",
+    "variant_type_flags",
+    "review_quality_tiers",
+    "review_quality_tier_default",
+    "recent_evaluation_days",
+    "conservation",
+    "frequency_flags",
+    "mutation_severity",
+    "loss_of_function_edit_types",
+    "splice_affecting_regions",
+    "protein_impact_categories",
+    "predicted_pathogenicity_with_conservation",
+    "predicted_pathogenicity_without_conservation",
+    "predicted_pathogenicity_default",
+    "high_impact_from",
+    "very_high_impact_from",
+    "tissue_specificity",
+    "tissue_specificity_default",
+    "cancer_mutation",
+    "frequently_mutated_minimum",
+    "frequently_tested_minimum",
+    "pharmacogene",
 )
 
 
@@ -503,6 +999,66 @@ def validate_genomics_rules(rules: dict, bronze_sources: dict) -> list:
             unknown = (set(entry.get("all", [])) | set(entry.get("none", []))) - flags
             if unknown:
                 problems.append(f"{table}: unknown flag(s) {sorted(unknown)}")
+    for table in ("frequency_bands",):
+        limits = [entry.get("below") for entry in rules[table]]
+        if not limits or limits != sorted(limits) or len(set(limits)) != len(limits):
+            problems.append(f"{table}: limits must rise: {limits}")
+    for group in ("origin_flags", "variant_type_flags"):
+        for name, pattern in rules[group].items():
+            try:
+                _re.compile(pattern)
+            except _re.error as exc:
+                problems.append(f"{group}.{name}: {exc}")
+    keywords = set(rules["text_rules"].get("gene_description_keywords", {}))
+    missing = set(rules["function_keyword_flags"]) - keywords
+    if missing:
+        problems.append(f"function_keyword_flags: unknown flag(s) {sorted(missing)}")
+    for entry in rules["primary_gene_category"]:
+        for test in entry.get("any", []):
+            if "flag" in test and test["flag"] not in keywords:
+                problems.append(f"primary_gene_category: unknown flag {test['flag']!r}")
+            if (
+                "text" in test
+                and test["text"] not in rules["text_rules"]["gene_category_text"]
+            ):
+                problems.append(
+                    f"primary_gene_category: unknown text rule {test['text']!r}"
+                )
+            if (
+                "disease" in test
+                and test["disease"] not in rules["text_rules"]["disease_category"]
+            ):
+                problems.append(
+                    f"primary_gene_category: unknown disease category {test['disease']!r}"
+                )
+    for name, entries in (
+        ("gene_annotation_quality", rules["gene_annotation_quality"]),
+        ("review_quality_tiers", rules["review_quality_tiers"]),
+        (
+            "predicted_pathogenicity_with_conservation",
+            rules["predicted_pathogenicity_with_conservation"],
+        ),
+        (
+            "predicted_pathogenicity_without_conservation",
+            rules["predicted_pathogenicity_without_conservation"],
+        ),
+        (
+            "gene_importance.disease_count_points",
+            rules["gene_importance"]["disease_count_points"],
+        ),
+    ):
+        starts = [entry["from"] for entry in entries]
+        if starts != sorted(starts, reverse=True):
+            problems.append(f"{name}: `from` values must fall: {starts}")
+    if set(rules["mutation_severity"]) != {
+        "loss_of_function",
+        "splice",
+        "missense",
+        "other",
+    }:
+        problems.append(
+            "mutation_severity needs loss_of_function, splice, missense and other"
+        )
     for entity, body in rules["precedence"].items():
         if isinstance(body, list):
             # a source order of whole datasets (`<source>.<dataset>`)
@@ -930,6 +1486,18 @@ def clean_placeholders(column, rules: dict, qualified: str | None = None):
     return F.when(text.isin(sorted(values)), F.lit(None).cast("string")).otherwise(text)
 
 
+def typed_number(column, spark_type: str, rules: dict, qualified: str | None = None):
+    """A cleaned text column as a number (`int`, `bigint` or `double`); null when
+    the text is no number. The cast goes through double, so `12.0` is read."""
+    text = clean_placeholders(column, rules, qualified)
+    number = text.rlike(r"^[-+]?\d+(\.\d+)?([eE][-+]?\d+)?$")
+    value = text.cast("double")
+    if spark_type == "double":
+        return F.when(number, value)
+    target = {"int": "int", "bigint": "long"}[spark_type]
+    return F.when(number, value.cast(target))
+
+
 def claims_frame(
     df,
     *,
@@ -1031,8 +1599,9 @@ def chromosome_expr(column):
     return F.when(upper == "M", F.lit("MT")).otherwise(upper)
 
 
-def variant_key_expr(assembly: str, chromosome, position, reference, alternate):
-    """Column expr of `variant_key`; arguments after `assembly` are names or Columns."""
+def variant_key_expr(assembly, chromosome, position, reference, alternate):
+    """Column expr of `variant_key`; `assembly` is a text or a Column, the other
+    arguments are names or Columns."""
 
     def column(value):
         return F.col(value) if isinstance(value, str) else value
@@ -1040,7 +1609,7 @@ def variant_key_expr(assembly: str, chromosome, position, reference, alternate):
     contig = chromosome_expr(column(chromosome))
     pos = F.trim(column(position))
     parts = [
-        F.lit(assembly),
+        F.lit(assembly) if isinstance(assembly, str) else assembly,
         contig,
         F.when(pos.rlike(r"^\d+$"), pos),
         F.upper(F.trim(column(reference))),

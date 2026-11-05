@@ -538,3 +538,139 @@ def test_every_gene_field_has_a_precedence_list_or_is_unranked(genomics, rules):
     ranked = set(rules["precedence"]["gene"])
     unranked = {"chromosome", "map_location"}
     assert set(genomics["GENE_FIELDS"]) == ranked | unranked
+
+
+def test_all_forty_tables_have_a_declared_structure(genomics):
+    declared = set(genomics["GENOMICS_STRUCTURES"])
+    tables = genomics["GENOMICS_REFERENCE_TABLES"] | genomics["GENOMICS_MAIN_TABLES"]
+    assert declared == tables
+
+
+def test_the_variant_master_declares_each_field_with_source_and_method(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["variant"]}
+    for field in genomics["VARIANT_FIELDS"]:
+        assert {field, f"{field}_source", f"{field}_method"} <= columns
+    assert {"variant_key", "key_source", "assembly", "position"} <= columns
+
+
+def test_every_ranked_variant_field_is_a_declared_variant_field(genomics, rules):
+    ranked = set(rules["precedence"]["variant"]) - {"coordinate"}
+    assert ranked <= set(genomics["VARIANT_FIELDS"])
+
+
+def test_the_frequency_bands_rise_and_end_in_common(rules):
+    limits = [band["below"] for band in rules["frequency_bands"]]
+    assert limits == sorted(limits)
+    assert [band["label"] for band in rules["frequency_bands"]] == [
+        "ultra_rare",
+        "rare",
+        "low_frequency",
+    ]
+    assert rules["frequency_band_default"] == "common"
+
+
+def test_unordered_band_limits_are_reported(genomics, rules):
+    broken = copy.deepcopy(rules)
+    broken["frequency_bands"] = [
+        {"label": "a", "below": 0.05},
+        {"label": "b", "below": 0.01},
+    ]
+    problems = genomics["validate_genomics_rules"](broken, _bronze_sources())
+    assert any("frequency_bands" in problem for problem in problems)
+
+
+def test_clinvar_writes_minus_one_for_no_dbsnp_id_and_no_gene(rules):
+    by_column = rules["placeholders"]["by_column"]
+    assert by_column["clinvar.variant_summary.RS_dbSNP"] == ["-1"]
+    assert by_column["clinvar.variant_summary.GeneID"] == ["-1"]
+
+
+def test_alphamissense_genome_names_map_to_assembly_labels(rules):
+    assert rules["ucsc_assembly_names"] == {"hg38": "GRCh38", "hg19": "GRCh37"}
+
+
+def test_the_frequency_bands_keep_the_old_cutoffs(rules):
+    assert [(band["label"], band["below"]) for band in rules["frequency_bands"]] == [
+        ("ultra_rare", 0.001),
+        ("rare", 0.01),
+        ("low_frequency", 0.05),
+    ]
+
+
+def test_the_conservation_cutoffs_are_the_old_ones(rules):
+    assert rules["conservation"] == {
+        "phylop_conserved_above": 2.7,
+        "gerp_constrained_above": 4.0,
+        "cadd_deleterious_above": 20.0,
+        "allele_frequency_common_above": 0.01,
+        "allele_frequency_rare_below": 0.001,
+    }
+
+
+def test_the_old_gene_importance_weights_are_in_the_rules(rules):
+    importance = rules["gene_importance"]
+    assert [(e["from"], e["points"]) for e in importance["disease_count_points"]] == [
+        (50, 10),
+        (20, 8),
+        (10, 5),
+        (5, 3),
+        (1, 2),
+    ]
+    assert importance["function_keyword_points"] == 2
+    assert importance["cancer_points"] == 3
+    assert [e["label"] for e in rules["gene_annotation_quality"]] == [
+        "Excellent",
+        "Good",
+        "Moderate",
+    ]
+
+
+def test_a_rising_from_list_is_reported(genomics, rules):
+    broken = copy.deepcopy(rules)
+    broken["review_quality_tiers"] = [
+        {"from": 1, "label": "Low Quality"},
+        {"from": 3, "label": "High Quality"},
+    ]
+    problems = genomics["validate_genomics_rules"](broken, _bronze_sources())
+    assert any("review_quality_tiers" in problem for problem in problems)
+
+
+def test_an_unknown_flag_in_the_gene_category_rules_is_reported(genomics, rules):
+    broken = copy.deepcopy(rules)
+    broken["primary_gene_category"][0]["any"].append({"flag": "has_no_such_flag"})
+    problems = genomics["validate_genomics_rules"](broken, _bronze_sources())
+    assert any("has_no_such_flag" in problem for problem in problems)
+
+
+def test_declared_column_names_use_no_shorthand_words(genomics):
+    shorthand = {
+        "idx",
+        "dt",
+        "seq",
+        "seqs",
+        "mfr",
+        "rept",
+        "init",
+        "occp",
+        "vbm",
+        "tpm",
+        "msa",
+        "dms",
+        "pdb",
+        "lfc",
+        "rcv",
+        "scv",
+        "pmid",
+        "tss",
+        "trt",
+        "ctrl",
+        "num",
+        "cod",
+        "cum",
+        "nda",
+        "wt",
+        "grp",
+    }
+    for table, columns in genomics["GENOMICS_STRUCTURES"].items():
+        for name, _ in columns:
+            assert not shorthand & set(name.split("_")), (table, name)

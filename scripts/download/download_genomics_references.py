@@ -67,7 +67,7 @@ UNIPROT_ENTRY_COLUMNS = [
     "sequence_length",
 ]
 UNIPROT_FEATURE_COLUMNS = ["accession", "feature_type", "location", "qualifiers"]
-GTF_FEATURES = {"gene", "transcript"}
+GTF_FEATURES = {"gene", "transcript", "exon", "CDS", "UTR"}
 GTF_ATTRIBUTES = [
     "gene_id",
     "gene_name",

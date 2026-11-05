@@ -57,9 +57,19 @@ def parquet_parts(dataset: str) -> list[str]:
     return parts
 
 
+# Nested time series make the association rows very large; Silver never reads them.
+OPEN_TARGETS_DROPPED_COLUMNS = {
+    "association_overall_direct": ["timeseries"],
+    "association_by_datasource_direct": ["timeseries"],
+}
+
+
 def parse_open_targets(dataset: str):
+    dropped = OPEN_TARGETS_DROPPED_COLUMNS.get(dataset, [])
+
     def parse(path: Path, tag: str):
         for frame in read_parquet(path, chunksize=OPEN_TARGETS_BATCH_ROWS):
+            frame = frame.drop(columns=dropped, errors="ignore")
             yield {dataset: stringify_nested(frame)}, len(frame)
 
     return parse
