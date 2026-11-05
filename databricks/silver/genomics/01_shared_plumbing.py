@@ -14,8 +14,6 @@
 # MAGIC
 # MAGIC **Purpose:** every id, name, claim and interval of every genomics entity: the base
 # MAGIC of all other tables.
-# MAGIC
-# MAGIC **Run:** `TABLES` lists the tables to build (default `all`); the others are skipped.
 
 # COMMAND ----------
 
@@ -48,20 +46,6 @@ COMPONENT = "silver/genomics/01_shared_plumbing"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
-AVAILABLE = ["entity_id_crosswalk", "entity_name", "entity_claim", "entity_coordinate"]
-dbutils.widgets.text("TABLES", "all")
-SELECTED = {
-    name.strip() for name in dbutils.widgets.get("TABLES").split(",") if name.strip()
-}
-UNKNOWN = SELECTED - {"all", *AVAILABLE}
-if UNKNOWN:
-    message = f"unknown table(s) in TABLES: {sorted(UNKNOWN)}"
-    raise ValueError(message)
-
-
-def selected(table):
-    return "all" in SELECTED or table in SELECTED
-
 
 # COMMAND ----------
 
@@ -2036,331 +2020,315 @@ def opentargets_nested_claims(rules, xwalk):
 # COMMAND ----------
 
 # DBTITLE 1,Build -- entity_id_crosswalk
-if selected("entity_id_crosswalk"):
-    # -- Transform -- ids of every entity type
-    crosswalk = finish_crosswalk(crosswalk_all(RULES))
+# -- Transform -- ids of every entity type
+crosswalk = finish_crosswalk(crosswalk_all(RULES))
 
-    # -- Transform -- keys and provenance
-    crosswalk = crosswalk.withColumn(
-        "_srid",
-        sha_key(
-            "entity_type",
-            "entity_key",
-            "id_type",
-            "id_value",
-            "source_dataset",
-            "source_field",
-        ),
-    )
-    crosswalk = conform_genomics(
-        add_genomics_provenance(crosswalk, "_srid", RID), TABLE
-    )
+# -- Transform -- keys and provenance
+crosswalk = crosswalk.withColumn(
+    "_srid",
+    sha_key(
+        "entity_type",
+        "entity_key",
+        "id_type",
+        "id_value",
+        "source_dataset",
+        "source_field",
+    ),
+)
+crosswalk = conform_genomics(
+    add_genomics_provenance(crosswalk, "_srid", RID), "entity_id_crosswalk"
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_id_crosswalk
-if selected("entity_id_crosswalk"):
-    write_silver(
-        crosswalk, "entity_id_crosswalk", source=SOURCE, component=COMPONENT, rid=RID
-    )
+write_silver(
+    crosswalk, "entity_id_crosswalk", source=SOURCE, component=COMPONENT, rid=RID
+)
 
-    written = spark.table(genomics_table("entity_id_crosswalk"))
-    blocks = inspect_table(
-        written,
-        "entity_id_crosswalk",
-        source=FINDINGS,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=[
-            "entity_type",
-            "entity_key",
-            "id_type",
-            "id_value",
-            "source_dataset",
-            "source_field",
-        ],
-        extra_checks={
-            "entity_types": written.select("entity_type").distinct().count(),
-            "entities_with_an_own_key": written.filter(
-                F.col("match_method").startswith("own_")
+written = spark.table(genomics_table("entity_id_crosswalk"))
+blocks = inspect_table(
+    written,
+    "entity_id_crosswalk",
+    source=FINDINGS,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=[
+        "entity_type",
+        "entity_key",
+        "id_type",
+        "id_value",
+        "source_dataset",
+        "source_field",
+    ],
+    extra_checks={
+        "entity_types": written.select("entity_type").distinct().count(),
+        "entities_with_an_own_key": written.filter(
+            F.col("match_method").startswith("own_")
+        )
+        .select("entity_type", "entity_key")
+        .distinct()
+        .count(),
+        "ids_held_by_several_entities": written.filter(F.col("entities_sharing_id") > 1)
+        .select("entity_type", "id_type", "id_value")
+        .distinct()
+        .count(),
+        **{
+            f"{column}_counts": str(
+                {
+                    r[column]: r["count"]
+                    for r in written.groupBy(column).count().collect()
+                }
             )
-            .select("entity_type", "entity_key")
-            .distinct()
-            .count(),
-            "ids_held_by_several_entities": written.filter(
-                F.col("entities_sharing_id") > 1
-            )
-            .select("entity_type", "id_type", "id_value")
-            .distinct()
-            .count(),
-            **{
-                f"{column}_counts": str(
-                    {
-                        r[column]: r["count"]
-                        for r in written.groupBy(column).count().collect()
-                    }
-                )
-                for column in written.columns
-                if column.endswith("_link_method")
-            },
+            for column in written.columns
+            if column.endswith("_link_method")
         },
-    )
+    },
+)
 
-    write_silver_findings(
-        FINDINGS,
-        f"{COMPONENT.split('/')[-1]}__entity_id_crosswalk",
-        "entity_id_crosswalk",
-        blocks,
-    )
+write_silver_findings(
+    FINDINGS,
+    f"{COMPONENT.split('/')[-1]}__entity_id_crosswalk",
+    "entity_id_crosswalk",
+    blocks,
+)
 
-    print(
-        "STRING alias sources (add the ones that hold UniProt ids to string_alias_id_types):"
-    )
-    read_genomics_bronze("string_protein_aliases").groupBy("source").count().orderBy(
-        F.desc("count")
-    ).show(60, truncate=False)
+print(
+    "STRING alias sources (add the ones that hold UniProt ids to string_alias_id_types):"
+)
+read_genomics_bronze("string_protein_aliases").groupBy("source").count().orderBy(
+    F.desc("count")
+).show(60, truncate=False)
 
 # COMMAND ----------
 
 # DBTITLE 1,Build -- entity_name
-if selected("entity_name"):
-    # -- Read Silver -- id crosswalk
-    xwalk = read_silver("entity_id_crosswalk")
+# -- Read Silver -- id crosswalk
+xwalk = read_silver("entity_id_crosswalk")
 
-    # -- Transform -- names, sharing count and provenance
-    names = finish_names(names_all(RULES, xwalk)).withColumn(
-        "_srid",
-        sha_key(
-            "entity_type",
-            "entity_key",
-            "term",
-            "term_type",
-            "source_dataset",
-            "source_field",
-        ),
-    )
-    names = conform_genomics(add_genomics_provenance(names, "_srid", RID), TABLE)
+# -- Transform -- names, sharing count and provenance
+names = finish_names(names_all(RULES, xwalk)).withColumn(
+    "_srid",
+    sha_key(
+        "entity_type",
+        "entity_key",
+        "term",
+        "term_type",
+        "source_dataset",
+        "source_field",
+    ),
+)
+names = conform_genomics(add_genomics_provenance(names, "_srid", RID), "entity_name")
 
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_name
-if selected("entity_name"):
-    write_silver(names, "entity_name", source=SOURCE, component=COMPONENT, rid=RID)
+write_silver(names, "entity_name", source=SOURCE, component=COMPONENT, rid=RID)
 
-    written = spark.table(genomics_table("entity_name"))
-    blocks = inspect_table(
-        written,
-        "entity_name",
-        source=FINDINGS,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["source_record_id"],
-        extra_checks={
-            "entity_types": written.select("entity_type").distinct().count(),
-            "terms_held_by_several_entities": written.filter(
-                F.col("entities_sharing_term") > 1
+written = spark.table(genomics_table("entity_name"))
+blocks = inspect_table(
+    written,
+    "entity_name",
+    source=FINDINGS,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["source_record_id"],
+    extra_checks={
+        "entity_types": written.select("entity_type").distinct().count(),
+        "terms_held_by_several_entities": written.filter(
+            F.col("entities_sharing_term") > 1
+        )
+        .select("entity_type", F.upper("term"))
+        .distinct()
+        .count(),
+        **{
+            f"{column}_counts": str(
+                {
+                    r[column]: r["count"]
+                    for r in written.groupBy(column).count().collect()
+                }
             )
-            .select("entity_type", F.upper("term"))
-            .distinct()
-            .count(),
-            **{
-                f"{column}_counts": str(
-                    {
-                        r[column]: r["count"]
-                        for r in written.groupBy(column).count().collect()
-                    }
-                )
-                for column in written.columns
-                if column.endswith("_link_method")
-            },
+            for column in written.columns
+            if column.endswith("_link_method")
         },
-    )
+    },
+)
 
-    write_silver_findings(
-        FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_name", "entity_name", blocks
-    )
+write_silver_findings(
+    FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_name", "entity_name", blocks
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Build -- entity_claim
-if selected("entity_claim"):
-    # -- Read Silver -- crosswalk and names
-    xwalk = read_silver("entity_id_crosswalk")
-    names = read_silver("entity_name")
+# -- Read Silver -- crosswalk and names
+xwalk = read_silver("entity_id_crosswalk")
+names = read_silver("entity_name")
 
-    # -- Transform -- transcript genes for the variant claims
-    tx_claims = transcript_claims(RULES, xwalk, names)
-    transcript_genes = (
-        tx_claims.filter(F.col("field") == "gene_key")
-        .groupBy(F.col("entity_key").alias("transcript_key"))
-        .agg(
-            F.countDistinct("value_text").alias("genes"),
-            F.min("value_text").alias("gene_key"),
-        )
-        .filter(F.col("genes") == 1)
-        .select("transcript_key", "gene_key")
+# -- Transform -- transcript genes for the variant claims
+tx_claims = transcript_claims(RULES, xwalk, names)
+transcript_genes = (
+    tx_claims.filter(F.col("field") == "gene_key")
+    .groupBy(F.col("entity_key").alias("transcript_key"))
+    .agg(
+        F.countDistinct("value_text").alias("genes"),
+        F.min("value_text").alias("gene_key"),
     )
+    .filter(F.col("genes") == 1)
+    .select("transcript_key", "gene_key")
+)
 
-    # -- Transform -- claims of every entity type
-    claims = _union(
-        [
-            gene_claims(RULES, xwalk),
-            tx_claims,
-            protein_claims(RULES, xwalk),
-            disease_claims(RULES, xwalk),
-            drug_claims(RULES, xwalk),
-            small_claims(RULES),
-            variant_claims(RULES, variant_id_map(xwalk), transcript_genes),
-            opentargets_nested_claims(RULES, xwalk),
-        ]
-    )
+# -- Transform -- claims of every entity type
+claims = _union(
+    [
+        gene_claims(RULES, xwalk),
+        tx_claims,
+        protein_claims(RULES, xwalk),
+        disease_claims(RULES, xwalk),
+        drug_claims(RULES, xwalk),
+        small_claims(RULES),
+        variant_claims(RULES, variant_id_map(xwalk), transcript_genes),
+        opentargets_nested_claims(RULES, xwalk),
+    ]
+)
 
-    # -- Transform -- keys and provenance
-    claims = claims.distinct().withColumn(
-        "_srid",
-        sha_key(
-            "entity_type",
-            "entity_key",
-            "field",
-            "source_dataset",
-            "source_field",
-            "value_text",
-        ),
-    )
-    claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), TABLE)
+# -- Transform -- keys and provenance
+claims = claims.distinct().withColumn(
+    "_srid",
+    sha_key(
+        "entity_type",
+        "entity_key",
+        "field",
+        "source_dataset",
+        "source_field",
+        "value_text",
+    ),
+)
+claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), "entity_claim")
 
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_claim
-if selected("entity_claim"):
-    write_silver(claims, "entity_claim", source=SOURCE, component=COMPONENT, rid=RID)
+write_silver(claims, "entity_claim", source=SOURCE, component=COMPONENT, rid=RID)
 
-    written = spark.table(genomics_table("entity_claim"))
-    blocks = inspect_table(
-        written,
-        "entity_claim",
-        source=FINDINGS,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["source_record_id"],
-        extra_checks={
-            "entity_types": written.select("entity_type").distinct().count(),
-            "claims_without_rank": written.filter(
-                F.col("source_rank").isNull()
-            ).count(),
-            "llm_generated_claims": written.filter(
-                F.col("source_type") == "llm_generated"
-            ).count(),
-            **{
-                f"{column}_counts": str(
-                    {
-                        r[column]: r["count"]
-                        for r in written.groupBy(column).count().collect()
-                    }
-                )
-                for column in written.columns
-                if column.endswith("_link_method")
-            },
+written = spark.table(genomics_table("entity_claim"))
+blocks = inspect_table(
+    written,
+    "entity_claim",
+    source=FINDINGS,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["source_record_id"],
+    extra_checks={
+        "entity_types": written.select("entity_type").distinct().count(),
+        "claims_without_rank": written.filter(F.col("source_rank").isNull()).count(),
+        "llm_generated_claims": written.filter(
+            F.col("source_type") == "llm_generated"
+        ).count(),
+        **{
+            f"{column}_counts": str(
+                {
+                    r[column]: r["count"]
+                    for r in written.groupBy(column).count().collect()
+                }
+            )
+            for column in written.columns
+            if column.endswith("_link_method")
         },
-    )
+    },
+)
 
-    write_silver_findings(
-        FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_claim", "entity_claim", blocks
-    )
+write_silver_findings(
+    FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_claim", "entity_claim", blocks
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Build -- entity_coordinate
-if selected("entity_coordinate"):
-    # -- Read Silver -- id crosswalk
-    xwalk = read_silver("entity_id_crosswalk")
+# -- Read Silver -- id crosswalk
+xwalk = read_silver("entity_id_crosswalk")
 
-    # -- Transform -- intervals, length, primary interval and provenance
-    # one primary interval per entity and assembly, by the coordinate source order
-    primary = Window.partitionBy("entity_type", "entity_key", "assembly").orderBy(
-        dataset_rank_expr(RULES).asc_nulls_last(),
-        F.col("source_dataset"),
-        F.col("contig"),
-        F.col("start_position"),
+# -- Transform -- intervals, length, primary interval and provenance
+# one primary interval per entity and assembly, by the coordinate source order
+primary = Window.partitionBy("entity_type", "entity_key", "assembly").orderBy(
+    dataset_rank_expr(RULES).asc_nulls_last(),
+    F.col("source_dataset"),
+    F.col("contig"),
+    F.col("start_position"),
+)
+coordinates = (
+    coordinate_all(RULES, xwalk)
+    .distinct()
+    .withColumn("interval_length", F.col("end_position") - F.col("start_position") + 1)
+    .withColumn("is_primary", F.row_number().over(primary) == 1)
+    .withColumn(
+        "_srid",
+        sha_key(
+            "entity_type",
+            "entity_key",
+            "feature_level",
+            "source_dataset",
+            "assembly",
+            "contig",
+            "start_position",
+            "end_position",
+            "strand",
+        ),
     )
-    coordinates = (
-        coordinate_all(RULES, xwalk)
-        .distinct()
-        .withColumn(
-            "interval_length", F.col("end_position") - F.col("start_position") + 1
-        )
-        .withColumn("is_primary", F.row_number().over(primary) == 1)
-        .withColumn(
-            "_srid",
-            sha_key(
-                "entity_type",
-                "entity_key",
-                "feature_level",
-                "source_dataset",
-                "assembly",
-                "contig",
-                "start_position",
-                "end_position",
-                "strand",
-            ),
-        )
-    )
-    coordinates = conform_genomics(
-        add_genomics_provenance(coordinates, "_srid", RID), TABLE
-    )
+)
+coordinates = conform_genomics(
+    add_genomics_provenance(coordinates, "_srid", RID), "entity_coordinate"
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_coordinate
-if selected("entity_coordinate"):
-    write_silver(
-        coordinates, "entity_coordinate", source=SOURCE, component=COMPONENT, rid=RID
-    )
+write_silver(
+    coordinates, "entity_coordinate", source=SOURCE, component=COMPONENT, rid=RID
+)
 
-    written = spark.table(genomics_table("entity_coordinate"))
-    blocks = inspect_table(
-        written,
-        "entity_coordinate",
-        source=FINDINGS,
-        component=COMPONENT,
-        rid=RID,
-        key_cols=["source_record_id"],
-        extra_checks={
-            "entity_types": written.select("entity_type").distinct().count(),
-            "intervals_with_start_after_end": written.filter(
-                F.col("start_position") > F.col("end_position")
-            ).count(),
-            "genes_without_a_grch38_interval": xwalk.filter(
-                F.col("entity_type") == "gene"
+written = spark.table(genomics_table("entity_coordinate"))
+blocks = inspect_table(
+    written,
+    "entity_coordinate",
+    source=FINDINGS,
+    component=COMPONENT,
+    rid=RID,
+    key_cols=["source_record_id"],
+    extra_checks={
+        "entity_types": written.select("entity_type").distinct().count(),
+        "intervals_with_start_after_end": written.filter(
+            F.col("start_position") > F.col("end_position")
+        ).count(),
+        "genes_without_a_grch38_interval": xwalk.filter(F.col("entity_type") == "gene")
+        .select("entity_key")
+        .distinct()
+        .join(
+            written.filter(
+                (F.col("entity_type") == "gene") & (F.col("assembly") == "GRCh38")
             )
             .select("entity_key")
-            .distinct()
-            .join(
-                written.filter(
-                    (F.col("entity_type") == "gene") & (F.col("assembly") == "GRCh38")
-                )
-                .select("entity_key")
-                .distinct(),
-                "entity_key",
-                "left_anti",
+            .distinct(),
+            "entity_key",
+            "left_anti",
+        )
+        .count(),
+        **{
+            f"{column}_counts": str(
+                {
+                    r[column]: r["count"]
+                    for r in written.groupBy(column).count().collect()
+                }
             )
-            .count(),
-            **{
-                f"{column}_counts": str(
-                    {
-                        r[column]: r["count"]
-                        for r in written.groupBy(column).count().collect()
-                    }
-                )
-                for column in written.columns
-                if column.endswith("_link_method")
-            },
+            for column in written.columns
+            if column.endswith("_link_method")
         },
-    )
+    },
+)
 
-    write_silver_findings(
-        FINDINGS,
-        f"{COMPONENT.split('/')[-1]}__entity_coordinate",
-        "entity_coordinate",
-        blocks,
-    )
+write_silver_findings(
+    FINDINGS,
+    f"{COMPONENT.split('/')[-1]}__entity_coordinate",
+    "entity_coordinate",
+    blocks,
+)

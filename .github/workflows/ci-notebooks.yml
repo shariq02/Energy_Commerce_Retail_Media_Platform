@@ -75,23 +75,26 @@ jobs:
           done < <(find databricks -name "*.py" -print0)
           exit "$fail"
 
-      # The cell-count split threshold (MAX_CELLS below) only ever applied to Silver/Gold
-      # notebooks (source-of-truth transform layers) -- eda/, setup/ and
-      # utility/ notebooks were never subject to it, so this stays scoped
-      # to avoid failing the build on files the convention never covered.
-      - name: Verify Silver/Gold notebooks stay under the cell split threshold
+      # The cell-count split threshold applies to every notebook under databricks/,
+      # except the two EDA notebooks listed in EXCEPTIONS. scripts/utilities/lint.py
+      # (not checked out in CI) holds the same limit and the same two exceptions.
+      - name: Verify notebooks stay under the cell split threshold
         env:
           MAX_CELLS: 35
+          EXCEPTIONS: >-
+            databricks/eda/accuweather/01_accuweather_eda.py
+            databricks/eda/iot/01_iot_devices_eda.py
         run: |
           fail=0
           while IFS= read -r -d '' f; do
+            case " $EXCEPTIONS " in *" $f "*) continue ;; esac
             n=$(grep -c "^# COMMAND ----------" "$f")
             cells=$((n + 1))
             if [ "$cells" -gt "$MAX_CELLS" ]; then
               echo "Exceeds the $MAX_CELLS-cell split threshold ($cells cells): $f"
               fail=1
             fi
-          done < <(find databricks/silver databricks/gold -name "*.py" -print0)
+          done < <(find databricks -name "*.py" -print0)
           exit "$fail"
 
       - name: Verify %run relative paths resolve

@@ -34,10 +34,10 @@ jobs:
         run: python -m pip install ruff==0.16.2
 
       - name: Run ruff check
-        run: ruff check . --exclude data/ --exclude docs/ --exclude archive/ --exclude .terraform/
+        run: ruff check . --exclude data/ --exclude docs/ --exclude archive/
 
       - name: Run ruff format --check
-        run: ruff format . --exclude data/ --exclude docs/ --exclude archive/ --exclude .terraform/ --check
+        run: ruff format . --exclude data/ --exclude docs/ --exclude archive/ --check
 
   workflow-lint:
     name: GitHub Actions workflow lint
