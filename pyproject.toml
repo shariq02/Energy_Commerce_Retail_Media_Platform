@@ -86,6 +86,10 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
 "databricks/silver/_semantic_common.py" = ["F821"]
+# _genomics_common.py is %run after _silver_common and uses its names.
+"databricks/silver/_genomics_common.py" = ["F821"]
+"databricks/silver/_genomics_entities.py" = ["F821"]
+"databricks/silver/genomics/**/*.py" = ["F821"]
 "databricks/utility/06_silver_legacy_retirement.py" = ["F821"]
 # The genomics Bronze notebooks pull `%run ./_genomics_bronze_common` (Databricks
 # runtime magic). The common file itself is NOT exempted.

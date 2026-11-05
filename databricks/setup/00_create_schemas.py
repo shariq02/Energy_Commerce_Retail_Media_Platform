@@ -42,6 +42,8 @@ SCHEMAS = [
     "energy_silver_reference",
     "commerce_silver",
     "commerce_silver_reference",
+    "genomics_silver",
+    "genomics_silver_reference",
     "energy_gold",
     "shared_conformed",
     "quality",

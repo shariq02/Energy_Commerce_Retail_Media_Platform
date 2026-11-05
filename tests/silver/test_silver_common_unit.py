@@ -57,10 +57,21 @@ def test_load_contract_and_load_mapping_resolve_the_conventional_path(silver):
         ("honda_iot", "energy"),
         ("rees46", "commerce"),
         ("ga4", "commerce"),
+        ("clinvar", "genomics"),
+        ("gencode", "genomics"),
     ],
 )
 def test_ecosystem_for_matches_the_governed_map(silver, source, expected):
     assert silver["ecosystem_for"](source) == expected
+
+
+def test_ecosystem_for_strict_raises_on_an_unknown_source(silver):
+    with pytest.raises(ValueError, match="source_ecosystem_map"):
+        silver["ecosystem_for"]("a_source_that_does_not_exist", strict=True)
+
+
+def test_ecosystem_for_strict_accepts_a_mapped_source(silver):
+    assert silver["ecosystem_for"]("clinvar", strict=True) == "genomics"
 
 
 def test_ecosystem_for_unknown_source_falls_back_to_the_documented_default(silver):

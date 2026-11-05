@@ -13,7 +13,7 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** capture the current schema (schema, table, column, datatype,
-# MAGIC nullable, ordinal position) of every table across all four Silver
+# MAGIC nullable, ordinal position) of every table across all six Silver
 # MAGIC schemas and store it as a versioned Markdown file -- same mechanism as
 # MAGIC `01_snapshot_bronze_schema.py`. Tables are discovered live via
 # MAGIC `SHOW TABLES`, never a hardcoded list, so a table added after this
@@ -38,6 +38,8 @@ SILVER_SCHEMAS = (
     "energy_silver_reference",
     "commerce_silver",
     "commerce_silver_reference",
+    "genomics_silver",
+    "genomics_silver_reference",
 )
 REGISTRY_SUBDIR = "src/schemas/silver_registry"
 
@@ -84,7 +86,7 @@ print(f"OK  registry directory: {REGISTRY_DIR}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Capture the current schema across all four Silver schemas
+# DBTITLE 1,Capture the current schema across all six Silver schemas
 rows = []  # (schema, table, ordinal, column, datatype, nullable)
 for _schema in SILVER_SCHEMAS:
     tables = sorted(

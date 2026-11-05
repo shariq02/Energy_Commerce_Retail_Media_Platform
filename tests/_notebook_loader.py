@@ -81,6 +81,15 @@ def load_silver_common() -> dict:
     )
 
 
+def load_genomics_common() -> dict:
+    """`_silver_common.py`, then `_genomics_common.py`: the `%run` chain of the
+    genomics Silver notebooks (pure functions only, as in `load_silver_common`)."""
+    namespace = load_silver_common()
+    return _exec_notebook(
+        REPO_ROOT / "databricks" / "silver" / "_genomics_common.py", namespace
+    )
+
+
 def load_gold_common() -> dict:
     """Same as `load_silver_common`, then layers `_gold_common.py` on top --
     reproducing the real notebook's own `%run ../silver/_silver_common` before

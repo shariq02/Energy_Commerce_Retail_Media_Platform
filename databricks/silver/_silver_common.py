@@ -17,12 +17,14 @@
 # MAGIC `%run ../../_silver_common`). Definitions only -- no side effects at
 # MAGIC import; the caller owns `spark` / `dbutils`.
 # MAGIC
-# MAGIC Silver = source-scoped, typed, cleaned, localised, governed. Primary
-# MAGIC Silver tables preserve source semantics and source grain. Reference /
-# MAGIC decode / bridge tables are additive and never replace the source table.
-# MAGIC No ML targets/features, no segmentation, no scores, no universal
-# MAGIC envelope, no cross-source facts/dimensions, no Gold grain changes, no
-# MAGIC `canonical_id`.
+# MAGIC Energy and commerce Silver = source-scoped, typed, cleaned, localised,
+# MAGIC governed. Primary Silver tables preserve source semantics and source
+# MAGIC grain. Reference / decode / bridge tables are additive and never replace
+# MAGIC the source table. No ML targets/features, no segmentation, no scores, no
+# MAGIC universal envelope, no cross-source facts/dimensions, no Gold grain
+# MAGIC changes, no `canonical_id`.
+# MAGIC
+# MAGIC Genomics Silver has its own rules: see `_genomics_common`.
 
 # COMMAND ----------
 
@@ -42,9 +44,8 @@ CATALOG = "energy_commerce_retail_media"
 BRONZE_SCHEMA = "bronze"
 QUALITY_SCHEMA = "quality"
 
-# Silver data lives in one schema per ecosystem (energy_silver /
-# energy_silver_reference / commerce_silver / commerce_silver_reference);
-# which one a given TABLE belongs to is resolved from the seeded
+# Silver data lives in two schemas per ecosystem ({eco}_silver and
+# {eco}_silver_reference); which one a given TABLE belongs to is resolved from the seeded
 # field_class_registry's own target_schema column (src/schemas/_generate_
 # field_classes.py), not re-derived here -- a source can own both a primary
 # and a reference table (e.g. dwd), so ecosystem-per-source alone can't
@@ -171,15 +172,19 @@ def load_mapping(source: str) -> dict:
 _ecosystem_by_source: dict[str, str] | None = None  # cached after first load
 
 
-def ecosystem_for(source: str) -> str:
+def ecosystem_for(source: str, *, strict: bool = False) -> str:
     """source_system -> ecosystem, from the governed source_ecosystem_map.yml
-    (loaded once per session, not per call)."""
+    (loaded once per session). An unmapped source gets the default ecosystem;
+    `strict` raises instead."""
     global _ecosystem_by_source
     if _ecosystem_by_source is None:
         doc = load_yaml("src/schemas/reference/source_ecosystem_map.yml")
         _ecosystem_by_source = {
             m["source_system"]: m["ecosystem"] for m in doc["mappings"]
         }
+    if strict and source not in _ecosystem_by_source:
+        message = f"source {source!r} is not in source_ecosystem_map.yml"
+        raise ValueError(message)
     return _ecosystem_by_source.get(source, _DEFAULT_ECOSYSTEM)
 
 
@@ -246,8 +251,8 @@ def contract_tables(contract: dict) -> dict:
 # DBTITLE 1,Bronze read + typed casts
 
 
-def read_bronze(table: str) -> DataFrame:
-    return spark.table(f"{CATALOG}.{BRONZE_SCHEMA}.{table}")
+def read_bronze(table: str, schema: str | None = None) -> DataFrame:
+    return spark.table(f"{CATALOG}.{schema or BRONZE_SCHEMA}.{table}")
 
 
 _LOGICAL_TO_SPARK = {

@@ -7,6 +7,7 @@ Date: September 2026
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -14,13 +15,21 @@ import yaml
 
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
-_MAP_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "schemas"
-    / "reference"
-    / "source_ecosystem_map.yml"
-)
+_ROOT = Path(__file__).resolve().parents[2]
+_MAP_PATH = _ROOT / "src" / "schemas" / "reference" / "source_ecosystem_map.yml"
+_GENOMICS_BRONZE = _ROOT / "databricks" / "bronze" / "_genomics_bronze_common.py"
+
+
+def _genomics_sources() -> set[str]:
+    """The source folders of genomics_bronze, read from the Bronze config."""
+    tree = ast.parse(_GENOMICS_BRONZE.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "SOURCES" for t in node.targets
+        ):
+            return set(ast.literal_eval(node.value))
+    message = "SOURCES not found in the genomics Bronze config"
+    raise AssertionError(message)
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +44,7 @@ def test_file_exists_and_parses(doc):
 
 def test_allowed_ecosystems_is_closed_vocabulary(doc):
     allowed = doc["allowed_ecosystems"]
-    assert allowed == ["energy", "commerce"], (
+    assert allowed == ["energy", "commerce", "genomics"], (
         "allowed_ecosystems must only grow via a governed change -- if this "
         "fails because a new value was added, confirm an architecture "
         "decision backs it."
@@ -64,8 +73,18 @@ def test_expected_current_scope_sources_present(doc):
         "honda_iot",
         "rees46",
         "ga4",
-    }
+    } | _genomics_sources()
     assert sources == expected
+
+
+def test_every_genomics_bronze_source_maps_to_genomics(doc):
+    mapped = {
+        e["source_system"]: e["ecosystem"]
+        for e in doc["mappings"]
+        if e["source_system"] in _genomics_sources()
+    }
+    assert set(mapped) == _genomics_sources()
+    assert set(mapped.values()) == {"genomics"}
 
 
 def test_current_scope_sources_map_to_the_expected_ecosystem(doc):
@@ -78,6 +97,7 @@ def test_current_scope_sources_map_to_the_expected_ecosystem(doc):
         "honda_iot": "energy",
         "rees46": "commerce",
         "ga4": "commerce",
+        **dict.fromkeys(_genomics_sources(), "genomics"),
     }
     for entry in doc["mappings"]:
         assert entry["ecosystem"] == expected_ecosystem[entry["source_system"]], entry
