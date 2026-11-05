@@ -119,7 +119,6 @@ scripts/utilities/verify_energy_weather_deepening_acquisition.py
 scripts/utilities/verify_acquisition.py
 scripts/utilities/genomics_bronze_samples.py
 scripts/utilities/genomics_bronze_checks.py
-# Local paths of the files that authored knowledge units were written from.
 scripts/knowledge/local_sources.yml
 
 # VS Code
@@ -137,5 +136,5 @@ graphify-out/
 # Claude Code local settings and hooks
 .claude/
 
-# access matrix of the tool servers (which table each server may read): kept private
+# access matrix of the tool servers 
 src/findings/tools_findings/boundary.md

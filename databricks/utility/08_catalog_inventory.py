@@ -12,24 +12,21 @@
 # MAGIC
 # MAGIC **Date:** October 2026
 # MAGIC
-# MAGIC **Purpose:** list every schema, table and Volume in the catalog with its row
-# MAGIC count and size, the totals per schema and overall, the catalogs, the quota
+# MAGIC **Purpose:** list every schema and table in the catalog with its row count and
+# MAGIC size, the totals per schema and overall, the Volumes, the catalogs, the quota
 # MAGIC limits with their usage, and a warning when a guard line is reached.
 # MAGIC
-# MAGIC **Read-only on the catalog** (metadata, `COUNT(*)` and file listings only). The
-# MAGIC one write is `src/inventory/catalog_inventory_<date>.md` in the Git folder.
-# MAGIC "Run All" is safe.
+# MAGIC **Read-only on the catalog** (metadata and `COUNT(*)` only). The one write is
+# MAGIC `src/inventory/catalog_inventory_<date>.md` in the Git folder. "Run All" is safe.
 # MAGIC
-# MAGIC Table size is `sizeInBytes` from `DESCRIBE DETAIL` (current table version only).
-# MAGIC A view or a non-Delta table has a row count and no size. A Volume size is the
-# MAGIC sum of its file sizes; a listing that passes the time limit is marked partial.
-# MAGIC A table or Volume that fails is listed with its error text.
+# MAGIC Size is `sizeInBytes` from `DESCRIBE DETAIL` (current table version only). A
+# MAGIC view or a non-Delta table has a row count and no size. A table that fails is
+# MAGIC listed with its error text. Volumes are listed without a size.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
 import os
-import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
@@ -49,8 +46,6 @@ from pyspark.sql.types import (
 CATALOG = "energy_commerce_retail_media"
 MAX_WORKERS = 8
 FINDINGS_SUBDIR = "src/inventory"
-# Limit on the file listing of one Volume; a listing that is cut is marked partial.
-VOLUME_TIME_LIMIT_SECONDS = 300
 # Guard lines from the quota rules (tables per schema 100, tables per metastore 500,
 # Volumes per metastore 50); a warning prints at these counts.
 GUARD_TABLES_PER_SCHEMA = 90
@@ -59,7 +54,6 @@ GUARD_VOLUMES_PER_METASTORE = 40
 
 print(f"Catalog: {CATALOG}")
 print(f"Parallel queries: {MAX_WORKERS}")
-print(f"Volume listing time limit: {VOLUME_TIME_LIMIT_SECONDS} s")
 
 # COMMAND ----------
 
@@ -244,51 +238,9 @@ volumes = [
     ).collect()
 ]
 print(f"Volumes: {len(volumes)}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Measure Volume sizes
-
-
-def profile_volume(item):
-    schema_name, volume_name, volume_type = item
-    root = f"/Volumes/{CATALOG}/{schema_name}/{volume_name}"
-    deadline = time.monotonic() + VOLUME_TIME_LIMIT_SECONDS
-    file_count = size_bytes = 0
-    complete, error = True, None
-    pending = [root]
-    try:
-        while pending:
-            if time.monotonic() > deadline:
-                complete = False
-                break
-            for entry in dbutils.fs.ls(pending.pop()):
-                if entry.isDir():
-                    pending.append(entry.path)
-                else:
-                    file_count += 1
-                    size_bytes += entry.size
-    except Exception as exc:
-        error = str(exc)[:200]
-    return (
-        schema_name,
-        volume_name,
-        volume_type,
-        file_count,
-        size_bytes,
-        "yes" if complete and error is None else "partial",
-        error,
-    )
-
-
-with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-    volume_results = list(pool.map(profile_volume, volumes))
-volume_rows = [(*r[:5], round(r[4] / (1024 * 1024), 2), *r[5:]) for r in volume_results]
 display(
     spark.createDataFrame(
-        volume_rows,
-        "schema_name string, volume_name string, volume_type string, file_count long,"
-        " size_bytes long, size_mb double, complete string, error string",
+        volumes, "schema_name string, volume_name string, volume_type string"
     )
 )
 
@@ -444,8 +396,6 @@ overall = schema_totals_df.agg(
     F.sum("size_bytes").alias("size_bytes"),
 ).first()
 error_rows = [r for r in table_rows if r[8] is not None]
-volume_error_rows = [r for r in volume_rows if r[7] is not None]
-volume_bytes = sum(r[4] for r in volume_rows)
 
 # COMMAND ----------
 
@@ -478,7 +428,6 @@ findings_text = "\n".join(
                 "size_bytes",
                 "size_gb",
                 "volumes",
-                "volume_size_gb",
             ],
             [
                 (
@@ -489,8 +438,7 @@ findings_text = "\n".join(
                     overall["file_count"],
                     overall["size_bytes"],
                     round(overall["size_bytes"] / (1024**3), 3),
-                    len(volume_rows),
-                    round(volume_bytes / (1024**3), 3),
+                    len(volumes),
                 )
             ],
         ),
@@ -548,28 +496,14 @@ findings_text = "\n".join(
         "",
         "## Volumes",
         "",
-        markdown_table(
-            [
-                "schema",
-                "volume",
-                "type",
-                "files",
-                "size_bytes",
-                "size_mb",
-                "complete",
-                "error",
-            ],
-            volume_rows,
-        ),
+        markdown_table(["schema", "volume", "type"], volumes),
         "",
-        f"## Errors ({len(error_rows) + len(volume_error_rows)})",
+        f"## Errors ({len(error_rows)})",
         "",
         markdown_table(
-            ["schema", "object", "error"],
-            [(r[0], r[1], r[8]) for r in error_rows]
-            + [(r[0], r[1], r[7]) for r in volume_error_rows],
+            ["schema", "table", "error"], [(r[0], r[1], r[8]) for r in error_rows]
         )
-        if error_rows or volume_error_rows
+        if error_rows
         else "None.",
         "",
     ]
