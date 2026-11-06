@@ -13,7 +13,7 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** `shared_conformed.dim_date` already exists
-# MAGIC (`databricks/setup/03_create_shared_conformed.py`, range 2016-01-01 ..
+# MAGIC (`databricks/setup/02_create_shared_conformed.py`, range 2016-01-01 ..
 # MAGIC 2031-12-31). This notebook checks that range against the earliest and
 # MAGIC latest dates Gold actually needs (DWD's historical weather goes back well
 # MAGIC before 2016) and regenerates the table with a wider range only if the
@@ -69,7 +69,7 @@ _DAY_NAMES = [
 # DBTITLE 1,Assert dim_date already exists
 if not spark.catalog.tableExists(FQ):
     raise RuntimeError(
-        f"{FQ} missing -- run databricks/setup/03_create_shared_conformed.py first"
+        f"{FQ} missing -- run databricks/setup/02_create_shared_conformed.py first"
     )
 
 # COMMAND ----------

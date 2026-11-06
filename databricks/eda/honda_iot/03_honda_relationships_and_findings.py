@@ -48,7 +48,19 @@ DATASETS = [
     "weather",
 ]
 ENERGY = [d for d in DATASETS if d != "weather"]
-TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{d}" for d in DATASETS}
+# P and W of a metric share one table; column measurement_type holds p or w.
+TABLES = {
+    d: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{d if d == 'weather' else d[:-2]}"
+    for d in DATASETS
+}
+
+
+def honda_frame(dataset):
+    df = spark.table(TABLES[dataset])
+    if dataset == "weather":
+        return df
+    return df.where(F.col("measurement_type") == dataset[-1]).drop("measurement_type")
+
 
 # COMMAND ----------
 
@@ -62,8 +74,8 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # DBTITLE 1,Tagged union of (frequency, datetime_utc, source) across all 7 tables
 u = None
-for d, t in TABLES.items():
-    part = spark.table(t).select("frequency", "datetime_utc", F.lit(d).alias("src"))
+for d in TABLES:
+    part = honda_frame(d).select("frequency", "datetime_utc", F.lit(d).alias("src"))
     u = part if u is None else u.unionByName(part)
 
 # COMMAND ----------
@@ -212,7 +224,7 @@ frame = (
 )
 ENERGY_COLS = []
 for e_ in [d_ for d_ in ENERGY if d_.endswith("_p")]:
-    pt = spark.table(TABLES[e_]).where(F.col("frequency") == "1h")
+    pt = honda_frame(e_).where(F.col("frequency") == "1h")
     vc = [c for c in pt.columns if c not in ("frequency", "datetime_utc")]
     fam = e_[: -len("_p")]
     frame = frame.join(

@@ -47,7 +47,8 @@ ENERGY = [
     "cooling_p",
     "cooling_w",
 ]
-TABLES = {e: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{e}" for e in ENERGY}
+# P and W of a metric share one table; column measurement_type holds p or w.
+TABLES = {e: f"{CATALOG}.{BRONZE_SCHEMA}.honda_iot_{e[:-2]}" for e in ENERGY}
 KEY_COLS = ["frequency", "datetime_utc"]
 VALUE_EXCLUDE = {"frequency", "datetime_utc"}
 FREQ_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
@@ -67,7 +68,10 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Profile -- rows, missingness, approx distinct, constant columns (one agg per table)
-frames = {e: spark.table(t) for e, t in TABLES.items()}
+frames = {
+    e: spark.table(t).where(F.col("measurement_type") == e[-1]).drop("measurement_type")
+    for e, t in TABLES.items()
+}
 prof = {}
 for e in ENERGY:
     df = frames[e]

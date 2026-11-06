@@ -5,7 +5,7 @@ Author: Sharique Mohammad
 Date: September 2026
 
 No Spark, no database. The notebook
-``databricks/setup/03_create_shared_conformed.py`` creates the
+``databricks/setup/02_create_shared_conformed.py`` creates the
 ``shared_conformed`` schema and its five conformed dimension tables and
 populates ``dim_date`` / ``dim_time`` / ``dim_geography`` inline. These tests
 assert the notebook parses, names every table, carries the header, and that
@@ -26,7 +26,7 @@ _NB = (
     Path(__file__).resolve().parents[2]
     / "databricks"
     / "setup"
-    / "03_create_shared_conformed.py"
+    / "02_create_shared_conformed.py"
 )
 _TABLES = (
     "dim_date",

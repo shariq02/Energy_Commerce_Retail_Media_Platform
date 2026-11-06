@@ -16,7 +16,7 @@
 # MAGIC assert that the `quality` tables exist. Preflight: every Silver table named in a
 # MAGIC Gold `read_silver()` call must be registered in `quality.field_class_registry`;
 # MAGIC a missing one fails here, before any Gold run. `shared_conformed` comes from
-# MAGIC `03_create_shared_conformed.py`. Safe to re-run.
+# MAGIC `02_create_shared_conformed.py`. Safe to re-run.
 
 # COMMAND ----------
 
@@ -49,7 +49,7 @@ for schema in GOLD_SCHEMAS:
 if not spark.catalog.databaseExists(f"{CATALOG}.{SHARED_CONFORMED_SCHEMA}"):
     raise RuntimeError(
         f"{CATALOG}.{SHARED_CONFORMED_SCHEMA} missing -- run "
-        "databricks/setup/03_create_shared_conformed.py first"
+        "databricks/setup/02_create_shared_conformed.py first"
     )
 print(f"OK  present: {CATALOG}.{SHARED_CONFORMED_SCHEMA}")
 

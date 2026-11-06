@@ -43,7 +43,7 @@ GOLD_STAGE = "gold"
 
 # The two Gold schema families: one per ecosystem, plus the cross-ecosystem
 # conformed schema created separately by
-# databricks/setup/03_create_shared_conformed.py.
+# databricks/setup/02_create_shared_conformed.py.
 SHARED_CONFORMED_SCHEMA = "shared_conformed"
 
 

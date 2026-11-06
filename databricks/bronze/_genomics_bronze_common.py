@@ -13,7 +13,7 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** the source and dataset list of `genomics_bronze`, pulled into
-# MAGIC the volume notebook and the loader with `%run`. Definitions only.
+# MAGIC the loader with `%run`. Definitions only.
 
 # COMMAND ----------
 
@@ -23,11 +23,10 @@ import re
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-CATALOG = "energy_commerce_retail_media"
 SCHEMA = "genomics_bronze"
 
-# source folder in data/staging -> datasets. One volume per source; one Bronze
-# table per dataset, named <source>_<dataset> like its staged chunk files.
+# source folder in data/staging -> datasets. One Bronze table per dataset, named
+# <source>_<dataset> like its staged chunk files.
 SOURCES = {
     "alphamissense": ["variant_scores"],
     "biogrid": ["interactions"],
@@ -93,10 +92,6 @@ MULTILINE_TABLES = {"hpo_terms", "opentargets_disease", "opentargets_drug_molecu
 # COMMAND ----------
 
 # DBTITLE 1,Helpers
-
-
-def volume_path(source: str) -> str:
-    return f"/Volumes/{CATALOG}/{SCHEMA}/{source}"
 
 
 def table_name(source: str, dataset: str) -> str:

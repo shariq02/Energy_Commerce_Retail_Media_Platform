@@ -42,7 +42,12 @@ DATASETS = [
     "marktfunktionen",
     "marktrollen",
 ]
-TABLES = {d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{d}" for d in DATASETS}
+# The four code lists share the table mastr_code_lookup (column catalog_kind).
+CODE_LISTS = ["einheitentypen", "lokationstypen", "marktfunktionen", "marktrollen"]
+TABLES = {
+    d: f"{CATALOG}.{BRONZE_SCHEMA}.mastr_{'code_lookup' if d in CODE_LISTS else d}"
+    for d in DATASETS
+}
 
 # COMMAND ----------
 
@@ -58,6 +63,8 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 meta = {}
 for name, t in TABLES.items():
     df = spark.table(t)
+    if name in CODE_LISTS:
+        df = df.filter(df["catalog_kind"] == name).drop("catalog_kind")
     recs = [x.asDict() for x in df.collect()]
     cols = df.columns
     total = len(recs)

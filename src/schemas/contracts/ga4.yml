@@ -42,7 +42,7 @@ bronze_physical_types: >
   RESOLVED -- unlike every other Bronze table in this project (all-STRING,
   cast in Silver), GA4's nested fields (event_params, ecommerce, items) are
   kept as Delta STRUCT/ARRAY as-is, inferred from JSON. Decided in
-  databricks/bronze/09_load_ga4_bronze.py: flattening structured
+  databricks/bronze/01_load_energy_commerce_bronze.py: flattening structured
   arrays/records to opaque strings would have made them unusable downstream.
 
 acquisition:

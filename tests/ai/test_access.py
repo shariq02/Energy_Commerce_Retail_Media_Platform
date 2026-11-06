@@ -294,7 +294,7 @@ def test_the_boundary_lists_follow_the_scope_of_servers_yml(server):
 
 def test_the_setup_notebook_grants_the_scope_of_servers_yml():
     tree = ast.parse(
-        (ROOT / "databricks" / "setup" / "05_tool_principals.py").read_text("utf-8")
+        (ROOT / "databricks" / "setup" / "03_tool_principals.py").read_text("utf-8")
     )
     grants_node = next(
         n.value

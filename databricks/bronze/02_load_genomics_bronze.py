@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # GENOMICS BRONZE LOAD
@@ -12,53 +12,51 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** load the uploaded chunk files of each genomics source into its
-# MAGIC `genomics_bronze` tables, check each table, and drop the volume of a source whose
-# MAGIC tables all passed. A source with no volume, or with a dataset that has no file
-# MAGIC yet, is skipped. Safe to run again.
+# MAGIC **Purpose:** load the chunk files of each genomics source from the landing Volume
+# MAGIC into its `genomics_bronze` tables, check each table, and remove the files of a
+# MAGIC source whose tables all passed. A dataset with no file is skipped. One source
+# MAGIC folder in the Volume is one run. Safe to run again.
 
 # COMMAND ----------
 
-# DBTITLE 1,Shared config
+# DBTITLE 1,Shared libraries
+# MAGIC %run ./_bronze_common
+
+# COMMAND ----------
+
 # MAGIC %run ./_genomics_bronze_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-RUN_SOURCES = []  # empty = all sources; for example ["clinvar", "faers"]
+RUN_SOURCES = []  # empty = every source folder found in the landing Volume
+WRITE_MODE = "overwrite"  # "append" for the second and later parts of a split source
 
-selected = RUN_SOURCES or list(SOURCES)
-unknown = [s for s in selected if s not in SOURCES]
-if unknown:
-    raise RuntimeError(f"unknown source(s): {unknown}")
-print(f"Sources selected: {len(selected)}")
+if RUN_SOURCES:
+    unknown = [s for s in RUN_SOURCES if s not in SOURCES]
+    if unknown:
+        raise RuntimeError(f"unknown source(s): {unknown}")
+    selected = RUN_SOURCES
+else:
+    selected = [s for s in landing_sources() if s in SOURCES]
+if not selected:
+    raise RuntimeError(f"FAIL  no genomics source folder in {landing_root()}")
+print(f"Sources selected: {selected}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Map each dataset to its uploaded files
-live_volumes = {
-    row.volume_name
-    for row in spark.sql(f"SHOW VOLUMES IN {CATALOG}.{SCHEMA}").collect()
-}
-
 plan: dict[str, dict[str, list[str]]] = {}
 for source in selected:
-    if source not in live_volumes:
-        print(f"SKIP  {source}: no volume (loaded already, or not created)")
-        continue
-    paths = [f.path for f in dbutils.fs.ls(volume_path(source)) if not f.isDir()]
+    paths = list_files(landing_path(source))
     found: dict[str, list[str]] = {}
-    missing = []
     for dataset in SOURCES[source]:
         pattern = file_pattern(source, dataset)
         matches = sorted(p for p in paths if pattern.match(p.rsplit("/", 1)[-1]))
         if matches:
             found[dataset] = matches
         else:
-            missing.append(dataset)
-    if missing:
-        print(f"WAIT  {source}: no file yet for {missing}")
-        continue
+            print(f"SKIP  {source}_{dataset}: no file")
     plan[source] = found
     print(f"OK    {source}: {sum(len(v) for v in found.values())} file(s) to load")
 
@@ -76,9 +74,9 @@ for source, datasets in plan.items():
             "table": table,
             "files": len(files),
             "rows": None,
-            "status": "FAILED",
             "validated": False,
             "error": None,
+            "paths": files,
         }
         try:
             df = (
@@ -91,11 +89,7 @@ for source, datasets in plan.items():
                 .csv(files)
             )
             df = df.toDF(*clean_columns(df.columns))
-            df.write.format("delta").mode("overwrite").option(
-                "overwriteSchema", "true"
-            ).saveAsTable(table)
-            result["rows"] = spark.table(table).count()
-            result["status"] = "LOADED"
+            result["rows"] = write_bronze(df, table, WRITE_MODE)
             print(f"OK    {name}: {result['rows']} rows from {len(files)} file(s)")
         except Exception as exc:
             result["error"] = str(exc)
@@ -106,39 +100,27 @@ for source, datasets in plan.items():
 
 # DBTITLE 1,Validate each table
 for result in load_results:
-    if result["status"] != "LOADED":
+    if result["rows"] is None:
         continue
-    if not spark.table(result["table"]).columns:
-        result["error"] = "table has an empty schema"
-    elif not result["rows"]:
-        result["error"] = "table has zero rows after load"
-    else:
-        result["validated"] = True
+    result["error"] = check_table(result["table"], result["rows"])
+    result["validated"] = result["error"] is None
     if result["error"]:
         print(f"FAIL  {result['table']}: {result['error']}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Drop the volume of every source that passed
-volume_cleanup: dict[str, str] = {}
+# DBTITLE 1,Remove the files of every source that passed
 for source in plan:
     results = [r for r in load_results if r["source"] == source]
-    if all(r["validated"] for r in results):
-        spark.sql(f"DROP VOLUME IF EXISTS {CATALOG}.{SCHEMA}.{source}")
-        volume_cleanup[source] = "DELETED"
+    if results and all(r["validated"] for r in results):
+        remove_files([p for r in results for p in r["paths"]])
+        print(f"REMOVED    files of {source}")
     else:
-        volume_cleanup[source] = "PRESERVED"
-    print(f"{volume_cleanup[source]:<10} volume {source}")
+        print(f"PRESERVED  files of {source}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Summary
-loaded = sum(1 for r in load_results if r["validated"])
-print("=" * 70)
-print(f"Tables loaded and validated: {loaded}/{len(load_results)}")
-print(
-    f"Sources loaded             : {sum(v == 'DELETED' for v in volume_cleanup.values())}/{len(plan)}"
-)
-print("=" * 70)
-if loaded != len(load_results):
+print_summary("GENOMICS BRONZE LOAD", load_results)
+if not all(r["validated"] for r in load_results):
     raise RuntimeError("FAIL  at least one table did not load; see the lines above")
