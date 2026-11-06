@@ -43,14 +43,7 @@ SERIES = {
         "bronze_schema",
         "bronze-schema-hash",
         "Bronze",
-        lambda s: s == "bronze",
-    ),
-    "genomics_bronze": (
-        "bronze_registry",
-        "genomics_bronze_schema",
-        "bronze-schema-hash",
-        "Genomics Bronze",
-        lambda s: s == "genomics_bronze",
+        lambda s: s == "bronze" or s.endswith("_bronze"),
     ),
     "silver": (
         "silver_registry",
