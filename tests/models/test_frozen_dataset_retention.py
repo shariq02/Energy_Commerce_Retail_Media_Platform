@@ -22,7 +22,7 @@ _PATH = (
     Path(__file__).resolve().parents[2]
     / "databricks"
     / "utility"
-    / "11_frozen_dataset_retention.py"
+    / "05_frozen_dataset_retention.py"
 )
 _TEXT = _PATH.read_text(encoding="utf-8")
 _CELLS = _TEXT.split("# COMMAND ----------")

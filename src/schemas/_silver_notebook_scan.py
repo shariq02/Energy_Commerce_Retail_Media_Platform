@@ -5,8 +5,8 @@ Author: Sharique Mohammad
 Date: September 2026
 
 Purpose: one AST-based scanner, shared by `_generate_field_classes.py`,
-`databricks/silver/00_silver_setup.py`, `databricks/gold/00_gold_setup.py`,
-`databricks/utility/07_gold_legacy_retirement.py` and the test suite -- a
+`databricks/silver/00_silver_setup.py`, `databricks/gold/00_gold_setup.py`
+and the test suite -- a
 table name literal is extracted straight from every `write_silver(...)` /
 `explode_link_bridge(...)` / `write_semantic(...)` call (Silver side),
 `read_silver(...)` call (Gold reading Silver), or `write_gold(...)` /

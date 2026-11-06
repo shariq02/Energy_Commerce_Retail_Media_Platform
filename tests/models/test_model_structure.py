@@ -202,9 +202,7 @@ def test_setup_preflight_splits_and_gates_exist():
         "lib/_operate_requests.py",
     ):
         assert (_MODELS / rel).exists(), rel
-    assert (
-        _ROOT / "databricks" / "schema_registry" / "05_snapshot_model_schema.py"
-    ).exists()
+    assert (_ROOT / "databricks" / "schema_registry" / "01_snapshot_schema.py").exists()
 
 
 _APPROVAL = [p for p in _NOTEBOOKS if _rel(p).startswith("approve/")]

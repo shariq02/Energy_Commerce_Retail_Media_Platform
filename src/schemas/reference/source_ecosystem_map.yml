@@ -176,10 +176,10 @@ mappings:
 historical_out_of_scope:
   - source_system: ipinyou
     formerly: energy
-    note: "Bronze table (bronze.ipinyou_*) deleted via databricks/utility/01_historical_uc_cleanup.py; historical contract/mapping under archive/historical/"
+    note: "Bronze table (bronze.ipinyou_*) deleted; historical contract/mapping under archive/historical/"
   - source_system: criteo_attribution
     formerly: energy
-    note: "Bronze table (bronze.criteo_attribution_events) deleted via databricks/utility/01_historical_uc_cleanup.py; historical contract/mapping under archive/historical/"
+    note: "Bronze table (bronze.criteo_attribution_events) deleted; historical contract/mapping under archive/historical/"
   - source_system: kddcup2012_track2
     formerly: energy
-    note: "Bronze table (bronze.kddcup2012_click_prediction) deleted via databricks/utility/01_historical_uc_cleanup.py; historical contract/mapping under archive/historical/"
+    note: "Bronze table (bronze.kddcup2012_click_prediction) deleted; historical contract/mapping under archive/historical/"
