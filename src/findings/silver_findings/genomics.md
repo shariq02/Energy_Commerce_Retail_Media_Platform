@@ -1271,7 +1271,7 @@ _Generated: 2026-11-05T22:18Z_
 <!-- BEGIN genomics:04_variants__variant -->
 ## variant
 
-_Generated: 2026-11-05T22:20Z_
+_Generated: 2026-11-06T14:22Z_
 
 ### cardinality
 
@@ -1392,7 +1392,7 @@ _Generated: 2026-11-05T22:20Z_
 <!-- BEGIN genomics:04_variants__variant_classification -->
 ## variant_classification
 
-_Generated: 2026-11-05T22:33Z_
+_Generated: 2026-11-06T14:39Z_
 
 ### cardinality
 
@@ -1408,6 +1408,7 @@ _Generated: 2026-11-05T22:33Z_
 | distinct:clinical_significance_simple | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:clinvar_submission_accessions | approx_distinct | 5030910.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_snapshot | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1421,12 +1422,13 @@ _Generated: 2026-11-05T22:33Z_
 | null_rate:classification_type | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:term | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:review_status | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:review_stars | null_rate | 5.955106261048329e-05 |  | INFO | INFO |  |
-| null_rate:last_evaluated | null_rate | 0.00916164596226209 |  | INFO | INFO |  |
-| null_rate:number_submitters | null_rate | 0.0007335332518700671 |  | INFO | INFO |  |
-| null_rate:clinical_significance_simple | null_rate | 0.0007335332518700671 |  | INFO | INFO |  |
-| null_rate:clinvar_submission_accessions | null_rate | 0.37130815249195726 |  | INFO | INFO |  |
+| null_rate:review_stars | null_rate | 5.4403036710605775e-05 |  | INFO | INFO |  |
+| null_rate:last_evaluated | null_rate | 0.009575726738300266 |  | INFO | INFO |  |
+| null_rate:number_submitters | null_rate | 0.0009669303482674657 |  | INFO | INFO |  |
+| null_rate:clinical_significance_simple | null_rate | 0.0009669303482674657 |  | INFO | INFO |  |
+| null_rate:clinvar_submission_accessions | null_rate | 0.26983923814621213 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_snapshot | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1437,13 +1439,13 @@ _Generated: 2026-11-05T22:33Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| value_counts:review_status | count |  |  | INFO | INFO | no classifications from unflagged records=480, no classification provided=18660, criteria provided, conflicting classifications=413018, criteria provided, multiple submitters=11, criteria provided, single submitter=5977724, no classification for the single variant=2259, reviewed by expert panel=47075, no assertion criteria provided=229744, practice guideline=131, criteria provided, multiple submitters, no conflicts=1555923 |
+| value_counts:review_status | count |  |  | INFO | INFO | criteria provided, multiple submitters, no conflicts=1883593, criteria provided, single submitter=8576346, reviewed by expert panel=61579, no assertion criteria provided=340131, criteria provided, conflicting classifications=465526, no classifications from unflagged records=602, no classification for the single variant=6096, no classification provided=25609, practice guideline=162, criteria provided, multiple submitters=16 |
 
 ### grain
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| duplicate_keys | count | 2963021.0 | 0.0 | WARN | WARN | key_cols=['source_record_id'] |
+| duplicate_keys | count | 3.0 | 0.0 | WARN | WARN | key_cols=['source_record_id'] |
 
 ### numeric
 
@@ -1451,11 +1453,11 @@ _Generated: 2026-11-05T22:33Z_
 |---|---|---|---|---|---|---|
 | min:review_stars | min | 0.0 |  | INFO | INFO |  |
 | max:review_stars | max | 4.0 |  | INFO | INFO |  |
-| zero_count:review_stars | count | 250663.0 |  | INFO | INFO |  |
+| zero_count:review_stars | count | 371836.0 |  | INFO | INFO |  |
 | negative_count:review_stars | count | 0.0 |  | INFO | INFO |  |
 | min:number_submitters | min | 0.0 |  | INFO | INFO |  |
 | max:number_submitters | max | 96.0 |  | INFO | INFO |  |
-| zero_count:number_submitters | count | 753.0 |  | INFO | INFO |  |
+| zero_count:number_submitters | count | 2032.0 |  | INFO | INFO |  |
 | negative_count:number_submitters | count | 0.0 |  | INFO | INFO |  |
 
 ### schema
@@ -1463,28 +1465,28 @@ _Generated: 2026-11-05T22:33Z_
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
-| column_count | count | 15.0 |  | INFO | INFO |  |
+| column_count | count | 16.0 |  | INFO | INFO |  |
 
 ### transformation_specific
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| types | value |  |  | INFO | INFO | {'germline': 8238977, 'somatic_clinical_impact': 2097, 'oncogenicity': 3951} |
-| review_statuses_without_stars | value | 491.0 |  | INFO | INFO | 491 |
-| rows_without_a_date | value | 75538.0 |  | INFO | INFO | 75538 |
+| types | value |  |  | INFO | INFO | {'germline': 11348676, 'oncogenicity': 6437, 'somatic_clinical_impact': 4547} |
+| review_statuses_without_stars | value | 618.0 |  | INFO | INFO | 618 |
+| rows_without_a_date | value | 108777.0 |  | INFO | INFO | 108777 |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 8245025.0 |  | INFO | INFO |  |
+| row_count | rows | 11359660.0 |  | INFO | INFO |  |
 
 <!-- END genomics:04_variants__variant_classification -->
 
 <!-- BEGIN genomics:04_variants__variant_condition -->
 ## variant_condition
 
-_Generated: 2026-11-05T22:32Z_
+_Generated: 2026-11-06T14:38Z_
 
 ### cardinality
 
@@ -1495,11 +1497,12 @@ _Generated: 2026-11-05T22:32Z_
 | distinct:condition_name | approx_distinct | 36858.0 |  | INFO | INFO |  |
 | distinct:clinvar_condition_accession | approx_distinct | 6477562.0 |  | INFO | INFO |  |
 | distinct:condition_ids | approx_distinct | 27445.0 |  | INFO | INFO |  |
-| distinct:disease_key | approx_distinct | 8559.0 |  | INFO | INFO |  |
+| distinct:disease_key | approx_distinct | 9063.0 |  | INFO | INFO |  |
 | distinct:disease_link_method | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:is_generic_label | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:pairing_status | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_snapshot | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1511,14 +1514,15 @@ _Generated: 2026-11-05T22:32Z_
 |---|---|---|---|---|---|---|
 | null_rate:variant_key | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:condition_position | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:condition_name | null_rate | 0.00028739696032528423 |  | INFO | INFO |  |
+| null_rate:condition_name | null_rate | 0.00014421770216825768 |  | INFO | INFO |  |
 | null_rate:clinvar_condition_accession | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:condition_ids | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:disease_key | null_rate | 0.3176940912537089 |  | INFO | INFO |  |
+| null_rate:disease_key | null_rate | 0.18807173368335542 |  | INFO | INFO |  |
 | null_rate:disease_link_method | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:is_generic_label | null_rate | 0.00028739696032528423 |  | INFO | INFO |  |
+| null_rate:is_generic_label | null_rate | 0.00014421770216825768 |  | INFO | INFO |  |
 | null_rate:pairing_status | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_snapshot | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1529,14 +1533,14 @@ _Generated: 2026-11-05T22:32Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| flag_true_count:is_generic_label | count | 3097924.0 |  | INFO | INFO |  |
-| value_counts:pairing_status | count |  |  | INFO | INFO | count_mismatch=109526, paired=7138289 |
+| flag_true_count:is_generic_label | count | 7277748.0 |  | INFO | INFO |  |
+| value_counts:pairing_status | count |  |  | INFO | INFO | paired=15628817, count_mismatch=236087 |
 
 ### grain
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| duplicate_keys | count | 117821.0 | 0.0 | WARN | WARN | key_cols=['source_record_id'] |
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['source_record_id'] |
 
 ### numeric
 
@@ -1552,29 +1556,29 @@ _Generated: 2026-11-05T22:32Z_
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
-| column_count | count | 15.0 |  | INFO | INFO |  |
+| column_count | count | 16.0 |  | INFO | INFO |  |
 
 ### transformation_specific
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| pairing_mismatches | value | 109526.0 |  | INFO | INFO | 109526 |
-| conditions_without_a_disease_key | value | 2302588.0 |  | INFO | INFO | 2302588 |
-| generic_labels | value | 3097924.0 |  | INFO | INFO | 3097924 |
-| disease_link_method_counts | value |  |  | INFO | INFO | {'unlinked': 2029580, 'no_id': 273008, 'ids': 4945227} |
+| pairing_mismatches | value | 236087.0 |  | INFO | INFO | 236087 |
+| conditions_without_a_disease_key | value | 2983740.0 |  | INFO | INFO | 2983740 |
+| generic_labels | value | 7277748.0 |  | INFO | INFO | 7277748 |
+| disease_link_method_counts | value |  |  | INFO | INFO | {'ids': 12881164, 'unlinked': 2386350, 'no_id': 597390} |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 7247815.0 |  | INFO | INFO |  |
+| row_count | rows | 15864904.0 |  | INFO | INFO |  |
 
 <!-- END genomics:04_variants__variant_condition -->
 
 <!-- BEGIN genomics:04_variants__variant_hgvs -->
 ## variant_hgvs
 
-_Generated: 2026-11-05T22:30Z_
+_Generated: 2026-11-06T14:35Z_
 
 ### cardinality
 
@@ -1606,6 +1610,7 @@ _Generated: 2026-11-05T22:30Z_
 | distinct:parse_status | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:source_field | approx_distinct | 2.0 |  | INFO | INFO |  |
+| distinct:source_snapshot | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1616,31 +1621,32 @@ _Generated: 2026-11-05T22:30Z_
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | null_rate:variant_key | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:transcript_accession | null_rate | 0.005723489904450081 |  | INFO | INFO |  |
-| null_rate:transcript_version | null_rate | 0.005845859361814011 |  | INFO | INFO |  |
-| null_rate:transcript_key | null_rate | 0.02140726827189936 |  | INFO | INFO |  |
-| null_rate:gene_symbol | null_rate | 0.3590126150645722 |  | INFO | INFO |  |
-| null_rate:coding_notation | null_rate | 0.35903366038127144 |  | INFO | INFO |  |
-| null_rate:coding_region | null_rate | 0.35903366038127144 |  | INFO | INFO |  |
-| null_rate:coding_start | null_rate | 0.35903366038127144 |  | INFO | INFO |  |
-| null_rate:coding_start_offset | null_rate | 0.8880156398758856 |  | INFO | INFO |  |
-| null_rate:coding_end | null_rate | 0.9770961449021622 |  | INFO | INFO |  |
-| null_rate:coding_end_offset | null_rate | 0.9936278683477461 |  | INFO | INFO |  |
-| null_rate:coding_edit_type | null_rate | 0.35903366038127144 |  | INFO | INFO |  |
-| null_rate:coding_reference_base | null_rate | 0.40551942001894636 |  | INFO | INFO |  |
-| null_rate:coding_alternate_base | null_rate | 0.40551942001894636 |  | INFO | INFO |  |
-| null_rate:coding_inserted_bases | null_rate | 0.9946820854041252 |  | INFO | INFO |  |
-| null_rate:protein_notation | null_rate | 0.13378549637609402 |  | INFO | INFO |  |
-| null_rate:protein_reference_amino_acid | null_rate | 0.13378549637609402 |  | INFO | INFO |  |
-| null_rate:protein_position | null_rate | 0.13378549637609402 |  | INFO | INFO |  |
-| null_rate:protein_end_reference_amino_acid | null_rate | 0.9959126092527198 |  | INFO | INFO |  |
-| null_rate:protein_end_position | null_rate | 0.9959126092527198 |  | INFO | INFO |  |
-| null_rate:protein_edit_type | null_rate | 0.13378549637609402 |  | INFO | INFO |  |
-| null_rate:protein_alternate_amino_acid | null_rate | 0.16324364358264878 |  | INFO | INFO |  |
-| null_rate:protein_inserted_amino_acids | null_rate | 0.997231077437985 |  | INFO | INFO |  |
+| null_rate:transcript_accession | null_rate | 0.0077943856157422714 |  | INFO | INFO |  |
+| null_rate:transcript_version | null_rate | 0.007855468397800018 |  | INFO | INFO |  |
+| null_rate:transcript_key | null_rate | 0.015628774192399355 |  | INFO | INFO |  |
+| null_rate:gene_symbol | null_rate | 0.18414872586047412 |  | INFO | INFO |  |
+| null_rate:coding_notation | null_rate | 0.18417871068856853 |  | INFO | INFO |  |
+| null_rate:coding_region | null_rate | 0.18417871068856853 |  | INFO | INFO |  |
+| null_rate:coding_start | null_rate | 0.18417871068856853 |  | INFO | INFO |  |
+| null_rate:coding_start_offset | null_rate | 0.8555929983269718 |  | INFO | INFO |  |
+| null_rate:coding_end | null_rate | 0.9705954583351422 |  | INFO | INFO |  |
+| null_rate:coding_end_offset | null_rate | 0.9916088397777756 |  | INFO | INFO |  |
+| null_rate:coding_edit_type | null_rate | 0.18417871068856853 |  | INFO | INFO |  |
+| null_rate:coding_reference_base | null_rate | 0.24398598964125065 |  | INFO | INFO |  |
+| null_rate:coding_alternate_base | null_rate | 0.24398598964125065 |  | INFO | INFO |  |
+| null_rate:coding_inserted_bases | null_rate | 0.993300443246721 |  | INFO | INFO |  |
+| null_rate:protein_notation | null_rate | 0.17319014082155368 |  | INFO | INFO |  |
+| null_rate:protein_reference_amino_acid | null_rate | 0.17319014082155368 |  | INFO | INFO |  |
+| null_rate:protein_position | null_rate | 0.17319014082155368 |  | INFO | INFO |  |
+| null_rate:protein_end_reference_amino_acid | null_rate | 0.9947502896910074 |  | INFO | INFO |  |
+| null_rate:protein_end_position | null_rate | 0.9947502896910074 |  | INFO | INFO |  |
+| null_rate:protein_edit_type | null_rate | 0.17319014082155368 |  | INFO | INFO |  |
+| null_rate:protein_alternate_amino_acid | null_rate | 0.2107765750452764 |  | INFO | INFO |  |
+| null_rate:protein_inserted_amino_acids | null_rate | 0.9965217599410489 |  | INFO | INFO |  |
 | null_rate:parse_status | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_field | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_snapshot | null_rate | 0.17634738320805102 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1651,13 +1657,13 @@ _Generated: 2026-11-05T22:30Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| value_counts:parse_status | count |  |  | INFO | INFO | partial=1776, unparsed=41258, ok=7131959 |
+| value_counts:parse_status | count |  |  | INFO | INFO | ok=14256396, unparsed=112567, partial=4973 |
 
 ### grain
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| duplicate_keys | count | 3628.0 | 0.0 | WARN | WARN | key_cols=['source_record_id'] |
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['source_record_id'] |
 
 ### numeric
 
@@ -1669,20 +1675,20 @@ _Generated: 2026-11-05T22:30Z_
 | negative_count:transcript_version | count | 0.0 |  | INFO | INFO |  |
 | min:coding_start | min | -473617.0 |  | INFO | INFO |  |
 | max:coding_start | max | 684684.0 |  | INFO | INFO |  |
-| zero_count:coding_start | count | 7.0 |  | INFO | INFO |  |
-| negative_count:coding_start | count | 44349.0 |  | INFO | INFO |  |
+| zero_count:coding_start | count | 8.0 |  | INFO | INFO |  |
+| negative_count:coding_start | count | 110247.0 |  | INFO | INFO |  |
 | min:coding_start_offset | min | -384796.0 |  | INFO | INFO |  |
 | max:coding_start_offset | max | 324116.0 |  | INFO | INFO |  |
 | zero_count:coding_start_offset | count | 0.0 |  | INFO | INFO |  |
-| negative_count:coding_start_offset | count | 407952.0 |  | INFO | INFO |  |
+| negative_count:coding_start_offset | count | 1052287.0 |  | INFO | INFO |  |
 | min:coding_end | min | -30466.0 |  | INFO | INFO |  |
 | max:coding_end | max | 344331.0 |  | INFO | INFO |  |
 | zero_count:coding_end | count | 1.0 |  | INFO | INFO |  |
-| negative_count:coding_end | count | 1777.0 |  | INFO | INFO |  |
+| negative_count:coding_end | count | 4162.0 |  | INFO | INFO |  |
 | min:coding_end_offset | min | -265138.0 |  | INFO | INFO |  |
 | max:coding_end_offset | max | 306663.0 |  | INFO | INFO |  |
 | zero_count:coding_end_offset | count | 0.0 |  | INFO | INFO |  |
-| negative_count:coding_end_offset | count | 22980.0 |  | INFO | INFO |  |
+| negative_count:coding_end_offset | count | 60383.0 |  | INFO | INFO |  |
 | min:protein_position | min | 1.0 |  | INFO | INFO |  |
 | max:protein_position | max | 35992.0 |  | INFO | INFO |  |
 | zero_count:protein_position | count | 0.0 |  | INFO | INFO |  |
@@ -1697,29 +1703,29 @@ _Generated: 2026-11-05T22:30Z_
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
-| column_count | count | 31.0 |  | INFO | INFO |  |
+| column_count | count | 32.0 |  | INFO | INFO |  |
 
 ### transformation_specific
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| clinvar_unparsed | value | 41258.0 |  | INFO | INFO | 41258 |
-| clinvar_partial | value | 1776.0 |  | INFO | INFO | 1776 |
-| rows_without_a_transcript | value | 153597.0 |  | INFO | INFO | 153597 |
-| edit_types | value |  |  | INFO | INFO | {None: 959910, 'delins': 6409, 'deletion': 23474, 'extension': 229, 'missense': 5108185, 'insertion': 13458, 'other': 10, 'duplication': 3060, 'frameshift': 164874, 'nonsense': 104241, 'synonymous': 791143} |
+| clinvar_unparsed | value | 112567.0 |  | INFO | INFO | 112567 |
+| clinvar_partial | value | 4973.0 |  | INFO | INFO | 4973 |
+| rows_without_a_transcript | value | 224647.0 |  | INFO | INFO | 224647 |
+| edit_types | value |  |  | INFO | INFO | {'insertion': 33636, 'other': 30, None: 2489424, 'missense': 8955967, 'duplication': 9065, 'delins': 16360, 'nonsense': 266891, 'frameshift': 419425, 'deletion': 61533, 'synonymous': 2121011, 'extension': 594} |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 7174993.0 |  | INFO | INFO |  |
+| row_count | rows | 14373936.0 |  | INFO | INFO |  |
 
 <!-- END genomics:04_variants__variant_hgvs -->
 
 <!-- BEGIN genomics:05_variant_scores__position_score -->
 ## position_score
 
-_Generated: 2026-11-05T22:34Z_
+_Generated: 2026-11-06T14:40Z_
 
 ### cardinality
 
@@ -1782,7 +1788,7 @@ _Generated: 2026-11-05T22:34Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| scores | value |  |  | INFO | INFO | {'phastcons_100way': 4055013, 'phylop_100way': 4055013} |
+| scores | value |  |  | INFO | INFO | {'phylop_100way': 4055013, 'phastcons_100way': 4055013} |
 | contigs | value | 25.0 |  | INFO | INFO | 25 |
 
 ### volume
@@ -1796,7 +1802,7 @@ _Generated: 2026-11-05T22:34Z_
 <!-- BEGIN genomics:05_variant_scores__variant_feature_overlap -->
 ## variant_feature_overlap
 
-_Generated: 2026-11-05T22:39Z_
+_Generated: 2026-11-06T14:46Z_
 
 ### cardinality
 
@@ -1860,7 +1866,7 @@ _Generated: 2026-11-05T22:39Z_
 <!-- BEGIN genomics:05_variant_scores__variant_population_frequency -->
 ## variant_population_frequency
 
-_Generated: 2026-11-05T22:35Z_
+_Generated: 2026-11-06T14:41Z_
 
 ### cardinality
 
@@ -1943,7 +1949,7 @@ _Generated: 2026-11-05T22:35Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| measures | value |  |  | INFO | INFO | {'highest_group_allele_frequency': 2548327, 'allele_frequency': 29957365, 'filtering_allele_frequency_95': 1604522, 'highest_ancestry_allele_frequency': 2723576} |
+| measures | value |  |  | INFO | INFO | {'highest_ancestry_allele_frequency': 2723576, 'allele_frequency': 29957365, 'highest_group_allele_frequency': 2548327, 'filtering_allele_frequency_95': 1604522} |
 | populations | value | 12.0 |  | INFO | INFO | 12 |
 | frequencies_above_one | value | 0.0 |  | INFO | INFO | 0 |
 
@@ -1958,7 +1964,7 @@ _Generated: 2026-11-05T22:35Z_
 <!-- BEGIN genomics:05_variant_scores__variant_score -->
 ## variant_score
 
-_Generated: 2026-11-05T22:34Z_
+_Generated: 2026-11-06T14:40Z_
 
 ### cardinality
 
@@ -2680,7 +2686,7 @@ _Generated: 2026-11-05T22:40Z_
 <!-- BEGIN genomics:07_relations__drug_gene_relation -->
 ## drug_gene_relation
 
-_Generated: 2026-11-05T22:43Z_
+_Generated: 2026-11-06T14:50Z_
 
 ### cardinality
 
@@ -2762,14 +2768,14 @@ _Generated: 2026-11-05T22:43Z_
 <!-- BEGIN genomics:07_relations__gene_disease_association -->
 ## gene_disease_association
 
-_Generated: 2026-11-05T22:42Z_
+_Generated: 2026-11-06T14:49Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:gene_key | approx_distinct | 23650.0 |  | INFO | INFO |  |
-| distinct:disease_key | approx_distinct | 29448.0 |  | INFO | INFO |  |
+| distinct:disease_key | approx_distinct | 29614.0 |  | INFO | INFO |  |
 | distinct:record_kind | approx_distinct | 8.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 8.0 |  | INFO | INFO |  |
 | distinct:source_gene_id | approx_distinct | 45229.0 |  | INFO | INFO |  |
@@ -2777,8 +2783,8 @@ _Generated: 2026-11-05T22:42Z_
 | distinct:gene_link_method | approx_distinct | 6.0 |  | INFO | INFO |  |
 | distinct:disease_link_method | approx_distinct | 8.0 |  | INFO | INFO |  |
 | distinct:score | approx_distinct | 2308085.0 |  | INFO | INFO |  |
-| distinct:evidence_count | approx_distinct | 1430.0 |  | INFO | INFO |  |
-| distinct:supporting_count | approx_distinct | 335.0 |  | INFO | INFO |  |
+| distinct:evidence_count | approx_distinct | 1489.0 |  | INFO | INFO |  |
+| distinct:supporting_count | approx_distinct | 363.0 |  | INFO | INFO |  |
 | distinct:relation_type | approx_distinct | 6.0 |  | INFO | INFO |  |
 | distinct:classification | approx_distinct | 15.0 |  | INFO | INFO |  |
 | distinct:mode_of_inheritance | approx_distinct | 6.0 |  | INFO | INFO |  |
@@ -2796,25 +2802,25 @@ _Generated: 2026-11-05T22:42Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| null_rate:gene_key | null_rate | 0.007976849177670118 |  | INFO | INFO |  |
-| null_rate:disease_key | null_rate | 0.00414264867400382 |  | INFO | INFO |  |
+| null_rate:gene_key | null_rate | 0.007940121199183631 |  | INFO | INFO |  |
+| null_rate:disease_key | null_rate | 0.004123574587483317 |  | INFO | INFO |  |
 | null_rate:record_kind | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:source_gene_id | null_rate | 0.03573740514336221 |  | INFO | INFO |  |
-| null_rate:source_disease_id | null_rate | 0.03541240932440143 |  | INFO | INFO |  |
+| null_rate:source_gene_id | null_rate | 0.04017718017864284 |  | INFO | INFO |  |
+| null_rate:source_disease_id | null_rate | 0.03985368074493157 |  | INFO | INFO |  |
 | null_rate:gene_link_method | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:disease_link_method | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:score | null_rate | 0.04563179584349543 |  | INFO | INFO |  |
-| null_rate:evidence_count | null_rate | 0.7680445489177176 |  | INFO | INFO |  |
-| null_rate:supporting_count | null_rate | 0.9649975310908254 |  | INFO | INFO |  |
-| null_rate:relation_type | null_rate | 0.7988278086985914 |  | INFO | INFO |  |
-| null_rate:classification | null_rate | 0.9985007830347329 |  | INFO | INFO |  |
-| null_rate:mode_of_inheritance | null_rate | 0.9991798985342314 |  | INFO | INFO |  |
-| null_rate:evaluation_date | null_rate | 0.23829165605778527 |  | INFO | INFO |  |
-| null_rate:study_id | null_rate | 0.23897077155728377 |  | INFO | INFO |  |
-| null_rate:aggregation_value | null_rate | 0.04563179584349543 |  | INFO | INFO |  |
-| null_rate:report_url | null_rate | 0.9991798985342314 |  | INFO | INFO |  |
-| null_rate:comment | null_rate | 0.9929871065134633 |  | INFO | INFO |  |
+| null_rate:score | null_rate | 0.05002601392255472 |  | INFO | INFO |  |
+| null_rate:evidence_count | null_rate | 0.7645082248578019 |  | INFO | INFO |  |
+| null_rate:supporting_count | null_rate | 0.9605543721728115 |  | INFO | INFO |  |
+| null_rate:relation_type | null_rate | 0.7997540701521589 |  | INFO | INFO |  |
+| null_rate:classification | null_rate | 0.9985076859116985 |  | INFO | INFO |  |
+| null_rate:mode_of_inheritance | null_rate | 0.9991836745450748 |  | INFO | INFO |  |
+| null_rate:evaluation_date | null_rate | 0.24179880619265326 |  | INFO | INFO |  |
+| null_rate:study_id | null_rate | 0.24247479482602957 |  | INFO | INFO |  |
+| null_rate:aggregation_value | null_rate | 0.05002601392255472 |  | INFO | INFO |  |
+| null_rate:report_url | null_rate | 0.9991836745450748 |  | INFO | INFO |  |
+| null_rate:comment | null_rate | 0.993019396129998 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
@@ -2840,8 +2846,8 @@ _Generated: 2026-11-05T22:42Z_
 | zero_count:evidence_count | count | 0.0 |  | INFO | INFO |  |
 | negative_count:evidence_count | count | 0.0 |  | INFO | INFO |  |
 | min:supporting_count | min | 0.0 |  | INFO | INFO |  |
-| max:supporting_count | max | 4646.0 |  | INFO | INFO |  |
-| zero_count:supporting_count | count | 140496.0 |  | INFO | INFO |  |
+| max:supporting_count | max | 4736.0 |  | INFO | INFO |  |
+| zero_count:supporting_count | count | 160872.0 |  | INFO | INFO |  |
 | negative_count:supporting_count | count | 0.0 |  | INFO | INFO |  |
 
 ### schema
@@ -2855,24 +2861,24 @@ _Generated: 2026-11-05T22:42Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| kinds | value |  |  | INFO | INFO | {'opentargets_datasource': 440000, 'clingen_validity': 3717, 'clingen_dosage': 3078, 'hpo_gene_disease': 12673, 'clinvar_variant_condition': 158644, 'opentargets_gwas_credible_set': 3445546, 'omim_gene_link': 28708, 'opentargets_overall': 440000} |
+| kinds | value |  |  | INFO | INFO | {'clingen_validity': 3717, 'opentargets_overall': 440000, 'hpo_gene_disease': 12673, 'clinvar_variant_condition': 179609, 'omim_gene_link': 28708, 'clingen_dosage': 3078, 'opentargets_gwas_credible_set': 3445546, 'opentargets_datasource': 440000} |
 | rows_without_a_gene_key | value | 36154.0 |  | INFO | INFO | 36154 |
 | rows_without_a_disease_key | value | 18776.0 |  | INFO | INFO | 18776 |
-| gene_link_method_counts | value |  |  | INFO | INFO | {'clinvar_gene_id': 158644, 'ensembl': 4292735, 'ncbi_gene': 41116, 'no_id': 3331, 'hgnc': 3717, 'unlinked': 32823} |
-| disease_link_method_counts | value |  |  | INFO | INFO | {'orphanet': 5007, 'omim': 9200, 'clinvar_condition_ids': 158644, 'no_id': 1858, 'opentargets_disease': 4325546, 'medgen': 10882, 'unlinked': 16918, 'mondo': 4311} |
+| gene_link_method_counts | value |  |  | INFO | INFO | {'hgnc': 3717, 'ensembl': 4292735, 'no_id': 3331, 'unlinked': 32823, 'clinvar_gene_id': 179609, 'ncbi_gene': 41116} |
+| disease_link_method_counts | value |  |  | INFO | INFO | {'mondo': 4311, 'opentargets_disease': 4325546, 'omim': 9200, 'orphanet': 5007, 'clinvar_condition_ids': 179609, 'no_id': 1858, 'medgen': 10882, 'unlinked': 16918} |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 4532366.0 |  | INFO | INFO |  |
+| row_count | rows | 4553331.0 |  | INFO | INFO |  |
 
 <!-- END genomics:07_relations__gene_disease_association -->
 
 <!-- BEGIN genomics:07_relations__pharmacogenomic_association -->
 ## pharmacogenomic_association
 
-_Generated: 2026-11-05T22:43Z_
+_Generated: 2026-11-06T14:51Z_
 
 ### cardinality
 
@@ -2953,7 +2959,7 @@ _Generated: 2026-11-05T22:43Z_
 <!-- BEGIN genomics:07_relations__phenotype_annotation -->
 ## phenotype_annotation
 
-_Generated: 2026-11-05T22:42Z_
+_Generated: 2026-11-06T14:50Z_
 
 ### cardinality
 
@@ -3311,7 +3317,7 @@ _Generated: 2026-11-05T22:44Z_
 <!-- BEGIN genomics:09_facts__perturbation_expression -->
 ## perturbation_expression
 
-_Generated: 2026-11-05T22:47Z_
+_Generated: 2026-11-06T14:54Z_
 
 ### cardinality
 
@@ -3433,7 +3439,7 @@ _Generated: 2026-11-05T22:47Z_
 | rows_without_a_gene_key | value | 1064499.0 |  | INFO | INFO | 1064499 |
 | rows_without_a_drug_key | value | 0.0 |  | INFO | INFO | 0 |
 | rows_without_a_p_value | value | 5722416.0 |  | INFO | INFO | 5722416 |
-| gene_link_method_counts | value |  |  | INFO | INFO | {'unlinked': 1064499, 'gene_alias': 201287, 'gene_symbol': 9506576} |
+| gene_link_method_counts | value |  |  | INFO | INFO | {'gene_symbol': 9506576, 'gene_alias': 201287, 'unlinked': 1064499} |
 | drug_link_method_counts | value |  |  | INFO | INFO | {'tahoe_drug': 10772362} |
 
 ### volume
@@ -3447,7 +3453,7 @@ _Generated: 2026-11-05T22:47Z_
 <!-- BEGIN genomics:09_facts__perturbation_sample -->
 ## perturbation_sample
 
-_Generated: 2026-11-05T22:47Z_
+_Generated: 2026-11-06T14:53Z_
 
 ### cardinality
 
@@ -3541,7 +3547,7 @@ _Generated: 2026-11-05T22:47Z_
 <!-- BEGIN genomics:09_facts__somatic_mutation -->
 ## somatic_mutation
 
-_Generated: 2026-11-05T22:47Z_
+_Generated: 2026-11-06T14:53Z_
 
 ### cardinality
 
@@ -3710,7 +3716,7 @@ _Generated: 2026-11-05T22:47Z_
 <!-- BEGIN genomics:09_facts__tumor_sample -->
 ## tumor_sample
 
-_Generated: 2026-11-05T22:45Z_
+_Generated: 2026-11-06T14:51Z_
 
 ### cardinality
 
@@ -4048,7 +4054,7 @@ _Generated: 2026-11-05T22:48Z_
 <!-- BEGIN genomics:11_derived_attributes__entity_derived_attribute -->
 ## entity_derived_attribute
 
-_Generated: 2026-11-05T22:54Z_
+_Generated: 2026-11-06T15:03Z_
 
 ### cardinality
 
@@ -4079,12 +4085,12 @@ _Generated: 2026-11-05T22:54Z_
 | null_rate:entity_type | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:entity_key | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:attribute | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:value_text | null_rate | 0.6161846232182221 |  | INFO | INFO |  |
-| null_rate:value_number | null_rate | 0.730083112061333 |  | INFO | INFO |  |
-| null_rate:value_boolean | null_rate | 0.6537379208888213 |  | INFO | INFO |  |
+| null_rate:value_text | null_rate | 0.6122827719824826 |  | INFO | INFO |  |
+| null_rate:value_number | null_rate | 0.740262516876574 |  | INFO | INFO |  |
+| null_rate:value_boolean | null_rate | 0.6474578457890087 |  | INFO | INFO |  |
 | null_rate:value_type | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:method | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:matched_text | null_rate | 0.864022165004782 |  | INFO | INFO |  |
+| null_rate:matched_text | null_rate | 0.8624678110826802 |  | INFO | INFO |  |
 | null_rate:text_source | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:rule_name | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:rule_version | null_rate | 0.0 |  | INFO | INFO |  |
@@ -4099,7 +4105,7 @@ _Generated: 2026-11-05T22:54Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| duplicate_keys | count | 17336.0 | 0.0 | WARN | WARN | key_cols=['source_record_id'] |
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['source_record_id'] |
 
 ### numeric
 
@@ -4107,7 +4113,7 @@ _Generated: 2026-11-05T22:54Z_
 |---|---|---|---|---|---|---|
 | min:value_number | min | 0.0 |  | INFO | INFO |  |
 | max:value_number | max | 2473539.0 |  | INFO | INFO |  |
-| zero_count:value_number | count | 4955383.0 |  | INFO | INFO |  |
+| zero_count:value_number | count | 4912305.0 |  | INFO | INFO |  |
 | negative_count:value_number | count | 0.0 |  | INFO | INFO |  |
 
 ### schema
@@ -4124,12 +4130,12 @@ _Generated: 2026-11-05T22:54Z_
 | attributes | value | 178.0 |  | INFO | INFO | 178 |
 | genes_with_the_default_primary_function | value | 209127.0 |  | INFO | INFO | 209127 |
 | entity_types | value | 7.0 |  | INFO | INFO | 7 |
-| variants_with_an_impact_score | value | 4632109.0 |  | INFO | INFO | 4632109 |
+| variants_with_an_impact_score | value | 4623292.0 |  | INFO | INFO | 4623292 |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 123758692.0 |  | INFO | INFO |  |
+| row_count | rows | 121225730.0 |  | INFO | INFO |  |
 
 <!-- END genomics:11_derived_attributes__entity_derived_attribute -->
