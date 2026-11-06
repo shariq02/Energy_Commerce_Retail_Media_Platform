@@ -97,9 +97,9 @@ GENOMICS_TABLE_GRAIN = {
     "cell_line": "cell line",
     "genetic_test": "test",
     "variant": "variant",
-    "variant_hgvs": "variant, transcript",
-    "variant_condition": "variant, condition position",
-    "variant_classification": "variant, classification type, term, source",
+    "variant_hgvs": "variant, transcript, snapshot",
+    "variant_condition": "variant, condition position, snapshot",
+    "variant_classification": "variant, classification type, term, source, snapshot",
     "variant_score": "variant, score name, source",
     "position_score": "assembly, contig, position, score name",
     "variant_population_frequency": "variant, population, source",
@@ -414,7 +414,7 @@ GENOMICS_STRUCTURES.update(
                 "protein_inserted_amino_acids",
                 "parse_status",
             ),
-            *_text("source_dataset", "source_field"),
+            *_text("source_dataset", "source_field", "source_snapshot"),
         ],
         "variant_condition": [
             ("variant_key", "string"),
@@ -423,7 +423,7 @@ GENOMICS_STRUCTURES.update(
             ("condition_ids", "array<string>"),
             *_text("disease_key", "disease_link_method"),
             ("is_generic_label", "boolean"),
-            *_text("pairing_status", "source_dataset"),
+            *_text("pairing_status", "source_dataset", "source_snapshot"),
         ],
         "variant_classification": [
             *_text("variant_key", "classification_type", "term", "review_status"),
@@ -433,6 +433,7 @@ GENOMICS_STRUCTURES.update(
             ("clinical_significance_simple", "string"),
             ("clinvar_submission_accessions", "array<string>"),
             ("source_dataset", "string"),
+            ("source_snapshot", "string"),
         ],
         "variant_score": [
             *_text("variant_key", "score_name"),
@@ -882,6 +883,7 @@ def bronze_table_name(source_dataset: str) -> str:
 
 _RULE_SECTIONS = (
     "version",
+    "clinvar_current_snapshot",
     "placeholders",
     "assembly_labels",
     "ucsc_assembly_names",

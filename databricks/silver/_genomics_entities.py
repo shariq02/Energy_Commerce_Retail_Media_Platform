@@ -342,6 +342,14 @@ def dbvar_frame(rules):
     )
 
 
+def current_snapshot(df, rules):
+    """The rows of the current ClinVar snapshot and the rows of sources without one."""
+    return df.filter(
+        F.col("source_snapshot").isNull()
+        | (F.col("source_snapshot") == rules["clinvar_current_snapshot"])
+    )
+
+
 def variant_frames(rules):
     """(dataset, frame) of every source that has genomic coordinates."""
     return [

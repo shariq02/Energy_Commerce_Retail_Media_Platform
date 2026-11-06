@@ -6,7 +6,12 @@
 # Read by databricks/silver/_genomics_common.py. Precedence entries are
 # "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
 
-version: 1
+version: 2
+
+# ClinVar is staged as three snapshots (column `snapshot`: current, 2026-01, 2025-01).
+# variant_hgvs, variant_condition and variant_classification keep all three in
+# `source_snapshot`; every reader of those tables uses only this snapshot.
+clinvar_current_snapshot: current
 
 placeholders:
   general: ["", "-", "na", "NA", "N/A", "n/a", "[]"]

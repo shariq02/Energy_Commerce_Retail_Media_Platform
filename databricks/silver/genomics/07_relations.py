@@ -197,12 +197,12 @@ variants = (
     .select("variant_key", "gene_key")
 )
 conditions = (
-    read_silver("variant_condition")
+    current_snapshot(read_silver("variant_condition"), RULES)
     .filter(F.col("disease_key").isNotNull() & ~F.col("is_generic_label"))
     .select("variant_key", "disease_key")
 )
 pathogenic = (
-    read_silver("variant_classification")
+    current_snapshot(read_silver("variant_classification"), RULES)
     .filter(
         (F.col("classification_type") == "germline")
         & F.col("term").isin(RULES["pathogenic_terms"])

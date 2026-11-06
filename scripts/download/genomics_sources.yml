@@ -1,0 +1,466 @@
+# Genomics download list: one entry per stage() call, in run order
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: November 2026
+#
+# Read by download_genomics.py. `vars` fill {name} in a url or file name.
+# A file is {tag, url, file}; `each` repeats it for every item (a value, or a
+# mapping whose keys fill the template); `range` repeats it for n = 0 .. N-1;
+# `from` takes the file list from a named listing. A `manual:` url is a page
+# saved by hand to data/raw/<source>/<file>. `capped` names the datasets that
+# stop the stage at the staging size cap.
+
+vars:
+  ncbi: https://ftp.ncbi.nlm.nih.gov
+  clinvar: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited
+  gene: https://ftp.ncbi.nlm.nih.gov/gene/DATA
+  dbvar: https://ftp.ncbi.nlm.nih.gov/pub/dbVar/data/Homo_sapiens/by_study/vcf
+  gencode_release: 50
+  hpo: https://github.com/obophenotype/human-phenotype-ontology/releases/latest/download
+  pharmgkb: https://s3.pgkb.org/data
+  reactome: https://reactome.org/download/current
+  string: https://stringdb-downloads.org/download
+  string_version: v12.5
+  proteingym: https://marks.hms.harvard.edu/proteingym/ProteinGym_v1.3
+  proteingym_reference: https://raw.githubusercontent.com/OATML-Markslab/ProteinGym/main/reference_files
+  hf: https://huggingface.co/datasets
+  faers: https://fis.fda.gov/content/Exports
+  long_range: https://huggingface.co/datasets/InstaDeepAI/genomics-long-range-benchmark/resolve/main
+  chembl_release: 37
+  chembl: https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/latest
+  opentargets_release: "26.09"
+  opentargets: https://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output
+  maps: https://huggingface.co/datasets/ching-goodfire/MAPS-ClinVar-VKS-Embeddings-L80-shuffled/resolve/main/metadata
+  tahoe: https://huggingface.co/datasets/tahoebio/Tahoe-100M/resolve/main/metadata
+  ucsc: https://hgdownload.soe.ucsc.edu/goldenPath/hg38
+  gnomad: https://huggingface.co/datasets/altar-genomics/gnomad-4.1.1-genomes/resolve/main
+
+stages:
+  # --- NCBI (ClinVar first: gnomAD, CADD, conservation and AlphaMissense read its positions)
+  - source: clinvar
+    datasets: [variant_summary]
+    # The current file first: it has the most columns; older snapshots are aligned to it.
+    files:
+      - {tag: current, url: "{clinvar}/variant_summary.txt.gz", file: variant_summary.txt.gz}
+      - {tag: "2026-01", url: "{clinvar}/archive/variant_summary_2026-01.txt.gz", file: variant_summary_2026-01.txt.gz}
+      - {tag: "2025-01", url: "{clinvar}/archive/variant_summary_2025-01.txt.gz", file: variant_summary_2025-01.txt.gz}
+    parser: {name: table, dataset: variant_summary, keep: assembly_grch38, tag_column: snapshot}
+  - source: clinvar
+    datasets: [variation_allele]
+    files:
+      - {tag: "", url: "{clinvar}/variation_allele.txt.gz", file: variation_allele.txt.gz}
+    parser: {name: table, dataset: variation_allele}
+  - source: ncbi_gene
+    datasets: [gene_info]
+    files:
+      - {tag: "", url: "{gene}/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz", file: Homo_sapiens.gene_info.gz}
+    parser: {name: table, dataset: gene_info, keep: tax_id_human}
+  - source: ncbi_gene
+    datasets: [gene2refseq]
+    files:
+      - {tag: "", url: "{gene}/gene2refseq.gz", file: gene2refseq.gz}
+    parser: gene2refseq
+  - source: ncbi_gene
+    datasets: [mim2gene_medgen]
+    files:
+      - {tag: "", url: "{gene}/mim2gene_medgen", file: mim2gene_medgen}
+    parser: {name: table, dataset: mim2gene_medgen}
+  - source: medgen
+    datasets: [concepts]
+    files:
+      - {tag: "", url: "{ncbi}/pub/medgen/MGCONSO.RRF.gz", file: MGCONSO.RRF.gz}
+    parser: {name: table, dataset: concepts, keep: not_suppressed, read: {sep: "|"}}
+  - source: medgen
+    datasets: [relations]
+    files:
+      - {tag: "", url: "{ncbi}/pub/medgen/MGREL.RRF.gz", file: MGREL.RRF.gz}
+    parser: {name: table, dataset: relations, keep: not_suppressed, read: {sep: "|"}}
+  - source: gtr
+    datasets: [test_condition_gene]
+    files:
+      - {tag: "", url: "{ncbi}/pub/GTR/data/test_condition_gene.txt", file: test_condition_gene.txt}
+    parser: {name: table, dataset: test_condition_gene}
+  - source: dbvar
+    datasets: [variants]
+    files:
+      - each:
+          - nstd102.GRCh38.variant_region
+          - nstd102.GRCh38.variant_call
+          - estd214.GRCh38.variant_region
+        tag: "{item}"
+        url: "{dbvar}/{item}.vcf.gz"
+        file: "{item}.vcf.gz"
+    parser: dbvar
+
+  # --- reference sources
+  - source: uniprot
+    datasets: [entries, features]
+    files:
+      - tag: ""
+        url: https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz
+        file: uniprot_sprot.dat.gz
+    parser: uniprot
+  - source: refseq
+    datasets: [annotation]
+    files:
+      - {tag: "", url: "{ucsc}/bigZips/genes/hg38.ncbiRefSeq.gtf.gz", file: hg38.ncbiRefSeq.gtf.gz}
+    parser: gtf
+  - source: gencode
+    datasets: [annotation]
+    files:
+      - tag: ""
+        url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_{gencode_release}/gencode.v{gencode_release}.basic.annotation.gtf.gz"
+        file: "gencode.v{gencode_release}.basic.annotation.gtf.gz"
+    parser: gtf
+
+  # --- pharmacogenomics, expression and cancer
+  - source: pharmgkb
+    datasets: [genes]
+    files: [{tag: genes, url: "{pharmgkb}/genes.zip", file: genes.zip}]
+    parser: pharmgkb
+  - source: pharmgkb
+    datasets: [drugs]
+    files: [{tag: drugs, url: "{pharmgkb}/drugs.zip", file: drugs.zip}]
+    parser: pharmgkb
+  - source: pharmgkb
+    datasets: [variants]
+    files: [{tag: variants, url: "{pharmgkb}/variants.zip", file: variants.zip}]
+    parser: pharmgkb
+  - source: pharmgkb
+    datasets: [relationships]
+    files: [{tag: relationships, url: "{pharmgkb}/relationships.zip", file: relationships.zip}]
+    parser: pharmgkb
+  - source: gtex
+    datasets: [gene_median_tpm]
+    files:
+      - tag: ""
+        url: https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_median_tpm.gct.gz
+        file: GTEx_Analysis_v10_RNASeQCv2.4.2_gene_median_tpm.gct.gz
+    parser: {name: table, dataset: gene_median_tpm, read: {skip_lines: 2}}
+  - source: tcga
+    datasets: [mc3_somatic_mutations]
+    # TCGA MC3 public MAF (mc3.v0.2.8.PUBLIC.maf.gz), GRCh37 coordinates.
+    files:
+      - {tag: "", url: "https://api.gdc.cancer.gov/data/1c8cfe5f-e52d-41ba-94da-f15ea1337efc", file: mc3.v0.2.8.PUBLIC.maf.gz}
+    parser:
+      name: table
+      dataset: mc3_somatic_mutations
+      usecols_in:
+        - Hugo_Symbol
+        - Entrez_Gene_Id
+        - NCBI_Build
+        - Chromosome
+        - Start_Position
+        - End_Position
+        - Strand
+        - Variant_Classification
+        - Variant_Type
+        - Reference_Allele
+        - Tumor_Seq_Allele1
+        - Tumor_Seq_Allele2
+        - dbSNP_RS
+        - Tumor_Sample_Barcode
+        - HGVSc
+        - HGVSp_Short
+        - Transcript_ID
+        - Exon_Number
+        - t_depth
+        - t_ref_count
+        - t_alt_count
+        - Gene
+        - IMPACT
+        - FILTER
+
+  # --- curation
+  - source: clingen
+    datasets: [gene_validity]
+    files:
+      - {tag: "", url: "https://search.clinicalgenome.org/kb/gene-validity/download", file: gene_validity.csv}
+    parser: clingen_validity
+  - source: clingen
+    datasets: [dosage_sensitivity]
+    files:
+      - {tag: "", url: "https://ftp.clinicalgenome.org/ClinGen_gene_curation_list_GRCh38.tsv", file: ClinGen_gene_curation_list_GRCh38.tsv}
+    parser: {name: table, dataset: dosage_sensitivity}
+  - source: hpo
+    datasets: [terms, term_relations]
+    files: [{tag: "", url: "{hpo}/hp.json", file: hp.json}]
+    parser: hpo_ontology
+  - source: hpo
+    datasets: [phenotype_annotations]
+    files: [{tag: "", url: "{hpo}/phenotype.hpoa", file: phenotype.hpoa}]
+    parser: {name: table, dataset: phenotype_annotations}
+  - source: hpo
+    datasets: [genes_to_phenotype]
+    files: [{tag: "", url: "{hpo}/genes_to_phenotype.txt", file: genes_to_phenotype.txt}]
+    parser: {name: table, dataset: genes_to_phenotype}
+  - source: cpic
+    datasets: [pairs]
+    files: [{tag: "", url: "https://api.cpicpgx.org/v1/pair_view", file: pair_view.json}]
+    parser: cpic_pairs
+  - source: fda
+    datasets: [pgx_biomarkers]
+    # fda.gov blocks scripted requests: the table is exported by hand to Excel.
+    files:
+      - tag: ""
+        url: "manual:https://www.fda.gov/drugs/science-and-research-drugs/table-pharmacogenomic-biomarkers-drug-labeling"
+        file: pgx_biomarkers.xlsx
+    parser: fda_biomarkers
+
+  # --- pathways and interactions
+  - source: reactome
+    datasets: [pathway_mappings]
+    files:
+      - each:
+          - {id_type: ncbi_gene, name: NCBI2Reactome_All_Levels.txt}
+          - {id_type: uniprot, name: UniProt2Reactome_All_Levels.txt}
+        tag: "{id_type}"
+        url: "{reactome}/{name}"
+        file: "{name}"
+    # Reactome files have no header line.
+    parser:
+      name: table
+      dataset: pathway_mappings
+      keep: reactome_human
+      tag_column: id_type
+      read: {names: [identifier, pathway_id, url, pathway_name, evidence, species]}
+  - source: reactome
+    datasets: [pathways]
+    files: [{tag: "", url: "{reactome}/ReactomePathways.txt", file: ReactomePathways.txt}]
+    parser:
+      name: table
+      dataset: pathways
+      keep: reactome_human
+      read: {names: [pathway_id, pathway_name, species]}
+  - source: reactome
+    datasets: [pathway_relations]
+    files: [{tag: "", url: "{reactome}/ReactomePathwaysRelation.txt", file: ReactomePathwaysRelation.txt}]
+    parser:
+      name: table
+      dataset: pathway_relations
+      keep: reactome_human_relation
+      read: {names: [parent_pathway_id, child_pathway_id]}
+  - source: string
+    datasets: [protein_links]
+    files: [{tag: "", url: "{string}/protein.links.detailed.{string_version}/9606.protein.links.detailed.{string_version}.txt.gz", file: "9606.protein.links.detailed.{string_version}.txt.gz"}]
+    parser: {name: table, dataset: protein_links, read: {sep: " "}}
+  - source: string
+    datasets: [protein_info]
+    files: [{tag: "", url: "{string}/protein.info.{string_version}/9606.protein.info.{string_version}.txt.gz", file: "9606.protein.info.{string_version}.txt.gz"}]
+    parser: {name: table, dataset: protein_info}
+  - source: string
+    datasets: [protein_aliases]
+    files: [{tag: "", url: "{string}/protein.aliases.{string_version}/9606.protein.aliases.{string_version}.txt.gz", file: "9606.protein.aliases.{string_version}.txt.gz"}]
+    parser: {name: table, dataset: protein_aliases}
+  - source: biogrid
+    datasets: [interactions]
+    files:
+      - tag: ""
+        url: https://downloads.thebiogrid.org/Download/BioGRID/Latest-Release/BIOGRID-ORGANISM-LATEST.tab3.zip
+        file: BIOGRID-ORGANISM-LATEST.tab3.zip
+    parser: biogrid
+
+  # --- benchmarks
+  - source: proteingym
+    datasets: [dms_reference]
+    files: [{tag: "", url: "{proteingym_reference}/DMS_substitutions.csv", file: DMS_substitutions.csv}]
+    parser: {name: reference, dataset: dms_reference, keep_human: true}
+  - source: proteingym
+    datasets: [clinical_reference]
+    files: [{tag: "", url: "{proteingym_reference}/clinical_substitutions.csv", file: clinical_substitutions.csv}]
+    parser: {name: reference, dataset: clinical_reference, keep_human: false}
+  - source: proteingym
+    datasets: [dms_substitutions]
+    files: [{tag: "", url: "{proteingym}/DMS_ProteinGym_substitutions.zip", file: DMS_ProteinGym_substitutions.zip}]
+    parser:
+      name: substitutions
+      dataset: dms_substitutions
+      id_column: DMS_id
+      columns: [mutant, DMS_score, DMS_score_bin]
+      human_only: true
+  - source: proteingym
+    datasets: [clinical_substitutions]
+    files: [{tag: "", url: "{proteingym}/clinical_ProteinGym_substitutions.zip", file: clinical_ProteinGym_substitutions.zip}]
+    parser:
+      name: substitutions
+      dataset: clinical_substitutions
+      id_column: protein
+      columns: [protein, mutant, DMS_bin_score]
+      human_only: false
+  - source: clinvar_vs_benign
+    datasets: [variants]
+    files:
+      - each: [GPN-Star-V100, GPN-Star-P243, GPN-Star-M447]
+        tag: "{item}"
+        url: "{hf}/songlab/clinvar_vs_benign/resolve/main/predictions/{item}.parquet"
+        file: "{item}.parquet"
+      - {tag: test, url: "{hf}/songlab/clinvar_vs_benign/resolve/main/test.parquet", file: test.parquet}
+    parser: clinvar_vs_benign
+  - source: gnomad_balanced
+    datasets: [variants]
+    files: [{tag: "", url: "{hf}/songlab/gnomad_balanced/resolve/main/test.parquet", file: test.parquet}]
+    parser: {name: parquet, dataset: variants}
+  - source: spectralbio
+    datasets: [variants]
+    files:
+      - each:
+          - {subset: brca1_full_filtered, path: brca1/brca1_full_filtered_v1.json, name: brca1_full_filtered_v1.json}
+          - {subset: brca1_transfer100, path: brca1/brca1_transfer100_v1.json, name: brca1_transfer100_v1.json}
+          - {subset: tp53_canonical, path: tp53/tp53_canonical_v1.json, name: tp53_canonical_v1.json}
+        tag: "{subset}"
+        url: "{hf}/DaviBonetto/spectralbio-clinvar/resolve/main/benchmarks/{path}"
+        file: "{name}"
+    parser: spectralbio
+
+  # --- regulatory, drug safety and long-range benchmark
+  - source: encode
+    datasets: [ccre_registry]
+    files: [{tag: V4, url: "https://downloads.wenglab.org/Registry-V4/GRCh38-cCREs.bed", file: GRCh38-cCREs.bed}]
+    parser:
+      name: table
+      dataset: ccre_registry
+      read: {names: [chrom, start, end, dhs_accession, ccre_accession, ccre_class]}
+  - source: faers
+    datasets: [demo, drug, reac, outc, rpsr, ther, indi]
+    files:
+      - each: [2026q1, 2026q2]
+        tag: "{item}"
+        url: "{faers}/faers_ascii_{item}.zip"
+        file: "faers_ascii_{item}.zip"
+    parser: faers
+  - source: long_range_benchmark
+    datasets: [causal_eqtl]
+    files: [{tag: "", url: "{long_range}/variant_effect_causal_eqtl/All_Tissues.csv", file: All_Tissues.csv}]
+    parser: {name: csv, dataset: causal_eqtl}
+  - source: long_range_benchmark
+    datasets: [pathogenic_coding]
+    files: [{tag: "", url: "{long_range}/variant_effect_pathogenic/vep_pathogenic_coding.csv", file: vep_pathogenic_coding.csv}]
+    parser: {name: csv, dataset: pathogenic_coding}
+  - source: long_range_benchmark
+    datasets: [pathogenic_non_coding]
+    files: [{tag: "", url: "{long_range}/variant_effect_pathogenic/vep_pathogenic_non_coding.csv", file: vep_pathogenic_non_coding.csv}]
+    parser: {name: csv, dataset: pathogenic_non_coding}
+
+  # --- drugs and targets
+  - source: chembl
+    datasets: [compounds]
+    files:
+      - tag: "{chembl_release}"
+        url: "{chembl}/chembl_{chembl_release}_chemreps.txt.gz"
+        file: "chembl_{chembl_release}_chemreps.txt.gz"
+    parser: {name: table, dataset: compounds}
+  - source: chembl
+    datasets: [uniprot_mapping]
+    files:
+      - {tag: "{chembl_release}", url: "{chembl}/chembl_uniprot_mapping.txt", file: chembl_uniprot_mapping.txt}
+    parser:
+      name: table
+      dataset: uniprot_mapping
+      read: {names: [uniprot_accession, chembl_target_id, target_name, target_type]}
+  # Nested time series make the association rows very large; Silver never reads them.
+  - source: opentargets
+    datasets: [association_overall_direct]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: association_overall_direct, dropped: [timeseries]}
+    capped: [association_overall_direct]
+  - source: opentargets
+    datasets: [association_by_datasource_direct]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: association_by_datasource_direct, dropped: [timeseries]}
+    capped: [association_by_datasource_direct]
+  - source: opentargets
+    datasets: [target]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: target}
+    capped: [target]
+  - source: opentargets
+    datasets: [disease]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: disease}
+    capped: [disease]
+  - source: opentargets
+    datasets: [drug_molecule]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: drug_molecule}
+    capped: [drug_molecule]
+  - source: opentargets
+    datasets: [drug_mechanism_of_action]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: drug_mechanism_of_action}
+    capped: [drug_mechanism_of_action]
+  - source: opentargets
+    datasets: [evidence_gwas_credible_sets]
+    files: {from: opentargets_parts}
+    parser: {name: open_targets, dataset: evidence_gwas_credible_sets}
+    capped: [evidence_gwas_credible_sets]
+
+  # --- variant scores (AlphaMissense, CADD and conservation read the staged ClinVar positions)
+  - source: alphamissense
+    datasets: [variant_scores]
+    files:
+      - tag: ""
+        url: https://storage.googleapis.com/dm_alphamissense/AlphaMissense_hg38.tsv.gz
+        file: AlphaMissense_hg38.tsv.gz
+    parser: {name: table, dataset: variant_scores, keep: clinvar_variants}
+    capped: [variant_scores]
+  - source: maps_embeddings
+    datasets: [metadata]
+    files:
+      - {tag: test, url: "{maps}/test-00000-of-00001.parquet", file: test-00000-of-00001.parquet}
+      - range: 8
+        tag: train
+        url: "{maps}/train-{n:05d}-of-00008.parquet"
+        file: "train-{n:05d}-of-00008.parquet"
+    parser: maps
+    capped: [metadata]
+  - source: cadd
+    datasets: [scores]
+    files:
+      - tag: v1.7
+        url: https://huggingface.co/datasets/genomics-commons/cadd-scores/resolve/main/cadd.sqlite.gz
+        file: cadd.sqlite.gz
+    parser: cadd
+  - source: ucsc_conservation
+    datasets: [phylop_100way]
+    files: [{tag: phylop_100way, url: "{ucsc}/phyloP100way/hg38.phyloP100way.bw", file: hg38.phyloP100way.bw}]
+    parser: bigwig
+  - source: ucsc_conservation
+    datasets: [phastcons_100way]
+    files: [{tag: phastcons_100way, url: "{ucsc}/phastCons100way/hg38.phastCons100way.bw", file: hg38.phastCons100way.bw}]
+    parser: bigwig
+  - source: gnomad
+    datasets: [variants]
+    files:
+      - each: [chr1, chr2, chr3, chr4, chr5, chr6, chr7, chr8, chr9, chr10, chr11, chr12, chr13, chr14, chr15, chr16, chr17, chr18, chr19, chr20, chr21, chr22, chrX, chrY]
+        tag: "{item}"
+        url: "{gnomad}/chr={item}/gnomad.genomes.v4.1.1.sites.{item}.parquet"
+        file: "gnomad.genomes.v4.1.1.sites.{item}.parquet"
+    parser: gnomad
+    capped: [variants]
+
+  # --- Tahoe-100M
+  - source: tahoe
+    datasets: [cell_line_metadata]
+    files: [{tag: "", url: "{tahoe}/cell_line_metadata.parquet", file: cell_line_metadata.parquet}]
+    parser: {name: metadata, dataset: cell_line_metadata}
+  - source: tahoe
+    datasets: [drug_metadata]
+    files: [{tag: "", url: "{tahoe}/drug_metadata.parquet", file: drug_metadata.parquet}]
+    parser: {name: metadata, dataset: drug_metadata}
+  - source: tahoe
+    datasets: [gene_metadata]
+    files: [{tag: "", url: "{tahoe}/gene_metadata.parquet", file: gene_metadata.parquet}]
+    parser: {name: metadata, dataset: gene_metadata}
+  - source: tahoe
+    datasets: [sample_metadata]
+    files: [{tag: "", url: "{tahoe}/sample_metadata.parquet", file: sample_metadata.parquet}]
+    parser: {name: metadata, dataset: sample_metadata}
+  - source: tahoe
+    datasets: [pseudobulk_differential_expression]
+    files:
+      - range: 1026
+        tag: ""
+        url: "{tahoe}/pseudobulk_differential_expression/train-{n:05d}-of-01026.parquet"
+        file: "pseudobulk_differential_expression_{n:05d}.parquet"
+    parser: {name: metadata, dataset: pseudobulk_differential_expression}
+    capped: [pseudobulk_differential_expression]

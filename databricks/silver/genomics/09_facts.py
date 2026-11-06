@@ -123,7 +123,7 @@ gene_map = entity_id_map(xwalk, "gene").unionByName(
 transcript_map = entity_id_map(xwalk, "transcript")
 variant_map = entity_id_map(xwalk, "variant")
 protein_changes = (
-    read_silver("variant_hgvs")
+    current_snapshot(read_silver("variant_hgvs"), RULES)
     .filter(
         F.col("transcript_key").isNotNull()
         & F.col("protein_reference_amino_acid").isNotNull()

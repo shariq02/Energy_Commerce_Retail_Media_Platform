@@ -187,7 +187,7 @@ frames = dict(variant_frames(RULES))
 name_column = clean_placeholders("Name", RULES, "clinvar.variant_summary.Name")
 parsed = (
     frames[CLINVAR]
-    .select("variant_key", name_column.alias("name"))
+    .select("variant_key", name_column.alias("name"), "snapshot")
     .filter(F.col("name").isNotNull())
     .withColumn("parsed", hgvs_name_udf()(F.col("name")))
 )
@@ -196,6 +196,7 @@ clinvar = parsed.select(
     *[F.col(f"parsed.{n}").alias(n) for n, _ in HGVS_NAME_FIELDS],
     F.lit(CLINVAR).alias("source_dataset"),
     F.lit("Name").alias("source_field"),
+    F.col("snapshot").alias("source_snapshot"),
 )
 
 # -- Transform -- AlphaMissense protein changes
@@ -232,6 +233,7 @@ alphamissense = alpha.select(
     .alias("parse_status"),
     F.lit(ALPHAMISSENSE).alias("source_dataset"),
     F.lit("protein_variant").alias("source_field"),
+    F.lit(None).cast("string").alias("source_snapshot"),
 )
 
 # -- Transform -- transcript links and provenance
@@ -255,6 +257,7 @@ hgvs = hgvs.distinct().withColumn(
         "coding_notation",
         "protein_notation",
         "source_dataset",
+        "source_snapshot",
     ),
 )
 hgvs = conform_genomics(add_genomics_provenance(hgvs, "_srid", RID), "variant_hgvs")
@@ -320,6 +323,7 @@ text = text_for(DATASET)
 
 parsed = frames[CLINVAR].select(
     "variant_key",
+    F.col("snapshot").alias("source_snapshot"),
     F.explode(
         clinvar_conditions_udf()(
             text("PhenotypeIDS"), text("PhenotypeList"), text("RCVaccession")
@@ -328,6 +332,7 @@ parsed = frames[CLINVAR].select(
 )
 conditions = parsed.select(
     "variant_key",
+    "source_snapshot",
     F.col("c.position").alias("condition_position"),
     F.col("c.name").alias("condition_name"),
     F.col("c.accession").alias("clinvar_condition_accession"),
@@ -337,25 +342,30 @@ conditions = parsed.select(
 
 # -- Transform -- disease links through exact ids
 ids = conditions.select(
-    "variant_key", "condition_position", F.explode("condition_ids").alias("raw_id")
+    "variant_key",
+    "source_snapshot",
+    "condition_position",
+    F.explode("condition_ids").alias("raw_id"),
 )
 id_type, id_value = split_curie("raw_id", RULES)
 linked = (
     ids.withColumn("id_type", id_type)
     .withColumn("id_value", id_value)
     .join(disease_map, ["id_type", "id_value"], "inner")
-    .groupBy("variant_key", "condition_position")
+    .groupBy("variant_key", "source_snapshot", "condition_position")
     .agg(
         F.countDistinct("entity_key").alias("candidates"),
         F.min("entity_key").alias("disease_key"),
     )
     .filter(F.col("candidates") == 1)
-    .select("variant_key", "condition_position", "disease_key")
+    .select("variant_key", "source_snapshot", "condition_position", "disease_key")
 )
 
 # -- Transform -- label flag and provenance
 condition = (
-    conditions.join(linked, ["variant_key", "condition_position"], "left")
+    conditions.join(
+        linked, ["variant_key", "source_snapshot", "condition_position"], "left"
+    )
     .withColumn(
         "disease_link_method",
         F.when(F.col("disease_key").isNotNull(), "ids")
@@ -373,6 +383,7 @@ condition = (
         "_srid",
         sha_key(
             "variant_key",
+            "source_snapshot",
             "condition_position",
             "clinvar_condition_accession",
             "condition_name",
@@ -490,13 +501,17 @@ for kind, term, review, evaluated, scv in TYPES:
             ),
             split_list(text(scv), r"[|,;]").alias("clinvar_submission_accessions"),
             F.lit(CLINVAR).alias("source_dataset"),
+            F.col("snapshot").alias("source_snapshot"),
         ).filter(F.col("term").isNotNull())
     )
 classification = _union(parts)
 
 # -- Transform -- keys and provenance
 classification = classification.distinct().withColumn(
-    "_srid", sha_key("variant_key", "classification_type", "term", "review_status")
+    "_srid",
+    sha_key(
+        "variant_key", "source_snapshot", "classification_type", "term", "review_status"
+    ),
 )
 classification = conform_genomics(
     add_genomics_provenance(classification, "_srid", RID), "variant_classification"

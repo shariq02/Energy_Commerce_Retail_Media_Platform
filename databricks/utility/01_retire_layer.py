@@ -261,6 +261,6 @@ for schema in inventory:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC After a real drop, run `databricks/utility/03_catalog_inventory.py` for the new
+# MAGIC After a real drop, run `databricks/utility/02_catalog_inventory.py` for the new
 # MAGIC object and Volume counts, and `databricks/schema_registry/01_snapshot_schema.py`
 # MAGIC for the schema snapshot.

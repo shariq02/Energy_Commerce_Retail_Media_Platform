@@ -683,7 +683,7 @@ disease_flags = keyword_rows(
 
 # DBTITLE 1,Transform -- variant labels, quality, origin and type
 variant = read_silver("variant")
-germline = read_silver("variant_classification").filter(
+germline = current_snapshot(read_silver("variant_classification"), RULES).filter(
     F.col("classification_type") == "germline"
 )
 term = F.lower(F.col("term"))
@@ -826,7 +826,7 @@ allele_rows = text_rows(
     "allele_class",
     "variant.reference_allele+alternate_allele",
 )
-conditions = read_silver("variant_condition").select(
+conditions = current_snapshot(read_silver("variant_condition"), RULES).select(
     "variant_key", F.explode("condition_ids").alias("raw_id")
 )
 condition_type, condition_value = split_curie("raw_id", RULES)
@@ -862,7 +862,7 @@ phenotype_rows = [
 
 # DBTITLE 1,Transform -- variant impact and conservation
 hgvs = (
-    read_silver("variant_hgvs")
+    current_snapshot(read_silver("variant_hgvs"), RULES)
     .groupBy("variant_key")
     .agg(
         F.max(
@@ -1586,7 +1586,7 @@ relation_counts = [
     ),
 ]
 pathogenic_variants = (
-    read_silver("variant_classification")
+    current_snapshot(read_silver("variant_classification"), RULES)
     .filter(
         (F.col("classification_type") == "germline")
         & F.col("term").isin(RULES["pathogenic_terms"])

@@ -479,7 +479,7 @@ for kind in ("exon", "CDS", "UTR"):
 
 # -- Transform -- protein features by protein position
 hgvs = (
-    read_silver("variant_hgvs")
+    current_snapshot(read_silver("variant_hgvs"), RULES)
     .filter(F.col("protein_position").isNotNull() & F.col("transcript_key").isNotNull())
     .select("variant_key", "transcript_key", "protein_position")
 )
