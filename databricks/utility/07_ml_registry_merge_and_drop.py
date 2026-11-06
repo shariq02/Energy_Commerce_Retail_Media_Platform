@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # ML REGISTRY TABLES -- MERGE THE TWO ECOSYSTEM SCHEMAS INTO ONE
