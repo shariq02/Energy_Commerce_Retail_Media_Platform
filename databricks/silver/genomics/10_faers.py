@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # SILVER -- FAERS (GENOMICS)
@@ -233,40 +233,44 @@ drug = link_entities(
     "drug_key",
     "drug_link_method",
 )
+case_drug = drug.select(
+    "quarter",
+    F.col("primaryid").alias("primary_id"),
+    text("caseid").alias("case_id"),
+    F.col("drug_seq").alias("drug_sequence"),
+    text("role_cod").alias("role_code"),
+    text("drugname").alias("drug_name"),
+    text("prod_ai").alias("active_ingredient"),
+    text("val_vbm").alias("drug_name_validation_code"),
+    text("route").alias("route"),
+    text("dose_vbm").alias("dose_verbatim_text"),
+    typed_number("cum_dose_chr", "double", RULES, f"{DRUG}.cum_dose_chr").alias(
+        "cumulative_dose"
+    ),
+    text("cum_dose_unit").alias("cumulative_dose_unit"),
+    text("dechal").alias("dechallenge"),
+    text("rechal").alias("rechallenge"),
+    text("lot_num").alias("lot_number"),
+    text("exp_dt").alias("expiry_date_raw"),
+    text("nda_num").alias("new_drug_application_number"),
+    typed_number("dose_amt", "double", RULES, f"{DRUG}.dose_amt").alias("dose_amount"),
+    text("dose_unit").alias("dose_unit"),
+    text("dose_form").alias("dose_form"),
+    text("dose_freq").alias("dose_frequency"),
+    "drug_key",
+    "drug_link_method",
+    "indications",
+    "therapies",
+).distinct()
+# A drug sequence can hold several dose records; number them inside the sequence.
+SEQUENCE = ["quarter", "primary_id", "drug_sequence"]
 case_drug = (
-    drug.select(
-        "quarter",
-        F.col("primaryid").alias("primary_id"),
-        text("caseid").alias("case_id"),
-        F.col("drug_seq").alias("drug_sequence"),
-        text("role_cod").alias("role_code"),
-        text("drugname").alias("drug_name"),
-        text("prod_ai").alias("active_ingredient"),
-        text("val_vbm").alias("drug_name_validation_code"),
-        text("route").alias("route"),
-        text("dose_vbm").alias("dose_verbatim_text"),
-        typed_number("cum_dose_chr", "double", RULES, f"{DRUG}.cum_dose_chr").alias(
-            "cumulative_dose"
-        ),
-        text("cum_dose_unit").alias("cumulative_dose_unit"),
-        text("dechal").alias("dechallenge"),
-        text("rechal").alias("rechallenge"),
-        text("lot_num").alias("lot_number"),
-        text("exp_dt").alias("expiry_date_raw"),
-        text("nda_num").alias("new_drug_application_number"),
-        typed_number("dose_amt", "double", RULES, f"{DRUG}.dose_amt").alias(
-            "dose_amount"
-        ),
-        text("dose_unit").alias("dose_unit"),
-        text("dose_form").alias("dose_form"),
-        text("dose_freq").alias("dose_frequency"),
-        "drug_key",
-        "drug_link_method",
-        "indications",
-        "therapies",
+    within_group_ordinal(
+        case_drug, SEQUENCE, [c for c in case_drug.columns if c not in SEQUENCE]
     )
-    .distinct()
-    .withColumn("_srid", sha_key("quarter", "primary_id", "drug_sequence", "drug_name"))
+    .withColumnRenamed("_source_id_ordinal", "dose_record_number")
+    .drop("_source_id_disambiguated")
+    .withColumn("_srid", sha_key(*SEQUENCE, "dose_record_number"))
 )
 case_drug = conform_genomics(
     add_genomics_provenance(case_drug, "_srid", RID), "faers_case_drug"
@@ -284,7 +288,7 @@ blocks = inspect_table(
     source=FINDINGS,
     component=COMPONENT,
     rid=RID,
-    key_cols=["quarter", "primary_id", "drug_sequence"],
+    key_cols=[*SEQUENCE, "dose_record_number"],
     extra_checks={
         "drugs_without_a_drug_key": written.filter(F.col("drug_key").isNull()).count(),
         "roles": str(

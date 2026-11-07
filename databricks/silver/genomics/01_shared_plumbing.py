@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # SILVER -- SHARED PLUMBING (GENOMICS)
@@ -2014,7 +2014,7 @@ def opentargets_nested_claims(rules, xwalk):
 
 # DBTITLE 1,Build -- entity_id_crosswalk
 # -- Transform -- ids of every entity type
-crosswalk = finish_crosswalk(crosswalk_all(RULES))
+crosswalk = finish_crosswalk(keep_best_match_method(crosswalk_all(RULES), RULES))
 
 # -- Transform -- keys and provenance
 crosswalk = crosswalk.withColumn(
@@ -2056,6 +2056,13 @@ blocks = inspect_table(
     ],
     extra_checks={
         "entity_types": written.select("entity_type").distinct().count(),
+        "methods_without_a_rank": str(
+            sorted(
+                row["match_method"]
+                for row in written.select("match_method").distinct().collect()
+                if row["match_method"] not in RULES["crosswalk_method_precedence"]
+            )
+        ),
         "entities_with_an_own_key": written.filter(
             F.col("match_method").startswith("own_")
         )
@@ -2195,6 +2202,7 @@ claims = claims.distinct().withColumn(
         "source_dataset",
         "source_field",
         "value_text",
+        "value_number",
     ),
 )
 claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), "entity_claim")

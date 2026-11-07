@@ -266,6 +266,9 @@ association = (
             "study_id",
             "classification",
             "evaluation_date",
+            "mode_of_inheritance",
+            "report_url",
+            "comment",
         ),
     )
 )
@@ -410,6 +413,7 @@ annotation = (
             "modifier",
             "evidence",
             "reference",
+            "biocuration",
             "source_dataset",
         ),
     )

@@ -151,6 +151,26 @@ def test_review_stars_outside_the_scale_are_reported(genomics, rules):
     assert any("practice guideline" in p for p in problems)
 
 
+def test_a_repeated_crosswalk_method_is_reported(genomics, rules):
+    broken = copy.deepcopy(rules)
+    broken["crosswalk_method_precedence"].append("exact_id")
+    problems = genomics["validate_genomics_rules"](broken, _bronze_sources())
+    assert any("crosswalk_method_precedence" in p for p in problems)
+
+
+def test_the_crosswalk_precedence_starts_with_the_exact_id(rules):
+    assert rules["crosswalk_method_precedence"][0] == "exact_id"
+
+
+def test_the_clinvar_snapshot_rule_names_a_snapshot(rules):
+    assert rules["clinvar_current_snapshot"] == "current"
+
+
+def test_the_dose_record_number_is_declared(genomics):
+    columns = dict(genomics["GENOMICS_STRUCTURES"]["faers_case_drug"])
+    assert columns["dose_record_number"] == "int"
+
+
 def test_conflicting_classifications_get_one_star(rules):
     stars = rules["clinvar_review_stars"]
     assert stars["criteria provided, conflicting classifications"] == 1

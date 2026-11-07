@@ -274,6 +274,10 @@ somatic = (
             "transcript_source_id",
             "coding_change_notation",
             "protein_change_short_notation",
+            "filter_status",
+            "tumor_depth",
+            "tumor_ref_count",
+            "tumor_alt_count",
         ),
     )
 )

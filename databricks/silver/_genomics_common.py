@@ -120,7 +120,7 @@ GENOMICS_TABLE_GRAIN = {
     "perturbation_sample": "sample",
     "perturbation_expression": "gene, drug, cell line, concentration, plate",
     "faers_case": "case version",
-    "faers_case_drug": "case version, drug sequence",
+    "faers_case_drug": "case version, drug sequence, dose record",
 }
 
 # Domain columns (name, Spark type) per table; the generator adds the governance
@@ -774,6 +774,7 @@ GENOMICS_STRUCTURES.update(
                 "role_code",
                 "drug_name",
             ),
+            ("dose_record_number", "int"),
             *_text(
                 "active_ingredient",
                 "drug_name_validation_code",
@@ -884,6 +885,7 @@ def bronze_table_name(source_dataset: str) -> str:
 _RULE_SECTIONS = (
     "version",
     "clinvar_current_snapshot",
+    "crosswalk_method_precedence",
     "placeholders",
     "assembly_labels",
     "ucsc_assembly_names",
@@ -966,6 +968,9 @@ def validate_genomics_rules(rules: dict, bronze_sources: dict) -> list:
         return problems
     if not isinstance(rules["version"], int):
         problems.append("version must be an integer")
+    order = rules["crosswalk_method_precedence"]
+    if not order or len(set(order)) != len(order):
+        problems.append(f"crosswalk_method_precedence must be unique: {order}")
     for key in rules["placeholders"].get("by_column", {}):
         if not _source_dataset_known(key, bronze_sources, 3):
             problems.append(f"placeholder column {key!r} is not a Bronze column")
@@ -1917,6 +1922,30 @@ def finish_crosswalk(frame):
         .withColumn(
             "entities_sharing_id", F.size(F.collect_set("entity_key").over(same))
         )
+    )
+
+
+def keep_best_match_method(frame, rules):
+    """One row per entity, id and source column: the row whose match method is
+    first in `crosswalk_method_precedence` (a method not in the list comes last,
+    then by name)."""
+    order = rules["crosswalk_method_precedence"]
+    position = F.array_position(
+        F.array(*[F.lit(method) for method in order]), F.col("match_method")
+    )
+    rank = F.when(position == 0, F.lit(len(order) + 1)).otherwise(position)
+    best = Window.partitionBy(
+        "entity_type",
+        "entity_key",
+        "id_type",
+        "id_value",
+        "source_dataset",
+        "source_field",
+    ).orderBy(rank, F.col("match_method"))
+    return (
+        frame.withColumn("_method_order", F.row_number().over(best))
+        .filter(F.col("_method_order") == 1)
+        .drop("_method_order")
     )
 
 

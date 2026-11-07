@@ -42,13 +42,26 @@ def _latest_registry() -> Path:
 
 
 def _registry() -> dict[str, list[str]]:
-    """table name -> ordered column list, parsed from the latest Bronze snapshot."""
-    row = re.compile(r"\|\s*([a-z0-9_]+)\s*\|\s*(\d+)\s*\|\s*([^\s|]+)\s*\|")
+    """table name -> ordered column list of the schema `bronze`, parsed from the
+    latest Bronze snapshot. Two row formats: `| table | # | column |` (to v004) and
+    `| schema | table | # | column |` (from v005, `bronze` and `genomics_bronze`)."""
+    with_schema = re.compile(
+        r"\|\s*([a-z0-9_]+)\s*\|\s*([a-z0-9_]+)\s*\|\s*(\d+)\s*\|\s*([^\s|]+)\s*\|"
+    )
+    plain = re.compile(r"\|\s*([a-z0-9_]+)\s*\|\s*(\d+)\s*\|\s*([^\s|]+)\s*\|")
     acc: dict[str, list[tuple[int, str]]] = {}
     for line in _latest_registry().read_text(encoding="utf-8").splitlines():
-        m = row.match(line)
+        m = with_schema.match(line)
         if m:
-            acc.setdefault(m.group(1), []).append((int(m.group(2)), m.group(3)))
+            if m.group(1) != "bronze":
+                continue
+            table, position, column = m.group(2), m.group(3), m.group(4)
+        else:
+            m = plain.match(line)
+            if not m:
+                continue
+            table, position, column = m.groups()
+        acc.setdefault(table, []).append((int(position), column))
     return {t: [c for _, c in sorted(v)] for t, v in acc.items()}
 
 

@@ -510,7 +510,13 @@ classification = _union(parts)
 classification = classification.distinct().withColumn(
     "_srid",
     sha_key(
-        "variant_key", "source_snapshot", "classification_type", "term", "review_status"
+        "variant_key",
+        "source_snapshot",
+        "classification_type",
+        "term",
+        "review_status",
+        "last_evaluated",
+        "clinvar_submission_accessions",
     ),
 )
 classification = conform_genomics(

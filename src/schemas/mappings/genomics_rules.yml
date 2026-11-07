@@ -6,7 +6,20 @@
 # Read by databricks/silver/_genomics_common.py. Precedence entries are
 # "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
 
-version: 2
+version: 3
+
+# entity_id_crosswalk keeps one row per entity, id and source column. When one id is
+# found by several methods, the first method of this list wins; a method that is not in
+# the list comes last. The order is the assistant's (an exact id first, an assumed
+# assembly and an own key last); the owner confirms or changes it. The first Silver run
+# lists the methods that are not in the list (`methods_without_a_rank`).
+crosswalk_method_precedence:
+  - exact_id
+  - vcf_alleles
+  - keyword
+  - vcf_alleles_assumed_grch38
+  - own_ensembl_id
+  - own_source_id
 
 # ClinVar is staged as three snapshots (column `snapshot`: current, 2026-01, 2025-01).
 # variant_hgvs, variant_condition and variant_classification keep all three in
