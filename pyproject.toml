@@ -79,16 +79,11 @@ extend-ignore = ["E402", "BLE001"]
 # runtime magic). databricks/silver/_silver_common.py is NOT exempted.
 "databricks/silver/[0-9]*_*.py" = ["F821"]
 "databricks/silver/energy/**/*.py" = ["F821"]
-# _silver_inspect.py is a second shared library, always %run directly after
-# _silver_common.py (never first) -- unlike _silver_common.py it legitimately
-# depends on that prior %run's names (CATALOG, QUALITY_SCHEMA, now_utc,
-# target_schema_for), same as every numbered notebook above.
-"databricks/silver/_silver_inspect.py" = ["F821"]
 "databricks/silver/commerce/**/*.py" = ["F821"]
+# _semantic_common.py and _genomics_common.py are %run after _silver_common (which
+# they run first themselves) and use its names.
 "databricks/silver/_semantic_common.py" = ["F821"]
-# _genomics_common.py is %run after _silver_common and uses its names.
 "databricks/silver/_genomics_common.py" = ["F821"]
-"databricks/silver/_genomics_entities.py" = ["F821"]
 "databricks/silver/genomics/**/*.py" = ["F821"]
 # The Bronze loaders and the landing Volume notebook pull `%run ./_bronze_common`
 # (Databricks runtime magic). The common files themselves are NOT exempted.

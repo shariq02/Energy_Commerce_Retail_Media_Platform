@@ -32,9 +32,8 @@ _GOVERNANCE = {
     "_silver_loaded_at",
     "_silver_run_id",
 }
-_SPARK_TYPES = re.compile(
-    r"^(string|int|bigint|double|boolean|date|timestamp|array<.+>)$"
-)
+# Silver is flat: no array, struct or map type.
+_SPARK_TYPES = re.compile(r"^(string|int|bigint|double|boolean|date|timestamp)$")
 
 
 @pytest.fixture(scope="module")
@@ -61,11 +60,11 @@ def _bronze_sources() -> dict:
 # --- declared structures ---------------------------------------------------
 
 
-def test_the_two_schemas_hold_fifteen_and_twenty_five_tables(genomics):
+def test_the_two_schemas_hold_eleven_and_twenty_tables(genomics):
     reference = genomics["GENOMICS_REFERENCE_TABLES"]
     main = genomics["GENOMICS_MAIN_TABLES"]
-    assert len(reference) == 15
-    assert len(main) == 25
+    assert len(reference) == 11
+    assert len(main) == 20
     assert reference.isdisjoint(main)
 
 
@@ -75,7 +74,10 @@ def test_every_table_has_a_grain_and_no_stray_table_has_one(genomics):
 
 
 def test_target_schema_follows_the_table_sets(genomics):
-    assert genomics["genomics_target_schema"]("gene") == "genomics_silver_reference"
+    assert (
+        genomics["genomics_target_schema"]("entity_master")
+        == "genomics_silver_reference"
+    )
     assert genomics["genomics_target_schema"]("variant") == "genomics_silver"
     with pytest.raises(KeyError):
         genomics["genomics_target_schema"]("not_a_genomics_table")
@@ -109,13 +111,13 @@ def test_every_genomics_table_is_classified_in_its_own_schema(genomics):
         assert {r["target_schema"] for r in mine} == {expected}, table
 
 
-def test_the_registry_places_fifteen_and_twenty_five_genomics_tables():
+def test_the_registry_places_eleven_and_twenty_genomics_tables():
     rows = build_rows()
     per_schema: dict[str, set[str]] = {}
     for r in rows:
         per_schema.setdefault(r["target_schema"], set()).add(r["table_name"])
-    assert len(per_schema["genomics_silver_reference"]) == 15
-    assert len(per_schema["genomics_silver"]) == 25
+    assert len(per_schema["genomics_silver_reference"]) == 11
+    assert len(per_schema["genomics_silver"]) == 20
 
 
 def test_the_registry_is_complete_with_the_genomics_tables():
@@ -547,11 +549,46 @@ def test_a_json_empty_list_is_a_placeholder(rules):
     assert "[]" in rules["placeholders"]["general"]
 
 
-def test_the_gene_master_declares_each_field_with_source_and_method(genomics):
-    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["gene"]}
-    for field in genomics["GENE_FIELDS"]:
-        assert {field, f"{field}_source", f"{field}_method"} <= columns
-    assert {"gene_key", "key_source", "grch38_contig", "cytoband_arm"} <= columns
+def test_the_entity_master_declares_each_field_of_all_five_types(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["entity_master"]}
+    for fields in genomics["MASTER_FIELDS"].values():
+        for field in fields:
+            assert {field, f"{field}_source", f"{field}_method"} <= columns
+    assert set(genomics["MASTER_FIELDS"]) == {
+        "gene",
+        "transcript",
+        "protein",
+        "disease",
+        "drug",
+    }
+    assert {
+        "entity_type",
+        "entity_key",
+        "key_source",
+        "grch38_contig",
+        "cytoband_arm",
+    } <= columns
+
+
+def test_no_declared_genomics_column_is_an_array_struct_or_map(genomics):
+    nested = {
+        f"{table}.{name}": kind
+        for table, columns in genomics["GENOMICS_STRUCTURES"].items()
+        for name, kind in columns
+        if kind.startswith(("array", "struct", "map"))
+    }
+    assert not nested, nested
+
+
+def test_the_flat_relation_table_names_its_kinds_and_publications(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["entity_relation"]}
+    assert {"relation_kind", "relation_subkind", "pubmed_id"} <= columns
+    assert {f"channel_{c}_score" for c in genomics["STRING_CHANNELS"]} <= columns
+
+
+def test_every_variant_source_has_a_flag_column(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["variant"]}
+    assert set(genomics["VARIANT_SOURCE_FLAGS"].values()) <= columns
 
 
 def test_every_gene_field_has_a_precedence_list_or_is_unranked(genomics, rules):
@@ -560,7 +597,7 @@ def test_every_gene_field_has_a_precedence_list_or_is_unranked(genomics, rules):
     assert set(genomics["GENE_FIELDS"]) == ranked | unranked
 
 
-def test_all_forty_tables_have_a_declared_structure(genomics):
+def test_all_thirty_one_tables_have_a_declared_structure(genomics):
     declared = set(genomics["GENOMICS_STRUCTURES"])
     tables = genomics["GENOMICS_REFERENCE_TABLES"] | genomics["GENOMICS_MAIN_TABLES"]
     assert declared == tables

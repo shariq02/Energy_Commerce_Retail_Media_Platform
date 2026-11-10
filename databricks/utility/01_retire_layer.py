@@ -19,6 +19,10 @@
 # MAGIC is empty. A schema that does not exist is skipped, so the list may name layers
 # MAGIC that are not built yet.
 # MAGIC
+# MAGIC The `MODE` switch picks the list: `retire` (drop a Bronze layer after its Silver
+# MAGIC successor is checked) or `fresh` (drop the tables of the six Silver schemas, keep
+# MAGIC the schemas, before a rebuild from Bronze; the Bronze schemas must hold tables).
+# MAGIC
 # MAGIC The default is a dry run: the notebook lists what it would drop and writes the
 # MAGIC findings file. The three drop switches stay off until you have read the plan.
 # MAGIC Safe to re-run. The staged source files stay on the external disk.
@@ -35,17 +39,45 @@ from datetime import UTC, datetime
 CATALOG = "energy_commerce_retail_media"
 FINDINGS_SUBDIR = "src/inventory"
 
+# "retire": drop a Bronze layer after its Silver successor is checked.
+# "fresh": drop the tables of the six Silver schemas (the schemas stay) before a
+# rebuild from Bronze; the Bronze schemas must hold tables first.
+MODE = "retire"  # "fresh"
+
 # name -> schemas to drop, and the schemas that must hold the data before the drop
-RETIREMENTS = {
-    "bronze (energy and commerce)": {
-        "drop": ["bronze"],
-        "successor": ["energy_silver", "energy_silver_reference", "commerce_silver"],
+RETIREMENTS_BY_MODE = {
+    "retire": {
+        "bronze (energy and commerce)": {
+            "drop": ["bronze"],
+            "successor": [
+                "energy_silver",
+                "energy_silver_reference",
+                "commerce_silver",
+            ],
+        },
+        "genomics bronze": {
+            "drop": ["genomics_bronze"],
+            "successor": ["genomics_silver", "genomics_silver_reference"],
+        },
     },
-    "genomics bronze": {
-        "drop": ["genomics_bronze"],
-        "successor": ["genomics_silver", "genomics_silver_reference"],
+    # `successor` holds the schemas the rebuild reads (Bronze); `keep_schema`
+    # drops the tables only.
+    "fresh": {
+        "silver (fresh rebuild)": {
+            "drop": [
+                "energy_silver",
+                "energy_silver_reference",
+                "commerce_silver",
+                "commerce_silver_reference",
+                "genomics_silver",
+                "genomics_silver_reference",
+            ],
+            "successor": ["bronze", "genomics_bronze"],
+            "keep_schema": True,
+        },
     },
 }
+RETIREMENTS = RETIREMENTS_BY_MODE[MODE]
 
 # successor tables that may be empty without blocking the drop, as "schema.table"
 ALLOW_EMPTY = set()
@@ -56,6 +88,7 @@ DROP_VOLUMES = False  # True
 DROP_SCHEMAS = False  # True
 
 print(f"Catalog : {CATALOG}")
+print(f"Mode : {MODE}")
 print(f"Drop tables and views : {DROP_TABLES}")
 print(f"Drop Volumes : {DROP_VOLUMES}")
 print(f"Drop schemas : {DROP_SCHEMAS}")
@@ -234,6 +267,9 @@ for name, spec in RETIREMENTS.items():
         continue
     for schema in spec["drop"]:
         if schema not in inventory:
+            continue
+        if spec.get("keep_schema"):
+            print(f"KEEP  schema {schema} (tables only)")
             continue
         if not DROP_SCHEMAS:
             print(f"WOULD DROP  schema {schema}")

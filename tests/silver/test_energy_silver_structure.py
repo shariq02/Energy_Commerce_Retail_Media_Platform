@@ -78,6 +78,24 @@ def test_every_semantic_structure_is_classified_column_for_column() -> None:
         assert {r["target_schema"] for r in mine} == {expected}, table
 
 
+def test_no_declared_semantic_column_is_an_array_struct_or_map() -> None:
+    """Silver is flat: a closed list of values is columns, a many-side is rows."""
+    ns = _semantic_namespace()
+    nested = {
+        f"{table}.{column}": kind
+        for table, columns in ns["SEMANTIC_STRUCTURES"].items()
+        for column, kind in columns
+        if kind.startswith(("array", "struct", "map"))
+    }
+    assert not nested, nested
+
+
+def test_the_energy_and_commerce_tables_number_28() -> None:
+    ns = _semantic_namespace()
+    tables = set(ns["SEMANTIC_STRUCTURES"]) | set(ns["SEMANTIC_MEMBER_STRUCTURES"])
+    assert len(tables) == 28
+
+
 def test_every_member_structure_carries_its_members_and_discriminators() -> None:
     ns = _semantic_namespace()
     rows = build_rows()
@@ -105,8 +123,10 @@ def test_generator_build_rows_covers_every_written_table() -> None:
 def test_assert_registry_complete_fails_on_a_missing_table() -> None:
     """Proves the fail-early mechanism itself, not just today's repo state --
     an incomplete registry must raise, never be silently accepted."""
-    incomplete_rows = [r for r in build_rows() if r["table_name"] != "mastr_code_list"]
-    with pytest.raises(RuntimeError, match="mastr_code_list"):
+    incomplete_rows = [
+        r for r in build_rows() if r["table_name"] != "reference_code_list"
+    ]
+    with pytest.raises(RuntimeError, match="reference_code_list"):
         assert_registry_complete(incomplete_rows)
 
 

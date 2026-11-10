@@ -17,23 +17,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Shared library
-# MAGIC %run ../_silver_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspection library
-# MAGIC %run ../_silver_inspect
-
-# COMMAND ----------
-
 # DBTITLE 1,Genomics library
 # MAGIC %run ../_genomics_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Entity helpers
-# MAGIC %run ../_genomics_entities
 
 # COMMAND ----------
 
@@ -77,14 +62,6 @@ GTEX = "gtex.gene_median_tpm"
 # COMMAND ----------
 
 # DBTITLE 1,Helpers
-
-
-def _bronze(table):
-    return read_genomics_bronze(table)
-
-
-def _union(frames):
-    return _reduce(lambda left, right: left.unionByName(right), frames)
 
 
 def _gencode(feature):

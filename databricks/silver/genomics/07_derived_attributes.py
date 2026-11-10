@@ -18,23 +18,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Shared library
-# MAGIC %run ../_silver_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspection library
-# MAGIC %run ../_silver_inspect
-
-# COMMAND ----------
-
 # DBTITLE 1,Genomics library
 # MAGIC %run ../_genomics_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Entity helpers
-# MAGIC %run ../_genomics_entities
 
 # COMMAND ----------
 
@@ -43,7 +28,7 @@ from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/11_derived_attributes"
+COMPONENT = "silver/genomics/07_derived_attributes"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
@@ -51,9 +36,20 @@ RULES = load_genomics_rules()
 # COMMAND ----------
 
 # DBTITLE 1,Read Silver -- tables and rule values
-gene = read_silver("gene")
-protein = read_silver("protein")
-disease = read_silver("disease")
+master = read_silver("entity_master")
+
+
+def master_of(entity_type, key):
+    """The rows of one entity type, with the key under its own name."""
+    return master.filter(F.col("entity_type") == entity_type).withColumnRenamed(
+        "entity_key", key
+    )
+
+
+gene = master_of("gene", "gene_key")
+protein = master_of("protein", "protein_key")
+disease = master_of("disease", "disease_key")
+relation_table = read_silver("entity_relation")
 claims = read_silver("entity_claim")
 names = read_silver("entity_name")
 xwalk = read_silver("entity_id_crosswalk")
@@ -399,13 +395,16 @@ cytoband_rows = _union(
 # DBTITLE 1,Transform -- gene scores and categories
 # gene-level disease text and counts from the gene-disease records of the importance rules
 importance = RULES["gene_importance"]
-association = read_silver("gene_disease_association").filter(
-    F.col("gene_key").isNotNull()
+gene_disease = relation_table.filter(
+    (F.col("relation_kind") == "gene_disease")
+    & F.col("gene_key").isNotNull()
     & F.col("disease_key").isNotNull()
-    & F.col("record_kind").isin(importance["disease_record_kinds"])
+)
+association = gene_disease.filter(
+    F.col("relation_subkind").isin(importance["disease_record_kinds"])
 )
 disease_names = disease.select("disease_key", F.col("name").alias("disease_name"))
-per_kind = association.groupBy("gene_key", "record_kind").agg(
+per_kind = association.groupBy("gene_key", "relation_subkind").agg(
     F.countDistinct("disease_key").alias("n")
 )
 disease_totals = per_kind.groupBy("gene_key").agg(
@@ -436,7 +435,7 @@ disease_category_flags = _union(
             matched=F.regexp_extract(
                 F.col("all_disease_text"), "(?i)(" + pattern + ")", 1
             ),
-            text_source="gene_disease_association+disease.name",
+            text_source="entity_relation+disease.name",
             **RULE_FIELDS,
         )
         for name, pattern in RULES["text_rules"]["disease_category"].items()
@@ -449,7 +448,7 @@ disease_total_rows = number_rows(
     "total_disease_count",
     F.col("total_disease_count"),
     "gene_disease_count",
-    "gene_disease_association",
+    "entity_relation",
 )
 all_flags = (
     function_flags.unionByName(location_flags)
@@ -537,7 +536,7 @@ score_rows = [
         "gene_importance_score",
         F.col("gene_importance_score"),
         "gene_importance",
-        "gene_disease_association+gene_description_keywords",
+        "entity_relation+gene_description_keywords",
         method="rule",
     ),
     text_rows(
@@ -826,8 +825,11 @@ allele_rows = text_rows(
     "allele_class",
     "variant.reference_allele+alternate_allele",
 )
-conditions = current_snapshot(read_silver("variant_condition"), RULES).select(
-    "variant_key", F.explode("condition_ids").alias("raw_id")
+conditions = (
+    current_snapshot(read_silver("variant_condition"), RULES)
+    .filter(F.col("condition_id").isNotNull())
+    .select("variant_key", F.col("condition_id").alias("raw_id"))
+    .distinct()
 )
 condition_type, condition_value = split_curie("raw_id", RULES)
 phenotype_databases = (
@@ -844,7 +846,7 @@ phenotype_rows = [
         "phenotype_database_count",
         F.col("n"),
         "phenotype_databases",
-        "variant_condition.condition_ids",
+        "variant_condition.condition_id",
         method="rule",
     ),
     flag_rows(
@@ -854,7 +856,7 @@ phenotype_rows = [
         "is_well_annotated",
         F.col("n") >= RULES["variant_well_annotated_minimum"],
         "phenotype_databases",
-        "variant_condition.condition_ids",
+        "variant_condition.condition_id",
     ),
 ]
 
@@ -888,8 +890,9 @@ variant_positions = variant.filter(F.col("assembly") == "GRCh38").select(
     F.col("contig").alias("variant_contig"),
     F.col("position").alias("variant_position"),
 )
+locus_scores = read_silver("locus_score")
 phylop_scores = (
-    read_silver("position_score")
+    locus_scores.filter(F.col("variant_key").isNull())
     .filter(F.col("score_name") == "phylop_100way")
     .select(
         F.col("contig").alias("score_contig"),
@@ -904,7 +907,7 @@ phylop = variant_positions.join(
     "inner",
 ).select("variant_key", "phylop_score")
 cadd_scores = (
-    read_silver("variant_score")
+    locus_scores.filter(F.col("variant_key").isNotNull())
     .filter(F.col("score_name") == "cadd_phred")
     .groupBy("variant_key")
     .agg(F.max("score_value").alias("cadd_phred"))
@@ -988,7 +991,7 @@ high_impact = F.col("pathogenicity_score") >= F.when(
 very_high_impact = F.col("pathogenicity_score") >= F.when(
     F.col("has_conservation"), very_high_from["with_conservation"]
 ).otherwise(very_high_from["without_conservation"])
-SOURCE_TEXT = "variant_hgvs+variant_feature_overlap+position_score+variant_score"
+SOURCE_TEXT = "variant_hgvs+variant_feature_overlap+locus_score"
 impact_rows = [
     number_rows(
         impact,
@@ -1035,7 +1038,7 @@ impact_rows = [
         "conservation_level",
         F.col("conservation_level"),
         "conservation",
-        "position_score+variant_score",
+        "locus_score",
         method="rule",
     ),
     flag_rows(
@@ -1090,7 +1093,7 @@ impact_rows = [
         "is_highly_conserved_region",
         F.col("phylop_score") > cutoffs["phylop_conserved_above"],
         "conservation",
-        "position_score.phylop_100way",
+        "locus_score.phylop_100way",
     ),
     flag_rows(
         impact,
@@ -1099,7 +1102,7 @@ impact_rows = [
         "is_conservation_constrained",
         F.col("conservation_level") >= 1,
         "conservation",
-        "position_score+variant_score",
+        "locus_score",
     ),
     flag_rows(
         impact,
@@ -1108,7 +1111,7 @@ impact_rows = [
         "has_cadd_score",
         F.col("cadd_phred").isNotNull(),
         "conservation",
-        "variant_score.cadd_phred",
+        "locus_score.cadd_phred",
     ),
     flag_rows(
         impact,
@@ -1117,7 +1120,7 @@ impact_rows = [
         "is_deleterious_by_cadd",
         F.col("cadd_phred") > cutoffs["cadd_deleterious_above"],
         "conservation",
-        "variant_score.cadd_phred",
+        "locus_score.cadd_phred",
     ),
 ]
 
@@ -1373,40 +1376,44 @@ mutation_rows = [
         "somatic_mutation",
     ),
 ]
-tests = read_silver("genetic_test")
+test_rows_all = read_silver("genetic_test")
+tests = test_rows_all.groupBy("test_key").agg(
+    F.max(F.coalesce(F.col("link_kind") == "gene", F.lit(False))).alias("has_gene"),
+    F.max(F.coalesce(F.col("link_kind") == "condition", F.lit(False))).alias(
+        "has_condition"
+    ),
+)
 test_rows = [
     flag_rows(
         tests,
         "genetic_test",
         "test_key",
         "has_gene_info",
-        F.size("genes") > 0,
+        F.col("has_gene"),
         "genetic_test_record",
-        "genetic_test.genes",
+        "genetic_test.link_kind",
     ),
     flag_rows(
         tests,
         "genetic_test",
         "test_key",
         "has_disease_info",
-        F.size("conditions") > 0,
+        F.col("has_condition"),
         "genetic_test_record",
-        "genetic_test.conditions",
+        "genetic_test.link_kind",
     ),
     flag_rows(
         tests,
         "genetic_test",
         "test_key",
         "is_complete_record",
-        (F.size("genes") > 0) & (F.size("conditions") > 0),
+        F.col("has_gene") & F.col("has_condition"),
         "genetic_test_record",
-        "genetic_test.genes+conditions",
+        "genetic_test.link_kind",
     ),
 ]
 tests_per_gene = (
-    tests.select("test_key", F.explode("genes").alias("g"))
-    .select("test_key", F.col("g.gene_key").alias("gene_key"))
-    .filter(F.col("gene_key").isNotNull())
+    test_rows_all.filter((F.col("link_kind") == "gene") & F.col("gene_key").isNotNull())
     .groupBy("gene_key")
     .agg(F.countDistinct("test_key").alias("n"))
 )
@@ -1450,12 +1457,14 @@ def truthy_claim(field):
     )
 
 
-relations = read_silver("drug_gene_relation").filter(F.col("gene_key").isNotNull())
+relations = relation_table.filter(
+    (F.col("relation_kind") == "drug_gene") & F.col("gene_key").isNotNull()
+)
 
 
 def relation_kind(kind, column):
     return (
-        relations.filter(F.col("relation_type") == kind)
+        relations.filter(F.col("drug_gene_relation_type") == kind)
         .select("gene_key")
         .distinct()
         .withColumn(column, F.lit(1))
@@ -1496,7 +1505,7 @@ evidence = evidence.withColumn(
     .when(F.col("fda_label") == 1, "FDA_Label")
     .otherwise("PharmGKB_Validated"),
 )
-PHARMACOGENE_SOURCE = "gene claims+drug_gene_relation"
+PHARMACOGENE_SOURCE = "gene claims+entity_relation"
 pharmacogene_rows = [
     flag_rows(
         evidence,
@@ -1536,9 +1545,7 @@ pharmacogene_rows = [
         PHARMACOGENE_SOURCE,
     ),
 ]
-association_all = read_silver("gene_disease_association").filter(
-    F.col("gene_key").isNotNull() & F.col("disease_key").isNotNull()
-)
+association_all = gene_disease
 relation_counts = [
     number_rows(
         association_all.groupBy("gene_key").agg(
@@ -1549,7 +1556,7 @@ relation_counts = [
         "associated_disease_count",
         F.col("n"),
         "associated_disease_count",
-        "gene_disease_association",
+        "entity_relation",
     ),
     number_rows(
         association_all.groupBy("disease_key").agg(
@@ -1560,7 +1567,7 @@ relation_counts = [
         "associated_gene_count",
         F.col("n"),
         "associated_gene_count",
-        "gene_disease_association",
+        "entity_relation",
     ),
     number_rows(
         relations.filter(F.col("drug_key").isNotNull())
@@ -1571,7 +1578,7 @@ relation_counts = [
         "gene_target_count",
         F.col("n"),
         "gene_target_count",
-        "drug_gene_relation",
+        "entity_relation",
     ),
     number_rows(
         relations.filter(F.col("drug_key").isNotNull())
@@ -1582,7 +1589,7 @@ relation_counts = [
         "related_drug_count",
         F.col("n"),
         "related_drug_count",
-        "drug_gene_relation",
+        "entity_relation",
     ),
 ]
 pathogenic_variants = (
@@ -1674,45 +1681,24 @@ derived = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_derived_attribute
-write_silver(
-    derived, "entity_derived_attribute", source=SOURCE, component=COMPONENT, rid=RID
-)
-
-written = spark.table(genomics_table("entity_derived_attribute"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    derived,
     "entity_derived_attribute",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
     extra_checks={
-        "attributes": written.select("rule_name", "attribute").distinct().count(),
-        "genes_with_the_default_primary_function": written.filter(
-            F.col("rule_name") == "primary_function"
-        )
-        .filter(F.col("value_text") == RULES["primary_function_default"])
-        .count(),
-        "entity_types": written.select("entity_type").distinct().count(),
-        "variants_with_an_impact_score": written.filter(
+        "attributes": lambda t: t.select("rule_name", "attribute").distinct().count(),
+        "genes_with_the_default_primary_function": lambda t: (
+            t.filter(F.col("rule_name") == "primary_function")
+            .filter(F.col("value_text") == RULES["primary_function_default"])
+            .count()
+        ),
+        "entity_types": lambda t: t.select("entity_type").distinct().count(),
+        "variants_with_an_impact_score": lambda t: t.filter(
             F.col("attribute") == "pathogenicity_score"
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__entity_derived_attribute",
-    "entity_derived_attribute",
-    blocks,
 )

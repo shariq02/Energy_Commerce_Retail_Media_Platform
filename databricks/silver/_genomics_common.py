@@ -13,8 +13,15 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** the declared genomics structures, the rules loader, the pure
-# MAGIC parsers and the claim helpers. Pulled in with `%run` after `_silver_common`;
-# MAGIC the constants and pure functions run without Spark.
+# MAGIC parsers, the claim helpers and the entity builders (crosswalk, names,
+# MAGIC claims, coordinates, derived rows, linking). A notebook pulls it in with
+# MAGIC one `%run ../_genomics_common`; the library runs `_silver_common` itself.
+# MAGIC The constants and pure functions run without Spark. No Silver column is an
+# MAGIC array, struct or map.
+
+# COMMAND ----------
+
+# MAGIC %run ./_silver_common
 
 # COMMAND ----------
 
@@ -39,13 +46,9 @@ GENOMICS_REFERENCE_TABLES = {
     "entity_derived_attribute",
     "ontology_relation",
     "entity_coordinate",
-    "gene",
-    "transcript",
-    "protein",
+    "entity_master",
     "protein_gene_link",
     "protein_feature",
-    "disease",
-    "drug",
     "cell_line",
     "genetic_test",
 }
@@ -56,18 +59,12 @@ GENOMICS_MAIN_TABLES = {
     "variant_hgvs",
     "variant_condition",
     "variant_classification",
-    "variant_score",
-    "position_score",
+    "locus_score",
     "variant_population_frequency",
     "variant_feature_overlap",
     "benchmark_variant",
     "embedding_split",
-    "gene_disease_association",
-    "drug_gene_relation",
-    "pharmacogenomic_association",
-    "phenotype_annotation",
-    "pathway_membership",
-    "protein_interaction",
+    "entity_relation",
     "gene_expression_median",
     "tumor_sample",
     "somatic_mutation",
@@ -77,6 +74,7 @@ GENOMICS_MAIN_TABLES = {
     "perturbation_expression",
     "faers_case",
     "faers_case_drug",
+    "faers_case_item",
 }
 
 # One row per ...
@@ -87,31 +85,21 @@ GENOMICS_TABLE_GRAIN = {
     "entity_derived_attribute": "entity, attribute, rule",
     "ontology_relation": "ontology, parent, child, relation",
     "entity_coordinate": "entity, source, assembly, contig, interval",
-    "gene": "gene",
-    "transcript": "transcript",
-    "protein": "protein",
+    "entity_master": "entity type, entity",
     "protein_gene_link": "protein, gene, source",
-    "protein_feature": "protein, feature record",
-    "disease": "disease",
-    "drug": "drug",
-    "cell_line": "cell line",
-    "genetic_test": "test",
+    "protein_feature": "protein, feature record, reference",
+    "cell_line": "cell line, driver",
+    "genetic_test": "test, link",
     "variant": "variant",
     "variant_hgvs": "variant, transcript, snapshot",
-    "variant_condition": "variant, condition position, snapshot",
-    "variant_classification": "variant, classification type, term, source, snapshot",
-    "variant_score": "variant, score name, source",
-    "position_score": "assembly, contig, position, score name",
+    "variant_condition": "variant, condition position, condition id, snapshot",
+    "variant_classification": "variant, classification type, term, submission, snapshot",
+    "locus_score": "variant or position, score name, source",
     "variant_population_frequency": "variant, population, source",
     "variant_feature_overlap": "variant, feature kind, feature",
     "benchmark_variant": "benchmark set, record",
     "embedding_split": "split file",
-    "gene_disease_association": "gene, disease, source, record kind",
-    "drug_gene_relation": "drug, gene, source, relation",
-    "pharmacogenomic_association": "subject, object, source",
-    "phenotype_annotation": "subject, phenotype, source record",
-    "pathway_membership": "member, pathway, source",
-    "protein_interaction": "source interaction record",
+    "entity_relation": "relation kind, record, publication",
     "gene_expression_median": "gene, tissue, source",
     "tumor_sample": "sample barcode",
     "somatic_mutation": "sample, mutation record",
@@ -121,6 +109,7 @@ GENOMICS_TABLE_GRAIN = {
     "perturbation_expression": "gene, drug, cell line, concentration, plate",
     "faers_case": "case version",
     "faers_case_drug": "case version, drug sequence, dose record",
+    "faers_case_item": "case version, drug sequence, item kind, item",
 }
 
 # Domain columns (name, Spark type) per table; the generator adds the governance
@@ -209,28 +198,6 @@ GENE_FIELDS = (
     "chromosome",
     "map_location",
 )
-GENOMICS_STRUCTURES["gene"] = [
-    ("gene_key", "string"),
-    ("key_source", "string"),
-    *[
-        column
-        for field in GENE_FIELDS
-        for column in (
-            (field, "string"),
-            (f"{field}_source", "string"),
-            (f"{field}_method", "string"),
-        )
-    ],
-    ("cytoband_arm", "string"),
-    ("cytoband_band", "string"),
-    ("cytoband_sub_band", "string"),
-    ("grch38_contig", "string"),
-    ("grch38_start_position", "bigint"),
-    ("grch38_end_position", "bigint"),
-    ("grch38_strand", "string"),
-    ("grch38_source", "string"),
-]
-
 TRANSCRIPT_FIELDS = (
     "gene_key",
     "protein_key",
@@ -281,19 +248,30 @@ _GRCH38 = [
     ("grch38_strand", "string"),
     ("grch38_source", "string"),
 ]
+# The five masters (gene, transcript, protein, disease, drug) are one table:
+# the resolved fields of every type side by side (a field two types share, such
+# as `name` or `description`, is one column), the cytoband parts of genes and
+# the GRCh38 interval of genes and transcripts.
+MASTER_FIELDS = {
+    "gene": GENE_FIELDS,
+    "transcript": TRANSCRIPT_FIELDS,
+    "protein": PROTEIN_FIELDS,
+    "disease": DISEASE_FIELDS,
+    "drug": DRUG_FIELDS,
+}
+ALL_MASTER_FIELDS = tuple(
+    dict.fromkeys(field for fields in MASTER_FIELDS.values() for field in fields)
+)
+CYTOBAND_COLUMNS = ("cytoband_arm", "cytoband_band", "cytoband_sub_band")
 GENOMICS_STRUCTURES.update(
     {
-        "transcript": [
-            ("transcript_key", "string"),
+        "entity_master": [
+            ("entity_type", "string"),
+            ("entity_key", "string"),
             ("key_source", "string"),
-            *_resolved(TRANSCRIPT_FIELDS),
-            ("tags", "array<string>"),
+            *_resolved(ALL_MASTER_FIELDS),
+            *[(name, "string") for name in CYTOBAND_COLUMNS],
             *_GRCH38,
-        ],
-        "protein": [
-            ("protein_key", "string"),
-            ("key_source", "string"),
-            *_resolved(PROTEIN_FIELDS),
         ],
         "protein_gene_link": [
             ("protein_key", "string"),
@@ -303,54 +281,47 @@ GENOMICS_STRUCTURES.update(
             ("source_dataset", "string"),
             ("source_field", "string"),
         ],
+        # One row per feature and reference: `feature_id` names the feature,
+        # `reference_kind` is evidence_code, pubmed_id or dbsnp_id; a feature
+        # without a reference keeps one row with no reference.
         "protein_feature": [
             ("protein_key", "string"),
+            ("feature_id", "string"),
             ("feature_type", "string"),
             ("location_raw", "string"),
             ("start_position", "int"),
             ("end_position", "int"),
             ("note", "string"),
-            ("evidence_codes", "array<string>"),
-            ("pubmed_ids", "array<string>"),
-            ("dbsnp_ids", "array<string>"),
             ("qualifiers", "string"),
+            ("reference_kind", "string"),
+            ("reference_value", "string"),
         ],
-        "disease": [
-            ("disease_key", "string"),
-            ("key_source", "string"),
-            *_resolved(DISEASE_FIELDS),
-        ],
-        "drug": [
-            ("drug_key", "string"),
-            ("key_source", "string"),
-            *_resolved(DRUG_FIELDS),
-        ],
+        # One row per cell line and driver (a cell line without a driver keeps one row).
         "cell_line": [
             ("cell_line_key", "string"),
             ("cell_name", "string"),
             ("cellosaur_id", "string"),
             ("organ", "string"),
-            (
-                "drivers",
-                (
-                    "array<struct<gene_symbol:string,variant_zygosity:string,"
-                    "variant_type:string,effect:string,mechanism:string,gene_type:string>>"
-                ),
-            ),
+            ("driver_gene_symbol", "string"),
+            ("driver_variant_zygosity", "string"),
+            ("driver_variant_type", "string"),
+            ("driver_effect", "string"),
+            ("driver_mechanism", "string"),
+            ("driver_gene_type", "string"),
         ],
+        # One row per test and link; `link_kind` is gene or condition.
         "genetic_test": [
             ("test_key", "string"),
             ("latest_version", "string"),
             ("versions", "int"),
             ("test_type", "string"),
-            ("genes", "array<struct<gene_key:string,gene_symbol:string>>"),
-            (
-                "conditions",
-                (
-                    "array<struct<disease_key:string,condition_name:string,"
-                    "mim_number:string,snomed_ct_id:string>>"
-                ),
-            ),
+            ("link_kind", "string"),
+            ("gene_key", "string"),
+            ("gene_symbol", "string"),
+            ("disease_key", "string"),
+            ("condition_name", "string"),
+            ("mim_number", "string"),
+            ("snomed_ct_id", "string"),
         ],
         "ontology_relation": [
             ("ontology", "string"),
@@ -365,6 +336,32 @@ GENOMICS_STRUCTURES.update(
 )
 
 VARIANT_FIELDS = ("variant_type", "rsid", "gene_key", "origin", "name")
+# The seven STRING evidence channels, in the order of the source columns.
+STRING_CHANNELS = (
+    "neighborhood",
+    "fusion",
+    "cooccurence",
+    "coexpression",
+    "experimental",
+    "database",
+    "textmining",
+)
+# The source datasets that hold a variant: one boolean column per dataset.
+VARIANT_SOURCE_FLAGS = {
+    "clinvar.variant_summary": "in_clinvar",
+    "gnomad.variants": "in_gnomad",
+    "alphamissense.variant_scores": "in_alphamissense",
+    "cadd.scores": "in_cadd",
+    "dbvar.variants": "in_dbvar",
+    "pharmgkb.variants": "in_pharmgkb",
+    "long_range_benchmark.pathogenic_coding": "in_long_range_pathogenic_coding",
+    "long_range_benchmark.pathogenic_non_coding": (
+        "in_long_range_pathogenic_non_coding"
+    ),
+    "long_range_benchmark.causal_eqtl": "in_long_range_causal_eqtl",
+    "clinvar_vs_benign.variants": "in_clinvar_vs_benign",
+    "gnomad_balanced.variants": "in_gnomad_balanced",
+}
 
 
 def _text(*names):
@@ -384,7 +381,7 @@ GENOMICS_STRUCTURES.update(
             ("position", "bigint"),
             *_text("reference_allele", "alternate_allele"),
             ("end_position", "bigint"),
-            ("source_datasets", "array<string>"),
+            *[(flag, "boolean") for flag in VARIANT_SOURCE_FLAGS.values()],
             *_resolved(VARIANT_FIELDS),
         ],
         "variant_hgvs": [
@@ -419,8 +416,7 @@ GENOMICS_STRUCTURES.update(
         "variant_condition": [
             ("variant_key", "string"),
             ("condition_position", "int"),
-            *_text("condition_name", "clinvar_condition_accession"),
-            ("condition_ids", "array<string>"),
+            *_text("condition_name", "clinvar_condition_accession", "condition_id"),
             *_text("disease_key", "disease_link_method"),
             ("is_generic_label", "boolean"),
             *_text("pairing_status", "source_dataset", "source_snapshot"),
@@ -431,21 +427,19 @@ GENOMICS_STRUCTURES.update(
             ("last_evaluated", "date"),
             ("number_submitters", "int"),
             ("clinical_significance_simple", "string"),
-            ("clinvar_submission_accessions", "array<string>"),
+            ("submission_accession", "string"),
             ("source_dataset", "string"),
             ("source_snapshot", "string"),
         ],
-        "variant_score": [
-            *_text("variant_key", "score_name"),
-            ("score_value", "double"),
-            *_text("score_label", "context", "source_dataset", "source_field"),
-        ],
-        "position_score": [
+        # A score of a variant (variant_key set) or of a genome position
+        # (assembly, contig, position set).
+        "locus_score": [
+            ("variant_key", "string"),
             *_text("assembly", "contig"),
             ("position", "bigint"),
             ("score_name", "string"),
             ("score_value", "double"),
-            ("source_dataset", "string"),
+            *_text("score_label", "context", "source_dataset", "source_field"),
         ],
         "variant_population_frequency": [
             *_text("variant_key", "population", "measure"),
@@ -517,14 +511,21 @@ GENOMICS_STRUCTURES.update(
             ("variant_rows", "bigint"),
             *_number("int", "distinct_index_values", "distinct_mean_embedding_values"),
         ],
-        "gene_disease_association": [
-            *_text("gene_key", "disease_key", "record_kind", "source_dataset"),
-            *_text("source_gene_id", "source_disease_id"),
+        # The flat typed union of the gene-disease, drug-gene, pharmacogenomic,
+        # phenotype, pathway-member and protein-interaction records; a row
+        # fills the columns of its own `relation_kind` and leaves the others
+        # null. A name two kinds would share with a different meaning (score,
+        # relation type, evidence) carries the kind. One row per publication
+        # where a record names publications.
+        "entity_relation": [
+            *_text("relation_kind", "relation_subkind", "source_dataset"),
+            # gene-disease
+            *_text("gene_key", "disease_key", "source_gene_id", "source_disease_id"),
             *_text("gene_link_method", "disease_link_method"),
-            ("score", "double"),
+            ("gene_disease_score", "double"),
             *_number("bigint", "evidence_count", "supporting_count"),
             *_text(
-                "relation_type",
+                "gene_disease_relation_type",
                 "classification",
                 "mode_of_inheritance",
                 "evaluation_date",
@@ -533,51 +534,30 @@ GENOMICS_STRUCTURES.update(
                 "report_url",
                 "comment",
             ),
-        ],
-        "drug_gene_relation": [
-            *_text("drug_key", "gene_key", "relation_type", "relation_detail"),
-            *_text(
-                "evidence_level", "source_dataset", "source_drug_id", "source_gene_id"
-            ),
-            *_text("drug_link_method", "gene_link_method"),
-            ("pmids", "array<string>"),
-            *_text("labeling_sections", "therapeutic_area"),
-        ],
-        "pharmacogenomic_association": [
+            # drug-gene
+            *_text("drug_key", "source_drug_id", "drug_link_method"),
+            *_text("drug_gene_relation_type", "relation_detail", "evidence_level"),
+            *_text("labeling_sections", "therapeutic_area", "pubmed_id"),
+            # pharmacogenomic association and phenotype annotation (a subject
+            # and an object, or a subject and a phenotype)
             *_text("subject_type", "subject_id", "subject_name", "subject_key"),
+            *_text("subject_source_id", "subject_link_method"),
             *_text("object_type", "object_id", "object_name", "object_key"),
-            *_text("evidence", "association", "pharmacokinetic", "pharmacodynamic"),
-            ("pmids", "array<string>"),
-            ("source_dataset", "string"),
-        ],
-        "phenotype_annotation": [
-            *_text("subject_type", "subject_key", "subject_source_id"),
-            *_text("subject_link_method", "subject_name", "phenotype_key"),
+            *_text("pharmacogenomic_evidence", "association"),
+            *_text("pharmacokinetic", "pharmacodynamic"),
+            *_text("phenotype_key"),
             ("is_negated", "boolean"),
-            *_text(
-                "frequency",
-                "onset",
-                "sex",
-                "modifier",
-                "aspect",
-                "evidence",
-                "reference",
-                "biocuration",
-                "source_dataset",
-            ),
-        ],
-        "pathway_membership": [
+            *_text("frequency", "onset", "sex", "modifier", "aspect"),
+            *_text("phenotype_evidence", "reference", "biocuration"),
+            # pathway member
             *_text("member_type", "member_key", "member_id_type", "member_id"),
-            *_text("member_link_method", "pathway_key", "evidence", "species"),
-            ("source_dataset", "string"),
-        ],
-        "protein_interaction": [
-            *_text("interaction_source", "interaction_id"),
-            *_text("interactor_a_id", "interactor_b_id"),
+            *_text("member_link_method", "pathway_key", "pathway_evidence", "species"),
+            # protein interaction
+            *_text("interaction_id", "interactor_a_id", "interactor_b_id"),
             *_text("protein_a_key", "protein_b_key", "gene_a_key", "gene_b_key"),
             *_text("experimental_system", "experimental_system_type", "throughput"),
-            ("score", "double"),
-            ("channel_scores", "array<int>"),
+            ("interaction_score", "double"),
+            *[(f"channel_{name}_score", "int") for name in STRING_CHANNELS],
             ("combined_score", "int"),
             *_text(
                 "author",
@@ -591,7 +571,6 @@ GENOMICS_STRUCTURES.update(
                 "ontology_term_ids",
                 "ontology_term_names",
                 "ontology_term_categories",
-                "source_dataset",
             ),
         ],
         "gene_expression_median": [
@@ -758,12 +737,6 @@ GENOMICS_STRUCTURES.update(
                 "reporter_country",
                 "occurrence_country",
             ),
-            (
-                "reactions",
-                "array<struct<reaction:string,drug_recurrence_action:string>>",
-            ),
-            ("outcomes", "array<string>"),
-            ("report_sources", "array<string>"),
         ],
         "faers_case_drug": [
             *_text(
@@ -792,10 +765,18 @@ GENOMICS_STRUCTURES.update(
                 "drug_key",
                 "drug_link_method",
             ),
-            ("indications", "array<string>"),
-            (
-                "therapies",
-                "array<struct<start_dt:string,end_dt:string,duration:string,duration_unit:string>>",
+        ],
+        # The reactions, outcomes and report sources of a case, and the
+        # indications and therapies of a drug sequence, as rows; `item_kind`
+        # names the list. Case items carry no drug sequence.
+        "faers_case_item": [
+            *_text("quarter", "primary_id", "case_id", "drug_sequence"),
+            *_text("item_kind", "item_value", "drug_recurrence_action"),
+            *_text(
+                "therapy_start_date_raw",
+                "therapy_end_date_raw",
+                "therapy_duration",
+                "therapy_duration_unit",
             ),
         ],
     }
@@ -818,18 +799,16 @@ GENOMICS_DERIVED_COLUMNS = {
     "grch38_start_position",
     "grch38_end_position",
     "grch38_strand",
-    "tags",
-    "drivers",
-    "genes",
-    "conditions",
     "versions",
     "latest_version",
     "link_method",
     "genes_sharing_symbol",
-    "evidence_codes",
-    "pubmed_ids",
-    "dbsnp_ids",
-    "source_datasets",
+    "feature_id",
+    "reference_kind",
+    "link_kind",
+    "item_kind",
+    "relation_kind",
+    "relation_subkind",
     "disease_link_method",
     "gene_link_method",
     "drug_link_method",
@@ -845,6 +824,7 @@ GENOMICS_DERIVED_COLUMNS = {
     "distinct_index_values",
     "distinct_mean_embedding_values",
     "mutation_records",
+    *VARIANT_SOURCE_FLAGS.values(),
 }
 
 
@@ -2119,3 +2099,1107 @@ def conform_genomics(df, table: str):
     missing column fails here."""
     columns = [name for name, _ in GENOMICS_STRUCTURES[table]]
     return df.select(*columns, *GOVERNANCE_COLUMNS)
+
+
+def conform_union(df, table: str):
+    """Like `conform_genomics`, for a table that unites several kinds of rows:
+    a declared column the frame does not have becomes null."""
+    return df.select(
+        *[
+            (F.col(name) if name in df.columns else F.lit(None)).cast(kind).alias(name)
+            for name, kind in GENOMICS_STRUCTURES[table]
+        ],
+        *GOVERNANCE_COLUMNS,
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: Bronze reads and unions
+
+
+def _bronze(table):
+    return read_genomics_bronze(table)
+
+
+def _union(frames):
+    return _reduce(lambda left, right: left.unionByName(right), frames)
+
+
+def genetic_test(rules=None):
+    """GTR rows with `test_key` (the accession without its version)."""
+    return _bronze("gtr_test_condition_gene").withColumn(
+        "test_key", F.regexp_replace(F.trim(F.col("accession_version")), r"\.\d+$", "")
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: derived attribute rows
+
+
+def derived_rows(
+    df,
+    *,
+    entity_type,
+    key,
+    attribute,
+    rule_name,
+    method,
+    version,
+    as_of,
+    value_text=None,
+    value_number=None,
+    value_boolean=None,
+    matched=None,
+    text_source=None,
+):
+    """Rows in the column order of `entity_derived_attribute`; `attribute`,
+    `value_*` and `matched` are Columns or texts, `key` is a column name."""
+
+    def column(value, kind):
+        return (
+            (F.lit(value) if isinstance(value, str) else value)
+            if value is not None
+            else F.lit(None).cast(kind)
+        )
+
+    if value_boolean is not None:
+        value_type = "boolean"
+    elif value_number is not None:
+        value_type = "number"
+    else:
+        value_type = "text"
+    return df.select(
+        F.lit(entity_type).alias("entity_type"),
+        F.col(key).cast("string").alias("entity_key"),
+        column(attribute, "string").alias("attribute"),
+        column(value_text, "string").alias("value_text"),
+        column(value_number, "double").cast("double").alias("value_number"),
+        column(value_boolean, "boolean").alias("value_boolean"),
+        F.lit(value_type).alias("value_type"),
+        F.lit(method).alias("method"),
+        column(matched, "string").alias("matched_text"),
+        F.lit(text_source).cast("string").alias("text_source"),
+        F.lit(rule_name).alias("rule_name"),
+        F.lit(version).alias("rule_version"),
+        as_of.alias("as_of_date"),
+    )
+
+
+def keyword_rows(
+    df,
+    *,
+    entity_type,
+    key,
+    text,
+    group,
+    rules,
+    text_source,
+    version,
+    as_of,
+    patterns=None,
+    suffix=None,
+):
+    """One true-flag row per entity and keyword rule that matches the text column;
+    the first match is kept in `matched_text`. The rules are `patterns` (a dict) or
+    the text rules of `group`; a `suffix` text is added to each attribute name."""
+    parts = []
+    for attribute, pattern in (patterns or rules["text_rules"][group]).items():
+        hit = df.filter(F.col(text).rlike("(?i)" + pattern))
+        parts.append(
+            derived_rows(
+                hit,
+                entity_type=entity_type,
+                key=key,
+                attribute=attribute + (suffix or ""),
+                rule_name=group,
+                method="keyword",
+                version=version,
+                as_of=as_of,
+                value_boolean=F.lit(True),
+                matched=F.regexp_extract(F.col(text), "(?i)(" + pattern + ")", 1),
+                text_source=text_source,
+            )
+        )
+    return _union(parts)
+
+
+def captured_rows(
+    df, *, entity_type, key, text, group, rules, text_source, version, as_of, numbers=()
+):
+    """One row per entity and capture rule of `group`: the first capture group
+    of the first match, as text or (for `numbers`) as a number."""
+    parts = []
+    for attribute, pattern in rules["text_rules"][group].items():
+        regex = "(?i)" + pattern
+        value = F.nullif(F.regexp_extract(F.col(text), regex, 1), F.lit(""))
+        hit = df.filter(F.col(text).rlike(regex)).withColumn("_captured", value)
+        hit = hit.filter(F.col("_captured").isNotNull())
+        extra = (
+            {"value_number": F.col("_captured").cast("double")}
+            if attribute in numbers
+            else {"value_text": F.col("_captured")}
+        )
+        parts.append(
+            derived_rows(
+                hit,
+                entity_type=entity_type,
+                key=key,
+                attribute=attribute,
+                rule_name=group,
+                method="keyword",
+                version=version,
+                as_of=as_of,
+                matched=F.regexp_extract(F.col(text), regex, 0),
+                text_source=text_source,
+                **extra,
+            )
+        )
+    return _union(parts)
+
+
+def first_match_expr(entries, flags, value_key, default):
+    """Column expr: the `value_key` of the first rule whose `all` flags are in
+    the array column `flags` and whose `none` flags are not; else `default`.
+    (`flags` is an intermediate list of flag names inside one expression, not a
+    column of a Silver table.)"""
+    expr = F.lit(default)
+    for entry in reversed(entries):
+        condition = F.lit(True)
+        for name in entry.get("all", []):
+            condition = condition & F.array_contains(flags, name)
+        for name in entry.get("none", []):
+            condition = condition & ~F.array_contains(flags, name)
+        expr = F.when(condition, F.lit(entry[value_key])).otherwise(expr)
+    return expr
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: variant datasets
+CLINVAR = "clinvar.variant_summary"
+GNOMAD = "gnomad.variants"
+ALPHAMISSENSE = "alphamissense.variant_scores"
+CADD = "cadd.scores"
+DBVAR = "dbvar.variants"
+PHARMGKB_VARIANTS = "pharmgkb.variants"
+LR_CODING = "long_range_benchmark.pathogenic_coding"
+LR_NON_CODING = "long_range_benchmark.pathogenic_non_coding"
+LR_EQTL = "long_range_benchmark.causal_eqtl"
+CLINVAR_BENIGN = "clinvar_vs_benign.variants"
+GNOMAD_BALANCED = "gnomad_balanced.variants"
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: one frame per variant source, with its key and ids
+
+ID_ARRAY = "array<struct<id_type:string,id_value:string,source_field:string>>"
+
+
+def _clean(name, rules, dataset):
+    return clean_placeholders(name, rules, f"{dataset}.{name}")
+
+
+def _id_item(id_type, value, field):
+    return F.struct(
+        F.lit(id_type).alias("id_type"),
+        value.cast("string").alias("id_value"),
+        F.lit(field).alias("source_field"),
+    )
+
+
+def _variant_frame(
+    df, *, dataset, assembly, chrom, pos, ref, alt, end, ids, method, own=None
+):
+    """Add the common variant columns to a source frame; the source columns stay.
+    `own` is the key of a row without usable alleles (else the key stays null).
+    `v_ids` is an intermediate list of ids that the crosswalk explodes; it is not
+    a column of a Silver table."""
+    ids_column = F.array(*ids) if ids else F.array().cast(ID_ARRAY)
+    key = variant_key_expr(assembly, chrom, pos, ref, alt)
+    how = F.lit(method)
+    if own is not None:
+        how = F.when(key.isNotNull(), how).otherwise(F.lit("own_source_id"))
+        key = F.coalesce(key, own)
+    return (
+        df.withColumn("variant_key", key)
+        .withColumn("key_method", how)
+        .withColumn(
+            "v_assembly", assembly if not isinstance(assembly, str) else F.lit(assembly)
+        )
+        .withColumn("v_contig", chromosome_expr(chrom))
+        .withColumn("v_position", pos)
+        .withColumn("v_reference", F.upper(F.trim(ref)))
+        .withColumn("v_alternate", F.upper(F.trim(alt)))
+        .withColumn("v_end", end)
+        .withColumn("v_source", F.lit(dataset))
+        .withColumn(
+            "v_ids", F.filter(ids_column, lambda item: item["id_value"].isNotNull())
+        )
+        .filter(F.col("variant_key").isNotNull())
+    )
+
+
+def _rsid(column, rules, dataset):
+    digits = _clean(column, rules, dataset)
+    return F.when(digits.rlike(r"^\d+$"), F.concat(F.lit("rs"), digits))
+
+
+def clinvar_frame(rules):
+    d = CLINVAR
+    assembly = F.coalesce(_clean("Assembly", rules, d), F.lit("unspecified"))
+    frame = _bronze("clinvar_variant_summary")
+    return _variant_frame(
+        frame.withColumn("RS_dbSNP", _rsid("RS_dbSNP", rules, d)).withColumn(
+            "GeneID",
+            F.when(
+                _clean("GeneID", rules, d).rlike(r"^\d+$"), _clean("GeneID", rules, d)
+            ),
+        ),
+        dataset=d,
+        assembly=assembly,
+        chrom=_clean("Chromosome", rules, d),
+        pos=F.coalesce(_clean("PositionVCF", rules, d), _clean("Start", rules, d)),
+        ref=_clean("ReferenceAlleleVCF", rules, d),
+        alt=_clean("AlternateAlleleVCF", rules, d),
+        end=_clean("Stop", rules, d),
+        ids=[
+            _id_item("clinvar_allele", F.col("AlleleID"), "AlleleID"),
+            _id_item("clinvar_variation", F.col("VariationID"), "VariationID"),
+            _id_item("rsid", F.col("RS_dbSNP"), "RS_dbSNP"),
+            _id_item("dbvar", _clean("nsv_esv_dbVar", rules, d), "nsv_esv_dbVar"),
+        ],
+        method="vcf_alleles",
+        own=F.concat(F.lit("clinvar_allele:"), F.col("AlleleID"), F.lit(":"), assembly),
+    )
+
+
+def _vcf_frame(
+    table,
+    dataset,
+    rules,
+    *,
+    chrom,
+    pos,
+    ref,
+    alt,
+    assembly="GRCh38",
+    method="vcf_alleles_assumed_grch38",
+    ids=(),
+):
+    return _variant_frame(
+        _bronze(table),
+        dataset=dataset,
+        assembly=assembly,
+        chrom=_clean(chrom, rules, dataset),
+        pos=_clean(pos, rules, dataset),
+        ref=_clean(ref, rules, dataset),
+        alt=_clean(alt, rules, dataset),
+        end=F.lit(None).cast("string"),
+        ids=list(ids),
+        method=method,
+    )
+
+
+def alphamissense_frame(rules):
+    d = ALPHAMISSENSE
+    names = rules["ucsc_assembly_names"]
+    mapped = F.lit(None).cast("string")
+    for label, canonical in names.items():
+        mapped = F.when(
+            F.lower(F.trim(F.col("genome"))) == label, F.lit(canonical)
+        ).otherwise(mapped)
+    assembly = F.coalesce(mapped, _clean("genome", rules, d), F.lit("unspecified"))
+    return _variant_frame(
+        _bronze("alphamissense_variant_scores"),
+        dataset=d,
+        assembly=assembly,
+        chrom=_clean("CHROM", rules, d),
+        pos=_clean("POS", rules, d),
+        ref=_clean("REF", rules, d),
+        alt=_clean("ALT", rules, d),
+        end=F.lit(None).cast("string"),
+        ids=[],
+        method="vcf_alleles",
+    )
+
+
+def dbvar_frame(rules):
+    d = DBVAR
+    own = F.concat(F.lit("dbvar:"), F.col("study"), F.lit(":"), F.col("ID"))
+    return _variant_frame(
+        _bronze("dbvar_variants"),
+        dataset=d,
+        assembly=F.lit("unspecified"),
+        chrom=_clean("CHROM", rules, d),
+        pos=_clean("POS", rules, d),
+        ref=F.lit(None).cast("string"),
+        alt=F.lit(None).cast("string"),
+        end=_clean("END", rules, d),
+        ids=[_id_item("dbvar", _clean("ID", rules, d), "ID")],
+        method="vcf_alleles",
+        own=own,
+    )
+
+
+def current_snapshot(df, rules):
+    """The rows of the current ClinVar snapshot and the rows of sources without one."""
+    return df.filter(
+        F.col("source_snapshot").isNull()
+        | (F.col("source_snapshot") == rules["clinvar_current_snapshot"])
+    )
+
+
+def variant_frames(rules):
+    """(dataset, frame) of every source that has genomic coordinates."""
+    return [
+        (CLINVAR, clinvar_frame(rules)),
+        (
+            GNOMAD,
+            _vcf_frame(
+                "gnomad_variants",
+                GNOMAD,
+                rules,
+                chrom="chr",
+                pos="pos",
+                ref="ref",
+                alt="alt",
+                method="vcf_alleles",
+                ids=[_id_item("gnomad_variant", F.col("variant_id"), "variant_id")],
+            ),
+        ),
+        (ALPHAMISSENSE, alphamissense_frame(rules)),
+        (
+            CADD,
+            _vcf_frame(
+                "cadd_scores",
+                CADD,
+                rules,
+                chrom="chrom",
+                pos="pos",
+                ref="ref",
+                alt="alt",
+            ),
+        ),
+        (DBVAR, dbvar_frame(rules)),
+        (
+            LR_CODING,
+            _vcf_frame(
+                "long_range_benchmark_pathogenic_coding",
+                LR_CODING,
+                rules,
+                chrom="CHROM",
+                pos="POS",
+                ref="REF",
+                alt="ALT",
+            ),
+        ),
+        (
+            LR_NON_CODING,
+            _vcf_frame(
+                "long_range_benchmark_pathogenic_non_coding",
+                LR_NON_CODING,
+                rules,
+                chrom="CHROM",
+                pos="POS",
+                ref="REF",
+                alt="ALT",
+            ),
+        ),
+        (
+            LR_EQTL,
+            _vcf_frame(
+                "long_range_benchmark_causal_eqtl",
+                LR_EQTL,
+                rules,
+                chrom="CHROM",
+                pos="POS",
+                ref="REF",
+                alt="ALT",
+            ),
+        ),
+        (
+            CLINVAR_BENIGN,
+            _vcf_frame(
+                "clinvar_vs_benign_variants",
+                CLINVAR_BENIGN,
+                rules,
+                chrom="chrom",
+                pos="pos",
+                ref="ref",
+                alt="alt",
+            ),
+        ),
+        (
+            GNOMAD_BALANCED,
+            _vcf_frame(
+                "gnomad_balanced_variants",
+                GNOMAD_BALANCED,
+                rules,
+                chrom="chrom",
+                pos="pos",
+                ref="ref",
+                alt="alt",
+            ),
+        ),
+    ]
+
+
+def _variant_id_rows(frame, dataset):
+    rows = frame.select(
+        F.col("variant_key").alias("entity_key"),
+        F.explode("v_ids").alias("item"),
+        F.col("key_method").alias("match_method"),
+    )
+    return rows.select(
+        F.lit("variant").alias("entity_type"),
+        "entity_key",
+        F.col("item.id_type").alias("id_type"),
+        F.col("item.id_value").alias("id_value"),
+        F.lit(dataset).alias("source_dataset"),
+        F.col("item.source_field").alias("source_field"),
+        "match_method",
+    )
+
+
+def pharmgkb_variant_frame(rules, id_map):
+    """PharmGKB variants keyed by an exact, unique rsID of another source, else
+    by their own accession (`id_map`: unique rsID rows of the other sources)."""
+    d = PHARMGKB_VARIANTS
+    frame = _bronze("pharmgkb_variants").withColumn(
+        "rsid_text",
+        F.when(
+            _clean("Variant_Name", rules, d).rlike(r"^rs\d+$"),
+            _clean("Variant_Name", rules, d),
+        ),
+    )
+    pairs = frame.select(
+        F.col("Variant_ID").alias("own"),
+        F.lit("rsid").alias("id_type"),
+        F.col("rsid_text").alias("id_value"),
+    ).filter(F.col("id_value").isNotNull())
+    links = link_by_ids(pairs, id_map)
+    frame = frame.join(links, frame["Variant_ID"] == links["own"], "left")
+    own = F.concat(F.lit("pharmgkb_variant:"), F.col("Variant_ID"))
+    return (
+        frame.withColumn("variant_key", F.coalesce(F.col("entity_key"), own))
+        .withColumn(
+            "key_method",
+            F.when(
+                F.col("entity_key").isNotNull(), F.lit("rsid_via_other_source")
+            ).otherwise(F.lit("own_source_id")),
+        )
+        .withColumn("v_source", F.lit(d))
+        .withColumn(
+            "v_ids",
+            F.filter(
+                F.array(
+                    _id_item("pharmgkb_variant", F.col("Variant_ID"), "Variant_ID"),
+                    _id_item("rsid", F.col("rsid_text"), "Variant_Name"),
+                ),
+                lambda item: item["id_value"].isNotNull(),
+            ),
+        )
+        .filter(F.col("variant_key").isNotNull())
+    )
+
+
+def variant_crosswalk(rules):
+    """Variant id rows; PharmGKB variants link through rsIDs that one variant of
+    the other sources holds."""
+    frames = variant_frames(rules)
+    rows = _union([_variant_id_rows(frame, dataset) for dataset, frame in frames])
+    id_map = unique_id_map(finish_crosswalk(rows), ["rsid"])
+    pharmgkb = pharmgkb_variant_frame(rules, id_map)
+    return rows.unionByName(_variant_id_rows(pharmgkb, PHARMGKB_VARIANTS))
+
+
+def variant_id_map(xwalk):
+    """The unique rsID rows of the variant crosswalk, without the PharmGKB rows
+    (the map the PharmGKB link was made with)."""
+    rows = xwalk.filter(
+        (F.col("entity_type") == "variant")
+        & (F.col("source_dataset") != PHARMGKB_VARIANTS)
+    ).select(
+        "entity_type",
+        "entity_key",
+        "id_type",
+        "id_value",
+        "source_dataset",
+        "source_field",
+        "match_method",
+    )
+    return unique_id_map(finish_crosswalk(rows), ["rsid"])
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: variant names and claims
+
+
+def variant_names(rules, id_map):
+    keyed = {"key_col": "entity_key", "rules": rules, "entity_type": "variant"}
+    clinvar = clinvar_frame(rules).withColumn("entity_key", F.col("variant_key"))
+    gnomad = variant_frames(rules)[1][1].withColumn("entity_key", F.col("variant_key"))
+    pharmgkb = pharmgkb_variant_frame(rules, id_map).withColumn(
+        "entity_key", F.col("variant_key")
+    )
+    return _union(
+        [
+            names_frame(
+                clinvar, dataset=CLINVAR, specs=[("Name", "hgvs_name", "text")], **keyed
+            ),
+            names_frame(
+                gnomad,
+                dataset=GNOMAD,
+                specs=[("variant_id", "gnomad_variant_id", "text")],
+                **keyed,
+            ),
+            names_frame(
+                pharmgkb,
+                dataset=PHARMGKB_VARIANTS,
+                specs=[
+                    ("Variant_Name", "name", "text"),
+                    ("Synonyms", "synonym", "comma"),
+                ],
+                **keyed,
+            ),
+        ]
+    )
+
+
+def variant_claims(rules, id_map, transcript_genes):
+    """Claims of the variant fields. `transcript_genes` (transcript_key,
+    gene_key) turns the AlphaMissense transcript into a gene claim."""
+    base = {"entity_type": "variant", "key_col": "entity_key", "rules": rules}
+    clinvar = clinvar_frame(rules).withColumn("entity_key", F.col("variant_key"))
+    alpha = (
+        alphamissense_frame(rules)
+        .withColumn("entity_key", F.col("variant_key"))
+        .withColumn("tx_key", ensembl_unversioned_expr(F.col("transcript_id")))
+        .join(
+            F.broadcast(transcript_genes),
+            F.col("tx_key") == F.col("transcript_key"),
+            "inner",
+        )
+        .withColumn("transcript_id", F.col("gene_key"))
+    )
+    dbvar = dbvar_frame(rules).withColumn("entity_key", F.col("variant_key"))
+    pharmgkb = pharmgkb_variant_frame(rules, id_map).withColumn(
+        "entity_key", F.col("variant_key")
+    )
+    return _union(
+        [
+            claims_frame(
+                clinvar,
+                fields=[
+                    ("variant_type", "Type"),
+                    ("origin", "OriginSimple"),
+                    ("rsid", "RS_dbSNP"),
+                    ("gene_key", "GeneID"),
+                    ("name", "Name"),
+                ],
+                source_dataset=CLINVAR,
+                **base,
+            ),
+            claims_frame(
+                alpha,
+                fields=[("gene_key", "transcript_id")],
+                source_dataset=ALPHAMISSENSE,
+                **base,
+            ),
+            claims_frame(
+                dbvar, fields=[("variant_type", "SVTYPE")], source_dataset=DBVAR, **base
+            ),
+            claims_frame(
+                pharmgkb,
+                fields=[("name", "Variant_Name")],
+                source_dataset=PHARMGKB_VARIANTS,
+                **base,
+            ),
+        ]
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: id maps, symbol maps, links
+
+
+def entity_id_map(xwalk, entity_type):
+    """(id_type, id_value, entity_key) of the unique ids of one entity type."""
+    return unique_id_map(xwalk.filter(F.col("entity_type") == entity_type))
+
+
+def term_map(names, entity_type, term_types, id_type):
+    """(id_type, id_value, entity_key) of the upper-case terms (of `term_types`)
+    that exactly one entity of the type holds."""
+    terms = (
+        names.filter(
+            (F.col("entity_type") == entity_type) & F.col("term_type").isin(*term_types)
+        )
+        .select(F.upper(F.col("term")).alias("id_value"), F.col("entity_key"))
+        .distinct()
+    )
+    return (
+        terms.groupBy("id_value")
+        .agg(
+            F.countDistinct("entity_key").alias("holders"),
+            F.min("entity_key").alias("entity_key"),
+        )
+        .filter(F.col("holders") == 1)
+        .select(F.lit(id_type).alias("id_type"), "id_value", "entity_key")
+    )
+
+
+def link_entities(df, specs, id_map, key_out, method_out):
+    """Add `key_out` (the entity key of the first spec that finds one) and
+    `method_out` (its id type, `unlinked` or `no_id`). A spec is (value Column,
+    id type text or Column); `id_map` holds unique ids only, so no row is copied."""
+    out = df
+    keys, methods, values = [], [], []
+    for index, (value, id_type) in enumerate(specs):
+        tmp_value, tmp_key = f"_le_value_{index}", f"_le_key_{index}"
+        tmp_id, tmp_type = f"_le_id_{index}", f"_le_type_{index}"
+        out = out.withColumn(tmp_value, value)
+        if isinstance(id_type, str):
+            lookup = id_map.filter(F.col("id_type") == id_type).select(
+                F.col("id_value").alias(tmp_id), F.col("entity_key").alias(tmp_key)
+            )
+            condition = F.col(tmp_value) == F.col(tmp_id)
+            label = F.lit(id_type)
+        else:
+            out = out.withColumn(tmp_type, id_type)
+            lookup = id_map.select(
+                F.col("id_value").alias(tmp_id),
+                F.col("id_type").alias(f"_le_maptype_{index}"),
+                F.col("entity_key").alias(tmp_key),
+            )
+            condition = (F.col(tmp_value) == F.col(tmp_id)) & (
+                F.col(tmp_type) == F.col(f"_le_maptype_{index}")
+            )
+            label = F.col(tmp_type)
+        out = out.join(lookup, condition, "left")
+        keys.append(F.col(tmp_key))
+        methods.append(F.when(F.col(tmp_key).isNotNull(), label))
+        values.append(F.col(tmp_value).isNotNull())
+    out = out.withColumn(key_out, F.coalesce(*keys)).withColumn(
+        method_out,
+        F.coalesce(
+            *methods,
+            F.when(_reduce(lambda a, b: a | b, values), F.lit("unlinked")),
+            F.lit("no_id"),
+        ),
+    )
+    return out.drop(*[c for c in out.columns if c.startswith("_le_")])
+
+
+def split_curie(column, rules):
+    """(id_type, id_value) Columns of a `LABEL:value` text; `OMIM:123` -> omim, 123."""
+    text = F.col(column) if isinstance(column, str) else column
+    label = F.regexp_extract(text, r"^([^:]+):", 1)
+    value = F.regexp_extract(text, r"^[^:]+:(.*)$", 1)
+    id_type = id_type_expr(label, rules)
+    return id_type, id_value_expr(id_type, value)
+
+
+def band_expr(entries, value, default):
+    """Column expr: the label of the first band whose `below` is above `value`."""
+    expr = F.lit(default)
+    for entry in reversed(entries):
+        expr = F.when(
+            value < F.lit(float(entry["below"])), F.lit(entry["label"])
+        ).otherwise(expr)
+    return F.when(value.isNotNull(), expr)
+
+
+def split_list(column, separators=r"[;|,]"):
+    """Array of the trimmed, non-empty parts of a list text; null for no part.
+    The array is an intermediate value: a notebook explodes it into rows."""
+    text = F.col(column) if isinstance(column, str) else column
+    parts = F.filter(
+        F.transform(F.split(text, separators), lambda x: F.trim(x)), lambda x: x != ""
+    )
+    return F.when(F.size(parts) > 0, parts)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: parser UDFs (small text parsers over Spark rows)
+
+HGVS_NAME_FIELDS = [
+    ("transcript_accession", "string"),
+    ("transcript_version", "int"),
+    ("gene_symbol", "string"),
+    ("coding_notation", "string"),
+    ("coding_region", "string"),
+    ("coding_start", "int"),
+    ("coding_start_offset", "int"),
+    ("coding_end", "int"),
+    ("coding_end_offset", "int"),
+    ("coding_edit_type", "string"),
+    ("coding_reference_base", "string"),
+    ("coding_alternate_base", "string"),
+    ("coding_inserted_bases", "string"),
+    ("protein_notation", "string"),
+    ("protein_reference_amino_acid", "string"),
+    ("protein_position", "int"),
+    ("protein_end_reference_amino_acid", "string"),
+    ("protein_end_position", "int"),
+    ("protein_edit_type", "string"),
+    ("protein_alternate_amino_acid", "string"),
+    ("protein_inserted_amino_acids", "string"),
+    ("parse_status", "string"),
+]
+HGVS_PROTEIN_FIELDS = [
+    ("protein_notation", "string"),
+    ("protein_reference_amino_acid", "string"),
+    ("protein_position", "int"),
+    ("protein_end_reference_amino_acid", "string"),
+    ("protein_end_position", "int"),
+    ("protein_edit_type", "string"),
+    ("protein_alternate_amino_acid", "string"),
+    ("protein_inserted_amino_acids", "string"),
+]
+TCGA_FIELDS = [
+    ("project", "string"),
+    ("tissue_source_site", "string"),
+    ("participant_barcode", "string"),
+    ("sample_barcode", "string"),
+    ("sample_type_code", "string"),
+    ("vial", "string"),
+    ("portion", "string"),
+    ("analyte", "string"),
+    ("plate", "string"),
+    ("center", "string"),
+    ("parse_status", "string"),
+]
+PARSER_KEY = {
+    "coding_notation": "c_notation",
+    "coding_region": "c_region",
+    "coding_start_offset": "c_start_offset",
+    "coding_start": "c_start",
+    "coding_end_offset": "c_end_offset",
+    "coding_end": "c_end",
+    "coding_edit_type": "c_edit_type",
+    "coding_reference_base": "c_reference",
+    "coding_alternate_base": "c_alternate",
+    "coding_inserted_bases": "c_inserted",
+    "protein_notation": "p_notation",
+    "protein_reference_amino_acid": "p_reference",
+    "protein_position": "p_position",
+    "protein_end_reference_amino_acid": "p_end_reference",
+    "protein_end_position": "p_end_position",
+    "protein_edit_type": "p_edit_type",
+    "protein_alternate_amino_acid": "p_alternate",
+    "protein_inserted_amino_acids": "p_inserted",
+}
+
+# The parsed conditions are an intermediate list: a notebook explodes it into rows.
+CONDITION_DDL = "array<struct<position:int,ids:array<string>,name:string,accession:string,pairing_status:string>>"
+
+
+def _ddl(fields):
+    return "struct<" + ",".join(f"{name}:{kind}" for name, kind in fields) + ">"
+
+
+def hgvs_name_udf():
+    names = [name for name, _ in HGVS_NAME_FIELDS]
+    return F.udf(
+        lambda text: tuple(parse_hgvs_name(text)[PARSER_KEY.get(n, n)] for n in names),
+        _ddl(HGVS_NAME_FIELDS),
+    )
+
+
+def hgvs_protein_udf():
+    names = [name for name, _ in HGVS_PROTEIN_FIELDS]
+    return F.udf(
+        lambda text: tuple(
+            parse_hgvs_protein(text)[PARSER_KEY.get(n, n)] for n in names
+        ),
+        _ddl(HGVS_PROTEIN_FIELDS),
+    )
+
+
+def tcga_barcode_udf():
+    names = [name for name, _ in TCGA_FIELDS]
+    return F.udf(
+        lambda text: tuple(parse_tcga_barcode(text)[n] for n in names),
+        _ddl(TCGA_FIELDS),
+    )
+
+
+def clinvar_conditions_udf():
+    keys = ("position", "ids", "name", "accession", "pairing_status")
+
+    def parse(ids, names, accessions):
+        return [
+            tuple(row[k] for k in keys)
+            for row in parse_clinvar_conditions(ids, names, accessions)
+        ]
+
+    return F.udf(parse, CONDITION_DDL)
+
+
+def faers_date(column):
+    """A FAERS `yyyymmdd` text as a date; null for a partial date."""
+    text = F.col(column)
+    return F.when(
+        text.rlike(r"^\d{8}$"),
+        F.expr(f"cast(try_to_timestamp({column}, 'yyyyMMdd') as date)"),
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: band helpers for the old cutoffs and weights
+
+
+def from_band_expr(entries, value, default):
+    """Column expr: the label of the first entry (list falling by `from`) whose
+    `from` the value reaches; `default` when none."""
+    expr = F.lit(default)
+    for entry in reversed(entries):
+        expr = F.when(value >= F.lit(entry["from"]), F.lit(entry["label"])).otherwise(
+            expr
+        )
+    return F.when(value.isNotNull(), expr)
+
+
+def points_expr(entries, value):
+    """Column expr: the points of the first entry (list falling by `from`) whose
+    `from` the value reaches; 0 when none."""
+    expr = F.lit(0)
+    for entry in reversed(entries):
+        expr = F.when(value >= F.lit(entry["from"]), F.lit(entry["points"])).otherwise(
+            expr
+        )
+    return F.coalesce(expr, F.lit(0))
+
+
+def any_match_expr(entries, flags, test_names, default):
+    """Column expr: the label of the first entry with any test whose flag name
+    is in the array column `flags`; `test_names` turns a test into a flag name."""
+    expr = F.lit(default)
+    for entry in reversed(entries):
+        condition = F.lit(False)
+        for test in entry["any"]:
+            condition = condition | F.array_contains(flags, test_names(test))
+        expr = F.when(condition, F.lit(entry["label"])).otherwise(expr)
+    return expr
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity builders: source columns and row shaping (use the notebook's RULES)
+
+
+def source_text(column, dataset):
+    """Trimmed text of a Bronze column; null for a placeholder."""
+    return clean_placeholders(column, RULES, f"{dataset}.{column}")
+
+
+def source_number(column, kind, dataset):
+    """A Bronze column as a number (`int`, `bigint` or `double`)."""
+    return typed_number(column, kind, RULES, f"{dataset}.{column}")
+
+
+def source_double(column, dataset):
+    return source_number(column, "double", dataset)
+
+
+def source_typed(source, kind, dataset):
+    """A Bronze column as the declared Spark type (text, number or boolean)."""
+    text = source_text(source, dataset)
+    if kind == "boolean":
+        return F.when(text.isNotNull(), F.lower(text) == "true")
+    if kind in ("int", "bigint", "double"):
+        return source_number(source, kind, dataset)
+    return text
+
+
+def text_for(dataset):
+    """`text(column)` of one dataset."""
+    return lambda column: source_text(column, dataset)
+
+
+def number_for(dataset, default_kind="double"):
+    """`number(column, kind)` of one dataset."""
+    return lambda column, kind=default_kind: source_number(column, kind, dataset)
+
+
+def shape_rows(df, columns, dataset, fixed=None, from_source=False, **given):
+    """The frame in the declared columns of a table: `fixed` literals, `given`
+    Columns, else the same-named column of `df` (when `from_source`), else null."""
+    fixed = fixed or {}
+    values = []
+    for name, kind in columns:
+        if name == "source_dataset":
+            value = F.lit(dataset)
+        elif name in fixed:
+            value = F.lit(fixed[name])
+        elif name in given:
+            value = given[name]
+        elif from_source and name in df.columns:
+            value = F.col(name)
+        else:
+            value = F.lit(None)
+        values.append(value.cast(kind).alias(name))
+    return df.select(*values)
+
+
+def rows_factory(columns, label_column=None, from_source=False):
+    """`rows(df, [label,] dataset, **given)` of one table."""
+
+    def rows(df, *args, **given):
+        if label_column is None:
+            (dataset,) = args
+            fixed = {}
+        else:
+            label, dataset = args
+            fixed = {label_column: label}
+        return shape_rows(df, columns, dataset, fixed, from_source, **given)
+
+    return rows
+
+
+def mapped_rows_factory(columns, label_column):
+    """`rows(df, label, dataset, mapping)`: `mapping` gives the source column of a target column."""
+
+    def rows(df, label, dataset, mapping):
+        values = []
+        for name, kind in columns:
+            if name == label_column:
+                value = F.lit(label)
+            elif name == "source_dataset":
+                value = F.lit(dataset)
+            elif name in mapping:
+                value = source_typed(mapping[name], kind, dataset)
+            elif name in df.columns:
+                value = F.col(name)
+            else:
+                value = F.lit(None)
+            values.append(value.cast(kind).alias(name))
+        return df.select(*values)
+
+    return rows
+
+
+def pair_linker(first_map, first_name, second_map, second_name):
+    """`linked(df, first_specs, second_specs)`: two entity links, each with its key
+    and its link method column."""
+
+    def linked(df, first_specs, second_specs):
+        df = link_entities(
+            df, first_specs, first_map, f"{first_name}_key", f"{first_name}_link_method"
+        )
+        return link_entities(
+            df,
+            second_specs,
+            second_map,
+            f"{second_name}_key",
+            f"{second_name}_link_method",
+        )
+
+    return linked
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Entity master builder (gene, transcript, protein, disease, drug)
+# The key flags and the key-source rule of each entity type: the id types the
+# crosswalk holds decide which kind of key the master has.
+
+
+def _master_key_flags(entity_type: str) -> list:
+    return {
+        "gene": [
+            (
+                "in_ncbi",
+                (F.col("source_dataset") == "ncbi_gene.gene_info")
+                & (F.col("id_type") == "ncbi_gene"),
+            )
+        ],
+        "transcript": [
+            ("has_ensembl", F.col("id_type") == "ensembl_transcript"),
+            ("has_refseq", F.col("id_type") == "refseq_rna"),
+        ],
+        "protein": [
+            ("has_uniprot", F.col("id_type") == "uniprot"),
+            ("has_own_ensembl", F.col("match_method") == "own_ensembl_protein"),
+        ],
+        "disease": [("has_medgen", F.col("id_type") == "medgen")],
+        "drug": [
+            ("has_chembl", F.col("id_type") == "chembl"),
+            ("has_pharmgkb", F.col("id_type") == "pharmgkb"),
+        ],
+    }[entity_type]
+
+
+def _master_key_source(entity_type: str):
+    return {
+        "gene": F.when(F.col("in_ncbi"), F.lit("ncbi_gene_id")).otherwise("own_id"),
+        "transcript": F.when(F.col("has_ensembl"), "ensembl_transcript")
+        .when(F.col("has_refseq"), "refseq_rna")
+        .otherwise("own_refseq_annotation_name"),
+        "protein": F.when(F.col("has_uniprot"), "uniprot_accession")
+        .when(F.col("has_own_ensembl"), "own_ensembl_protein")
+        .otherwise("own_refseq_protein"),
+        "disease": F.when(F.col("has_medgen"), "medgen_cui").otherwise(
+            "own_opentargets_id"
+        ),
+        "drug": F.when(F.col("has_chembl"), "chembl_id")
+        .when(F.col("has_pharmgkb"), "pharmgkb_accession")
+        .otherwise("own_tahoe_name"),
+    }[entity_type]
+
+
+def build_master(entity_type: str, claims, xwalk, coordinates=None):
+    """(rows, conflicts): the master rows of one entity type, shaped for
+    `conform_union(..., "entity_master")` after `add_genomics_provenance`.
+    `xwalk` is the whole crosswalk; `coordinates` (GRCh38, primary) is given for
+    the types that carry an interval (gene, transcript)."""
+    type_xwalk = xwalk.filter(F.col("entity_type") == entity_type)
+    masters, conflicts = resolve_master(
+        claims, entity_type=entity_type, fields=MASTER_FIELDS[entity_type]
+    )
+    keys = type_xwalk.groupBy("entity_key").agg(
+        *[
+            F.max(F.when(condition, F.lit(True))).alias(name)
+            for name, condition in _master_key_flags(entity_type)
+        ]
+    )
+    rows = keys.join(masters, "entity_key", "left")
+    if coordinates is not None:
+        rows = rows.join(
+            coordinates.filter(F.col("entity_type") == entity_type).select(
+                "entity_key",
+                F.col("contig").alias("grch38_contig"),
+                F.col("start_position").alias("grch38_start_position"),
+                F.col("end_position").alias("grch38_end_position"),
+                F.col("strand").alias("grch38_strand"),
+                F.col("source_dataset").alias("grch38_source"),
+            ),
+            "entity_key",
+            "left",
+        )
+    rows = rows.withColumn("entity_type", F.lit(entity_type)).withColumn(
+        "key_source", _master_key_source(entity_type)
+    )
+    if entity_type == "gene":
+        location = F.col("map_location")
+        chromosome = r"^(?:[0-9]+|X|Y|MT)"
+        for name, pattern in (
+            ("cytoband_arm", r"([pq])"),
+            ("cytoband_band", r"[pq](\d+)"),
+            ("cytoband_sub_band", r"[pq]\d+\.(\d+)"),
+        ):
+            rows = rows.withColumn(
+                name,
+                F.nullif(
+                    F.regexp_extract(location, chromosome + pattern, 1), F.lit("")
+                ),
+            )
+    rows = rows.withColumn("_srid", sha_key("entity_type", "entity_key"))
+    return rows, conflicts

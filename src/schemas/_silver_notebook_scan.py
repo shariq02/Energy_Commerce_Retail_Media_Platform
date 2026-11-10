@@ -8,7 +8,8 @@ Purpose: one AST-based scanner, shared by `_generate_field_classes.py`,
 `databricks/silver/00_silver_setup.py`, `databricks/gold/00_gold_setup.py`
 and the test suite -- a
 table name literal is extracted straight from every `write_silver(...)` /
-`explode_link_bridge(...)` / `write_semantic(...)` call (Silver side),
+`explode_link_bridge(...)` / `write_semantic(...)` / `write_inspect_export(...)`
+call (Silver side),
 `read_silver(...)` call (Gold reading Silver), or `write_gold(...)` /
 `write_gold_view(...)` call (Gold writing), never hand-maintained twice.
 """
@@ -19,7 +20,12 @@ import ast
 from pathlib import Path
 
 # function name -> positional index of the Silver-table-name argument
-TABLE_ARG = {"write_silver": 1, "explode_link_bridge": 3, "write_semantic": 1}
+TABLE_ARG = {
+    "write_silver": 1,
+    "explode_link_bridge": 3,
+    "write_semantic": 1,
+    "write_inspect_export": 1,
+}
 
 
 def silver_notebooks(silver_root: Path) -> list[Path]:

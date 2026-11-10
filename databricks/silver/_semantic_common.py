@@ -1,20 +1,27 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
-# MAGIC # SILVER SEMANTIC STRUCTURES SHARED HELPER
+# MAGIC # SILVER SEMANTIC STRUCTURES SHARED LIBRARY
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** September 2026
+# MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** building blocks for the cross-source Silver structures --
-# MAGIC time columns, place keys, column conformance, per-source replace writes.
-# MAGIC Pulled in with `%run ../../_semantic_common` after `_silver_common`.
+# MAGIC **Purpose:** the flat energy and commerce Silver structures, the helpers
+# MAGIC of the source notebooks (time columns, place keys, column conformance,
+# MAGIC cleaning of Bronze, wide joins on a grain, per-source writes) and the
+# MAGIC constants of the weather, MaStR and Honda sources. A notebook pulls it in
+# MAGIC with one `%run ../_semantic_common`; the library runs `_silver_common`
+# MAGIC itself. No Silver column is an array, struct or map.
+
+# COMMAND ----------
+
+# MAGIC %run ./_silver_common
 
 # COMMAND ----------
 
@@ -31,9 +38,38 @@ _PROVENANCE_TAIL = [
     ("_silver_run_id", "string"),
 ]
 
-# Place/time scaffolding shared by every family; measurement columns below
-# are designed per family, not shared. Grain = (source_system, place,
-# observation_timestamp_utc, interval_seconds, interval_reference).
+# COMMAND ----------
+
+# DBTITLE 1,Source constants (weather, Honda, DWD products)
+# DWD: per-table read metadata (quality column, native time window).
+DWD_TABLES = {
+    "dwd_air_temperature": {"qn": "QN_9", "time": "hourly"},
+    "dwd_moisture": {"qn": "QN_8", "time": "hourly"},
+    "dwd_dew_point": {"qn": "QN_8", "time": "hourly"},
+    "dwd_pressure": {"qn": "QN_8", "time": "hourly"},
+    "dwd_precipitation": {"qn": "QN_8", "time": "hourly"},
+    "dwd_sun": {"qn": "QN_7", "time": "hourly"},
+    "dwd_wind": {"qn": "QN_3", "time": "hourly"},
+    "dwd_wind_synop": {"qn": "QN_8", "time": "hourly"},
+    "dwd_extreme_wind": {"qn": "QN_8", "time": "hourly"},
+    "dwd_visibility": {"qn": "QN_8", "time": "hourly"},
+    "dwd_cloudiness": {"qn": "QN_8", "time": "hourly"},
+    "dwd_cloud_type": {"qn": "QN_8", "time": "hourly"},
+    "dwd_weather_phenomena": {"qn": "QN_8", "time": "hourly"},
+    "dwd_soil_temperature": {"qn": "QN_2", "time": "hourly"},
+    "dwd_solar": {"qn": "QN_592", "time": "hourly_true_solar"},
+}
+METHOD_LABELS = {"P": "human_observation", "I": "instrument"}
+HONDA_INTERVAL_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
+EIGHTHS_TO_PERCENT = 12.5  # eighths (okta) -> percent
+J_CM2_TO_W_M2 = 10000.0  # J/cm2 summed over an interval -> mean W/m2, / seconds
+
+# COMMAND ----------
+
+# DBTITLE 1,Structure parts shared by the time-series structures
+# Place/time scaffolding shared by the observation structures. Grain =
+# (source_system, place, observation_timestamp_utc, interval_seconds,
+# interval_reference).
 _PLACE_HEAD = [
     ("observation_key", "string"),
     ("location_key", "string"),
@@ -49,230 +85,177 @@ _TIME_COLUMNS = [
     ("interval_seconds", "int"),
     ("interval_reference", "string"),
 ]
-# DWD's per-product quality classification (QN_*); NULL for sources that
-# don't carry one (Honda, AccuWeather). quality_flags as in every structure.
-_QUALITY_COLUMNS = [
-    ("quality_code", "string"),
-    ("quality_label", "string"),
-    ("quality_flags", "array<string>"),
-]
 _TAIL = [("measurement_basis", "string"), *_PROVENANCE_HEAD, *_PROVENANCE_TAIL]
 
-# dwd_solar's native true-solar-time stamp (MESS_DATUM_WOZ).
-_SOLAR_TIME = [("true_solar_time_native", "string")]
 
-# One alternate estimate of a field's primary value, with its own native
-# form, source and quality code.
-_ALT_READING = (
-    "array<struct<value:double,native_value:double,native_unit:string,"
-    "source_dataset:string,quality_code:string>>"
+def _doubles(*names):
+    return [(name, "double") for name in names]
+
+
+def _texts(*names):
+    return [(name, "string") for name in names]
+
+
+def _booleans(*names):
+    return [(name, "boolean") for name in names]
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Structure -- weather_observation (wide: one row per station, instant, interval)
+# One column group per weather family. Flags and quality columns carry the
+# family name; every list of values is columns (alternate readings by source,
+# cloud layers 1 to 4, wind statistics), never an array.
+_CLOUD_LAYER_FIELDS = (
+    ("genus_code", "string"),
+    ("genus_text", "string"),
+    ("base_height_m", "double"),
+    ("cover_percent", "double"),
+    ("cover_native_value", "double"),
+    ("cover_native_unit", "string"),
 )
-
-WEATHER_TEMPERATURE_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("air_temperature_degc", "double"),
-    ("air_temperature_alternate", _ALT_READING),
-    ("dew_point_temperature_degc", "double"),
-    ("dew_point_temperature_alternate", _ALT_READING),
-    ("wet_bulb_temperature_degc", "double"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-WEATHER_HUMIDITY_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("relative_humidity_percent", "double"),
-    ("relative_humidity_alternate", _ALT_READING),
-    ("absolute_humidity_g_per_m3", "double"),
-    ("vapour_pressure_hpa", "double"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Native value/unit populated only where a source converts (AccuWeather Pa).
-WEATHER_PRESSURE_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("pressure_station_hpa", "double"),
-    ("pressure_station_native_value", "double"),
-    ("pressure_station_native_unit", "string"),
-    ("pressure_station_alternate", _ALT_READING),
-    ("pressure_sea_level_hpa", "double"),
-    ("pressure_sea_level_native_value", "double"),
-    ("pressure_sea_level_native_unit", "string"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# One `readings` array entry per statistic present (mean/instant/max/
-# unspecified), not one row per product. Already m/s and degrees.
-WEATHER_WIND_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    (
-        "readings",
-        (
-            "array<struct<statistic:string,wind_speed_m_per_s:double,"
-            "wind_direction_degrees:double,wind_direction_variable:boolean,"
-            "wind_gust_m_per_s:double,source_dataset:string>>"
+WEATHER_FAMILY_MEASUREMENTS = {
+    "temperature": [
+        *_doubles(
+            "air_temperature_degc",
+            "dew_point_temperature_degc",
+            "wet_bulb_temperature_degc",
+            "air_temperature_moisture_degc",
         ),
-    ),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Amount, occurred-flag and form describe one precipitation event.
-WEATHER_PRECIPITATION_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("precipitation_mm", "double"),
-    ("precipitation_occurred", "boolean"),
-    ("precipitation_form_code", "string"),
-    ("precipitation_form_text", "string"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Layers: array of structs (0-4, variably populated), not flat columns.
-WEATHER_CLOUD_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("cloud_cover_total_percent", "double"),
-    ("cloud_cover_total_native_value", "double"),
-    ("cloud_cover_total_native_unit", "string"),
-    ("cloud_cover_total_alternate", _ALT_READING),
-    ("cloud_base_height_m", "double"),
-    ("observation_method", "string"),
-    (
-        "layers",
-        (
-            "array<struct<layer_number:int,genus_code:string,genus_text:string,"
-            "base_height_m:double,cover_percent:double,cover_native_value:double,"
-            "cover_native_unit:string>>"
+        *_texts("air_temperature_moisture_quality_code"),
+        *_doubles("air_temperature_dew_point_degc"),
+        *_texts("air_temperature_dew_point_quality_code"),
+        *_doubles("dew_point_temperature_moisture_degc"),
+        *_texts("dew_point_temperature_moisture_quality_code"),
+        *_booleans("dew_point_above_air_temperature"),
+    ],
+    "humidity": [
+        *_doubles(
+            "relative_humidity_percent",
+            "absolute_humidity_g_per_m3",
+            "vapour_pressure_hpa",
+            "relative_humidity_moisture_percent",
         ),
-    ),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Separate from cloud: different physical basis (extinction distance).
-WEATHER_VISIBILITY_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("visibility_m", "double"),
-    ("visibility_native_value", "double"),
-    ("visibility_native_unit", "string"),
-    ("observation_method", "string"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Purely categorical -- no numeric value/unit columns. DWD only.
-WEATHER_PRESENT_WEATHER_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("present_weather_code", "string"),
-    ("present_weather_text", "string"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Six depths, always reported together -- a fixed set, so flat columns
-# (unlike cloud's variably-populated layers). DWD only.
-WEATHER_SOIL_TEMPERATURE_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("soil_temperature_2cm_degc", "double"),
-    ("soil_temperature_5cm_degc", "double"),
-    ("soil_temperature_10cm_degc", "double"),
-    ("soil_temperature_20cm_degc", "double"),
-    ("soil_temperature_50cm_degc", "double"),
-    ("soil_temperature_100cm_degc", "double"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# dwd_solar's one row split by meaning into four families below: flux,
-# longwave flux, duration and geometry.
-
-# Shortwave flux only (global + diffuse). Native pair on DWD's two sums.
-WEATHER_SOLAR_RADIATION_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    *_SOLAR_TIME,
-    ("global_radiation_w_per_m2", "double"),
-    ("global_radiation_native_value", "double"),
-    ("global_radiation_native_unit", "string"),
-    ("diffuse_radiation_w_per_m2", "double"),
-    ("diffuse_radiation_native_value", "double"),
-    ("diffuse_radiation_native_unit", "string"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# Atmospheric infrared, not sunlight -- a different physical process. DWD only.
-WEATHER_LONGWAVE_RADIATION_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    *_SOLAR_TIME,
-    ("longwave_downward_radiation_w_per_m2", "double"),
-    ("longwave_downward_radiation_native_value", "double"),
-    ("longwave_downward_radiation_native_unit", "string"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# A duration, not a flux. dwd_sun (clock hour) and dwd_solar (true-solar
-# hour) are different windows, so separate rows, never _alternate.
-WEATHER_SUNSHINE_DURATION_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    *_SOLAR_TIME,
-    ("sunshine_duration_minutes", "double"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# An astronomical position, not an atmospheric measurement. DWD only.
-WEATHER_SOLAR_GEOMETRY_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    *_SOLAR_TIME,
-    ("solar_zenith_angle_degrees", "double"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# An index, not a physical flux measurement -- AccuWeather only.
-WEATHER_UV_INDEX_COLUMNS = [
-    *_PLACE_HEAD,
-    *_TIME_COLUMNS,
-    ("uv_index", "double"),
-    *_QUALITY_COLUMNS,
-    *_TAIL,
-]
-
-# name -> column list, one entry per Silver structure.
-WEATHER_FAMILY_COLUMNS = {
-    "weather_temperature": WEATHER_TEMPERATURE_COLUMNS,
-    "weather_humidity": WEATHER_HUMIDITY_COLUMNS,
-    "weather_pressure": WEATHER_PRESSURE_COLUMNS,
-    "weather_wind": WEATHER_WIND_COLUMNS,
-    "weather_precipitation": WEATHER_PRECIPITATION_COLUMNS,
-    "weather_cloud": WEATHER_CLOUD_COLUMNS,
-    "weather_visibility": WEATHER_VISIBILITY_COLUMNS,
-    "weather_present_weather": WEATHER_PRESENT_WEATHER_COLUMNS,
-    "weather_soil_temperature": WEATHER_SOIL_TEMPERATURE_COLUMNS,
-    "weather_solar_radiation": WEATHER_SOLAR_RADIATION_COLUMNS,
-    "weather_longwave_radiation": WEATHER_LONGWAVE_RADIATION_COLUMNS,
-    "weather_sunshine_duration": WEATHER_SUNSHINE_DURATION_COLUMNS,
-    "weather_solar_geometry": WEATHER_SOLAR_GEOMETRY_COLUMNS,
-    "weather_uv_index": WEATHER_UV_INDEX_COLUMNS,
+        *_texts("relative_humidity_moisture_quality_code"),
+        *_booleans("relative_humidity_above_100"),
+    ],
+    "pressure": [
+        *_doubles("pressure_station_hpa", "pressure_station_native_value"),
+        *_texts("pressure_station_native_unit"),
+        *_doubles("pressure_station_moisture_hpa"),
+        *_texts("pressure_station_moisture_quality_code"),
+        *_doubles("pressure_sea_level_hpa", "pressure_sea_level_native_value"),
+        *_texts("pressure_sea_level_native_unit"),
+    ],
+    "wind": [
+        *_doubles(
+            "wind_mean_speed_m_per_s",
+            "wind_mean_direction_degrees",
+        ),
+        *_booleans("wind_mean_direction_variable"),
+        *_doubles(
+            "wind_instant_speed_m_per_s",
+            "wind_instant_direction_degrees",
+            "wind_max_gust_m_per_s",
+            "wind_unspecified_speed_m_per_s",
+            "wind_unspecified_direction_degrees",
+            "wind_unspecified_gust_m_per_s",
+        ),
+    ],
+    "precipitation": [
+        *_doubles("precipitation_mm"),
+        *_booleans("precipitation_occurred"),
+        *_texts("precipitation_form_code", "precipitation_form_text"),
+    ],
+    "cloud": [
+        *_doubles("cloud_cover_total_percent", "cloud_cover_total_native_value"),
+        *_texts("cloud_cover_total_native_unit"),
+        *_doubles(
+            "cloud_cover_total_cloud_type_percent",
+            "cloud_cover_total_cloud_type_native_value",
+        ),
+        *_texts(
+            "cloud_cover_total_cloud_type_native_unit",
+            "cloud_cover_total_cloud_type_quality_code",
+        ),
+        *_doubles("cloud_base_height_m"),
+        *_texts("cloud_observation_method"),
+        *[
+            (f"cloud_layer_{number}_{field}", kind)
+            for number in (1, 2, 3, 4)
+            for field, kind in _CLOUD_LAYER_FIELDS
+        ],
+    ],
+    "visibility": [
+        *_doubles("visibility_m", "visibility_native_value"),
+        *_texts("visibility_native_unit", "visibility_observation_method"),
+    ],
+    "present_weather": [*_texts("present_weather_code", "present_weather_text")],
+    "soil_temperature": [
+        *_doubles(
+            *[f"soil_temperature_{depth}cm_degc" for depth in (2, 5, 10, 20, 50, 100)]
+        )
+    ],
+    "solar_radiation": [
+        *_doubles("global_radiation_w_per_m2", "global_radiation_native_value"),
+        *_texts("global_radiation_native_unit"),
+        *_doubles("diffuse_radiation_w_per_m2", "diffuse_radiation_native_value"),
+        *_texts("diffuse_radiation_native_unit"),
+    ],
+    "longwave_radiation": [
+        *_doubles(
+            "longwave_downward_radiation_w_per_m2",
+            "longwave_downward_radiation_native_value",
+        ),
+        *_texts("longwave_downward_radiation_native_unit"),
+    ],
+    "sunshine_duration": [*_doubles("sunshine_duration_minutes")],
+    "solar_geometry": [*_doubles("solar_zenith_angle_degrees")],
+    "uv_index": [*_doubles("uv_index")],
 }
-WEATHER_FAMILIES = list(WEATHER_FAMILY_COLUMNS)
+WEATHER_FAMILIES = list(WEATHER_FAMILY_MEASUREMENTS)
+# Data-quality flags of every family; a flag a source does not check stays NULL.
+WEATHER_FLAG_NAMES = ("key_conflict_resolved", "qn_missing", "stuck_reading")
 
+
+def _weather_family_block(family: str) -> list:
+    return [
+        *WEATHER_FAMILY_MEASUREMENTS[family],
+        (f"{family}_quality_code", "string"),
+        (f"{family}_quality_label", "string"),
+        (f"{family}_source_dataset", "string"),
+        *[(f"{family}_{flag}", "boolean") for flag in WEATHER_FLAG_NAMES],
+    ]
+
+
+WEATHER_OBSERVATION_CONTEXT = [
+    *_PLACE_HEAD,
+    *_TIME_COLUMNS,
+    ("true_solar_time_native", "string"),
+    ("measurement_basis", "string"),
+    ("source_system", "string"),
+]
+WEATHER_OBSERVATION_COLUMNS = [
+    *WEATHER_OBSERVATION_CONTEXT,
+    *[
+        column
+        for family in WEATHER_FAMILIES
+        for column in _weather_family_block(family)
+    ],
+    *_PROVENANCE_TAIL,
+]
+
+WEATHER_GRAIN = [
+    "source_system",
+    "location_key",
+    "observation_timestamp_utc",
+    "interval_seconds",
+    "interval_reference",
+]
+
+# COMMAND ----------
+
+# DBTITLE 1,Structures -- weather daily, location, station periods, gaps
 WEATHER_DAILY_COLUMNS = [
     ("daily_key", "string"),
     ("location_key", "string"),
@@ -315,9 +298,12 @@ WEATHER_LOCATION_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
-# Station periods; several rows can share a start date (relocations), so
-# record_ordinal keeps them apart.
-WEATHER_LOCATION_VALIDITY_COLUMNS = [
+# One row per station period. `period_kind`: location (coordinates), name (name
+# history), instrument, parameter (parameter period). Several rows can share a
+# start date (relocations), so record_ordinal keeps them apart; every row keeps
+# its own validity window.
+WEATHER_STATION_PERIOD_COLUMNS = [
+    ("period_kind", "string"),
     ("location_key", "string"),
     ("source_location_id", "string"),
     ("valid_from", "date"),
@@ -327,56 +313,20 @@ WEATHER_LOCATION_VALIDITY_COLUMNS = [
     ("latitude", "double"),
     ("longitude", "double"),
     ("elevation_m", "double"),
-    ("quality_flags", "array<string>"),
-    *_PROVENANCE_HEAD,
-    *_PROVENANCE_TAIL,
-]
-
-# DWD station reference, one structure per DWD metadata product: their
-# validity windows do not align, so they are not folded together.
-_STATION_PERIOD_HEAD = [
-    ("location_key", "string"),
-    ("source_location_id", "string"),
-    ("valid_from", "date"),
-    ("valid_to", "date"),
-    ("record_ordinal", "int"),
-    ("name", "string"),
-]
-WEATHER_STATION_NAME_HISTORY_COLUMNS = [
-    *_STATION_PERIOD_HEAD,
-    *_PROVENANCE_HEAD,
-    *_PROVENANCE_TAIL,
-]
-WEATHER_STATION_INSTRUMENT_COLUMNS = [
-    *_STATION_PERIOD_HEAD,
-    ("parameter_category", "string"),
-    ("latitude", "double"),
-    ("longitude", "double"),
-    ("elevation_m", "double"),
-    ("sensor_height_m", "double"),
-    ("device_type", "string"),
-    ("measurement_method", "string"),
-    *_PROVENANCE_HEAD,
-    *_PROVENANCE_TAIL,
-]
-WEATHER_PARAMETER_PERIOD_COLUMNS = [
-    *_STATION_PERIOD_HEAD,
-    ("parameter_source_code", "string"),
-    ("parameter_description_de", "string"),
-    ("parameter_unit", "string"),
-    ("parameter_data_source", "string"),
-    ("parameter_extra_info", "string"),
-    ("parameter_special_notes", "string"),
-    ("parameter_reference", "string"),
-    *_PROVENANCE_HEAD,
-    *_PROVENANCE_TAIL,
-]
-WEATHER_PARAMETER_CATALOG_COLUMNS = [
-    ("parameter_source_code", "string"),
-    ("parameter_business_name", "string"),
-    ("parameter_unit", "string"),
-    ("parameter_description_de", "string"),
-    ("catalog_vintage", "string"),
+    ("coordinate_outside_germany_bounding_box", "boolean"),
+    *_texts("parameter_category"),
+    *_doubles("sensor_height_m"),
+    *_texts(
+        "device_type",
+        "measurement_method",
+        "parameter_source_code",
+        "parameter_description_de",
+        "parameter_unit",
+        "parameter_data_source",
+        "parameter_extra_info",
+        "parameter_special_notes",
+        "parameter_reference",
+    ),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
@@ -405,18 +355,26 @@ WEATHER_MISSINGNESS_RECONCILIATION_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
-# MaStR code lists in one structure: key (catalog_kind, code_id); katalog
-# values point at their category through parent_id.
-MASTR_CODE_LIST_COLUMNS = [
+# COMMAND ----------
+
+# DBTITLE 1,Structures -- code lists and register links
+# MaStR code lists and the DWD parameter catalog in one structure, keyed by
+# (catalog_kind, code_id); katalog values point at their category through
+# parent_id. The unit, description and vintage columns are filled for the DWD
+# parameter rows only.
+REFERENCE_CODE_LIST_COLUMNS = [
     ("catalog_kind", "string"),
     ("code_id", "string"),
     ("parent_id", "string"),
     ("label", "string"),
+    ("unit", "string"),
+    ("description_de", "string"),
+    ("catalog_vintage", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
 
-# Every MaStR link array as one typed relationship structure.
+# Every MaStR link as one typed relationship structure.
 REGISTER_LINK_COLUMNS = [
     ("relationship_type", "string"),
     ("parent_type", "string"),
@@ -427,52 +385,41 @@ REGISTER_LINK_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
-# Commerce: GA4 and REES46 are separate identity spaces, so separate
-# structures; GA4 transaction fields sit on the event (same grain).
+# COMMAND ----------
+
+# DBTITLE 1,Structure -- commerce events (REES46 and GA4 in one grain: one row per event)
 _EVENT_TIME = [
     ("event_timestamp_native", "string"),
     ("event_timestamp_utc", "timestamp"),
     ("event_timestamp_project", "timestamp"),
     ("local_date", "date"),
 ]
-REES46_EVENT_COLUMNS = [
-    ("event_key", "string"),
-    *_EVENT_TIME,
-    ("event_type", "string"),
-    ("user_id", "string"),
-    ("user_session", "string"),
-    ("product_id", "string"),
-    ("category_id", "string"),
-    ("category_code", "string"),
-    ("category_l1", "string"),
-    ("category_l2", "string"),
-    ("category_l3", "string"),
-    ("brand", "string"),
-    ("price", "double"),
-    ("currency_unknown", "boolean"),
-    ("quality_flags", "array<string>"),
-    ("measurement_basis", "string"),
-    *_PROVENANCE_HEAD,
-    *_PROVENANCE_TAIL,
-]
-GA4_EVENT_COLUMNS = [
+COMMERCE_EVENT_COLUMNS = [
     ("event_key", "string"),
     ("event_date_native", "string"),
     *_EVENT_TIME,
-    ("event_name", "string"),
-    ("user_pseudo_id", "string"),
+    *_texts("event_type", "event_name", "user_id", "user_session", "product_id"),
+    *_texts("category_id", "category_code", "category_l1", "category_l2"),
+    *_texts("category_l3", "brand"),
+    *_doubles("price"),
+    *_booleans("currency_unknown"),
+    *_texts("user_pseudo_id"),
     ("session_id", "bigint"),
     ("session_number", "bigint"),
-    ("page_location", "string"),
-    ("page_title", "string"),
-    ("search_term", "string"),
-    ("unique_search_term", "string"),
-    ("geo_country", "string"),
-    ("transaction_id", "string"),
-    ("purchase_revenue", "double"),
+    *_texts(
+        "page_location",
+        "page_title",
+        "search_term",
+        "unique_search_term",
+        "geo_country",
+        "transaction_id",
+    ),
+    *_doubles("purchase_revenue"),
     ("unique_items", "bigint"),
     ("total_item_quantity", "bigint"),
-    ("quality_flags", "array<string>"),
+    *_booleans(
+        "key_conflict_resolved", "bot_burst_suspected", "category_code_ambiguous"
+    ),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
@@ -495,22 +442,12 @@ GA4_EVENT_ITEM_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
-WEATHER_GRAIN = [
-    "source_system",
-    "location_key",
-    "observation_timestamp_utc",
-    "interval_seconds",
-    "interval_reference",
-]
+# COMMAND ----------
 
-# Energy families: a place is a site (location_key) or a market area
-# (market_area_code, never a geography). Sign is always native.
+# DBTITLE 1,Structures -- energy observation (wide) and energy component (rows)
+# Energy: a place is a site (location_key) or a market area (market_area_code,
+# never a geography). Sign is always native.
 _ENERGY_HEAD = [*_PLACE_HEAD, ("market_area_code", "string")]
-_ENERGY_TAIL = [
-    ("sign_convention", "string"),
-    ("quality_flags", "array<string>"),
-    *_TAIL,
-]
 ENERGY_GRAIN = [*WEATHER_GRAIN[:2], "market_area_code", *WEATHER_GRAIN[2:]]
 
 # Market-area vocabulary (SMARD region, redispatch TSO).
@@ -523,53 +460,7 @@ MARKET_AREA_CODES = {
     "TransnetBW": "transnetbw",
     "PSE": "pse_poland",
 }
-
-# Terms of one electricity balance at one node over one window.
-ELECTRICITY_BALANCE_COLUMNS = [
-    *_ENERGY_HEAD,
-    *_TIME_COLUMNS,
-    (
-        "components",
-        (
-            "array<struct<component_kind:string,carrier_code:string,"
-            "native_label:string,energy_mwh:double,power_w:double,"
-            "source_series:string,source_filter_id:string>>"
-        ),
-    ),
-    *_ENERGY_TAIL,
-]
-
-ELECTRICITY_PRICE_COLUMNS = [
-    *_ENERGY_HEAD,
-    *_TIME_COLUMNS,
-    ("price_eur_per_mwh", "double"),
-    *_ENERGY_TAIL,
-]
-
-# Window = the forecast target; the source has no issue time.
-ELECTRICITY_GENERATION_FORECAST_COLUMNS = [
-    *_ENERGY_HEAD,
-    *_TIME_COLUMNS,
-    ("forecast_issue_timestamp", "timestamp"),
-    (
-        "components",
-        (
-            "array<struct<forecast_scope:string,native_label:string,"
-            "energy_mwh:double,semantic_status:string,semantic_issue_ref:string,"
-            "source_series:string,source_filter_id:string>>"
-        ),
-    ),
-    *_ENERGY_TAIL,
-]
-
-THERMAL_ENERGY_COLUMNS = [
-    *_ENERGY_HEAD,
-    *_TIME_COLUMNS,
-    ("heating_total_w", "double"),
-    ("heating_combined_heat_and_power_heat_w", "double"),
-    ("cooling_total_w", "double"),
-    *_ENERGY_TAIL,
-]
+MARKET_AREA_VALUES = tuple(dict.fromkeys(MARKET_AREA_CODES.values()))
 
 # Cumulative register state (kWh) plus its derived forward increment.
 HONDA_METER_CHANNELS = {
@@ -582,26 +473,68 @@ HONDA_METER_CHANNELS = {
     "cooling_total": ("cooling", "total"),
     "cooling_electricity": ("cooling", "cool_elec"),
 }
-ENERGY_METER_READING_COLUMNS = [
+THERMAL_COLUMNS = (
+    "heating_total_w",
+    "heating_combined_heat_and_power_heat_w",
+    "cooling_total_w",
+)
+PRICE_COLUMN = "price_eur_per_mwh"
+METER_COLUMNS = [f"{channel}_kwh" for channel in HONDA_METER_CHANNELS]
+# Flag columns of energy_observation: five-sigma outlier and stuck reading per
+# thermal channel, outlier for the price, four checks per meter register.
+ENERGY_FLAG_COLUMNS = [
+    f"{PRICE_COLUMN}_outlier_five_sigma",
+    *[
+        f"{column}_{check}"
+        for column in THERMAL_COLUMNS
+        for check in ("outlier_five_sigma", "stuck_reading")
+    ],
+    *[
+        name
+        for channel in HONDA_METER_CHANNELS
+        for name in (
+            f"{channel}_kwh_outlier_five_sigma",
+            f"{channel}_kwh_stuck_reading",
+            f"{channel}_kwh_magnitude_decrease",
+            f"{channel}_increment_kwh_spans_gap",
+        )
+    ],
+]
+ENERGY_OBSERVATION_COLUMNS = [
     *_ENERGY_HEAD,
     *_TIME_COLUMNS,
+    *_doubles(PRICE_COLUMN, *THERMAL_COLUMNS),
     *[
-        col
-        for ch in HONDA_METER_CHANNELS
-        for col in ((f"{ch}_kwh", "double"), (f"{ch}_increment_kwh", "double"))
+        column
+        for channel in HONDA_METER_CHANNELS
+        for column in (
+            (f"{channel}_kwh", "double"),
+            (f"{channel}_increment_kwh", "double"),
+        )
     ],
     ("increment_derivation_rule", "string"),
-    *_ENERGY_TAIL,
+    ("sign_convention", "string"),
+    *_booleans(*ENERGY_FLAG_COLUMNS),
+    *_TAIL,
 ]
 
-ENERGY_FAMILY_COLUMNS = {
-    "electricity_balance": ELECTRICITY_BALANCE_COLUMNS,
-    "electricity_price": ELECTRICITY_PRICE_COLUMNS,
-    "electricity_generation_forecast": ELECTRICITY_GENERATION_FORECAST_COLUMNS,
-    "thermal_energy": THERMAL_ENERGY_COLUMNS,
-    "energy_meter_reading": ENERGY_METER_READING_COLUMNS,
-}
+# One row per component of an energy balance or forecast at a place and window.
+ENERGY_COMPONENT_COLUMNS = [
+    *_ENERGY_HEAD,
+    *_TIME_COLUMNS,
+    *_texts("component_group", "component_kind", "forecast_scope", "carrier_code"),
+    *_texts("native_label"),
+    *_doubles("energy_mwh", "power_w"),
+    *_texts("semantic_status", "semantic_issue_ref", "source_series"),
+    *_texts("source_filter_id"),
+    *_booleans("is_outlier_five_sigma", "is_stuck_reading"),
+    ("sign_convention", "string"),
+    *_TAIL,
+]
 
+# COMMAND ----------
+
+# DBTITLE 1,Structures -- grid events, plant sample, device snapshot
 # One row per measure: an event with a start and an end, not a window grain.
 GRID_INTERVENTION_EVENT_COLUMNS = [
     ("event_key", "string"),
@@ -623,13 +556,17 @@ GRID_INTERVENTION_EVENT_COLUMNS = [
     ("instructing_transmission_system_operator_native", "string"),
     ("instructing_market_area_code", "string"),
     ("requesting_transmission_system_operator_native", "string"),
-    ("requesting_market_area_codes", "array<string>"),
+    *[(f"requested_by_{area}", "boolean") for area in MARKET_AREA_VALUES],
     ("affected_asset_text", "string"),
     ("affected_unit_match_name", "string"),
     ("affected_unit_match_confidence", "string"),
     ("primary_energy_type_native", "string"),
     ("primary_energy_type", "string"),
-    ("quality_flags", "array<string>"),
+    *_booleans(
+        "negative_duration",
+        "mean_power_above_maximum_power",
+        "energy_differs_from_power_times_duration",
+    ),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
@@ -644,7 +581,7 @@ PLANT_OPERATING_SAMPLE_COLUMNS = [
     ("relative_humidity_percent", "double"),
     ("net_electrical_output_mw", "double"),
     ("repeat_index", "int"),
-    ("quality_flags", "array<string>"),
+    *_booleans("exact_repeat", "relative_humidity_above_100"),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
@@ -673,27 +610,26 @@ DEVICE_TELEMETRY_SNAPSHOT_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
+# COMMAND ----------
+
+# DBTITLE 1,Structure registry (the declared inventory)
 # Every semantic Silver table and its columns. The field-class generator
 # registers exactly these (energy_silver); notebooks conform to them.
 SEMANTIC_STRUCTURES = {
-    **WEATHER_FAMILY_COLUMNS,
+    "weather_observation": WEATHER_OBSERVATION_COLUMNS,
     "weather_daily": WEATHER_DAILY_COLUMNS,
     "weather_location": WEATHER_LOCATION_COLUMNS,
-    "weather_location_validity": WEATHER_LOCATION_VALIDITY_COLUMNS,
-    "weather_station_name_history": WEATHER_STATION_NAME_HISTORY_COLUMNS,
-    "weather_station_instrument": WEATHER_STATION_INSTRUMENT_COLUMNS,
-    "weather_parameter_period": WEATHER_PARAMETER_PERIOD_COLUMNS,
-    "weather_parameter_catalog": WEATHER_PARAMETER_CATALOG_COLUMNS,
+    "weather_station_period": WEATHER_STATION_PERIOD_COLUMNS,
     "weather_missing_value_period": WEATHER_MISSING_VALUE_PERIOD_COLUMNS,
     "weather_missingness_reconciliation": WEATHER_MISSINGNESS_RECONCILIATION_COLUMNS,
-    **ENERGY_FAMILY_COLUMNS,
+    "reference_code_list": REFERENCE_CODE_LIST_COLUMNS,
+    "register_link": REGISTER_LINK_COLUMNS,
+    "energy_observation": ENERGY_OBSERVATION_COLUMNS,
+    "energy_component": ENERGY_COMPONENT_COLUMNS,
     "grid_intervention_event": GRID_INTERVENTION_EVENT_COLUMNS,
     "plant_operating_sample": PLANT_OPERATING_SAMPLE_COLUMNS,
     "device_telemetry_snapshot": DEVICE_TELEMETRY_SNAPSHOT_COLUMNS,
-    "mastr_code_list": MASTR_CODE_LIST_COLUMNS,
-    "register_link": REGISTER_LINK_COLUMNS,
-    "rees46_event": REES46_EVENT_COLUMNS,
-    "ga4_event": GA4_EVENT_COLUMNS,
+    "commerce_event": COMMERCE_EVENT_COLUMNS,
     "ga4_event_item": GA4_EVENT_ITEM_COLUMNS,
 }
 
@@ -737,14 +673,21 @@ SEMANTIC_MEMBER_STRUCTURES = {
     "unit_repowering": (["mastr_ertuechtigungen"], []),
     "market_actor": (["mastr_marktakteure"], []),
     "market_actor_role": (["mastr_marktakteure_und_rollen"], []),
-    "grid_location": (["mastr_lokationen"], []),
+    "grid_location": (
+        ["mastr_lokationen"],
+        ["distinct_coordinate_count", "coordinate_conflict"],
+    ),
     "grid_connection_point": (["mastr_netzanschlusspunkte"], []),
     "grid_network": (["mastr_netze"], []),
     "balancing_area": (["mastr_bilanzierungsgebiete"], []),
-    "grid_location_coordinate_conflict": (["mastr_location_coordinate_conflict"], []),
-    "unit_deletion_event": (["mastr_unit_deletion_events"], []),
-    "actor_deletion_event": (["mastr_actor_deletion_events"], []),
-    "grid_operator_change_event": (["mastr_grid_operator_change_events"], []),
+    "register_change_event": (
+        [
+            "mastr_unit_deletion_events",
+            "mastr_actor_deletion_events",
+            "mastr_grid_operator_change_events",
+        ],
+        ["event_kind"],
+    ),
     "power_plant_register": (["power_plant_list"], []),
     "power_plant_capacity_plan": (["power_plant_capacity_additions"], []),
 }
@@ -754,14 +697,10 @@ SEMANTIC_MEMBER_STRUCTURES = {
 # SEMANTIC_SCHEMA.
 REFERENCE_STRUCTURES = {
     "weather_location",
-    "weather_location_validity",
-    "weather_station_name_history",
-    "weather_station_instrument",
-    "weather_parameter_period",
-    "weather_parameter_catalog",
+    "weather_station_period",
     "weather_missing_value_period",
     "weather_missingness_reconciliation",
-    "mastr_code_list",
+    "reference_code_list",
     "market_actor",
     "market_actor_role",
     "grid_location",
@@ -769,7 +708,7 @@ REFERENCE_STRUCTURES = {
     "grid_network",
     "balancing_area",
 }
-COMMERCE_STRUCTURES = {"rees46_event", "ga4_event", "ga4_event_item"}
+COMMERCE_STRUCTURES = {"commerce_event", "ga4_event_item"}
 
 
 def semantic_target_schema(table: str) -> str:
@@ -780,6 +719,9 @@ def semantic_target_schema(table: str) -> str:
     return SEMANTIC_SCHEMA
 
 
+# COMMAND ----------
+
+# DBTITLE 1,Continent lookup
 # Continent by ISO 3166-1 alpha-2 (UN geoscheme; Russia -> Europe, Turkey and
 # Cyprus -> Asia).
 _CONTINENT_CODES = {
@@ -829,7 +771,7 @@ def ensure_utc_session() -> None:
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- time columns
+# DBTITLE 1,Helper -- time columns and place keys
 
 
 def add_project_time(df, utc_col: str = "observation_timestamp_utc"):
@@ -849,11 +791,6 @@ def local_time_to_utc(local_ts_col: str, offset_hours_col: str):
     ).cast("timestamp")
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Helper -- place keys and continent lookup
-
-
 def location_key(source_system: str, source_location_id):
     """Deterministic place key; `source_location_id` is a column name or Column."""
     return sha_key(F.lit(source_system), source_location_id)
@@ -864,9 +801,22 @@ def continent_of(country_code_col: str):
     return m[F.upper(F.col(country_code_col))]
 
 
+def finish_observation(df, *, source: str, grain: list):
+    """The place key (when the frame has a `source_location_id`), the project
+    time and local date, and the observation key and record id built from the
+    `grain` columns. The source notebook has set the native and UTC time, the
+    interval and the basis before."""
+    if "source_location_id" in df.columns:
+        df = df.withColumn("location_key", location_key(source, "source_location_id"))
+    df = add_project_time(df)
+    return df.withColumn("observation_key", sha_key(*grain)).withColumn(
+        "source_record_id", F.col("observation_key")
+    )
+
+
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- keep rows where at least one named column is populated
+# DBTITLE 1,Helper -- columns from a spec, rows with a value, boolean flags
 
 
 def lit_map(d: dict):
@@ -874,12 +824,12 @@ def lit_map(d: dict):
     return F.create_map([F.lit(x) for kv in d.items() for x in kv])
 
 
-def flag_array(flags: dict):
-    """quality_flags column: the names in {name: bool Column} that are true."""
-    return F.filter(
-        F.array(*[F.when(cond, F.lit(name)) for name, cond in flags.items()]),
-        lambda x: x.isNotNull(),
-    )
+def from_spec(df, columns: dict, keep: list | None = None):
+    """Add each column of `columns` (name -> source column name or Column);
+    with `keep`, keep only the rows where at least one of those columns is set."""
+    for name, source in columns.items():
+        df = df.withColumn(name, F.col(source) if isinstance(source, str) else source)
+    return any_present(df, keep) if keep else df
 
 
 def any_present(df, cols: list):
@@ -889,6 +839,11 @@ def any_present(df, cols: list):
     for c in cols:
         cond = cond | F.col(c).isNotNull()
     return df.filter(cond)
+
+
+def flag(condition):
+    """A boolean flag column: true where the condition holds, else false."""
+    return F.coalesce(condition, F.lit(False))
 
 
 # COMMAND ----------
@@ -923,6 +878,71 @@ def conform(df, columns: list):
     )
 
 
+def mastr_structure(
+    df, bronze_table: str, id_col: str, *, name_map: dict, coded_map: dict, rid: str
+):
+    """One MaStR Bronze table as a Silver structure: decoded, renamed and typed
+    by `mastr_standardise`, with the record id taken from `id_col`."""
+    names = {**name_map, **MASTR_KEY_NAMES.get(bronze_table, {})}
+    out = mastr_standardise(df, names, coded_map)
+    out = out.withColumn("_srid", F.col(names.get(id_col, id_col)).cast("string"))
+    return add_semantic_provenance(out, "mastr", bronze_table, rid, "_srid")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- clean one Bronze table (collapse identical rows, quarantine conflicts)
+
+
+def clean_bronze(
+    df,
+    key_cols: list,
+    content_cols: list,
+    *,
+    source: str,
+    bronze_table: str,
+    rid: str,
+    qn_col: str | None = None,
+    raw_bronze_df=None,
+):
+    """(kept, stats): identical rows collapsed, same-key conflicts quarantined
+    (written to the quarantine table), and the reconciliation numbers for the
+    findings."""
+    kept, quarantined = resolve_conflicts(
+        df, key_cols, content_cols, qn_col=qn_col, bronze_table=bronze_table
+    )
+    write_quarantine(quarantined.withColumn("source_system", F.lit(source)), rid)
+    stats = reconciliation_stats(df, kept, quarantined, raw_bronze_df=raw_bronze_df)
+    return kept, stats
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- one wide row per grain from several frames
+
+
+def join_on_grain(frames: dict, grain: list, context: list):
+    """One row per `grain`: the `context` columns of every frame (identical for
+    a grain; one row wins) and the other columns of each frame, left-joined on
+    the grain (NULL-safe). Each frame must hold one row per grain."""
+    spread = None
+    for frame in frames.values():
+        part = frame.select(*context)
+        spread = part if spread is None else spread.unionByName(part)
+    wide = spread.dropDuplicates(grain)
+    for frame in frames.values():
+        values = [c for c in frame.columns if c not in context]
+        right = frame.select(
+            *[F.col(c).alias(f"_g_{c}") for c in grain],
+            *values,
+        )
+        condition = F.lit(True)
+        for c in grain:
+            condition = condition & wide[c].eqNullSafe(right[f"_g_{c}"])
+        wide = wide.join(right, condition, "left").drop(*[f"_g_{c}" for c in grain])
+    return wide
+
+
 # COMMAND ----------
 
 # DBTITLE 1,Helper -- write (full overwrite or replace one source's rows)
@@ -935,20 +955,13 @@ def _schema_signature(schema) -> set:
 
 
 def _migrate_schema(existing_df, columns: list):
-    """Like conform(), for carrying pre-existing rows onto a changed schema --
-    a plain CAST has no rule for inventing a field a struct/array<struct>
-    column doesn't have yet (CAST_WITHOUT_SUGGESTION), so those columns are
-    round-tripped through JSON instead, which fills a new field with NULL."""
-
-    def _project(n, t):
-        if n not in existing_df.columns:
-            return F.lit(None).cast(t).alias(n)
-        col = F.col(n)
-        if t.startswith(("array<struct", "struct<")):
-            return F.from_json(F.to_json(col), t).alias(n)
-        return col.cast(t).alias(n)
-
-    return existing_df.select(*[_project(n, t) for n, t in columns])
+    """Like conform(), for carrying pre-existing rows onto a changed schema."""
+    return existing_df.select(
+        *[
+            (F.col(n) if n in existing_df.columns else F.lit(None)).cast(t).alias(n)
+            for n, t in columns
+        ]
+    )
 
 
 def write_semantic(
@@ -1023,7 +1036,6 @@ SEMANTIC_HIGH_CARDINALITY = {
     "device_name",
     "ip_address",
 }
-FINDINGS_SOURCE = "weather"
 
 # COMMAND ----------
 
@@ -1047,6 +1059,10 @@ def structure_extra_checks(df) -> dict:
             "time_basis",
             "interval_reference",
             "measurement_basis",
+            "period_kind",
+            "component_group",
+            "event_kind",
+            "catalog_kind",
         )
         if c in df.columns
     ]
@@ -1093,7 +1109,7 @@ def dict_to_markdown_row(stats: dict) -> str:
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- dedup/conflict reconciliation proof (Genomics-style rule)
+# DBTITLE 1,Helper -- dedup/conflict reconciliation proof
 
 
 def reconciliation_stats(
@@ -1133,7 +1149,7 @@ def reconciliation_stats(
 
 # COMMAND ----------
 
-# DBTITLE 1,Helper -- validation check log (shared by the validation notebooks)
+# DBTITLE 1,Helper -- validation check log (shared by the validation notebook)
 CHECK_RESULTS = []
 FINDINGS_BLOCKS = []
 
@@ -1160,3 +1176,130 @@ def checks_blocks() -> list:
         ]
     )
     return [("checks", table), *FINDINGS_BLOCKS]
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- DWD reference notebooks (station filter, metadata renames)
+# References `SOURCE`, `RID`, `STATION_IDS`, `TABLES` and `META_FIELDS` from the
+# caller's configuration cell (resolved at call time, not at import time).
+
+
+def clean_station_id(id_col):
+    return F.regexp_replace(F.trim(F.col(id_col)), r"\.0$", "")
+
+
+def keep_real_stations(df, id_col, bronze_table):
+    """Row-quarantine parser-trailer / spurious-header rows (id not a curated
+    numeric station id). The kept frame has `station_id` normalised."""
+    df = df.withColumn("station_id", clean_station_id(id_col))
+    kept, q = row_quarantine(
+        df,
+        ~F.col("station_id").isin(STATION_IDS),
+        rule_id="metadata_trailer_row",
+        reason="id column not a curated numeric station id (trailer/header row)",
+        field_name=id_col,
+        value_col="station_id",
+        sr_id_col="station_id",
+        source_system=SOURCE,
+        bronze_table=bronze_table,
+    )
+    write_quarantine(q, RID)
+    return kept.drop(id_col)
+
+
+def rename_meta(df, bronze_table):
+    for col in TABLES[bronze_table]["columns"]:
+        n = col["name"]
+        tgt = META_FIELDS.get(n)
+        if tgt and tgt != n and n in df.columns:
+            df = df.withColumnRenamed(n, tgt)
+    return df
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- MaStR generation units (structural constants, bounding-box quarantine)
+# References `NAME_MAP`, `SOURCE`, `RID` and `STRUCTURAL_CONSTANT_COLS` from the
+# caller's configuration cell (resolved at call time, not at import time).
+
+
+def _drop_structural_constants(df):
+    """Drop STRUCTURAL_CONSTANT_COLS by whichever name (raw or business-
+    renamed) is actually present -- mastr_standardise may have already
+    renamed them. Silently no-ops for a column that isn't present."""
+    for raw in STRUCTURAL_CONSTANT_COLS:
+        target = NAME_MAP.get(raw, raw)
+        if target in df.columns:
+            df = df.drop(target)
+        elif raw in df.columns:
+            df = df.drop(raw)
+    return df
+
+
+def quarantine_out_of_bbox(df, bronze_table: str) -> None:
+    """Record (not drop) units whose coordinate falls outside the Germany
+    bounding box -- `df` keeps every row."""
+    bad = df.filter(bbox_outside_de("latitude", "longitude"))
+    write_quarantine(
+        _q_rows(
+            bad,
+            "coord_outside_de_bbox",
+            "unit coordinate outside the Germany bounding box",
+            "latitude,longitude",
+            "latitude",
+            "unit_id",
+            SOURCE,
+            bronze_table,
+        ),
+        RID,
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Helper -- Honda data-quality flags (five-sigma outlier, stuck reading)
+
+
+def add_5sigma_outlier_flags(df, value_cols):
+    """Add `_{c}_5sigma_outlier` per value column, from that column's own
+    mean/sd (per-source profiling data-quality section)."""
+    if not value_cols:
+        return df
+    stat_exprs = []
+    for c in value_cols:
+        stat_exprs += [F.mean(c).alias(f"{c}__mean"), F.stddev(c).alias(f"{c}__sd")]
+    stats = df.agg(*stat_exprs).first()
+    for c in value_cols:
+        mean_c, sd_c = stats[f"{c}__mean"], stats[f"{c}__sd"]
+        df = df.withColumn(
+            f"_{c}_5sigma_outlier",
+            F.when(
+                F.lit(sd_c).isNotNull() & (F.lit(sd_c) > 0) & F.col(c).isNotNull(),
+                F.abs(F.col(c) - F.lit(mean_c)) > (F.lit(5.0) * F.lit(sd_c)),
+            ).otherwise(F.lit(False)),
+        )
+    return df
+
+
+def add_stuck_reading_flags(df, value_cols, lookback_by_freq, w):
+    """Add `_{c}_stuck_reading_flag` per value column -- flat for the window
+    `lookback_by_freq` names per frequency (matching profiling's "value ==
+    value N steps back" definition, scaled to the same ~10h window per
+    frequency). `w` is the caller's own `Window.partitionBy("frequency").
+    orderBy("datetime_utc")` -- passed in (not built here) so a caller can
+    reuse the same window for its monotonicity-violation flags."""
+    for c in value_cols:
+        stuck_expr = F.lit(False)
+        for freq, lag_n in lookback_by_freq.items():
+            lag1 = F.lag(F.col(c), 1).over(w)
+            lagN = F.lag(F.col(c), lag_n).over(w)
+            cond = (
+                (F.col("frequency") == freq)
+                & F.col(c).isNotNull()
+                & (F.col(c) == lag1)
+                & (F.col(c) == lagN)
+            )
+            stuck_expr = F.when(cond, F.lit(True)).otherwise(stuck_expr)
+        df = df.withColumn(f"_{c}_stuck_reading_flag", stuck_expr)
+    return df

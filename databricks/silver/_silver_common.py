@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # SILVER SHARED LIBRARY
@@ -10,12 +10,13 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** September 2026
+# MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the reusable Silver-transform plumbing pulled into every
-# MAGIC source Silver notebook with `%run ../_silver_common` (or
-# MAGIC `%run ../../_silver_common`). Definitions only -- no side effects at
-# MAGIC import; the caller owns `spark` / `dbutils`.
+# MAGIC **Purpose:** the reusable Silver-transform plumbing, the post-Silver
+# MAGIC inspection functions and `write_inspect_export`. `_semantic_common` and
+# MAGIC `_genomics_common` pull it in with `%run ./_silver_common`, so a notebook
+# MAGIC has one `%run` cell. Definitions only -- no side effects at import; the
+# MAGIC caller owns `spark` / `dbutils`.
 # MAGIC
 # MAGIC Energy and commerce Silver = source-scoped, typed, cleaned, localised,
 # MAGIC governed. Primary Silver tables preserve source semantics and source
@@ -24,6 +25,7 @@
 # MAGIC universal envelope, no cross-source facts/dimensions, no Gold grain
 # MAGIC changes, no `canonical_id`.
 # MAGIC
+# MAGIC Silver tables are flat: no array, struct or map column.
 # MAGIC Genomics Silver has its own rules: see `_genomics_common`.
 
 # COMMAND ----------
@@ -31,6 +33,7 @@
 # DBTITLE 1,Imports
 import datetime as _dt
 import os as _os
+import re as _re
 
 import yaml as _yaml
 from pyspark.sql import Column, DataFrame
@@ -201,7 +204,7 @@ def target_schema_for(silver_table: str, *, source: str | None = None) -> str:
     `source=` and it falls back to that source's ecosystem default schema
     (`{ecosystem}_silver`), prints a NEW TABLE notice, and lets the write
     proceed. Classification happens after inspecting the actual Silver output
-    (see _silver_inspect.py), never as a precondition for writing it."""
+    (see inspect_table below), never as a precondition for writing it."""
     global _target_schema_by_table
     if _target_schema_by_table is None:
         try:
@@ -420,7 +423,7 @@ def validate_field_classes(df: DataFrame, silver_table: str) -> list[str]:
     report them -- does NOT block the write. A legitimate new Silver column (or
     a brand-new table, see target_schema_for) is allowed to exist before it is
     registered; classification is a post-hoc reconciliation step against the
-    actual Silver output (see _silver_inspect.py), not a pre-run whitelist.
+    actual Silver output (see inspect_table below), not a pre-run whitelist.
     Notebooks never write the registry itself -- it is a seeded build artifact,
     reconciled separately. Returns the sorted list of unclassified column names
     (empty if none)."""
@@ -1130,7 +1133,7 @@ def mastr_catalog_ref(category_name: str, fallback_global: bool = False) -> Data
     -- the decode reference for a coded column bound to that category.
     `fallback_global` adds every other katalog value id (ids are unique across
     categories), so a binding to an absent category name still decodes."""
-    codes = read_silver("mastr_code_list")
+    codes = read_silver("reference_code_list")
     cat = codes.filter(
         (F.col("catalog_kind") == "katalogkategorien")
         & (F.col("label") == category_name)
@@ -1149,3 +1152,428 @@ def mastr_catalog_ref(category_name: str, fallback_global: bool = False) -> Data
         "left_anti",
     )
     return scoped.unionByName(rest)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspection configuration
+# Columns skipped for approx_count_distinct -- expected-high-cardinality /
+# free-text fields where a distinct count is not diagnostic and only adds cost.
+HIGH_CARDINALITY_SKIP = {
+    "source_record_id",
+    "url",
+    "page_location",
+    "page_title",
+    "search_term",
+    "unique_search_term",
+    "plant_name",
+    "station_name",
+    "offending_value",
+}
+
+# Boolean/status columns this framework recognises as DQ/trust flags by name.
+_FLAG_COL_PATTERN = _re.compile(
+    r"^_.*_(flag|violated|violation|outlier|suspected|ambiguous|out_of_set|conflict)$"
+    r"|^is_[a-z_]+$"
+    r"|_status$"
+    r"|^currency_unknown$"
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Findings export (src/findings/silver_findings/<source>.md)
+# A repo file, not a table: one `## ` section per notebook and table, a re-run
+# replaces its own section. The file name is the ecosystem (energy, commerce,
+# genomics).
+
+
+def _findings_dir():
+    d = _os.path.join(repo_root(), "src", "findings", "silver_findings")
+    _os.makedirs(d, exist_ok=True)
+    return d
+
+
+STALE_AFTER_HOURS = 24
+_GEN_PAT = _re.compile(r"_Generated: (\d{4}-\d\d-\d\dT\d\d:\d\dZ)_")
+
+
+def _mark_stale(block: str, now) -> str:
+    """Label a preserved block STALE when it is unstamped or older than
+    STALE_AFTER_HOURS; a re-run of its notebook replaces it with a fresh one."""
+    if "> STALE" in block:
+        return block
+    m = _GEN_PAT.search(block)
+    if m:
+        gen = _dt.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%MZ").replace(
+            tzinfo=_dt.UTC
+        )
+        if now - gen <= _dt.timedelta(hours=STALE_AFTER_HOURS):
+            return block
+    head, _, rest = block.partition("\n## ")
+    title, _, tail = rest.partition("\n")
+    return f"{head}\n## {title}\n\n> STALE: not rewritten in the last {STALE_AFTER_HOURS}h\n{tail}"
+
+
+def write_silver_findings(
+    source: str, notebook_key: str, section_title: str, blocks: list
+) -> None:
+    d = _findings_dir()
+    md = _os.path.join(d, source + ".md")
+    now = _dt.datetime.now(tz=_dt.UTC)
+    lines = [
+        f"<!-- BEGIN {source}:{notebook_key} -->",
+        f"## {section_title}",
+        "",
+        f"_Generated: {now.strftime('%Y-%m-%dT%H:%MZ')}_",
+        "",
+    ]
+    for heading, body in blocks:
+        if body is None or str(body).strip() == "":
+            continue
+        lines += [f"### {heading}", "", str(body).rstrip(), ""]
+    lines.append(f"<!-- END {source}:{notebook_key} -->")
+    block = "\n".join(lines)
+    existing = ""
+    if _os.path.exists(md):
+        with open(md, encoding="utf-8") as fh:
+            existing = fh.read()
+    pat = _re.compile(
+        r"<!-- BEGIN "
+        + _re.escape(source)
+        + r":([\w.\-]+) -->.*?<!-- END "
+        + _re.escape(source)
+        + r":\1 -->",
+        _re.DOTALL,
+    )
+    kept = {mm.group(1): _mark_stale(mm.group(0), now) for mm in pat.finditer(existing)}
+    kept[notebook_key] = block
+    intro = (
+        "_Auto-generated by the Silver notebooks (`databricks/silver/`). One "
+        "`## ` section per (notebook, table); re-running a notebook replaces "
+        "its own sections, other sections are preserved and marked STALE once older "
+        "than 24h._"
+    )
+    header = f"# {source.upper()} SILVER FINDINGS\n\n{intro}\n\n"
+    body_out = "\n\n".join(kept[k] for k in sorted(kept))
+    out = header + body_out + "\n"
+    tmp = md + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(out)
+    _os.replace(tmp, md)
+    print(f"findings export -> {md}  ('{notebook_key}', {len(kept)} section(s))")
+
+
+def _findings_markdown(rows: list[tuple]) -> list:
+    by_cat: dict[str, list] = {}
+    for r in rows:
+        cat, name = r[5], r[6]
+        metric, obs, exp, status, sev, details = r[7], r[8], r[9], r[10], r[11], r[12]
+        by_cat.setdefault(cat, []).append(
+            (name, metric, obs, exp, status, sev, details)
+        )
+    blocks = []
+    for cat in sorted(by_cat):
+        table = [
+            "| check | metric | observed | expected | status | severity | details |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for name, metric, obs, exp, status, sev, details in by_cat[cat]:
+            table.append(
+                f"| {name} | {metric} | {obs if obs is not None else ''} | "
+                f"{exp if exp is not None else ''} | {status} | {sev} | {details} |"
+            )
+        blocks.append((cat, "\n".join(table)))
+    return blocks
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Common inspection
+
+
+def inspect_table(
+    df_after: DataFrame,
+    silver_table: str,
+    *,
+    source: str,
+    component: str,
+    rid: str,
+    key_cols: list[str] | None = None,
+    df_before: DataFrame | None = None,
+    extra_checks: dict | None = None,
+) -> list:
+    """Run the common post-Silver checks on `df_after` and RETURN the findings
+    as `blocks` ready for `write_silver_findings()` -- does not write anything
+    itself (`write_inspect_export` does both steps).
+
+    `key_cols` -- the table's business grain key (not `_srid`) -- enables the
+    duplicate/grain check; omit where no single business key applies.
+    `df_before` -- the Bronze (or pre-transformation) read -- enables the
+    input/output row-count reconciliation check; omit where not meaningful
+    (e.g. a derived reference table with no 1:1 Bronze counterpart).
+    `extra_checks` -- {check_name: value} for source-specific findings the
+    caller already computed -- passed through as `transformation_specific`
+    rows, never invented by this function.
+    """
+    ts = now_utc()
+    rows: list[tuple] = []
+    full = f"{CATALOG}.{target_schema_for(silver_table, source=source)}.{silver_table}"
+    cols = df_after.columns
+    dtypes = dict(df_after.dtypes)
+
+    def add(category, name, metric, observed, expected, status, severity, details=""):
+        rows.append(
+            (
+                ts,
+                rid,
+                source,
+                component,
+                full,
+                category,
+                name,
+                metric,
+                None if observed is None else float(observed),
+                None if expected is None else float(expected),
+                status,
+                severity,
+                details,
+            )
+        )
+
+    # Schema
+    add("schema", "table_exists", "exists", 1.0, 1.0, "PASS", "INFO")
+    add("schema", "column_count", "count", float(len(cols)), None, "INFO", "INFO")
+
+    # Volume
+    n_after = df_after.count()
+    add("volume", "row_count", "rows", float(n_after), None, "INFO", "INFO")
+    if df_before is not None:
+        n_before = df_before.count()
+        delta = n_after - n_before
+        ratio = (n_after / n_before) if n_before else None
+        vol_status = (
+            "WARN" if (ratio is not None and (ratio < 0.5 or ratio > 2.0)) else "PASS"
+        )
+        add(
+            "volume",
+            "input_output_reconciliation",
+            "row_delta",
+            float(delta),
+            float(n_before),
+            vol_status,
+            "WARN" if vol_status == "WARN" else "INFO",
+            f"before={n_before} after={n_after}",
+        )
+
+    # Completeness (one agg pass across every column)
+    if cols:
+        null_exprs = [F.sum(F.col(c).isNull().cast("int")).alias(c) for c in cols]
+        null_row = df_after.agg(*null_exprs).first()
+        if null_row and n_after:
+            for c in cols:
+                rate = (null_row[c] or 0) / n_after
+                add(
+                    "completeness",
+                    f"null_rate:{c}",
+                    "null_rate",
+                    rate,
+                    None,
+                    "INFO",
+                    "INFO",
+                )
+
+    # Cardinality (one agg pass, skipping known-high-cardinality columns)
+    card_cols = [c for c in cols if c not in HIGH_CARDINALITY_SKIP]
+    if card_cols:
+        card_exprs = [F.approx_count_distinct(F.col(c)).alias(c) for c in card_cols]
+        card_row = df_after.agg(*card_exprs).first()
+        for c in card_cols:
+            add(
+                "cardinality",
+                f"distinct:{c}",
+                "approx_distinct",
+                float(card_row[c]),
+                None,
+                "INFO",
+                "INFO",
+            )
+
+    # Grain / duplicate-key check
+    if key_cols:
+        dup_n = df_after.groupBy(*key_cols).count().filter(F.col("count") > 1).count()
+        grain_status = "WARN" if dup_n else "PASS"
+        add(
+            "grain",
+            "duplicate_keys",
+            "count",
+            float(dup_n),
+            0.0,
+            grain_status,
+            "WARN" if dup_n else "INFO",
+            f"key_cols={key_cols}",
+        )
+
+    # Numeric behaviour (one agg pass over numeric columns)
+    numeric_types = {"double", "float", "int", "bigint", "smallint", "decimal"}
+    numeric_cols = [c for c in cols if dtypes.get(c) in numeric_types]
+    if numeric_cols:
+        stat_exprs = []
+        for c in numeric_cols:
+            stat_exprs += [
+                F.min(c).alias(f"{c}__min"),
+                F.max(c).alias(f"{c}__max"),
+                F.sum((F.col(c) == 0).cast("int")).alias(f"{c}__zero"),
+                F.sum((F.col(c) < 0).cast("int")).alias(f"{c}__neg"),
+            ]
+        stat_row = df_after.agg(*stat_exprs).first()
+        for c in numeric_cols:
+            add(
+                "numeric",
+                f"min:{c}",
+                "min",
+                stat_row[f"{c}__min"],
+                None,
+                "INFO",
+                "INFO",
+            )
+            add(
+                "numeric",
+                f"max:{c}",
+                "max",
+                stat_row[f"{c}__max"],
+                None,
+                "INFO",
+                "INFO",
+            )
+            add(
+                "numeric",
+                f"zero_count:{c}",
+                "count",
+                float(stat_row[f"{c}__zero"] or 0),
+                None,
+                "INFO",
+                "INFO",
+            )
+            add(
+                "numeric",
+                f"negative_count:{c}",
+                "count",
+                float(stat_row[f"{c}__neg"] or 0),
+                None,
+                "INFO",
+                "INFO",
+            )
+
+    # DQ / semantic-status flag counts (recognised by name, not forced on tables
+    # that carry none)
+    flag_cols = [c for c in cols if _FLAG_COL_PATTERN.search(c)]
+    bool_flag_cols = [c for c in flag_cols if dtypes.get(c) == "boolean"]
+    if bool_flag_cols:
+        flag_exprs = [F.sum(F.col(c).cast("int")).alias(c) for c in bool_flag_cols]
+        flag_row = df_after.agg(*flag_exprs).first()
+        for c in bool_flag_cols:
+            add(
+                "dq",
+                f"flag_true_count:{c}",
+                "count",
+                float(flag_row[c] or 0),
+                None,
+                "INFO",
+                "INFO",
+            )
+    for c in flag_cols:
+        if dtypes.get(c) == "string":
+            vc = df_after.groupBy(c).count().collect()
+            details = ", ".join(f"{r[c]}={r['count']}" for r in vc)
+            add("dq", f"value_counts:{c}", "count", None, None, "INFO", "INFO", details)
+
+    # Source-specific checks the caller already computed -- never invented here
+    if extra_checks:
+        for name, value in extra_checks.items():
+            numeric_value = (
+                value
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+                else None
+            )
+            add(
+                "transformation_specific",
+                name,
+                "value",
+                numeric_value,
+                None,
+                "INFO",
+                "INFO",
+                str(value),
+            )
+
+    print(f"INSPECTED {full}: {len(rows)} check(s)")
+    return _findings_markdown(rows)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export one table
+
+
+def write_inspect_export(
+    df: DataFrame,
+    table: str,
+    *,
+    source: str,
+    component: str,
+    rid: str,
+    findings: str,
+    key_cols: list[str] | None = None,
+    df_before: DataFrame | None = None,
+    extra_checks=None,
+    extra_blocks: list | None = None,
+    writer=None,
+    replace_where: str | None = None,
+    link_method_counts: bool = False,
+    section: str | None = None,
+) -> DataFrame:
+    """Write `df` as Silver table `table`, inspect what was written and export
+    the findings section; returns the written table. One call replaces the
+    write, inspect and export steps of a table.
+
+    `writer` is `write_silver` (default) or `write_semantic`; `replace_where`
+    needs `write_semantic`. `extra_checks` is a dict (a value may be a function
+    of the written table) or a function of the written table that returns one. `link_method_counts` adds the counts of every
+    `*_link_method` column. `findings` is the findings file (the ecosystem);
+    `extra_blocks` are findings blocks the caller already built."""
+    write = writer or write_silver
+    options = {"replace_where": replace_where} if replace_where else {}
+    write(df, table, source=source, component=component, rid=rid, **options)
+    full = f"{CATALOG}.{target_schema_for(table, source=source)}.{table}"
+    written = spark.table(full)
+    if replace_where:
+        written = written.filter(replace_where)
+    extra = extra_checks(written) if callable(extra_checks) else (extra_checks or {})
+    checks = {
+        name: (value(written) if callable(value) else value)
+        for name, value in extra.items()
+    }
+    if link_method_counts:
+        for column in written.columns:
+            if column.endswith("_link_method"):
+                counts = written.groupBy(column).count().collect()
+                checks[f"{column}_counts"] = str(
+                    {row[column]: row["count"] for row in counts}
+                )
+    blocks = inspect_table(
+        written,
+        table,
+        source=findings,
+        component=component,
+        rid=rid,
+        key_cols=key_cols,
+        df_before=df_before,
+        extra_checks=checks,
+    )
+    write_silver_findings(
+        findings,
+        f"{component.split('/')[-1]}__{table}",
+        section or table,
+        [*blocks, *(extra_blocks or [])],
+    )
+    return written

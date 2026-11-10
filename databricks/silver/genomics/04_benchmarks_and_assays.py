@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # SILVER -- BENCHMARKS AND ASSAYS (GENOMICS)
@@ -17,23 +17,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Shared library
-# MAGIC %run ../_silver_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspection library
-# MAGIC %run ../_silver_inspect
-
-# COMMAND ----------
-
 # DBTITLE 1,Genomics library
 # MAGIC %run ../_genomics_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Entity helpers
-# MAGIC %run ../_genomics_entities
 
 # COMMAND ----------
 
@@ -41,7 +26,7 @@
 from pyspark.sql import functions as F
 
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/06_benchmarks_and_assays"
+COMPONENT = "silver/genomics/04_benchmarks_and_assays"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()

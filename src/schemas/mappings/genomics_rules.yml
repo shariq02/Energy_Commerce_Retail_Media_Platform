@@ -14,11 +14,24 @@ version: 3
 # assembly and an own key last); the owner confirms or changes it. The first Silver run
 # lists the methods that are not in the list (`methods_without_a_rank`).
 crosswalk_method_precedence:
+  # 1. the source states the id itself
   - exact_id
+  # 2. the id is found through a stated link or exact alleles
   - vcf_alleles
+  - ids_via_chembl
+  - ids_via_medgen
+  - ids_via_pubchem
+  - ensembl_protein_via_string
+  - rsid_via_other_source
+  # 3. the id is found through a text rule or an assumed assembly
   - keyword
   - vcf_alleles_assumed_grch38
+  # 4. the source gives no id: its own key
   - own_ensembl_id
+  - own_ensembl_protein
+  - own_opentargets_id
+  - own_pharmgkb_id
+  - own_tahoe_name
   - own_source_id
 
 # ClinVar is staged as three snapshots (column `snapshot`: current, 2026-01, 2025-01).

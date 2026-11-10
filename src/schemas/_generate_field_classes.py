@@ -491,8 +491,13 @@ SEMANTIC_DERIVED = {
     "measurement_basis",
     "sign_convention",
     "quality_label",
-    "quality_flag",
-    "quality_flags",
+    "component_group",
+    "component_kind",
+    "forecast_scope",
+    "carrier_code",
+    "semantic_status",
+    "semantic_issue_ref",
+    "period_kind",
     "variable",
     "statistic",
     "is_primary",
@@ -514,7 +519,6 @@ SEMANTIC_DERIVED = {
     "direction",
     "primary_energy_type",
     "instructing_market_area_code",
-    "requesting_market_area_codes",
     "affected_unit_match_name",
     "affected_unit_match_confidence",
     "forecast_issue_timestamp",
@@ -891,9 +895,22 @@ def build_rows() -> list[dict]:
                 )
         for col in (*discriminators, "source_dataset"):
             add(table, col, "derived", "discriminator / provenance", "semantic")
+    # Derived: the named computed columns, the per-family quality columns of the
+    # wide weather table, the forward increments and every boolean (a flag is
+    # always computed in Silver).
+    family_derived = {
+        f"{family}_{part}"
+        for family in ns["WEATHER_FAMILIES"]
+        for part in ("quality_code", "quality_label", "source_dataset")
+    }
     for table, columns in semantic.items():
-        for col, _ in columns:
-            if col in SEMANTIC_DERIVED or col.endswith("_increment_kwh"):
+        for col, kind in columns:
+            if (
+                col in SEMANTIC_DERIVED
+                or col in family_derived
+                or col.endswith("_increment_kwh")
+                or kind == "boolean"
+            ):
                 add(table, col, "derived", "derived in Silver", "semantic")
             else:
                 add(

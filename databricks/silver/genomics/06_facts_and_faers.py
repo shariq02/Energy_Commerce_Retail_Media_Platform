@@ -4,7 +4,7 @@
 # environment_version = "6"
 # ///
 # MAGIC %md
-# MAGIC # SILVER -- FACTS (GENOMICS)
+# MAGIC # SILVER -- FACTS AND FAERS (GENOMICS)
 # MAGIC
 # MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
 # MAGIC
@@ -12,18 +12,9 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** tumor samples, somatic mutations, and perturbation samples and
-# MAGIC expression.
-
-# COMMAND ----------
-
-# DBTITLE 1,Shared library
-# MAGIC %run ../_silver_common
-
-# COMMAND ----------
-
-# DBTITLE 1,Inspection library
-# MAGIC %run ../_silver_inspect
+# MAGIC **Purpose:** tumor samples, somatic mutations, perturbation samples and expression,
+# MAGIC and the FAERS cases with their drugs and their reaction, outcome, report source,
+# MAGIC indication and therapy rows.
 
 # COMMAND ----------
 
@@ -32,16 +23,11 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Entity helpers
-# MAGIC %run ../_genomics_entities
-
-# COMMAND ----------
-
 # DBTITLE 1,Configuration
 from pyspark.sql import functions as F
 
 SOURCE = "genomics"
-COMPONENT = "silver/genomics/09_facts"
+COMPONENT = "silver/genomics/06_facts_and_faers"
 RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
@@ -78,37 +64,21 @@ sample = conform_genomics(add_genomics_provenance(sample, "_srid", RID), "tumor_
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- tumor_sample
-write_silver(sample, "tumor_sample", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("tumor_sample"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    sample,
     "tumor_sample",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["sample_barcode"],
     extra_checks={
-        "unparsed_barcodes": written.filter(
+        "unparsed_barcodes": lambda t: t.filter(
             F.col("parse_status") == "unparsed"
         ).count(),
-        "projects": written.select("project").distinct().count(),
-        "participants": written.select("participant_barcode").distinct().count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
+        "projects": lambda t: t.select("project").distinct().count(),
+        "participants": lambda t: t.select("participant_barcode").distinct().count(),
     },
-)
-
-write_silver_findings(
-    FINDINGS, f"{COMPONENT.split('/')[-1]}__tumor_sample", "tumor_sample", blocks
 )
 
 # COMMAND ----------
@@ -152,11 +122,8 @@ protein_changes = (
 
 # -- Transform -- columns, parsed protein change and keys
 DATASET = "tcga.mc3_somatic_mutations"
-
 text = text_for(DATASET)
-
 number = number_for(DATASET)
-
 EXON = r"^(\d+)/(\d+)$"
 mutation = read_genomics_bronze("tcga_mc3_somatic_mutations")
 mutation = link_entities(
@@ -288,49 +255,31 @@ somatic = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- somatic_mutation
-write_silver(somatic, "somatic_mutation", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("somatic_mutation"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    somatic,
     "somatic_mutation",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
     extra_checks={
         "records_in_bronze": read_genomics_bronze("tcga_mc3_somatic_mutations").count(),
-        "records_without_a_gene_key": written.filter(
+        "records_without_a_gene_key": lambda t: t.filter(
             F.col("gene_key").isNull()
         ).count(),
-        "variant_links": str(
+        "variant_links": lambda t: str(
             {
                 r["variant_link_method"]: r["count"]
-                for r in written.groupBy("variant_link_method").count().collect()
+                for r in t.groupBy("variant_link_method").count().collect()
             }
         ),
-        "unparsed_protein_changes": written.filter(
+        "unparsed_protein_changes": lambda t: t.filter(
             F.col("protein_change_short_notation").isNotNull()
             & F.col("protein_position").isNull()
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__somatic_mutation",
-    "somatic_mutation",
-    blocks,
+    link_method_counts=True,
 )
 
 # COMMAND ----------
@@ -342,11 +291,8 @@ drug_map = entity_id_map(xwalk, "drug")
 
 # -- Transform -- sample record and provenance
 DATASET = "tahoe.sample_metadata"
-
 text = text_for(DATASET)
-
 number = number_for(DATASET)
-
 samples = read_genomics_bronze("tahoe_sample_metadata").withColumn(
     "tahoe_key", F.concat(F.lit("tahoe:"), F.lower(F.trim(F.col("drug"))))
 )
@@ -381,39 +327,21 @@ sample = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- perturbation_sample
-write_silver(sample, "perturbation_sample", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("perturbation_sample"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    sample,
     "perturbation_sample",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
     extra_checks={
-        "samples_without_a_drug_key": written.filter(
+        "samples_without_a_drug_key": lambda t: t.filter(
             F.col("drug_key").isNull()
         ).count(),
-        "plates": written.select("plate").distinct().count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
+        "plates": lambda t: t.select("plate").distinct().count(),
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__perturbation_sample",
-    "perturbation_sample",
-    blocks,
+    link_method_counts=True,
 )
 
 # COMMAND ----------
@@ -436,11 +364,8 @@ drug_map = entity_id_map(xwalk, "drug")
 
 # -- Transform -- typed statistics, gene and drug keys
 DATASET = "tahoe.pseudobulk_differential_expression"
-
 text = text_for(DATASET)
-
 number = number_for(DATASET)
-
 expression = read_genomics_bronze(
     "tahoe_pseudobulk_differential_expression"
 ).withColumn("tahoe_key", F.concat(F.lit("tahoe:"), F.lower(F.trim(F.col("drug")))))
@@ -505,42 +430,292 @@ perturbation = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- perturbation_expression
-write_silver(
+write_inspect_export(
     perturbation,
     "perturbation_expression",
     source=SOURCE,
     component=COMPONENT,
     rid=RID,
-)
-
-written = spark.table(genomics_table("perturbation_expression"))
-blocks = inspect_table(
-    written,
-    "perturbation_expression",
-    source=FINDINGS,
-    component=COMPONENT,
-    rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
     extra_checks={
-        "rows_without_a_gene_key": written.filter(F.col("gene_key").isNull()).count(),
-        "rows_without_a_drug_key": written.filter(F.col("drug_key").isNull()).count(),
-        "rows_without_a_p_value": written.filter(F.col("p_value").isNull()).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
+        "rows_without_a_gene_key": lambda t: t.filter(
+            F.col("gene_key").isNull()
+        ).count(),
+        "rows_without_a_drug_key": lambda t: t.filter(
+            F.col("drug_key").isNull()
+        ).count(),
+        "rows_without_a_p_value": lambda t: t.filter(F.col("p_value").isNull()).count(),
+    },
+    link_method_counts=True,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Build -- faers_case
+# -- Transform -- demographics, dates and provenance (one row per case version)
+DEMO = "faers.demo"
+text = text_for(DEMO)
+case = (
+    read_genomics_bronze("faers_demo")
+    .select(
+        "quarter",
+        F.col("primaryid").alias("primary_id"),
+        text("caseid").alias("case_id"),
+        text("caseversion").alias("case_version"),
+        text("i_f_code").alias("initial_or_followup"),
+        text("event_dt").alias("event_date_raw"),
+        text("mfr_dt").alias("manufacturer_date_raw"),
+        text("init_fda_dt").alias("initial_fda_date_raw"),
+        text("fda_dt").alias("fda_date_raw"),
+        text("rept_dt").alias("report_date_raw"),
+        faers_date("event_dt").alias("event_date"),
+        faers_date("mfr_dt").alias("manufacturer_date"),
+        faers_date("init_fda_dt").alias("initial_fda_date"),
+        faers_date("fda_dt").alias("fda_date"),
+        faers_date("rept_dt").alias("report_date"),
+        text("rept_cod").alias("report_code"),
+        text("mfr_num").alias("manufacturer_number"),
+        text("mfr_sndr").alias("manufacturer_sender"),
+        typed_number("age", "double", RULES, f"{DEMO}.age").alias("age"),
+        text("age_cod").alias("age_unit"),
+        text("age_grp").alias("age_group"),
+        text("sex").alias("sex"),
+        text("e_sub").alias("electronic_submission"),
+        typed_number("wt", "double", RULES, f"{DEMO}.wt").alias("weight"),
+        text("wt_cod").alias("weight_unit"),
+        text("occp_cod").alias("occupation_code"),
+        text("reporter_country").alias("reporter_country"),
+        text("occr_country").alias("occurrence_country"),
+    )
+    .distinct()
+    .withColumn("_srid", sha_key("quarter", "primary_id"))
+)
+case_ids = case.select("quarter", "primary_id", "case_id").distinct()
+case = conform_genomics(add_genomics_provenance(case, "_srid", RID), "faers_case")
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- faers_case
+write_inspect_export(
+    case,
+    "faers_case",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["quarter", "primary_id"],
+    extra_checks={
+        "quarters": lambda t: t.select("quarter").distinct().count(),
+        "dates_not_parsed": lambda t: t.filter(
+            F.col("event_date_raw").isNotNull() & F.col("event_date").isNull()
+        ).count(),
+        "case_ids_with_several_versions": lambda t: (
+            t.groupBy("case_id").count().filter(F.col("count") > 1).count()
+        ),
     },
 )
 
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__perturbation_expression",
-    "perturbation_expression",
-    blocks,
+# COMMAND ----------
+
+# DBTITLE 1,Build -- faers_case_drug
+# -- Read Silver -- drug ids and names
+xwalk = read_silver("entity_id_crosswalk")
+names = read_silver("entity_name")
+drug_map = entity_id_map(xwalk, "drug").unionByName(
+    term_map(
+        names,
+        "drug",
+        ("name", "generic_name", "trade_name", "synonym", "brand_mixture"),
+        "drug_name",
+    )
+)
+
+# -- Transform -- drug records, keys and provenance
+DRUG = "faers.drug"
+text = text_for(DRUG)
+drug = link_entities(
+    read_genomics_bronze("faers_drug"),
+    [
+        (F.upper(F.trim(text("drugname"))), "drug_name"),
+        (F.upper(F.trim(text("prod_ai"))), "drug_name"),
+    ],
+    drug_map,
+    "drug_key",
+    "drug_link_method",
+)
+case_drug = drug.select(
+    "quarter",
+    F.col("primaryid").alias("primary_id"),
+    text("caseid").alias("case_id"),
+    F.col("drug_seq").alias("drug_sequence"),
+    text("role_cod").alias("role_code"),
+    text("drugname").alias("drug_name"),
+    text("prod_ai").alias("active_ingredient"),
+    text("val_vbm").alias("drug_name_validation_code"),
+    text("route").alias("route"),
+    text("dose_vbm").alias("dose_verbatim_text"),
+    typed_number("cum_dose_chr", "double", RULES, f"{DRUG}.cum_dose_chr").alias(
+        "cumulative_dose"
+    ),
+    text("cum_dose_unit").alias("cumulative_dose_unit"),
+    text("dechal").alias("dechallenge"),
+    text("rechal").alias("rechallenge"),
+    text("lot_num").alias("lot_number"),
+    text("exp_dt").alias("expiry_date_raw"),
+    text("nda_num").alias("new_drug_application_number"),
+    typed_number("dose_amt", "double", RULES, f"{DRUG}.dose_amt").alias("dose_amount"),
+    text("dose_unit").alias("dose_unit"),
+    text("dose_form").alias("dose_form"),
+    text("dose_freq").alias("dose_frequency"),
+    "drug_key",
+    "drug_link_method",
+).distinct()
+# A drug sequence can hold several dose records; number them inside the sequence.
+SEQUENCE = ["quarter", "primary_id", "drug_sequence"]
+case_drug = (
+    within_group_ordinal(
+        case_drug, SEQUENCE, [c for c in case_drug.columns if c not in SEQUENCE]
+    )
+    .withColumnRenamed("_source_id_ordinal", "dose_record_number")
+    .drop("_source_id_disambiguated")
+    .withColumn("_srid", sha_key(*SEQUENCE, "dose_record_number"))
+)
+case_drug = conform_genomics(
+    add_genomics_provenance(case_drug, "_srid", RID), "faers_case_drug"
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- faers_case_drug
+write_inspect_export(
+    case_drug,
+    "faers_case_drug",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=[*SEQUENCE, "dose_record_number"],
+    extra_checks={
+        "drugs_without_a_drug_key": lambda t: t.filter(
+            F.col("drug_key").isNull()
+        ).count(),
+        "roles": lambda t: str(
+            {
+                r["role_code"]: r["count"]
+                for r in t.groupBy("role_code").count().collect()
+            }
+        ),
+    },
+    link_method_counts=True,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Build -- faers_case_item
+# -- Helpers -- one row per reaction, outcome, report source, indication or therapy
+none = F.lit(None).cast("string")
+
+
+def item(df, kind, dataset, value, drug_sequence=None, **extra):
+    """Rows in the columns of `faers_case_item`; a case-level item has no drug sequence."""
+    text_of = text_for(dataset)
+    return df.select(
+        "quarter",
+        F.col("primaryid").alias("primary_id"),
+        (drug_sequence if drug_sequence is not None else none).alias("drug_sequence"),
+        F.lit(kind).alias("item_kind"),
+        (text_of(value) if value else none).alias("item_value"),
+        extra.get("drug_recurrence_action", none).alias("drug_recurrence_action"),
+        extra.get("therapy_start_date_raw", none).alias("therapy_start_date_raw"),
+        extra.get("therapy_end_date_raw", none).alias("therapy_end_date_raw"),
+        extra.get("therapy_duration", none).alias("therapy_duration"),
+        extra.get("therapy_duration_unit", none).alias("therapy_duration_unit"),
+    )
+
+
+# -- Transform -- case-level items (no drug sequence)
+reac = read_genomics_bronze("faers_reac")
+reactions = item(
+    reac,
+    "reaction",
+    "faers.reac",
+    "pt",
+    drug_recurrence_action=source_text("drug_rec_act", "faers.reac"),
+)
+outcomes = item(read_genomics_bronze("faers_outc"), "outcome", "faers.outc", "outc_cod")
+report_sources = item(
+    read_genomics_bronze("faers_rpsr"), "report_source", "faers.rpsr", "rpsr_cod"
+)
+
+# -- Transform -- drug-sequence items
+indications = item(
+    read_genomics_bronze("faers_indi"),
+    "indication",
+    "faers.indi",
+    "indi_pt",
+    drug_sequence=F.col("indi_drug_seq"),
+)
+therapies = item(
+    read_genomics_bronze("faers_ther"),
+    "therapy",
+    "faers.ther",
+    None,
+    drug_sequence=F.col("dsg_drug_seq"),
+    therapy_start_date_raw=source_text("start_dt", "faers.ther"),
+    therapy_end_date_raw=source_text("end_dt", "faers.ther"),
+    therapy_duration=source_text("dur", "faers.ther"),
+    therapy_duration_unit=source_text("dur_cod", "faers.ther"),
+)
+
+# -- Transform -- union, case id and provenance
+case_items = (
+    _union([reactions, outcomes, report_sources, indications, therapies])
+    .distinct()
+    .join(case_ids, ["quarter", "primary_id"], "left")
+    .withColumn(
+        "_srid",
+        sha_key(
+            "quarter",
+            "primary_id",
+            "drug_sequence",
+            "item_kind",
+            "item_value",
+            "drug_recurrence_action",
+            "therapy_start_date_raw",
+            "therapy_end_date_raw",
+            "therapy_duration",
+            "therapy_duration_unit",
+        ),
+    )
+)
+case_items = conform_genomics(
+    add_genomics_provenance(case_items, "_srid", RID), "faers_case_item"
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- faers_case_item
+write_inspect_export(
+    case_items,
+    "faers_case_item",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["source_record_id"],
+    extra_checks={
+        "items_by_kind": lambda t: str(
+            {
+                r["item_kind"]: r["count"]
+                for r in t.groupBy("item_kind").count().collect()
+            }
+        ),
+        "items_without_a_case_id": lambda t: t.filter(
+            F.col("case_id").isNull()
+        ).count(),
+        "items_without_a_value": lambda t: t.filter(
+            (F.col("item_kind") != "therapy") & F.col("item_value").isNull()
+        ).count(),
+    },
 )

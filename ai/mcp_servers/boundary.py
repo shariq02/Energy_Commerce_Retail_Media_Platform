@@ -54,7 +54,7 @@ CHECKS = {
         ),
         "refused": (
             ("quality", "quarantine"),
-            ("energy_silver", "electricity_balance"),
+            ("energy_silver", "energy_component"),
             ("energy_gold", "capacity_plan"),
             ("commerce_analytics", "ga4_demand_daily"),
             ("ml_models", "model_registry"),
@@ -69,7 +69,7 @@ CHECKS = {
         ),
         "refused": (
             ("quality", "quarantine"),
-            ("commerce_silver", "ga4_event"),
+            ("commerce_silver", "commerce_event"),
             ("commerce_gold", "ga4_session"),
             ("energy_analytics", "market_price_daily"),
             ("ml_models", "model_registry"),
