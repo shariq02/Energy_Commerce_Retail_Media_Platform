@@ -838,6 +838,7 @@ def crosswalk_all(rules):
             cell_line_crosswalk(rules),
             test_crosswalk(rules),
             drug_crosswalk(rules),
+            variant_crosswalk(rules),
         ]
     )
 

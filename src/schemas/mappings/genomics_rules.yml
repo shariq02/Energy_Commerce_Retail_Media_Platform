@@ -24,6 +24,7 @@ crosswalk_method_precedence:
   - ids_via_medgen
   - ids_via_chembl
   - ids_via_pubchem
+  - rsid_via_other_source
   - keyword
   # 3. list or alias
   - pharmgkb_list

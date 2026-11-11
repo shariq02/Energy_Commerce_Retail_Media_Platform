@@ -58,7 +58,11 @@ for entity_type in MASTER_FIELDS:
     conflict_frames.append(conflicts.withColumn("entity_type", F.lit(entity_type)))
 master = _union(frames)
 master_conflicts = _union(conflict_frames)
-master_keys = xwalk.select("entity_type", "entity_key").distinct()
+master_keys = (
+    xwalk.filter(F.col("entity_type").isin(*MASTER_FIELDS))
+    .select("entity_type", "entity_key")
+    .distinct()
+)
 
 # COMMAND ----------
 
