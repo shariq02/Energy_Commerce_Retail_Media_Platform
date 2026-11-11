@@ -2400,15 +2400,15 @@ _Generated: 2026-11-11T15:41Z_
 <!-- BEGIN genomics:05_relations_and_expression__entity_relation -->
 ## entity_relation
 
-_Generated: 2026-11-11T15:44Z_
+_Generated: 2026-11-11T17:23Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| distinct:relation_kind | approx_distinct | 6.0 |  | INFO | INFO |  |
-| distinct:relation_subkind | approx_distinct | 18.0 |  | INFO | INFO |  |
-| distinct:source_dataset | approx_distinct | 17.0 |  | INFO | INFO |  |
+| distinct:relation_kind | approx_distinct | 7.0 |  | INFO | INFO |  |
+| distinct:relation_subkind | approx_distinct | 24.0 |  | INFO | INFO |  |
+| distinct:source_dataset | approx_distinct | 18.0 |  | INFO | INFO |  |
 | distinct:gene_key | approx_distinct | 23650.0 |  | INFO | INFO |  |
 | distinct:disease_key | approx_distinct | 30570.0 |  | INFO | INFO |  |
 | distinct:source_gene_id | approx_distinct | 46942.0 |  | INFO | INFO |  |
@@ -2435,8 +2435,8 @@ _Generated: 2026-11-11T15:44Z_
 | distinct:labeling_sections | approx_distinct | 134.0 |  | INFO | INFO |  |
 | distinct:therapeutic_area | approx_distinct | 34.0 |  | INFO | INFO |  |
 | distinct:pubmed_id | approx_distinct | 9353.0 |  | INFO | INFO |  |
-| distinct:subject_type | approx_distinct | 11.0 |  | INFO | INFO |  |
-| distinct:subject_id | approx_distinct | 27469.0 |  | INFO | INFO |  |
+| distinct:subject_type | approx_distinct | 12.0 |  | INFO | INFO |  |
+| distinct:subject_id | approx_distinct | 28977.0 |  | INFO | INFO |  |
 | distinct:subject_name | approx_distinct | 43901.0 |  | INFO | INFO |  |
 | distinct:subject_key | approx_distinct | 15731.0 |  | INFO | INFO |  |
 | distinct:subject_source_id | approx_distinct | 17909.0 |  | INFO | INFO |  |
@@ -2459,10 +2459,10 @@ _Generated: 2026-11-11T15:44Z_
 | distinct:phenotype_evidence | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:reference | approx_distinct | 22624.0 |  | INFO | INFO |  |
 | distinct:biocuration | approx_distinct | 12053.0 |  | INFO | INFO |  |
-| distinct:member_type | approx_distinct | 2.0 |  | INFO | INFO |  |
+| distinct:member_type | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:member_key | approx_distinct | 22804.0 |  | INFO | INFO |  |
-| distinct:member_id_type | approx_distinct | 2.0 |  | INFO | INFO |  |
-| distinct:member_id | approx_distinct | 24105.0 |  | INFO | INFO |  |
+| distinct:member_id_type | approx_distinct | 3.0 |  | INFO | INFO |  |
+| distinct:member_id | approx_distinct | 25773.0 |  | INFO | INFO |  |
 | distinct:member_link_method | approx_distinct | 3.0 |  | INFO | INFO |  |
 | distinct:pathway_key | approx_distinct | 2766.0 |  | INFO | INFO |  |
 | distinct:pathway_evidence | approx_distinct | 2.0 |  | INFO | INFO |  |
@@ -2497,6 +2497,7 @@ _Generated: 2026-11-11T15:44Z_
 | distinct:ontology_term_ids | approx_distinct | 1049.0 |  | INFO | INFO |  |
 | distinct:ontology_term_names | approx_distinct | 902.0 |  | INFO | INFO |  |
 | distinct:ontology_term_categories | approx_distinct | 157.0 |  | INFO | INFO |  |
+| distinct:variation_interpreted | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -2509,94 +2510,95 @@ _Generated: 2026-11-11T15:44Z_
 | null_rate:relation_kind | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:relation_subkind | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:gene_key | null_rate | 0.7475580161408968 |  | INFO | INFO |  |
-| null_rate:disease_key | null_rate | 0.748896341835284 |  | INFO | INFO |  |
-| null_rate:source_gene_id | null_rate | 0.7595032651255574 |  | INFO | INFO |  |
-| null_rate:source_disease_id | null_rate | 0.761729193534507 |  | INFO | INFO |  |
-| null_rate:gene_link_method | null_rate | 0.7455668233878247 |  | INFO | INFO |  |
-| null_rate:disease_link_method | null_rate | 0.74787303171809 |  | INFO | INFO |  |
-| null_rate:gene_disease_score | null_rate | 0.7642535692273164 |  | INFO | INFO |  |
-| null_rate:evidence_count | null_rate | 0.9375941061348521 |  | INFO | INFO |  |
-| null_rate:supporting_count | null_rate | 0.9862451009763903 |  | INFO | INFO |  |
-| null_rate:gene_disease_relation_type | null_rate | 0.9503067832064432 |  | INFO | INFO |  |
-| null_rate:classification | null_rate | 0.9996296659434207 |  | INFO | INFO |  |
-| null_rate:mode_of_inheritance | null_rate | 0.9997974199134209 |  | INFO | INFO |  |
-| null_rate:evaluation_date | null_rate | 0.8118440842935903 |  | INFO | INFO |  |
-| null_rate:study_id | null_rate | 0.8120118382635906 |  | INFO | INFO |  |
-| null_rate:aggregation_value | null_rate | 0.7642535692273164 |  | INFO | INFO |  |
-| null_rate:report_url | null_rate | 0.9997974199134209 |  | INFO | INFO |  |
-| null_rate:comment | null_rate | 0.9982676868302615 |  | INFO | INFO |  |
-| null_rate:drug_key | null_rate | 0.9977467121066645 |  | INFO | INFO |  |
-| null_rate:source_drug_id | null_rate | 0.9976937916697346 |  | INFO | INFO |  |
-| null_rate:drug_link_method | null_rate | 0.9976937916697346 |  | INFO | INFO |  |
-| null_rate:drug_gene_relation_type | null_rate | 0.9976937916697346 |  | INFO | INFO |  |
-| null_rate:relation_detail | null_rate | 0.9977454040835066 |  | INFO | INFO |  |
-| null_rate:evidence_level | null_rate | 0.9985636270697354 |  | INFO | INFO |  |
-| null_rate:labeling_sections | null_rate | 0.9999622853322807 |  | INFO | INFO |  |
-| null_rate:therapeutic_area | null_rate | 0.9999622853322807 |  | INFO | INFO |  |
-| null_rate:pubmed_id | null_rate | 0.9721289150563767 |  | INFO | INFO |  |
-| null_rate:subject_type | null_rate | 0.9404779701922232 |  | INFO | INFO |  |
-| null_rate:subject_id | null_rate | 0.9734742713752376 |  | INFO | INFO |  |
-| null_rate:subject_name | null_rate | 0.9404981355492408 |  | INFO | INFO |  |
-| null_rate:subject_key | null_rate | 0.9617463722386473 |  | INFO | INFO |  |
-| null_rate:subject_source_id | null_rate | 0.9670036988169857 |  | INFO | INFO |  |
-| null_rate:subject_link_method | null_rate | 0.9670036988169857 |  | INFO | INFO |  |
-| null_rate:object_type | null_rate | 0.9734742713752376 |  | INFO | INFO |  |
-| null_rate:object_id | null_rate | 0.9734742713752376 |  | INFO | INFO |  |
-| null_rate:object_name | null_rate | 0.9734742713752376 |  | INFO | INFO |  |
-| null_rate:object_key | null_rate | 0.9925898308066595 |  | INFO | INFO |  |
-| null_rate:pharmacogenomic_evidence | null_rate | 0.9734742713752376 |  | INFO | INFO |  |
-| null_rate:association | null_rate | 0.9734742713752376 |  | INFO | INFO |  |
+| null_rate:gene_key | null_rate | 0.7476066974871944 |  | INFO | INFO |  |
+| null_rate:disease_key | null_rate | 0.7489447650965533 |  | INFO | INFO |  |
+| null_rate:source_gene_id | null_rate | 0.7595496429294984 |  | INFO | INFO |  |
+| null_rate:source_disease_id | null_rate | 0.7617751420865856 |  | INFO | INFO |  |
+| null_rate:gene_link_method | null_rate | 0.7456158887191572 |  | INFO | INFO |  |
+| null_rate:disease_link_method | null_rate | 0.7479216523162421 |  | INFO | INFO |  |
+| null_rate:gene_disease_score | null_rate | 0.7642990309744452 |  | INFO | INFO |  |
+| null_rate:evidence_count | null_rate | 0.9376061405947459 |  | INFO | INFO |  |
+| null_rate:supporting_count | null_rate | 0.9862477534947726 |  | INFO | INFO |  |
+| null_rate:gene_disease_relation_type | null_rate | 0.9503163661318283 |  | INFO | INFO |  |
+| null_rate:classification | null_rate | 0.9996297373592771 |  | INFO | INFO |  |
+| null_rate:mode_of_inheritance | null_rate | 0.9997974589793132 |  | INFO | INFO |  |
+| null_rate:evaluation_date | null_rate | 0.8118803686039513 |  | INFO | INFO |  |
+| null_rate:study_id | null_rate | 0.8120480902239874 |  | INFO | INFO |  |
+| null_rate:aggregation_value | null_rate | 0.7642990309744452 |  | INFO | INFO |  |
+| null_rate:report_url | null_rate | 0.9997974589793132 |  | INFO | INFO |  |
+| null_rate:comment | null_rate | 0.9982680208925122 |  | INFO | INFO |  |
+| null_rate:drug_key | null_rate | 0.9977471466345769 |  | INFO | INFO |  |
+| null_rate:source_drug_id | null_rate | 0.9976942364029151 |  | INFO | INFO |  |
+| null_rate:drug_link_method | null_rate | 0.9976942364029151 |  | INFO | INFO |  |
+| null_rate:drug_gene_relation_type | null_rate | 0.9976942364029151 |  | INFO | INFO |  |
+| null_rate:relation_detail | null_rate | 0.9977458388636604 |  | INFO | INFO |  |
+| null_rate:evidence_level | null_rate | 0.9985639040623615 |  | INFO | INFO |  |
+| null_rate:labeling_sections | null_rate | 0.999962292605242 |  | INFO | INFO |  |
+| null_rate:therapeutic_area | null_rate | 0.999962292605242 |  | INFO | INFO |  |
+| null_rate:pubmed_id | null_rate | 0.9721342897643277 |  | INFO | INFO |  |
+| null_rate:subject_type | null_rate | 0.9402966068030897 |  | INFO | INFO |  |
+| null_rate:subject_id | null_rate | 0.9732865449226393 |  | INFO | INFO |  |
+| null_rate:subject_name | null_rate | 0.9405096099911082 |  | INFO | INFO |  |
+| null_rate:subject_key | null_rate | 0.9617537491340105 |  | INFO | INFO |  |
+| null_rate:subject_source_id | null_rate | 0.9670100618804504 |  | INFO | INFO |  |
+| null_rate:subject_link_method | null_rate | 0.9670100618804504 |  | INFO | INFO |  |
+| null_rate:object_type | null_rate | 0.9734793866423624 |  | INFO | INFO |  |
+| null_rate:object_id | null_rate | 0.9734793866423624 |  | INFO | INFO |  |
+| null_rate:object_name | null_rate | 0.9734793866423624 |  | INFO | INFO |  |
+| null_rate:object_key | null_rate | 0.9925912597964301 |  | INFO | INFO |  |
+| null_rate:pharmacogenomic_evidence | null_rate | 0.9734793866423624 |  | INFO | INFO |  |
+| null_rate:association | null_rate | 0.9734793866423624 |  | INFO | INFO |  |
 | null_rate:pharmacokinetic | null_rate | 1.0 |  | INFO | INFO |  |
-| null_rate:pharmacodynamic | null_rate | 0.9860752214687585 |  | INFO | INFO |  |
-| null_rate:phenotype_key | null_rate | 0.9670036988169857 |  | INFO | INFO |  |
-| null_rate:is_negated | null_rate | 0.982584816172878 |  | INFO | INFO |  |
-| null_rate:frequency | null_rate | 0.973342760546904 |  | INFO | INFO |  |
-| null_rate:onset | null_rate | 0.9998338810589472 |  | INFO | INFO |  |
-| null_rate:sex | null_rate | 0.999965228384386 |  | INFO | INFO |  |
-| null_rate:modifier | null_rate | 0.99994408201 |  | INFO | INFO |  |
-| null_rate:aspect | null_rate | 0.984378933436827 |  | INFO | INFO |  |
-| null_rate:phenotype_evidence | null_rate | 0.984378933436827 |  | INFO | INFO |  |
-| null_rate:reference | null_rate | 0.984378933436827 |  | INFO | INFO |  |
-| null_rate:biocuration | null_rate | 0.984378933436827 |  | INFO | INFO |  |
-| null_rate:member_type | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:member_key | null_rate | 0.9831294443152468 |  | INFO | INFO |  |
-| null_rate:member_id_type | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:member_id | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:member_link_method | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:pathway_key | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:pathway_evidence | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:species | null_rate | 0.9825444309578779 |  | INFO | INFO |  |
-| null_rate:interaction_id | null_rate | 0.9214411646550996 |  | INFO | INFO |  |
-| null_rate:interactor_a_id | null_rate | 0.33141077546207415 |  | INFO | INFO |  |
-| null_rate:interactor_b_id | null_rate | 0.33141077546207415 |  | INFO | INFO |  |
-| null_rate:protein_a_key | null_rate | 0.3354835780690079 |  | INFO | INFO |  |
-| null_rate:protein_b_key | null_rate | 0.3327874698357597 |  | INFO | INFO |  |
-| null_rate:gene_a_key | null_rate | 0.9269120260139646 |  | INFO | INFO |  |
-| null_rate:gene_b_key | null_rate | 0.9222461984078197 |  | INFO | INFO |  |
-| null_rate:experimental_system | null_rate | 0.9214411646550996 |  | INFO | INFO |  |
-| null_rate:experimental_system_type | null_rate | 0.9214411646550996 |  | INFO | INFO |  |
-| null_rate:throughput | null_rate | 0.9214411646550996 |  | INFO | INFO |  |
-| null_rate:interaction_score | null_rate | 0.9756874465583976 |  | INFO | INFO |  |
-| null_rate:channel_neighborhood_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:channel_fusion_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:channel_cooccurence_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:channel_coexpression_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:channel_experimental_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:channel_database_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:channel_textmining_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:combined_score | null_rate | 0.4099696108069745 |  | INFO | INFO |  |
-| null_rate:author | null_rate | 0.9214416006628189 |  | INFO | INFO |  |
-| null_rate:publication_source | null_rate | 0.9214411646550996 |  | INFO | INFO |  |
-| null_rate:modification | null_rate | 0.9991266220372799 |  | INFO | INFO |  |
-| null_rate:qualifications | null_rate | 0.9502955560076713 |  | INFO | INFO |  |
+| null_rate:pharmacodynamic | null_rate | 0.9860779067469972 |  | INFO | INFO |  |
+| null_rate:phenotype_key | null_rate | 0.9670100618804504 |  | INFO | INFO |  |
+| null_rate:is_negated | null_rate | 0.9825881745468764 |  | INFO | INFO |  |
+| null_rate:frequency | null_rate | 0.9733479011748033 |  | INFO | INFO |  |
+| null_rate:onset | null_rate | 0.9998339130936095 |  | INFO | INFO |  |
+| null_rate:sex | null_rate | 0.9999652350898041 |  | INFO | INFO |  |
+| null_rate:modifier | null_rate | 0.9999440927933213 |  | INFO | INFO |  |
+| null_rate:aspect | null_rate | 0.984381945830167 |  | INFO | INFO |  |
+| null_rate:phenotype_evidence | null_rate | 0.984381945830167 |  | INFO | INFO |  |
+| null_rate:reference | null_rate | 0.984381945830167 |  | INFO | INFO |  |
+| null_rate:biocuration | null_rate | 0.984381945830167 |  | INFO | INFO |  |
+| null_rate:member_type | null_rate | 0.9823549554001076 |  | INFO | INFO |  |
+| null_rate:member_key | null_rate | 0.9831326976622178 |  | INFO | INFO |  |
+| null_rate:member_id_type | null_rate | 0.9823549554001076 |  | INFO | INFO |  |
+| null_rate:member_id | null_rate | 0.9823549554001076 |  | INFO | INFO |  |
+| null_rate:member_link_method | null_rate | 0.9823549554001076 |  | INFO | INFO |  |
+| null_rate:pathway_key | null_rate | 0.9825477971198308 |  | INFO | INFO |  |
+| null_rate:pathway_evidence | null_rate | 0.9825477971198308 |  | INFO | INFO |  |
+| null_rate:species | null_rate | 0.9825477971198308 |  | INFO | INFO |  |
+| null_rate:interaction_id | null_rate | 0.921456314076007 |  | INFO | INFO |  |
+| null_rate:interactor_a_id | null_rate | 0.33153970735792243 |  | INFO | INFO |  |
+| null_rate:interactor_b_id | null_rate | 0.33153970735792243 |  | INFO | INFO |  |
+| null_rate:protein_a_key | null_rate | 0.33561172455859734 |  | INFO | INFO |  |
+| null_rate:protein_b_key | null_rate | 0.3329161362474974 |  | INFO | INFO |  |
+| null_rate:gene_a_key | null_rate | 0.9269261204245591 |  | INFO | INFO |  |
+| null_rate:gene_b_key | null_rate | 0.9222611925846338 |  | INFO | INFO |  |
+| null_rate:experimental_system | null_rate | 0.921456314076007 |  | INFO | INFO |  |
+| null_rate:experimental_system_type | null_rate | 0.921456314076007 |  | INFO | INFO |  |
+| null_rate:throughput | null_rate | 0.921456314076007 |  | INFO | INFO |  |
+| null_rate:interaction_score | null_rate | 0.9756921350330141 |  | INFO | INFO |  |
+| null_rate:channel_neighborhood_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:channel_fusion_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:channel_cooccurence_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:channel_coexpression_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:channel_experimental_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:channel_database_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:channel_textmining_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:combined_score | null_rate | 0.4100833932819154 |  | INFO | INFO |  |
+| null_rate:author | null_rate | 0.9214567499996458 |  | INFO | INFO |  |
+| null_rate:publication_source | null_rate | 0.921456314076007 |  | INFO | INFO |  |
+| null_rate:modification | null_rate | 0.9991267904609882 |  | INFO | INFO |  |
+| null_rate:qualifications | null_rate | 0.9503051410981287 |  | INFO | INFO |  |
 | null_rate:tags | null_rate | 1.0 |  | INFO | INFO |  |
-| null_rate:source_database | null_rate | 0.9214411646550996 |  | INFO | INFO |  |
-| null_rate:organism_a | null_rate | 0.33141077546207415 |  | INFO | INFO |  |
-| null_rate:organism_b | null_rate | 0.33141077546207415 |  | INFO | INFO |  |
-| null_rate:ontology_term_ids | null_rate | 0.9960511870882418 |  | INFO | INFO |  |
-| null_rate:ontology_term_names | null_rate | 0.9960511870882418 |  | INFO | INFO |  |
-| null_rate:ontology_term_categories | null_rate | 0.9960511870882418 |  | INFO | INFO |  |
+| null_rate:source_database | null_rate | 0.921456314076007 |  | INFO | INFO |  |
+| null_rate:organism_a | null_rate | 0.33153970735792243 |  | INFO | INFO |  |
+| null_rate:organism_b | null_rate | 0.33153970735792243 |  | INFO | INFO |  |
+| null_rate:ontology_term_ids | null_rate | 0.9960519485841146 |  | INFO | INFO |  |
+| null_rate:ontology_term_names | null_rate | 0.9960519485841146 |  | INFO | INFO |  |
+| null_rate:ontology_term_categories | null_rate | 0.9960519485841146 |  | INFO | INFO |  |
+| null_rate:variation_interpreted | null_rate | 0.9998071582802769 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
@@ -2673,14 +2675,14 @@ _Generated: 2026-11-11T15:44Z_
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
-| column_count | count | 96.0 |  | INFO | INFO |  |
+| column_count | count | 97.0 |  | INFO | INFO |  |
 
 ### transformation_specific
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| kinds | value |  |  | INFO | INFO | {'protein_interaction': 12267475, 'gene_disease': 4626101, 'pathway_member': 320280, 'pharmacogenomic': 486702, 'phenotype': 605426, 'drug_gene': 42315} |
-| subkinds | value |  |  | INFO | INFO | {'protein_interaction.string': 10826054, 'protein_interaction.biogrid': 1441421, 'gene_disease.clingen_dosage': 3078, 'gene_disease.clingen_validity': 3717, 'gene_disease.clinvar_variant_condition': 252379, 'gene_disease.hpo_gene_disease': 12673, 'gene_disease.opentargets_datasource': 440000, 'gene_disease.opentargets_overall': 440000, 'gene_disease.omim_gene_link': 28708, 'gene_disease.opentargets_gwas_credible_set': 3445546, 'drug_gene.cpic_pair': 632, 'pharmacogenomic.pharmgkb_relationship': 486702, 'drug_gene.tahoe_target': 550, 'phenotype.gene': 318806, 'drug_gene.opentargets_mechanism': 14718, 'pathway_member.reactome_pathway_mapping': 320280, 'phenotype.disease': 286620, 'drug_gene.fda_label_biomarker': 692, 'drug_gene.pharmgkb_relationship': 25723} |
+| kinds | value |  |  | INFO | INFO | {'protein_interaction': 12267475, 'gene_disease': 4626101, 'pathway_member': 320280, 'pharmacogenomic': 486702, 'phenotype': 605426, 'drug_gene': 42315, 'variation_member': 3539} |
+| subkinds | value |  |  | INFO | INFO | {'protein_interaction.string': 10826054, 'protein_interaction.biogrid': 1441421, 'gene_disease.clingen_dosage': 3078, 'gene_disease.clingen_validity': 3717, 'gene_disease.clinvar_variant_condition': 252379, 'gene_disease.hpo_gene_disease': 12673, 'gene_disease.opentargets_datasource': 440000, 'gene_disease.opentargets_overall': 440000, 'gene_disease.omim_gene_link': 28708, 'gene_disease.opentargets_gwas_credible_set': 3445546, 'drug_gene.cpic_pair': 632, 'pharmacogenomic.pharmgkb_relationship': 486702, 'variation_member.Distinct chromosomes': 2, 'drug_gene.tahoe_target': 550, 'phenotype.gene': 318806, 'variation_member.Phase unknown': 23, 'drug_gene.opentargets_mechanism': 14718, 'pathway_member.reactome_pathway_mapping': 320280, 'variation_member.Diplotype': 1461, 'variation_member.CompoundHeterozygote': 609, 'variation_member.Haplotype': 1444, 'phenotype.disease': 286620, 'drug_gene.fda_label_biomarker': 692, 'drug_gene.pharmgkb_relationship': 25723} |
 | gene_disease_rows_without_a_gene_key | value | 36154.0 |  | INFO | INFO | 36154 |
 | gene_disease_rows_without_a_disease_key | value | 18776.0 |  | INFO | INFO | 18776 |
 | drug_gene_rows_without_a_drug_key | value | 971.0 |  | INFO | INFO | 971 |
@@ -2690,19 +2692,21 @@ _Generated: 2026-11-11T15:44Z_
 | negated_phenotype_annotations | value | 733.0 |  | INFO | INFO | 733 |
 | pathway_members_without_a_key | value | 10734.0 |  | INFO | INFO | 10734 |
 | interactions_without_a_protein_key | value | 99541.0 |  | INFO | INFO | 99541 |
+| variation_members_without_a_key | value | 3539.0 |  | INFO | INFO | 3539 |
+| variation_allele_pairs_without_a_coordinate | value | 70371.0 |  | INFO | INFO | 70371 |
 
 ### volume
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 18348299.0 |  | INFO | INFO |  |
+| row_count | rows | 18351838.0 |  | INFO | INFO |  |
 
 <!-- END genomics:05_relations_and_expression__entity_relation -->
 
 <!-- BEGIN genomics:05_relations_and_expression__gene_expression_median -->
 ## gene_expression_median
 
-_Generated: 2026-11-11T15:44Z_
+_Generated: 2026-11-11T17:24Z_
 
 ### cardinality
 
@@ -3587,7 +3591,7 @@ _Generated: 2026-11-11T15:45Z_
 <!-- BEGIN genomics:07_derived_attributes__entity_derived_attribute -->
 ## entity_derived_attribute
 
-_Generated: 2026-11-11T15:56Z_
+_Generated: 2026-11-11T17:32Z_
 
 ### cardinality
 
