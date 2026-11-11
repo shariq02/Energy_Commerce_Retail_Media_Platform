@@ -584,6 +584,7 @@ def test_the_flat_relation_table_names_its_kinds_and_publications(genomics):
     columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["entity_relation"]}
     assert {"relation_kind", "relation_subkind", "pubmed_id"} <= columns
     assert {f"channel_{c}_score" for c in genomics["STRING_CHANNELS"]} <= columns
+    assert {"subject_id", "member_id", "member_key", "variation_interpreted"} <= columns
 
 
 def test_every_variant_source_has_a_flag_column(genomics):

@@ -42,7 +42,7 @@ FINDINGS_SUBDIR = "src/inventory"
 # "retire": drop a Bronze layer after its Silver successor is checked.
 # "fresh": drop the tables of the six Silver schemas (the schemas stay) before a
 # rebuild from Bronze; the Bronze schemas must hold tables first.
-MODE = "retire"  # "fresh"
+MODE = "fresh"  # "retire"
 
 # name -> schemas to drop, and the schemas that must hold the data before the drop
 RETIREMENTS_BY_MODE = {

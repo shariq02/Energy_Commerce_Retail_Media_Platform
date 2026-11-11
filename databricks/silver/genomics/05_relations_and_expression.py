@@ -13,8 +13,9 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** the relations between entities as one flat table (gene-disease,
-# MAGIC drug-gene, pharmacogenomic, phenotype, pathway-member and protein-interaction
-# MAGIC records) and the median gene expression per tissue.
+# MAGIC drug-gene, pharmacogenomic, phenotype, pathway-member, protein-interaction
+# MAGIC and ClinVar variation-member records) and the median gene expression per
+# MAGIC tissue.
 
 # COMMAND ----------
 
@@ -794,6 +795,65 @@ interaction = biogrid_rows.unionByName(string_rows)
 
 # COMMAND ----------
 
+# DBTITLE 1,Build -- entity_relation: ClinVar variation members
+# -- Read Silver -- id map
+xwalk = read_silver("entity_id_crosswalk")
+variant_map = entity_id_map(xwalk, "variant")
+
+# -- Transform -- complex variations (haplotype, diplotype, ...) and their alleles
+ALLELES = "clinvar.variation_allele"
+allele_text = text_for(ALLELES)
+SIMPLE_TYPES = ("Variant", "Haplotype, single variant")
+interpreted = F.lower(allele_text("Interpreted"))
+members = link_entities(
+    read_genomics_bronze("clinvar_variation_allele").filter(
+        ~allele_text("Type").isin(*SIMPLE_TYPES)
+    ),
+    [(allele_text("AlleleID"), "clinvar_allele")],
+    variant_map,
+    "variant_key",
+    "variant_method",
+)
+variation_member = relation_rows(
+    members,
+    "variation_member",
+    allele_text("Type"),
+    ALLELES,
+    subject_type=F.lit("clinvar_variation"),
+    subject_id=allele_text("VariationID"),
+    member_type=F.lit("variant"),
+    member_key=F.col("variant_key"),
+    member_id_type=F.lit("clinvar_allele"),
+    member_id=allele_text("AlleleID"),
+    member_link_method=F.col("variant_method"),
+    variation_interpreted=(
+        F.when(interpreted == "yes", True).when(interpreted == "no", False)
+    ),
+)
+
+# -- Check -- simple pairs that no ClinVar snapshot places (counted, not written)
+summary_text = text_for("clinvar.variant_summary")
+summary_pairs = (
+    read_genomics_bronze("clinvar_variant_summary")
+    .select(
+        summary_text("VariationID").alias("VariationID"),
+        summary_text("AlleleID").alias("AlleleID"),
+    )
+    .distinct()
+)
+unplaced_pairs = (
+    read_genomics_bronze("clinvar_variation_allele")
+    .filter(allele_text("Type").isin(*SIMPLE_TYPES))
+    .select(
+        allele_text("VariationID").alias("VariationID"),
+        allele_text("AlleleID").alias("AlleleID"),
+    )
+    .distinct()
+    .join(summary_pairs, ["VariationID", "AlleleID"], "left_anti")
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Build -- entity_relation: union and keys
 # -- Transform -- one flat table of all kinds
 KEY_COLUMNS = [
@@ -850,7 +910,17 @@ KEY_COLUMNS = [
     "combined_score",
 ]
 relation = (
-    _union([gene_disease, phenotype, drug_gene, pharmacogenomic, pathway, interaction])
+    _union(
+        [
+            gene_disease,
+            phenotype,
+            drug_gene,
+            pharmacogenomic,
+            pathway,
+            interaction,
+            variation_member,
+        ]
+    )
     .distinct()
     .withColumn("_srid", sha_key(*KEY_COLUMNS))
 )
@@ -913,6 +983,11 @@ write_inspect_export(
             (F.col("relation_kind") == "protein_interaction")
             & (F.col("protein_a_key").isNull() | F.col("protein_b_key").isNull())
         ).count(),
+        "variation_members_without_a_key": lambda t: t.filter(
+            (F.col("relation_kind") == "variation_member")
+            & F.col("member_key").isNull()
+        ).count(),
+        "variation_allele_pairs_without_a_coordinate": lambda t: unplaced_pairs.count(),
     },
 )
 

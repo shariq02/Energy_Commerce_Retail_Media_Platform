@@ -512,7 +512,8 @@ GENOMICS_STRUCTURES.update(
             *_number("int", "distinct_index_values", "distinct_mean_embedding_values"),
         ],
         # The flat typed union of the gene-disease, drug-gene, pharmacogenomic,
-        # phenotype, pathway-member and protein-interaction records; a row
+        # phenotype, pathway-member, protein-interaction and ClinVar
+        # variation-member records; a row
         # fills the columns of its own `relation_kind` and leaves the others
         # null. A name two kinds would share with a different meaning (score,
         # relation type, evidence) carries the kind. One row per publication
@@ -572,6 +573,8 @@ GENOMICS_STRUCTURES.update(
                 "ontology_term_names",
                 "ontology_term_categories",
             ),
+            # ClinVar variation member (a complex variation and one of its alleles)
+            ("variation_interpreted", "boolean"),
         ],
         "gene_expression_median": [
             *_text("gene_key", "gene_ensembl_id", "gene_symbol", "tissue_key"),
