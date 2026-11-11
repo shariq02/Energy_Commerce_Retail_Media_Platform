@@ -41,8 +41,10 @@ master = read_silver("entity_master")
 
 def master_of(entity_type, key):
     """The rows of one entity type, with the key under its own name."""
-    return master.filter(F.col("entity_type") == entity_type).withColumnRenamed(
-        "entity_key", key
+    return (
+        master.filter(F.col("entity_type") == entity_type)
+        .drop(key)
+        .withColumnRenamed("entity_key", key)
     )
 
 
