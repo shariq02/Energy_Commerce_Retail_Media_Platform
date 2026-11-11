@@ -120,10 +120,52 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/ml/**/*.py" = ["F821"]
 "databricks/models/**/*.py" = ["F821"]
 
-# Pytest config lives in pytest.ini only -- when both pytest.ini and
-# [tool.pytest.ini_options] exist, pytest uses pytest.ini and silently
-# ignores this section, so a duplicate copy here would drift unnoticed
-# (as this one already had). Do not re-add it.
+# Pytest config lives here only. Do not add a pytest.ini: when both exist,
+# pytest uses pytest.ini and silently ignores this section.
+[tool.pytest.ini_options]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+testpaths = ["tests"]
+minversion = "6.0"
+pythonpath = ["."]
+# --cov-fail-under is temporarily 0 -- no unit tests exist yet. Restore
+# to 75 once real unit tests are added under tests/unit/.
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "-p", "no:cacheprovider",
+    "--cov=src",
+    "--cov=fastapi",
+    "--cov=ai",
+    "--cov=scripts/knowledge",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=0",
+]
+markers = [
+    "unit: Unit tests (deselect with '-m \"not unit\"')",
+    "integration: Integration tests (deselect with '-m \"not integration\"')",
+    "slow: Slow tests (deselect with '-m \"not slow\"')",
+    "databricks: Databricks processing tests",
+    "bigquery: BigQuery acquisition tests",
+    "api: FastAPI endpoint tests",
+    "ai: AI agent, tool, and RAG evaluation tests",
+    "schema: Schema validation tests",
+    "data_quality: Data quality tests",
+    "data_flow: Data flow tests",
+    "regression: Regression tests",
+    "performance: Performance tests",
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
 
 [tool.databricks.environment]
 environment_version = '5'

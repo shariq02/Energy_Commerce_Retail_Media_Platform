@@ -1,12 +1,10 @@
-"""The Makefile commands that run the same on Windows, without make.
+"""Project commands that run the same on Windows, without make.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: November 2026
 
-Purpose: setup, test, lint and clean for a system without `make` (Windows). Each
-command runs what the Makefile target of the same name runs. The gcloud and grafana
-targets stay in the Makefile; they call their own programs.
+Purpose: setup, test, lint and clean for a system without `make` (Windows).
 
 Usage:
     python scripts/utilities/tasks.py <command>
