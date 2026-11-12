@@ -692,6 +692,47 @@ def test_clinvar_writes_minus_one_for_no_dbsnp_id_and_no_gene(rules):
     assert by_column["clinvar.variant_summary.GeneID"] == ["-1"]
 
 
+@pytest.mark.parametrize(
+    "column",
+    [
+        "dbvar.variants.QUAL",
+        "dbvar.variants.SVLEN",
+        "thousand_genomes.variants.QUAL",
+        "gencode.annotation.score",
+        "refseq.annotation.score",
+    ],
+)
+def test_the_vcf_and_gff_missing_value_is_a_placeholder(rules, column):
+    assert rules["placeholders"]["by_column"][column] == ["."]
+
+
+def test_the_gene_ages_none_text_is_a_placeholder(rules):
+    by_column = rules["placeholders"]["by_column"]
+    assert by_column["gene_ages.consensus.NodeError"] == ["None"]
+
+
+def test_proteingym_clinical_labels_map_to_one_and_zero(rules):
+    labels = rules["proteingym_clinical_label_numbers"]
+    assert labels == {"Pathogenic": 1, "Benign": 0}
+
+
+@pytest.mark.parametrize(
+    ("text", "is_number"),
+    [
+        ("12", True),
+        ("-1.5", True),
+        (".5", True),
+        ("5.", True),
+        ("1e-05", True),
+        ("1,013.39", False),
+        (".", False),
+        ("NaN", False),
+    ],
+)
+def test_the_number_text_pattern(genomics, text, is_number):
+    assert bool(re.fullmatch(genomics["NUMBER_TEXT"], text)) is is_number
+
+
 def test_alphamissense_genome_names_map_to_assembly_labels(rules):
     assert rules["ucsc_assembly_names"] == {"hg38": "GRCh38", "hg19": "GRCh37"}
 

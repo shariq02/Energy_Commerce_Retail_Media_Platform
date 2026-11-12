@@ -922,7 +922,7 @@ def mastr_structure(
     """One MaStR Bronze table as a Silver structure: decoded, renamed and typed
     by `mastr_standardise`, with the record id taken from `id_col`."""
     names = {**name_map, **MASTR_KEY_NAMES.get(bronze_table, {})}
-    out = mastr_standardise(df, names, coded_map)
+    out = mastr_standardise(df, names, coded_map, table=bronze_table)
     out = out.withColumn("_srid", F.col(names.get(id_col, id_col)).cast("string"))
     return add_semantic_provenance(out, "mastr", bronze_table, rid, "_srid")
 

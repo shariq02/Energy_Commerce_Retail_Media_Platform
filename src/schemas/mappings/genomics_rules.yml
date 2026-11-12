@@ -6,7 +6,7 @@
 # Read by databricks/silver/_genomics_common.py. Precedence entries are
 # "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
 
-version: 4
+version: 5
 
 # entity_id_crosswalk keeps one row per entity, id and source column. When one id is
 # found by several methods, the first method of this list wins; a method that is not in
@@ -67,6 +67,20 @@ placeholders:
     # ClinVar writes -1 where a variant has no dbSNP id or no gene.
     "clinvar.variant_summary.RS_dbSNP": ["-1"]
     "clinvar.variant_summary.GeneID": ["-1"]
+    # VCF and GFF write "." for a missing value.
+    "dbvar.variants.QUAL": ["."]
+    "dbvar.variants.SVLEN": ["."]
+    "thousand_genomes.variants.QUAL": ["."]
+    "gencode.annotation.score": ["."]
+    "refseq.annotation.score": ["."]
+    # The gene ages file writes the pandas text "None" for a missing node error.
+    "gene_ages.consensus.NodeError": ["None"]
+
+# ProteinGym clinical substitutions label each mutant in DMS_bin_score; the integer
+# label is 1 for pathogenic and 0 for benign (the text label is kept as well).
+proteingym_clinical_label_numbers:
+  Pathogenic: 1
+  Benign: 0
 
 # gene2refseq names the assembly in free text; the first matching pattern wins.
 assembly_labels:

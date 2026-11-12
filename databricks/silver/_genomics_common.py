@@ -1899,16 +1899,42 @@ def clean_placeholders(column, rules: dict, qualified: str | None = None):
     return F.when(text.isin(sorted(values)), F.lit(None).cast("string")).otherwise(text)
 
 
+def register_bronze_read(qualified: str, text, parsed) -> None:
+    """Register a lenient read of `<source>.<dataset>.<column>` (Bronze table
+    `<source>_<dataset>`) for the rejected-values check."""
+    dataset, column = qualified.rsplit(".", 1)
+    register_lenient(qualified, dataset.replace(".", "_"), text, parsed, column)
+
+
+NUMBER_TEXT = r"^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$"
+
+
 def typed_number(column, spark_type: str, rules: dict, qualified: str | None = None):
     """A cleaned text column as a number (`int`, `bigint` or `double`); null when
-    the text is no number. The cast goes through double, so `12.0` is read."""
+    the text is no number. The cast goes through double, so `12.0` and `.5` are
+    read."""
     text = clean_placeholders(column, rules, qualified)
-    number = text.rlike(r"^[-+]?\d+(\.\d+)?([eE][-+]?\d+)?$")
+    number = text.rlike(NUMBER_TEXT)
     value = text.cast("double")
     if spark_type == "double":
-        return F.when(number, value)
-    target = {"int": "int", "bigint": "long"}[spark_type]
-    return F.when(number, value.cast(target))
+        parsed = F.when(number, value)
+    else:
+        target = {"int": "int", "bigint": "long"}[spark_type]
+        parsed = F.when(number, value.cast(target))
+    if qualified:
+        register_bronze_read(qualified, text, parsed)
+    return parsed
+
+
+def label_number(column, labels: dict, rules: dict, qualified: str):
+    """An integer from a text label by the `labels` map; null for another label
+    (counted by the rejected-values check)."""
+    text = clean_placeholders(column, rules, qualified)
+    parsed = F.lit(None).cast("int")
+    for label, number in labels.items():
+        parsed = F.when(text == label, F.lit(int(number))).otherwise(parsed)
+    register_bronze_read(qualified, text, parsed)
+    return parsed
 
 
 def claims_frame(

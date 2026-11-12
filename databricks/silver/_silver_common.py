@@ -390,6 +390,84 @@ def parse_mess_datum_10min(colname: str, src_tz: str = "UTC"):
 
 # COMMAND ----------
 
+# DBTITLE 1,Rejected values of lenient parsers (findings check)
+# A lenient parser returns null for a text it cannot read. Each such read is
+# registered; the check counts rows with a source text but no parsed value.
+LENIENT_READS: list = []
+
+
+def register_lenient(label: str, source, text, parsed, column: str | None = None):
+    """Register a lenient read: `source` is the frame or a table name, `text` the
+    source text, `parsed` the parsed value, `column` the source column if known."""
+    LENIENT_READS.append((label, source, text, parsed, column))
+
+
+def _example(value, count) -> str:
+    return f"`{str(value)[:40].replace('|', '/')}` ({count})"
+
+
+def rejected_values_blocks(reader=None, examples: int = 5) -> list:
+    """Findings block of every registered read: rejected rows and up to `examples`
+    rejected texts; FAIL when a read rejects a row. `reader` opens a table name."""
+    open_table = reader or read_bronze
+    groups: dict = {}
+    for label, source, text, parsed, column in LENIENT_READS:
+        key = source if isinstance(source, str) else id(source)
+        groups.setdefault(key, (source, {}))[1][label] = (text, parsed, column)
+    lines = ["| read | rejected rows | examples | status |", "|---|---|---|---|"]
+    for source, reads in groups.values():
+        try:
+            frame = open_table(source) if isinstance(source, str) else source
+            columns = frame.columns  # resolves the table now
+        except Exception as exc:  # a table that cannot be read is a failed check
+            reason = (str(exc).splitlines() or [""])[0][:80].replace("|", "/")
+            print(f"FAIL  rejected values  {source}: {reason}")
+            lines += [f"| {label} | | {reason} | FAIL |" for label in reads]
+            continue
+        checks = {}
+        for label, (text, parsed, column) in reads.items():
+            if column is not None and column not in columns:
+                print(f"SKIP  rejected values  {label}: column not in {source}")
+                lines.append(f"| {label} | | column not in `{source}` | SKIP |")
+                continue
+            present = F.trim(text.cast("string"))
+            cond = present.isNotNull() & (present != "") & parsed.isNull()
+            checks[label] = (present, cond)
+        if not checks:
+            continue
+        counts = frame.agg(*[F.sum(c.cast("int")) for _, c in checks.values()]).first()
+        for position, (label, (present, cond)) in enumerate(checks.items()):
+            rejected = counts[position] or 0
+            shown = ""
+            if rejected:
+                top = (
+                    frame.filter(cond)
+                    .groupBy(present.alias("value"))
+                    .count()
+                    .orderBy(F.desc("count"))
+                    .limit(examples)
+                    .collect()
+                )
+                shown = ", ".join(_example(r["value"], r["count"]) for r in top)
+                print(f"FAIL  rejected values  {label}: {rejected} rows  {shown}")
+            status = "FAIL" if rejected else "PASS"
+            lines.append(f"| {label} | {rejected} | {shown} | {status} |")
+    if len(lines) == 2:
+        lines.append("| (no lenient read) | | | PASS |")
+    return [("rejected values", "\n".join(lines))]
+
+
+def export_rejected_values(findings: str, component: str, reader=None) -> None:
+    """Write the rejected-values check of a notebook to its findings file."""
+    name = component.split("/")[-1]
+    blocks = rejected_values_blocks(reader)
+    write_silver_findings(
+        findings, f"{name}__rejected_values", f"{name} -- rejected values", blocks
+    )
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Deterministic keys + within-group ordinal
 
 
@@ -1048,10 +1126,16 @@ def bundesland_ags(name_col):
 _MASTR_NUM_SUFFIX = ("_kw", "_m", "_km")
 _MASTR_NUM_EXACT = {"capacity_increase"}
 _MASTR_FLAG_COLS = ("FernsteuerbarkeitNb", "FernsteuerbarkeitDv")
+# Date columns whose English name has no date word.
+_MASTR_DATE_EXACT = {"biomethane_first_use"}
 
 
 def _is_mastr_date(col: str) -> bool:
-    return "_date" in col or col.endswith(("_at", "_deadline"))
+    if col.endswith("_not_available"):
+        return False
+    return (
+        "_date" in col or col.endswith(("_at", "_deadline")) or col in _MASTR_DATE_EXACT
+    )
 
 
 def untranslated_source_columns(columns) -> list:
@@ -1095,11 +1179,17 @@ def mastr_not_available(df: DataFrame, name_map: dict) -> DataFrame:
 
 
 def mastr_standardise(
-    df: DataFrame, name_map: dict, coded_map: dict, *, source: str = "mastr"
+    df: DataFrame,
+    name_map: dict,
+    coded_map: dict,
+    *,
+    source: str = "mastr",
+    table: str | None = None,
 ) -> DataFrame:
     """Decode every present coded column against its katalog category, apply the
     English business renames, then type the date / capacity / geometry /
-    coordinate columns. Column names come out aligned with the registry."""
+    coordinate columns. Column names come out aligned with the registry.
+    `table` names the Bronze table in the rejected-values check."""
     df = mastr_not_available(df, name_map)
     decoded = []
     for raw, category in coded_map.items():
@@ -1145,8 +1235,12 @@ def mastr_standardise(
         ),
     )
     df = apply_renames(df, name_map)
+    dates = [c for c in df.columns if _is_mastr_date(c)]
+    for c in dates:
+        parsed = parse_ts(c, GERMAN_TS_FORMATS, "Europe/Berlin")
+        register_lenient(f"{table or source}.{c}", df, F.col(c), parsed)
     for c in df.columns:
-        if _is_mastr_date(c):
+        if c in dates:
             df = df.withColumn(c, parse_ts(c, GERMAN_TS_FORMATS, "Europe/Berlin"))
         elif c.endswith(_MASTR_NUM_SUFFIX) or c in _MASTR_NUM_EXACT:
             df = df.withColumn(c, F.col(c).cast("double"))

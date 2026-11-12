@@ -419,14 +419,18 @@ def export_window():
     )
 
 
+def export_number(column):
+    """Double of a SMARD export value: "-" is null, "," is the thousands separator."""
+    text = F.trim(F.col(column))
+    return F.when(text != "-", F.regexp_replace(text, ",", "")).cast("double")
+
+
 bronze_balancing = read_bronze(BALANCING_TABLE)
 price_column = next(c for c in bronze_balancing.columns if c.startswith("Price_"))
 balancing = (
     bronze_balancing.select(
         *export_window(),
-        F.when(F.trim(F.col(price_column)) != "-", F.col(price_column))
-        .cast("double")
-        .alias("balancing_price_eur_per_mwh"),
+        export_number(price_column).alias("balancing_price_eur_per_mwh"),
     )
     .filter(F.col("timestamp_utc").isNotNull())
     .withColumn("region", F.lit("DE-LU"))
@@ -544,9 +548,7 @@ for column in bronze_exchanges.columns:
                 f"commercial_net_{direction}" if net else f"commercial_{direction}"
             ).alias("component_kind"),
             F.lit(column).alias("native_label"),
-            F.when(F.trim(F.col(column)) != "-", F.col(column))
-            .cast("double")
-            .alias("energy_mwh"),
+            export_number(column).alias("energy_mwh"),
         )
     )
 exchanges = (

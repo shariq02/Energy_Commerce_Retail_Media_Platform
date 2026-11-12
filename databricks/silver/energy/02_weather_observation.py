@@ -179,13 +179,15 @@ def dwd_frame(df, family, values, keep, dataset, *, qn_col, conflict_col, solar=
     product and the key-conflict flag."""
     code = strip_float_suffix(qn_col)
     parse = parse_mess_datum_10min if solar else parse_mess_datum
+    timestamp = parse("MESS_DATUM")
+    register_lenient(f"{dataset}.MESS_DATUM", df, F.col("MESS_DATUM"), timestamp)
     base = (
         df.withColumn("source_system", F.lit("dwd"))
         .withColumn("source_location_id", F.col("STATIONS_ID"))
         .withColumn("observation_timestamp_native", F.trim(F.col("MESS_DATUM")))
         .withColumn("time_basis", F.lit("utc"))
         .withColumn("utc_offset_hours", NO_NUMBER)
-        .withColumn("observation_timestamp_utc", parse("MESS_DATUM"))
+        .withColumn("observation_timestamp_utc", timestamp)
         .withColumn("interval_seconds", F.lit(3600))
         .withColumn(
             "interval_reference", F.lit("true_solar_time" if solar else "clock")
@@ -956,3 +958,8 @@ write_inspect_export(
         )
     ],
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient timestamp parser
+export_rejected_values(FINDINGS, COMPONENT)

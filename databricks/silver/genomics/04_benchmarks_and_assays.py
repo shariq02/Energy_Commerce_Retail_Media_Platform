@@ -155,6 +155,7 @@ parts.append(
     )
 )
 CLINICAL = "proteingym.clinical_substitutions"
+CLINICAL_LABELS = RULES["proteingym_clinical_label_numbers"]
 SINGLE = r"^([A-Z])(\d+)([A-Z])$"
 mutant = text("mutant", CLINICAL)
 parts.append(
@@ -164,7 +165,10 @@ parts.append(
         CLINICAL,
         protein_id=text("protein", CLINICAL),
         mutant=mutant,
-        label_integer=number("DMS_bin_score", "int", CLINICAL),
+        label=text("DMS_bin_score", CLINICAL),
+        label_integer=label_number(
+            "DMS_bin_score", CLINICAL_LABELS, RULES, f"{CLINICAL}.DMS_bin_score"
+        ),
         wild_type_aa=F.nullif(F.regexp_extract(mutant, SINGLE, 1), F.lit("")),
         protein_position=F.nullif(F.regexp_extract(mutant, SINGLE, 2), F.lit("")).cast(
             "int"
@@ -527,15 +531,16 @@ dms = read_genomics_bronze("proteingym_dms_substitutions").select(
     F.lit(DMS).alias("source_dataset"),
 )
 clinical_mutant = text("mutant", CLINICAL)
+clinical_label = label_number(
+    "DMS_bin_score", CLINICAL_LABELS, RULES, f"{CLINICAL}.DMS_bin_score"
+)
 clinical = read_genomics_bronze("proteingym_clinical_substitutions").select(
     F.lit("clinical").alias("assay_set"),
     text("protein", CLINICAL).alias("assay_id"),
     clinical_mutant.alias("mutant"),
     *[value.alias(name) for name, value in mutant_columns(clinical_mutant).items()],
     F.lit(None).cast("double").alias("scan_score"),
-    typed_number("DMS_bin_score", "int", RULES, f"{CLINICAL}.DMS_bin_score").alias(
-        "scan_score_binarized"
-    ),
+    clinical_label.alias("scan_score_binarized"),
     F.lit(CLINICAL).alias("source_dataset"),
 )
 mutant = dms.unionByName(clinical).filter(F.col("mutant").isNotNull())
@@ -592,3 +597,8 @@ write_silver_findings(
     "dms_assay_mutant",
     blocks,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient number reads
+export_rejected_values(FINDINGS, COMPONENT, read_genomics_bronze)

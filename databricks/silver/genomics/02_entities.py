@@ -690,3 +690,8 @@ write_inspect_export(
         "ontologies": lambda t: t.select("ontology").distinct().count(),
     },
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient number reads
+export_rejected_values(FINDINGS, COMPONENT, read_genomics_bronze)

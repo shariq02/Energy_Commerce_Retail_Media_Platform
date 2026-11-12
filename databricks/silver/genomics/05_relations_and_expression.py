@@ -1550,3 +1550,8 @@ write_inspect_export(
     },
     link_method_counts=True,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient number reads
+export_rejected_values(FINDINGS, COMPONENT, read_genomics_bronze)

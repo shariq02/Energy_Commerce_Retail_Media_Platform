@@ -103,21 +103,23 @@ ensure_utc_session()
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- DWD station coordinate periods (one row per station and validity)
-dwd_validity = (
+geography = (
     read_bronze("dwd_station_geography")
     .withColumn("source_location_id", strip_float_suffix("Stations_id"))
     .filter(F.col("source_location_id").isin(STATION_IDS))
-    .select(
-        "source_location_id",
-        F.col("Stationsname").alias("name"),
-        F.col("`Geogr.Breite`").cast("double").alias("latitude"),
-        F.col("`Geogr.Laenge`").cast("double").alias("longitude"),
-        F.col("Stationshoehe").cast("double").alias("elevation_m"),
-        F.to_date(parse_ts("von_datum", ("yyyyMMdd",), "UTC")).alias("valid_from"),
-        F.to_date(parse_ts("bis_datum", ("yyyyMMdd",), "UTC")).alias("valid_to"),
-    )
-    .withColumn("location_key", location_key("dwd", "source_location_id"))
 )
+for _c in ("von_datum", "bis_datum"):
+    _day = parse_ts(_c, DAY, "UTC")
+    register_lenient(f"dwd_station_geography.{_c}", geography, F.col(_c), _day)
+dwd_validity = geography.select(
+    "source_location_id",
+    F.col("Stationsname").alias("name"),
+    F.col("`Geogr.Breite`").cast("double").alias("latitude"),
+    F.col("`Geogr.Laenge`").cast("double").alias("longitude"),
+    F.col("Stationshoehe").cast("double").alias("elevation_m"),
+    F.to_date(parse_ts("von_datum", DAY, "UTC")).alias("valid_from"),
+    F.to_date(parse_ts("bis_datum", DAY, "UTC")).alias("valid_to"),
+).withColumn("location_key", location_key("dwd", "source_location_id"))
 # Relocations can share a start date (2-17 rows): ordinal, never a drop.
 dwd_validity = within_group_ordinal(
     dwd_validity,
@@ -264,6 +266,9 @@ def station_period(df, kind, bronze_table, content_cols, extra_key=()):
     """Real stations only, business names, validity as dates and a record_ordinal
     where several rows share one key; `kind` is the `period_kind`."""
     df = rename_meta(keep_real_stations(df, "Stations_ID", bronze_table), bronze_table)
+    for column in ("valid_from", "valid_to"):
+        day = parse_ts(column, DAY, "UTC")
+        register_lenient(f"{bronze_table}.{column}", df, F.col(column), day)
     df = (
         df.withColumn("valid_from", F.to_date(parse_ts("valid_from", DAY, "UTC")))
         .withColumn("valid_to", F.to_date(parse_ts("valid_to", DAY, "UTC")))
@@ -398,6 +403,9 @@ missing = rename_meta(
     ),
     "dwd_missing_value_periods",
 )
+for _c in ("valid_from", "valid_to"):
+    _gap = parse_ts(_c, _gap_format, "UTC")
+    register_lenient(f"dwd_missing_value_periods.{_c}", missing, F.col(_c), _gap)
 missing = (
     missing.withColumn(
         "gap_start_timestamp", parse_ts("valid_from", _gap_format, "UTC")
@@ -456,10 +464,12 @@ for _t in MEASUREMENT_TABLES:
     _value_cols = [c for c in DWD_TABLES[_t]["values"] if c in DWD_CODES]
     if not _value_cols:
         continue
+    _ts = parse_mess_datum("MESS_DATUM")
+    register_lenient(f"{_t}.MESS_DATUM", _df, F.col("MESS_DATUM"), _ts)
     _clean = (
         strip_sentinels(_df, _value_cols)
         .withColumn("source_location_id", strip_float_suffix("STATIONS_ID"))
-        .withColumn("_ts", parse_mess_datum("MESS_DATUM"))
+        .withColumn("_ts", _ts)
     )
     _missing_parts.append(
         _clean.select(
@@ -547,3 +557,8 @@ write_inspect_export(
         }
     },
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient date parsers
+export_rejected_values(FINDINGS, COMPONENT)

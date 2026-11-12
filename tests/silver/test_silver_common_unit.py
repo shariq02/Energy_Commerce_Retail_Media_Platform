@@ -144,3 +144,14 @@ def test_mastr_not_available_name_uses_the_english_field(silver):
     assert name("Hausnummer_nv", {"Hausnummer": "house_number"}) == (
         "house_number_not_available"
     )
+
+
+def test_a_not_available_flag_is_no_mastr_date(silver):
+    is_date = silver["_is_mastr_date"]
+    assert not is_date("water_rights_expiry_date_not_available")
+    assert is_date("water_rights_expiry_date")
+    assert is_date("authorisation_deadline")
+
+
+def test_biomethane_first_use_is_a_mastr_date(silver):
+    assert silver["_is_mastr_date"]("biomethane_first_use")

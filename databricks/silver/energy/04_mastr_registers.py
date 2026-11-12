@@ -147,7 +147,9 @@ write_inspect_export(
 units = None
 for unit_type in UNIT_TYPES:
     bt = f"mastr_einheiten_{unit_type}"
-    df = _drop_structural_constants(mastr_standardise(read_bronze(bt), NAME_MAP, CODED))
+    df = _drop_structural_constants(
+        mastr_standardise(read_bronze(bt), NAME_MAP, CODED, table=bt)
+    )
     quarantine_out_of_bbox(df, bt)
     df = (
         attach_ags_prefix(df, "source_municipality_key")
@@ -182,7 +184,7 @@ generation_unit = write_inspect_export(
 # DBTITLE 1,Transform -- support_registration (EEG and KWK in one table)
 registrations = None
 for bt, (scheme, unit_type, id_col) in SUPPORT.items():
-    df = mastr_standardise(read_bronze(bt), NAME_MAP, CODED)
+    df = mastr_standardise(read_bronze(bt), NAME_MAP, CODED, table=bt)
     df = (
         df.withColumn(
             "support_registration_id",
@@ -262,7 +264,9 @@ grid_location = locations.join(conflict, "location_id", "left")
 # DBTITLE 1,Transform -- balancing_area (Id not unique: ordinal, never a drop)
 _names = {**NAME_MAP, **MASTR_KEY_NAMES[BALANCING_BT]}
 _id = _names["Id"]
-areas = mastr_standardise(read_bronze(BALANCING_BT).dropDuplicates(), _names, CODED)
+areas = mastr_standardise(
+    read_bronze(BALANCING_BT).dropDuplicates(), _names, CODED, table=BALANCING_BT
+)
 areas = within_group_ordinal(
     areas,
     [_id],
@@ -309,7 +313,7 @@ write_inspect_export(
 # DBTITLE 1,Transform -- register_change_event (deletions and grid-operator changes)
 events = []
 for kind, (bt, id_col) in DELETIONS.items():
-    df = mastr_standardise(read_bronze(bt), NAME_MAP, CODED)
+    df = mastr_standardise(read_bronze(bt), NAME_MAP, CODED, table=bt)
     df = df.withColumn("_srid", sha_key(F.lit(kind), F.col(id_col).cast("string")))
     events.append(
         add_semantic_provenance(df, SOURCE, bt, RID, "_srid").withColumn(
@@ -320,7 +324,7 @@ for kind, (bt, id_col) in DELETIONS.items():
 commissioning = generation_unit.filter(F.col("commissioning_date").isNotNull()).select(
     "unit_id", "commissioning_date"
 )
-changes = mastr_standardise(read_bronze(CHANGE_BT), NAME_MAP, CODED)
+changes = mastr_standardise(read_bronze(CHANGE_BT), NAME_MAP, CODED, table=CHANGE_BT)
 changes = within_group_ordinal(
     changes, CHANGE_KEY, [c for c in changes.columns if c not in CHANGE_KEY]
 )
@@ -484,3 +488,8 @@ write_inspect_export(
         }
     },
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient date parser
+export_rejected_values(FINDINGS, COMPONENT)

@@ -1726,7 +1726,7 @@ def small_claims(rules):
 def coordinate_all(rules, xwalk):
     gene_x = xwalk.filter(F.col("entity_type") == "gene")
 
-    def number(column, dataset):
+    def text(column, dataset):
         return clean_placeholders(column, rules, f"{dataset}.{column}")
 
     def strand(column):
@@ -1744,14 +1744,14 @@ def coordinate_all(rules, xwalk):
     gene2refseq = (
         _human(_bronze("ncbi_gene_gene2refseq"))
         .withColumn("assembly_label", assembly_expr("assembly", rules))
-        .withColumn("contig_name", number("genomic_nucleotide_accession_version", G2R))
+        .withColumn("contig_name", text("genomic_nucleotide_accession_version", G2R))
         .withColumn(
             "start_number",
-            number("start_position_on_the_genomic_accession", G2R).cast("long"),
+            text("start_position_on_the_genomic_accession", G2R).cast("long"),
         )
         .withColumn(
             "end_number",
-            number("end_position_on_the_genomic_accession", G2R).cast("long"),
+            text("end_position_on_the_genomic_accession", G2R).cast("long"),
         )
         .filter(
             F.col("contig_name").isNotNull()
@@ -1837,7 +1837,7 @@ def coordinate_all(rules, xwalk):
                 level="gene",
                 dataset=PHARMGKB,
                 assembly=F.lit(assembly),
-                contig=chromosome_expr(number("Chromosome", PHARMGKB)),
+                contig=chromosome_expr(text("Chromosome", PHARMGKB)),
                 start=number(start, PHARMGKB),
                 end=number(end, PHARMGKB),
                 strand=F.lit(None).cast("string"),
@@ -1881,14 +1881,14 @@ def coordinate_all(rules, xwalk):
     records = (
         _gene2refseq(rules)
         .withColumn("assembly_label", assembly_expr("assembly", rules))
-        .withColumn("contig_name", number("genomic_nucleotide_accession_version", G2R))
+        .withColumn("contig_name", text("genomic_nucleotide_accession_version", G2R))
         .withColumn(
             "start_number",
-            number("start_position_on_the_genomic_accession", G2R).cast("long"),
+            text("start_position_on_the_genomic_accession", G2R).cast("long"),
         )
         .withColumn(
             "end_number",
-            number("end_position_on_the_genomic_accession", G2R).cast("long"),
+            text("end_position_on_the_genomic_accession", G2R).cast("long"),
         )
         .filter(
             F.col("rna").isNotNull()
@@ -2431,3 +2431,8 @@ write_silver_findings(
     "entity_coordinate",
     blocks,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient number reads
+export_rejected_values(FINDINGS, COMPONENT, read_genomics_bronze)

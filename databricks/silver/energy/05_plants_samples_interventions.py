@@ -121,6 +121,7 @@ ensure_utc_session()
 plant_bronze = read_bronze(PLANT_BT)
 plants = plant_bronze
 for c in GERMAN_DECIMALS:
+    register_lenient(f"{PLANT_BT}.{c}", plant_bronze, F.col(c), german_decimal(c))
     plants = plants.withColumn(c, german_decimal(c))
 for c in YEAR_COLS:
     plants = plants.withColumn(c, F.col(c).cast("int"))
@@ -405,6 +406,14 @@ def _normalise(col):
     return F.upper(F.trim(F.regexp_replace(col, r"\s+", " ")))
 
 
+for _day, _clock in (
+    ("BEGINN_DATUM", "BEGINN_UHRZEIT"),
+    ("ENDE_DATUM", "ENDE_UHRZEIT"),
+):
+    _native = F.concat_ws(" ", _day, _clock)
+    _parsed = parse_ts(_native, DE_TS_FORMATS, "UTC")
+    register_lenient(f"{GRID_BT}.{_day} {_clock}", _kept, _native, _parsed)
+
 _market = lit_map(MARKET_AREA_CODES)
 _requesting = F.split(
     F.regexp_replace(F.trim("ANFORDERNDER_UENB"), r"\s*&\s*", "&"), "&"
@@ -634,3 +643,8 @@ write_inspect_export(
         )
     ],
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient parsers
+export_rejected_values(FINDINGS, COMPONENT)
