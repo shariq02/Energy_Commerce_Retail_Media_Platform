@@ -1,19 +1,26 @@
-# Genomics sources: download and staging
+# Source download and staging, all ecosystems in one run
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
 # Date: November 2026
 #
-# Purpose: run every stage of genomics_sources.yml in order: download the files,
-# parse them with the named parser, stage the rows in data/staging/<source>/ and
-# delete each downloaded file after its parse. A stage already in the release
-# record is skipped.
+# Purpose: run the scripts named under `before` in sources.yml, then every
+# stage in order: download the files, parse them with the named parser, stage
+# the rows in data/staging/<source>/ and delete each downloaded file after its
+# parse. A stage already in the release record is skipped; a failed stage is
+# logged and the run continues.
 
+import argparse
 import gzip
+import importlib
+import io
 import json
 import re
 import sqlite3
 import sys
+import tarfile
 import zipfile
+from datetime import date, timedelta
+from fnmatch import fnmatch
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +39,7 @@ from _download_common import (
     clinvar_positions,
     clinvar_variant_codes,
     recorded,
+    recorded_tags,
     stage,
     table_parser,
     unpack,
@@ -54,7 +62,7 @@ from config import DATA_STAGING_DIR, get_logger
 
 logger = get_logger(__name__)
 
-SOURCES_FILE = Path(__file__).with_name("genomics_sources.yml")
+SOURCES_FILE = Path(__file__).with_name("sources.yml")
 
 HUMAN = "Homo sapiens"
 HUMAN_TAX_ID = "9606"
@@ -189,17 +197,6 @@ def parse_gtf(path: Path, tag: str):
         )
 
 
-def parse_pharmgkb(path: Path, tag: str):
-    member = f"{tag}.tsv"
-    with zipfile.ZipFile(path) as archive:
-        extracted = Path(archive.extract(member, path.parent))
-    try:
-        for frame in read_table(extracted):
-            yield {tag: frame}, len(frame)
-    finally:
-        extracted.unlink()
-
-
 def parse_clingen_validity(path: Path, tag: str):
     frame = pd.read_csv(
         path,
@@ -240,17 +237,6 @@ def parse_fda_biomarkers(path: Path, tag: str):
         path, skiprows=1, dtype=str, keep_default_na=False, na_values=[""]
     )
     yield {"pgx_biomarkers": frame}, len(frame)
-
-
-def parse_biogrid(path: Path, tag: str):
-    with zipfile.ZipFile(path) as archive:
-        member = next(n for n in archive.namelist() if "Homo_sapiens" in n)
-        extracted = Path(archive.extract(member, path.parent))
-    try:
-        for frame in read_table(extracted):
-            yield {"interactions": frame}, len(frame)
-    finally:
-        extracted.unlink()
 
 
 def parse_clinvar_vs_benign(path: Path, tag: str):
@@ -398,20 +384,258 @@ def parse_bigwig(path: Path, tag: str):
             close()
 
 
+CIF_FIELDS = ("label_atom_id", "label_seq_id", "label_comp_id", "B_iso_or_equiv")
+
+
+def ca_confidence(text: str) -> list[tuple[str, str, str]]:
+    """(residue number, residue, pLDDT) of every C-alpha atom of an mmCIF model."""
+    names: list[str] = []
+    rows: list[tuple[str, str, str]] = []
+    at: list[int] = []
+    for line in text.splitlines():
+        if line.startswith("_atom_site."):
+            names.append(line.split()[0].removeprefix("_atom_site."))
+        elif names and line.startswith("ATOM"):
+            if not at:
+                at = [names.index(n) for n in CIF_FIELDS]
+            values = line.split()
+            if values[at[0]] == "CA":
+                rows.append((values[at[1]], values[at[2]], values[at[3]]))
+        elif rows:
+            break
+    return rows
+
+
+ALPHAFOLD_COLUMNS = ["accession", "fragment", "residue_number", "residue", "plddt"]
+
+
+def alphafold_frame(rows: list[tuple]) -> pd.DataFrame:
+    return pd.DataFrame(rows, columns=ALPHAFOLD_COLUMNS)
+
+
+def parse_alphafold(path: Path, tag: str):
+    """Per-residue model confidence (pLDDT, in B_iso_or_equiv) of each model."""
+    rows: list[tuple] = []
+    models = 0
+    with tarfile.open(path, "r|") as archive:
+        for member in archive:
+            name = Path(member.name).name
+            if not name.endswith(".cif.gz"):
+                continue
+            accession, fragment = name.split("-")[1:3]
+            text = gzip.decompress(archive.extractfile(member).read()).decode()
+            rows += [(accession, fragment, *row) for row in ca_confidence(text)]
+            models += 1
+            if len(rows) >= BATCH_ROWS:
+                yield {"residue_confidence": alphafold_frame(rows)}, models
+                rows, models = [], 0
+    if rows or models:
+        yield {"residue_confidence": alphafold_frame(rows)}, models
+
+
+def parse_energy_charts(path: Path, tag: str):
+    """One row per quarter-hour and border; unit and licence from the payload."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    records = payload.get("data") or []
+    frame = text_frame(
+        [
+            {"timestamp": record["timestamp"], "border": border, "value": value}
+            for record in records
+            for border, value in record["values"].items()
+        ]
+    )
+    frame["unit"] = payload.get("unit")
+    frame["sign_convention"] = payload.get("attributes", {}).get("sign_convention")
+    frame["license"] = payload.get("license")
+    yield {"physical_flows": frame}, len(records)
+
+
+def html_table_rows(path: Path) -> list[list[str]]:
+    """Rows of the first HTML table; a cell spanning rows is repeated below."""
+    from bs4 import BeautifulSoup
+
+    table = BeautifulSoup(
+        path.read_text(encoding="utf-8", errors="replace"), "html.parser"
+    ).find("table")
+    if table is None:
+        raise RuntimeError(f"{path.name}: no table found")
+    rows: list[list[str]] = []
+    pending: dict[int, list] = {}
+    for tr in table.find_all("tr"):
+        cells = iter(tr.find_all(["th", "td"]))
+        row: list[str] = []
+        while True:
+            column = len(row)
+            if column in pending:
+                text, left = pending[column]
+                row.append(text)
+                if left > 1:
+                    pending[column] = [text, left - 1]
+                else:
+                    del pending[column]
+                continue
+            cell = next(cells, None)
+            if cell is None:
+                break
+            text = cell.get_text(" ", strip=True)
+            row.append(text)
+            span = int(cell.get("rowspan", 1))
+            if span > 1:
+                pending[column] = [text, span - 1]
+        if row:
+            rows.append(row)
+    return rows
+
+
+def parse_acmg(path: Path, tag: str):
+    header, *body = html_table_rows(path)
+    width = len(header)
+    frame = pd.DataFrame([(r + [None] * width)[:width] for r in body], columns=header)
+    yield {"secondary_findings_genes": frame}, len(body)
+
+
+def parse_depmap_effect(path: Path, tag: str):
+    """The model x gene matrix as rows (model, gene, effect); values unchanged."""
+    for frame in read_text_csv(path, chunksize=50):
+        model = frame.columns[0]
+        long = frame.melt(id_vars=[model], var_name="gene", value_name="gene_effect")
+        yield {"gene_effect": long.rename(columns={model: "model_id"})}, len(frame)
+
+
 # --- parser factories: the arguments come from the `parser` mapping of a stage
 
 
-def table(dataset, keep=None, tag_column=None, read=None, usecols_in=None):
+def zipped(members: dict, read=None):
+    """Delimited members of a zip, matched by file-name pattern ({tag} filled)."""
+
+    def parse(path: Path, tag: str):
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            for dataset, pattern in members.items():
+                dataset, pattern = dataset.format(tag=tag), pattern.format(tag=tag)
+                member = next(
+                    (n for n in names if fnmatch(Path(n).name, pattern)), None
+                )
+                if member is None:
+                    raise RuntimeError(f"{path.name}: no member matches {pattern}")
+                extracted = Path(archive.extract(member, path.parent))
+                try:
+                    for frame in read_table(extracted, **(read or {})):
+                        yield {dataset: frame}, len(frame)
+                finally:
+                    extracted.unlink()
+
+    return parse
+
+
+def vcf(dataset, info_keys, keep=None):
+    """A VCF: optional row filter, named INFO fields copied into columns."""
+
+    def parse(path: Path, tag: str):
+        for frame in read_table(path):
+            read = len(frame)
+            if keep:
+                frame = frame.loc[FILTERS[keep](frame)].copy()
+            yield (
+                {dataset: add_fields(frame, "INFO", info_keys, VCF_INFO_PATTERN)},
+                read,
+            )
+
+    return parse
+
+
+def homologies(species):
+    """Ensembl Compara homologies of human: paralogues (both genes human) and
+    orthologues to the named species (gene order in a row is arbitrary)."""
+    wanted = set(species)
+
+    def parse(path: Path, tag: str):
+        for frame in read_table(path):
+            first, second = frame["species"], frame["homology_species"]
+            kind = frame["homology_type"].fillna("")
+            human = (first == "homo_sapiens") | (second == "homo_sapiens")
+            paralogue = kind.str.contains("paralog") & (first == second) & human
+            orthologue = (
+                kind.str.startswith("ortholog")
+                & human
+                & (first.isin(wanted) | second.isin(wanted))
+            )
+            batches = {
+                "orthologues": frame.loc[orthologue],
+                "paralogues": frame.loc[paralogue],
+            }
+            yield batches, len(frame)
+
+    return parse
+
+
+def iedb(dataset, columns=None):
+    """An IEDB export: two header rows joined, human-host rows kept; `columns`
+    keeps a named subset ("Category | Field")."""
+
+    def parse(path: Path, tag: str):
+        with zipfile.ZipFile(path) as archive:
+            member = next(n for n in archive.namelist() if n.endswith(".csv"))
+            with archive.open(member) as raw:
+                frames = pd.read_csv(
+                    io.TextIOWrapper(raw, encoding="utf-8"),
+                    header=[0, 1],
+                    dtype=str,
+                    keep_default_na=False,
+                    na_values=[""],
+                    chunksize=BATCH_ROWS,
+                )
+                for frame in frames:
+                    frame.columns = [f"{a} | {b}" for a, b in frame.columns]
+                    read = len(frame)
+                    host = next(
+                        (c for c in frame.columns if c.startswith("Host | Name")), None
+                    )
+                    if host:
+                        frame = frame.loc[
+                            frame[host].str.contains("Homo sapiens", na=False)
+                        ]
+                    if columns:
+                        frame = frame.reindex(columns=columns)
+                    yield {dataset: frame}, read
+
+    return parse
+
+
+def table(
+    dataset,
+    keep=None,
+    tag_column=None,
+    read=None,
+    usecols_in=None,
+    rename=None,
+    columns=None,
+):
+    """`rename` maps column names; `columns` keeps a fixed column set (a column a
+    file lacks becomes null), for files of one source whose columns differ."""
     options = dict(read or {})
     if usecols_in is not None:
         wanted = set(usecols_in)
         options["usecols"] = lambda column: column in wanted
-    return table_parser(
+    parse = table_parser(
         dataset,
         keep=FILTERS[keep] if keep else None,
         tag_column=tag_column,
         **options,
     )
+    if not (rename or columns):
+        return parse
+    fixed = ([tag_column] if tag_column else []) + list(columns or [])
+
+    def shaped(path: Path, tag: str):
+        for batches, read_rows in parse(path, tag):
+            frame = batches[dataset].rename(columns=rename or {})
+            yield (
+                {dataset: frame.reindex(columns=fixed) if columns else frame},
+                read_rows,
+            )
+
+    return shaped
 
 
 def reference(dataset, keep_human):
@@ -510,12 +734,10 @@ PLAIN_PARSERS = {
     "dbvar": parse_dbvar,
     "uniprot": parse_uniprot,
     "gtf": parse_gtf,
-    "pharmgkb": parse_pharmgkb,
     "clingen_validity": parse_clingen_validity,
     "hpo_ontology": parse_hpo_ontology,
     "cpic_pairs": parse_cpic_pairs,
     "fda_biomarkers": parse_fda_biomarkers,
-    "biogrid": parse_biogrid,
     "clinvar_vs_benign": parse_clinvar_vs_benign,
     "spectralbio": parse_spectralbio,
     "faers": parse_faers,
@@ -523,8 +745,16 @@ PLAIN_PARSERS = {
     "cadd": parse_cadd,
     "gnomad": parse_gnomad,
     "bigwig": parse_bigwig,
+    "alphafold": parse_alphafold,
+    "energy_charts": parse_energy_charts,
+    "acmg": parse_acmg,
+    "depmap_effect": parse_depmap_effect,
 }
 PARSER_FACTORIES = {
+    "zipped": zipped,
+    "vcf": vcf,
+    "homologies": homologies,
+    "iedb": iedb,
     "table": table,
     "reference": reference,
     "substitutions": substitutions,
@@ -578,7 +808,62 @@ def open_targets_parts(dataset: str, variables: dict) -> list[tuple[str, str, st
     return [(release, f"{base}/{dataset}/{part}", part) for part in parts]
 
 
-LISTINGS = {"opentargets_parts": open_targets_parts}
+def energy_charts_months(dataset: str, variables: dict) -> list[tuple[str, str, str]]:
+    """One API call per calendar month of the window."""
+    start = date.fromisoformat(variables["energy_charts_start"])
+    end = date.fromisoformat(variables["energy_charts_end"])
+    files = []
+    month = start.replace(day=1)
+    while month <= end:
+        following = date(month.year + month.month // 12, month.month % 12 + 1, 1)
+        first, last = max(month, start), min(following - timedelta(days=1), end)
+        url = f"{variables['energy_charts']}/cbpf?region=de&start={first}&end={last}"
+        files.append((f"{month:%Y-%m}", url, f"cbpf_{month:%Y-%m}.json"))
+        month = following
+    return files
+
+
+def encode_re2g(dataset: str, variables: dict) -> list[tuple[str, str, str]]:
+    """Released ENCODE-rE2G prediction files of the biosamples whose name holds
+    a keyword of `encode_tissue_keywords` (tissues as in GTEx)."""
+    base = variables["encode"]
+    search = (
+        f"{base}/search/?type=Annotation&annotation_type=element+gene+regulatory"
+        "+interaction+predictions&status=released&format=json&limit=all"
+    )
+    headers = {"Accept": "application/json"}
+    graph = requests.get(search, timeout=REQUEST_TIMEOUT, headers=headers).json()
+    keywords = [k.lower() for k in variables["encode_tissue_keywords"]]
+    files = []
+    for item in graph["@graph"]:
+        tissue = item.get("biosample_ontology", {}).get("term_name", "")
+        if "ENCODE-rE2G" not in item.get("description", "") or not any(
+            k in tissue.lower() for k in keywords
+        ):
+            continue
+        annotation = requests.get(
+            f"{base}{item['@id']}?format=json", timeout=REQUEST_TIMEOUT, headers=headers
+        ).json()
+        chosen = [
+            f
+            for f in annotation.get("files", [])
+            if isinstance(f, dict)
+            and f.get("status") == "released"
+            and f.get("file_format") in ("tsv", "bed")
+            and "threshold" in f.get("output_type", "")
+        ]
+        files += [(tissue, f"{base}{f['href']}", Path(f["href"]).name) for f in chosen]
+    if not files:
+        raise RuntimeError("encode: no ENCODE-rE2G thresholded file found")
+    logger.info(f"encode: {len(files)} ENCODE-rE2G files")
+    return files
+
+
+LISTINGS = {
+    "opentargets_parts": open_targets_parts,
+    "energy_charts_months": energy_charts_months,
+    "encode_re2g": encode_re2g,
+}
 
 
 def stage_files(entry: dict, variables: dict) -> list[tuple[str, str, str]]:
@@ -588,21 +873,68 @@ def stage_files(entry: dict, variables: dict) -> list[tuple[str, str, str]]:
     return [file for item in files for file in expand_item(item, variables)]
 
 
+def needs_staging(entry: dict, files: list[tuple[str, str, str]]) -> bool:
+    """False when the stage is recorded; a stage marked `refresh_when_files_added`
+    runs again when its list holds a tag the record does not have."""
+    key = (entry["source"], "+".join(entry["datasets"]))
+    if key not in recorded():
+        return True
+    if not entry.get("refresh_when_files_added"):
+        return False
+    return not {tag for tag, _, _ in files} <= recorded_tags(*key)
+
+
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Download and stage the sources.")
+    parser.add_argument(
+        "--skip-before", action="store_true", help="do not run the `before` scripts"
+    )
+    parser.add_argument(
+        "--only",
+        default="",
+        help="comma-separated sources; only their stages run (in list order)",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    arguments = parse_arguments()
+    only = {s.strip() for s in arguments.only.split(",") if s.strip()}
     config = load_sources()
+    failed: list[str] = []
+    for name in [] if arguments.skip_before else config.get("before", []):
+        try:
+            importlib.import_module(name).main()
+        except Exception:
+            logger.exception(f"{name}: failed; continuing")
+            failed.append(name)
     for entry in config["stages"]:
-        source, datasets = entry["source"], entry["datasets"]
-        if (source, "+".join(datasets)) in recorded():
-            logger.info(f"{source}/{'+'.join(datasets)}: already staged, skipping")
+        if only and entry["source"] not in only:
             continue
-        stage(
-            source,
-            datasets,
-            stage_files(entry, config["vars"]),
-            build_parser(entry["parser"]),
-            capped=tuple(entry.get("capped", ())),
-        )
-    logger.info("Genomics sources staged.")
+        label = f"{entry['source']}/{'+'.join(entry['datasets'])}"
+        try:
+            files = stage_files(entry, config["vars"])
+            if not needs_staging(entry, files):
+                logger.info(f"{label}: already staged, skipping")
+                continue
+            stage(
+                entry["source"],
+                entry["datasets"],
+                files,
+                build_parser(entry["parser"]),
+                capped=tuple(entry.get("capped", ())),
+                keep_manual=entry.get("keep_manual", False),
+                pause_seconds=entry.get("pause_seconds", 0),
+                force=True,
+                timeout_seconds=entry.get("timeout_seconds", REQUEST_TIMEOUT),
+            )
+        except Exception:
+            logger.exception(f"{label}: failed; continuing with the next stage")
+            failed.append(label)
+    if failed:
+        logger.error(f"Failed: {', '.join(failed)}")
+        sys.exit(1)
+    logger.info("All sources staged.")
 
 
 if __name__ == "__main__":

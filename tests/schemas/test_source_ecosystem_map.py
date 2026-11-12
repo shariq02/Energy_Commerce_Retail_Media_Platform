@@ -71,6 +71,7 @@ def test_expected_current_scope_sources_present(doc):
         "power_plant_list",
         "redispatch",
         "honda_iot",
+        "energy_charts",
         "rees46",
         "ga4",
     } | _genomics_sources()
@@ -95,6 +96,7 @@ def test_current_scope_sources_map_to_the_expected_ecosystem(doc):
         "power_plant_list": "energy",
         "redispatch": "energy",
         "honda_iot": "energy",
+        "energy_charts": "energy",
         "rees46": "commerce",
         "ga4": "commerce",
         **dict.fromkeys(_genomics_sources(), "genomics"),

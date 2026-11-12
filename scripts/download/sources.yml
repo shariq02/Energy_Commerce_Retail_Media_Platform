@@ -1,14 +1,22 @@
-# Genomics download list: one entry per stage() call, in run order
+# Source download list: scripts run first, then one entry per stage() call, in run order
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
 # Date: November 2026
 #
-# Read by download_genomics.py. `vars` fill {name} in a url or file name.
-# A file is {tag, url, file}; `each` repeats it for every item (a value, or a
-# mapping whose keys fill the template); `range` repeats it for n = 0 .. N-1;
-# `from` takes the file list from a named listing. A `manual:` url is a page
-# saved by hand to data/raw/<source>/<file>. `capped` names the datasets that
-# stop the stage at the staging size cap.
+# Read by download_sources.py. `before` names scripts whose main() runs first.
+# `vars` fill {name} in a url or file name. A file is {tag, url, file}; `each` repeats a file for
+# every item (a value, or a mapping whose keys fill the template); `range`
+# repeats it for n = 0 .. N-1; `from` takes the file list from a named listing.
+# A `manual:` url is a page saved by hand to data/raw/<source>/<file>;
+# `keep_manual` keeps that file after staging. `capped` names the datasets that
+# stop the stage at the staging size cap. `ecosystem` is genomics unless named.
+# `refresh_when_files_added` stages a recorded stage again when a tag is new.
+# `pause_seconds` waits between the downloads of a stage; `timeout_seconds`
+# sets the request timeout (default 60).
+
+before:
+  - download_smard
+  - stage_smard
 
 vars:
   ncbi: https://ftp.ncbi.nlm.nih.gov
@@ -34,17 +42,36 @@ vars:
   tahoe: https://huggingface.co/datasets/tahoebio/Tahoe-100M/resolve/main/metadata
   ucsc: https://hgdownload.soe.ucsc.edu/goldenPath/hg38
   gnomad: https://huggingface.co/datasets/altar-genomics/gnomad-4.1.1-genomes/resolve/main
+  gnomad_mtdna: https://storage.googleapis.com/gcp-public-data--gnomad/release/3.1/vcf/genomes
+  alphafold: https://ftp.ebi.ac.uk/pub/databases/alphafold/latest
+  alphafold_version: v6
+  thousand_genomes: https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL
+  ensembl_release: 116
+  encode: https://www.encodeproject.org
+  # Biosamples kept from ENCODE-rE2G: names holding one of these (tissues as in GTEx).
+  encode_tissue_keywords: [adipose, adrenal, artery, aorta, blood, brain, breast, colon, esophagus, heart, kidney, liver, lung, muscle, nerve, ovary, pancreas, pituitary, prostate, skin, small intestine, spleen, stomach, testis, thyroid, uterus, vagina]
+  collectri: https://zenodo.org/api/records/8192729/files
+  ddinter: https://ddinter2.scbdd.com/static/media/download
+  energy_charts: https://api.energy-charts.info/v2
+  energy_charts_start: "2024-11-01"
+  energy_charts_end: "2026-11-12"
 
 stages:
   # --- NCBI (ClinVar first: gnomAD, CADD, conservation and AlphaMissense read its positions)
   - source: clinvar
     datasets: [variant_summary]
     # The current file first: it has the most columns; older snapshots are aligned to it.
+    # January snapshots 2019 to 2024 (owner, 2026-11-11) sit in yearly archive folders.
     files:
       - {tag: current, url: "{clinvar}/variant_summary.txt.gz", file: variant_summary.txt.gz}
       - {tag: "2026-01", url: "{clinvar}/archive/variant_summary_2026-01.txt.gz", file: variant_summary_2026-01.txt.gz}
       - {tag: "2025-01", url: "{clinvar}/archive/variant_summary_2025-01.txt.gz", file: variant_summary_2025-01.txt.gz}
+      - each: [2024, 2023, 2022, 2021, 2020, 2019]
+        tag: "{item}-01"
+        url: "{clinvar}/archive/{item}/variant_summary_{item}-01.txt.gz"
+        file: "variant_summary_{item}-01.txt.gz"
     parser: {name: table, dataset: variant_summary, keep: assembly_grch38, tag_column: snapshot}
+    refresh_when_files_added: true
   - source: clinvar
     datasets: [variation_allele]
     files:
@@ -117,19 +144,19 @@ stages:
   - source: pharmgkb
     datasets: [genes]
     files: [{tag: genes, url: "{pharmgkb}/genes.zip", file: genes.zip}]
-    parser: pharmgkb
+    parser: {name: zipped, members: {"{tag}": "{tag}.tsv"}}
   - source: pharmgkb
     datasets: [drugs]
     files: [{tag: drugs, url: "{pharmgkb}/drugs.zip", file: drugs.zip}]
-    parser: pharmgkb
+    parser: {name: zipped, members: {"{tag}": "{tag}.tsv"}}
   - source: pharmgkb
     datasets: [variants]
     files: [{tag: variants, url: "{pharmgkb}/variants.zip", file: variants.zip}]
-    parser: pharmgkb
+    parser: {name: zipped, members: {"{tag}": "{tag}.tsv"}}
   - source: pharmgkb
     datasets: [relationships]
     files: [{tag: relationships, url: "{pharmgkb}/relationships.zip", file: relationships.zip}]
-    parser: pharmgkb
+    parser: {name: zipped, members: {"{tag}": "{tag}.tsv"}}
   - source: gtex
     datasets: [gene_median_tpm]
     files:
@@ -258,7 +285,7 @@ stages:
       - tag: ""
         url: https://downloads.thebiogrid.org/Download/BioGRID/Latest-Release/BIOGRID-ORGANISM-LATEST.tab3.zip
         file: BIOGRID-ORGANISM-LATEST.tab3.zip
-    parser: biogrid
+    parser: {name: zipped, members: {interactions: "*Homo_sapiens*"}}
 
   # --- benchmarks
   - source: proteingym
@@ -464,3 +491,202 @@ stages:
         file: "pseudobulk_differential_expression_{n:05d}.parquet"
     parser: {name: metadata, dataset: pseudobulk_differential_expression}
     capped: [pseudobulk_differential_expression]
+
+  # --- batch 4: sources for the Gold use cases (2026-11-11)
+  - source: acmg
+    datasets: [secondary_findings_genes]
+    # The NCBI page answers scripts with a browser check: save it by hand as HTML.
+    files:
+      - tag: ""
+        url: "manual:https://www.ncbi.nlm.nih.gov/clinvar/docs/acmg/"
+        file: acmg_secondary_findings.html
+    parser: acmg
+    keep_manual: true
+  - source: alphafold
+    datasets: [residue_confidence]
+    files:
+      - tag: "{alphafold_version}"
+        url: "{alphafold}/UP000005640_9606_HUMAN_{alphafold_version}.tar"
+        file: "UP000005640_9606_HUMAN_{alphafold_version}.tar"
+    parser: alphafold
+    capped: [residue_confidence]
+  - source: gnomad_mtdna
+    datasets: [variants]
+    files:
+      - tag: v3.1
+        url: "{gnomad_mtdna}/gnomad.genomes.v3.1.sites.chrM.reduced_annotations.tsv"
+        file: gnomad.genomes.v3.1.sites.chrM.reduced_annotations.tsv
+    parser: {name: table, dataset: variants}
+  - source: thousand_genomes
+    datasets: [variants]
+    # GRCh38 sites-only VCF with population frequencies; ClinVar SNVs kept.
+    files:
+      - tag: "20190312"
+        url: "{thousand_genomes}/ALL.wgs.shapeit2_integrated_snvindels_v2a.GRCh38.27022019.sites.vcf.gz"
+        file: ALL.wgs.shapeit2_integrated_snvindels_v2a.GRCh38.27022019.sites.vcf.gz
+    parser: {name: vcf, dataset: variants, info_keys: [AF, AFR_AF, AMR_AF, EAS_AF, EUR_AF, SAS_AF], keep: clinvar_variants}
+  - source: ensembl_compara
+    datasets: [orthologues, paralogues]
+    # All human protein homologies of the Ensembl FTP, saved by hand (BioMart
+    # answered 504 and 502 to the whole-genome queries): human paralogues, and
+    # orthologues of 7 species from mouse to yeast for gene age and conservation.
+    files:
+      - tag: "{ensembl_release}"
+        url: "manual:https://ftp.ensembl.org/pub/current/tsv/ensembl-compara/homologies/homo_sapiens/"
+        file: "Compara.{ensembl_release}.protein_default.homologies.tsv.gz"
+    parser:
+      name: homologies
+      species: [mus_musculus, gallus_gallus, xenopus_tropicalis, danio_rerio, drosophila_melanogaster, caenorhabditis_elegans, saccharomyces_cerevisiae]
+    keep_manual: true
+  - source: encode
+    datasets: [enhancer_gene_links]
+    files: {from: encode_re2g}
+    # The model variants carry different feature columns: the shared ones are kept.
+    # All biosamples, no cap (owner, 2026-11-12): the cap kept 108 of 752.
+    parser:
+      name: table
+      dataset: enhancer_gene_links
+      tag_column: biosample
+      rename: {TargetGeneEnsembl_ID: TargetGeneEnsemblID}
+      columns: [chr, start, end, name, class, TargetGene, TargetGeneEnsemblID, TargetGeneTSS, isSelfPromoter, CellType, Score]
+    refresh_when_files_added: true
+  - source: collectri
+    datasets: [regulons]
+    files:
+      - {tag: "8192729", url: "{collectri}/CollecTRI_regulons.csv/content", file: CollecTRI_regulons.csv}
+    parser: {name: csv, dataset: regulons}
+  - source: iedb
+    datasets: [epitopes]
+    # The IEDB server refuses scripted downloads (HTTP 403): save both exports by hand.
+    files: [{tag: v3, url: "manual:https://www.iedb.org/database_export.php", file: epitope_full_v3.zip}]
+    parser: {name: iedb, dataset: epitopes}
+    capped: [epitopes]
+    keep_manual: true
+  - source: iedb
+    datasets: [mhc_ligands]
+    # 35 of 112 columns (owner, 2026-11-12): identity, peptide, source protein and
+    # organism, host, disease, assay result, HLA allele. The rest is empty, free
+    # text or reference text; no cap. Tag `v3-columns` stages it again over the
+    # first run, which the 1 GB cap cut after 900,000 rows.
+    files: [{tag: v3-columns, url: "manual:https://www.iedb.org/database_export.php", file: mhc_ligand_full_single_file.zip}]
+    parser:
+      name: iedb
+      dataset: mhc_ligands
+      columns:
+        - "Assay ID | IEDB IRI"
+        - "Reference | PMID"
+        - "Reference | Date"
+        - "Epitope | Epitope IRI"
+        - "Epitope | Object Type"
+        - "Epitope | Name"
+        - "Epitope | Reference Name"
+        - "Epitope | Modified residues"
+        - "Epitope | Modifications"
+        - "Epitope | Starting Position"
+        - "Epitope | Ending Position"
+        - "Epitope | Source Molecule"
+        - "Epitope | Source Molecule IRI"
+        - "Epitope | Molecule Parent"
+        - "Epitope | Molecule Parent IRI"
+        - "Epitope | Source Organism"
+        - "Epitope | Species"
+        - "Epitope | Species IRI"
+        - "Related Object | Epitope Relation"
+        - "Related Object | Name"
+        - "Host | Name"
+        - "Host | IRI"
+        - "in vivo Process | Process Type"
+        - "in vivo Process | Disease"
+        - "in vivo Process | Disease IRI"
+        - "Assay | Method"
+        - "Assay | Response measured"
+        - "Assay | Qualitative Measurement"
+        - "Assay | Measurement Inequality"
+        - "Assay | Quantitative measurement"
+        - "Assay | Units"
+        - "Antigen Presenting Cell | Name"
+        - "MHC Restriction | Name"
+        - "MHC Restriction | Class"
+        - "MHC Restriction | Evidence Code"
+    keep_manual: true
+    refresh_when_files_added: true
+  - source: depmap
+    datasets: [models]
+    # The DepMap portal answers scripts with a browser check: save both files by hand.
+    files:
+      - tag: ""
+        url: "manual:https://depmap.org/portal/data_page/?tab=allData"
+        file: Model.csv
+    parser: {name: csv, dataset: models}
+    keep_manual: true
+  - source: depmap
+    datasets: [gene_effect]
+    # No cap: the rows (model, gene, effect) are about twice the 500 MB source
+    # file; the first run stopped at the cap after 1,300 models. The tag
+    # `uncapped` stages it again over that cut run.
+    files:
+      - tag: uncapped
+        url: "manual:https://depmap.org/portal/data_page/?tab=allData"
+        file: CRISPRGeneEffect.csv
+    parser: depmap_effect
+    keep_manual: true
+    refresh_when_files_added: true
+  - source: aact
+    datasets: [studies, conditions, browse_conditions, interventions, browse_interventions, keywords, eligibilities]
+    # The AACT download page could not be read by script: save the newest
+    # pipe-delimited flat-file zip by hand under this name.
+    files:
+      - tag: ""
+        url: "manual:https://aact.ctti-clinicaltrials.org/"
+        file: aact_flatfiles.zip
+    keep_manual: true
+    parser:
+      name: zipped
+      read: {sep: "|"}
+      members:
+        studies: studies.txt
+        conditions: conditions.txt
+        browse_conditions: browse_conditions.txt
+        interventions: interventions.txt
+        browse_interventions: browse_interventions.txt
+        keywords: keywords.txt
+        eligibilities: eligibilities.txt
+    capped: [eligibilities]
+  - source: ddinter
+    datasets: [interactions]
+    # CC BY-NC-SA 4.0: private, never in git.
+    files:
+      - each: [A, B, D, H, L, P, R, V]
+        tag: "{item}"
+        url: "{ddinter}/ddinter_downloads_code_{item}.csv"
+        file: "ddinter_downloads_code_{item}.csv"
+    parser: {name: csv, dataset: interactions}
+
+  # --- energy additions for the Gold use cases (2026-11-11)
+  - source: smard
+    ecosystem: energy
+    datasets: [balancing_energy]
+    # Exported by hand from the SMARD download centre (bidding zone DE/LU, quarter-hour).
+    files:
+      - tag: "2024-11-01..2026-11-12"
+        url: "manual:https://www.smard.de/en/downloadcenter/download-market-data"
+        file: manual/Balancing_energy_202411010000_202611120000_Quarterhour.csv
+    parser: {name: table, dataset: balancing_energy, read: {sep: ";"}}
+    keep_manual: true
+  - source: smard
+    ecosystem: energy
+    datasets: [commercial_exchanges]
+    files:
+      - tag: "2024-11-01..2026-11-12"
+        url: "manual:https://www.smard.de/en/downloadcenter/download-market-data"
+        file: manual/Scheduled_commercial_exchanges_202411010000_202611120000_Quarterhour.csv
+    parser: {name: table, dataset: commercial_exchanges, read: {sep: ";"}}
+    keep_manual: true
+  - source: energy_charts
+    ecosystem: energy
+    datasets: [physical_flows]
+    # Fraunhofer ISE Energy-Charts, CC BY 4.0, attribution "energy-charts.info".
+    files: {from: energy_charts_months}
+    parser: energy_charts
+    # The public API answered 429 after 6 calls with a 2 s pause.
+    pause_seconds: 10

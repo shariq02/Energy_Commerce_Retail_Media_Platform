@@ -66,8 +66,34 @@ CONTROL_AREA_FILTERS = {
 # bounded here to the last ~2 years instead.
 RECENT_QUARTERHOUR_CHUNKS = 104
 
-# Not pulled: cross-border flows, intraday prices, Ausgleichsenergie --
-# filter IDs not yet confirmed against the live API.
+# Consumption forecast and neighbouring day-ahead prices, recent window only.
+# 258 is labelled "Polen" twice in the public filter list; its zone is
+# confirmed at staging.
+RECENT_QUARTERHOUR_FILTERS = {
+    411: "forecast_consumption_total",
+    4362: "forecast_residual_load",
+}
+RECENT_HOURLY_FILTERS = {
+    5078: "price_neighbours_average",
+    4996: "price_belgium",
+    4997: "price_norway_2",
+    4170: "price_austria",
+    252: "price_denmark_1",
+    253: "price_denmark_2",
+    254: "price_france",
+    255: "price_italy_north",
+    256: "price_netherlands",
+    257: "price_poland",
+    258: "price_zone_258",
+    259: "price_switzerland",
+    260: "price_slovenia",
+    261: "price_czechia",
+    262: "price_hungary",
+}
+
+# Not on the chart API: intraday prices (SMARD has none), cross-border flows,
+# commercial exchanges and balancing energy. The last three come from
+# download_sources.py (Energy-Charts API and the manual SMARD CSV export).
 
 OUTPUT_DIR = DATA_RAW_DIR / "smard"
 
@@ -161,6 +187,27 @@ def main() -> None:
             "quarterhour",
             name,
             quarterhour_dir,
+            limit_chunks=RECENT_QUARTERHOUR_CHUNKS,
+        )
+
+    # Additions for the Gold use cases: the same recent window.
+    for filter_id, name in RECENT_QUARTERHOUR_FILTERS.items():
+        download_series(
+            filter_id,
+            "DE-LU",
+            "quarterhour",
+            name,
+            quarterhour_dir,
+            limit_chunks=RECENT_QUARTERHOUR_CHUNKS,
+        )
+    hourly_dir = OUTPUT_DIR / "hourly"
+    for filter_id, name in RECENT_HOURLY_FILTERS.items():
+        download_series(
+            filter_id,
+            "DE-LU",
+            "hour",
+            name,
+            hourly_dir,
             limit_chunks=RECENT_QUARTERHOUR_CHUNKS,
         )
 

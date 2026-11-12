@@ -56,6 +56,9 @@ mappings:
   - source_system: honda_iot
     ecosystem: energy
     first_mapped: "2026-08-30"
+  - source_system: energy_charts
+    ecosystem: energy
+    first_mapped: "2026-11-11"
   - source_system: rees46
     ecosystem: commerce
     first_mapped: "2026-08-30 (energy; re-mapped to commerce 2026-09-15)"
@@ -63,6 +66,36 @@ mappings:
     ecosystem: commerce
     first_mapped: "2026-09-15"
   # genomics: one entry per source folder of genomics_bronze
+  - source_system: aact
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: acmg
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: alphafold
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: collectri
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: ddinter
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: depmap
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: ensembl_compara
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: gnomad_mtdna
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: iedb
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
+  - source_system: thousand_genomes
+    ecosystem: genomics
+    first_mapped: "2026-11-11"
   - source_system: alphamissense
     ecosystem: genomics
     first_mapped: "2026-11-05"

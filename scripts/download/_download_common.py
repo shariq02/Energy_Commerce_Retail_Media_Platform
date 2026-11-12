@@ -41,6 +41,7 @@ STREAM_CHUNK_BYTES = 1024 * 1024
 PROGRESS_SECONDS = 5
 RETRIES = 5
 RETRY_WAIT_SECONDS = 10
+RATE_WAIT_SECONDS = 60
 UNPACK_BLOCK_BYTES = 16 * 1024 * 1024
 MIN_FREE_BYTES = 5 * 1024**3
 STAGE_CAP_BYTES = 1024**3
@@ -94,9 +95,10 @@ def _write(response: requests.Response, dest: Path, have: int, total: int) -> in
     return written
 
 
-def download(url: str, dest: Path) -> dict | None:
+def download(url: str, dest: Path, timeout: float = REQUEST_TIMEOUT) -> dict | None:
     """Stream `url` to `dest`; after a broken connection, continue from the
-    bytes on disk. None when the file is over MAX_FILE_BYTES."""
+    bytes on disk; after a 429 answer, wait (Retry-After) and try again. None
+    when the file is over MAX_FILE_BYTES."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(1, RETRIES + 2):
         have = dest.stat().st_size if dest.exists() else 0
@@ -107,8 +109,19 @@ def download(url: str, dest: Path) -> dict | None:
             headers["Range"] = f"bytes={have}-"
         try:
             with requests.get(
-                url, stream=True, timeout=REQUEST_TIMEOUT, headers=headers
+                url, stream=True, timeout=timeout, headers=headers
             ) as response:
+                if response.status_code == 429 and attempt <= RETRIES:
+                    after = response.headers.get("Retry-After", "")
+                    wait = (
+                        int(after) if after.isdigit() else RATE_WAIT_SECONDS * attempt
+                    )
+                    logger.warning(
+                        f"{dest.name}: too many requests; waiting {wait} s "
+                        f"(retry {attempt} of {RETRIES})"
+                    )
+                    time.sleep(wait)
+                    continue
                 if have and response.status_code == 416:
                     logger.info(f"{dest.name}: already complete on disk")
                     return {
@@ -180,6 +193,18 @@ def recorded() -> set[tuple[str, str]]:
         return {(row["source"], row["datasets"]) for row in csv.DictReader(f)}
 
 
+def recorded_tags(source: str, datasets: str) -> set[str]:
+    """The file tags recorded for one stage."""
+    if not RELEASE_RECORD.exists():
+        return set()
+    with open(RELEASE_RECORD, newline="", encoding="utf-8") as f:
+        return {
+            row["tag"]
+            for row in csv.DictReader(f)
+            if row["source"] == source and row["datasets"] == datasets
+        }
+
+
 def record(rows: list[dict]) -> None:
     new = not RELEASE_RECORD.exists()
     RELEASE_RECORD.parent.mkdir(parents=True, exist_ok=True)
@@ -202,14 +227,22 @@ def stage(
     files: list[FileSpec],
     parse: Parser,
     capped: tuple[str, ...] = (),
+    keep_manual: bool = False,
+    pause_seconds: float = 0,
+    force: bool = False,
+    timeout_seconds: float = REQUEST_TIMEOUT,
 ) -> None:
     """Download each file, stage its batches, delete it; record when all are done.
 
     When a dataset in `capped` reaches STAGE_CAP_BYTES, the parse and the
     remaining files stop; list a capped dataset last in `datasets` and in the
-    parse order, so no other dataset is cut."""
+    parse order, so no other dataset is cut. `keep_manual` keeps a file saved
+    by hand; `pause_seconds` waits between downloads (rate-limited APIs);
+    `force` stages even when the stage is recorded (the caller decided);
+    `timeout_seconds` is the request timeout (a server that builds its answer
+    first needs more)."""
     key = "+".join(datasets)
-    if (source, key) in recorded():
+    if not force and (source, key) in recorded():
         logger.info(f"{source}/{key}: already staged, skipping")
         return
 
@@ -232,7 +265,8 @@ def stage(
                 return
             facts = {"bytes": dest.stat().st_size, "last_modified": ""}
         else:
-            facts = download(url, dest)
+            facts = download(url, dest, timeout_seconds)
+            time.sleep(pause_seconds)
         if facts is None:
             logger.error(f"{source}/{key}: not staged, {name} was skipped")
             return
@@ -258,7 +292,8 @@ def stage(
                     )
                     cut = True
                     break
-        dest.unlink()
+        if not (keep_manual and url.startswith(MANUAL)):
+            dest.unlink()
         rows.append(
             {
                 "source": source,

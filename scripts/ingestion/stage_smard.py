@@ -117,7 +117,21 @@ def stage_energy_timeseries(monitor: PeakRSSMonitor) -> tuple[int, Path, int]:
     return total_rows, out_path, files_read
 
 
+def up_to_date() -> bool:
+    """True when the staged file is newer than every raw SMARD JSON file."""
+    out_path = ANALYTICAL_DIR / "energy_timeseries.csv"
+    raw = list(RAW_SMARD_DIR.rglob("*.json"))
+    return (
+        out_path.exists()
+        and bool(raw)
+        and out_path.stat().st_mtime >= max(p.stat().st_mtime for p in raw)
+    )
+
+
 def main() -> None:
+    if up_to_date():
+        logger.info("SMARD staging is newer than every raw file; skipping")
+        return
     monitor = PeakRSSMonitor()
 
     total_rows, out_path, files_read = stage_energy_timeseries(monitor)

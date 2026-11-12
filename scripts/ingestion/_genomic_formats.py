@@ -68,7 +68,7 @@ def _read_csv(source, sep: str, names: list[str], usecols, **options):
 
 
 def _header(line: str, sep: str) -> list[str]:
-    names = [name.strip() for name in line.rstrip("\r\n").lstrip("#").split(sep)]
+    names = [name.strip() for name in line.rstrip("\r\n").lstrip("﻿#").split(sep)]
     while names and not names[-1]:
         names.pop()
     return names

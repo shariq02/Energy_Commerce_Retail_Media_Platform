@@ -1,5 +1,6 @@
-"""Unit tests for scripts/download/download_genomics.py and genomics_sources.yml --
-the stage list must cover the genomics Bronze sources and expand without a network.
+"""Unit tests for scripts/download/download_sources.py and sources.yml -- the
+genomics stages must cover the genomics Bronze sources and every stage must
+expand without a network.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
@@ -12,6 +13,7 @@ import ast
 import importlib.util
 import re
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -39,7 +41,7 @@ def genomics():
     sys.path.insert(0, str(DOWNLOAD_DIR))
     try:
         spec = importlib.util.spec_from_file_location(
-            "download_genomics", DOWNLOAD_DIR / "download_genomics.py"
+            "download_sources", DOWNLOAD_DIR / "download_sources.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -65,6 +67,8 @@ def _files(genomics, config, source, dataset):
 def test_stages_cover_every_bronze_dataset(config):
     staged: dict[str, set[str]] = {}
     for entry in config["stages"]:
+        if entry.get("ecosystem", "genomics") != "genomics":
+            continue
         staged.setdefault(entry["source"], set()).update(entry["datasets"])
     expected = {s: set(d) for s, d in _bronze_sources().items()}
     assert staged == expected
@@ -99,6 +103,11 @@ def test_every_stage_expands_to_files(genomics, config, monkeypatch):
     monkeypatch.setitem(
         genomics.LISTINGS, "opentargets_parts", genomics.open_targets_parts
     )
+    monkeypatch.setitem(
+        genomics.LISTINGS,
+        "encode_re2g",
+        lambda dataset, variables: [("liver", "https://x/a.tsv.gz", "a.tsv.gz")],
+    )
     for entry in config["stages"]:
         files = genomics.stage_files(entry, config["vars"])
         label = f"{entry['source']}/{entry['datasets']}"
@@ -113,7 +122,8 @@ def test_every_stage_expands_to_files(genomics, config, monkeypatch):
 @pytest.mark.parametrize(
     ("source", "dataset", "count"),
     [
-        ("clinvar", "variant_summary", 3),
+        ("clinvar", "variant_summary", 9),
+        ("ddinter", "interactions", 8),
         ("dbvar", "variants", 3),
         ("reactome", "pathway_mappings", 2),
         ("clinvar_vs_benign", "variants", 4),
@@ -129,7 +139,18 @@ def test_file_counts(genomics, config, source, dataset, count):
 
 def test_snapshot_tags_and_order(genomics, config):
     files = _files(genomics, config, "clinvar", "variant_summary")
-    assert [tag for tag, _, _ in files] == ["current", "2026-01", "2025-01"]
+    assert [tag for tag, _, _ in files] == [
+        "current",
+        "2026-01",
+        "2025-01",
+        "2024-01",
+        "2023-01",
+        "2022-01",
+        "2021-01",
+        "2020-01",
+        "2019-01",
+    ]
+    assert files[-1][1].endswith("/archive/2019/variant_summary_2019-01.txt.gz")
 
 
 def test_benchmark_models_come_before_the_test_file(genomics, config):
@@ -186,3 +207,117 @@ def test_open_targets_listing_reads_the_parquet_links(genomics, config, monkeypa
 
 def test_windows_group_close_positions(genomics):
     assert genomics.windows([1, 2, 500, 5000, 5001]) == [[1, 2, 500], [5000, 5001]]
+
+
+def test_table_keeps_a_fixed_column_set(genomics, tmp_path):
+    table = tmp_path / "e.tsv"
+    table.write_text(
+        "#chr\tstart\textra\tTargetGeneEnsembl_ID\n1\t5\tx\tENSG1\n", encoding="utf-8"
+    )
+    parse = genomics.table(
+        "links",
+        tag_column="biosample",
+        rename={"TargetGeneEnsembl_ID": "TargetGeneEnsemblID"},
+        columns=["chr", "start", "TargetGeneEnsemblID", "Score"],
+    )
+    batches, _ = next(parse(table, "liver"))
+    frame = batches["links"]
+    assert list(frame.columns) == [
+        "biosample",
+        "chr",
+        "start",
+        "TargetGeneEnsemblID",
+        "Score",
+    ]
+    assert frame.iloc[0]["TargetGeneEnsemblID"] == "ENSG1"
+    assert frame["Score"].isna().all()
+
+
+def test_iedb_keeps_human_rows_and_named_columns(genomics, tmp_path):
+    archive = tmp_path / "i.zip"
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr(
+            "i.csv",
+            (
+                "Assay ID,Host,Host,Assay\n"
+                "IEDB IRI,Name,IRI,Units\n"
+                "a1,Homo sapiens (human),h1,nM\n"
+                "a2,Mus musculus,m1,nM\n"
+            ),
+        )
+    parse = genomics.iedb("ligands", columns=["Assay ID | IEDB IRI", "Host | Name"])
+    batches, read = next(parse(archive, "v3"))
+    frame = batches["ligands"]
+    assert read == 2
+    assert list(frame.columns) == ["Assay ID | IEDB IRI", "Host | Name"]
+    assert frame["Assay ID | IEDB IRI"].tolist() == ["a1"]
+
+
+def test_homologies_split_paralogues_and_orthologues(genomics, tmp_path):
+    table = tmp_path / "h.tsv"
+    table.write_text(
+        (
+            "gene_stable_id\tspecies\thomology_type\thomology_species\n"
+            "G1\thomo_sapiens\twithin_species_paralog\thomo_sapiens\n"
+            "G1\thomo_sapiens\tortholog_one2one\tmus_musculus\n"
+            "G1\thomo_sapiens\tortholog_one2one\tpan_troglodytes\n"
+        ),
+        encoding="utf-8",
+    )
+    parse = genomics.homologies(["mus_musculus"])
+    batches, read = next(parse(table, "116"))
+    assert read == 3
+    assert batches["paralogues"]["homology_species"].tolist() == ["homo_sapiens"]
+    assert batches["orthologues"]["homology_species"].tolist() == ["mus_musculus"]
+
+
+def test_energy_charts_months_cover_the_window(genomics, config):
+    months = genomics.energy_charts_months("physical_flows", config["vars"])
+    assert months[0][1].endswith("start=2024-11-01&end=2024-11-30")
+    assert months[-1][1].endswith("start=2026-11-01&end=2026-11-12")
+    assert len(months) == 25
+
+
+def test_needs_staging_refreshes_only_marked_stages(genomics, monkeypatch):
+    monkeypatch.setattr(genomics, "recorded", lambda: {("clinvar", "variant_summary")})
+    monkeypatch.setattr(genomics, "recorded_tags", lambda s, d: {"current"})
+    entry = {"source": "clinvar", "datasets": ["variant_summary"]}
+    files = [("current", "u", "f"), ("2019-01", "u", "g")]
+    assert not genomics.needs_staging(entry, files)
+    assert genomics.needs_staging({**entry, "refresh_when_files_added": True}, files)
+    assert not genomics.needs_staging(
+        {**entry, "refresh_when_files_added": True}, files[:1]
+    )
+
+
+def test_html_table_rows_repeat_a_spanned_cell(genomics, tmp_path):
+    page = tmp_path / "t.html"
+    page.write_text(
+        (
+            "<table><tr><th>Gene</th><th>Condition</th></tr>"
+            '<tr><td>BRCA1</td><td rowspan="2">HBOC</td></tr>'
+            "<tr><td>BRCA2</td></tr></table>"
+        ),
+        encoding="utf-8",
+    )
+    assert genomics.html_table_rows(page) == [
+        ["Gene", "Condition"],
+        ["BRCA1", "HBOC"],
+        ["BRCA2", "HBOC"],
+    ]
+
+
+def test_mmcif_confidence_reads_c_alpha_rows(genomics):
+    text = (
+        "loop_\n"
+        "_atom_site.group_PDB\n"
+        "_atom_site.label_atom_id\n"
+        "_atom_site.label_comp_id\n"
+        "_atom_site.label_seq_id\n"
+        "_atom_site.B_iso_or_equiv\n"
+        "ATOM N MET 1 50.1\n"
+        "ATOM CA MET 1 51.2\n"
+        "ATOM CA ALA 2 88.0\n"
+        "#\n"
+    )
+    assert genomics.ca_confidence(text) == [("1", "MET", "51.2"), ("2", "ALA", "88.0")]
