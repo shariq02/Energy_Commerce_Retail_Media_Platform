@@ -420,9 +420,12 @@ def export_window():
 
 
 def export_number(column):
-    """Double of a SMARD export value: "-" is null, "," is the thousands separator."""
+    """Double of a SMARD export value: "-" is null, "," is the thousands separator
+    (English export); any other text goes to the strict cast and stops the run."""
     text = F.trim(F.col(column))
-    return F.when(text != "-", F.regexp_replace(text, ",", "")).cast("double")
+    grouped = text.rlike(r"^-?\d{1,3}(,\d{3})+(\.\d+)?$")
+    plain = F.when(grouped, F.regexp_replace(text, ",", "")).otherwise(text)
+    return F.when(text != "-", plain).cast("double")
 
 
 bronze_balancing = read_bronze(BALANCING_TABLE)

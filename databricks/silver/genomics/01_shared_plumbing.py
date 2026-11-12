@@ -1838,8 +1838,8 @@ def coordinate_all(rules, xwalk):
                 dataset=PHARMGKB,
                 assembly=F.lit(assembly),
                 contig=chromosome_expr(text("Chromosome", PHARMGKB)),
-                start=number(start, PHARMGKB),
-                end=number(end, PHARMGKB),
+                start=text(start, PHARMGKB),
+                end=text(end, PHARMGKB),
                 strand=F.lit(None).cast("string"),
                 system="unstated",
             )

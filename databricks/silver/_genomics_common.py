@@ -1903,7 +1903,7 @@ def register_bronze_read(qualified: str, text, parsed) -> None:
     """Register a lenient read of `<source>.<dataset>.<column>` (Bronze table
     `<source>_<dataset>`) for the rejected-values check."""
     dataset, column = qualified.rsplit(".", 1)
-    register_lenient(qualified, dataset.replace(".", "_"), text, parsed, column)
+    register_lenient(qualified, bronze_table_name(dataset), text, parsed, column)
 
 
 NUMBER_TEXT = r"^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$"
