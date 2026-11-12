@@ -1976,6 +1976,7 @@ def opentargets_nested_claims(rules, xwalk):
             source.alias("source_field"),
             F.lit(None).cast("int").alias("source_rank"),
             F.lit("source").alias("source_type"),
+            F.lit(None).cast("string").alias("source_snapshot"),
         ).filter(F.col("value_text").isNotNull() | F.col("value_number").isNotNull())
 
     def exploded(column, schema):
@@ -2290,6 +2291,7 @@ claims = claims.distinct().withColumn(
         "source_field",
         "value_text",
         "value_number",
+        "source_snapshot",
     ),
 )
 claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), "entity_claim")

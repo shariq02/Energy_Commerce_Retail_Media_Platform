@@ -2218,6 +2218,7 @@ def array_claims(df, *, entity_type, key_col, field, array, dataset, source_fiel
         F.lit(source_field).alias("source_field"),
         F.lit(None).cast("int").alias("source_rank"),
         F.lit("source").alias("source_type"),
+        F.lit(None).cast("string").alias("source_snapshot"),
     )
 
 
@@ -2449,6 +2450,7 @@ def xwalk_claims(xwalk, rules: dict, entity_type: str, mapping: dict):
             "source_field",
             rank_expr(rules, entity_type, field).alias("source_rank"),
             F.lit("source").alias("source_type"),
+            F.lit(None).cast("string").alias("source_snapshot"),
         )
         for field, id_type in mapping.items()
     ]
