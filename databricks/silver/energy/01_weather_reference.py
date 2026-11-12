@@ -453,7 +453,7 @@ _missing_parts = []
 _coverage_parts = []
 for _t in MEASUREMENT_TABLES:
     _df = read_bronze(_t)
-    _value_cols = [c for c in _df.columns if c in DWD_CODES]
+    _value_cols = [c for c in DWD_TABLES[_t]["values"] if c in DWD_CODES]
     if not _value_cols:
         continue
     _clean = (

@@ -1,0 +1,130 @@
+# Bronze tables that hold several source datasets, one row set per part.
+# A part keeps its own columns; the columns of the other parts are empty on its rows.
+# `parts` maps the discriminator value to the table name the part had (or, with
+# `at_load`, the staged dataset table name). `at_load: true` = built by the loader
+# from the landing files; otherwise built by bronze/03_merge_bronze_tables.py from
+# the existing tables. `append: true` = the parts are added to an existing table
+# whose current rows carry the `kept` values. Silver reads a part through
+# `read_bronze` with its old name.
+version: 1
+merges:
+  - schema: bronze
+    table: dwd_measurement
+    discriminator: measurement
+    parts:
+      air_temperature: dwd_air_temperature
+      cloud_type: dwd_cloud_type
+      cloudiness: dwd_cloudiness
+      dew_point: dwd_dew_point
+      extreme_wind: dwd_extreme_wind
+      moisture: dwd_moisture
+      precipitation: dwd_precipitation
+      pressure: dwd_pressure
+      soil_temperature: dwd_soil_temperature
+      solar: dwd_solar
+      sun: dwd_sun
+      visibility: dwd_visibility
+      weather_phenomena: dwd_weather_phenomena
+      wind: dwd_wind
+      wind_synop: dwd_wind_synop
+  - schema: bronze
+    table: mastr_einheiten
+    discriminator: energy_source
+    parts:
+      biomasse: mastr_einheiten_biomasse
+      geothermie_gsgk: mastr_einheiten_geothermie_gsgk
+      kernkraft: mastr_einheiten_kernkraft
+      verbrennung: mastr_einheiten_verbrennung
+      wasser: mastr_einheiten_wasser
+      wind: mastr_einheiten_wind
+  - schema: bronze
+    table: mastr_anlagen_eeg
+    discriminator: energy_source
+    parts:
+      biomasse: mastr_anlagen_eeg_biomasse
+      geothermie_gsgk: mastr_anlagen_eeg_geothermie_gsgk
+      wasser: mastr_anlagen_eeg_wasser
+      wind: mastr_anlagen_eeg_wind
+  - schema: bronze
+    table: honda_iot_meter
+    discriminator: meter_kind
+    parts:
+      cooling: honda_iot_cooling
+      electricity: honda_iot_electricity
+      heating: honda_iot_heating
+  - schema: bronze
+    table: mastr_code_lookup
+    discriminator: catalog_kind
+    append: true
+    kept: [einheitentypen, lokationstypen, marktfunktionen, marktrollen]
+    parts:
+      katalogwerte: mastr_katalogwerte
+  - schema: genomics_bronze
+    table: aact_study_terms
+    discriminator: term_kind
+    at_load: true
+    parts:
+      condition: aact_conditions
+      keyword: aact_keywords
+  - schema: genomics_bronze
+    table: aact_browse_terms
+    discriminator: browse_kind
+    at_load: true
+    parts:
+      condition: aact_browse_conditions
+      intervention: aact_browse_interventions
+  - schema: genomics_bronze
+    table: ensembl_compara_homologues
+    discriminator: null  # homology_type in the data tells the two parts apart
+    at_load: true
+    parts:
+      orthologues: ensembl_compara_orthologues
+      paralogues: ensembl_compara_paralogues
+  - schema: genomics_bronze
+    table: long_range_benchmark_pathogenic
+    discriminator: variant_region
+    parts:
+      coding: long_range_benchmark_pathogenic_coding
+      non_coding: long_range_benchmark_pathogenic_non_coding
+  - schema: genomics_bronze
+    table: opentargets_association_direct
+    discriminator: association_level
+    parts:
+      datasource: opentargets_association_by_datasource_direct
+      overall: opentargets_association_overall_direct
+  - schema: genomics_bronze
+    table: proteingym_reference
+    discriminator: assay_set
+    parts:
+      clinical: proteingym_clinical_reference
+      dms: proteingym_dms_reference
+  - schema: genomics_bronze
+    table: proteingym_substitutions
+    discriminator: assay_set
+    parts:
+      clinical: proteingym_clinical_substitutions
+      dms: proteingym_dms_substitutions
+  - schema: genomics_bronze
+    table: ucsc_conservation_100way
+    discriminator: score_kind
+    parts:
+      phastcons: ucsc_conservation_phastcons_100way
+      phylop: ucsc_conservation_phylop_100way
+  - schema: genomics_bronze
+    table: genome_annotation
+    discriminator: annotation_set
+    parts:
+      gencode: gencode_annotation
+      refseq: refseq_annotation
+  - schema: genomics_bronze
+    table: faers_case_code
+    discriminator: code_kind
+    parts:
+      outcome: faers_outc
+      report_source: faers_rpsr
+  - schema: genomics_bronze
+    table: variant_benchmark_sets
+    discriminator: benchmark
+    parts:
+      clinvar_vs_benign: clinvar_vs_benign_variants
+      gnomad_balanced: gnomad_balanced_variants

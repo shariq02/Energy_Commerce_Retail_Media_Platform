@@ -126,7 +126,14 @@ SOURCES = {
         },
     },
     "smard": {
-        "datasets": [("energy_timeseries", "smard_energy_timeseries", None)],
+        "datasets": [
+            ("energy_timeseries", "smard_energy_timeseries", None),
+            ("balancing_energy", "smard_balancing_energy", None),
+            ("commercial_exchanges", "smard_commercial_exchanges", None),
+        ],
+    },
+    "energy_charts": {
+        "datasets": [("physical_flows", "energy_charts_physical_flows", None)],
     },
     "honda_iot": {
         "datasets": [

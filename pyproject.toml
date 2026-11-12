@@ -85,9 +85,9 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/silver/_semantic_common.py" = ["F821"]
 "databricks/silver/_genomics_common.py" = ["F821"]
 "databricks/silver/genomics/**/*.py" = ["F821"]
-# The Bronze loaders and the landing Volume notebook pull `%run ./_bronze_common`
+# The Bronze notebooks and the landing Volume notebook pull `%run ./_bronze_common`
 # (Databricks runtime magic). The common files themselves are NOT exempted.
-"databricks/bronze/0[12]_load_*_bronze.py" = ["F821"]
+"databricks/bronze/0[1-3]_*.py" = ["F821"]
 "databricks/setup/01_create_landing_volume.py" = ["F821"]
 # Gold notebooks pull `%run ../silver/_silver_common` then `%run ../../_gold_common`
 # (Databricks runtime magic). _gold_common.py itself is the second link in that

@@ -254,8 +254,40 @@ def contract_tables(contract: dict) -> dict:
 # DBTITLE 1,Bronze read + typed casts
 
 
+BRONZE_MERGES_PATH = "src/schemas/mappings/bronze_merges.yml"
+_bronze_parts: dict | None = None  # cached after first load
+
+
+def bronze_parts() -> dict:
+    """(schema, table name a part had) -> (merged table, discriminator, values,
+    keep the discriminator), from bronze_merges.yml. An appended table reads
+    only its `kept` rows."""
+    global _bronze_parts
+    if _bronze_parts is None:
+        _bronze_parts = {}
+        for merge in load_yaml(BRONZE_MERGES_PATH)["merges"]:
+            column = merge["discriminator"]
+            if not column:
+                continue
+            for value, part in merge["parts"].items():
+                key = (merge["schema"], part)
+                _bronze_parts[key] = (merge["table"], column, [value], False)
+            if merge.get("append"):
+                key = (merge["schema"], merge["table"])
+                _bronze_parts[key] = (merge["table"], column, merge["kept"], True)
+    return _bronze_parts
+
+
 def read_bronze(table: str, schema: str | None = None) -> DataFrame:
-    return spark.table(f"{CATALOG}.{schema or BRONZE_SCHEMA}.{table}")
+    """A Bronze table by the name Silver knows; a merged part is filtered out of
+    its merged table and keeps the empty columns of the other parts."""
+    schema = schema or BRONZE_SCHEMA
+    merged = bronze_parts().get((schema, table))
+    if merged is None:
+        return spark.table(f"{CATALOG}.{schema}.{table}")
+    name, column, values, keep = merged
+    df = spark.table(f"{CATALOG}.{schema}.{name}").filter(F.col(column).isin(values))
+    return df if keep else df.drop(column)
 
 
 _LOGICAL_TO_SPARK = {

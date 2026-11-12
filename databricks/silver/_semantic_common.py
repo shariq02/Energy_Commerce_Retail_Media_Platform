@@ -41,23 +41,57 @@ _PROVENANCE_TAIL = [
 # COMMAND ----------
 
 # DBTITLE 1,Source constants (weather, Honda, DWD products)
-# DWD: per-table read metadata (quality column, native time window).
+# DWD: per-table read metadata (quality column, native time window, own value
+# columns). The tables share one merged Bronze table, so a part carries the empty
+# value columns of the others; `values` names its own.
+_CLOUD_LAYERS = [
+    f"V_S{n}_{kind}" for n in range(1, 5) for kind in ("CS", "CSA", "HHS", "NS")
+]
+_MOISTURE = ["ABSF_STD", "VP_STD", "TF_STD", "P_STD", "TT_STD", "RF_STD", "TD_STD"]
+_SOIL = ["V_TE002", "V_TE005", "V_TE010", "V_TE020", "V_TE050", "V_TE100"]
 DWD_TABLES = {
-    "dwd_air_temperature": {"qn": "QN_9", "time": "hourly"},
-    "dwd_moisture": {"qn": "QN_8", "time": "hourly"},
-    "dwd_dew_point": {"qn": "QN_8", "time": "hourly"},
-    "dwd_pressure": {"qn": "QN_8", "time": "hourly"},
-    "dwd_precipitation": {"qn": "QN_8", "time": "hourly"},
-    "dwd_sun": {"qn": "QN_7", "time": "hourly"},
-    "dwd_wind": {"qn": "QN_3", "time": "hourly"},
-    "dwd_wind_synop": {"qn": "QN_8", "time": "hourly"},
-    "dwd_extreme_wind": {"qn": "QN_8", "time": "hourly"},
-    "dwd_visibility": {"qn": "QN_8", "time": "hourly"},
-    "dwd_cloudiness": {"qn": "QN_8", "time": "hourly"},
-    "dwd_cloud_type": {"qn": "QN_8", "time": "hourly"},
-    "dwd_weather_phenomena": {"qn": "QN_8", "time": "hourly"},
-    "dwd_soil_temperature": {"qn": "QN_2", "time": "hourly"},
-    "dwd_solar": {"qn": "QN_592", "time": "hourly_true_solar"},
+    "dwd_air_temperature": {
+        "qn": "QN_9",
+        "time": "hourly",
+        "values": ["TT_TU", "RF_TU"],
+    },
+    "dwd_moisture": {"qn": "QN_8", "time": "hourly", "values": _MOISTURE},
+    "dwd_dew_point": {"qn": "QN_8", "time": "hourly", "values": ["TT", "TD"]},
+    "dwd_pressure": {"qn": "QN_8", "time": "hourly", "values": ["P", "P0"]},
+    "dwd_precipitation": {
+        "qn": "QN_8",
+        "time": "hourly",
+        "values": ["R1", "RS_IND", "WRTR"],
+    },
+    "dwd_sun": {"qn": "QN_7", "time": "hourly", "values": ["SD_SO"]},
+    "dwd_wind": {"qn": "QN_3", "time": "hourly", "values": ["F", "D"]},
+    "dwd_wind_synop": {"qn": "QN_8", "time": "hourly", "values": ["FF", "DD"]},
+    "dwd_extreme_wind": {"qn": "QN_8", "time": "hourly", "values": ["FX_911"]},
+    "dwd_visibility": {"qn": "QN_8", "time": "hourly", "values": ["V_VV_I", "V_VV"]},
+    "dwd_cloudiness": {"qn": "QN_8", "time": "hourly", "values": ["V_N_I", "V_N"]},
+    "dwd_cloud_type": {
+        "qn": "QN_8",
+        "time": "hourly",
+        "values": ["V_N", "V_N_I", *_CLOUD_LAYERS],
+    },
+    "dwd_weather_phenomena": {
+        "qn": "QN_8",
+        "time": "hourly",
+        "values": ["WW", "WW_Text"],
+    },
+    "dwd_soil_temperature": {"qn": "QN_2", "time": "hourly", "values": _SOIL},
+    "dwd_solar": {
+        "qn": "QN_592",
+        "time": "hourly_true_solar",
+        "values": [
+            "ATMO_LBERG",
+            "FD_LBERG",
+            "FG_LBERG",
+            "SD_LBERG",
+            "ZENIT",
+            "MESS_DATUM_WOZ",
+        ],
+    },
 }
 METHOD_LABELS = {"P": "human_observation", "I": "instrument"}
 HONDA_INTERVAL_SECONDS = {"1min": 60, "15min": 900, "1h": 3600}
