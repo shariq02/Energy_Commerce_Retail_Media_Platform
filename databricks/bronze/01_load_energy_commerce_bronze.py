@@ -32,7 +32,7 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-RUN_SOURCES = []  # empty = every source folder found in the landing Volume
+RUN_SOURCES = []  # empty = every source with a file in the landing Volume
 WRITE_MODE = "overwrite"  # "append" for the second and later parts of a split source
 BRONZE_SCHEMA = "bronze"
 
@@ -274,19 +274,18 @@ def prepare_frame(source: str, dataset: str, value, files: list[str]):
 # COMMAND ----------
 
 # DBTITLE 1,Select the sources and map each dataset to its files
+# A file counts when it sits in its source folder or loose in the landing root.
 if RUN_SOURCES:
     unknown = [s for s in RUN_SOURCES if s not in SOURCES]
     if unknown:
         raise RuntimeError(f"not an energy or commerce source: {unknown}")
-    selected = RUN_SOURCES
-else:
-    selected = [s for s in landing_sources() if s in SOURCES]
-if not selected:
-    raise RuntimeError(f"FAIL  no energy or commerce source folder in {landing_root()}")
+folders, loose = set(landing_sources()), loose_files()
 
 plan: dict[str, dict[str, list[str]]] = {}
-for source in selected:
-    paths = list_files(landing_path(source))
+seen: set[str] = set()
+for source in RUN_SOURCES or SOURCES:
+    paths = candidate_files(source, folders, loose)
+    seen.update(paths)
     ext = r"jsonl" if SOURCES[source].get("format") == "json" else CSV_EXTENSIONS
     plan[source] = {}
     for dataset, _table, _value in SOURCES[source]["datasets"]:
@@ -296,6 +295,12 @@ for source in selected:
         plan[source][dataset] = sorted(
             p for p in paths if pattern.match(p.rsplit("/", 1)[-1])
         )
+selected = list(RUN_SOURCES) or [s for s in plan if any(plan[s].values())]
+if not selected:
+    raise RuntimeError(f"FAIL  no energy or commerce file in {landing_root()}")
+plan = {source: plan[source] for source in selected}
+claim_files(plan, seen)
+for source in selected:
     found = sum(1 for files in plan[source].values() if files)
     print(f"{source}: {found} of {len(plan[source])} datasets have files")
 
@@ -363,7 +368,7 @@ for result in load_results:
 for source in selected:
     results = [r for r in load_results if r["source"] == source]
     if all(r["validated"] for r in results):
-        remove_files([p for r in results for p in r["paths"]])
+        remove_source(source, [p for r in results for p in r["paths"]])
         print(f"REMOVED    files of {source}")
     else:
         print(f"PRESERVED  files of {source} (a table did not pass)")

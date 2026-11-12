@@ -37,7 +37,7 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-RUN_SOURCES = []  # empty = every source folder found in the landing Volume
+RUN_SOURCES = []  # empty = every source with a file in the landing Volume
 WRITE_MODE = "overwrite"  # "append" for the second and later parts of a split source
 
 # The `current` ClinVar rows in Bronze are the release of 2026-10-26 (release record)
@@ -52,29 +52,35 @@ if RUN_SOURCES:
     unknown = [s for s in RUN_SOURCES if s not in SOURCES]
     if unknown:
         raise RuntimeError(f"unknown source(s): {unknown}")
-    selected = RUN_SOURCES
-else:
-    selected = [s for s in landing_sources() if s in SOURCES]
-if not selected:
-    raise RuntimeError(f"FAIL  no genomics source folder in {landing_root()}")
-print(f"Sources selected: {selected}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Map each dataset to its uploaded files
+# A file counts when it sits in its source folder or loose in the landing root.
+folders, loose = set(landing_sources()), loose_files()
 plan: dict[str, dict[str, list[str]]] = {}
-for source in selected:
-    paths = list_files(landing_path(source))
+seen: set[str] = set()
+for source in RUN_SOURCES or SOURCES:
+    paths = candidate_files(source, folders, loose)
+    seen.update(paths)
     found: dict[str, list[str]] = {}
     for dataset in SOURCES[source]:
         pattern = file_pattern(source, dataset)
         matches = sorted(p for p in paths if pattern.match(p.rsplit("/", 1)[-1]))
         if matches:
             found[dataset] = matches
-        else:
-            print(f"SKIP  {source}_{dataset}: no file")
     plan[source] = found
-    print(f"OK    {source}: {sum(len(v) for v in found.values())} file(s) to load")
+selected = list(RUN_SOURCES) or [s for s in plan if plan[s]]
+if not selected:
+    raise RuntimeError(f"FAIL  no genomics file in {landing_root()}")
+plan = {source: plan[source] for source in selected}
+claim_files(plan, seen)
+for source in selected:
+    for dataset in SOURCES[source]:
+        if dataset not in plan[source]:
+            print(f"SKIP  {source}_{dataset}: no file")
+    count = sum(len(v) for v in plan[source].values())
+    print(f"OK    {source}: {count} file(s) to load")
 
 # COMMAND ----------
 
@@ -184,7 +190,7 @@ for result in load_results:
 for source in plan:
     results = [r for r in load_results if r["source"] == source]
     if results and all(r["validated"] for r in results):
-        remove_files([p for r in results for p in r["paths"]])
+        remove_source(source, [p for r in results for p in r["paths"]])
         print(f"REMOVED    files of {source}")
     else:
         print(f"PRESERVED  files of {source}")

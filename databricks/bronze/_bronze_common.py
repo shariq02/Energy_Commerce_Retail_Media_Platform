@@ -70,6 +70,40 @@ def remove_files(paths: list[str]) -> None:
         dbutils.fs.rm(path)
 
 
+def loose_files() -> list[str]:
+    """Files put directly in the landing root, outside any source folder."""
+    return [item.path for item in dbutils.fs.ls(landing_root()) if not item.isDir()]
+
+
+def candidate_files(source: str, folders: set[str], loose: list[str]) -> list[str]:
+    """The files of the source folder (if it exists) and the loose files."""
+    inside = list_files(landing_path(source)) if source in folders else []
+    return inside + loose
+
+
+def claim_files(plan: dict[str, dict[str, list[str]]], seen: set[str]) -> None:
+    """Fail when one file matches two sources; report the seen files (in a source
+    folder or loose) that match no dataset of this notebook."""
+    owners: dict[str, list[str]] = {}
+    for source, datasets in plan.items():
+        for path in {p for files in datasets.values() for p in files}:
+            owners.setdefault(path, []).append(source)
+    shared = {path: sources for path, sources in owners.items() if len(sources) > 1}
+    if shared:
+        raise RuntimeError(f"FAIL  a file matches several sources: {shared}")
+    unclaimed = sorted(path for path in seen if path not in owners)
+    if unclaimed:
+        print(f"WARN  files this notebook does not load: {unclaimed}")
+
+
+def remove_source(source: str, paths: list[str]) -> None:
+    """Remove the loaded files, then the source folder once it holds no file."""
+    remove_files(paths)
+    if source in landing_sources() and not list_files(landing_path(source)):
+        dbutils.fs.rm(landing_path(source), recurse=True)
+        print(f"REMOVED    empty folder {source}/")
+
+
 # COMMAND ----------
 
 # DBTITLE 1,Merge list
