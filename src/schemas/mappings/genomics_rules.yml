@@ -6,7 +6,7 @@
 # Read by databricks/silver/_genomics_common.py. Precedence entries are
 # "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
 
-version: 3
+version: 4
 
 # entity_id_crosswalk keeps one row per entity, id and source column. When one id is
 # found by several methods, the first method of this list wins; a method that is not in
@@ -32,6 +32,7 @@ crosswalk_method_precedence:
   - string_alias
   - ensembl_protein_via_string
   - vcf_alleles_assumed_grch38
+  - obsolete_cross_reference
   # 4. own keys last
   - own_ensembl_id
   - own_ensembl_protein
@@ -40,10 +41,21 @@ crosswalk_method_precedence:
   - own_source_id
   - own_tahoe_name
 
-# ClinVar is staged as three snapshots (column `snapshot`: current, 2026-01, 2025-01).
-# variant_hgvs, variant_condition and variant_classification keep all three in
-# `source_snapshot`; every reader of those tables uses only this snapshot.
+# ClinVar holds ten snapshots (column `snapshot`): `current` (the newest file), the
+# earlier current file of 2026-10-26 and the January files of 2019 to 2026. Every
+# ClinVar table and builder keeps all ten; a reader that needs one state uses this one.
 clinvar_current_snapshot: current
+# The date of each snapshot label that is no date, so that the snapshots sort
+# (`current` = the weekly file staged in the download run of 2026-11-11).
+clinvar_snapshot_dates:
+  current: "2026-11-11"
+
+# dbVar files name their assembly in the file name, not in a column: study -> assembly
+# (staged files nstd102.GRCh38.variant_region, nstd102.GRCh38.variant_call,
+# estd214.GRCh38.variant_region).
+dbvar_assembly_by_study:
+  nstd102: GRCh38
+  estd214: GRCh38
 
 placeholders:
   general: ["", "-", "na", "NA", "N/A", "n/a", "[]"]
@@ -345,6 +357,7 @@ precedence:
     name:
       - clinvar.variant_summary.Name
       - pharmgkb.variants.Variant_Name
+      - dbvar.variants.ID
     # Coordinates of every source are kept; TCGA (GRCh37) has no variant row.
     coordinate:
       - clinvar.variant_summary.PositionVCF
@@ -357,6 +370,8 @@ precedence:
     gene_key:
       - clinvar.variant_summary.GeneID
       - alphamissense.variant_scores.transcript_id
+      # the gene of a PharmGKB variant by its gene ids or symbols
+      - pharmgkb.variants.pharmgkb_gene_key
 
 # Condition labels that name no disease (compared in lower case).
 generic_condition_labels:
@@ -537,3 +552,428 @@ frequently_tested_minimum: 10
 pharmacogene:
   level_high_from: 3
   level_medium_from: 2
+
+# ---------------------------------------------------------------------------
+# Feature attributes of genes, variants, diseases, structural variants and somatic
+# sites: one section per feature group, with the formulas of the earlier genomics
+# project (data_engineering/gold_layer/). Band lists
+# fall by `from`; the first band the value reaches wins. Targets and leakage
+# columns of the earlier notebooks are not carried (genomics ML phase). Old inputs
+# that Silver holds in another form: the GTEx maximum TPM is the GTEx median TPM
+# of `gene_expression_median`; a protein domain flag is the protein name flag.
+# ---------------------------------------------------------------------------
+
+# old notebook feature_engineering_clinical
+clinical_features:
+  strong_evidence_review_from: 2
+  combined_risk_points: {domain_affecting: 2, deleterious_by_cadd: 2}
+  well_characterized_description_above: 50
+  expression_tpm_above: 1.0
+  broadly_expressed_tissues_from: 10
+  highly_expressed_tpm_from: 100
+  expression_context:
+    - {from: 10, label: Ubiquitous}
+    - {from: 5, label: Broad}
+  expression_context_default: Tissue_Specific
+  cancer_gene_mutations_from: 10
+  mutation_burden:
+    - {from: 1000, label: Very_High}
+    - {from: 500, label: High}
+    - {from: 100, label: Moderate}
+    - {from: 10, label: Low}
+  mutation_burden_default: Very_Low
+  pathogenic_enriched_above: 0.1
+  benign_enriched_above: 0.5
+  vus_enriched_above: 0.5
+  high_lof_burden_above: 0.1
+  quality_annotations_from: 1.0
+  # contig -> inheritance pattern; another contig is autosomal
+  inheritance: {X: X_Linked, Y: Y_Linked, MT: Mitochondrial}
+  inheritance_default: Autosomal
+
+# old notebook feature_engineering_disease_v2_FIXED (supersedes the first version)
+disease_features:
+  generic_name_pattern: "disease|disorder|syndrome"
+  generic_name_shorter_than: 30
+  well_annotated_coverage_from: 2
+  coverage_id_types: [omim, mondo, orphanet]
+  disease_count_category:
+    - {from: 10, label: Highly_Associated}
+    - {from: 5, label: Moderately_Associated}
+    - {from: 2, label: Associated}
+    - {from: 1, label: Single_Disease}
+  disease_count_category_default: Not_Associated
+  association_strength:
+    - {from: 10, label: "5"}
+    - {from: 5, label: "4"}
+    - {from: 2, label: "3"}
+    - {from: 1, label: "2"}
+  association_strength_default: "1"
+  multi_disease_from: 3
+  polygenic_gene_count_from: 3
+  disease_complexity:
+    - {from: 10, label: Highly_Complex}
+    - {from: 5, label: Complex}
+    - {from: 3, label: Moderately_Complex}
+    - {from: 2, label: Oligogenic}
+  disease_complexity_default: Monogenic
+  disease_complexity_score:
+    - {from: 10, label: "5"}
+    - {from: 5, label: "4"}
+    - {from: 3, label: "3"}
+    - {from: 2, label: "2"}
+  disease_complexity_score_default: "1"
+  high_pathogenic_burden_above: 0.2
+  high_quality_review_from: 2
+  utility_weights: {pathogenic: 3, high_quality: 2, disease_diversity: 2}
+  priority_tier:
+    - {from: 20, label: Tier_1_Critical}
+    - {from: 10, label: Tier_2_High}
+    - {from: 5, label: Tier_3_Medium}
+    - {from: 1, label: Tier_4_Low}
+  priority_tier_default: Tier_5_Minimal
+  actionable: {pathogenic_from: 5, high_quality_from: 3}
+  research_candidate: {variants_from: 10, diversity_from: 2}
+  excellent_annotation_from: 10
+  annotation_priority:
+    - {from: 20, label: Excellent}
+    - {from: 10, label: Good}
+    - {from: 5, label: Moderate}
+  annotation_priority_default: Poor
+  cancer_hotspot_gene_mutations_from: 100
+  complex_protein_domains_from: 5
+
+# old notebook feature_engineering_pharmacogene
+pharmacogene_features:
+  drug_target_flags: [is_kinase, is_receptor, is_gpcr]
+  metabolizing_flags: [is_enzyme, is_phosphatase, is_protease]
+  # first match wins; `any` lists function flags of the gene
+  drug_target_category:
+    - {label: Kinase, any: [is_kinase]}
+    - {label: Receptor, any: [is_receptor]}
+    - {label: GPCR, any: [is_gpcr]}
+    - {label: Metabolizing_Enzyme, any: [is_enzyme, is_phosphatase, is_protease]}
+    - {label: Transporter, any: [is_transporter]}
+  drug_target_category_default: Not_Drug_Target
+  enhanced_druggability_points: {pharmacogene: 2, drug_target: 1, pharmgkb_annotation: 1}
+  burden:
+    - {from: 10, label: High_Burden}
+    - {from: 5, label: Moderate_Burden}
+    - {from: 1, label: Low_Burden}
+  burden_default: No_Burden
+  priority:
+    - {from: 10, label: Critical_Priority}
+    - {from: 5, label: High_Priority}
+    - {from: 1, label: Moderate_Priority}
+  priority_default: Low_Priority
+  drug_description_pattern: "drug|metabolism|pharmacology"
+  # GTEx tissues counted as liver and as kidney
+  liver_tissues: [Liver, Liver_Hepatocyte, Liver_Mixed_Cell, Liver_Portal_Tract]
+  kidney_tissues: [Kidney_Cortex, Kidney_Medulla]
+  expression_breadth:
+    - {from: 15, label: Ubiquitous}
+    - {from: 5, label: Broad}
+  expression_breadth_default: Tissue_Specific
+  oncology_target_mutations_from: 50
+
+# old notebook feature_engineering_variant_impact
+variant_impact_features:
+  domain_type_flags: [has_zinc_finger, has_kinase_in_name, has_receptor_in_name, has_sh2_domain, has_sh3_domain, has_ph_domain]
+  combined_impact_points: {domain: 3, deleterious_by_cadd: 2, highly_conserved: 1}
+  impact_tier:
+    - {from: 12, label: Tier_1_Critical}
+    - {from: 9, label: Tier_2_High}
+    - {from: 6, label: Tier_3_Moderate}
+    - {from: 3, label: Tier_4_Low}
+  impact_tier_default: Tier_5_Minimal
+  druggable_gene_from: 3.0
+  disease_impact_category:
+    - {from: 10, label: Highly_Disease_Associated}
+    - {from: 5, label: Disease_Associated}
+    - {from: 1, label: Single_Disease}
+  disease_impact_category_default: Not_Disease_Associated
+  gene_impact_burden:
+    - {from: 100, label: Very_High_Burden}
+    - {from: 50, label: High_Burden}
+    - {from: 10, label: Moderate_Burden}
+    - {from: 1, label: Low_Burden}
+  gene_impact_burden_default: No_Burden
+  lof_tolerance:
+    - {from: 50, label: LoF_Tolerant}
+    - {from: 10, label: LoF_Moderate}
+    - {from: 1, label: LoF_Sensitive}
+  lof_tolerance_default: No_LoF_Variants
+
+# old notebook feature_engineering_structural (after the dbVar fix)
+structural_variant_features:
+  # first match wins; patterns over the dbVar SV type (case ignored)
+  type_classes:
+    - {label: Deletion, pattern: "deletion|loss|del"}
+    - {label: Duplication, pattern: "duplication|gain|dup"}
+    - {label: Inversion, pattern: "inversion|inv"}
+    - {label: Translocation, pattern: "translocation|trans"}
+    - {label: Insertion, pattern: "insertion|ins"}
+    - {label: Copy_Number_Variant, pattern: "copy|cnv"}
+  type_class_default: Other_SV
+  size_categories:
+    - {below: 1000, label: Small}
+    - {below: 10000, label: Medium}
+    - {below: 100000, label: Large}
+    - {below: 1000000, label: Very_Large}
+  size_category_default: Mega
+  risk: {deletion_above: 100000, deletion_duplication_above: 10000, low_above: 1000}
+  disruption:
+    - {from: 0.9, label: Complete_Disruption}
+    - {from: 0.5, label: Major_Disruption}
+    - {from: 0.25, label: Moderate_Disruption}
+  disruption_default: Minor_Disruption
+  essential_gene_tissues_from: 10
+  gene_count_points:
+    - {from: 20, label: "5"}
+    - {from: 10, label: "4"}
+    - {from: 5, label: "3"}
+    - {from: 1, label: "2"}
+  gene_count_points_default: "1"
+  pharmacogene_points:
+    - {from: 3, label: "3"}
+    - {from: 1, label: "2"}
+  omim_gene_points:
+    - {from: 3, label: "2"}
+    - {from: 1, label: "1"}
+  size_points:
+    - {from: 1000000, label: "2"}
+    - {from: 100000, label: "1"}
+  deletion_points: 1
+  cancer_genes_from: 2
+  neurological_genes_from: 2
+
+# 23_pharmacogene_features
+pharmacogene_gene_features:
+  high_druggability_from: 0.7
+  complex_target_domains_from: 5
+  oncology_target_mutations_from: 50
+  evidence_points: {source: 5, high_druggability: 3, pharmacogene_variants: 2}
+  interaction_points: {drug_relationship: 2, liver_or_kidney: 3, pathogenic: 2}
+  utility_points: {source: 10, high_druggability: 5, drug_relationship: 0.5, many_diseases: 5, oncology: 5}
+  many_diseases_from: 5
+  variant_impact_weights: {pathogenic: 3, domain_affecting: 2, loss_of_function: 1}
+  metabolism_points: {hepatic: 10, renal: 8, liver: 3}
+  variant_impact_burden:
+    - {from: 10, label: High}
+    - {from: 5, label: Medium}
+  variant_impact_burden_default: Low
+  cancer_mutation_burden:
+    - {from: 100, label: Very_High}
+    - {from: 50, label: High}
+    - {from: 10, label: Medium}
+  cancer_mutation_burden_default: Low
+  priority:
+    - {from: 20, label: critical}
+    - {from: 15, label: high}
+    - {from: 8, label: medium}
+  priority_default: low
+
+# 24_drug_response_features (old `pathogenicity_score` of this notebook is
+# `drug_response_significance_points`, so it does not clash with the variant
+# pathogenicity score)
+drug_response_features:
+  functional_points: {domain_affecting: 5, missense: 3, nonsense: 5, frameshift: 5}
+  significance_points: {pathogenic: 10, benign: -5}
+  population_points: {common_annotated: 10, rare_annotated: 7}
+  tissue_points: {hepatic_metabolism: 10, liver_annotated: 5}
+  weights: {functional: 0.35, significance: 0.25, population: 0.20, tissue: 0.20}
+  annotation_points: 10
+  priority:
+    - {from: 20, label: critical}
+    - {from: 15, label: high}
+    - {from: 8, label: medium}
+  priority_default: low
+  cancer_gene_mutations_from: 10
+
+# 25_transcript_expression_features
+expression_features:
+  ubiquitous_from: 40
+  tissue_specific_up_to: 5
+  highly_expressed_from: 100
+  lowly_expressed_below: 1
+  breadth_category:
+    - {up_to: 5, label: tissue_specific}
+    - {up_to: 20, label: moderately_specific}
+    - {up_to: 40, label: broadly_expressed}
+  breadth_category_default: ubiquitous
+  level_category:
+    - {from: 100, label: high}
+    - {from: 10, label: medium}
+    - {from: 1, label: low}
+  level_category_default: very_low
+  significance_points:
+    - {from: 100, label: "10"}
+    - {from: 50, label: "8"}
+    - {from: 10, label: "6"}
+    - {from: 1, label: "4"}
+  significance_points_default: "2"
+  relevance_points: {tissue_specific: 8, highly_expressed: 5, primary_tissue: 2}
+  priority_medium_tissues_up_to: 15
+  cancer_burden: {high_from: 100, moderate_from: 10}
+  disease_points: {highly_expressed: 10, tissue_specific: 8, category: 3}
+  cancer_points: {highly_expressed: 10, many_samples: 5}
+  cancer_many_samples_from: 100
+  functional_points: {domain_highly_expressed: 8, expression_variants: 5, pharmacogene_highly_expressed: 7}
+  domain_correlation: {multi_domain_from: 5, few_domains_from: 2}
+
+# 26_protein_family_features
+protein_family_features:
+  multi_domain_from: 5
+  families:
+    signaling: [has_kinase_in_name, has_sh2_domain, has_sh3_domain]
+    dna_binding: [has_zinc_finger, has_helix_loop_helix, has_leucine_zipper]
+    membrane: [has_receptor_in_name, has_ph_domain]
+    apoptosis: [has_death_domain]
+    immune: [has_immunoglobulin]
+  diversity_points: {domain: 2, signaling: 3, dna_binding: 3, membrane: 2}
+  complexity_points: {functional_protein: 2, multi_domain: 5}
+  druggability_points: {kinase: 10, receptor: 8, signaling: 5}
+  variant_domain_weights: {domain_affecting: 2, domain_pathogenic: 5, critical_domain: 10}
+  cancer_relevant_samples_from: 10
+  cancer_points: {signaling: 15, relevant: 10, per_sample: 0.1}
+  disease_associated_from: 5
+  disease_points: {multi_domain: 12, associated: 8, per_disease: 0.5}
+  tissue_specific_up_to: 5
+  priority_medium_druggability_from: 10
+
+# 27_genetic_test_features
+genetic_test_features:
+  multiple_tests_from: 3
+  comprehensive_tests_from: 10
+  well_tested: {complete_from: 5, diseases_from: 2}
+  availability_category:
+    - {from: 10, label: comprehensive}
+    - {from: 3, label: multiple}
+    - {from: 1, label: limited}
+  availability_category_default: none
+  accessibility_points: {per_test: 2, multiple: 5, comprehensive: 10}
+  utility_points: {per_complete_test: 3, per_disease: 2, well_tested: 8}
+  quality_points: {gene_info: 1, disease_info: 2, complete: 3}
+  multi_disease_from: 3
+  disease_test_correlation:
+    - {from: 10, label: high_disease_burden}
+    - {from: 3, label: moderate_disease_burden}
+  disease_test_correlation_default: low_disease_burden
+  variant_test_coverage_level:
+    - {from: 20, label: high}
+    - {from: 5, label: moderate}
+  variant_test_coverage_level_default: low
+  cancer_panel_mutations_from: 50
+  hereditary_cancer_samples_from: 10
+  carrier_screening_from: 3
+  population_test_priority:
+    - {from: 10, label: high_carrier_risk}
+    - {from: 3, label: moderate_carrier_risk}
+  population_test_priority_default: low_carrier_risk
+  composite_points: {multi_disease: 5, many_pathogenic: 8, per_pathogenic: 2, coverage_bonus: 10, carrier: 10, hereditary: 8, per_rare_pathogenic: 1}
+  many_pathogenic_from: 10
+  priority_medium_utility_from: 10
+  test_recommendation_tier:
+    - {from: 20, label: tier_1}
+    - {from: 10, label: tier_2}
+    - {from: 5, label: tier_3}
+  test_recommendation_tier_default: unclassified
+
+# 28_cancer_variant_features_v2_FIXED (the fixed version supersedes 28). A site is
+# the GRCh37 somatic site (contig, start, reference, tumour allele).
+cancer_features:
+  recurrent_from: 3
+  hotspot_from: 10
+  high_impact: {truncating_from: 1, samples_from: 2}
+  mutation_frequency_category:
+    - {from: 10, label: hotspot}
+    - {from: 3, label: recurrent}
+    - {from: 2, label: low_recurrent}
+  mutation_frequency_category_default: singleton
+  cancer_gene_samples_from: 5
+  frequently_mutated_sites_from: 10
+  tumor_suppressor_samples_from: 3
+  oncogene_samples_from: 5
+  burden_weights: {per_sample: 2, per_site: 1}
+  impact_weights: {truncating: 3, missense: 1, silent: -0.5}
+  priority_points: {tumor_suppressor: 10, oncogene: 10, per_sample: 0.5}
+  likely_germline_frequency_above: 0.01
+  site_points: {recurrent: 10, pathogenic: 8, conserved: 5, oncogenic_domain: 7}
+  therapeutic_points: {hotspot_kinase: 15, oncogene: 10, oncogenic_domain: 8}
+  prognostic_points: {suppressor_pathogenic: 12, hereditary: 10, per_sample: 0.5}
+  conserved_phylop_above: 2.7
+
+# 29_population_frequency_features
+population_features:
+  tiers:
+    - {below: 0.0001, label: ultra_rare}
+    - {below: 0.001, label: very_rare}
+    - {below: 0.01, label: rare}
+    - {below: 0.05, label: low_frequency}
+  tier_default: common
+  rarity_points: {ultra_rare: 10, very_rare: 8, rare: 6, low_frequency: 4, common: 2}
+  carrier_points: {ultra_rare: 10, very_rare: 10, rare: 7, low_frequency: 5, common: 2}
+  likelihood_points: {ultra_rare: 9, very_rare: 7, rare: 5, low_frequency: 3, common: 1}
+  disease_allele_frequency:
+    - {from: 10, label: High_Disease_Burden}
+    - {from: 5, label: Medium_Disease_Burden}
+    - {from: 1, label: Low_Disease_Burden}
+  disease_allele_frequency_default: No_Disease
+  carrier_by_disease: {high_from: 5, medium_from: 1}
+  expression_frequency_correlation:
+    - {from: 20, label: Ubiquitous_Expression}
+    - {from: 10, label: Broad_Expression}
+  expression_frequency_correlation_default: Tissue_Specific_Expression
+  significance_weights: {pathogenicity: 0.5, rarity: 0.3, rare_pathogenic: 10}
+  carrier_adjustment: {lof_sensitive: 5, per_constraint: 0.1}
+  likelihood_adjustment: {per_conservation: 2, conflict: -5}
+
+# ---------------------------------------------------------------------------
+# Batch 4 sources
+# ---------------------------------------------------------------------------
+
+# Gene age by the most distant species with an orthologue in the staged Ensembl
+# Compara file (6 species besides human). Rank 5 is the oldest level; the level
+# is a clade name, no divergence time (the TimeTree times were not confirmed).
+orthologue_depth:
+  levels: [amniote, tetrapod, vertebrate, bilaterian, eukaryote]
+  species:
+    gallus_gallus: {rank: 1, level: amniote}
+    xenopus_tropicalis: {rank: 2, level: tetrapod}
+    danio_rerio: {rank: 3, level: vertebrate}
+    drosophila_melanogaster: {rank: 4, level: bilaterian}
+    caenorhabditis_elegans: {rank: 4, level: bilaterian}
+    saccharomyces_cerevisiae: {rank: 5, level: eukaryote}
+  paralogue_types: [within_species_paralog, other_paralog]
+  # Consensus gene ages (Liebeskind et al. 2016, marcottelab/Gene-Ages, MIT): the
+  # Bronze columns of the age distribution, oldest first.
+  consensus_classes:
+    - Cellular_organisms
+    - Euk_Archaea
+    - Euk_Bac
+    - Eukaryota
+    - Opisthokonta
+    - Eumetazoa
+    - Vertebrata
+    - Mammalia
+
+# DepMap CRISPR gene effect (Chronos): 0 = no effect, -1 = the median of the common
+# essential genes (DepMap). The dependency cutoff -0.5 is the usual DepMap cutoff; the
+# class bands over the share of dependent cell lines are the assistant's, to confirm.
+gene_essentiality:
+  dependent_at_or_below: -0.5
+  strongly_essential_at_or_below: -1.0
+  classes:
+    - {from: 0.9, label: common_dependency}
+    - {from: 0.1, label: selective_dependency}
+    - {from: 0.0001, label: rare_dependency}
+  class_default: no_dependency
+
+# AlphaFold per-residue confidence bands (AlphaFold DB): first band whose `from` the
+# pLDDT reaches.
+plddt_bands:
+  bands:
+    - {from: 90, label: very_high}
+    - {from: 70, label: confident}
+    - {from: 50, label: low}
+  band_default: very_low

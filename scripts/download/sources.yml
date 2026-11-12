@@ -51,6 +51,7 @@ vars:
   # Biosamples kept from ENCODE-rE2G: names holding one of these (tissues as in GTEx).
   encode_tissue_keywords: [adipose, adrenal, artery, aorta, blood, brain, breast, colon, esophagus, heart, kidney, liver, lung, muscle, nerve, ovary, pancreas, pituitary, prostate, skin, small intestine, spleen, stomach, testis, thyroid, uterus, vagina]
   collectri: https://zenodo.org/api/records/8192729/files
+  gene_ages: https://raw.githubusercontent.com/marcottelab/Gene-Ages/master
   ddinter: https://ddinter2.scbdd.com/static/media/download
   energy_charts: https://api.energy-charts.info/v2
   energy_charts_start: "2024-11-01"
@@ -555,6 +556,14 @@ stages:
     files:
       - {tag: "8192729", url: "{collectri}/CollecTRI_regulons.csv/content", file: CollecTRI_regulons.csv}
     parser: {name: csv, dataset: regulons}
+  # Consensus gene ages of human proteins (Liebeskind, McWhite and Marcotte 2016,
+  # Genome Biol Evol 8:1812; marcottelab/Gene-Ages, MIT licence): mode age, the age
+  # distribution over 13 orthology algorithms and the error columns.
+  - source: gene_ages
+    datasets: [consensus]
+    files:
+      - {tag: master, url: "{gene_ages}/Main/main_HUMAN.csv", file: main_HUMAN.csv}
+    parser: {name: csv, dataset: consensus, rename: {"Unnamed: 0": protein_accession}}
   - source: iedb
     datasets: [epitopes]
     # The IEDB server refuses scripted downloads (HTTP 403): save both exports by hand.

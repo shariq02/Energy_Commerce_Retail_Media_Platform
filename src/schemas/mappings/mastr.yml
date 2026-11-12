@@ -458,9 +458,12 @@ coded_value_labels:
     "38": permanently_shut_down
   unknown_code_policy: quarantine   # never a silent NULL
 
+# `<field>_nv` ("nicht vorhanden"): the registrant stated that the information does not
+# exist; when true, a value in `<field>` is to be ignored (MaStR export documentation,
+# section Nicht-Vorhanden Felder). Silver: boolean `<English field>_not_available`, and
+# the base value is null when it is true.
 dropped_columns:
   - { column: "constant columns per table (contracts/mastr.yml constant_columns_observed)", reason: "no information at the observed population" }
-  - { column: "*_nv 'nicht veroeffentlicht' flags", reason: "retained only where they disambiguate a suppressed value; otherwise dropped at Silver" }
 
 localisation:
   required: true

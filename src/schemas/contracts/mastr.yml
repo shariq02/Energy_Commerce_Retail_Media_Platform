@@ -979,6 +979,7 @@ tables:
     columns:
       - { name: Id,   type: string, required: true, nullable: false, notes: "code" }
       - { name: Wert, type: string, required: true, nullable: false, notes: "German label" }
+      - { name: KatalogKategorieId, type: string, required: false, nullable: true, notes: "column of the merged table mastr_code_lookup; filled only on katalogwerte rows, null here" }
 
   - name: mastr_katalogkategorien
     kind: light
@@ -1018,6 +1019,7 @@ tables:
     columns:
       - { name: Id,   type: string, required: true, nullable: false }
       - { name: Wert, type: string, required: true, nullable: false }
+      - { name: KatalogKategorieId, type: string, required: false, nullable: true, notes: "column of the merged table mastr_code_lookup; filled only on katalogwerte rows, null here" }
 
   - name: mastr_marktfunktionen
     bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: marktfunktionen }
@@ -1028,6 +1030,7 @@ tables:
     columns:
       - { name: Id,   type: string, required: true, nullable: false }
       - { name: Wert, type: string, required: true, nullable: false }
+      - { name: KatalogKategorieId, type: string, required: false, nullable: true, notes: "column of the merged table mastr_code_lookup; filled only on katalogwerte rows, null here" }
 
   - name: mastr_marktrollen
     bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: marktrollen }
@@ -1038,6 +1041,7 @@ tables:
     columns:
       - { name: Id,   type: string, required: true, nullable: false }
       - { name: Wert, type: string, required: true, nullable: false }
+      - { name: KatalogKategorieId, type: string, required: false, nullable: true, notes: "column of the merged table mastr_code_lookup; filled only on katalogwerte rows, null here" }
 
 # ===========================================================================
 

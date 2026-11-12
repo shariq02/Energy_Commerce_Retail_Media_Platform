@@ -487,6 +487,9 @@ case = (
         text("occp_cod").alias("occupation_code"),
         text("reporter_country").alias("reporter_country"),
         text("occr_country").alias("occurrence_country"),
+        text("auth_num").alias("authority_number"),
+        text("lit_ref").alias("literature_reference"),
+        text("to_mfr").alias("sent_to_manufacturer"),
     )
     .distinct()
     .withColumn("_srid", sha_key("quarter", "primary_id"))

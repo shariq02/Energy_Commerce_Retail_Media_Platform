@@ -696,7 +696,10 @@ def parquet(dataset):
     return parse
 
 
-def csv(dataset):
+def csv(dataset, rename=None):
+    """A comma-separated file; `rename` maps column names (pandas names an empty
+    header `Unnamed: 0`)."""
+
     def parse(path: Path, tag: str):
         frames = pd.read_csv(
             path,
@@ -706,7 +709,7 @@ def csv(dataset):
             chunksize=BATCH_ROWS,
         )
         for frame in frames:
-            yield {dataset: frame}, len(frame)
+            yield {dataset: frame.rename(columns=rename or {})}, len(frame)
 
     return parse
 

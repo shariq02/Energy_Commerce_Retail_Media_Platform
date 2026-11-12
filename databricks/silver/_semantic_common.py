@@ -538,6 +538,8 @@ ENERGY_OBSERVATION_COLUMNS = [
     *_ENERGY_HEAD,
     *_TIME_COLUMNS,
     *_doubles(PRICE_COLUMN, *THERMAL_COLUMNS),
+    # the SMARD balancing energy price of the quarter-hour
+    ("balancing_price_eur_per_mwh", "double"),
     *[
         column
         for channel in HONDA_METER_CHANNELS
@@ -561,6 +563,8 @@ ENERGY_COMPONENT_COLUMNS = [
     *_doubles("energy_mwh", "power_w"),
     *_texts("semantic_status", "semantic_issue_ref", "source_series"),
     *_texts("source_filter_id"),
+    # the neighbour of a cross-border exchange, and the licence text a source gives
+    *_texts("counterpart_area_code", "source_license"),
     *_booleans("is_outlier_five_sigma", "is_stuck_reading"),
     ("sign_convention", "string"),
     *_TAIL,

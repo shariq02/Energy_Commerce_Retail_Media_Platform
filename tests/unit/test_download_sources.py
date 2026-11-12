@@ -233,6 +233,19 @@ def test_table_keeps_a_fixed_column_set(genomics, tmp_path):
     assert frame["Score"].isna().all()
 
 
+def test_csv_names_the_empty_first_header(genomics, tmp_path):
+    table = tmp_path / "ages.csv"
+    table.write_text(",Eukaryota,modeAge\nP1,1.0,Eukaryota\n", encoding="utf-8")
+    parse = genomics.csv("consensus", rename={"Unnamed: 0": "protein_accession"})
+    batches, rows = next(parse(table, "master"))
+    assert list(batches["consensus"].columns) == [
+        "protein_accession",
+        "Eukaryota",
+        "modeAge",
+    ]
+    assert rows == 1
+
+
 def test_iedb_keeps_human_rows_and_named_columns(genomics, tmp_path):
     archive = tmp_path / "i.zip"
     with zipfile.ZipFile(archive, "w") as handle:

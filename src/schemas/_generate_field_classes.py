@@ -659,6 +659,18 @@ def build_rows() -> list[dict]:
             st = topo.get("renamed_tables", {}).get(bt, bt) if source == "mastr" else bt
             for col in tdef["columns"]:
                 name = col["name"]
+                if source == "mastr" and name.endswith("_nv"):
+                    # "nicht vorhanden" flag -> <English field>_not_available
+                    base = name[: -len("_nv")]
+                    english = key_names.get(bt, {}).get(base, bn.get(base, base))
+                    add(
+                        st,
+                        f"{english}_not_available",
+                        "derived",
+                        "MaStR flag as a boolean; the base value is null when true",
+                        f"{source} contract / business-name mapping",
+                    )
+                    continue
                 out_name = bn.get(name, name)
                 # DWD MESS_DATUM -> observation_timestamp
                 out_name = topo.get("ts_rename", {}).get(name, out_name)

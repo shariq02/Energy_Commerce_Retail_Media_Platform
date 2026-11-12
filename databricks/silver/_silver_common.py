@@ -1055,9 +1055,43 @@ def _is_mastr_date(col: str) -> bool:
 
 
 def untranslated_source_columns(columns) -> list:
-    """Columns still carrying a source-style (uppercase) name. The `_nv`
-    companions are excluded until their meaning is settled."""
-    return [c for c in columns if c != c.lower() and not c.endswith("_nv")]
+    """Columns still carrying a source-style (uppercase) name."""
+    return [c for c in columns if c != c.lower()]
+
+
+MASTR_NOT_AVAILABLE_SUFFIX = "_nv"
+
+
+def mastr_not_available_name(column: str, name_map: dict) -> str:
+    """`Hausnummer_nv` -> `house_number_not_available` (the English name of the
+    base field plus `_not_available`)."""
+    base = column[: -len(MASTR_NOT_AVAILABLE_SUFFIX)]
+    return f"{name_map.get(base, base)}_not_available"
+
+
+def mastr_not_available(df: DataFrame, name_map: dict) -> DataFrame:
+    """MaStR "nicht vorhanden" flags: for a required field the registrant can state
+    that the information does not exist; the export then adds `<field>_nv`. When
+    it is true, a value in the base field is to be ignored (MaStR export
+    documentation, section Nicht-Vorhanden Felder). Each flag becomes a boolean
+    `<english field>_not_available`, and the base value is null where it is true."""
+    for column in [c for c in df.columns if c.endswith(MASTR_NOT_AVAILABLE_SUFFIX)]:
+        text = F.lower(F.trim(F.col(column).cast("string")))
+        flag = F.when(text.isin("true", "1"), F.lit(True)).when(
+            text.isin("false", "0"), F.lit(False)
+        )
+        base = column[: -len(MASTR_NOT_AVAILABLE_SUFFIX)]
+        if base in df.columns:
+            df = df.withColumn(
+                base,
+                F.when(F.coalesce(flag, F.lit(False)), F.lit(None)).otherwise(
+                    F.col(base)
+                ),
+            )
+        df = df.withColumn(mastr_not_available_name(column, name_map), flag).drop(
+            column
+        )
+    return df
 
 
 def mastr_standardise(
@@ -1066,6 +1100,7 @@ def mastr_standardise(
     """Decode every present coded column against its katalog category, apply the
     English business renames, then type the date / capacity / geometry /
     coordinate columns. Column names come out aligned with the registry."""
+    df = mastr_not_available(df, name_map)
     decoded = []
     for raw, category in coded_map.items():
         if raw not in df.columns:

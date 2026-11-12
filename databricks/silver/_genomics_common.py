@@ -75,6 +75,13 @@ GENOMICS_MAIN_TABLES = {
     "faers_case",
     "faers_case_drug",
     "faers_case_item",
+    "clinical_trial",
+    "protein_residue_score",
+    "gene_dependency",
+    "regulatory_element_gene_link",
+    "epitope",
+    "epitope_mhc_assay",
+    "gene_disease_score_year",
 }
 
 # One row per ...
@@ -110,6 +117,13 @@ GENOMICS_TABLE_GRAIN = {
     "faers_case": "case version",
     "faers_case_drug": "case version, drug sequence, dose record",
     "faers_case_item": "case version, drug sequence, item kind, item",
+    "clinical_trial": "study",
+    "protein_residue_score": "protein, fragment, residue, score name",
+    "gene_dependency": "cell line, gene",
+    "regulatory_element_gene_link": "element, target gene, biosample, cell type, score",
+    "epitope": "epitope",
+    "epitope_mhc_assay": "assay",
+    "gene_disease_score_year": "gene, disease, association level, datasource, year",
 }
 
 # Domain columns (name, Spark type) per table; the generator adds the governance
@@ -137,6 +151,8 @@ GENOMICS_STRUCTURES = {
         ("source_field", "string"),
         ("source_rank", "int"),
         ("source_type", "string"),
+        # the ClinVar snapshot of a ClinVar claim (null for other sources)
+        ("source_snapshot", "string"),
     ],
     "entity_name": [
         ("entity_type", "string"),
@@ -184,6 +200,8 @@ GENOMICS_STRUCTURES = {
         ("coordinate_system", "string"),
         ("coordinate_conversion", "string"),
         ("is_primary", "boolean"),
+        # the GenBank gi of the genomic contig (gene2refseq)
+        ("contig_genbank_gi", "string"),
     ],
 }
 
@@ -263,6 +281,55 @@ ALL_MASTER_FIELDS = tuple(
     dict.fromkeys(field for fields in MASTER_FIELDS.values() for field in fields)
 )
 CYTOBAND_COLUMNS = ("cytoband_arm", "cytoband_band", "cytoband_sub_band")
+# DepMap model columns of `cell_line` (source column -> Silver column); the model id
+# is `cell_line_key`, the RRID is `cellosaur_id` and the cell line name `cell_name`.
+DEPMAP_MODEL_COLUMNS = {
+    "PatientID": "patient_id",
+    "StrippedCellLineName": "stripped_cell_line_name",
+    "CCLEName": "ccle_name",
+    "DepmapModelType": "depmap_model_type",
+    "ModelType": "model_type",
+    "PediatricModelType": "pediatric_model_type",
+    "OncotreeLineage": "oncotree_lineage",
+    "OncotreePrimaryDisease": "oncotree_primary_disease",
+    "OncotreeSubtype": "oncotree_subtype",
+    "OncotreeCode": "oncotree_code",
+    "Age": "age",
+    "AgeCategory": "age_category",
+    "Sex": "sex",
+    "PatientRace": "patient_race",
+    "PrimaryOrMetastasis": "primary_or_metastasis",
+    "SourceType": "source_type",
+    "SourceDetail": "source_detail",
+    "CatalogNumber": "catalog_number",
+    "SampleCollectionSite": "sample_collection_site",
+    "ModelSubtypeFeatures": "model_subtype_features",
+    "PatientSubtypeFeatures": "patient_subtype_features",
+    "TissueOrigin": "tissue_origin",
+    "ModelDerivationMaterial": "model_derivation_material",
+    "ModelTreatment": "model_treatment",
+    "PatientTreatmentStatus": "patient_treatment_status",
+    "PatientTreatmentType": "patient_treatment_type",
+    "PatientTreatmentDetails": "patient_treatment_details",
+    "Stage": "stage",
+    "StagingSystem": "staging_system",
+    "PatientTumorGrade": "patient_tumor_grade",
+    "PatientTreatmentResponse": "patient_treatment_response",
+    "GrowthPattern": "growth_pattern",
+    "OnboardedMedia": "onboarded_media",
+    "FormulationID": "formulation_id",
+    "SerumFreeMedia": "serum_free_media",
+    "PlateCoating": "plate_coating",
+    "EngineeredModel": "engineered_model",
+    "EngineeredModelDetails": "engineered_model_details",
+    "CulturedResistanceDrug": "cultured_resistance_drug",
+    "PublicComments": "public_comments",
+    "ModelIDAlias": "model_id_alias",
+    "HCMIID": "hcmi_id",
+    "SangerModelID": "sanger_model_id",
+    "WTSIMasterCellID": "wtsi_master_cell_id",
+    "COSMICID": "cosmic_id",
+}
 GENOMICS_STRUCTURES.update(
     {
         "entity_master": [
@@ -296,7 +363,8 @@ GENOMICS_STRUCTURES.update(
             ("reference_kind", "string"),
             ("reference_value", "string"),
         ],
-        # One row per cell line and driver (a cell line without a driver keeps one row).
+        # One row per cell line and driver (a cell line without a driver keeps one
+        # row): the Tahoe lines with their drivers and every DepMap model.
         "cell_line": [
             ("cell_line_key", "string"),
             ("cell_name", "string"),
@@ -308,6 +376,9 @@ GENOMICS_STRUCTURES.update(
             ("driver_effect", "string"),
             ("driver_mechanism", "string"),
             ("driver_gene_type", "string"),
+            ("in_tahoe", "boolean"),
+            ("in_depmap", "boolean"),
+            *[(name, "string") for name in DEPMAP_MODEL_COLUMNS.values()],
         ],
         # One row per test and link; `link_kind` is gene or condition.
         "genetic_test": [
@@ -331,6 +402,16 @@ GENOMICS_STRUCTURES.update(
             ("direction", "string"),
             ("source_dataset", "string"),
             ("source_field", "string"),
+            # MedGen relation id, atom ids and the source type of the first atom
+            *[
+                (name, "string")
+                for name in (
+                    "relation_id",
+                    "parent_atom_id",
+                    "child_atom_id",
+                    "parent_source_type",
+                )
+            ],
         ],
     }
 )
@@ -361,6 +442,8 @@ VARIANT_SOURCE_FLAGS = {
     "long_range_benchmark.causal_eqtl": "in_long_range_causal_eqtl",
     "clinvar_vs_benign.variants": "in_clinvar_vs_benign",
     "gnomad_balanced.variants": "in_gnomad_balanced",
+    "gnomad_mtdna.variants": "in_gnomad_mtdna",
+    "thousand_genomes.variants": "in_thousand_genomes",
 }
 
 
@@ -572,9 +655,52 @@ GENOMICS_STRUCTURES.update(
                 "ontology_term_ids",
                 "ontology_term_names",
                 "ontology_term_categories",
+                "ontology_term_qualifier_ids",
+                "ontology_term_qualifier_names",
+                "ontology_term_types",
             ),
             # ClinVar variation member (a complex variation and one of its alleles)
             ("variation_interpreted", "boolean"),
+            # the link of an object (trial condition or intervention, drug B of a
+            # drug interaction)
+            ("object_link_method", "string"),
+            # homology (Ensembl Compara): identity of gene A to gene B and back
+            *_number("double", "percent_identity", "homology_percent_identity"),
+            *_number(
+                "double",
+                "gene_order_conservation_score",
+                "whole_genome_alignment_coverage",
+            ),
+            ("is_high_confidence", "boolean"),
+            # source labels of a gene-disease record (ClinGen) and the gene region
+            *_text("source_gene_symbol", "source_disease_name"),
+            *_text("standard_operating_procedure", "cytogenetic_band"),
+            ("genomic_location", "string"),
+            # Open Targets: association novelty, GWAS evidence fields, mechanism target
+            ("novelty_score", "double"),
+            *_text("target_from_source_id", "disease_from_source_mapped_id"),
+            *_text("datatype_id", "curation_date", "publication_date"),
+            ("resource_score", "double"),
+            *_text("quality_controls", "target_name", "target_type"),
+            # CPIC pair attributes
+            *_text("clinpgx_level", "pharmacogenomic_testing"),
+            *_number("boolean", "used_for_recommendation", "is_provisional"),
+            # HPO phenotype name of a gene annotation
+            ("phenotype_name", "string"),
+            # BioGRID interactor details (A and B)
+            *[
+                (f"{name}_{side}", "string")
+                for name in (
+                    "source_gene",
+                    "systematic_name",
+                    "official_symbol",
+                    "synonyms",
+                    "swiss_prot_accessions",
+                    "trembl_accessions",
+                    "refseq_accessions",
+                )
+                for side in ("a", "b")
+            ],
         ],
         "gene_expression_median": [
             *_text("gene_key", "gene_ensembl_id", "gene_symbol", "tissue_key"),
@@ -740,6 +866,11 @@ GENOMICS_STRUCTURES.update(
                 "reporter_country",
                 "occurrence_country",
             ),
+            *_text(
+                "authority_number",
+                "literature_reference",
+                "sent_to_manufacturer",
+            ),
         ],
         "faers_case_drug": [
             *_text(
@@ -785,6 +916,227 @@ GENOMICS_STRUCTURES.update(
     }
 )
 
+# Clinical trial columns (AACT studies and the 1:1 eligibilities): source column ->
+# Silver column; an abbreviation of the source is spelled out.
+TRIAL_STUDY_COLUMNS = {
+    "nlm_download_date_description": "nlm_download_date_description",
+    "study_first_submitted_date": "study_first_submitted_date",
+    "results_first_submitted_date": "results_first_submitted_date",
+    "disposition_first_submitted_date": "disposition_first_submitted_date",
+    "last_update_submitted_date": "last_update_submitted_date",
+    "study_first_submitted_qc_date": "study_first_submitted_quality_check_date",
+    "study_first_posted_date": "study_first_posted_date",
+    "study_first_posted_date_type": "study_first_posted_date_type",
+    "results_first_submitted_qc_date": "results_first_submitted_quality_check_date",
+    "results_first_posted_date": "results_first_posted_date",
+    "results_first_posted_date_type": "results_first_posted_date_type",
+    "disposition_first_submitted_qc_date": (
+        "disposition_first_submitted_quality_check_date"
+    ),
+    "disposition_first_posted_date": "disposition_first_posted_date",
+    "disposition_first_posted_date_type": "disposition_first_posted_date_type",
+    "last_update_submitted_qc_date": "last_update_submitted_quality_check_date",
+    "last_update_posted_date": "last_update_posted_date",
+    "last_update_posted_date_type": "last_update_posted_date_type",
+    "start_month_year": "start_month_year",
+    "start_date_type": "start_date_type",
+    "start_date": "start_date",
+    "verification_month_year": "verification_month_year",
+    "verification_date": "verification_date",
+    "completion_month_year": "completion_month_year",
+    "completion_date_type": "completion_date_type",
+    "completion_date": "completion_date",
+    "primary_completion_month_year": "primary_completion_month_year",
+    "primary_completion_date_type": "primary_completion_date_type",
+    "primary_completion_date": "primary_completion_date",
+    "target_duration": "target_duration",
+    "study_type": "study_type",
+    "acronym": "acronym",
+    "baseline_population": "baseline_population",
+    "brief_title": "brief_title",
+    "official_title": "official_title",
+    "overall_status": "overall_status",
+    "last_known_status": "last_known_status",
+    "phase": "phase",
+    "enrollment": "enrollment",
+    "enrollment_type": "enrollment_type",
+    "source": "sponsor_source",
+    "limitations_and_caveats": "limitations_and_caveats",
+    "number_of_arms": "number_of_arms",
+    "number_of_groups": "number_of_groups",
+    "why_stopped": "why_stopped",
+    "has_expanded_access": "has_expanded_access",
+    "expanded_access_type_individual": "expanded_access_type_individual",
+    "expanded_access_type_intermediate": "expanded_access_type_intermediate",
+    "expanded_access_type_treatment": "expanded_access_type_treatment",
+    "has_dmc": "has_data_monitoring_committee",
+    "is_fda_regulated_drug": "is_fda_regulated_drug",
+    "is_fda_regulated_device": "is_fda_regulated_device",
+    "is_unapproved_device": "is_unapproved_device",
+    "is_ppsd": "is_pediatric_postmarket_surveillance_device",
+    "is_us_export": "is_us_export",
+    "biospec_retention": "biospecimen_retention",
+    "biospec_description": "biospecimen_description",
+    "ipd_time_frame": "individual_participant_data_time_frame",
+    "ipd_access_criteria": "individual_participant_data_access_criteria",
+    "ipd_url": "individual_participant_data_url",
+    "plan_to_share_ipd": "plan_to_share_individual_participant_data",
+    "plan_to_share_ipd_description": (
+        "plan_to_share_individual_participant_data_description"
+    ),
+    "created_at": "registry_created_at",
+    "updated_at": "registry_updated_at",
+    "source_class": "sponsor_source_class",
+    "delayed_posting": "delayed_posting",
+    "expanded_access_nctid": "expanded_access_nct_id",
+    "expanded_access_status_for_nctid": "expanded_access_status_for_nct_id",
+    "fdaaa801_violation": "fda_amendments_act_801_violation",
+    "baseline_type_units_analyzed": "baseline_type_units_analyzed",
+    "patient_registry": "patient_registry",
+}
+TRIAL_ELIGIBILITY_COLUMNS = {
+    "sampling_method": "sampling_method",
+    "gender": "eligible_gender",
+    "minimum_age": "minimum_age",
+    "maximum_age": "maximum_age",
+    "healthy_volunteers": "healthy_volunteers",
+    "population": "eligible_population",
+    "criteria": "eligibility_criteria",
+    "gender_description": "gender_description",
+    "gender_based": "gender_based",
+    "adult": "accepts_adults",
+    "child": "accepts_children",
+    "older_adult": "accepts_older_adults",
+}
+# IEDB columns (source column -> Silver column) of the epitope export and of the
+# MHC ligand assays.
+IEDB_EPITOPE_COLUMNS = {
+    "Epitope_Object_Type": "epitope_object_type",
+    "Epitope_Name": "epitope_name",
+    "Epitope_Modified_Residue_s": "epitope_modified_residues",
+    "Epitope_Modifications": "epitope_modifications",
+    "Epitope_Starting_Position": "epitope_starting_position",
+    "Epitope_Ending_Position": "epitope_ending_position",
+    "Epitope_IRI": "epitope_iri",
+    "Epitope_Synonyms": "epitope_synonyms",
+    "Epitope_Source_Molecule": "source_molecule",
+    "Epitope_Source_Molecule_IRI": "source_molecule_iri",
+    "Epitope_Molecule_Parent": "molecule_parent",
+    "Epitope_Molecule_Parent_IRI": "molecule_parent_iri",
+    "Epitope_Source_Organism": "source_organism",
+    "Epitope_Source_Organism_IRI": "source_organism_iri",
+    "Epitope_Species": "species",
+    "Epitope_Species_IRI": "species_iri",
+    "Related_Object_Epitope_Relation": "related_object_epitope_relation",
+    "Related_Object_Object_Type": "related_object_type",
+    "Related_Object_Name": "related_object_name",
+    "Related_Object_Starting_Position": "related_object_starting_position",
+    "Related_Object_Ending_Position": "related_object_ending_position",
+    "Related_Object_IRI": "related_object_iri",
+    "Related_Object_Synonyms": "related_object_synonyms",
+    "Related_Object_Source_Molecule": "related_object_source_molecule",
+    "Related_Object_Source_Molecule_IRI": "related_object_source_molecule_iri",
+    "Related_Object_Molecule_Parent": "related_object_molecule_parent",
+    "Related_Object_Molecule_Parent_IRI": "related_object_molecule_parent_iri",
+    "Related_Object_Source_Organism": "related_object_source_organism",
+    "Related_Object_Source_Organism_IRI": "related_object_source_organism_iri",
+    "Related_Object_Species": "related_object_species",
+    "Related_Object_Species_IRI": "related_object_species_iri",
+}
+IEDB_ASSAY_COLUMNS = {
+    "Reference_PMID": "reference_pubmed_id",
+    "Reference_Date": "reference_date",
+    "Epitope_Object_Type": "epitope_object_type",
+    "Epitope_Name": "epitope_name",
+    "Epitope_Reference_Name": "epitope_reference_name",
+    "Epitope_Modified_residues": "epitope_modified_residues",
+    "Epitope_Modifications": "epitope_modifications",
+    "Epitope_Starting_Position": "epitope_starting_position",
+    "Epitope_Ending_Position": "epitope_ending_position",
+    "Epitope_Source_Molecule": "source_molecule",
+    "Epitope_Source_Molecule_IRI": "source_molecule_iri",
+    "Epitope_Molecule_Parent": "molecule_parent",
+    "Epitope_Molecule_Parent_IRI": "molecule_parent_iri",
+    "Epitope_Source_Organism": "source_organism",
+    "Epitope_Species": "species",
+    "Epitope_Species_IRI": "species_iri",
+    "Related_Object_Epitope_Relation": "related_object_epitope_relation",
+    "Related_Object_Name": "related_object_name",
+    "Host_Name": "host_name",
+    "Host_IRI": "host_iri",
+    "in_vivo_Process_Process_Type": "in_vivo_process_type",
+    "in_vivo_Process_Disease": "in_vivo_process_disease",
+    "in_vivo_Process_Disease_IRI": "in_vivo_process_disease_iri",
+    "Assay_Method": "assay_method",
+    "Assay_Response_measured": "assay_response_measured",
+    "Assay_Qualitative_Measurement": "assay_qualitative_measurement",
+    "Assay_Measurement_Inequality": "assay_measurement_inequality",
+    "Assay_Quantitative_measurement": "assay_quantitative_measurement",
+    "Assay_Units": "assay_units",
+    "Antigen_Presenting_Cell_Name": "antigen_presenting_cell_name",
+    "MHC_Restriction_Name": "mhc_restriction_name",
+    "MHC_Restriction_Class": "mhc_restriction_class",
+    "MHC_Restriction_Evidence_Code": "mhc_restriction_evidence_code",
+}
+GENOMICS_STRUCTURES.update(
+    {
+        # One wide row per registered study, with its eligibility.
+        "clinical_trial": [
+            ("nct_id", "string"),
+            *[(name, "string") for name in TRIAL_STUDY_COLUMNS.values()],
+            *[(name, "string") for name in TRIAL_ELIGIBILITY_COLUMNS.values()],
+            ("source_dataset", "string"),
+        ],
+        # A per-residue score of a protein model (AlphaFold pLDDT and its band).
+        "protein_residue_score": [
+            *_text("protein_key", "uniprot_accession", "protein_link_method"),
+            ("fragment", "string"),
+            ("residue_number", "int"),
+            *_text("residue", "score_name"),
+            ("score_value", "double"),
+            *_text("score_band", "source_dataset"),
+        ],
+        # The CRISPR gene effect of a gene in a cell line (DepMap Chronos score).
+        "gene_dependency": [
+            *_text("cell_line_key", "gene_key", "gene_symbol", "ncbi_gene_id"),
+            ("gene_link_method", "string"),
+            ("gene_effect", "double"),
+            ("source_dataset", "string"),
+        ],
+        # A predicted enhancer-gene link of one biosample (ENCODE-rE2G).
+        "regulatory_element_gene_link": [
+            *_text("element_key", "contig"),
+            *_number("bigint", "start_position", "end_position"),
+            *_text("element_class", "gene_key", "gene_link_method"),
+            *_text("target_gene_symbol", "target_gene_ensembl_id"),
+            ("target_gene_transcription_start_site", "bigint"),
+            ("is_self_promoter", "boolean"),
+            *_text("biosample", "cell_type"),
+            ("score", "double"),
+            ("source_dataset", "string"),
+        ],
+        "epitope": [
+            ("epitope_id", "string"),
+            *[(name, "string") for name in IEDB_EPITOPE_COLUMNS.values()],
+            *_text("protein_key", "protein_link_method", "source_dataset"),
+        ],
+        # The yearly Open Targets association score of a gene and a disease.
+        "gene_disease_score_year": [
+            *_text("gene_key", "disease_key", "source_gene_id", "source_disease_id"),
+            *_text("gene_link_method", "disease_link_method"),
+            *_text("association_level", "datasource_id"),
+            ("year", "int"),
+            *_number("double", "association_score", "novelty", "yearly_evidence_count"),
+            ("source_dataset", "string"),
+        ],
+        "epitope_mhc_assay": [
+            *_text("assay_id", "epitope_id"),
+            *[(name, "string") for name in IEDB_ASSAY_COLUMNS.values()],
+            *_text("protein_key", "protein_link_method", "source_dataset"),
+        ],
+    }
+)
+
 # Tables whose domain columns are all computed in Silver.
 GENOMICS_DERIVED_TABLES = {"entity_derived_attribute"}
 # Computed columns of the other declared tables (and every `_source`/`_method`).
@@ -818,6 +1170,11 @@ GENOMICS_DERIVED_COLUMNS = {
     "member_link_method",
     "subject_link_method",
     "variant_link_method",
+    "object_link_method",
+    "protein_link_method",
+    "score_band",
+    "in_tahoe",
+    "in_depmap",
     "is_generic_label",
     "pairing_status",
     "parse_status",
@@ -924,6 +1281,63 @@ _RULE_SECTIONS = (
     "frequently_mutated_minimum",
     "frequently_tested_minimum",
     "pharmacogene",
+    "clinvar_snapshot_dates",
+    "dbvar_assembly_by_study",
+    "clinical_features",
+    "disease_features",
+    "pharmacogene_features",
+    "variant_impact_features",
+    "structural_variant_features",
+    "pharmacogene_gene_features",
+    "drug_response_features",
+    "expression_features",
+    "protein_family_features",
+    "genetic_test_features",
+    "cancer_features",
+    "population_features",
+    "orthologue_depth",
+    "gene_essentiality",
+    "plddt_bands",
+)
+
+# Band lists of the feature rules: `from` falls (first match wins).
+_FEATURE_BANDS = (
+    ("clinical_features", "expression_context"),
+    ("clinical_features", "mutation_burden"),
+    ("disease_features", "disease_count_category"),
+    ("disease_features", "association_strength"),
+    ("disease_features", "disease_complexity"),
+    ("disease_features", "disease_complexity_score"),
+    ("disease_features", "priority_tier"),
+    ("disease_features", "annotation_priority"),
+    ("pharmacogene_features", "burden"),
+    ("pharmacogene_features", "priority"),
+    ("pharmacogene_features", "expression_breadth"),
+    ("variant_impact_features", "impact_tier"),
+    ("variant_impact_features", "disease_impact_category"),
+    ("variant_impact_features", "gene_impact_burden"),
+    ("variant_impact_features", "lof_tolerance"),
+    ("structural_variant_features", "disruption"),
+    ("structural_variant_features", "gene_count_points"),
+    ("structural_variant_features", "pharmacogene_points"),
+    ("structural_variant_features", "omim_gene_points"),
+    ("structural_variant_features", "size_points"),
+    ("pharmacogene_gene_features", "variant_impact_burden"),
+    ("pharmacogene_gene_features", "cancer_mutation_burden"),
+    ("pharmacogene_gene_features", "priority"),
+    ("drug_response_features", "priority"),
+    ("expression_features", "level_category"),
+    ("expression_features", "significance_points"),
+    ("genetic_test_features", "availability_category"),
+    ("genetic_test_features", "disease_test_correlation"),
+    ("genetic_test_features", "variant_test_coverage_level"),
+    ("genetic_test_features", "population_test_priority"),
+    ("genetic_test_features", "test_recommendation_tier"),
+    ("cancer_features", "mutation_frequency_category"),
+    ("population_features", "disease_allele_frequency"),
+    ("population_features", "expression_frequency_correlation"),
+    ("gene_essentiality", "classes"),
+    ("plddt_bands", "bands"),
 )
 
 
@@ -1040,6 +1454,15 @@ def validate_genomics_rules(rules: dict, bronze_sources: dict) -> list:
         starts = [entry["from"] for entry in entries]
         if starts != sorted(starts, reverse=True):
             problems.append(f"{name}: `from` values must fall: {starts}")
+    for section, name in _FEATURE_BANDS:
+        starts = [entry["from"] for entry in rules[section][name]]
+        if starts != sorted(starts, reverse=True):
+            problems.append(f"{section}.{name}: `from` values must fall: {starts}")
+    ranks = [entry["rank"] for entry in rules["orthologue_depth"]["species"].values()]
+    if len(set(ranks)) != len(rules["orthologue_depth"]["levels"]):
+        problems.append(
+            f"orthologue_depth: species ranks must name each level: {ranks}"
+        )
     if set(rules["mutation_severity"]) != {
         "loss_of_function",
         "splice",
@@ -1498,10 +1921,13 @@ def claims_frame(
     rules: dict,
     numeric_fields=(),
     source_type: str = "source",
+    snapshot_col: str | None = None,
 ):
     """One claim row per entity, field and value; `fields` maps a field to its
     source column (a dict, or a list of pairs when a field has several columns).
-    A null or placeholder gives no row."""
+    A null or placeholder gives no row. `snapshot_col` names the ClinVar snapshot
+    column of the frame (`source_snapshot` is null without it)."""
+    snapshot = F.col(snapshot_col) if snapshot_col else F.lit(None).cast("string")
     parts = []
     for field, column in fields.items() if isinstance(fields, dict) else fields:
         value = clean_placeholders(column, rules, f"{source_dataset}.{column}")
@@ -1522,6 +1948,7 @@ def claims_frame(
                 F.lit(column).alias("source_field"),
                 F.lit(rank).cast("int").alias("source_rank"),
                 F.lit(source_type).alias("source_type"),
+                snapshot.alias("source_snapshot"),
             ).filter(F.col("entity_key").isNotNull() & F.col("value_text").isNotNull())
         )
     return _reduce(lambda left, right: left.unionByName(right), parts)
@@ -1531,10 +1958,16 @@ def resolve_master(claims, *, entity_type: str, fields):
     """(masters, conflicts) from a claims frame. A master row has each field, its
     `<field>_source` and `<field>_method` (`primary`, `filled` or `unranked`);
     left-join it onto the entity list. `conflicts` lists fields whose sources
-    gave more than one value."""
+    gave more than one value. Among claims of one rank the newest ClinVar
+    snapshot wins; the older snapshots stay as claims."""
     fields = list(fields)
     scoped = claims.filter(
         (F.col("entity_type") == entity_type) & F.col("field").isin(fields)
+    )
+    snapshot = (
+        F.col("source_snapshot")
+        if "source_snapshot" in claims.columns
+        else F.lit(None).cast("string")
     )
     pair = Window.partitionBy("entity_key", "field")
     ranked = scoped.withColumn(
@@ -1544,6 +1977,9 @@ def resolve_master(claims, *, entity_type: str, fields):
         F.row_number().over(
             pair.orderBy(
                 F.col("source_rank").asc_nulls_last(),
+                F.when(snapshot == "current", F.lit("9999"))
+                .otherwise(snapshot)
+                .desc_nulls_last(),
                 F.col("source_dataset").asc(),
                 F.col("source_field").asc(),
                 F.col("value_text").asc(),
@@ -1799,9 +2235,11 @@ def coordinate_rows(
     strand,
     system,
     conversion=None,
+    contig_gi=None,
 ):
     """A frame in the column order of `entity_coordinate` (before the computed
-    columns); `key` is a column name, the others are Columns."""
+    columns); `key` is a column name, the others are Columns; `contig_gi` is the
+    GenBank gi of the contig where the source gives one."""
     return df.select(
         F.lit(entity_type).alias("entity_type"),
         F.col(key).cast("string").alias("entity_key"),
@@ -1814,6 +2252,9 @@ def coordinate_rows(
         strand.alias("strand"),
         F.lit(system).alias("coordinate_system"),
         F.lit(conversion).cast("string").alias("coordinate_conversion"),
+        (contig_gi if contig_gi is not None else F.lit(None))
+        .cast("string")
+        .alias("contig_genbank_gi"),
     )
 
 
@@ -2292,6 +2733,8 @@ LR_NON_CODING = "long_range_benchmark.pathogenic_non_coding"
 LR_EQTL = "long_range_benchmark.causal_eqtl"
 CLINVAR_BENIGN = "clinvar_vs_benign.variants"
 GNOMAD_BALANCED = "gnomad_balanced.variants"
+GNOMAD_MTDNA = "gnomad_mtdna.variants"
+THOUSAND_GENOMES = "thousand_genomes.variants"
 
 # COMMAND ----------
 
@@ -2429,12 +2872,17 @@ def alphamissense_frame(rules):
 
 
 def dbvar_frame(rules):
+    """dbVar structural variants; the assembly comes from the study (the staged
+    file names carry it), the interval end from `END`."""
     d = DBVAR
     own = F.concat(F.lit("dbvar:"), F.col("study"), F.lit(":"), F.col("ID"))
+    by_study = rules["dbvar_assembly_by_study"]
+    pairs = [F.lit(part) for item in by_study.items() for part in item]
+    assembly = F.coalesce(F.create_map(*pairs)[F.col("study")], F.lit("unspecified"))
     return _variant_frame(
         _bronze("dbvar_variants"),
         dataset=d,
-        assembly=F.lit("unspecified"),
+        assembly=assembly,
         chrom=_clean("CHROM", rules, d),
         pos=_clean("POS", rules, d),
         ref=F.lit(None).cast("string"),
@@ -2546,6 +2994,40 @@ def variant_frames(rules):
                 alt="alt",
             ),
         ),
+        # gnomAD v3.1 mitochondrial variants and 1000 Genomes sites are GRCh38 files.
+        (
+            GNOMAD_MTDNA,
+            _vcf_frame(
+                "gnomad_mtdna_variants",
+                GNOMAD_MTDNA,
+                rules,
+                chrom="chromosome",
+                pos="position",
+                ref="ref",
+                alt="alt",
+                method="vcf_alleles",
+            ),
+        ),
+        (
+            THOUSAND_GENOMES,
+            _vcf_frame(
+                "thousand_genomes_variants",
+                THOUSAND_GENOMES,
+                rules,
+                chrom="CHROM",
+                pos="POS",
+                ref="REF",
+                alt="ALT",
+                method="vcf_alleles",
+                ids=[
+                    _id_item(
+                        "rsid",
+                        F.when(F.col("ID").rlike(r"^rs\d+$"), F.col("ID")),
+                        "ID",
+                    )
+                ],
+            ),
+        ),
     ]
 
 
@@ -2608,11 +3090,34 @@ def pharmgkb_variant_frame(rules, id_map):
     )
 
 
+def clinvar_other_ids(rules):
+    """Crosswalk rows of the ClinVar `OtherIDs` list (`ClinGen:CA123,OMIM:...`): one
+    row per listed id, the label in lower case as the id type."""
+    item = F.explode(F.split(_clean("OtherIDs", rules, CLINVAR), r"\s*,\s*"))
+    rows = (
+        clinvar_frame(rules)
+        .select("variant_key", "key_method", item.alias("item"))
+        .withColumn("label", F.lower(F.regexp_extract("item", r"^([^:]+):", 1)))
+        .withColumn("value", F.regexp_extract("item", r"^[^:]+:(.+)$", 1))
+        .filter((F.col("label") != "") & (F.col("value") != ""))
+    )
+    return rows.select(
+        F.lit("variant").alias("entity_type"),
+        F.col("variant_key").alias("entity_key"),
+        F.col("label").alias("id_type"),
+        F.col("value").alias("id_value"),
+        F.lit(CLINVAR).alias("source_dataset"),
+        F.lit("OtherIDs").alias("source_field"),
+        F.col("key_method").alias("match_method"),
+    ).distinct()
+
+
 def variant_crosswalk(rules):
-    """Variant id rows; PharmGKB variants link through rsIDs that one variant of
-    the other sources holds."""
+    """Variant id rows (with the ClinVar `OtherIDs`); PharmGKB variants link through
+    rsIDs that one variant of the other sources holds."""
     frames = variant_frames(rules)
     rows = _union([_variant_id_rows(frame, dataset) for dataset, frame in frames])
+    rows = rows.unionByName(clinvar_other_ids(rules))
     id_map = unique_id_map(finish_crosswalk(rows), ["rsid"])
     pharmgkb = pharmgkb_variant_frame(rules, id_map)
     return rows.unionByName(_variant_id_rows(pharmgkb, PHARMGKB_VARIANTS))
@@ -2672,11 +3177,43 @@ def variant_names(rules, id_map):
     )
 
 
-def variant_claims(rules, id_map, transcript_genes):
+def pharmgkb_variant_genes(rules, id_map, gene_map):
+    """(entity_key, pharmgkb_gene_key, gene_link_method): the genes of a PharmGKB
+    variant by its PharmGKB gene ids (`Gene_IDs`), else by its gene symbols
+    (`Gene_Symbols`, position by position). `gene_map` holds the unique
+    (id_type, id_value, entity_key) rows of the genes (`pharmgkb` and `symbol`)."""
+    frame = pharmgkb_variant_frame(rules, id_map).withColumn(
+        "entity_key", F.col("variant_key")
+    )
+    ids = F.split(_clean("Gene_IDs", rules, PHARMGKB_VARIANTS), r"\s*,\s*")
+    symbols = F.split(_clean("Gene_Symbols", rules, PHARMGKB_VARIANTS), r"\s*,\s*")
+    pairs = frame.select(
+        "entity_key",
+        F.posexplode_outer(ids).alias("position", "gene_id"),
+        symbols.alias("symbols"),
+    )
+    symbol = F.element_at("symbols", F.col("position") + 1)
+    pairs = pairs.withColumn("gene_symbol", F.upper(F.trim(symbol)))
+    linked = link_entities(
+        pairs.filter(F.col("gene_id").isNotNull() | F.col("gene_symbol").isNotNull()),
+        [(F.trim(F.col("gene_id")), "pharmgkb"), (F.col("gene_symbol"), "symbol")],
+        gene_map,
+        "pharmgkb_gene_key",
+        "gene_link_method",
+    )
+    return linked.select("entity_key", "pharmgkb_gene_key", "gene_link_method")
+
+
+def variant_claims(rules, id_map, transcript_genes, gene_map):
     """Claims of the variant fields. `transcript_genes` (transcript_key,
-    gene_key) turns the AlphaMissense transcript into a gene claim."""
+    gene_key) turns the AlphaMissense transcript into a gene claim; `gene_map`
+    links the PharmGKB variant genes. ClinVar claims carry their snapshot."""
     base = {"entity_type": "variant", "key_col": "entity_key", "rules": rules}
-    clinvar = clinvar_frame(rules).withColumn("entity_key", F.col("variant_key"))
+    clinvar = (
+        clinvar_frame(rules)
+        .withColumn("entity_key", F.col("variant_key"))
+        .withColumnRenamed("snapshot", "source_snapshot")
+    )
     alpha = (
         alphamissense_frame(rules)
         .withColumn("entity_key", F.col("variant_key"))
@@ -2702,8 +3239,19 @@ def variant_claims(rules, id_map, transcript_genes):
                     ("rsid", "RS_dbSNP"),
                     ("gene_key", "GeneID"),
                     ("name", "Name"),
+                    ("gene_symbol", "GeneSymbol"),
+                    ("origin_detail", "Origin"),
+                    ("chromosome_accession", "ChromosomeAccession"),
+                    ("reference_allele_text", "ReferenceAllele"),
+                    ("alternate_allele_text", "AlternateAllele"),
+                    ("cytogenetic_location", "Cytogenetic"),
+                    ("guidelines", "Guidelines"),
+                    ("tested_in_genetic_testing_registry", "TestedInGTR"),
+                    ("other_ids", "OtherIDs"),
+                    ("submitter_categories", "SubmitterCategories"),
                 ],
                 source_dataset=CLINVAR,
+                snapshot_col="source_snapshot",
                 **base,
             ),
             claims_frame(
@@ -2713,11 +3261,56 @@ def variant_claims(rules, id_map, transcript_genes):
                 **base,
             ),
             claims_frame(
-                dbvar, fields=[("variant_type", "SVTYPE")], source_dataset=DBVAR, **base
+                dbvar,
+                fields=[
+                    ("variant_type", "SVTYPE"),
+                    ("name", "ID"),
+                    ("structural_variant_length", "SVLEN"),
+                    ("quality", "QUAL"),
+                    ("source_file_type", "file_type"),
+                ],
+                numeric_fields=("structural_variant_length", "quality"),
+                source_dataset=DBVAR,
+                **base,
             ),
             claims_frame(
                 pharmgkb,
-                fields=[("name", "Variant_Name")],
+                fields=[
+                    ("name", "Variant_Name"),
+                    ("genomic_location", "Location"),
+                    ("variant_annotation_count", "Variant_Annotation_count"),
+                    ("clinical_annotation_count", "Clinical_Annotation_count"),
+                    (
+                        "level_1_2_clinical_annotation_count",
+                        "Level_1_2_Clinical_Annotation_count",
+                    ),
+                    ("guideline_annotation_count", "Guideline_Annotation_count"),
+                    ("label_annotation_count", "Label_Annotation_count"),
+                ],
+                numeric_fields=(
+                    "variant_annotation_count",
+                    "clinical_annotation_count",
+                    "level_1_2_clinical_annotation_count",
+                    "guideline_annotation_count",
+                    "label_annotation_count",
+                ),
+                source_dataset=PHARMGKB_VARIANTS,
+                **base,
+            ),
+            claims_frame(
+                variant_frames(rules)[-1][1].withColumn(
+                    "entity_key", F.col("variant_key")
+                ),
+                fields=[("quality", "QUAL"), ("filter_status", "FILTER")],
+                numeric_fields=("quality",),
+                source_dataset=THOUSAND_GENOMES,
+                **base,
+            ),
+            claims_frame(
+                pharmgkb_variant_genes(rules, id_map, gene_map).filter(
+                    F.col("pharmgkb_gene_key").isNotNull()
+                ),
+                fields=[("gene_key", "pharmgkb_gene_key")],
                 source_dataset=PHARMGKB_VARIANTS,
                 **base,
             ),

@@ -132,7 +132,15 @@ def test_coded_columns_mastr_uses_the_named_category_binding_shape(silver):
 
 
 def test_untranslated_source_columns_flags_source_names_only(silver):
+    # a MaStR `_nv` flag is decoded before this check, so one left over is flagged
     found = silver["untranslated_source_columns"](
         ["unit_id", "Strasse", "MastrNummer", "Fax_nv", "capacity_gross_kw"]
     )
-    assert found == ["Strasse", "MastrNummer"]
+    assert found == ["Strasse", "MastrNummer", "Fax_nv"]
+
+
+def test_mastr_not_available_name_uses_the_english_field(silver):
+    name = silver["mastr_not_available_name"]
+    assert name("Hausnummer_nv", {"Hausnummer": "house_number"}) == (
+        "house_number_not_available"
+    )

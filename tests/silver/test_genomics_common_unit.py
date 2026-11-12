@@ -60,12 +60,36 @@ def _bronze_sources() -> dict:
 # --- declared structures ---------------------------------------------------
 
 
-def test_the_two_schemas_hold_eleven_and_twenty_tables(genomics):
+def test_the_two_schemas_hold_eleven_and_twenty_seven_tables(genomics):
     reference = genomics["GENOMICS_REFERENCE_TABLES"]
     main = genomics["GENOMICS_MAIN_TABLES"]
     assert len(reference) == 11
-    assert len(main) == 20
+    assert len(main) == 27
     assert reference.isdisjoint(main)
+
+
+def test_the_batch_four_tables_are_declared_in_the_main_schema(genomics):
+    for table in (
+        "clinical_trial",
+        "protein_residue_score",
+        "gene_dependency",
+        "regulatory_element_gene_link",
+        "epitope",
+        "epitope_mhc_assay",
+        "gene_disease_score_year",
+    ):
+        assert table in genomics["GENOMICS_STRUCTURES"], table
+        assert genomics["genomics_target_schema"](table) == "genomics_silver"
+
+
+def test_claims_carry_the_clinvar_snapshot(genomics):
+    columns = dict(genomics["GENOMICS_STRUCTURES"]["entity_claim"])
+    assert columns["source_snapshot"] == "string"
+
+
+def test_cell_lines_carry_the_depmap_model_columns(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["cell_line"]}
+    assert {"in_tahoe", "in_depmap", "oncotree_lineage", "cosmic_id"} <= columns
 
 
 def test_every_table_has_a_grain_and_no_stray_table_has_one(genomics):
@@ -111,13 +135,13 @@ def test_every_genomics_table_is_classified_in_its_own_schema(genomics):
         assert {r["target_schema"] for r in mine} == {expected}, table
 
 
-def test_the_registry_places_eleven_and_twenty_genomics_tables():
+def test_the_registry_places_eleven_and_twenty_seven_genomics_tables():
     rows = build_rows()
     per_schema: dict[str, set[str]] = {}
     for r in rows:
         per_schema.setdefault(r["target_schema"], set()).add(r["table_name"])
     assert len(per_schema["genomics_silver_reference"]) == 11
-    assert len(per_schema["genomics_silver"]) == 20
+    assert len(per_schema["genomics_silver"]) == 27
 
 
 def test_the_registry_is_complete_with_the_genomics_tables():
@@ -166,6 +190,31 @@ def test_the_crosswalk_precedence_starts_with_the_exact_id(rules):
 
 def test_the_clinvar_snapshot_rule_names_a_snapshot(rules):
     assert rules["clinvar_current_snapshot"] == "current"
+    assert "current" in rules["clinvar_snapshot_dates"]
+
+
+def test_every_dbvar_study_has_an_assembly(rules):
+    assert set(rules["dbvar_assembly_by_study"].values()) == {"GRCh38"}
+
+
+def test_a_rising_feature_band_is_reported(genomics, rules):
+    broken = copy.deepcopy(rules)
+    broken["clinical_features"]["mutation_burden"].reverse()
+    problems = genomics["validate_genomics_rules"](broken, _bronze_sources())
+    assert any("clinical_features.mutation_burden" in p for p in problems)
+
+
+def test_orthologue_species_name_every_depth_level(rules):
+    depth = rules["orthologue_depth"]
+    named = {entry["level"] for entry in depth["species"].values()}
+    assert named == set(depth["levels"])
+    assert len(depth["consensus_classes"]) == 8
+
+
+def test_plddt_bands_follow_alphafold(rules):
+    bands = rules["plddt_bands"]
+    assert [b["from"] for b in bands["bands"]] == [90, 70, 50]
+    assert bands["band_default"] == "very_low"
 
 
 def test_the_dose_record_number_is_declared(genomics):
@@ -732,3 +781,20 @@ def test_declared_column_names_use_no_shorthand_words(genomics):
     for table, columns in genomics["GENOMICS_STRUCTURES"].items():
         for name, _ in columns:
             assert not shorthand & set(name.split("_")), (table, name)
+
+
+def test_relations_carry_the_source_detail_columns(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["entity_relation"]}
+    assert {
+        "standard_operating_procedure",
+        "novelty_score",
+        "clinpgx_level",
+        "phenotype_name",
+        "official_symbol_a",
+        "refseq_accessions_b",
+    } <= columns
+
+
+def test_ontology_relations_carry_the_medgen_ids(genomics):
+    columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["ontology_relation"]}
+    assert {"relation_id", "parent_atom_id", "child_atom_id"} <= columns

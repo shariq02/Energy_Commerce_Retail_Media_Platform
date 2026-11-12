@@ -679,6 +679,67 @@ parts += [
         number("gnomad_af_max_ancestry"),
     ),
 ]
+
+# -- Transform -- gnomAD mitochondrial frequencies (homoplasmic and heteroplasmic)
+mtdna = FRAMES[GNOMAD_MTDNA]
+mt_number = number_for(GNOMAD_MTDNA)
+mt_status = clean_placeholders("filters", RULES, f"{GNOMAD_MTDNA}.filters")
+
+
+def mtdna_rows(measure, frequency, count=none_long):
+    return mtdna.select(
+        "variant_key",
+        F.lit("all").alias("population"),
+        F.lit(measure).alias("measure"),
+        frequency.alias("allele_frequency"),
+        count.alias("allele_count"),
+        mt_number("AN", "bigint").alias("allele_number"),
+        none_long.alias("homozygote_count"),
+        mt_status.alias("filter_status"),
+        F.lit(GNOMAD_MTDNA).alias("source_dataset"),
+    )
+
+
+parts += [
+    mtdna_rows(
+        "homoplasmic_allele_frequency",
+        mt_number("AF_hom"),
+        mt_number("AC_hom", "bigint"),
+    ),
+    mtdna_rows(
+        "heteroplasmic_allele_frequency",
+        mt_number("AF_het"),
+        mt_number("AC_het", "bigint"),
+    ),
+    mtdna_rows("maximum_observed_heteroplasmy", mt_number("max_observed_heteroplasmy")),
+]
+
+# -- Transform -- 1000 Genomes frequencies (all and five super-populations)
+thousand = FRAMES[THOUSAND_GENOMES]
+tg_number = number_for(THOUSAND_GENOMES)
+for population, column in (
+    ("all", "AF"),
+    ("afr", "AFR_AF"),
+    ("amr", "AMR_AF"),
+    ("eas", "EAS_AF"),
+    ("eur", "EUR_AF"),
+    ("sas", "SAS_AF"),
+):
+    parts.append(
+        thousand.select(
+            "variant_key",
+            F.lit(population).alias("population"),
+            F.lit("allele_frequency").alias("measure"),
+            tg_number(column).alias("allele_frequency"),
+            none_long.alias("allele_count"),
+            none_long.alias("allele_number"),
+            none_long.alias("homozygote_count"),
+            clean_placeholders("FILTER", RULES, f"{THOUSAND_GENOMES}.FILTER").alias(
+                "filter_status"
+            ),
+            F.lit(THOUSAND_GENOMES).alias("source_dataset"),
+        )
+    )
 frequency = _union(parts).filter(
     F.col("allele_frequency").isNotNull() & F.col("population").isNotNull()
 )
@@ -730,11 +791,21 @@ variants = (
         "variant_key",
         "contig",
         F.col("position").alias("start_position"),
-        (
-            F.col("position") + F.greatest(F.length("reference_allele"), F.lit(1)) - 1
+        # a structural variant spans to its END; a small variant spans its allele
+        F.greatest(
+            F.coalesce(F.col("end_position"), F.col("position")),
+            F.col("position") + F.greatest(F.length("reference_allele"), F.lit(1)) - 1,
         ).alias("end_position"),
     )
-    .withColumn("bin", F.floor(F.col("start_position") / BIN))
+    .withColumn(
+        "bin",
+        F.explode(
+            F.sequence(
+                F.floor(F.col("start_position") / BIN),
+                F.floor(F.col("end_position") / BIN),
+            )
+        ),
+    )
 )
 coordinates = read_silver("entity_coordinate").filter(
     (F.col("assembly") == "GRCh38") & F.col("is_primary")
@@ -813,6 +884,22 @@ parts = [
         "entity_coordinate",
     ),
 ]
+
+# -- Transform -- ENCODE-rE2G enhancer elements (distinct elements; BED start + 1)
+RE2G = "encode.enhancer_gene_links"
+enhancers = (
+    read_genomics_bronze("encode_enhancer_gene_links")
+    .select(
+        clean_placeholders("name", RULES, f"{RE2G}.name").alias("feature_key"),
+        chromosome_expr("chr").alias("f_contig"),
+        (typed_number("start", "bigint", RULES, f"{RE2G}.start") + 1).alias("f_start"),
+        typed_number("end", "bigint", RULES, f"{RE2G}.end").alias("f_end"),
+        clean_placeholders("class", RULES, f"{RE2G}.class").alias("feature_type"),
+    )
+    .filter(F.col("f_start").isNotNull() & F.col("f_end").isNotNull())
+    .distinct()
+)
+parts.append(overlaps(enhancers, "enhancer_element", RE2G))
 
 # -- Transform -- exon, CDS and UTR rows (when Bronze holds them)
 GENCODE = "gencode.annotation"
@@ -900,6 +987,18 @@ write_inspect_export(
             }
         ),
         "exon_rows_in_bronze": structure.count(),
+        "structural_variants_with_an_overlap": lambda t: (
+            t.filter(F.col("variant_key").startswith("dbvar:"))
+            .select("variant_key")
+            .distinct()
+            .count()
+        ),
+        "variants_in_an_enhancer_element": lambda t: (
+            t.filter(F.col("feature_kind") == "enhancer_element")
+            .select("variant_key")
+            .distinct()
+            .count()
+        ),
     },
     link_method_counts=True,
 )

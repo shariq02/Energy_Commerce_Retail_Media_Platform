@@ -96,6 +96,9 @@ mappings:
   - source_system: thousand_genomes
     ecosystem: genomics
     first_mapped: "2026-11-11"
+  - source_system: gene_ages
+    ecosystem: genomics
+    first_mapped: "2026-11-12"
   - source_system: alphamissense
     ecosystem: genomics
     first_mapped: "2026-11-05"

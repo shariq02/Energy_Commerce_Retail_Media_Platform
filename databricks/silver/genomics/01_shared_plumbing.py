@@ -47,6 +47,7 @@ OT_MOLECULE = "opentargets.drug_molecule"
 TAHOE_GENE = "tahoe.gene_metadata"
 TAHOE_DRUG = "tahoe.drug_metadata"
 TAHOE_CELL = "tahoe.cell_line_metadata"
+DEPMAP_MODELS = "depmap.models"
 UNIPROT = "uniprot.entries"
 CHEMBL = "chembl.compounds"
 CHEMBL_MAP = "chembl.uniprot_mapping"
@@ -242,7 +243,10 @@ def gene_crosswalk(rules):
         dataset=TAHOE_GENE,
         key="gene_key",
         method=F.col("key_method"),
-        specs=[("ensembl", "ensembl_id", "ensembl_id")],
+        specs=[
+            ("ensembl", "ensembl_id", "ensembl_id"),
+            ("tahoe_token", "token_id", "token_id"),
+        ],
     )
     return _union([ncbi, pharmgkb_rows, gencode_rows, opentargets_rows, tahoe_rows])
 
@@ -319,6 +323,7 @@ def transcript_crosswalk(rules):
                     "RNA_nucleotide_accession_version",
                     "RNA_nucleotide_accession_version",
                 ),
+                ("genbank_gi", "RNA_nucleotide_gi", "RNA_nucleotide_gi"),
             ],
             **tx,
         )
@@ -463,7 +468,17 @@ def protein_crosswalk(rules):
             **protein,
         )
     )
-    g2r = _gene2refseq(rules).select("np", "protein_accession_version").distinct()
+    g2r = (
+        _gene2refseq(rules)
+        .select(
+            "np",
+            "protein_accession_version",
+            "protein_gi",
+            "mature_peptide_accession_version",
+            "mature_peptide_gi",
+        )
+        .distinct()
+    )
     return rows.unionByName(
         _id_rows(
             g2r,
@@ -476,6 +491,13 @@ def protein_crosswalk(rules):
                     "protein_accession_version",
                     "protein_accession_version",
                 ),
+                ("genbank_gi", "protein_gi", "protein_gi"),
+                (
+                    "refseq_mature_peptide",
+                    "mature_peptide_accession_version",
+                    "mature_peptide_accession_version",
+                ),
+                ("genbank_gi_mature_peptide", "mature_peptide_gi", "mature_peptide_gi"),
             ],
             **protein,
         )
@@ -517,6 +539,21 @@ def disease_crosswalk(rules):
     )
     rows = rows.unionByName(
         crosswalk_frame(codes, dataset=MEDGEN, field="CODE", **disease)
+    )
+    # the atom and the source atom, concept and descriptor ids of every MedGen row
+    rows = rows.unionByName(
+        _id_rows(
+            medgen,
+            dataset=MEDGEN,
+            key="CUI",
+            specs=[
+                ("medgen_atom", "AUI", "AUI"),
+                ("source_atom", "SAUI", "SAUI"),
+                ("source_concept", "SCUI", "SCUI"),
+                ("source_descriptor", "SDUI", "SDUI"),
+            ],
+            **disease,
+        )
     )
     id_map = unique_id_map(finish_crosswalk(rows))
 
@@ -576,15 +613,34 @@ def disease_crosswalk(rules):
             )
         )
     )
-    opentargets = _id_rows(
-        keyed,
-        dataset=OT_DISEASE,
-        key="disease_key",
-        method=how,
-        specs=[("opentargets_disease", "id", "id")],
-        **disease,
-    ).unionByName(
-        crosswalk_frame(pairs, dataset=OT_DISEASE, field="id_and_dbXRefs", **disease)
+    obsolete = keyed.select(
+        F.col("disease_key").alias("entity_key"),
+        F.explode(F.from_json("obsoleteXRefs", "array<string>")).alias("item"),
+    ).select(
+        "entity_key",
+        F.regexp_extract("item", r"^([^:]+):", 1).alias("label"),
+        F.regexp_extract("item", r"^[^:]+:(.*)$", 1).alias("value"),
+        F.lit("obsolete_cross_reference").alias("method"),
+    )
+    opentargets = (
+        _id_rows(
+            keyed,
+            dataset=OT_DISEASE,
+            key="disease_key",
+            method=how,
+            specs=[("opentargets_disease", "id", "id")],
+            **disease,
+        )
+        .unionByName(
+            crosswalk_frame(
+                pairs, dataset=OT_DISEASE, field="id_and_dbXRefs", **disease
+            )
+        )
+        .unionByName(
+            crosswalk_frame(
+                obsolete, dataset=OT_DISEASE, field="obsoleteXRefs", **disease
+            )
+        )
     )
     return rows.unionByName(opentargets)
 
@@ -644,16 +700,34 @@ def regulatory_crosswalk(rules):
 
 
 def cell_line_crosswalk(rules):
-    return _id_rows(
-        _bronze("tahoe_cell_line_metadata"),
-        entity_type="cell_line",
-        rules=rules,
-        dataset=TAHOE_CELL,
-        key="Cell_ID_DepMap",
-        specs=[
-            ("depmap", "Cell_ID_DepMap", "Cell_ID_DepMap"),
-            ("cellosaur", "Cell_ID_Cellosaur", "Cell_ID_Cellosaur"),
-        ],
+    """Tahoe cell lines and DepMap models; both are keyed by the DepMap model id."""
+    return _union(
+        [
+            _id_rows(
+                _bronze("tahoe_cell_line_metadata"),
+                entity_type="cell_line",
+                rules=rules,
+                dataset=TAHOE_CELL,
+                key="Cell_ID_DepMap",
+                specs=[
+                    ("depmap", "Cell_ID_DepMap", "Cell_ID_DepMap"),
+                    ("cellosaur", "Cell_ID_Cellosaur", "Cell_ID_Cellosaur"),
+                ],
+            ),
+            _id_rows(
+                _bronze("depmap_models"),
+                entity_type="cell_line",
+                rules=rules,
+                dataset=DEPMAP_MODELS,
+                key="ModelID",
+                specs=[
+                    ("depmap", "ModelID", "ModelID"),
+                    ("cellosaur", "RRID", "RRID"),
+                    ("sanger_model", "SangerModelID", "SangerModelID"),
+                    ("cosmic", "COSMICID", "COSMICID"),
+                ],
+            ),
+        ]
     )
 
 
@@ -1116,6 +1190,17 @@ def names_all(rules, xwalk):
             **keyed,
         ),
         names_frame(
+            _bronze("depmap_models").withColumn("entity_key", F.col("ModelID")),
+            dataset=DEPMAP_MODELS,
+            specs=[
+                ("CellLineName", "name", "text"),
+                ("StrippedCellLineName", "stripped_name", "text"),
+                ("CCLEName", "ccle_name", "text"),
+            ],
+            entity_type="cell_line",
+            **keyed,
+        ),
+        names_frame(
             _bronze("hpo_terms").withColumn("entity_key", curie_expr("id")),
             dataset=HPO,
             specs=[("label", "name", "text")],
@@ -1141,6 +1226,8 @@ def names_all(rules, xwalk):
             entity_type="tissue",
             **keyed,
         ),
+        # ClinVar HGVS names, gnomAD ids, PharmGKB names and synonyms of variants
+        variant_names(rules, variant_id_map(xwalk)),
     ]
     return _union(parts)
 
@@ -1197,6 +1284,7 @@ def gene_claims(rules, xwalk):
                     ("map_location", "map_location"),
                     ("nomenclature_status", "Nomenclature_status"),
                     ("modification_date", "Modification_date"),
+                    ("feature_type", "Feature_type"),
                 ],
                 source_dataset=NCBI,
                 **base,
@@ -1525,6 +1613,7 @@ def drug_claims(rules, xwalk):
                     ("type", "Type"),
                     ("smiles", "SMILES"),
                     ("inchi", "InChI"),
+                    ("external_vocabulary", "External_Vocabulary"),
                     *facts,
                 ],
                 source_dataset=PHARMGKB_DRUGS,
@@ -1551,6 +1640,7 @@ def drug_claims(rules, xwalk):
                     ("description", "description"),
                     ("parent_chembl_id", "parentId"),
                     ("child_chembl_ids", "childChemblIds"),
+                    ("molfile", "molblock"),
                 ],
                 source_dataset=OT_MOLECULE,
                 **base,
@@ -1670,7 +1760,11 @@ def coordinate_all(rules, xwalk):
         )
     )
     genes = gene2refseq.groupBy(
-        "GeneID", "contig_name", "assembly_label", "orientation"
+        "GeneID",
+        "contig_name",
+        "assembly_label",
+        "orientation",
+        "genomic_nucleotide_gi",
     ).agg(
         F.min("start_number").alias("start_number"),
         F.max("end_number").alias("end_number"),
@@ -1713,6 +1807,7 @@ def coordinate_all(rules, xwalk):
             end=F.col("end_number"),
             strand=strand("orientation"),
             system="ncbi_1_based_closed",
+            contig_gi=F.col("genomic_nucleotide_gi"),
         ),
         coordinate_rows(
             opentargets,
@@ -1801,7 +1896,13 @@ def coordinate_all(rules, xwalk):
             & F.col("start_number").isNotNull()
             & F.col("end_number").isNotNull()
         )
-        .groupBy("rna", "contig_name", "assembly_label", "orientation")
+        .groupBy(
+            "rna",
+            "contig_name",
+            "assembly_label",
+            "orientation",
+            "genomic_nucleotide_gi",
+        )
         .agg(
             F.min("start_number").alias("start_number"),
             F.max("end_number").alias("end_number"),
@@ -1820,6 +1921,7 @@ def coordinate_all(rules, xwalk):
             end=F.col("end_number"),
             strand=strand("orientation"),
             system="ncbi_1_based_closed",
+            contig_gi=F.col("genomic_nucleotide_gi"),
         )
     )
     frames.append(
@@ -2156,8 +2258,15 @@ transcript_genes = (
     .select("transcript_key", "gene_key")
 )
 
-# -- Transform -- claims of every entity type
-claims = _union(
+# -- Transform -- unique gene ids and symbols for the PharmGKB variant genes
+gene_ids = entity_id_map(xwalk, "gene").filter(F.col("id_type") == "pharmgkb")
+gene_map = gene_ids.select("id_type", "id_value", "entity_key").unionByName(
+    term_map(names, "gene", ["symbol", "official_symbol"], "symbol")
+)
+
+# -- Transform -- claims of every entity type (only ClinVar claims carry a snapshot)
+claims = _reduce(
+    lambda left, right: left.unionByName(right, allowMissingColumns=True),
     [
         gene_claims(RULES, xwalk),
         tx_claims,
@@ -2165,9 +2274,9 @@ claims = _union(
         disease_claims(RULES, xwalk),
         drug_claims(RULES, xwalk),
         small_claims(RULES),
-        variant_claims(RULES, variant_id_map(xwalk), transcript_genes),
+        variant_claims(RULES, variant_id_map(xwalk), transcript_genes, gene_map),
         opentargets_nested_claims(RULES, xwalk),
-    ]
+    ],
 )
 
 # -- Transform -- keys and provenance
@@ -2204,6 +2313,15 @@ blocks = inspect_table(
         "llm_generated_claims": written.filter(
             F.col("source_type") == "llm_generated"
         ).count(),
+        "claims_per_clinvar_snapshot": str(
+            {
+                r["source_snapshot"]: r["count"]
+                for r in written.filter(F.col("source_snapshot").isNotNull())
+                .groupBy("source_snapshot")
+                .count()
+                .collect()
+            }
+        ),
         **{
             f"{column}_counts": str(
                 {

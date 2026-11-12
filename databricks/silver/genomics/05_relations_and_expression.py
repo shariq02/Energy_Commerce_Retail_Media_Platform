@@ -99,6 +99,9 @@ parts.append(
         evaluation_date=text("CLASSIFICATION_DATE", VALIDITY),
         report_url=text("ONLINE_REPORT", VALIDITY),
         study_id=text("GCEP", VALIDITY),
+        source_gene_symbol=text("GENE_SYMBOL", VALIDITY),
+        source_disease_name=text("DISEASE_LABEL", VALIDITY),
+        standard_operating_procedure=text("SOP", VALIDITY),
     )
 )
 DOSAGE = "clingen.dosage_sensitivity"
@@ -118,8 +121,18 @@ for kind, score, description, disease in (
     ),
 ):
     id_type, id_value = split_curie(text(disease, DOSAGE), RULES)
+    # one row per supporting publication of this dosage kind
+    prefix = score.removesuffix("_Score")
+    papers = F.filter(
+        F.array(
+            *[text(c, DOSAGE) for c in dosage.columns if c.startswith(f"{prefix}_PMID")]
+        ),
+        lambda value: value.isNotNull(),
+    )
     part = linked(
-        dosage.filter(text(score, DOSAGE).isNotNull()),
+        dosage.filter(text(score, DOSAGE).isNotNull()).withColumn(
+            "pubmed_id", F.explode_outer(F.when(F.size(papers) > 0, papers))
+        ),
         [(text("Gene_ID", DOSAGE), "ncbi_gene")],
         [(id_value, id_type)],
     )
@@ -136,6 +149,10 @@ for kind, score, description, disease in (
             classification=text(score, DOSAGE),
             comment=text(description, DOSAGE),
             evaluation_date=text("Date_Last_Evaluated", DOSAGE),
+            pubmed_id=F.col("pubmed_id"),
+            source_gene_symbol=text("Gene_Symbol", DOSAGE),
+            cytogenetic_band=text("cytoBand", DOSAGE),
+            genomic_location=text("Genomic_Location", DOSAGE),
         )
     )
 
@@ -171,11 +188,15 @@ for table, dataset, subkind in TARGETS:
             evidence_count=number("evidenceCount", "bigint", dataset),
             gene_disease_relation_type=text("aggregationType", dataset),
             aggregation_value=text("aggregationValue", dataset),
+            novelty_score=number("currentNovelty", "double", dataset),
         )
     )
 GWAS = "opentargets.evidence_gwas_credible_sets"
 gwas = linked(
-    read_genomics_bronze("opentargets_evidence_gwas_credible_sets"),
+    read_genomics_bronze("opentargets_evidence_gwas_credible_sets").withColumn(
+        "pubmed_id",
+        F.explode_outer(F.from_json(text("literature", GWAS), "array<string>")),
+    ),
     [(text("targetId", GWAS), "ensembl")],
     [(text("diseaseId", GWAS), "opentargets_disease")],
 )
@@ -192,6 +213,14 @@ parts.append(
         study_id=text("studyLocusId", GWAS),
         aggregation_value=text("datasourceId", GWAS),
         evaluation_date=text("evidenceDate", GWAS),
+        pubmed_id=F.col("pubmed_id"),
+        target_from_source_id=text("targetFromSourceId", GWAS),
+        disease_from_source_mapped_id=text("diseaseFromSourceMappedId", GWAS),
+        datatype_id=text("datatypeId", GWAS),
+        resource_score=number("resourceScore", "double", GWAS),
+        curation_date=text("curationDate", GWAS),
+        quality_controls=text("qualityControls", GWAS),
+        publication_date=text("publicationDate", GWAS),
     )
 )
 
@@ -334,6 +363,7 @@ gene_rows = genes.select(
     curie_expr(text("hpo_id", GENES)).alias("phenotype_key"),
     F.lit(False).alias("is_negated"),
     text("frequency", GENES).alias("frequency"),
+    text("hpo_name", GENES).alias("phenotype_name"),
     none.alias("onset"),
     none.alias("sex"),
     none.alias("modifier"),
@@ -349,9 +379,12 @@ phenotype = _union(
             "phenotype",
             F.col("subject_type"),
             dataset,
-            (*PHENOTYPE_KEEP, "phenotype_evidence"),
+            (*PHENOTYPE_KEEP, "phenotype_evidence", "phenotype_name"),
         )
-        for frame, dataset in ((disease_rows, ANN), (gene_rows, GENES))
+        for frame, dataset in (
+            (disease_rows.withColumn("phenotype_name", none), ANN),
+            (gene_rows, GENES),
+        )
     ]
 )
 
@@ -442,6 +475,16 @@ parts = [
 
 # -- Transform -- CPIC pairs and FDA biomarkers
 CPIC = "cpic.pairs"
+
+
+def truth(value):
+    """`Yes`/`True` -> true, `No`/`False` -> false, else null."""
+    lowered = F.lower(value)
+    return F.when(lowered.isin("yes", "true"), True).when(
+        lowered.isin("no", "false"), False
+    )
+
+
 id_type, id_value = split_curie(text("drugid", CPIC), RULES)
 cpic = drug_linked(
     read_genomics_bronze("cpic_pairs").withColumn(
@@ -462,6 +505,12 @@ parts.append(
         evidence_level=text("cpiclevel", CPIC),
         source_drug_id=text("drugid", CPIC),
         source_gene_id=text("genesymbol", CPIC),
+        interaction_id=text("pairid", CPIC),
+        report_url=text("guidelineurl", CPIC),
+        clinpgx_level=text("clinpgxlevel", CPIC),
+        pharmacogenomic_testing=text("pgxtesting", CPIC),
+        used_for_recommendation=truth(text("usedforrecommendation", CPIC)),
+        is_provisional=truth(text("provisional", CPIC)),
     )
 )
 FDA = "fda.pgx_biomarkers"
@@ -507,6 +556,8 @@ parts.append(
         relation_detail=text("mechanismOfAction", MOA),
         source_drug_id=F.col("chembl_id"),
         source_gene_id=F.col("target_id"),
+        target_name=text("targetName", MOA),
+        target_type=text("targetType", MOA),
     )
 )
 TAHOE = "tahoe.drug_metadata"
@@ -757,6 +808,22 @@ biogrid_rows = relation_rows(
     ontology_term_ids=bio_text("Ontology_Term_IDs"),
     ontology_term_names=bio_text("Ontology_Term_Names"),
     ontology_term_categories=bio_text("Ontology_Term_Categories"),
+    ontology_term_qualifier_ids=bio_text("Ontology_Term_Qualifier_IDs"),
+    ontology_term_qualifier_names=bio_text("Ontology_Term_Qualifier_Names"),
+    ontology_term_types=bio_text("Ontology_Term_Types"),
+    **{
+        f"{name}_{side.lower()}": bio_text(f"{column}_Interactor_{side}")
+        for side in ("A", "B")
+        for name, column in (
+            ("source_gene", "Entrez_Gene"),
+            ("systematic_name", "Systematic_Name"),
+            ("official_symbol", "Official_Symbol"),
+            ("synonyms", "Synonyms"),
+            ("swiss_prot_accessions", "SWISS_PROT_Accessions"),
+            ("trembl_accessions", "TREMBL_Accessions"),
+            ("refseq_accessions", "REFSEQ_Accessions"),
+        )
+    },
 )
 
 # -- Transform -- STRING links (one column per evidence channel)
@@ -854,6 +921,292 @@ unplaced_pairs = (
 
 # COMMAND ----------
 
+# DBTITLE 1,Build -- entity_relation: regulation, homology, interactions, ACMG, trials
+# -- Read Silver -- id and name maps
+xwalk = read_silver("entity_id_crosswalk")
+names = read_silver("entity_name")
+gene_ids = entity_id_map(xwalk, "gene").unionByName(
+    term_map(names, "gene", ("symbol", "official_symbol"), "gene_symbol")
+)
+drug_names = entity_id_map(xwalk, "drug").unionByName(
+    term_map(
+        names,
+        "drug",
+        ("name", "generic_name", "trade_name", "synonym", "brand_mixture"),
+        "drug_name",
+    )
+)
+disease_names = entity_id_map(xwalk, "disease").unionByName(
+    term_map(names, "disease", ("pt", "name", "mh", "sy", "syn"), "disease_name")
+)
+
+
+def null_text(column, dataset):
+    """A Bronze text; the literal `NULL` of a source is null."""
+    value = text(column, dataset)
+    return F.when(F.upper(value) != "NULL", value)
+
+
+# -- Transform -- CollecTRI TF-target edges (one row per publication)
+COLLECTRI = "collectri.regulons"
+regulons = read_genomics_bronze("collectri_regulons")
+for side, column in (("A", "source"), ("B", "target")):
+    regulons = link_entities(
+        regulons,
+        [(F.upper(text(column, COLLECTRI)), "gene_symbol")],
+        gene_ids,
+        f"gene_{side}",
+        f"gene_{side}_method",
+    )
+regulation = relation_rows(
+    regulons.withColumn("publication", publications(text("references", COLLECTRI))),
+    "regulatory_interaction",
+    "collectri",
+    COLLECTRI,
+    interactor_a_id=text("source", COLLECTRI),
+    interactor_b_id=text("target", COLLECTRI),
+    gene_a_key=F.col("gene_A"),
+    gene_b_key=F.col("gene_B"),
+    interaction_score=number("weight", "double", COLLECTRI),
+    relation_detail=text("sign_decision", COLLECTRI),
+    source_database=text("resources", COLLECTRI),
+    pubmed_id=F.regexp_replace(F.col("publication"), r"^CollecTRI:", ""),
+)
+
+# -- Transform -- Ensembl Compara homologies (orthologues: gene B of another species)
+COMPARA = "ensembl_compara.homologues"
+homologues = link_entities(
+    read_genomics_bronze("ensembl_compara_homologues"),
+    [(ensembl_unversioned_expr(text("gene_stable_id", COMPARA)), "ensembl")],
+    entity_id_map(xwalk, "gene"),
+    "gene_A",
+    "gene_A_method",
+)
+human_b = text("homology_species", COMPARA) == "homo_sapiens"
+homologues = link_entities(
+    homologues,
+    [
+        (
+            F.when(
+                human_b,
+                ensembl_unversioned_expr(text("homology_gene_stable_id", COMPARA)),
+            ),
+            "ensembl",
+        )
+    ],
+    entity_id_map(xwalk, "gene"),
+    "gene_B",
+    "gene_B_method",
+)
+high_confidence = null_text("is_high_confidence", COMPARA)
+homology = relation_rows(
+    homologues,
+    "homology",
+    text("homology_type", COMPARA),
+    COMPARA,
+    interaction_id=null_text("homology_id", COMPARA),
+    interactor_a_id=text("gene_stable_id", COMPARA),
+    interactor_b_id=text("homology_gene_stable_id", COMPARA),
+    gene_a_key=F.col("gene_A"),
+    gene_b_key=F.col("gene_B"),
+    gene_link_method=F.col("gene_A_method"),
+    organism_a=text("species", COMPARA),
+    organism_b=text("homology_species", COMPARA),
+    species=text("homology_species", COMPARA),
+    percent_identity=number("identity", "double", COMPARA),
+    homology_percent_identity=number("homology_identity", "double", COMPARA),
+    gene_order_conservation_score=null_text("goc_score", COMPARA).cast("double"),
+    whole_genome_alignment_coverage=null_text("wga_coverage", COMPARA).cast("double"),
+    is_high_confidence=F.when(high_confidence == "1", True).when(
+        high_confidence == "0", False
+    ),
+)
+
+# -- Transform -- DDInter drug-drug interactions (drug A subject, drug B object)
+DDINTER = "ddinter.interactions"
+interactions = read_genomics_bronze("ddinter_interactions")
+for side in ("A", "B"):
+    interactions = link_entities(
+        interactions,
+        [(F.upper(text(f"Drug_{side}", DDINTER)), "drug_name")],
+        drug_names,
+        f"drug_{side}",
+        f"drug_{side}_method",
+    )
+drug_interaction = relation_rows(
+    interactions,
+    "drug_interaction",
+    "ddinter",
+    DDINTER,
+    subject_type=F.lit("drug"),
+    subject_id=text("DDInterID_A", DDINTER),
+    subject_name=text("Drug_A", DDINTER),
+    subject_key=F.col("drug_A"),
+    subject_link_method=F.col("drug_A_method"),
+    object_type=F.lit("drug"),
+    object_id=text("DDInterID_B", DDINTER),
+    object_name=text("Drug_B", DDINTER),
+    object_key=F.col("drug_B"),
+    object_link_method=F.col("drug_B_method"),
+    evidence_level=text("Level", DDINTER),
+)
+
+# -- Transform -- ACMG secondary-findings genes and their conditions
+ACMG = "acmg.secondary_findings_genes"
+gene_text = text("Gene_via_GTR", ACMG)
+acmg = read_genomics_bronze("acmg_secondary_findings_genes").select(
+    "*",
+    F.upper(F.trim(F.regexp_extract(gene_text, r"^([^\s(]+)", 1))).alias("symbol"),
+    F.regexp_extract(gene_text, r"MIM\s*(\d+)", 1).alias("gene_mim"),
+    F.regexp_extract(text("MedGen", ACMG), r"(C\w*\d+)", 1).alias("medgen_id"),
+    F.regexp_extract(
+        text("Disease_name_and_MIM_number", ACMG), r"MIM\s*(\d+)", 1
+    ).alias("disease_mim"),
+)
+acmg = link_entities(
+    acmg,
+    [(F.col("gene_mim"), "omim"), (F.col("symbol"), "gene_symbol")],
+    gene_ids,
+    "gene_key",
+    "gene_link_method",
+)
+acmg = link_entities(
+    acmg,
+    [(F.col("medgen_id"), "medgen"), (F.col("disease_mim"), "omim")],
+    entity_id_map(xwalk, "disease"),
+    "disease_key",
+    "disease_link_method",
+)
+acmg_rows = relation_rows(
+    acmg,
+    "gene_disease",
+    "acmg_secondary_findings",
+    ACMG,
+    ("gene_key", "gene_link_method", "disease_key", "disease_link_method"),
+    source_gene_id=gene_text,
+    source_disease_id=text("MedGen", ACMG),
+    gene_disease_relation_type=F.lit("secondary_finding_gene"),
+    relation_detail=text("Disease_name_and_MIM_number", ACMG),
+    comment=text("Variations_that_may_be_pathogenic", ACMG),
+)
+
+# -- Transform -- clinical trial conditions, interventions and keywords
+STUDY_TERMS = "aact.study_terms"
+BROWSE_TERMS = "aact.browse_terms"
+INTERVENTIONS = "aact.interventions"
+
+
+def trial_rows(df, subkind, dataset, object_type, name, key, method, object_id=None):
+    extra = {} if object_id is None else {"object_id": object_id}
+    return relation_rows(
+        df,
+        "clinical_trial",
+        subkind,
+        dataset,
+        subject_type=F.lit("clinical_trial"),
+        subject_id=text("nct_id", dataset),
+        object_type=F.lit(object_type),
+        object_name=name,
+        object_key=key,
+        object_link_method=method,
+        **extra,
+    )
+
+
+terms = read_genomics_bronze("aact_study_terms")
+term_name = text("name", STUDY_TERMS)
+conditions = link_entities(
+    terms.filter(text("term_kind", STUDY_TERMS) == "condition"),
+    [(F.upper(term_name), "disease_name")],
+    disease_names,
+    "disease",
+    "disease_method",
+)
+browse = read_genomics_bronze("aact_browse_terms")
+mesh = text("mesh_term", BROWSE_TERMS)
+browse_kind = text("browse_kind", BROWSE_TERMS)
+mesh_conditions = link_entities(
+    browse.filter(browse_kind == "condition"),
+    [(F.upper(mesh), "disease_name")],
+    disease_names,
+    "disease",
+    "disease_method",
+)
+mesh_interventions = link_entities(
+    browse.filter(browse_kind == "intervention"),
+    [(F.upper(mesh), "drug_name")],
+    drug_names,
+    "drug",
+    "drug_method",
+)
+intervention_name = text("name", INTERVENTIONS)
+listed = link_entities(
+    read_genomics_bronze("aact_interventions"),
+    [(F.upper(intervention_name), "drug_name")],
+    drug_names,
+    "drug",
+    "drug_method",
+)
+# e.g. mesh_condition_list, mesh_intervention_ancestor
+mesh_subkind = F.concat(
+    F.lit("mesh_"),
+    browse_kind,
+    F.lit("_"),
+    F.regexp_replace(text("mesh_type", BROWSE_TERMS), r"^mesh-", ""),
+)
+trial = _union(
+    [
+        trial_rows(
+            conditions,
+            "condition",
+            STUDY_TERMS,
+            "disease",
+            term_name,
+            F.col("disease"),
+            F.col("disease_method"),
+        ),
+        trial_rows(
+            terms.filter(text("term_kind", STUDY_TERMS) == "keyword"),
+            "keyword",
+            STUDY_TERMS,
+            "keyword",
+            term_name,
+            F.lit(None).cast("string"),
+            F.lit(None).cast("string"),
+        ),
+        trial_rows(
+            mesh_conditions,
+            mesh_subkind,
+            BROWSE_TERMS,
+            "disease",
+            mesh,
+            F.col("disease"),
+            F.col("disease_method"),
+        ),
+        trial_rows(
+            mesh_interventions,
+            mesh_subkind,
+            BROWSE_TERMS,
+            "drug",
+            mesh,
+            F.col("drug"),
+            F.col("drug_method"),
+        ),
+        trial_rows(
+            listed,
+            F.lower(text("intervention_type", INTERVENTIONS)),
+            INTERVENTIONS,
+            "intervention",
+            intervention_name,
+            F.col("drug"),
+            F.col("drug_method"),
+            object_id=text("id", INTERVENTIONS),
+        ),
+    ]
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Build -- entity_relation: union and keys
 # -- Transform -- one flat table of all kinds
 KEY_COLUMNS = [
@@ -883,6 +1236,8 @@ KEY_COLUMNS = [
     "subject_source_id",
     "object_type",
     "object_id",
+    "object_name",
+    "object_key",
     "pharmacogenomic_evidence",
     "association",
     "pharmacokinetic",
@@ -919,6 +1274,11 @@ relation = (
             pathway,
             interaction,
             variation_member,
+            regulation,
+            homology,
+            drug_interaction,
+            acmg_rows,
+            trial,
         ]
     )
     .distinct()
@@ -988,7 +1348,141 @@ write_inspect_export(
             & F.col("member_key").isNull()
         ).count(),
         "variation_allele_pairs_without_a_coordinate": lambda t: unplaced_pairs.count(),
+        "links_by_kind_and_method": lambda t: str(
+            {
+                f"{r['relation_kind']}.{r['method']}": r["count"]
+                for r in t.filter(
+                    F.col("relation_kind").isin(
+                        "regulatory_interaction",
+                        "homology",
+                        "drug_interaction",
+                        "clinical_trial",
+                    )
+                )
+                .withColumn(
+                    "method",
+                    F.coalesce(
+                        "object_link_method",
+                        F.when(
+                            F.col("gene_a_key").isNotNull()
+                            & F.col("gene_b_key").isNotNull(),
+                            F.lit("both_genes"),
+                        ),
+                        F.when(F.col("gene_a_key").isNotNull(), F.lit("gene_a_only")),
+                        F.lit("unlinked"),
+                    ),
+                )
+                .groupBy("relation_kind", "method")
+                .count()
+                .collect()
+            }
+        ),
+        "acmg_genes_without_a_gene_key": lambda t: t.filter(
+            (F.col("relation_subkind") == "acmg_secondary_findings")
+            & F.col("gene_key").isNull()
+        ).count(),
     },
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Build -- gene_disease_score_year
+# -- Read Silver -- id maps
+xwalk = read_silver("entity_id_crosswalk")
+linked = pair_linker(
+    entity_id_map(xwalk, "gene"), "gene", entity_id_map(xwalk, "disease"), "disease"
+)
+YEAR_SCHEMA = (
+    "array<struct<year:double,associationScore:double,novelty:double,"
+    "yearlyEvidenceCount:double>>"
+)
+
+# -- Transform -- one row per association and year (overall and per datasource)
+years = []
+for table, dataset, level in (
+    (
+        "opentargets_association_overall_direct",
+        "opentargets.association_overall_direct",
+        "overall",
+    ),
+    (
+        "opentargets_association_by_datasource_direct",
+        "opentargets.association_by_datasource_direct",
+        "datasource",
+    ),
+):
+    part = linked(
+        read_genomics_bronze(table).withColumn(
+            "point", F.explode(F.from_json("timeseries", YEAR_SCHEMA))
+        ),
+        [(text("targetId", dataset), "ensembl")],
+        [(text("diseaseId", dataset), "opentargets_disease")],
+    )
+    years.append(
+        part.select(
+            "gene_key",
+            "disease_key",
+            text("targetId", dataset).alias("source_gene_id"),
+            text("diseaseId", dataset).alias("source_disease_id"),
+            "gene_link_method",
+            "disease_link_method",
+            F.lit(level).alias("association_level"),
+            (
+                text("aggregationValue", dataset)
+                if level == "datasource"
+                else F.lit(None).cast("string")
+            ).alias("datasource_id"),
+            F.col("point.year").cast("int").alias("year"),
+            F.col("point.associationScore").alias("association_score"),
+            F.col("point.novelty").alias("novelty"),
+            F.col("point.yearlyEvidenceCount").alias("yearly_evidence_count"),
+            F.lit(dataset).alias("source_dataset"),
+        )
+    )
+score_year = (
+    _union(years)
+    .filter(F.col("year").isNotNull())
+    .distinct()
+    .withColumn(
+        "_srid",
+        sha_key(
+            "source_gene_id",
+            "source_disease_id",
+            "association_level",
+            "datasource_id",
+            "year",
+        ),
+    )
+)
+score_year = conform_genomics(
+    add_genomics_provenance(score_year, "_srid", RID), "gene_disease_score_year"
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- gene_disease_score_year
+write_inspect_export(
+    score_year,
+    "gene_disease_score_year",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["source_record_id"],
+    extra_checks={
+        "associations": lambda t: (
+            t.select(
+                "source_gene_id",
+                "source_disease_id",
+                "association_level",
+                "datasource_id",
+            )
+            .distinct()
+            .count()
+        ),
+        "years": lambda t: t.select("year").distinct().count(),
+    },
+    link_method_counts=True,
 )
 
 # COMMAND ----------

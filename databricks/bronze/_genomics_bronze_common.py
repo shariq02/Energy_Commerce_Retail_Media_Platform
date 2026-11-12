@@ -56,6 +56,7 @@ SOURCES = {
     "faers": ["demo", "drug", "indi", "outc", "reac", "rpsr", "ther"],
     "fda": ["pgx_biomarkers"],
     "gencode": ["annotation"],
+    "gene_ages": ["consensus"],
     "gnomad": ["variants"],
     "gnomad_balanced": ["variants"],
     "gnomad_mtdna": ["variants"],

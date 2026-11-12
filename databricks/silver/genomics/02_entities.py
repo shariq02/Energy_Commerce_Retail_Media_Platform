@@ -316,22 +316,42 @@ cells = read_genomics_bronze("tahoe_cell_line_metadata")
 clean = text_for(DATASET)
 keyed = cells.filter(clean("Cell_ID_DepMap").isNotNull())
 
-# -- Transform -- one row per cell line and driver
+# -- Transform -- one row per Tahoe cell line and driver
+tahoe = keyed.groupBy(
+    clean("Cell_ID_DepMap").alias("cell_line_key"),
+    clean("Driver_Gene_Symbol").alias("driver_gene_symbol"),
+    clean("Driver_VarZyg").alias("driver_variant_zygosity"),
+    clean("Driver_VarType").alias("driver_variant_type"),
+    clean("Driver_ProtEffect_or_CdnaEffect").alias("driver_effect"),
+    clean("Driver_Mech_InferDM").alias("driver_mechanism"),
+    clean("Driver_GeneType_DM").alias("driver_gene_type"),
+).agg(
+    F.min(clean("cell_name")).alias("tahoe_cell_name"),
+    F.min(clean("Cell_ID_Cellosaur")).alias("tahoe_cellosaur_id"),
+    F.min(clean("Organ")).alias("organ"),
+)
+
+# -- Read Bronze -- DepMap models (one row per model; the model id is the key)
+MODELS = "depmap.models"
+model_text = text_for(MODELS)
+models = read_genomics_bronze("depmap_models").select(
+    model_text("ModelID").alias("cell_line_key"),
+    model_text("CellLineName").alias("depmap_cell_name"),
+    model_text("RRID").alias("depmap_cellosaur_id"),
+    *[model_text(src).alias(dst) for src, dst in DEPMAP_MODEL_COLUMNS.items()],
+)
+models = models.filter(F.col("cell_line_key").isNotNull()).dropDuplicates(
+    ["cell_line_key"]
+)
+
+# -- Transform -- every cell line: the Tahoe driver rows and the DepMap models
 cell_line = (
-    keyed.groupBy(
-        clean("Cell_ID_DepMap").alias("cell_line_key"),
-        clean("Driver_Gene_Symbol").alias("driver_gene_symbol"),
-        clean("Driver_VarZyg").alias("driver_variant_zygosity"),
-        clean("Driver_VarType").alias("driver_variant_type"),
-        clean("Driver_ProtEffect_or_CdnaEffect").alias("driver_effect"),
-        clean("Driver_Mech_InferDM").alias("driver_mechanism"),
-        clean("Driver_GeneType_DM").alias("driver_gene_type"),
-    )
-    .agg(
-        F.min(clean("cell_name")).alias("cell_name"),
-        F.min(clean("Cell_ID_Cellosaur")).alias("cellosaur_id"),
-        F.min(clean("Organ")).alias("organ"),
-    )
+    tahoe.withColumn("in_tahoe", F.lit(True))
+    .join(models.withColumn("in_depmap", F.lit(True)), "cell_line_key", "full")
+    .withColumn("in_tahoe", F.coalesce(F.col("in_tahoe"), F.lit(False)))
+    .withColumn("in_depmap", F.coalesce(F.col("in_depmap"), F.lit(False)))
+    .withColumn("cell_name", F.coalesce("tahoe_cell_name", "depmap_cell_name"))
+    .withColumn("cellosaur_id", F.coalesce("tahoe_cellosaur_id", "depmap_cellosaur_id"))
     .withColumn(
         "_srid",
         sha_key(
@@ -366,6 +386,15 @@ write_inspect_export(
         "cell_lines_without_drivers": lambda t: t.filter(
             F.col("driver_gene_symbol").isNull()
         ).count(),
+        "depmap_models": lambda t: (
+            t.filter(F.col("in_depmap")).select("cell_line_key").distinct().count()
+        ),
+        "tahoe_lines_without_a_depmap_model": lambda t: (
+            t.filter(F.col("in_tahoe") & ~F.col("in_depmap"))
+            .select("cell_line_key")
+            .distinct()
+            .count()
+        ),
     },
 )
 
@@ -508,10 +537,38 @@ terms = (
     .withColumn("curie", curie_expr("id"))
     .withColumn("ontology", F.regexp_extract("curie", r"^([A-Za-z]+):", 1))
 )
-parents = terms.select(
-    "id",
+# parents, children, ancestors and descendants: (field, relation, the term is the
+# child of the listed id)
+HIERARCHY = [
+    ("parents", "parent", True),
+    ("children", "child", False),
+    ("ancestors", "ancestor", True),
+    ("descendants", "descendant", False),
+]
+listed = _reduce(
+    lambda a, b: a.unionByName(b),
+    [
+        terms.select(
+            "id",
+            "ontology",
+            F.explode(F.from_json(field, "array<string>")).alias("other_id"),
+            F.lit(field).alias("field"),
+            F.lit(relation).alias("relation"),
+            F.lit(term_is_child).alias("term_is_child"),
+        )
+        for field, relation, term_is_child in HIERARCHY
+    ],
+)
+parents = listed.select(
+    F.when(F.col("term_is_child"), F.col("id"))
+    .otherwise(F.col("other_id"))
+    .alias("id"),
     "ontology",
-    F.explode(F.from_json("parents", "array<string>")).alias("parent_id"),
+    F.when(F.col("term_is_child"), F.col("other_id"))
+    .otherwise(F.col("id"))
+    .alias("parent_id"),
+    "field",
+    "relation",
 )
 child_map = disease_keys.select(
     F.col("_ot_id").alias("id"), F.col("_ot_key").alias("child_mapped")
@@ -526,10 +583,14 @@ opentargets = (
         F.nullif("ontology", F.lit("")).alias("ontology"),
         F.coalesce(F.col("parent_mapped"), F.col("parent_id")).alias("parent_key"),
         F.coalesce(F.col("child_mapped"), F.col("id")).alias("child_key"),
-        F.lit("parent").alias("relation"),
-        F.lit("parent_child").alias("direction"),
+        F.when(F.col("relation").isin("parent", "child"), F.lit("parent"))
+        .otherwise(F.lit("ancestor"))
+        .alias("relation"),
+        F.when(F.col("relation").isin("parent", "child"), F.lit("parent_child"))
+        .otherwise(F.lit("ancestor_descendant"))
+        .alias("direction"),
         F.lit("opentargets.disease").alias("source_dataset"),
-        F.lit("parents").alias("source_field"),
+        F.col("field").alias("source_field"),
     )
 )
 
@@ -571,14 +632,18 @@ medgen = (
         F.lit("source_order").alias("direction"),
         F.lit("medgen.relations").alias("source_dataset"),
         F.lit("CUI1,CUI2,REL,RELA").alias("source_field"),
+        F.col("RUI").alias("relation_id"),
+        F.col("AUI1").alias("parent_atom_id"),
+        F.col("AUI2").alias("child_atom_id"),
+        F.col("STYPE1").alias("parent_source_type"),
     )
 )
 
 # -- Transform -- union and provenance
 relations = (
-    opentargets.unionByName(hpo)
-    .unionByName(reactome)
-    .unionByName(medgen)
+    opentargets.unionByName(hpo, allowMissingColumns=True)
+    .unionByName(reactome, allowMissingColumns=True)
+    .unionByName(medgen, allowMissingColumns=True)
     .filter(F.col("parent_key").isNotNull() & F.col("child_key").isNotNull())
     .distinct()
     .withColumn(
@@ -591,6 +656,9 @@ relations = (
             "direction",
             "source_dataset",
             "source_field",
+            "relation_id",
+            "parent_atom_id",
+            "child_atom_id",
         ),
     )
 )

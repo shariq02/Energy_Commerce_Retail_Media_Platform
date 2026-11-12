@@ -136,7 +136,7 @@ def test_assert_registry_complete_passes_on_the_real_repo() -> None:
 
 def test_silver_columns_are_english_and_spelled_out() -> None:
     """Source-style (uppercase) names and abbreviations must not reach a Silver
-    structure; `_nv` companions are excluded until their meaning is settled."""
+    structure; a MaStR `_nv` flag arrives as `<English field>_not_available`."""
     ns = _semantic_namespace()
     tables = set(ns["SEMANTIC_STRUCTURES"]) | set(ns["SEMANTIC_MEMBER_STRUCTURES"])
     untranslated: dict[str, list[str]] = {}
@@ -144,7 +144,13 @@ def test_silver_columns_are_english_and_spelled_out() -> None:
         col = r["column_name"]
         if r["table_name"] not in tables:
             continue
-        german = col != col.lower() and not col.endswith("_nv")
+        german = col != col.lower()
         if german or _SHORTHAND & set(col.split("_")):
             untranslated.setdefault(r["table_name"], []).append(col)
     assert not untranslated, untranslated
+
+
+def test_mastr_not_available_flags_get_english_names() -> None:
+    columns = {r["column_name"] for r in build_rows()}
+    assert "house_number_not_available" in columns
+    assert not any(c.endswith("_nv") for c in columns)
