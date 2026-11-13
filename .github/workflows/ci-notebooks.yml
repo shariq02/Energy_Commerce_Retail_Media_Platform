@@ -126,3 +126,8 @@ jobs:
                       fail = True
           sys.exit(1 if fail else 0)
           PYEOF
+
+      # ruff leaves F821 off for notebooks that take names from %run libraries; this
+      # step joins each notebook with its %run chain and checks for undefined names.
+      - name: Verify notebooks define every name across their %run chain
+        run: python scripts/utilities/check_run_chain_names.py

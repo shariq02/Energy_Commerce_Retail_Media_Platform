@@ -1505,8 +1505,36 @@ def inspect_table(
     add("schema", "table_exists", "exists", 1.0, 1.0, "PASS", "INFO")
     add("schema", "column_count", "count", float(len(cols)), None, "INFO", "INFO")
 
+    # One aggregation pass: rows, nulls, cardinality, numeric behaviour, flags
+    card_cols = [c for c in cols if c not in HIGH_CARDINALITY_SKIP]
+    numeric_types = {"double", "float", "int", "bigint", "smallint", "decimal"}
+    numeric_cols = [c for c in cols if dtypes.get(c) in numeric_types]
+    flag_cols = [c for c in cols if _FLAG_COL_PATTERN.search(c)]
+    bool_flag_cols = [c for c in flag_cols if dtypes.get(c) == "boolean"]
+    exprs = [F.count(F.lit(1)).alias("_rows")]
+    exprs += [
+        F.sum(F.col(c).isNull().cast("int")).alias(f"_null_{i}")
+        for i, c in enumerate(cols)
+    ]
+    exprs += [
+        F.approx_count_distinct(F.col(c)).alias(f"_distinct_{i}")
+        for i, c in enumerate(card_cols)
+    ]
+    for i, c in enumerate(numeric_cols):
+        exprs += [
+            F.min(c).alias(f"_min_{i}"),
+            F.max(c).alias(f"_max_{i}"),
+            F.sum((F.col(c) == 0).cast("int")).alias(f"_zero_{i}"),
+            F.sum((F.col(c) < 0).cast("int")).alias(f"_negative_{i}"),
+        ]
+    exprs += [
+        F.sum(F.col(c).cast("int")).alias(f"_flag_{i}")
+        for i, c in enumerate(bool_flag_cols)
+    ]
+    stats = df_after.agg(*exprs).first()
+
     # Volume
-    n_after = df_after.count()
+    n_after = stats["_rows"]
     add("volume", "row_count", "rows", float(n_after), None, "INFO", "INFO")
     if df_before is not None:
         n_before = df_before.count()
@@ -1526,38 +1554,31 @@ def inspect_table(
             f"before={n_before} after={n_after}",
         )
 
-    # Completeness (one agg pass across every column)
-    if cols:
-        null_exprs = [F.sum(F.col(c).isNull().cast("int")).alias(c) for c in cols]
-        null_row = df_after.agg(*null_exprs).first()
-        if null_row and n_after:
-            for c in cols:
-                rate = (null_row[c] or 0) / n_after
-                add(
-                    "completeness",
-                    f"null_rate:{c}",
-                    "null_rate",
-                    rate,
-                    None,
-                    "INFO",
-                    "INFO",
-                )
-
-    # Cardinality (one agg pass, skipping known-high-cardinality columns)
-    card_cols = [c for c in cols if c not in HIGH_CARDINALITY_SKIP]
-    if card_cols:
-        card_exprs = [F.approx_count_distinct(F.col(c)).alias(c) for c in card_cols]
-        card_row = df_after.agg(*card_exprs).first()
-        for c in card_cols:
+    # Completeness
+    if n_after:
+        for i, c in enumerate(cols):
+            rate = (stats[f"_null_{i}"] or 0) / n_after
             add(
-                "cardinality",
-                f"distinct:{c}",
-                "approx_distinct",
-                float(card_row[c]),
+                "completeness",
+                f"null_rate:{c}",
+                "null_rate",
+                rate,
                 None,
                 "INFO",
                 "INFO",
             )
+
+    # Cardinality (known-high-cardinality columns skipped)
+    for i, c in enumerate(card_cols):
+        add(
+            "cardinality",
+            f"distinct:{c}",
+            "approx_distinct",
+            float(stats[f"_distinct_{i}"]),
+            None,
+            "INFO",
+            "INFO",
+        )
 
     # Grain / duplicate-key check
     if key_cols:
@@ -1574,74 +1595,41 @@ def inspect_table(
             f"key_cols={key_cols}",
         )
 
-    # Numeric behaviour (one agg pass over numeric columns)
-    numeric_types = {"double", "float", "int", "bigint", "smallint", "decimal"}
-    numeric_cols = [c for c in cols if dtypes.get(c) in numeric_types]
-    if numeric_cols:
-        stat_exprs = []
-        for c in numeric_cols:
-            stat_exprs += [
-                F.min(c).alias(f"{c}__min"),
-                F.max(c).alias(f"{c}__max"),
-                F.sum((F.col(c) == 0).cast("int")).alias(f"{c}__zero"),
-                F.sum((F.col(c) < 0).cast("int")).alias(f"{c}__neg"),
-            ]
-        stat_row = df_after.agg(*stat_exprs).first()
-        for c in numeric_cols:
-            add(
-                "numeric",
-                f"min:{c}",
-                "min",
-                stat_row[f"{c}__min"],
-                None,
-                "INFO",
-                "INFO",
-            )
-            add(
-                "numeric",
-                f"max:{c}",
-                "max",
-                stat_row[f"{c}__max"],
-                None,
-                "INFO",
-                "INFO",
-            )
-            add(
-                "numeric",
-                f"zero_count:{c}",
-                "count",
-                float(stat_row[f"{c}__zero"] or 0),
-                None,
-                "INFO",
-                "INFO",
-            )
-            add(
-                "numeric",
-                f"negative_count:{c}",
-                "count",
-                float(stat_row[f"{c}__neg"] or 0),
-                None,
-                "INFO",
-                "INFO",
-            )
+    # Numeric behaviour
+    for i, c in enumerate(numeric_cols):
+        add("numeric", f"min:{c}", "min", stats[f"_min_{i}"], None, "INFO", "INFO")
+        add("numeric", f"max:{c}", "max", stats[f"_max_{i}"], None, "INFO", "INFO")
+        add(
+            "numeric",
+            f"zero_count:{c}",
+            "count",
+            float(stats[f"_zero_{i}"] or 0),
+            None,
+            "INFO",
+            "INFO",
+        )
+        add(
+            "numeric",
+            f"negative_count:{c}",
+            "count",
+            float(stats[f"_negative_{i}"] or 0),
+            None,
+            "INFO",
+            "INFO",
+        )
 
     # DQ / semantic-status flag counts (recognised by name, not forced on tables
     # that carry none)
-    flag_cols = [c for c in cols if _FLAG_COL_PATTERN.search(c)]
-    bool_flag_cols = [c for c in flag_cols if dtypes.get(c) == "boolean"]
-    if bool_flag_cols:
-        flag_exprs = [F.sum(F.col(c).cast("int")).alias(c) for c in bool_flag_cols]
-        flag_row = df_after.agg(*flag_exprs).first()
-        for c in bool_flag_cols:
-            add(
-                "dq",
-                f"flag_true_count:{c}",
-                "count",
-                float(flag_row[c] or 0),
-                None,
-                "INFO",
-                "INFO",
-            )
+    for i, c in enumerate(bool_flag_cols):
+        add(
+            "dq",
+            f"flag_true_count:{c}",
+            "count",
+            float(stats[f"_flag_{i}"] or 0),
+            None,
+            "INFO",
+            "INFO",
+        )
     for c in flag_cols:
         if dtypes.get(c) == "string":
             vc = df_after.groupBy(c).count().collect()

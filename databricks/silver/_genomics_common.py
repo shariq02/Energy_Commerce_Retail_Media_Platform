@@ -87,7 +87,7 @@ GENOMICS_MAIN_TABLES = {
 # One row per ...
 GENOMICS_TABLE_GRAIN = {
     "entity_id_crosswalk": "entity, id type, id value, source column",
-    "entity_claim": "entity, field, source column, value",
+    "entity_claim": "entity, field, source column, value, snapshot run",
     "entity_name": "entity, term, term type",
     "entity_derived_attribute": "entity, attribute, rule",
     "ontology_relation": "ontology, parent, child, relation",
@@ -98,9 +98,11 @@ GENOMICS_TABLE_GRAIN = {
     "cell_line": "cell line, driver",
     "genetic_test": "test, link",
     "variant": "variant",
-    "variant_hgvs": "variant, transcript, snapshot",
-    "variant_condition": "variant, condition position, condition id, snapshot",
-    "variant_classification": "variant, classification type, term, submission, snapshot",
+    "variant_hgvs": "variant, transcript, snapshot run",
+    "variant_condition": "variant, condition position, condition id, snapshot run",
+    "variant_classification": (
+        "variant, classification type, term, submission, snapshot run"
+    ),
     "locus_score": "variant or position, score name, source",
     "variant_population_frequency": "variant, population, source",
     "variant_feature_overlap": "variant, feature kind, feature",
@@ -151,8 +153,9 @@ GENOMICS_STRUCTURES = {
         ("source_field", "string"),
         ("source_rank", "int"),
         ("source_type", "string"),
-        # the ClinVar snapshot of a ClinVar claim (null for other sources)
-        ("source_snapshot", "string"),
+        # the unbroken run of ClinVar snapshots of a ClinVar claim (null for others)
+        ("first_source_snapshot", "string"),
+        ("last_source_snapshot", "string"),
     ],
     "entity_name": [
         ("entity_type", "string"),
@@ -494,7 +497,8 @@ GENOMICS_STRUCTURES.update(
                 "protein_inserted_amino_acids",
                 "parse_status",
             ),
-            *_text("source_dataset", "source_field", "source_snapshot"),
+            *_text("source_dataset", "source_field"),
+            *_text("first_source_snapshot", "last_source_snapshot"),
         ],
         "variant_condition": [
             ("variant_key", "string"),
@@ -502,7 +506,8 @@ GENOMICS_STRUCTURES.update(
             *_text("condition_name", "clinvar_condition_accession", "condition_id"),
             *_text("disease_key", "disease_link_method"),
             ("is_generic_label", "boolean"),
-            *_text("pairing_status", "source_dataset", "source_snapshot"),
+            *_text("pairing_status", "source_dataset"),
+            *_text("first_source_snapshot", "last_source_snapshot"),
         ],
         "variant_classification": [
             *_text("variant_key", "classification_type", "term", "review_status"),
@@ -512,7 +517,8 @@ GENOMICS_STRUCTURES.update(
             ("clinical_significance_simple", "string"),
             ("submission_accession", "string"),
             ("source_dataset", "string"),
-            ("source_snapshot", "string"),
+            ("first_source_snapshot", "string"),
+            ("last_source_snapshot", "string"),
         ],
         # A score of a variant (variant_key set) or of a genome position
         # (assembly, contig, position set).
@@ -1984,15 +1990,15 @@ def resolve_master(claims, *, entity_type: str, fields):
     """(masters, conflicts) from a claims frame. A master row has each field, its
     `<field>_source` and `<field>_method` (`primary`, `filled` or `unranked`);
     left-join it onto the entity list. `conflicts` lists fields whose sources
-    gave more than one value. Among claims of one rank the newest ClinVar
-    snapshot wins; the older snapshots stay as claims."""
+    gave more than one value. Among claims of one rank the claim whose snapshot
+    run ends newest wins; the older runs stay as claims."""
     fields = list(fields)
     scoped = claims.filter(
         (F.col("entity_type") == entity_type) & F.col("field").isin(fields)
     )
     snapshot = (
-        F.col("source_snapshot")
-        if "source_snapshot" in claims.columns
+        F.col("last_source_snapshot")
+        if "last_source_snapshot" in claims.columns
         else F.lit(None).cast("string")
     )
     pair = Window.partitionBy("entity_key", "field")
@@ -2923,10 +2929,130 @@ def dbvar_frame(rules):
 
 
 def current_snapshot(df, rules):
-    """The rows of the current ClinVar snapshot and the rows of sources without one."""
+    """The rows whose snapshot run reaches the current ClinVar snapshot and the
+    rows of sources without one."""
     return df.filter(
-        F.col("source_snapshot").isNull()
-        | (F.col("source_snapshot") == rules["clinvar_current_snapshot"])
+        F.col("last_source_snapshot").isNull()
+        | (F.col("last_source_snapshot") == rules["clinvar_current_snapshot"])
+    )
+
+
+def clinvar_snapshot_order(rules):
+    """The ClinVar snapshot labels in Bronze, oldest first (a label that is no
+    date sorts by its date in `clinvar_snapshot_dates`)."""
+    dates = rules["clinvar_snapshot_dates"]
+    labels = [
+        row["snapshot"]
+        for row in read_genomics_bronze("clinvar_variant_summary")
+        .select("snapshot")
+        .distinct()
+        .collect()
+        if row["snapshot"]
+    ]
+    return sorted(labels, key=lambda label: dates.get(label, label))
+
+
+def snapshot_runs(df, order):
+    """`df` with `source_snapshot` replaced by `first_source_snapshot` and
+    `last_source_snapshot`: one row per value and unbroken run of snapshots in
+    `order`; a value missing from a snapshot starts a new run. Rows without a
+    snapshot keep both null."""
+    values = [c for c in df.columns if c != "source_snapshot"]
+    rank = F.create_map(
+        *[F.lit(part) for i, label in enumerate(order, 1) for part in (label, i)]
+    )
+    labels = F.array(*[F.lit(label) for label in order])
+    plain = (
+        df.filter(F.col("source_snapshot").isNull())
+        .drop("source_snapshot")
+        .distinct()
+        .withColumn("first_source_snapshot", F.lit(None).cast("string"))
+        .withColumn("last_source_snapshot", F.lit(None).cast("string"))
+    )
+    ranked = (
+        df.filter(F.col("source_snapshot").isNotNull())
+        .withColumn("_rank", rank[F.col("source_snapshot")])
+        .drop("source_snapshot")
+        .distinct()
+    )
+    runs = (
+        ranked.withColumn(
+            "_run",
+            F.col("_rank")
+            - F.row_number().over(Window.partitionBy(*values).orderBy("_rank")),
+        )
+        .groupBy(*values, "_run")
+        .agg(F.min("_rank").alias("_first"), F.max("_rank").alias("_last"))
+        .select(
+            *values,
+            F.element_at(labels, F.col("_first")).alias("first_source_snapshot"),
+            F.element_at(labels, F.col("_last")).alias("last_source_snapshot"),
+        )
+    )
+    return runs.unionByName(plain)
+
+
+def expand_snapshot_runs(df, order):
+    """One row per snapshot of each run, in `source_snapshot` (rows without a
+    snapshot are dropped)."""
+    rank = F.create_map(
+        *[F.lit(part) for i, label in enumerate(order, 1) for part in (label, i)]
+    )
+    labels = F.array(*[F.lit(label) for label in order])
+    return df.filter(F.col("first_source_snapshot").isNotNull()).withColumn(
+        "source_snapshot",
+        F.explode(
+            F.slice(
+                labels,
+                rank[F.col("first_source_snapshot")],
+                rank[F.col("last_source_snapshot")]
+                - rank[F.col("first_source_snapshot")]
+                + 1,
+            )
+        ),
+    )
+
+
+def interval_overlap_counts(spans, features, column: str):
+    """(variant_key, `column`): the number of feature intervals that overlap each
+    variant span, from running counts per contig, so no variant x feature row is
+    built. `spans`: variant_key, contig, start_position, end_position; `features`:
+    contig, f_start, f_end (one row per interval). Only counts above 0."""
+
+    def running(feature_position, variant_position, feature_first):
+        events = features.select(
+            "contig",
+            F.col(feature_position).alias("_position"),
+            F.lit(1).alias("_feature"),
+            F.lit(None).cast("string").alias("variant_key"),
+        ).unionByName(
+            spans.select(
+                "contig",
+                F.col(variant_position).alias("_position"),
+                F.lit(0).alias("_feature"),
+                "variant_key",
+            )
+        )
+        tie = F.col("_feature").desc() if feature_first else F.col("_feature").asc()
+        order = (
+            Window.partitionBy("contig")
+            .orderBy("_position", tie)
+            .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+        )
+        return (
+            events.withColumn("_count", F.sum("_feature").over(order))
+            .filter(F.col("_feature") == 0)
+            .select("variant_key", "_count")
+        )
+
+    # started: f_start <= variant end; ended: f_end < variant start
+    started = running("f_start", "end_position", True)
+    ended = running("f_end", "start_position", False)
+    return (
+        started.withColumnRenamed("_count", "_started")
+        .join(ended.withColumnRenamed("_count", "_ended"), "variant_key")
+        .select("variant_key", (F.col("_started") - F.col("_ended")).alias(column))
+        .filter(F.col(column) > 0)
     )
 
 
@@ -3564,6 +3690,22 @@ def clinvar_conditions_udf():
         ]
 
     return F.udf(parse, CONDITION_DDL)
+
+
+def parse_distinct(df, inputs, parser, output: str):
+    """`df` with `output` = `parser(*inputs)`; the parser runs once per distinct
+    input and the result joins back null-safe."""
+    keys = [f"_input_{i}" for i in range(len(inputs))]
+    parsed = (
+        df.select(*[F.col(c).alias(k) for c, k in zip(inputs, keys, strict=True)])
+        .distinct()
+        .withColumn(output, parser(*[F.col(k) for k in keys]))
+    )
+    matched = _reduce(
+        lambda left, right: left & right,
+        [F.col(c).eqNullSafe(F.col(k)) for c, k in zip(inputs, keys, strict=True)],
+    )
+    return df.join(parsed, matched, "left").drop(*keys)
 
 
 def faers_date(column):

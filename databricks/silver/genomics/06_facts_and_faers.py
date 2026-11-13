@@ -154,7 +154,12 @@ mutation = link_entities(
     "rsid_variant_key",
     "rsid_method",
 )
-mutation = mutation.withColumn("protein", hgvs_protein_udf()(text("HGVSp_Short")))
+mutation = parse_distinct(
+    mutation.withColumn("protein_change_text", text("HGVSp_Short")),
+    ["protein_change_text"],
+    hgvs_protein_udf(),
+    "protein",
+).drop("protein_change_text")
 mutation = (
     mutation.withColumn(
         "protein_reference_amino_acid",

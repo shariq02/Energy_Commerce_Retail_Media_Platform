@@ -2280,8 +2280,11 @@ claims = _reduce(
     ],
 )
 
+# -- Transform -- one row per value and unbroken run of ClinVar snapshots
+claims = snapshot_runs(claims, clinvar_snapshot_order(RULES))
+
 # -- Transform -- keys and provenance
-claims = claims.distinct().withColumn(
+claims = claims.withColumn(
     "_srid",
     sha_key(
         "entity_type",
@@ -2291,7 +2294,7 @@ claims = claims.distinct().withColumn(
         "source_field",
         "value_text",
         "value_number",
-        "source_snapshot",
+        "first_source_snapshot",
     ),
 )
 claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), "entity_claim")
@@ -2315,15 +2318,18 @@ blocks = inspect_table(
         "llm_generated_claims": written.filter(
             F.col("source_type") == "llm_generated"
         ).count(),
-        "claims_per_clinvar_snapshot": str(
+        "claim_runs_per_first_clinvar_snapshot": str(
             {
-                r["source_snapshot"]: r["count"]
-                for r in written.filter(F.col("source_snapshot").isNotNull())
-                .groupBy("source_snapshot")
+                r["first_source_snapshot"]: r["count"]
+                for r in written.filter(F.col("first_source_snapshot").isNotNull())
+                .groupBy("first_source_snapshot")
                 .count()
                 .collect()
             }
         ),
+        "claim_runs_in_current_clinvar": written.filter(
+            F.col("last_source_snapshot") == RULES["clinvar_current_snapshot"]
+        ).count(),
         **{
             f"{column}_counts": str(
                 {

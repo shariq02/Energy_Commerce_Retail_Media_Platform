@@ -82,9 +82,17 @@ def test_the_batch_four_tables_are_declared_in_the_main_schema(genomics):
         assert genomics["genomics_target_schema"](table) == "genomics_silver"
 
 
-def test_claims_carry_the_clinvar_snapshot(genomics):
-    columns = dict(genomics["GENOMICS_STRUCTURES"]["entity_claim"])
-    assert columns["source_snapshot"] == "string"
+def test_clinvar_tables_carry_the_snapshot_run(genomics):
+    for table in (
+        "entity_claim",
+        "variant_hgvs",
+        "variant_condition",
+        "variant_classification",
+    ):
+        columns = dict(genomics["GENOMICS_STRUCTURES"][table])
+        assert columns["first_source_snapshot"] == "string", table
+        assert columns["last_source_snapshot"] == "string", table
+        assert "source_snapshot" not in columns, table
 
 
 def test_cell_lines_carry_the_depmap_model_columns(genomics):

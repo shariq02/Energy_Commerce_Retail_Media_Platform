@@ -1157,19 +1157,40 @@ def reconciliation_stats(
     -> duplicates collapsed -> conflicts quarantined -> kept.
     Pass `raw_bronze_df` when `source_df` (resolve_conflicts' input) is already
     filtered, so `bronze_rows` reflects the true Bronze count. `qn_only_collapsed`
-    appears when kept_df carries `_qn_only_dropped`."""
-    dedup_input_rows = source_df.count()
-    quarantined_rows = quarantine_df.count()
-    if "_qn_only_dropped" in kept_df.columns:
-        agg = kept_df.agg(
-            F.count(F.lit(1)).alias("n"),
-            F.sum("_qn_only_dropped").alias("qn"),
-        ).first()
-        kept_rows, qn_only = agg["n"], int(agg["qn"] or 0)
-    else:
-        kept_rows, qn_only = kept_df.count(), None
+    appears when kept_df carries `_qn_only_dropped`. All counts come from one
+    statement (serverless has no cache)."""
+    has_qn = "_qn_only_dropped" in kept_df.columns
+    no_qn = F.lit(0).cast("bigint")
+    frames = {
+        "input": (source_df, no_qn),
+        "quarantined": (quarantine_df, no_qn),
+        "kept": (
+            kept_df,
+            F.col("_qn_only_dropped").cast("bigint") if has_qn else no_qn,
+        ),
+    }
+    if raw_bronze_df is not None:
+        frames["bronze"] = (raw_bronze_df, no_qn)
+    union = None
+    for name, (frame, qn) in frames.items():
+        part = frame.select(F.lit(name).alias("_part"), qn.alias("_qn"))
+        union = part if union is None else union.unionByName(part)
+    counts = {
+        row["_part"]: (row["n"], int(row["qn"] or 0))
+        for row in union.groupBy("_part")
+        .agg(F.count(F.lit(1)).alias("n"), F.sum("_qn").alias("qn"))
+        .collect()
+    }
+
+    def rows_of(name):
+        return counts.get(name, (0, 0))[0]
+
+    dedup_input_rows = rows_of("input")
+    quarantined_rows = rows_of("quarantined")
+    kept_rows = rows_of("kept")
+    qn_only = counts.get("kept", (0, 0))[1] if has_qn else None
     out = {
-        "bronze_rows": raw_bronze_df.count()
+        "bronze_rows": rows_of("bronze")
         if raw_bronze_df is not None
         else dedup_input_rows,
         "dedup_input_rows": dedup_input_rows,

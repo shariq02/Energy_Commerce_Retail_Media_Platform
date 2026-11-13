@@ -31,6 +31,7 @@ RID = run_id()
 FINDINGS = "genomics"
 RULES = load_genomics_rules()
 FRAMES = dict(variant_frames(RULES))
+SNAPSHOTS = clinvar_snapshot_order(RULES)
 
 # COMMAND ----------
 
@@ -159,14 +160,14 @@ write_inspect_export(
 xwalk = read_silver("entity_id_crosswalk")
 transcripts = entity_id_map(xwalk, "transcript")
 
-# -- Transform -- ClinVar names
+# -- Transform -- ClinVar names (parsed once per distinct name)
 name_column = clean_placeholders("Name", RULES, "clinvar.variant_summary.Name")
-parsed = (
+named = (
     FRAMES[CLINVAR]
     .select("variant_key", name_column.alias("name"), "snapshot")
     .filter(F.col("name").isNotNull())
-    .withColumn("parsed", hgvs_name_udf()(F.col("name")))
 )
+parsed = parse_distinct(named, ["name"], hgvs_name_udf(), "parsed")
 clinvar = parsed.select(
     "variant_key",
     *[F.col(f"parsed.{n}").alias(n) for n, _ in HGVS_NAME_FIELDS],
@@ -174,6 +175,7 @@ clinvar = parsed.select(
     F.lit("Name").alias("source_field"),
     F.col("snapshot").alias("source_snapshot"),
 )
+clinvar = snapshot_runs(clinvar, SNAPSHOTS)
 
 # -- Transform -- AlphaMissense protein changes
 alpha = FRAMES[ALPHAMISSENSE].select("variant_key", "transcript_id", "protein_variant")
@@ -208,7 +210,8 @@ alphamissense = alpha.select(
     .alias("parse_status"),
     F.lit(ALPHAMISSENSE).alias("source_dataset"),
     F.lit("protein_variant").alias("source_field"),
-    F.lit(None).cast("string").alias("source_snapshot"),
+    F.lit(None).cast("string").alias("first_source_snapshot"),
+    F.lit(None).cast("string").alias("last_source_snapshot"),
 )
 
 # -- Transform -- transcript links and provenance
@@ -232,7 +235,7 @@ hgvs = hgvs.distinct().withColumn(
         "coding_notation",
         "protein_notation",
         "source_dataset",
-        "source_snapshot",
+        "first_source_snapshot",
     ),
 )
 hgvs = conform_genomics(add_genomics_provenance(hgvs, "_srid", RID), "variant_hgvs")
@@ -278,15 +281,19 @@ disease_map = entity_id_map(xwalk, "disease")
 # -- Transform -- pair ids, names and accessions
 DATASET = "clinvar.variant_summary"
 text = text_for(DATASET)
-parsed = FRAMES[CLINVAR].select(
+condition_texts = FRAMES[CLINVAR].select(
     "variant_key",
     F.col("snapshot").alias("source_snapshot"),
-    F.explode(
-        clinvar_conditions_udf()(
-            text("PhenotypeIDS"), text("PhenotypeList"), text("RCVaccession")
-        )
-    ).alias("c"),
+    text("PhenotypeIDS").alias("phenotype_ids"),
+    text("PhenotypeList").alias("phenotype_names"),
+    text("RCVaccession").alias("condition_accessions"),
 )
+parsed = parse_distinct(
+    condition_texts,
+    ["phenotype_ids", "phenotype_names", "condition_accessions"],
+    clinvar_conditions_udf(),
+    "parsed_conditions",
+).select("variant_key", "source_snapshot", F.explode("parsed_conditions").alias("c"))
 
 # -- Transform -- one row per condition id (a condition without an id keeps one row)
 conditions = parsed.select(
@@ -297,7 +304,8 @@ conditions = parsed.select(
     F.col("c.accession").alias("clinvar_condition_accession"),
     F.explode_outer("c.ids").alias("condition_id"),
     F.col("c.pairing_status").alias("pairing_status"),
-).distinct()
+)
+conditions = snapshot_runs(conditions, SNAPSHOTS)
 
 # -- Transform -- disease links through the exact id
 id_type, id_value = split_curie("condition_id", RULES)
@@ -323,7 +331,7 @@ condition = (
         "_srid",
         sha_key(
             "variant_key",
-            "source_snapshot",
+            "first_source_snapshot",
             "condition_position",
             "condition_id",
             "clinvar_condition_accession",
@@ -425,14 +433,14 @@ for kind, term, review, evaluated, scv in TYPES:
             F.col("snapshot").alias("source_snapshot"),
         ).filter(F.col("term").isNotNull())
     )
-classification = _union(parts)
+classification = snapshot_runs(_union(parts), SNAPSHOTS)
 
 # -- Transform -- keys and provenance
-classification = classification.distinct().withColumn(
+classification = classification.withColumn(
     "_srid",
     sha_key(
         "variant_key",
-        "source_snapshot",
+        "first_source_snapshot",
         "classification_type",
         "term",
         "review_status",
@@ -814,10 +822,6 @@ master = read_silver("entity_master")
 gene_types = master.filter(F.col("entity_type") == "gene").select(
     F.col("entity_key").alias("gene_key"), F.col("gene_type").alias("feature_type")
 )
-transcript_types = master.filter(F.col("entity_type") == "transcript").select(
-    F.col("entity_key").alias("transcript_key"),
-    F.col("transcript_type").alias("feature_type"),
-)
 element_types = (
     read_silver("entity_claim")
     .filter(
@@ -847,19 +851,19 @@ def features_of(entity_type, types, key_column):
     )
 
 
-def overlaps(features, kind, source):
+def overlaps(features, kind, source, spans=variants):
     spread = features.withColumn(
         "bin",
         F.explode(
             F.sequence(F.floor(F.col("f_start") / BIN), F.floor(F.col("f_end") / BIN))
         ),
     )
-    joined = variants.join(
+    joined = spans.join(
         spread,
-        (variants["contig"] == spread["f_contig"])
-        & (variants["bin"] == spread["bin"])
-        & (variants["start_position"] <= spread["f_end"])
-        & (variants["end_position"] >= spread["f_start"]),
+        (spans["contig"] == spread["f_contig"])
+        & (spans["bin"] == spread["bin"])
+        & (spans["start_position"] <= spread["f_end"])
+        & (spans["end_position"] >= spread["f_start"]),
     )
     return joined.select(
         "variant_key",
@@ -871,56 +875,18 @@ def overlaps(features, kind, source):
     ).distinct()
 
 
+# Pair rows only for genes (every variant) and regulatory elements (variants that
+# are not dbVar structural variants); transcript, enhancer, exon, CDS and UTR
+# overlaps are counts per variant in 08.
 parts = [
     overlaps(features_of("gene", gene_types, "gene_key"), "gene", "entity_coordinate"),
-    overlaps(
-        features_of("transcript", transcript_types, "transcript_key"),
-        "transcript",
-        "entity_coordinate",
-    ),
     overlaps(
         features_of("regulatory_element", element_types, "element_key"),
         "regulatory_element",
         "entity_coordinate",
+        spans=variants.filter(~F.col("variant_key").startswith("dbvar:")),
     ),
 ]
-
-# -- Transform -- ENCODE-rE2G enhancer elements (distinct elements; BED start + 1)
-RE2G = "encode.enhancer_gene_links"
-enhancers = (
-    read_genomics_bronze("encode_enhancer_gene_links")
-    .select(
-        clean_placeholders("name", RULES, f"{RE2G}.name").alias("feature_key"),
-        chromosome_expr("chr").alias("f_contig"),
-        (typed_number("start", "bigint", RULES, f"{RE2G}.start") + 1).alias("f_start"),
-        typed_number("end", "bigint", RULES, f"{RE2G}.end").alias("f_end"),
-        clean_placeholders("class", RULES, f"{RE2G}.class").alias("feature_type"),
-    )
-    .filter(F.col("f_start").isNotNull() & F.col("f_end").isNotNull())
-    .distinct()
-)
-parts.append(overlaps(enhancers, "enhancer_element", RE2G))
-
-# -- Transform -- exon, CDS and UTR rows (when Bronze holds them)
-GENCODE = "gencode.annotation"
-structure = read_genomics_bronze("gencode_annotation").filter(
-    F.col("feature").isin("exon", "CDS", "UTR")
-)
-structure_features = structure.select(
-    ensembl_unversioned_expr(F.col("transcript_id")).alias("feature_key"),
-    chromosome_expr("seqname").alias("f_contig"),
-    typed_number("start", "bigint", RULES, f"{GENCODE}.start").alias("f_start"),
-    typed_number("end", "bigint", RULES, f"{GENCODE}.end").alias("f_end"),
-    F.col("feature").alias("feature_type"),
-).filter(F.col("f_start").isNotNull() & F.col("f_end").isNotNull())
-for kind in ("exon", "CDS", "UTR"):
-    parts.append(
-        overlaps(
-            structure_features.filter(F.col("feature_type") == kind),
-            kind.lower(),
-            GENCODE,
-        )
-    )
 
 # -- Transform -- protein features by protein position
 hgvs = (
@@ -986,15 +952,8 @@ write_inspect_export(
                 for r in t.groupBy("feature_kind").count().collect()
             }
         ),
-        "exon_rows_in_bronze": structure.count(),
         "structural_variants_with_an_overlap": lambda t: (
             t.filter(F.col("variant_key").startswith("dbvar:"))
-            .select("variant_key")
-            .distinct()
-            .count()
-        ),
-        "variants_in_an_enhancer_element": lambda t: (
-            t.filter(F.col("feature_kind") == "enhancer_element")
             .select("variant_key")
             .distinct()
             .count()

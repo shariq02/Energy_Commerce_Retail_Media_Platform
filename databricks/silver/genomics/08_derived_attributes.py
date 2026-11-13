@@ -3185,6 +3185,118 @@ disruption_rows = attribute_rows(
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- feature overlap counts per variant (no pair rows)
+spans = (
+    variant.filter(
+        (F.col("assembly") == "GRCh38")
+        & F.col("position").isNotNull()
+        & F.col("contig").isNotNull()
+    )
+    .select(
+        "variant_key",
+        "contig",
+        F.col("position").alias("start_position"),
+        # a structural variant spans to its END; a small variant spans its allele
+        F.greatest(
+            F.coalesce(F.col("end_position"), F.col("position")),
+            F.col("position") + F.greatest(F.length("reference_allele"), F.lit(1)) - 1,
+        ).alias("end_position"),
+    )
+    .distinct()
+)
+grch38_coordinates = read_silver("entity_coordinate").filter(
+    (F.col("assembly") == "GRCh38") & F.col("is_primary")
+)
+
+
+def intervals(frame, key, contig, start, end):
+    return (
+        frame.select(
+            F.col(key).alias("feature_key"),
+            F.col(contig).alias("contig"),
+            F.col(start).alias("f_start"),
+            F.col(end).alias("f_end"),
+        )
+        .filter(
+            F.col("contig").isNotNull()
+            & F.col("f_start").isNotNull()
+            & F.col("f_end").isNotNull()
+        )
+        .distinct()
+    )
+
+
+def coordinate_intervals(entity_type):
+    return intervals(
+        grch38_coordinates.filter(F.col("entity_type") == entity_type),
+        "entity_key",
+        "contig",
+        "start_position",
+        "end_position",
+    )
+
+
+GENCODE = "gencode.annotation"
+structure = (
+    read_genomics_bronze("gencode_annotation")
+    .filter(F.col("feature").isin("exon", "CDS", "UTR"))
+    .select(
+        "feature",
+        ensembl_unversioned_expr(F.col("transcript_id")).alias("transcript_key"),
+        chromosome_expr("seqname").alias("structure_contig"),
+        typed_number("start", "bigint", RULES, f"{GENCODE}.start").alias("f_start"),
+        typed_number("end", "bigint", RULES, f"{GENCODE}.end").alias("f_end"),
+    )
+)
+
+
+def structure_intervals(feature):
+    return intervals(
+        structure.filter(F.col("feature") == feature),
+        "transcript_key",
+        "structure_contig",
+        "f_start",
+        "f_end",
+    )
+
+
+OVERLAP_COUNTS = [
+    ("overlapping_transcript_count", coordinate_intervals("transcript")),
+    (
+        "overlapping_regulatory_element_count",
+        coordinate_intervals("regulatory_element"),
+    ),
+    (
+        "overlapping_enhancer_element_count",
+        intervals(
+            read_silver("regulatory_element_gene_link"),
+            "element_key",
+            "contig",
+            "start_position",
+            "end_position",
+        ),
+    ),
+    ("overlapping_exon_count", structure_intervals("exon")),
+    ("overlapping_coding_sequence_count", structure_intervals("CDS")),
+    ("overlapping_untranslated_region_count", structure_intervals("UTR")),
+]
+overlap_count_rows = _union(
+    [
+        number_rows(
+            interval_overlap_counts(spans, features, attribute),
+            "variant",
+            "variant_key",
+            attribute,
+            attribute,
+            "feature_overlap_counts",
+            "variant+entity_coordinate+regulatory_element_gene_link+gencode.annotation",
+        )
+        for attribute, features in OVERLAP_COUNTS
+    ]
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- pharmacogene gene features
 rule = FEATURES["pharmacogene_gene"]
 drug_gene_pharmgkb = relations.filter(
@@ -4842,8 +4954,9 @@ snapshot_sort = F.coalesce(
     F.col("source_snapshot"),
 )
 history = (
-    read_silver("variant_classification")
-    .filter(F.col("source_snapshot").isNotNull())
+    expand_snapshot_runs(
+        read_silver("variant_classification"), clinvar_snapshot_order(RULES)
+    )
     .withColumn("snapshot_date", snapshot_sort)
     .groupBy("variant_key")
     .agg(
@@ -4860,7 +4973,7 @@ history_rows = attribute_rows(
     "variant",
     "variant_key",
     "clinvar_snapshot_history",
-    "variant_classification.source_snapshot",
+    "variant_classification.first_source_snapshot+last_source_snapshot",
     [
         ("clinvar_first_snapshot", F.col("first"), "text"),
         ("clinvar_last_snapshot", F.col("last"), "text"),
@@ -4941,6 +5054,7 @@ derived = _union(
         gene_variant_priority,
         structural_rows,
         disruption_rows,
+        overlap_count_rows,
         pharmacogene_gene_rows,
         response_rows,
         expression_rows,
