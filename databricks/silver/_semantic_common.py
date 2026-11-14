@@ -495,6 +495,25 @@ MARKET_AREA_CODES = {
     "PSE": "pse_poland",
 }
 MARKET_AREA_VALUES = tuple(dict.fromkeys(MARKET_AREA_CODES.values()))
+# Day-ahead prices of the neighbour zones (SMARD filters 252 to 262, 4170, 4996,
+# 4997, 5078): metric -> market area of the price.
+NEIGHBOUR_PRICES = {
+    "price_denmark_1": "dk1",
+    "price_denmark_2": "dk2",
+    "price_france": "fr",
+    "price_italy_north": "it_north",
+    "price_netherlands": "nl",
+    "price_poland": "pl",
+    "price_zone_258": "smard_zone_258",
+    "price_switzerland": "ch",
+    "price_slovenia": "si",
+    "price_czechia": "cz",
+    "price_hungary": "hu",
+    "price_austria": "at",
+    "price_belgium": "be",
+    "price_norway_2": "no2",
+    "price_neighbours_average": "neighbours_average",
+}
 
 # Cumulative register state (kWh) plus its derived forward increment.
 HONDA_METER_CHANNELS = {

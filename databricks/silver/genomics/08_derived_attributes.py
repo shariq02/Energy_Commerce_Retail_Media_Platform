@@ -3186,24 +3186,7 @@ disruption_rows = attribute_rows(
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- feature overlap counts per variant (no pair rows)
-spans = (
-    variant.filter(
-        (F.col("assembly") == "GRCh38")
-        & F.col("position").isNotNull()
-        & F.col("contig").isNotNull()
-    )
-    .select(
-        "variant_key",
-        "contig",
-        F.col("position").alias("start_position"),
-        # a structural variant spans to its END; a small variant spans its allele
-        F.greatest(
-            F.coalesce(F.col("end_position"), F.col("position")),
-            F.col("position") + F.greatest(F.length("reference_allele"), F.lit(1)) - 1,
-        ).alias("end_position"),
-    )
-    .distinct()
-)
+spans = variant_spans(variant).distinct()
 grch38_coordinates = read_silver("entity_coordinate").filter(
     (F.col("assembly") == "GRCh38") & F.col("is_primary")
 )

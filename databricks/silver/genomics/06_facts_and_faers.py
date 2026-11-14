@@ -530,12 +530,19 @@ write_inspect_export(
 # -- Read Silver -- drug ids and names
 xwalk = read_silver("entity_id_crosswalk")
 names = read_silver("entity_name")
-drug_map = entity_id_map(xwalk, "drug").unionByName(
-    term_map(
-        names,
-        "drug",
-        ("name", "generic_name", "trade_name", "synonym", "brand_mixture"),
-        "drug_name",
+drug_map = (
+    entity_id_map(xwalk, "drug")
+    .unionByName(
+        term_map(
+            names,
+            "drug",
+            ("name", "generic_name", "trade_name", "synonym", "brand_mixture"),
+            "drug_name",
+        )
+    )
+    .unionByName(
+        # a name that several drugs hold, but only one holds as its primary name
+        term_map(names, "drug", ("name",), "drug_primary_name")
     )
 )
 
@@ -547,6 +554,8 @@ drug = link_entities(
     [
         (F.upper(F.trim(text("drugname"))), "drug_name"),
         (F.upper(F.trim(text("prod_ai"))), "drug_name"),
+        (F.upper(F.trim(text("drugname"))), "drug_primary_name"),
+        (F.upper(F.trim(text("prod_ai"))), "drug_primary_name"),
     ],
     drug_map,
     "drug_key",

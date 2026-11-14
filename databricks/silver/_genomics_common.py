@@ -760,8 +760,7 @@ GENOMICS_STRUCTURES.update(
             ),
         ],
         "dms_assay": [
-            *_text("assay_set", "assay_id"),
-            ("assay_index", "int"),
+            *_text("assay_set", "assay_id", "assay_index"),
             *_text("assay_filename", "uniprot_id", "protein_key", "taxon"),
             *_text("source_organism", "target_sequence"),
             ("sequence_length", "int"),
@@ -2827,9 +2826,44 @@ def _rsid(column, rules, dataset):
 
 
 def clinvar_frame(rules):
+    """ClinVar rows with their variant key. A row without VCF alleles (the 2019
+    and 2020 snapshots) takes the real key of the newest snapshot that has one
+    for the same allele, assembly and contig; the fallback key stays only when
+    no snapshot has VCF alleles."""
     d = CLINVAR
     assembly = F.coalesce(_clean("Assembly", rules, d), F.lit("unspecified"))
     frame = _bronze("clinvar_variant_summary")
+    built = _clinvar_keyed(frame, rules, d, assembly)
+    real = built.filter(F.col("key_method") == "vcf_alleles")
+    dates = rules["clinvar_snapshot_dates"]
+    date_of = F.create_map(*[F.lit(part) for pair in dates.items() for part in pair])
+    newest = real.groupBy("AlleleID", "v_assembly", "v_contig").agg(
+        F.max(
+            F.struct(
+                F.coalesce(date_of[F.col("snapshot")], F.col("snapshot")).alias("date"),
+                F.col("variant_key").alias("key"),
+            )
+        )["key"].alias("newest_key")
+    )
+    found = F.col("newest_key").isNotNull()
+    fallback = (
+        built.filter(F.col("key_method") != "vcf_alleles")
+        .join(newest, ["AlleleID", "v_assembly", "v_contig"], "left")
+        .withColumn("variant_key", F.coalesce("newest_key", "variant_key"))
+        .withColumn(
+            "key_method",
+            F.when(found, F.lit("vcf_alleles")).otherwise(F.col("key_method")),
+        )
+    )
+    # a filled row has no coordinates of its own; the real rows give them
+    for column in ("v_position", "v_reference", "v_alternate", "v_end"):
+        fallback = fallback.withColumn(
+            column, F.when(found, F.lit(None).cast("string")).otherwise(F.col(column))
+        )
+    return real.unionByName(fallback.drop("newest_key"))
+
+
+def _clinvar_keyed(frame, rules, d, assembly):
     return _variant_frame(
         frame.withColumn("RS_dbSNP", _rsid("RS_dbSNP", rules, d)).withColumn(
             "GeneID",
@@ -3053,6 +3087,90 @@ def interval_overlap_counts(spans, features, column: str):
         .join(ended.withColumnRenamed("_count", "_ended"), "variant_key")
         .select("variant_key", (F.col("_started") - F.col("_ended")).alias(column))
         .filter(F.col(column) > 0)
+    )
+
+
+def variant_spans(variants):
+    """(variant_key, contig, start_position, end_position) of the GRCh38 variants
+    that have a position. A structural variant spans to its END; a small
+    variant spans its allele."""
+    return variants.filter(
+        (F.col("assembly") == "GRCh38")
+        & F.col("position").isNotNull()
+        & F.col("contig").isNotNull()
+    ).select(
+        "variant_key",
+        "contig",
+        F.col("position").alias("start_position"),
+        F.greatest(
+            F.coalesce(F.col("end_position"), F.col("position")),
+            F.col("position") + F.greatest(F.length("reference_allele"), F.lit(1)) - 1,
+        ).alias("end_position"),
+    )
+
+
+def interval_single_overlap(spans, features):
+    """(variant_key, feature_key): the variant spans that overlap exactly one
+    feature interval, from running counts and running id sums per contig (a
+    count of 1 makes the id sum the id of that feature). `spans`: variant_key,
+    contig, start_position, end_position; `features`: feature_key, contig,
+    f_start, f_end (one row per interval)."""
+    ids = (
+        features.select("feature_key")
+        .distinct()
+        .withColumn(
+            "_feature_id",
+            F.row_number().over(Window.orderBy("feature_key")).cast("long"),
+        )
+    )
+    keyed = features.join(ids, "feature_key")
+
+    def running(feature_position, variant_position, feature_first):
+        events = keyed.select(
+            "contig",
+            F.col(feature_position).alias("_position"),
+            F.lit(1).alias("_feature"),
+            F.col("_feature_id").alias("_id"),
+            F.lit(None).cast("string").alias("variant_key"),
+        ).unionByName(
+            spans.select(
+                "contig",
+                F.col(variant_position).alias("_position"),
+                F.lit(0).alias("_feature"),
+                F.lit(0).cast("long").alias("_id"),
+                "variant_key",
+            )
+        )
+        tie = F.col("_feature").desc() if feature_first else F.col("_feature").asc()
+        order = (
+            Window.partitionBy("contig")
+            .orderBy("_position", tie)
+            .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+        )
+        return (
+            events.withColumn("_count", F.sum("_feature").over(order))
+            .withColumn("_id_sum", F.sum("_id").over(order))
+            .filter(F.col("_feature") == 0)
+            .select("variant_key", "_count", "_id_sum")
+        )
+
+    # started: f_start <= variant end; ended: f_end < variant start
+    started = running("f_start", "end_position", True)
+    ended = running("f_end", "start_position", False)
+    both = started.join(
+        ended.withColumnRenamed("_count", "_ended_count").withColumnRenamed(
+            "_id_sum", "_ended_id_sum"
+        ),
+        "variant_key",
+    )
+    return (
+        both.filter(F.col("_count") - F.col("_ended_count") == 1)
+        .select(
+            "variant_key",
+            (F.col("_id_sum") - F.col("_ended_id_sum")).alias("_feature_id"),
+        )
+        .join(ids, "_feature_id")
+        .select("variant_key", "feature_key")
     )
 
 

@@ -215,7 +215,7 @@ report("seattle max above min on every date", _bad_s == 0, f"violations: {_bad_s
 # COMMAND ----------
 
 # DBTITLE 1,Check -- energy: keys, grain and places
-_codes = set(MARKET_AREA_CODES.values())
+_codes = set(MARKET_AREA_CODES.values()) | set(NEIGHBOUR_PRICES.values())
 for name, df in (("energy_observation", energy), ("energy_component", components)):
     _dup_key = df.groupBy("source_record_id").count().filter("count > 1").count()
     report(f"{name} source_record_id unique", _dup_key == 0, f"duplicates: {_dup_key}")

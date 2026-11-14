@@ -177,77 +177,94 @@ def gene_crosswalk(rules):
         )
     )
 
-    gencode = (
-        _gencode("gene")
-        .withColumn("ensembl_clean", ensembl_unversioned_expr(F.col("gene_id")))
-        .withColumn("hgnc_clean", hgnc_expr(_attribute("hgnc_id")))
-    )
-    gencode = resolve_gene_key(
-        gencode, id_map, ensembl=F.col("ensembl_clean"), hgnc=F.col("hgnc_clean")
-    )
-    gencode_rows = _id_rows(
-        gencode,
-        entity_type="gene",
-        rules=rules,
-        dataset=GENCODE,
-        key="gene_key",
-        method=F.col("key_method"),
-        specs=[
-            ("ensembl", "ensembl_clean", "gene_id"),
-            ("hgnc", "hgnc_clean", "attributes"),
-        ],
-    )
+    def other_sources(id_map):
+        """(GENCODE, Open Targets, Tahoe) crosswalk rows, the genes resolved
+        through `id_map`."""
+        gencode = (
+            _gencode("gene")
+            .withColumn("ensembl_clean", ensembl_unversioned_expr(F.col("gene_id")))
+            .withColumn("hgnc_clean", hgnc_expr(_attribute("hgnc_id")))
+        )
+        gencode = resolve_gene_key(
+            gencode, id_map, ensembl=F.col("ensembl_clean"), hgnc=F.col("hgnc_clean")
+        )
+        gencode_rows = _id_rows(
+            gencode,
+            entity_type="gene",
+            rules=rules,
+            dataset=GENCODE,
+            key="gene_key",
+            method=F.col("key_method"),
+            specs=[
+                ("ensembl", "ensembl_clean", "gene_id"),
+                ("hgnc", "hgnc_clean", "attributes"),
+            ],
+        )
 
-    opentargets = _bronze("opentargets_target").withColumn(
-        "xrefs", F.from_json("dbXrefs", "array<struct<id:string,source:string>>")
-    )
-    hgnc_item = F.try_element_at(
-        F.filter("xrefs", lambda item: item["source"] == "HGNC"), F.lit(1)
-    )
-    opentargets = opentargets.withColumn("hgnc_clean", hgnc_expr(hgnc_item["id"]))
-    opentargets = resolve_gene_key(
-        opentargets,
-        id_map,
-        ensembl=clean_placeholders("id", rules, f"{OPENTARGETS}.id"),
-        hgnc=F.col("hgnc_clean"),
-    )
-    pairs = opentargets.select(
-        F.col("gene_key").alias("entity_key"),
-        F.explode("xrefs").alias("item"),
-        F.col("key_method").alias("method"),
-    ).select(
-        "entity_key",
-        F.col("item.source").alias("label"),
-        F.col("item.id").alias("value"),
-        "method",
-    )
-    opentargets_rows = _id_rows(
-        opentargets,
-        entity_type="gene",
-        rules=rules,
-        dataset=OPENTARGETS,
-        key="gene_key",
-        method=F.col("key_method"),
-        specs=[("ensembl", "id", "id")],
-    ).unionByName(crosswalk_frame(pairs, dataset=OPENTARGETS, field="dbXrefs", **gene))
+        opentargets = _bronze("opentargets_target").withColumn(
+            "xrefs", F.from_json("dbXrefs", "array<struct<id:string,source:string>>")
+        )
+        hgnc_item = F.try_element_at(
+            F.filter("xrefs", lambda item: item["source"] == "HGNC"), F.lit(1)
+        )
+        opentargets = opentargets.withColumn("hgnc_clean", hgnc_expr(hgnc_item["id"]))
+        opentargets = resolve_gene_key(
+            opentargets,
+            id_map,
+            ensembl=clean_placeholders("id", rules, f"{OPENTARGETS}.id"),
+            hgnc=F.col("hgnc_clean"),
+        )
+        pairs = opentargets.select(
+            F.col("gene_key").alias("entity_key"),
+            F.explode("xrefs").alias("item"),
+            F.col("key_method").alias("method"),
+        ).select(
+            "entity_key",
+            F.col("item.source").alias("label"),
+            F.col("item.id").alias("value"),
+            "method",
+        )
+        opentargets_rows = _id_rows(
+            opentargets,
+            entity_type="gene",
+            rules=rules,
+            dataset=OPENTARGETS,
+            key="gene_key",
+            method=F.col("key_method"),
+            specs=[("ensembl", "id", "id")],
+        ).unionByName(
+            crosswalk_frame(pairs, dataset=OPENTARGETS, field="dbXrefs", **gene)
+        )
 
-    tahoe = resolve_gene_key(
-        _bronze("tahoe_gene_metadata"),
-        id_map,
-        ensembl=clean_placeholders("ensembl_id", rules, f"{TAHOE_GENE}.ensembl_id"),
+        tahoe = resolve_gene_key(
+            _bronze("tahoe_gene_metadata"),
+            id_map,
+            ensembl=clean_placeholders("ensembl_id", rules, f"{TAHOE_GENE}.ensembl_id"),
+        )
+        tahoe_rows = _id_rows(
+            tahoe,
+            entity_type="gene",
+            rules=rules,
+            dataset=TAHOE_GENE,
+            key="gene_key",
+            method=F.col("key_method"),
+            specs=[
+                ("ensembl", "ensembl_id", "ensembl_id"),
+                ("tahoe_token", "token_id", "token_id"),
+            ],
+        )
+        return gencode_rows, opentargets_rows, tahoe_rows
+
+    # NCBI lists no Ensembl id for many genes (pseudogenes, lncRNAs), so a source
+    # without an HGNC id (Tahoe) would give such a gene its own Ensembl key beside
+    # the NCBI key. A second pass resolves the sources again with the Ensembl and
+    # HGNC ids that the first pass tied to one NCBI gene.
+    first = other_sources(id_map)
+    tied = _union([ncbi, pharmgkb_rows, first[0], first[1]]).filter(
+        ~F.col("match_method").isin("own_ensembl_id", "own_source_id")
     )
-    tahoe_rows = _id_rows(
-        tahoe,
-        entity_type="gene",
-        rules=rules,
-        dataset=TAHOE_GENE,
-        key="gene_key",
-        method=F.col("key_method"),
-        specs=[
-            ("ensembl", "ensembl_id", "ensembl_id"),
-            ("tahoe_token", "token_id", "token_id"),
-        ],
-    )
+    wide_map = unique_id_map(finish_crosswalk(tied), ["ensembl", "hgnc"])
+    gencode_rows, opentargets_rows, tahoe_rows = other_sources(wide_map)
     return _union([ncbi, pharmgkb_rows, gencode_rows, opentargets_rows, tahoe_rows])
 
 

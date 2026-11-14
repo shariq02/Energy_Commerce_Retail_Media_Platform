@@ -100,8 +100,43 @@ masters, conflicts = resolve_master(
     claims, entity_type="variant", fields=VARIANT_FIELDS
 )
 masters = masters.withColumnRenamed("entity_key", "variant_key")
+
+# -- Transform -- the gene of a variant that no source names: the one gene it overlaps
+gene_intervals = (
+    read_silver("entity_coordinate")
+    .filter(
+        (F.col("entity_type") == "gene")
+        & (F.col("assembly") == "GRCh38")
+        & F.col("is_primary")
+        & F.col("contig").isNotNull()
+        & F.col("start_position").isNotNull()
+        & F.col("end_position").isNotNull()
+    )
+    .select(
+        F.col("entity_key").alias("feature_key"),
+        "contig",
+        F.col("start_position").alias("f_start"),
+        F.col("end_position").alias("f_end"),
+    )
+    .distinct()
+)
+overlap_genes = interval_single_overlap(
+    variant_spans(records), gene_intervals
+).withColumnRenamed("feature_key", "overlap_gene_key")
+unnamed = F.col("gene_key").isNull() & F.col("overlap_gene_key").isNotNull()
 variant = (
     records.join(masters, "variant_key", "left")
+    .join(overlap_genes, "variant_key", "left")
+    .withColumn(
+        "gene_key_source",
+        F.when(unnamed, "entity_coordinate").otherwise(F.col("gene_key_source")),
+    )
+    .withColumn(
+        "gene_key_method",
+        F.when(unnamed, "coordinate_overlap").otherwise(F.col("gene_key_method")),
+    )
+    .withColumn("gene_key", F.coalesce("gene_key", "overlap_gene_key"))
+    .drop("overlap_gene_key")
     .withColumn(
         "key_source",
         F.when(
@@ -140,6 +175,9 @@ write_inspect_export(
         ).count(),
         "variants_without_a_gene": lambda t: t.filter(
             F.col("gene_key").isNull()
+        ).count(),
+        "variants_with_the_gene_by_overlap": lambda t: t.filter(
+            F.col("gene_key_method") == "coordinate_overlap"
         ).count(),
         "variants_by_assembly": lambda t: str(
             {r["assembly"]: r["count"] for r in t.groupBy("assembly").count().collect()}
@@ -274,9 +312,21 @@ write_inspect_export(
 # COMMAND ----------
 
 # DBTITLE 1,Build -- variant_condition
-# -- Read Silver -- disease ids
+# -- Read Silver -- disease ids and names
 xwalk = read_silver("entity_id_crosswalk")
 disease_map = entity_id_map(xwalk, "disease")
+names = read_silver("entity_name")
+disease_names = term_map(
+    names,
+    "disease",
+    ("pt", "name", "mh", "sy", "syn", "exact_synonym", "ptcs", "pheno"),
+    "disease_name",
+).unionByName(
+    # a name that several diseases hold, but only one holds as a preferred name
+    term_map(
+        names, "disease", ("name", "pt", "ptcs", "pheno", "mh"), "disease_primary_name"
+    )
+)
 
 # -- Transform -- pair ids, names and accessions
 DATASET = "clinvar.variant_summary"
@@ -307,8 +357,11 @@ conditions = parsed.select(
 )
 conditions = snapshot_runs(conditions, SNAPSHOTS)
 
-# -- Transform -- disease links through the exact id
+# -- Transform -- disease links through the exact id, then through the exact name
 id_type, id_value = split_curie("condition_id", RULES)
+generic = F.lower(F.trim(F.col("condition_name"))).isin(
+    RULES["generic_condition_labels"]
+)
 condition = (
     conditions.withColumn("id_type", id_type)
     .withColumn("id_value", id_value)
@@ -320,12 +373,24 @@ condition = (
         .when(F.col("condition_id").isNull(), "no_id")
         .otherwise("unlinked"),
     )
-    .withColumn(
-        "is_generic_label",
-        F.lower(F.trim(F.col("condition_name"))).isin(
-            RULES["generic_condition_labels"]
-        ),
+    .withColumn("is_generic_label", generic)
+)
+name = F.when(~F.col("is_generic_label"), F.upper(F.trim(F.col("condition_name"))))
+condition = link_entities(
+    condition,
+    [(name, "disease_name"), (name, "disease_primary_name")],
+    disease_names,
+    "name_key",
+    "name_method",
+)
+by_name = F.col("disease_key").isNull() & F.col("name_key").isNotNull()
+condition = (
+    condition.withColumn(
+        "disease_link_method",
+        F.when(by_name, F.col("name_method")).otherwise(F.col("disease_link_method")),
     )
+    .withColumn("disease_key", F.coalesce("disease_key", "name_key"))
+    .drop("name_key", "name_method")
     .withColumn("source_dataset", F.lit(CLINVAR))
     .withColumn(
         "_srid",
@@ -788,32 +853,14 @@ write_inspect_export(
 # DBTITLE 1,Build -- variant_feature_overlap
 # -- Read Silver -- variants, intervals, protein positions
 BIN = 100000
-variants = (
-    read_silver("variant")
-    .filter(
-        (F.col("assembly") == "GRCh38")
-        & F.col("position").isNotNull()
-        & F.col("contig").isNotNull()
-    )
-    .select(
-        "variant_key",
-        "contig",
-        F.col("position").alias("start_position"),
-        # a structural variant spans to its END; a small variant spans its allele
-        F.greatest(
-            F.coalesce(F.col("end_position"), F.col("position")),
-            F.col("position") + F.greatest(F.length("reference_allele"), F.lit(1)) - 1,
-        ).alias("end_position"),
-    )
-    .withColumn(
-        "bin",
-        F.explode(
-            F.sequence(
-                F.floor(F.col("start_position") / BIN),
-                F.floor(F.col("end_position") / BIN),
-            )
-        ),
-    )
+variants = variant_spans(read_silver("variant")).withColumn(
+    "bin",
+    F.explode(
+        F.sequence(
+            F.floor(F.col("start_position") / BIN),
+            F.floor(F.col("end_position") / BIN),
+        )
+    ),
 )
 coordinates = read_silver("entity_coordinate").filter(
     (F.col("assembly") == "GRCh38") & F.col("is_primary")
