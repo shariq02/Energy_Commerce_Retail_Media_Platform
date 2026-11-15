@@ -35,7 +35,12 @@ MASTER_TYPES = ("transcript", "protein", "disease", "drug")
 # profile table -> (entity type, key, Silver table or None for entity_master, grain)
 PROFILES = {
     **{f"{t}_profile": (t, f"{t}_key", None, [f"{t}_key"]) for t in MASTER_TYPES},
-    "cell_line_profile": ("cell_line", "cell_line_key", "cell_line", ["cell_line_key"]),
+    "cell_line_profile": (
+        "cell_line",
+        "cell_line_key",
+        "cell_line",
+        ["cell_line_key", "source_record_id"],
+    ),
     "genetic_test_profile": (
         "genetic_test",
         "test_key",
