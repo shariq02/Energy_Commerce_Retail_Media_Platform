@@ -296,7 +296,8 @@ disease_counts = [
 
 # DBTITLE 1,Transform -- drug counts (FAERS, DDInter, trials, perturbation, PharmGKB)
 case_drugs = read_silver("faers_case_drug")
-case_items = read_silver("faers_case_item")
+# the case id of the drug side is kept; faers_case_item has its own copy
+case_items = read_silver("faers_case_item").drop("case_id")
 drug_cases = case_drugs.select("primary_id", "case_id", "drug_key").distinct()
 reactions = case_items.filter(F.col("item_kind") == "reaction").join(
     drug_cases, "primary_id"
@@ -562,7 +563,10 @@ record_counts = [
                 "linked_disease_count",
             ),
             (
-                trial_rows.join(drug_keys, F.col("object_key") == F.col("drug_key")),
+                trial_rows.join(
+                    drug_keys.withColumnRenamed("drug_key", "_known_drug_key"),
+                    F.col("object_key") == F.col("_known_drug_key"),
+                ),
                 "subject_id",
                 "object_key",
                 "linked_drug_count",
