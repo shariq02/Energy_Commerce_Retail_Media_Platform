@@ -186,6 +186,10 @@ by_position = (
     .join(by_position, ["contig", "position"])
     .drop("contig", "position")
 )
+# A score name found as a variant score and as a position score keeps both columns.
+for column in by_position.columns:
+    if column != "variant_key" and column in by_variant.columns:
+        by_position = by_position.withColumnRenamed(column, f"{column}__position")
 TABLES["variant_score_profile"] = (
     add_provenance(
         variant.select(*LABELS).join(
@@ -221,7 +225,9 @@ combo_text = F.concat_ws(
         for c in ("source_dataset", "population", "measure")
     ],
 )
-frequency_rows = population_frequency.withColumn("_combo", combo_map[combo_text])
+frequency_rows = population_frequency.withColumn(
+    "_combo", F.try_element_at(combo_map, combo_text)
+)
 assert_unique_grain(frequency_rows, ["variant_key", "_combo"], **GATE)
 by_population = (
     frequency_rows.groupBy("variant_key")

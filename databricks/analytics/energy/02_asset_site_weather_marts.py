@@ -356,11 +356,19 @@ unit_by_support = (
     .filter(F.col("_support_id").isNotNull())
     .groupBy("_support_id")
     .agg(
-        F.min("carrier_key").alias("carrier_key"),
-        F.min("federal_state").alias("federal_state"),
+        F.min("carrier_key").alias("_unit_carrier_key"),
+        F.min("federal_state").alias("_unit_federal_state"),
     )
 )
 buildout_grain = ["support_scheme", "carrier_key", "federal_state", "vintage_year"]
+
+
+def own_or_unit(column):
+    """The registration's own `column` when it has one, else the unit's value."""
+    own = [F.col(column)] if column in gold["support_registration"].columns else []
+    return F.coalesce(*own, F.col(f"_unit_{column}"))
+
+
 capacity_kw = F.coalesce(
     "installed_capacity_kw", "electrical_combined_heat_and_power_capacity_kw"
 )
@@ -384,6 +392,8 @@ TABLES["support_scheme_buildout"] = (
             ),
         )
         .join(unit_by_support, "_support_id", "left")
+        .withColumn("carrier_key", own_or_unit("carrier_key"))
+        .withColumn("federal_state", own_or_unit("federal_state"))
         .groupBy(*buildout_grain)
         .agg(
             F.count(F.lit(1)).alias("registration_count"),

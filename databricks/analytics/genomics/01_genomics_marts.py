@@ -180,7 +180,7 @@ TABLES["gene_prioritization"] = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- disease_overview (disease profile, linked genes and tests)
+# DBTITLE 1,Transform -- disease_overview (disease profile and linked genes)
 linked_genes = (
     gene_disease.filter(F.col("disease_key").isNotNull())
     .groupBy("disease_key")
@@ -192,16 +192,11 @@ linked_genes = (
         F.max_by("gene_symbol", "gene_disease_score").alias("top_scored_gene_symbol"),
     )
 )
-tests = (
-    genetic_test.filter(F.col("disease_key").isNotNull())
-    .groupBy("disease_key")
-    .agg(F.countDistinct("test_key").alias("genetic_test_count"))
-)
+# `genetic_test_count` is a Silver attribute of disease_profile (distinct tests per
+# disease), so it is not counted again here.
 TABLES["disease_overview"] = (
     add_provenance(
-        disease_profile.join(linked_genes, "disease_key", "left").join(
-            tests, "disease_key", "left"
-        ),
+        disease_profile.join(linked_genes, "disease_key", "left"),
         SOURCE,
         RID,
         ecosystem="genomics",
