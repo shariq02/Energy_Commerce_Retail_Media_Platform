@@ -12,12 +12,13 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 10 gene and variant tables of `genomics_gold` and
-# MAGIC `multi_value_attribute`. The Silver attributes are pivoted to columns and
-# MAGIC split by rule (`GENE_PROFILE_RULES`, `VARIANT_PROFILE_RULES`); a rule not in
-# MAGIC a split goes to `gene_profile` or `variant_profile`. A cell with more than
-# MAGIC one value (any entity type) goes to `multi_value_attribute`. Variant scores
-# MAGIC and population frequencies become columns.
+# MAGIC **Purpose:** the 10 gene and variant tables of `genomics_gold`,
+# MAGIC `multi_value_attribute` and `multi_value_score`. The Silver attributes are
+# MAGIC pivoted to columns and split by rule (`GENE_PROFILE_RULES`,
+# MAGIC `VARIANT_PROFILE_RULES`); a rule not in a split goes to `gene_profile` or
+# MAGIC `variant_profile`. Variant scores and population frequencies become columns.
+# MAGIC A cell with more than one value stays empty; its rows go to
+# MAGIC `multi_value_attribute` (attributes) or `multi_value_score` (scores).
 
 # COMMAND ----------
 
@@ -141,8 +142,23 @@ for table in VARIANT_SPLITS:
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- variant_score_profile (variant scores and position scores)
-variant_scores = locus_score.filter(F.col("variant_key").isNotNull())
+# DBTITLE 1,Transform -- variant_score_profile and multi_value_score
+# A variant with more than one row of a score (AlphaMissense: one per transcript)
+# keeps the profile cell empty; its rows go to multi_value_score.
+variant_scores = locus_score.filter(F.col("variant_key").isNotNull()).withColumn(
+    "_values",
+    F.count(F.lit(1)).over(Window.partitionBy("variant_key", "score_name")),
+)
+TABLES["multi_value_score"] = (
+    add_provenance(
+        from_silver(variant_scores.filter(F.col("_values") > 1).drop("_values")),
+        SOURCE,
+        RID,
+        ecosystem="genomics",
+    ),
+    ["source_record_id"],
+)
+variant_scores = variant_scores.filter(F.col("_values") == 1).drop("_values")
 position_scores = locus_score.filter(F.col("variant_key").isNull())
 assert_unique_grain(variant_scores, ["variant_key", "score_name"], **GATE)
 assert_unique_grain(position_scores, ["contig", "position", "score_name"], **GATE)
