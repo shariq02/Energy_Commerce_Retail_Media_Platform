@@ -401,6 +401,33 @@ VALUE_COLUMNS = {
     "number": "value_number",
     "boolean": "value_boolean",
 }
+# One profile cell: an entity, a rule, an attribute and a value type.
+VALUE_GROUP = ("entity_type", "entity_key", "rule_name", "attribute", "value_type")
+MULTI_VALUE_COLUMNS = (
+    *VALUE_GROUP,
+    *VALUE_COLUMNS.values(),
+    "method",
+    "matched_text",
+    "text_source",
+    "source_record_id",
+)
+
+
+def with_value_count(attributes: DataFrame) -> DataFrame:
+    """`attributes` with `_values`: the rows of the same VALUE_GROUP."""
+    return attributes.withColumn(
+        "_values", F.count(F.lit(1)).over(Window.partitionBy(*VALUE_GROUP))
+    )
+
+
+def multi_value_attributes(attributes: DataFrame) -> DataFrame:
+    """The attribute rows of a cell with more than one value; the profiles
+    leave such a cell empty."""
+    return (
+        with_value_count(attributes)
+        .filter(F.col("_values") > 1)
+        .select(*MULTI_VALUE_COLUMNS)
+    )
 
 
 def attribute_columns(attributes: DataFrame, entity_type: str) -> dict:
@@ -444,8 +471,9 @@ def pivot_attributes(
 ) -> DataFrame:
     """One row per entity, one column per attribute of the chosen rules (all
     rules but `exclude` when `rules` is None); a keyword match adds
-    `<column>__matched_text`. Raises when an entity has two values for one
-    column, so no value is dropped."""
+    `<column>__matched_text`. A cell with more than one value stays empty (its
+    rows are in `multi_value_attribute`); raises when two attributes share a
+    column."""
     chosen = {
         k: name
         for k, name in columns.items()
@@ -455,9 +483,12 @@ def pivot_attributes(
         [(*k, name) for k, name in chosen.items()],
         "rule_name string, attribute string, value_type string, _column string",
     )
-    rows = attributes.filter(F.col("entity_type") == entity_type).join(
-        F.broadcast(names), ["rule_name", "attribute", "value_type"]
+    rows = with_value_count(
+        attributes.filter(F.col("entity_type") == entity_type).join(
+            F.broadcast(names), ["rule_name", "attribute", "value_type"]
+        )
     )
+    rows = rows.filter(F.col("_values") == 1).drop("_values")
     assert_unique_grain(
         rows, ["entity_key", "_column"], component=component, source=source, rid=rid
     )

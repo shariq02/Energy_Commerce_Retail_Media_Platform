@@ -12,10 +12,12 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 10 gene and variant tables of `genomics_gold`. The Silver
-# MAGIC attributes are pivoted to columns and split by rule (`GENE_PROFILE_RULES`,
-# MAGIC `VARIANT_PROFILE_RULES`); a rule not in a split goes to `gene_profile` or
-# MAGIC `variant_profile`. Variant scores and population frequencies become columns.
+# MAGIC **Purpose:** the 10 gene and variant tables of `genomics_gold` and
+# MAGIC `multi_value_attribute`. The Silver attributes are pivoted to columns and
+# MAGIC split by rule (`GENE_PROFILE_RULES`, `VARIANT_PROFILE_RULES`); a rule not in
+# MAGIC a split goes to `gene_profile` or `variant_profile`. A cell with more than
+# MAGIC one value (any entity type) goes to `multi_value_attribute`. Variant scores
+# MAGIC and population frequencies become columns.
 
 # COMMAND ----------
 
@@ -79,7 +81,13 @@ def combo_name(pair_datasets, dataset, population, measure):
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- gene_profile and the gene tables of the rule split
+# DBTITLE 1,Transform -- multi_value_attribute, gene_profile and the gene split tables
+TABLES["multi_value_attribute"] = (
+    add_provenance(
+        multi_value_attributes(attributes), SOURCE, RID, ecosystem="genomics"
+    ),
+    ["source_record_id"],
+)
 TABLES["gene_profile"] = (
     full_profile(
         genes,
