@@ -197,11 +197,29 @@ def write_tables(
         print(f"OK  {full}: {n if n is not None else '?'} rows")
 
 
+# Findings rows that would show a data value (a minimum, a maximum, the values
+# of a category column); they are left out of the Gold and analytics findings.
+VALUE_CHECKS = tuple(f"| {prefix}" for prefix in ("min:", "max:", "value_counts:"))
+
+
+def without_values(blocks: list) -> list:
+    """The findings blocks without the rows of VALUE_CHECKS; an emptied block
+    (header lines only) is dropped."""
+    kept = []
+    for category, table in blocks:
+        lines = [
+            line for line in table.splitlines() if not line.startswith(VALUE_CHECKS)
+        ]
+        if len(lines) > 2:
+            kept.append((category, "\n".join(lines)))
+    return kept
+
+
 def inspect_tables(
     tables: dict, *, schema: str, findings: str, source: str, component: str, rid: str
 ) -> None:
-    """Silver `inspect_table` on each written table; the section goes to
-    `src/findings/<stage>_findings/<findings>.md`."""
+    """Silver `inspect_table` on each written table, without data values; the
+    section goes to `src/findings/<stage>_findings/<findings>.md` (kept local)."""
     for table, (_, grain) in tables.items():
         full = f"{CATALOG}.{schema}.{table}"
         blocks = inspect_table(
@@ -217,7 +235,7 @@ def inspect_tables(
             findings,
             f"{component.split('/')[-1]}__{table}",
             table,
-            blocks,
+            without_values(blocks),
             stage=stage_of(rid),
         )
 

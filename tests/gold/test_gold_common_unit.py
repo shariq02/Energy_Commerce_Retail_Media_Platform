@@ -126,6 +126,16 @@ def test_pick_column_raises_on_no_or_two_matches(gold, columns):
         gold["pick_column"](SimpleNamespace(columns=columns), "score")
 
 
+def test_findings_keep_counts_and_drop_data_values(gold):
+    header = "| check | metric |\n|---|---|"
+    blocks = [
+        ("numeric", f"{header}\n| min:price | min |\n| zero_count:price | count |"),
+        ("dq", f"{header}\n| value_counts:overall_status | count |"),
+    ]
+    kept = gold["without_values"](blocks)
+    assert kept == [("numeric", f"{header}\n| zero_count:price | count |")]
+
+
 def test_stage_of_tells_gold_and_analytics_run_ids_apart(gold):
     assert gold["stage_of"](gold["analytics_run_id"]()) == "analytics"
     assert gold["stage_of"](gold["gold_run_id"]()) == "gold"
