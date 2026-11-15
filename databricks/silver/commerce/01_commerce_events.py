@@ -16,6 +16,8 @@
 # MAGIC (`commerce_event`, one row per event), and the GA4 event items as rows
 # MAGIC (`ga4_event_item`, one row per item of an event). The REES46 category path is
 # MAGIC three columns. The GA4 event parameters and transaction fields are columns.
+# MAGIC The sessions, users and products (`commerce_session`, `commerce_user`,
+# MAGIC `commerce_product`) carry their counts, sums and first and last event.
 
 # COMMAND ----------
 
@@ -209,7 +211,7 @@ commerce_event = conform(rees46_events, COMMERCE_EVENT_COLUMNS).unionByName(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- commerce_event
-write_inspect_export(
+written_events = write_inspect_export(
     commerce_event,
     "commerce_event",
     source=REES46,
@@ -234,7 +236,7 @@ write_inspect_export(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- ga4_event_item
-write_inspect_export(
+written_items = write_inspect_export(
     ga4_items,
     "ga4_event_item",
     source=GA4,
@@ -244,3 +246,188 @@ write_inspect_export(
     key_cols=["source_record_id"],
     writer=write_semantic,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- commerce_session (one row per session, counts per event name)
+
+
+def name_counts(name_col):
+    """One count column per REES46 event type and GA4 event name."""
+    return [
+        F.sum(F.when(name_col == name, 1).otherwise(0))
+        .cast("bigint")
+        .alias(f"{name}_event_count")
+        for name in COMMERCE_EVENT_NAMES
+    ]
+
+
+def with_row_provenance(df, key):
+    """Provenance that keeps the per-row source_system of the events."""
+    df = df.withColumnRenamed("source_system", "_origin")
+    df = add_semantic_provenance(df, REES46, None, RID, key)
+    return df.withColumn("source_system", F.col("_origin"))
+
+
+events = (
+    written_events.withColumn(
+        "source_user_id", F.coalesce(F.col("user_id"), F.col("user_pseudo_id"))
+    )
+    .withColumn(
+        "source_session_id",
+        F.coalesce(F.col("user_session"), F.col("session_id").cast("string")),
+    )
+    .withColumn("_name", F.coalesce(F.col("event_type"), F.col("event_name")))
+    .withColumn(
+        "_revenue",
+        F.coalesce(
+            F.col("purchase_revenue"),
+            F.when(F.col("event_type") == "purchase", F.col("price")),
+        ),
+    )
+)
+SHARED_SUMS = [
+    F.min("event_timestamp_utc").alias("first_event_utc"),
+    F.max("event_timestamp_utc").alias("last_event_utc"),
+    F.count(F.lit(1)).alias("event_count"),
+    *name_counts(F.col("_name")),
+    F.countDistinct("product_id").alias("distinct_product_count"),
+    F.countDistinct("transaction_id").alias("transaction_count"),
+    F.sum("_revenue").alias("revenue"),
+    F.max(F.coalesce(F.col("currency_unknown"), F.lit(False))).alias(
+        "currency_unknown"
+    ),
+    F.first("geo_country", ignorenulls=True).alias("geo_country"),
+    F.first("measurement_basis", ignorenulls=True).alias("measurement_basis"),
+    F.first("source_dataset", ignorenulls=True).alias("source_dataset"),
+]
+sessions = (
+    events.groupBy("source_system", "source_user_id", "source_session_id")
+    .agg(
+        F.max("session_number").alias("session_number"),
+        F.min("event_timestamp_project").alias("_first_project"),
+        F.countDistinct("category_id").alias("distinct_category_count"),
+        F.max(F.coalesce(F.col("bot_burst_suspected"), F.lit(False))).alias(
+            "bot_burst_suspected"
+        ),
+        *SHARED_SUMS,
+    )
+    .withColumn("local_date", F.to_date("_first_project"))
+    .withColumn(
+        "session_key", sha_key("source_system", "source_user_id", "source_session_id")
+    )
+    .withColumn("user_key", sha_key("source_system", "source_user_id"))
+)
+sessions = conform(
+    with_row_provenance(sessions.withColumn("_srid", F.col("session_key")), "_srid"),
+    COMMERCE_SESSION_COLUMNS,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- commerce_session
+write_inspect_export(
+    sessions,
+    "commerce_session",
+    source=REES46,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["session_key"],
+    writer=write_semantic,
+    extra_checks=structure_extra_checks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- commerce_user and commerce_product (REES46 events, GA4 items)
+users = (
+    events.groupBy("source_system", "source_user_id")
+    .agg(F.countDistinct("source_session_id").alias("session_count"), *SHARED_SUMS)
+    .withColumn("user_key", sha_key("source_system", "source_user_id"))
+)
+users = conform(
+    with_row_provenance(users.withColumn("_srid", F.col("user_key")), "_srid"),
+    COMMERCE_USER_COLUMNS,
+)
+PRICE_STATS = [
+    F.min("price").alias("minimum_price"),
+    F.max("price").alias("maximum_price"),
+    F.avg("price").alias("mean_price"),
+]
+rees46_products = (
+    events.filter((F.col("source_system") == REES46) & F.col("product_id").isNotNull())
+    .groupBy("source_system", F.col("product_id").alias("source_product_id"))
+    .agg(
+        *[
+            F.first(c, ignorenulls=True).alias(c)
+            for c in (
+                "category_id",
+                "category_code",
+                "category_l1",
+                "category_l2",
+                "category_l3",
+                "brand",
+            )
+        ],
+        F.min("event_timestamp_utc").alias("first_event_utc"),
+        F.max("event_timestamp_utc").alias("last_event_utc"),
+        F.count(F.lit(1)).alias("event_count"),
+        *name_counts(F.col("_name")),
+        F.countDistinct("user_id").alias("distinct_user_count"),
+        *PRICE_STATS,
+        F.sum("_revenue").alias("revenue"),
+        F.lit(True).alias("currency_unknown"),
+        F.first("measurement_basis", ignorenulls=True).alias("measurement_basis"),
+        F.first("source_dataset", ignorenulls=True).alias("source_dataset"),
+    )
+)
+ga4_products = (
+    written_items.filter(
+        (F.col("item_context") == "product") & F.col("item_id").isNotNull()
+    )
+    .groupBy("source_system", F.col("item_id").alias("source_product_id"))
+    .agg(
+        F.first("item_name", ignorenulls=True).alias("item_name"),
+        F.first("item_category", ignorenulls=True).alias("item_category"),
+        F.min("event_timestamp_utc").alias("first_event_utc"),
+        F.max("event_timestamp_utc").alias("last_event_utc"),
+        F.count(F.lit(1)).alias("event_count"),
+        *name_counts(F.col("event_name")),
+        F.countDistinct("user_pseudo_id").alias("distinct_user_count"),
+        *PRICE_STATS,
+        F.sum("quantity").alias("total_quantity"),
+        F.sum("item_revenue").alias("revenue"),
+        F.first("source_dataset", ignorenulls=True).alias("source_dataset"),
+    )
+    .withColumn("measurement_basis", F.lit("web_analytics_event_item"))
+)
+products = (
+    conform(rees46_products, COMMERCE_PRODUCT_COLUMNS)
+    .unionByName(conform(ga4_products, COMMERCE_PRODUCT_COLUMNS))
+    .withColumn("product_key", sha_key("source_system", "source_product_id"))
+    .drop("source_record_id", "_silver_loaded_at", "_silver_run_id")
+)
+products = conform(
+    with_row_provenance(products.withColumn("_srid", F.col("product_key")), "_srid"),
+    COMMERCE_PRODUCT_COLUMNS,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- commerce_user and commerce_product
+for table, frame, key in (
+    ("commerce_user", users, "user_key"),
+    ("commerce_product", products, "product_key"),
+):
+    write_inspect_export(
+        frame,
+        table,
+        source=REES46,
+        component=COMPONENT,
+        rid=RID,
+        findings=FINDINGS,
+        key_cols=[key],
+        writer=write_semantic,
+        extra_checks=structure_extra_checks,
+    )

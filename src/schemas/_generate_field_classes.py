@@ -538,6 +538,26 @@ SEMANTIC_DERIVED = {
     "category_l2",
     "category_l3",
     "currency_unknown",
+    "carrier_key",
+    "match_basis",
+    "source_vocabulary",
+    "row_count",
+    "session_key",
+    "user_key",
+    "product_key",
+    "first_event_utc",
+    "last_event_utc",
+    "event_count",
+    "session_count",
+    "distinct_product_count",
+    "distinct_category_count",
+    "distinct_user_count",
+    "transaction_count",
+    "revenue",
+    "minimum_price",
+    "maximum_price",
+    "mean_price",
+    "total_quantity",
 }
 
 
@@ -915,11 +935,13 @@ def build_rows() -> list[dict]:
         for family in ns["WEATHER_FAMILIES"]
         for part in ("quality_code", "quality_label", "source_dataset")
     }
+    event_counts = {f"{name}_event_count" for name in ns["COMMERCE_EVENT_NAMES"]}
     for table, columns in semantic.items():
         for col, kind in columns:
             if (
                 col in SEMANTIC_DERIVED
                 or col in family_derived
+                or col in event_counts
                 or col.endswith("_increment_kwh")
                 or kind == "boolean"
             ):

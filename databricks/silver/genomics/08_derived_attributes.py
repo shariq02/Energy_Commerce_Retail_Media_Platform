@@ -1940,6 +1940,9 @@ clinical_variant_rows = attribute_rows(
             "flag",
         ),
         ("is_regulatory_variant", F.col("is_splice"), "flag"),
+        ("is_missense_variant", F.col("is_missense"), "flag"),
+        ("is_frameshift_variant", F.col("is_frameshift"), "flag"),
+        ("is_nonsense_variant", F.col("is_nonsense"), "flag"),
         (
             "has_strong_evidence",
             F.col("review_stars") >= rule["strong_evidence_review_from"],

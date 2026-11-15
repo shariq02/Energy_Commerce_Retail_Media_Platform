@@ -185,6 +185,19 @@ plants = (
     .drop("_mastr_carrier_value")
 )
 
+# Carrier key, and whether the plant's own MaStR unit id is a real generation unit.
+_unit_ids = (
+    read_silver("generation_unit")
+    .select(F.col("unit_id").cast("string").alias("_unit_id"))
+    .distinct()
+)
+plants = (
+    plants.join(_unit_ids, F.col("mastr_unit_id") == F.col("_unit_id"), "left")
+    .withColumn("unit_resolved", F.col("_unit_id").isNotNull())
+    .drop("_unit_id")
+    .withColumn("carrier_key", energy_carrier_key(F.col("energy_carrier")))
+)
+
 # Record key and provenance (rows that share a key are numbered, never dropped).
 plants = plants.withColumn(
     "_ppl_key",
@@ -243,6 +256,7 @@ plan = (
     .withColumn("is_total", _fold(F.col("energietraeger")) == "insgesamt")
     .withColumnRenamed("energietraeger", "energy_carrier")
     .withColumnRenamed("2026_2029_total", "retiring_capacity_total_2026_2029_mw")
+    .withColumn("carrier_key", energy_carrier_key(F.col("energy_carrier")))
 )
 plan = within_group_ordinal(
     plan, ["capacity_section", "energy_carrier"], ["2026", "2027", "2028", "2029"]
@@ -275,6 +289,9 @@ power_plant_register = write_inspect_export(
         ).count(),
         "carrier_not_in_mastr_katalog": lambda t: t.filter(
             ~F.col("energy_carrier_mastr_matched")
+        ).count(),
+        "plant_rows_with_a_unit_id_not_resolved": lambda t: t.filter(
+            F.col("mastr_unit_id").isNotNull() & ~F.col("unit_resolved")
         ).count(),
     },
 )
@@ -463,6 +480,7 @@ events = (
         "primary_energy_type",
         lit_map(GRID_LABELS["primaerenergieart"]["map"])[F.col("PRIMAERENERGIEART")],
     )
+    .withColumn("carrier_key", energy_carrier_key(F.col("primary_energy_type")))
     .withColumn(
         "measurement_basis",
         F.lit("transmission_system_operator_reported_measure_pre_2021"),

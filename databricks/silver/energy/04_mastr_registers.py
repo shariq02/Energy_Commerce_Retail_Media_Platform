@@ -17,7 +17,8 @@
 # MAGIC one table, the support registrations, authorisations, repowering records, market
 # MAGIC actors and roles, the grid locations, connection points, networks and balancing
 # MAGIC areas, the register change events (deletions and grid-operator changes in one
-# MAGIC table) and the typed links between the register entities.
+# MAGIC table) and the typed links between the register entities. The counts, the
+# MAGIC carrier key, the lifecycle state and the link flags are computed here.
 
 # COMMAND ----------
 
@@ -88,6 +89,9 @@ DELETIONS = {
 }
 CHANGE_BT = "mastr_einheiten_aenderung_netzbetreiberzuordnungen"
 CHANGE_KEY = ["unit_id", "grid_operator_change_effective_date"]
+LINKED_UNITS = "VerknuepfteEinheitenMaStRNummern"
+AUTHORISATION_BT = "mastr_einheiten_genehmigung"
+REPOWERING_BT = "mastr_ertuechtigungen"
 
 # COMMAND ----------
 
@@ -157,6 +161,49 @@ for unit_type in UNIT_TYPES:
         .withColumn("source_dataset", F.lit(bt))
     )
     units = df if units is None else units.unionByName(df, allowMissingColumns=True)
+
+# Counts of the unit's support ids and of the authorisation and repowering records
+# that name it; the carrier key prefers the main fuel, then the biomass type, then
+# the unit type; the lifecycle state comes from the unit's own dates.
+authorisations = (
+    link_pairs(read_bronze(AUTHORISATION_BT), "GenMastrNummer", LINKED_UNITS)
+    .groupBy(F.col("linked_id").alias("unit_id"))
+    .agg(F.countDistinct("parent_id").alias("authorisation_count"))
+)
+repowerings = (
+    link_pairs(read_bronze(REPOWERING_BT), "Id", "EegMastrNummer")
+    .groupBy(F.col("linked_id").alias("renewable_energy_act_support_id"))
+    .agg(F.countDistinct("parent_id").alias("repowering_count"))
+)
+units = (
+    units.join(authorisations, "unit_id", "left")
+    .join(repowerings, "renewable_energy_act_support_id", "left")
+    .fillna(0, ["authorisation_count", "repowering_count"])
+    .withColumn(
+        "support_registration_count",
+        F.col("renewable_energy_act_support_id").isNotNull().cast("int")
+        + F.col("combined_heat_and_power_support_id").isNotNull().cast("int"),
+    )
+    .withColumn(
+        "carrier_key",
+        F.coalesce(
+            energy_carrier_key(F.col("main_fuel")),
+            energy_carrier_key(F.col("biomass_type")),
+            energy_carrier_key(F.col("unit_type")),
+        ),
+    )
+    .withColumn(
+        "lifecycle_state",
+        F.when(F.col("final_decommissioning_date").isNotNull(), "decommissioned")
+        .when(
+            F.col("provisional_shutdown_start_date").isNotNull(),
+            "provisionally_shutdown",
+        )
+        .when(F.col("commissioning_date").isNotNull(), "operating")
+        .when(F.col("planned_commissioning_date").isNotNull(), "planned")
+        .otherwise("unknown"),
+    )
+)
 units = units.withColumn("_srid", sha_key("unit_type", "unit_id"))
 units = add_semantic_provenance(units, SOURCE, None, RID, "_srid")
 
@@ -175,7 +222,12 @@ generation_unit = write_inspect_export(
     extra_checks=lambda t: {
         "rows_by_unit_type": {
             r["unit_type"]: r["count"] for r in t.groupBy("unit_type").count().collect()
-        }
+        },
+        "rows_by_lifecycle_state": {
+            r["lifecycle_state"]: r["count"]
+            for r in t.groupBy("lifecycle_state").count().collect()
+        },
+        "units_without_a_carrier_key": t.filter(F.col("carrier_key").isNull()).count(),
     },
 )
 
@@ -213,6 +265,36 @@ for name, (bt, id_col) in SINGLE.items():
     STRUCTURES[name] = mastr_structure(
         bronze_single[name], bt, id_col, name_map=NAME_MAP, coded_map=CODED, rid=RID
     )
+
+# Units an actor operates and its market roles; connection points and locations of
+# a network.
+operated = generation_unit.groupBy(F.col("operator_id").alias("market_actor_id")).agg(
+    F.countDistinct("unit_id").alias("operated_unit_count")
+)
+roles_per_actor = (
+    bronze_single["market_actor_role"]
+    .groupBy(F.col("MarktakteurMastrNummer").cast("string").alias("market_actor_id"))
+    .agg(F.countDistinct("Marktrolle").alias("market_role_count"))
+)
+STRUCTURES["market_actor"] = (
+    STRUCTURES["market_actor"]
+    .join(operated, "market_actor_id", "left")
+    .join(roles_per_actor, "market_actor_id", "left")
+    .fillna(0, ["operated_unit_count", "market_role_count"])
+)
+per_network = (
+    STRUCTURES["grid_connection_point"]
+    .groupBy("grid_id")
+    .agg(
+        F.countDistinct("connection_point_id").alias("connection_point_count"),
+        F.countDistinct("location_id").alias("location_count"),
+    )
+)
+STRUCTURES["grid_network"] = (
+    STRUCTURES["grid_network"]
+    .join(per_network, "grid_id", "left")
+    .fillna(0, ["connection_point_count", "location_count"])
+)
 
 # COMMAND ----------
 
@@ -257,7 +339,21 @@ conflict = (
     .agg(F.countDistinct("lat2dp", "lon2dp").alias("distinct_coordinate_count"))
     .withColumn("coordinate_conflict", F.col("distinct_coordinate_count") > 1)
 )
-grid_location = locations.join(conflict, "location_id", "left")
+
+
+def id_list_count(column):
+    """Distinct ids in a delimited id list; 0 when the list is empty."""
+    ids = F.array_distinct(F.split(F.trim(F.col(column)), r"[,;\s]+"))
+    return F.when(F.col(column).isNull(), F.lit(0)).otherwise(
+        F.size(F.filter(ids, lambda x: x != ""))
+    )
+
+
+grid_location = (
+    locations.join(conflict, "location_id", "left")
+    .withColumn("unit_count", id_list_count("linked_unit_ids"))
+    .withColumn("connection_point_count", id_list_count("connection_point_ids"))
+)
 
 # COMMAND ----------
 
@@ -276,7 +372,20 @@ areas = within_group_ordinal(
         "balancing_area_connection_point",
     ],
 )
-areas = areas.withColumn("_srid", sha_key(_id, "_source_id_ordinal"))
+per_area = (
+    STRUCTURES["grid_connection_point"]
+    .groupBy(
+        F.col("balancing_area_connection_point_id").alias(
+            "balancing_area_connection_point"
+        )
+    )
+    .agg(F.countDistinct("connection_point_id").alias("connection_point_count"))
+)
+areas = (
+    areas.join(per_area, "balancing_area_connection_point", "left")
+    .fillna(0, ["connection_point_count"])
+    .withColumn("_srid", sha_key(_id, "_source_id_ordinal"))
+)
 balancing_area = add_semantic_provenance(areas, SOURCE, BALANCING_BT, RID, "_srid")
 
 # COMMAND ----------
@@ -380,7 +489,6 @@ _EEG = [
     "mastr_anlagen_eeg_wasser",
     "mastr_anlagen_eeg_geothermie_gsgk",
 ]
-_UNITS = "VerknuepfteEinheitenMaStRNummern"
 # relationship_type -> (parent_type, linked_type, Bronze tables, parent col, link col)
 LINKS = {
     "renewable_energy_act_support_unit": (
@@ -388,26 +496,26 @@ LINKS = {
         "generation_unit",
         _EEG,
         "EegMaStRNummer",
-        _UNITS,
+        LINKED_UNITS,
     ),
     "combined_heat_and_power_support_unit": (
         "support_registration",
         "generation_unit",
         ["mastr_anlagen_kwk"],
         "KwkMastrNummer",
-        _UNITS,
+        LINKED_UNITS,
     ),
     "authorisation_unit": (
         "unit_authorisation",
         "generation_unit",
-        ["mastr_einheiten_genehmigung"],
+        [AUTHORISATION_BT],
         "GenMastrNummer",
-        _UNITS,
+        LINKED_UNITS,
     ),
     "repowering_renewable_energy_act": (
         "unit_repowering",
         "support_registration",
-        ["mastr_ertuechtigungen"],
+        [REPOWERING_BT],
         "Id",
         "EegMastrNummer",
     ),
@@ -416,7 +524,7 @@ LINKS = {
         "generation_unit",
         [LOCATION_BT],
         "MastrNummer",
-        _UNITS,
+        LINKED_UNITS,
     ),
     "location_connection": (
         "grid_location",
@@ -460,9 +568,46 @@ actor_roles = (
     .withColumn("source_dataset", F.lit("mastr_marktakteure_und_rollen"))
 )
 _link_key = ["relationship_type", "parent_id", "linked_id"]
+# Whether the parent and the linked id exist in their own structure.
+link_ids = register_link_ids(
+    {
+        "generation_unit": generation_unit,
+        "grid_location": grid_location,
+        "reference_code_list": codes,
+        **{
+            name: STRUCTURES[name]
+            for name in (
+                "support_registration",
+                "unit_authorisation",
+                "unit_repowering",
+                "grid_connection_point",
+                "market_actor",
+            )
+        },
+    }
+)
 links = (
     links.unionByName(actor_roles)
     .dropDuplicates(_link_key)
+    .join(
+        link_ids.select(
+            F.col("entity_type").alias("parent_type"),
+            F.col("id").alias("parent_id"),
+            F.lit(True).alias("parent_resolved"),
+        ),
+        ["parent_type", "parent_id"],
+        "left",
+    )
+    .join(
+        link_ids.select(
+            F.col("entity_type").alias("linked_type"),
+            F.col("id").alias("linked_id"),
+            F.lit(True).alias("linked_resolved"),
+        ),
+        ["linked_type", "linked_id"],
+        "left",
+    )
+    .fillna(False, ["parent_resolved", "linked_resolved"])
     .withColumn("_srid", sha_key(*_link_key))
 )
 links = conform(
@@ -485,7 +630,10 @@ write_inspect_export(
         "rows_by_relationship_type": {
             r["relationship_type"]: r["count"]
             for r in t.groupBy("relationship_type").count().collect()
-        }
+        },
+        "links_with_an_unresolved_id": t.filter(
+            ~F.col("parent_resolved") | ~F.col("linked_resolved")
+        ).count(),
     },
 )
 

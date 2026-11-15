@@ -90,10 +90,10 @@ def test_no_declared_semantic_column_is_an_array_struct_or_map() -> None:
     assert not nested, nested
 
 
-def test_the_energy_and_commerce_tables_number_28() -> None:
+def test_the_energy_and_commerce_tables_number_32() -> None:
     ns = _semantic_namespace()
     tables = set(ns["SEMANTIC_STRUCTURES"]) | set(ns["SEMANTIC_MEMBER_STRUCTURES"])
-    assert len(tables) == 28
+    assert len(tables) == 32
 
 
 def test_every_member_structure_carries_its_members_and_discriminators() -> None:

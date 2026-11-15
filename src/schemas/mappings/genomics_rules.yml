@@ -6,7 +6,7 @@
 # Read by databricks/silver/_genomics_common.py. Precedence entries are
 # "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
 
-version: 5
+version: 6
 
 # entity_id_crosswalk keeps one row per entity, id and source column. When one id is
 # found by several methods, the first method of this list wins; a method that is not in
@@ -991,3 +991,30 @@ plddt_bands:
     - {from: 70, label: confident}
     - {from: 50, label: low}
   band_default: very_low
+
+# Counts of the rows that link to an entity (genomics `09`). A count by phase,
+# status, role, outcome or level uses only the values of the source vocabulary
+# (ClinicalTrials.gov, FAERS, DDInter); a value outside it (a trial row shifted by a
+# `|` in a title) counts in the totals only. An assay is positive when its
+# qualitative result starts with the prefix.
+entity_counts:
+  trial_phases: [EARLY_PHASE1, PHASE1, PHASE1/PHASE2, PHASE2, PHASE2/PHASE3, PHASE3, PHASE4]
+  trial_statuses:
+    - COMPLETED
+    - UNKNOWN
+    - RECRUITING
+    - TERMINATED
+    - NOT_YET_RECRUITING
+    - ACTIVE_NOT_RECRUITING
+    - WITHDRAWN
+    - ENROLLING_BY_INVITATION
+    - SUSPENDED
+    - WITHHELD
+    - NO_LONGER_AVAILABLE
+    - AVAILABLE
+    - APPROVED_FOR_MARKETING
+    - TEMPORARILY_NOT_AVAILABLE
+  faers_roles: [PS, SS, C, I, DN]
+  faers_outcomes: [DE, LT, HO, DS, CA, RI, OT]
+  interaction_levels: [Major, Moderate, Minor, Unknown]
+  positive_assay_prefix: Positive

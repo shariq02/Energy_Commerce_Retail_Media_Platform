@@ -408,16 +408,29 @@ REFERENCE_CODE_LIST_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
-# Every MaStR link as one typed relationship structure.
+# Every MaStR link as one typed relationship structure; the two flags say
+# whether the parent and the linked id exist in their own structure.
 REGISTER_LINK_COLUMNS = [
     ("relationship_type", "string"),
     ("parent_type", "string"),
     ("parent_id", "string"),
     ("linked_type", "string"),
     ("linked_id", "string"),
+    *_booleans("parent_resolved", "linked_resolved"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
+# Structure -> the column that register_link ids refer to.
+REGISTER_LINK_ID_COLUMN = {
+    "generation_unit": "unit_id",
+    "support_registration": "support_registration_id",
+    "unit_authorisation": "source_record_id",
+    "unit_repowering": "source_record_id",
+    "grid_location": "source_record_id",
+    "grid_connection_point": "source_record_id",
+    "market_actor": "source_record_id",
+    "reference_code_list": "code_id",
+}
 
 # COMMAND ----------
 
@@ -472,6 +485,82 @@ GA4_EVENT_ITEM_COLUMNS = [
     ("price", "double"),
     ("quantity", "bigint"),
     ("item_revenue", "double"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
+
+# REES46 event types and GA4 event names (the closed vocabulary of the two
+# sources): one count column per name in the session, user and product tables.
+COMMERCE_EVENT_NAMES = (
+    "view",
+    "cart",
+    "purchase",
+    "view_item",
+    "view_promotion",
+    "add_to_cart",
+    "begin_checkout",
+    "select_item",
+    "view_search_results",
+    "add_shipping_info",
+    "add_payment_info",
+    "select_promotion",
+    "view_item_list",
+)
+_EVENT_NAME_COUNTS = [
+    (f"{name}_event_count", "bigint") for name in COMMERCE_EVENT_NAMES
+]
+_FIRST_LAST = [("first_event_utc", "timestamp"), ("last_event_utc", "timestamp")]
+COMMERCE_SESSION_COLUMNS = [
+    ("session_key", "string"),
+    ("user_key", "string"),
+    ("source_user_id", "string"),
+    ("source_session_id", "string"),
+    ("session_number", "bigint"),
+    *_FIRST_LAST,
+    ("local_date", "date"),
+    ("event_count", "bigint"),
+    *_EVENT_NAME_COUNTS,
+    ("distinct_product_count", "bigint"),
+    ("distinct_category_count", "bigint"),
+    ("transaction_count", "bigint"),
+    ("revenue", "double"),
+    *_booleans("currency_unknown", "bot_burst_suspected"),
+    ("geo_country", "string"),
+    ("measurement_basis", "string"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
+COMMERCE_USER_COLUMNS = [
+    ("user_key", "string"),
+    ("source_user_id", "string"),
+    *_FIRST_LAST,
+    ("session_count", "bigint"),
+    ("event_count", "bigint"),
+    *_EVENT_NAME_COUNTS,
+    ("distinct_product_count", "bigint"),
+    ("transaction_count", "bigint"),
+    ("revenue", "double"),
+    *_booleans("currency_unknown"),
+    ("geo_country", "string"),
+    ("measurement_basis", "string"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
+# REES46 products from the events; GA4 products from the event items.
+COMMERCE_PRODUCT_COLUMNS = [
+    ("product_key", "string"),
+    ("source_product_id", "string"),
+    *_texts("category_id", "category_code", "category_l1", "category_l2"),
+    *_texts("category_l3", "brand", "item_name", "item_category"),
+    *_FIRST_LAST,
+    ("event_count", "bigint"),
+    *_EVENT_NAME_COUNTS,
+    ("distinct_user_count", "bigint"),
+    *_doubles("minimum_price", "maximum_price", "mean_price"),
+    ("total_quantity", "bigint"),
+    ("revenue", "double"),
+    *_booleans("currency_unknown"),
+    ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
@@ -578,7 +667,7 @@ ENERGY_COMPONENT_COLUMNS = [
     *_ENERGY_HEAD,
     *_TIME_COLUMNS,
     *_texts("component_group", "component_kind", "forecast_scope", "carrier_code"),
-    *_texts("native_label"),
+    *_texts("carrier_key", "native_label"),
     *_doubles("energy_mwh", "power_w"),
     *_texts("semantic_status", "semantic_issue_ref", "source_series"),
     *_texts("source_filter_id"),
@@ -619,6 +708,7 @@ GRID_INTERVENTION_EVENT_COLUMNS = [
     ("affected_unit_match_confidence", "string"),
     ("primary_energy_type_native", "string"),
     ("primary_energy_type", "string"),
+    ("carrier_key", "string"),
     *_booleans(
         "negative_duration",
         "mean_power_above_maximum_power",
@@ -667,6 +757,15 @@ DEVICE_TELEMETRY_SNAPSHOT_COLUMNS = [
     *_PROVENANCE_TAIL,
 ]
 
+# Every carrier value of the energy tables with its carrier key; `match_basis`
+# is `authored` for a listed synonym, else `exact`.
+ENERGY_CARRIER_MAP_COLUMNS = [
+    *_texts("source_vocabulary", "source_value", "carrier_key", "match_basis"),
+    ("row_count", "bigint"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
+
 # COMMAND ----------
 
 # DBTITLE 1,Structure registry (the declared inventory)
@@ -688,6 +787,10 @@ SEMANTIC_STRUCTURES = {
     "device_telemetry_snapshot": DEVICE_TELEMETRY_SNAPSHOT_COLUMNS,
     "commerce_event": COMMERCE_EVENT_COLUMNS,
     "ga4_event_item": GA4_EVENT_ITEM_COLUMNS,
+    "commerce_session": COMMERCE_SESSION_COLUMNS,
+    "commerce_user": COMMERCE_USER_COLUMNS,
+    "commerce_product": COMMERCE_PRODUCT_COLUMNS,
+    "energy_carrier_map": ENERGY_CARRIER_MAP_COLUMNS,
 }
 
 # Register structures whose wide column set comes from the MaStR / plant-list
@@ -714,7 +817,14 @@ SEMANTIC_MEMBER_STRUCTURES = {
             "mastr_einheiten_kernkraft",
             "mastr_einheiten_geothermie_gsgk",
         ],
-        ["unit_type"],
+        [
+            "unit_type",
+            "carrier_key",
+            "lifecycle_state",
+            "support_registration_count",
+            "authorisation_count",
+            "repowering_count",
+        ],
     ),
     "support_registration": (
         [
@@ -728,15 +838,23 @@ SEMANTIC_MEMBER_STRUCTURES = {
     ),
     "unit_authorisation": (["mastr_einheiten_genehmigung"], []),
     "unit_repowering": (["mastr_ertuechtigungen"], []),
-    "market_actor": (["mastr_marktakteure"], []),
+    "market_actor": (
+        ["mastr_marktakteure"],
+        ["operated_unit_count", "market_role_count"],
+    ),
     "market_actor_role": (["mastr_marktakteure_und_rollen"], []),
     "grid_location": (
         ["mastr_lokationen"],
-        ["distinct_coordinate_count", "coordinate_conflict"],
+        [
+            "distinct_coordinate_count",
+            "coordinate_conflict",
+            "unit_count",
+            "connection_point_count",
+        ],
     ),
     "grid_connection_point": (["mastr_netzanschlusspunkte"], []),
-    "grid_network": (["mastr_netze"], []),
-    "balancing_area": (["mastr_bilanzierungsgebiete"], []),
+    "grid_network": (["mastr_netze"], ["connection_point_count", "location_count"]),
+    "balancing_area": (["mastr_bilanzierungsgebiete"], ["connection_point_count"]),
     "register_change_event": (
         [
             "mastr_unit_deletion_events",
@@ -745,8 +863,8 @@ SEMANTIC_MEMBER_STRUCTURES = {
         ],
         ["event_kind"],
     ),
-    "power_plant_register": (["power_plant_list"], []),
-    "power_plant_capacity_plan": (["power_plant_capacity_additions"], []),
+    "power_plant_register": (["power_plant_list"], ["carrier_key", "unit_resolved"]),
+    "power_plant_capacity_plan": (["power_plant_capacity_additions"], ["carrier_key"]),
 }
 
 # Schema per structure (per-schema table quota): reference and master data
@@ -764,8 +882,15 @@ REFERENCE_STRUCTURES = {
     "grid_connection_point",
     "grid_network",
     "balancing_area",
+    "energy_carrier_map",
 }
-COMMERCE_STRUCTURES = {"commerce_event", "ga4_event_item"}
+COMMERCE_STRUCTURES = {
+    "commerce_event",
+    "ga4_event_item",
+    "commerce_session",
+    "commerce_user",
+    "commerce_product",
+}
 
 
 def semantic_target_schema(table: str) -> str:
@@ -944,6 +1069,52 @@ def mastr_structure(
     out = mastr_standardise(df, names, coded_map, table=bronze_table)
     out = out.withColumn("_srid", F.col(names.get(id_col, id_col)).cast("string"))
     return add_semantic_provenance(out, "mastr", bronze_table, rid, "_srid")
+
+
+def register_link_ids(frames: dict):
+    """(entity_type, id) of every register entity a register_link row can name;
+    `frames` maps each structure of REGISTER_LINK_ID_COLUMN to its frame."""
+    ids = None
+    for name, column in REGISTER_LINK_ID_COLUMN.items():
+        df = frames[name]
+        if name == "reference_code_list":
+            df = df.filter(
+                (F.col("source_system") == "mastr")
+                & (F.col("catalog_kind") == "marktrollen")
+            )
+        part = df.select(
+            F.lit(name).alias("entity_type"), F.col(column).cast("string").alias("id")
+        )
+        ids = part if ids is None else ids.unionByName(part)
+    return ids.dropna().distinct()
+
+
+ENERGY_CARRIER_SYNONYMS = "src/schemas/mappings/energy_carrier_synonyms.yml"
+
+
+def _carrier_token(col):
+    token = F.regexp_replace(F.lower(F.trim(col)), r"[^a-z0-9]+", "_")
+    return F.nullif(F.regexp_replace(token, r"(^_+|_+$)", ""), F.lit(""))
+
+
+def _carrier_synonyms():
+    pairs = load_yaml(ENERGY_CARRIER_SYNONYMS)["synonyms"]
+    return F.create_map(*[F.lit(value) for pair in pairs.items() for value in pair])
+
+
+def energy_carrier_key(col):
+    """The carrier key of a source carrier value: its token (lower case, every
+    run of other characters one underscore) or the listed synonym of it."""
+    token = _carrier_token(col)
+    return F.coalesce(_carrier_synonyms()[token], token)
+
+
+def energy_carrier_match_basis(col):
+    """`authored` when a listed synonym gives the carrier key, else `exact`."""
+    authored = _carrier_synonyms()[_carrier_token(col)].isNotNull()
+    return F.when(_carrier_token(col).isNull(), F.lit(None)).otherwise(
+        F.when(authored, F.lit("authored")).otherwise(F.lit("exact"))
+    )
 
 
 # COMMAND ----------

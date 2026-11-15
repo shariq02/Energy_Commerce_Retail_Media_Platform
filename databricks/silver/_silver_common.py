@@ -958,26 +958,34 @@ def watermark(
 
 
 def write_silver(
-    df: DataFrame, silver_table: str, *, source: str, component: str, rid: str
+    df: DataFrame,
+    silver_table: str,
+    *,
+    source: str,
+    component: str,
+    rid: str,
+    replace_where: str | None = None,
 ) -> int | None:
-    """Deterministic full overwrite. Detects unclassified columns (non-blocking
-    -- see validate_field_classes), prints the Delta rollback line, records
-    rows_written from Delta metrics (no pre-write count), writes a watermark
-    row. A brand-new table (no field_class_registry entry at all) defaults to
-    its ecosystem's schema via `source` rather than failing -- see
+    """Deterministic full overwrite, or with `replace_where` (same schema) only
+    the matching rows of an existing table. Detects unclassified columns
+    (non-blocking -- see validate_field_classes), prints the Delta rollback
+    line, records rows_written from Delta metrics (no pre-write count), writes
+    a watermark row. A brand-new table (no field_class_registry entry at all)
+    defaults to its ecosystem's schema via `source` rather than failing -- see
     target_schema_for."""
     started = now_utc()
     full = f"{CATALOG}.{target_schema_for(silver_table, source=source)}.{silver_table}"
     unclassified = validate_field_classes(df, full)
-    if spark.catalog.tableExists(full):
+    exists = spark.catalog.tableExists(full)
+    if exists:
         v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
         print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
-    (
-        df.write.format("delta")
-        .mode("overwrite")
-        .option("overwriteSchema", "true")
-        .saveAsTable(full)
-    )
+    writer = df.write.format("delta").mode("overwrite")
+    if replace_where and exists:
+        writer = writer.option("replaceWhere", replace_where)
+    else:
+        writer = writer.option("overwriteSchema", "true")
+    writer.saveAsTable(full)
     n = _delta_rows_written(full)
     watermark(component, source, n, "COMPLETE", rid, started)
     audit(component, source, "rows_written", n, status="PASS", rid=rid)

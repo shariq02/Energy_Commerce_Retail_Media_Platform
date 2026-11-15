@@ -16,7 +16,8 @@
 # MAGIC (keys, grain, places, time, value ranges, daily rows), energy (grain, places, the
 # MAGIC balance identities, Honda power against meter increments) and the MaStR
 # MAGIC registers (unit keys, link coverage). The result table goes to the energy
-# MAGIC findings file.
+# MAGIC findings file. It also writes `energy_carrier_map` (every carrier value of the
+# MAGIC energy tables with its carrier key).
 
 # COMMAND ----------
 
@@ -33,16 +34,14 @@ from pyspark.sql import functions as F
 # DBTITLE 1,Configuration
 COMPONENT = "silver/energy/06_energy_validation"
 FINDINGS = "energy"
-# Structure -> the column register_link ids refer to.
-ID_COLUMN = {
-    "generation_unit": "unit_id",
-    "support_registration": "support_registration_id",
-    "unit_authorisation": "source_record_id",
-    "unit_repowering": "source_record_id",
-    "grid_location": "source_record_id",
-    "grid_connection_point": "source_record_id",
-    "market_actor": "source_record_id",
-    "reference_code_list": "code_id",
+RID = run_id()
+# Table -> its carrier value columns (the rows of energy_carrier_map).
+CARRIER_SOURCES = {
+    "generation_unit": ("main_fuel", "biomass_type", "unit_type"),
+    "power_plant_register": ("energy_carrier",),
+    "power_plant_capacity_plan": ("energy_carrier",),
+    "energy_component": ("carrier_code",),
+    "grid_intervention_event": ("primary_energy_type",),
 }
 
 # COMMAND ----------
@@ -54,7 +53,7 @@ locations = spark.table(semantic_table("weather_location")).select("location_key
 energy = spark.table(semantic_table("energy_observation"))
 components = spark.table(semantic_table("energy_component"))
 devices = spark.table(semantic_table("device_telemetry_snapshot"))
-T = {name: spark.table(semantic_table(name)) for name in ID_COLUMN}
+T = {name: spark.table(semantic_table(name)) for name in REGISTER_LINK_ID_COLUMN}
 links = spark.table(semantic_table("register_link"))
 plants = spark.table(semantic_table("power_plant_register"))
 
@@ -405,17 +404,44 @@ report("support id spaces disjoint", _shared_ids == 0, f"shared ids {_shared_ids
 # COMMAND ----------
 
 
-# DBTITLE 1,Check -- register link coverage and the plant register
+# DBTITLE 1,Check -- register link coverage, link flags and the plant register
+_ids = register_link_ids(T)
+
+
 def ids_of(name):
-    df = T[name]
-    if name == "reference_code_list":
-        df = df.filter(
-            (F.col("source_system") == "mastr")
-            & (F.col("catalog_kind") == "marktrollen")
-        )
-    return df.select(F.col(ID_COLUMN[name]).cast("string").alias("id")).distinct()
+    return _ids.filter(F.col("entity_type") == name).select("id")
 
 
+_flag_mismatch = (
+    links.join(
+        _ids.select(
+            F.col("entity_type").alias("parent_type"),
+            F.col("id").alias("parent_id"),
+            F.lit(True).alias("_parent_found"),
+        ),
+        ["parent_type", "parent_id"],
+        "left",
+    )
+    .join(
+        _ids.select(
+            F.col("entity_type").alias("linked_type"),
+            F.col("id").alias("linked_id"),
+            F.lit(True).alias("_linked_found"),
+        ),
+        ["linked_type", "linked_id"],
+        "left",
+    )
+    .filter(
+        (F.col("parent_resolved") != F.coalesce("_parent_found", F.lit(False)))
+        | (F.col("linked_resolved") != F.coalesce("_linked_found", F.lit(False)))
+    )
+    .count()
+)
+report(
+    "register_link resolved flags match the structures",
+    _flag_mismatch == 0,
+    f"mismatches {_flag_mismatch}",
+)
 _rows = []
 for rel, parent_type, linked_type in (
     links.select("relationship_type", "parent_type", "linked_type").distinct().collect()
@@ -441,6 +467,48 @@ report(
     True,
     f"{_found} of {_with_id.count()} plant rows with a MaStR unit id match a unit",
     status="INFO",
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Build, write and check -- energy_carrier_map (every carrier value)
+carrier_values = None
+for table, columns in CARRIER_SOURCES.items():
+    frame = spark.table(semantic_table(table))
+    for column in columns:
+        part = (
+            frame.filter(F.col(column).isNotNull() & (F.trim(F.col(column)) != ""))
+            .groupBy(
+                F.col("source_system").alias("_origin"),
+                F.col(column).alias("source_value"),
+            )
+            .agg(F.count("*").alias("row_count"))
+            .withColumn("source_vocabulary", F.lit(f"{table}.{column}"))
+        )
+        carrier_values = (
+            part if carrier_values is None else carrier_values.unionByName(part)
+        )
+carrier_map = (
+    carrier_values.withColumn("carrier_key", energy_carrier_key(F.col("source_value")))
+    .withColumn("match_basis", energy_carrier_match_basis(F.col("source_value")))
+    .withColumn("_srid", sha_key("_origin", "source_vocabulary", "source_value"))
+)
+carrier_map = add_semantic_provenance(
+    carrier_map, "mastr", "energy carrier values", RID, "_srid"
+).withColumn("source_system", F.col("_origin"))
+written_map = write_inspect_export(
+    conform(carrier_map, ENERGY_CARRIER_MAP_COLUMNS),
+    "energy_carrier_map",
+    source="mastr",
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["source_system", "source_vocabulary", "source_value"],
+    writer=write_semantic,
+)
+_no_key = written_map.filter(F.col("carrier_key").isNull()).count()
+report(
+    "every carrier value has a carrier key", _no_key == 0, f"without a key {_no_key}"
 )
 
 # COMMAND ----------

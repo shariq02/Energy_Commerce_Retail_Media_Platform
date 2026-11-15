@@ -1,0 +1,15 @@
+# Energy carrier synonyms: one carrier under two source tokens
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: November 2026
+#
+# Read by databricks/silver/_semantic_common.py (energy_carrier_key). A source
+# carrier value becomes a token (lower case, every run of other characters one
+# underscore); a token listed here takes the listed carrier key. The pairs come
+# from the SMARD balance decode map and the power plant list energy carrier map.
+
+synonyms:
+  hydro: hydropower
+  offshore_wind: wind_offshore
+  onshore_wind: wind_onshore
+  photovoltaic: solar_radiation

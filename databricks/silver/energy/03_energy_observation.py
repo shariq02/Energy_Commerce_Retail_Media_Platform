@@ -615,10 +615,12 @@ KEYED = ["observation_timestamp_utc", "interval_seconds", "interval_reference"]
 
 
 def finish(df, source, components):
-    """Observation key from the grain, record id, provenance and conformance."""
+    """Observation key from the grain, carrier key and record id of a component,
+    provenance and conformance."""
     key = sha_key("source_system", "location_key", "market_area_code", *KEYED)
     df = df.withColumn("observation_key", key)
     if components:
+        df = df.withColumn("carrier_key", energy_carrier_key(F.col("carrier_code")))
         df = df.withColumn(
             "source_record_id",
             sha_key(
