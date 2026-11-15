@@ -5043,3 +5043,91 @@ _Generated: 2026-11-15T14:54Z_
 | gene_ages.consensus.Mammalia | 0 |  | PASS |
 
 <!-- END genomics:08_derived_attributes__rejected_values -->
+
+<!-- BEGIN genomics:09_entity_counts__entity_derived_attribute -->
+## entity_derived_attribute -- entity counts
+
+_Generated: 2026-11-15T15:59Z_
+
+### cardinality
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| distinct:entity_type | approx_distinct | 11.0 |  | INFO | INFO |  |
+| distinct:entity_key | approx_distinct | 7529206.0 |  | INFO | INFO |  |
+| distinct:attribute | approx_distinct | 87.0 |  | INFO | INFO |  |
+| distinct:value_text | approx_distinct | 0.0 |  | INFO | INFO |  |
+| distinct:value_number | approx_distinct | 6220.0 |  | INFO | INFO |  |
+| distinct:value_boolean | approx_distinct | 0.0 |  | INFO | INFO |  |
+| distinct:value_type | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:method | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:matched_text | approx_distinct | 0.0 |  | INFO | INFO |  |
+| distinct:text_source | approx_distinct | 20.0 |  | INFO | INFO |  |
+| distinct:rule_name | approx_distinct | 20.0 |  | INFO | INFO |  |
+| distinct:rule_version | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:as_of_date | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_silver_run_id | approx_distinct | 1.0 |  | INFO | INFO |  |
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:entity_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:entity_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:attribute | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:value_text | null_rate | 1.0 |  | INFO | INFO |  |
+| null_rate:value_number | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:value_boolean | null_rate | 1.0 |  | INFO | INFO |  |
+| null_rate:value_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:method | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:matched_text | null_rate | 1.0 |  | INFO | INFO |  |
+| null_rate:text_source | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:rule_name | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:rule_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:as_of_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_silver_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_silver_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['source_record_id'] |
+
+### numeric
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| min:value_number | min | 1.0 |  | INFO | INFO |  |
+| max:value_number | max | 144522.0 |  | INFO | INFO |  |
+| zero_count:value_number | count | 0.0 |  | INFO | INFO |  |
+| negative_count:value_number | count | 0.0 |  | INFO | INFO |  |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
+| column_count | count | 18.0 |  | INFO | INFO |  |
+
+### transformation_specific
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| rows_by_entity_type | value |  |  | INFO | INFO | {'variant': 9409650, 'clinical_trial': 2221537, 'epitope': 6397925, 'gene': 168144, 'transcript': 146228, 'disease': 385678, 'genetic_test': 124447, 'protein': 72482, 'tumor_sample': 40510, 'cell_line': 4084, 'drug': 70451} |
+| attributes | value | 94.0 |  | INFO | INFO | 94 |
+| rules_written | value | 20.0 |  | INFO | INFO | 20 |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 19041136.0 |  | INFO | INFO |  |
+
+<!-- END genomics:09_entity_counts__entity_derived_attribute -->

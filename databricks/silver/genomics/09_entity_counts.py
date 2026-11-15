@@ -14,8 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** the counts of the rows that link to a gene, disease, drug, protein,
 # MAGIC transcript, variant, cell line, epitope, clinical trial, tumour sample or
-# MAGIC genetic test, as rows of `entity_derived_attribute`. It replaces only its own
-# MAGIC rules, so it runs after `08` (a run of `08` needs a run of this notebook).
+# MAGIC genetic test, as rows of `entity_derived_attribute`. 
 
 # COMMAND ----------
 
