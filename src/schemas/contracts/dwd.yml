@@ -23,6 +23,13 @@ description: >
   archives -- the oldest measurement rows start 1893.
 profiling_evidence: src/schemas/profiling/dwd.md
 bronze_physical_types: string
+bronze_layout: >
+  The 15 measurement datasets share one Bronze table, dwd_measurement, told
+  apart by a leading measurement column (the dataset name without the dwd_
+  prefix). Each measurement entry below is one logical dataset; its bronze:
+  block names the physical table and the measurement value. measurement is not
+  one of the source columns listed here. The metadata tables are their own
+  Bronze tables.
 
 acquisition:
   method: scripted_api
@@ -95,6 +102,7 @@ tables:
   # -------------------------------------------------------------------------
 
   - name: dwd_air_temperature
+    bronze: { table: dwd_measurement, discriminator: measurement, value: air_temperature }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 17336388
@@ -111,6 +119,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_cloudiness
+    bronze: { table: dwd_measurement, discriminator: measurement, value: cloudiness }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 12973316
@@ -127,6 +136,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_moisture
+    bronze: { table: dwd_measurement, discriminator: measurement, value: moisture }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 12449858
@@ -148,6 +158,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_precipitation
+    bronze: { table: dwd_measurement, discriminator: measurement, value: precipitation }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 7154301
@@ -165,6 +176,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_pressure
+    bronze: { table: dwd_measurement, discriminator: measurement, value: pressure }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 13227922
@@ -181,6 +193,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_sun
+    bronze: { table: dwd_measurement, discriminator: measurement, value: sun }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 12650564
@@ -196,6 +209,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_wind
+    bronze: { table: dwd_measurement, discriminator: measurement, value: wind }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 15957198
@@ -216,6 +230,7 @@ tables:
   # -------------------------------------------------------------------------
 
   - name: dwd_dew_point
+    bronze: { table: dwd_measurement, discriminator: measurement, value: dew_point }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 13524783
@@ -232,6 +247,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_soil_temperature
+    bronze: { table: dwd_measurement, discriminator: measurement, value: soil_temperature }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 7183226
@@ -252,6 +268,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_visibility
+    bronze: { table: dwd_measurement, discriminator: measurement, value: visibility }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 13124582
@@ -268,6 +285,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_cloud_type
+    bronze: { table: dwd_measurement, discriminator: measurement, value: cloud_type }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 13101463
@@ -300,6 +318,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_wind_synop
+    bronze: { table: dwd_measurement, discriminator: measurement, value: wind_synop }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 13524783
@@ -316,6 +335,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_extreme_wind
+    bronze: { table: dwd_measurement, discriminator: measurement, value: extreme_wind }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 6480621
@@ -331,6 +351,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_weather_phenomena
+    bronze: { table: dwd_measurement, discriminator: measurement, value: weather_phenomena }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: false }
     row_count_observed: 12915288
@@ -347,6 +368,7 @@ tables:
       - { name: eor,         type: string, required: true,  nullable: false, constant_observed: "eor" }
 
   - name: dwd_solar
+    bronze: { table: dwd_measurement, discriminator: measurement, value: solar }
     kind: measurement
     grain: { key: [STATIONS_ID, MESS_DATUM], unique: true }
     row_count_observed: 5809249

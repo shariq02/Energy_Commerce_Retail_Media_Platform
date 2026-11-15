@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- DWD RELATIONSHIPS AND FINDINGS
@@ -59,16 +59,6 @@ META = {
 }
 
 
-def as_ts(col):
-    # try_to_timestamp -> NULL on bad input (a plain to_timestamp with a format
-    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI).
-    s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
-    return F.coalesce(
-        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
-        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
-    )
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Validate profiling export path
@@ -83,7 +73,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 station_set = {}
 table_rows = {}
 for name, t in {**MEASUREMENT_TABLES, **META}.items():
-    df = spark.table(t)
+    df = bronze_frame(t)
     sid = find_col(df, "STATIONS_ID", "Stations_id", "stations_id")
     station_set[name] = {
         str(x[0]) for x in df.select(F.col(sid).cast("string")).distinct().collect()
@@ -92,7 +82,7 @@ for name, t in {**MEASUREMENT_TABLES, **META}.items():
         f"{name:<24} distinct stations = {len(station_set[name])}: {sorted(station_set[name])}"
     )
 for m, t in MEASUREMENT_TABLES.items():
-    table_rows[m] = spark.table(t).count()
+    table_rows[m] = bronze_frame(t).count()
 
 # COMMAND ----------
 
@@ -115,7 +105,7 @@ for meta_name in ("station_geography", "station_name_history", "parameter_unit")
 # DBTITLE 1,City <-> station consistency + city coordinates (one union + distinct, collected)
 city_map = None
 for t in MEASUREMENT_TABLES.values():
-    df = spark.table(t)
+    df = bronze_frame(t)
     sid = find_col(df, "STATIONS_ID")
     part = df.select(F.col(sid).cast("string").alias("station_id"), F.col("city"))
     city_map = part if city_map is None else city_map.union(part)
@@ -134,11 +124,11 @@ print("stations per city:", city_counts)
 # COMMAND ----------
 
 # DBTITLE 1,Relationship cardinality -- measurement station -> each metadata table
-geo = spark.table(META["station_geography"])
+geo = bronze_frame(META["station_geography"])
 gsid = find_col(geo, "STATIONS_ID", "Stations_id", "stations_id")
 meta_card = {}
 for meta_name, meta_t in META.items():
-    md = spark.table(meta_t)
+    md = bronze_frame(meta_t)
     s = find_col(md, "STATIONS_ID", "Stations_id", "stations_id")
     child_keys = {
         str(x[0]) for x in md.select(F.col(s).cast("string")).distinct().collect()
@@ -153,7 +143,7 @@ for meta_name, meta_t in META.items():
 # DBTITLE 1,Cross-measurement (station, MESS_DATUM) presence matrix -- one tagged union
 u = None
 for m, t in MEASUREMENT_TABLES.items():
-    df = spark.table(t)
+    df = bronze_frame(t)
     s, d = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     part = df.select(
         F.col(s).cast("string").alias("station"),
@@ -219,10 +209,12 @@ if gsid and geo_von:
         F.max(F.coalesce("gb", F.current_timestamp())).alias("gb"),
     )
     for m, t in MEASUREMENT_TABLES.items():
-        df = spark.table(t)
+        df = bronze_frame(t)
         s, dd = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
         j = (
-            df.select(F.col(s).cast("string").alias("station"), as_ts(dd).alias("ts"))
+            df.select(
+                F.col(s).cast("string").alias("station"), dwd_timestamp(dd).alias("ts")
+            )
             .where(F.col("ts").isNotNull())
             .join(wspan, on="station", how="inner")
         )
@@ -288,12 +280,12 @@ def clean(colname):
 
 
 def hourly(m, cols, raw=(), since=RECENT_FROM):
-    df = spark.table(MEASUREMENT_TABLES[m])
+    df = bronze_frame(MEASUREMENT_TABLES[m])
     s_, d_ = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     have = [c for c in cols if find_col(df, c)]
     return df.select(
         F.col(s_).cast("string").alias("station"),
-        as_ts(d_).alias("ts"),
+        dwd_timestamp(d_).alias("ts"),
         *[clean(find_col(df, c)).alias(c) for c in have],
         *[safe_num(find_col(df, c)).alias(f"raw_{c}") for c in raw if find_col(df, c)],
     ).where(
@@ -495,7 +487,7 @@ print({k: v for k, v in spatial_stats.items() if k != "table"})
 # DBTITLE 1,Verdict -- can the 7 measurements be combined downstream?
 max_pair_only = max((max(o[3], o[4]) for o in pair_overlap), default=0)
 schemas = {
-    m: tuple(sorted(spark.table(MEASUREMENT_TABLES[m]).columns)) for m in MEASUREMENTS
+    m: tuple(sorted(bronze_frame(MEASUREMENT_TABLES[m]).columns)) for m in MEASUREMENTS
 }
 schema_disjoint = len(set(schemas.values())) == len(schemas)
 print(f"(station, MESS_DATUM) unique in every measurement : {all(key_unique.values())}")

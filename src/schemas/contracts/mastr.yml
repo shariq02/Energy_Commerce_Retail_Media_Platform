@@ -36,12 +36,15 @@ profiling_evidence: src/schemas/profiling/mastr.md
 bronze_physical_types: string
 bronze_layout: >
   The four small code lookups (mastr_einheitentypen, mastr_lokationstypen,
-  mastr_marktfunktionen, mastr_marktrollen; each Id / Wert) share one Bronze
-  table, mastr_code_lookup, told apart by a leading catalog_kind column (the
-  lookup's name without the mastr_ prefix) added at load. Each of those entries
-  below is one logical dataset; its bronze: block names the physical table and
-  the catalog_kind value. catalog_kind is not one of the source columns listed
-  here. Every other table below is its own Bronze table.
+  mastr_marktfunktionen, mastr_marktrollen; each Id / Wert) and
+  mastr_katalogwerte share one Bronze table, mastr_code_lookup, told apart by a
+  leading catalog_kind column (the lookup's name without the mastr_ prefix).
+  The six einheiten_* tables share mastr_einheiten and the four anlagen_eeg_*
+  tables share mastr_anlagen_eeg, told apart by a leading energy_source column
+  (the table name suffix). Each of those entries below is one logical dataset;
+  its bronze: block names the physical table and the value. The leading column
+  is not one of the source columns listed here. Every other table below is its
+  own Bronze table.
 
 acquisition:
   method: scripted_download
@@ -128,6 +131,7 @@ tables:
   #   GenMastrNummer               FK -> einheiten_genehmigung (nullable)
 
   - name: mastr_einheiten_wind
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: wind }
     kind: deep
     grain: { key: [EinheitMastrNummer], unique: true }
     row_count_observed: 43457
@@ -218,6 +222,7 @@ tables:
       - { name: Einsatzverantwortlicher,      type: string,    required: false, nullable: true }
 
   - name: mastr_einheiten_biomasse
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: biomasse }
     kind: deep
     grain: { key: [EinheitMastrNummer], unique: true }
     row_count_observed: 24334
@@ -291,6 +296,7 @@ tables:
       - { name: Einsatzverantwortlicher,      type: string,    required: false, nullable: true }
 
   - name: mastr_einheiten_wasser
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: wasser }
     kind: deep
     grain: { key: [EinheitMastrNummer], unique: true }
     row_count_observed: 8814
@@ -364,6 +370,7 @@ tables:
       - { name: WeicDisplayName,              type: string,    required: false, nullable: true }
 
   - name: mastr_einheiten_verbrennung
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: verbrennung }
     kind: deep
     grain: { key: [EinheitMastrNummer], unique: true }
     row_count_observed: 94027
@@ -449,6 +456,7 @@ tables:
       - { name: DatumBaubeginn,               type: timestamp, required: false, nullable: true,  notes: "construction start date" }
 
   - name: mastr_einheiten_kernkraft
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: kernkraft }
     kind: deep
     grain: { key: [EinheitMastrNummer], unique: true }
     row_count_observed: 6
@@ -503,6 +511,7 @@ tables:
       - { name: GenMastrNummer,               type: string,    required: false, nullable: true,  constant_observed: true }
 
   - name: mastr_einheiten_geothermie_gsgk
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: geothermie_gsgk }
     kind: deep
     grain: { key: [EinheitMastrNummer], unique: true }
     row_count_observed: 336
@@ -570,6 +579,7 @@ tables:
   # ---- EEG / KWK support & authorisation (7) ----------------------------
 
   - name: mastr_anlagen_eeg_wind
+    bronze: { table: mastr_anlagen_eeg, discriminator: energy_source, value: wind }
     kind: deep
     grain: { key: [EegMaStRNummer], unique: true }
     row_count_observed: 43457
@@ -604,6 +614,7 @@ tables:
       - { name: VerhaeltnisReferenzertragErtrag15Jahre, type: double, required: false, nullable: true }
 
   - name: mastr_anlagen_eeg_biomasse
+    bronze: { table: mastr_anlagen_eeg, discriminator: energy_source, value: biomasse }
     kind: deep
     grain: { key: [EegMaStRNummer], unique: true }
     row_count_observed: 15644
@@ -635,6 +646,7 @@ tables:
       - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
 
   - name: mastr_anlagen_eeg_wasser
+    bronze: { table: mastr_anlagen_eeg, discriminator: energy_source, value: wasser }
     kind: deep
     grain: { key: [EegMaStRNummer], unique: true }
     row_count_observed: 7485
@@ -654,6 +666,7 @@ tables:
       - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
 
   - name: mastr_anlagen_eeg_geothermie_gsgk
+    bronze: { table: mastr_anlagen_eeg, discriminator: energy_source, value: geothermie_gsgk }
     kind: deep
     grain: { key: [EegMaStRNummer], unique: true }
     row_count_observed: 132
@@ -993,6 +1006,7 @@ tables:
       - { name: Name, type: string, required: true, nullable: false, notes: "category name (e.g. Land, Betriebsstatus, Brennstoff, Fernsteuerbarkeit)" }
 
   - name: mastr_katalogwerte
+    bronze: { table: mastr_code_lookup, discriminator: catalog_kind, value: katalogwerte }
     kind: light
     role: "code catalog -- the authoritative code -> value table for every coded column in MaStR (1737 value ids across 118 used categories)"
     grain: { key: [Id], unique: true }

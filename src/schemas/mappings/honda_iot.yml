@@ -11,10 +11,11 @@ source_system: honda_iot
 profiling_evidence: src/schemas/profiling/honda_iot.md
 contract: src/schemas/contracts/honda_iot.yml
 bronze_layout: >
-  from_tables name the logical datasets of the contract. In Bronze the P and W
-  datasets of a metric are one table (honda_iot_electricity / _heating /
-  _cooling) with a measurement_type column ('p' / 'w'); see the contract's
-  bronze: blocks. The "_p vs _w table" rule below reads measurement_type.
+  from_tables name the logical datasets of the contract. In Bronze the six
+  datasets are one table (honda_iot_meter) with a meter_kind column
+  (electricity / heating / cooling) and a measurement_type column ('p' / 'w');
+  see the contract's bronze: blocks. The "_p vs _w table" rule below reads
+  measurement_type.
 
 targets:
 

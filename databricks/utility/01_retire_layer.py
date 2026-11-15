@@ -23,6 +23,8 @@
 # MAGIC successor is checked), `fresh` (drop the tables of the six Silver schemas, keep
 # MAGIC the schemas, before a rebuild from Bronze; the Bronze schemas must hold tables)
 # MAGIC or `fresh_gold` (the same for the Gold schemas before a rebuild from Silver).
+# MAGIC `merged_parts` drops each Bronze table of `bronze_merges.yml` that a merge
+# MAGIC built from it, only when the merged table holds the same rows for its value.
 # MAGIC
 # MAGIC The default is a dry run: the notebook lists what it would drop and writes the
 # MAGIC findings file. The three drop switches stay off until you have read the plan.
@@ -34,6 +36,8 @@
 import os
 from datetime import UTC, datetime
 
+import yaml
+
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
@@ -44,7 +48,9 @@ FINDINGS_SUBDIR = "src/inventory"
 # "fresh": drop the tables of the six Silver schemas (the schemas stay) before a
 # rebuild from Bronze; the Bronze schemas must hold tables first.
 # "fresh_gold": drop the tables of the Gold schemas before a rebuild from Silver.
-MODE = "fresh"  # "retire", "fresh_gold"
+# "merged_parts": drop the Bronze tables that a merge of bronze_merges.yml holds.
+MODE = "fresh"  # "retire", "fresh_gold", "merged_parts"
+MERGES_FILE = "src/schemas/mappings/bronze_merges.yml"
 
 # name -> schemas to drop, and the schemas that must hold the data before the drop
 RETIREMENTS_BY_MODE = {
@@ -96,6 +102,7 @@ RETIREMENTS_BY_MODE = {
             "keep_schema": True,
         },
     },
+    "merged_parts": {},  # no whole layer is dropped in this mode
 }
 RETIREMENTS = RETIREMENTS_BY_MODE[MODE]
 
@@ -262,6 +269,45 @@ for name, spec in RETIREMENTS.items():
                     print(f"DROP  {sql_kind.lower()} {schema}.{obj}")
                 else:
                     print(f"WOULD DROP  {sql_kind.lower()} {schema}.{obj}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Drop the Bronze tables merged into another table (MODE merged_parts)
+part_rows = []  # (merged table, value, part table, part rows, merged rows, decision)
+if MODE == "merged_parts":
+    with open(os.path.join(find_repo_root(), MERGES_FILE), encoding="utf-8") as fh:
+        merges = yaml.safe_load(fh)["merges"]
+    for merge in merges:
+        column = merge["discriminator"]
+        if merge.get("at_load") or not column:
+            continue
+        merged = spark.table(f"{CATALOG}.{merge['schema']}.{merge['table']}")
+        counts = {r[0]: r[1] for r in merged.groupBy(column).count().collect()}
+        for value, part in merge["parts"].items():
+            full = f"{CATALOG}.{merge['schema']}.{part}"
+            merged_rows = counts.get(value)
+            if not spark.catalog.tableExists(full):
+                part_rows.append(
+                    (merge["table"], value, part, None, merged_rows, "gone")
+                )
+                continue
+            rows = spark.table(full).count()
+            if merged_rows != rows:
+                decision = "keep (row counts differ)"
+            elif DROP_TABLES:
+                spark.sql(f"DROP TABLE IF EXISTS {full}")
+                decision = "drop"
+            else:
+                decision = "would drop"
+            part_rows.append((merge["table"], value, part, rows, merged_rows, decision))
+            print(f"{decision.upper()}  {part}: {rows} rows, merged {merged_rows}")
+    columns = ["merged table", "value", "part table", "part rows", "merged rows"]
+    with open(findings_path, "a", encoding="utf-8") as fh:
+        fh.write(
+            "\n## Bronze tables merged into another table\n\n"
+            + markdown_table([*columns, "decision"], part_rows)
+            + "\n"
+        )
 
 # COMMAND ----------
 

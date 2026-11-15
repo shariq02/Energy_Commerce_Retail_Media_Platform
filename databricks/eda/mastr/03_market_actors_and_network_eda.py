@@ -74,7 +74,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Profile each table -- rows, missingness, approx distinct (one agg per table)
-frames = {d: spark.table(t) for d, t in TABLES.items()}
+frames = {d: bronze_frame(t) for d, t in TABLES.items()}
 prof = {}
 for name, df in frames.items():
     cols = df.columns

@@ -69,7 +69,9 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 
 # DBTITLE 1,Profile -- rows, missingness, approx distinct, constant columns (one agg per table)
 frames = {
-    e: spark.table(t).where(F.col("measurement_type") == e[-1]).drop("measurement_type")
+    e: bronze_frame(t)
+    .where(F.col("measurement_type") == e[-1])
+    .drop("measurement_type")
     for e, t in TABLES.items()
 }
 prof = {}

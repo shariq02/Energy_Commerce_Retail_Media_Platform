@@ -62,7 +62,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # DBTITLE 1,Collect the 6 catalog tables (small) and profile in Python
 meta = {}
 for name, t in TABLES.items():
-    df = spark.table(t)
+    df = bronze_frame(t)
     if name in CODE_LISTS:
         df = df.filter(df["catalog_kind"] == name).drop("catalog_kind")
     recs = [x.asDict() for x in df.collect()]
@@ -91,7 +91,10 @@ for name, t in TABLES.items():
 # DBTITLE 1,katalogkategorien <-> katalogwerte lookup consistency
 kk, kw = meta["katalogkategorien"], meta["katalogwerte"]
 kk_id = find_col(
-    spark.table(TABLES["katalogkategorien"]), "Id", "KatalogKategorieId", "kategorie_id"
+    bronze_frame(TABLES["katalogkategorien"]),
+    "Id",
+    "KatalogKategorieId",
+    "kategorie_id",
 )
 kw_fk = next((c for c in kw["cols"] if "kategorie" in c.lower()), None)
 kk_ids = {d[kk_id] for d in kk["recs"]} if kk_id else set()

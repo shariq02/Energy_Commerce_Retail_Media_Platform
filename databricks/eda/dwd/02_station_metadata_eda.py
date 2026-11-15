@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- DWD STATION METADATA
@@ -113,7 +113,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # DBTITLE 1,Collect the 4 metadata tables (small) and profile in Python
 meta = {}
 for name, t in TABLES.items():
-    df = spark.table(t)
+    df = bronze_frame(t)
     recs = [x.asDict() for x in df.collect()]
     cols = df.columns
     total = len(recs)
@@ -254,7 +254,7 @@ for sid, n in name_changes.items():
 # COMMAND ----------
 
 # DBTITLE 1,Spatial validity of the station coordinates (Germany bounding box)
-geo_df = spark.table(TABLES["station_geography"])
+geo_df = bronze_frame(TABLES["station_geography"])
 spatial = None
 if lat and lon:
     spatial = spatial_validity(geo_df, lat, lon, name="station_geography")
@@ -279,7 +279,7 @@ if punit:
     print("code -> unit:", upairs)
 observed = {}
 for m, t in MEASUREMENT_TABLES.items():
-    observed[m] = measurement_value_cols(spark.table(t).columns)
+    observed[m] = measurement_value_cols(bronze_frame(t).columns)
 observed_flat = {c for cs in observed.values() for c in cs}
 codes_unknown = sorted(observed_flat - declared)
 codes_unused = sorted(declared - observed_flat)
@@ -292,8 +292,8 @@ print("parameter_unit codes never a measurement value column:", codes_unused)
 mstations = reduce(
     lambda a, b: a.union(b),
     (
-        spark.table(t).select(
-            F.col(find_key(spark.table(t).columns, "STATIONS_ID"))
+        bronze_frame(t).select(
+            F.col(find_key(bronze_frame(t).columns, "STATIONS_ID"))
             .cast("string")
             .alias("s")
         )

@@ -5,8 +5,8 @@
 #
 # Purpose: formal contract for the Honda Research Institute smart-building
 # dataset -- 6 logical energy datasets (electricity / heating / cooling, each a P
-# and a W variant), stored in 3 Bronze tables (one per metric, with a
-# measurement_type column), + 1 weather table. Every *_observed value is traceable to
+# and a W variant), stored in 1 Bronze table (honda_iot_meter, with a meter_kind
+# and a measurement_type column), + 1 weather table. Every *_observed value is traceable to
 # src/schemas/profiling/honda_iot.md. Authored; generated/honda_iot_*.schema.json
 # is produced by src/schemas/_generate_jsonschema.py -- do not edit those by hand.
 
@@ -20,12 +20,12 @@ description: >
 profiling_evidence: src/schemas/profiling/honda_iot.md
 bronze_physical_types: string
 bronze_layout: >
-  The P and W datasets of a metric share one Bronze table per metric
-  (honda_iot_electricity, honda_iot_heating, honda_iot_cooling), told apart by a
-  leading measurement_type column ('p' / 'w') added at load. Each table entry
-  below is one logical dataset; its bronze: block names the physical table and
-  the measurement_type value. measurement_type is not one of the source columns
-  listed here. honda_iot_weather is its own Bronze table.
+  The six energy datasets share one Bronze table, honda_iot_meter, told apart by
+  a leading meter_kind column (electricity / heating / cooling) and then a
+  measurement_type column ('p' / 'w'). Each table entry below is one logical
+  dataset; its bronze: block names the physical table, the meter_kind value
+  and, as the inner pair, the measurement_type value. Neither column is one of
+  the source columns listed here. honda_iot_weather is its own Bronze table.
 
 acquisition:
   method: manual_download
@@ -53,7 +53,7 @@ conventions:
 tables:
 
   - name: honda_iot_electricity_p
-    bronze: { table: honda_iot_electricity, discriminator: measurement_type, value: p }
+    bronze: { table: honda_iot_meter, discriminator: meter_kind, value: electricity, inner_discriminator: measurement_type, inner_value: p }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417959
     columns:
@@ -64,7 +64,7 @@ tables:
       - { name: CHP,          type: double, required: true, nullable: true, notes: "mostly negative; range -282562..27705" }
 
   - name: honda_iot_electricity_w
-    bronze: { table: honda_iot_electricity, discriminator: measurement_type, value: w }
+    bronze: { table: honda_iot_meter, discriminator: meter_kind, value: electricity, inner_discriminator: measurement_type, inner_value: w }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417957
     columns:
@@ -75,7 +75,7 @@ tables:
       - { name: CHP,          type: double, required: true, nullable: true, notes: "range -3390184..0" }
 
   - name: honda_iot_heating_p
-    bronze: { table: honda_iot_heating, discriminator: measurement_type, value: p }
+    bronze: { table: honda_iot_meter, discriminator: meter_kind, value: heating, inner_discriminator: measurement_type, inner_value: p }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417959
     columns:
@@ -86,7 +86,7 @@ tables:
       - { name: CHP_elec,     type: double, required: true, nullable: true, notes: "mostly negative; identical stats to electricity CHP" }
 
   - name: honda_iot_heating_w
-    bronze: { table: honda_iot_heating, discriminator: measurement_type, value: w }
+    bronze: { table: honda_iot_meter, discriminator: meter_kind, value: heating, inner_discriminator: measurement_type, inner_value: w }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417947
     columns:
@@ -97,7 +97,7 @@ tables:
       - { name: CHP_elec,     type: double, required: true, nullable: true, notes: "range -3390184..0" }
 
   - name: honda_iot_cooling_p
-    bronze: { table: honda_iot_cooling, discriminator: measurement_type, value: p }
+    bronze: { table: honda_iot_meter, discriminator: meter_kind, value: cooling, inner_discriminator: measurement_type, inner_value: p }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417960
     columns:
@@ -107,7 +107,7 @@ tables:
       - { name: cool_elec,    type: double, required: true, nullable: true, notes: "range 0..332025; 8430 5-sigma" }
 
   - name: honda_iot_cooling_w
-    bronze: { table: honda_iot_cooling, discriminator: measurement_type, value: w }
+    bronze: { table: honda_iot_meter, discriminator: meter_kind, value: cooling, inner_discriminator: measurement_type, inner_value: w }
     grain: { key: [frequency, datetime_utc], unique: true }
     row_count_observed: 3417895
     columns:

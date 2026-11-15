@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA SHARED LIBRARY
@@ -27,6 +27,7 @@ import os as _os
 import re as _re
 
 import matplotlib.pyplot as plt
+import yaml
 from pyspark.sql import functions as F
 
 # Do NOT force a backend here -- Databricks installs its own inline backend and
@@ -119,6 +120,30 @@ def _profiling_dir():
     d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
     _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
     return d
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Bronze read (tables merged into another table)
+BRONZE_MERGES = _os.path.join("src", "schemas", "mappings", "bronze_merges.yml")
+
+
+def bronze_frame(full_name):
+    """A Bronze table by its full name; a table merged into another
+    (bronze_merges.yml) is read from the merged table, filtered by its value."""
+    catalog, schema, table = full_name.split(".")
+    with open(_os.path.join(_repo_root(), BRONZE_MERGES), encoding="utf-8") as fh:
+        merges = yaml.safe_load(fh)["merges"]
+    for merge in merges:
+        column = merge["discriminator"]
+        for value, part in merge["parts"].items():
+            if column and (merge["schema"], part) == (schema, table):
+                return (
+                    spark.table(f"{catalog}.{schema}.{merge['table']}")
+                    .filter(F.col(column) == value)
+                    .drop(column)
+                )
+    return spark.table(full_name)
 
 
 def fig_path(name):
@@ -1041,6 +1066,17 @@ def coverage_bias(counts):
 # DBTITLE 1,Cross-source temporal overlap
 
 
+def dwd_timestamp(col):
+    # DWD MESS_DATUM: yyyyMMddHH, a double-inferred "2025021300.0", or minutes.
+    # try_to_timestamp gives NULL on bad input; to_timestamp throws under ANSI.
+    s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
+    return F.coalesce(
+        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
+        F.try_to_timestamp(s, F.lit("yyyyMMddHHmm")),
+        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
+    )
+
+
 def _norm_token(s):
     # Lower-case, drop every non-alphanumeric char -- so "Betriebs-Status" and
     # "einheitbetriebsstatus" can be compared as substrings.
@@ -1054,7 +1090,7 @@ def load_mastr_catalog(spark, catalog, schema="bronze"):
     # Gesamtdatenexport carries no explicit column -> category binding, so a
     # column is matched to a category by NAME later (best-effort); membership in
     # the global id set is the weaker but always-available fallback.
-    kw = spark.table(f"{catalog}.{schema}.mastr_katalogwerte")
+    kw = bronze_frame(f"{catalog}.{schema}.mastr_katalogwerte")
     kk = spark.table(f"{catalog}.{schema}.mastr_katalogkategorien")
     kw_id = find_col(kw, "Id", "KatalogWertId", "Wert_Id", "KatalogwertId")
     kw_cat = next((c for c in kw.columns if "kategorie" in c.lower()), None)

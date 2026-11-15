@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- DWD WEATHER MEASUREMENTS
@@ -86,21 +86,7 @@ PLAUSIBLE = {
 
 # COMMAND ----------
 
-# DBTITLE 1,Helpers -- DWD hourly timestamp + value-column selection
-
-
-def as_ts(col):
-    # MESS_DATUM is yyyyMMddHH, but a double-inferred column arrives as
-    # "2025021300.0" -- to_timestamp(x, "yyyyMMddHH") then parses NOTHING. Strip a
-    # trailing ".0", then try the compact hour / minute forms.
-    s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
-    # try_to_timestamp -> NULL on bad input; a plain to_timestamp with a format
-    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI (e.g. a stray "1981010723:38").
-    return F.coalesce(
-        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
-        F.try_to_timestamp(s, F.lit("yyyyMMddHHmm")),
-        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
-    )
+# DBTITLE 1,Helpers -- value-column selection
 
 
 def value_columns(df):
@@ -124,7 +110,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Profile -- rows, missingness, approx distinct, min/max ts, constant columns (one agg per table)
-frames = {m: spark.table(t) for m, t in TABLES.items()}
+frames = {m: bronze_frame(t) for m, t in TABLES.items()}
 prof = {}
 for m in MEASUREMENTS:
     df = frames[m]
@@ -366,7 +352,7 @@ for m in MEASUREMENTS:
             .collect()
         )
 
-    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    decade = (F.floor(F.year(dwd_timestamp(dts)) / 10) * 10).cast("int")
     by_qn = by(F.col(qn)) if qn else []
     by_dec = by(decade)
     by_st = by(F.col(sid))
@@ -440,7 +426,7 @@ for m, cols in PROFILE_COLS.items():
     cols = [c for c in cols if c in df.columns]
     if not cols:
         continue
-    ts = as_ts(find_col(df, "MESS_DATUM"))
+    ts = dwd_timestamp(find_col(df, "MESS_DATUM"))
     aggs = [F.avg(clean_value(c)).alias(c) for c in cols]
     profiles[m] = {}
     for key, k in (("month", F.month(ts)), ("hour", F.hour(ts))):
@@ -469,7 +455,7 @@ for m in MEASUREMENTS:
     # gap_h <= 0, which the `> 0` filters drop; observed_hours uses
     # countDistinct. Saves a full 91M-row shuffle per table.
     per_station = (
-        df.select(F.col(sid).alias("station"), as_ts(dts).alias("ts"))
+        df.select(F.col(sid).alias("station"), dwd_timestamp(dts).alias("ts"))
         .where(F.col("ts").isNotNull())
         .withColumn(
             "gap_h",
@@ -510,7 +496,7 @@ for m in MEASUREMENTS:
     df = frames[m]
     dts = find_col(df, "MESS_DATUM")
     qn = qn_col(df)
-    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    decade = (F.floor(F.year(dwd_timestamp(dts)) / 10) * 10).cast("int")
     probe = [c for c in ([qn] if qn else []) + value_columns(df)]
     by_decade = population_by_group(
         df.withColumn("__decade", decade).where(F.col("__decade").isNotNull()),

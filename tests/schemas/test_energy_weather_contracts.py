@@ -34,7 +34,12 @@ _REGISTRY_DIR = _SCHEMAS / "bronze_registry"
 
 ENERGY_WEATHER_SOURCES = ("dwd", "smard", "power_plant_list", "redispatch", "mastr")
 # Sources whose logical datasets are stored, in Bronze, as slices of a shared table.
-BRONZE_LAYOUT_SOURCES = ("honda_iot", "mastr")
+BRONZE_LAYOUT_SOURCES = ("dwd", "honda_iot", "mastr")
+# bronze: block keys of a shared table, outer pair first.
+DISCRIMINATOR_KEYS = (
+    ("discriminator", "value"),
+    ("inner_discriminator", "inner_value"),
+)
 
 
 def _latest_registry() -> Path:
@@ -78,10 +83,20 @@ def _contract_tables(contract: dict) -> list[dict]:
     return []
 
 
-def _physical(table: dict) -> tuple[str, str | None]:
-    """(Bronze table, discriminator column) a contract table is stored in."""
+def _physical(table: dict) -> tuple[str, list[str], tuple]:
+    """(Bronze table, its leading discriminator columns, the values of this
+    dataset) a contract table is stored in."""
     bronze = table.get("bronze", {})
-    return bronze.get("table", table["name"]), bronze.get("discriminator")
+    pairs = [
+        (bronze[column], bronze[value])
+        for column, value in DISCRIMINATOR_KEYS
+        if bronze.get(column)
+    ]
+    return (
+        bronze.get("table", table["name"]),
+        [column for column, _ in pairs],
+        tuple(value for _, value in pairs),
+    )
 
 
 @pytest.fixture(scope="module")
@@ -100,21 +115,26 @@ def test_contract_parses_and_names_the_source(source):
 @pytest.mark.parametrize("source", ENERGY_WEATHER_SOURCES)
 def test_contract_tables_exist_in_bronze_registry(source, registry):
     for table in _contract_tables(_contract(source)):
-        physical, _ = _physical(table)
+        physical, _, _ = _physical(table)
         assert physical in registry, f"{physical} not in the Bronze snapshot"
 
 
 @pytest.mark.parametrize("source", ENERGY_WEATHER_SOURCES)
 def test_contract_columns_match_bronze_registry_order(source, registry):
+    """An own table matches the snapshot column for column; a dataset of a
+    shared table has its columns in that table (which holds the columns of
+    every dataset, ordered by the first dataset that has each)."""
     for table in _contract_tables(_contract(source)):
-        physical, discriminator = _physical(table)
+        physical, discriminators, _ = _physical(table)
         got = [c["name"] for c in table["columns"]]
         stored = registry[physical]
-        if discriminator:
-            assert stored[0] == discriminator, (
-                f"{physical}: {discriminator} is not the first Bronze column"
+        if discriminators:
+            assert stored[: len(discriminators)] == discriminators, (
+                f"{physical}: {discriminators} are not the first Bronze columns"
             )
-            stored = stored[1:]
+            missing = sorted(set(got) - set(stored[len(discriminators) :]))
+            assert not missing, f"{table['name']}: not in {physical}: {missing}"
+            continue
         assert got == stored, (
             f"{table['name']}: contract columns diverge from the Bronze snapshot"
         )
@@ -123,33 +143,33 @@ def test_contract_columns_match_bronze_registry_order(source, registry):
 @pytest.mark.parametrize("source", BRONZE_LAYOUT_SOURCES)
 def test_shared_bronze_tables_have_one_value_per_dataset(source, registry):
     """Every logical dataset stored in a shared Bronze table has its own value."""
-    seen: dict[str, dict[str, str]] = {}
+    seen: dict[str, dict[tuple, str]] = {}
     for table in _contract_tables(_contract(source)):
-        physical, discriminator = _physical(table)
+        physical, discriminators, value = _physical(table)
         assert physical in registry, f"{physical} not in the Bronze snapshot"
-        if not discriminator:
+        if not discriminators:
             continue
-        value = table["bronze"]["value"]
         values = seen.setdefault(physical, {})
         assert value not in values, f"{physical}: value {value!r} used twice"
         values[value] = table["name"]
-        assert registry[physical][0] == discriminator
+        assert registry[physical][: len(discriminators)] == discriminators
     assert seen, f"{source} declares no shared Bronze table"
 
 
 @pytest.mark.parametrize("source", BRONZE_LAYOUT_SOURCES)
 def test_shared_bronze_datasets_have_identical_columns(source):
-    """Datasets stored in one Bronze table must have the same columns."""
-    by_table: dict[str, list[list[str]]] = {}
+    """Datasets told apart only by the inner discriminator (one part of a merged
+    table, such as the P and W data of a Honda meter) have the same columns."""
+    by_part: dict[tuple, list[list[str]]] = {}
     for table in _contract_tables(_contract(source)):
-        physical, discriminator = _physical(table)
-        if discriminator:
-            by_table.setdefault(physical, []).append(
+        physical, discriminators, value = _physical(table)
+        if len(discriminators) > 1:
+            by_part.setdefault((physical, value[0]), []).append(
                 [c["name"] for c in table["columns"]]
             )
-    for physical, column_lists in by_table.items():
+    for part, column_lists in by_part.items():
         assert all(cols == column_lists[0] for cols in column_lists), (
-            f"{physical}: datasets stored together have different columns"
+            f"{part}: datasets stored together have different columns"
         )
 
 

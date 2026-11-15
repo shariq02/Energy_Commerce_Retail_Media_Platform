@@ -56,7 +56,7 @@ TABLES = {
 
 
 def honda_frame(dataset):
-    df = spark.table(TABLES[dataset])
+    df = bronze_frame(TABLES[dataset])
     if dataset == "weather":
         return df
     return df.where(F.col("measurement_type") == dataset[-1]).drop("measurement_type")
@@ -214,11 +214,11 @@ figs.append(
 # DBTITLE 1,Hourly energy and weather frame (1h, inner join on datetime_utc)
 WCOLS = [
     c
-    for c in spark.table(TABLES["weather"]).columns
+    for c in bronze_frame(TABLES["weather"]).columns
     if c not in ("frequency", "datetime_utc")
 ]
 frame = (
-    spark.table(TABLES["weather"])
+    bronze_frame(TABLES["weather"])
     .where(F.col("frequency") == "1h")
     .select("datetime_utc", *[safe_num(c).alias(c) for c in WCOLS])
 )

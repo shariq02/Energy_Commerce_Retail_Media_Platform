@@ -16,6 +16,8 @@
 # MAGIC from its existing part tables, with the discriminator column first, check the
 # MAGIC rows and columns of every part, and write the findings. No table is dropped.
 # MAGIC Safe to run again: a merged table is rebuilt, an appended part is added once.
+# MAGIC After the parts are dropped (`utility/01_retire_layer.py`, `merged_parts`),
+# MAGIC this notebook stops at the check "part tables not found".
 
 # COMMAND ----------
 

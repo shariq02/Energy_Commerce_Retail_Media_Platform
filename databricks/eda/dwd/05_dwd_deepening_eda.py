@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- DWD DEEPENING MEASUREMENTS & MISSING VALUE PERIODS
@@ -60,17 +60,6 @@ DWD_QN_CODES = {"1", "2", "3", "5", "7", "9", "10"}
 _NON_VALUE_SUFFIXES = ("_I", "_TEXT", "_WOZ")
 
 
-def as_ts(col):
-    s = F.regexp_replace(F.col(col).cast("string"), r"\.0$", "")
-    # try_to_timestamp -> NULL on bad input; a plain to_timestamp with a format
-    # THROWS CANNOT_PARSE_TIMESTAMP under ANSI.
-    return F.coalesce(
-        F.try_to_timestamp(s, F.lit("yyyyMMddHH")),
-        F.try_to_timestamp(s, F.lit("yyyyMMddHHmm")),
-        F.try_to_timestamp(F.substring(s, 1, 10), F.lit("yyyyMMddHH")),
-    )
-
-
 def qn_col(df):
     # QN suffix varies by parameter (QN_8, QN_7, QN_2, QN_592, ...) -- match by
     # prefix, not a fixed list.
@@ -98,7 +87,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Profile -- rows, missingness, approx distinct, min/max ts, constant columns (one agg per table)
-frames = {m: spark.table(t) for m, t in TABLES.items()}
+frames = {m: bronze_frame(t) for m, t in TABLES.items()}
 prof = {}
 for m in MEASUREMENTS:
     df = frames[m]
@@ -224,7 +213,7 @@ for m in MEASUREMENTS:
     # No pre-.distinct() shuffle -- duplicate (station, hour) rows give lag()
     # gap_h <= 0 (dropped by the `> 0` filter); observed_hours uses countDistinct.
     per_station = (
-        df.select(F.col(sid).alias("station"), as_ts(dts).alias("ts"))
+        df.select(F.col(sid).alias("station"), dwd_timestamp(dts).alias("ts"))
         .where(F.col("ts").isNotNull())
         .withColumn(
             "gap_h",
@@ -264,7 +253,7 @@ for m in MEASUREMENTS:
     qn = qn_col(df)
     if dts is None:
         continue
-    decade = (F.floor(F.year(as_ts(dts)) / 10) * 10).cast("int")
+    decade = (F.floor(F.year(dwd_timestamp(dts)) / 10) * 10).cast("int")
     probe = [c for c in ([qn] if qn else []) + value_columns(df)]
     regime[m] = population_by_group(
         df.withColumn("__decade", decade).where(F.col("__decade").isNotNull()),
@@ -276,7 +265,7 @@ for m in MEASUREMENTS:
 # COMMAND ----------
 
 # DBTITLE 1,missing_value_periods -- small metadata table, collected in Python
-mvp = spark.table(META_TABLE)
+mvp = bronze_frame(META_TABLE)
 mvp_recs = [x.asDict() for x in mvp.collect()]
 mvp_cols = mvp.columns
 mvp_total = len(mvp_recs)

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- MASTR RELATIONSHIPS AND FINDINGS
@@ -177,7 +177,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,Helpers -- resolve a *MastrNummer column by suffix, case-insensitive
-frames = {d: spark.table(t) for d, t in TABLES.items()}
+frames = {d: bronze_frame(t) for d, t in TABLES.items()}
 row_count = {d: frames[d].count() for d in ALL_DATASETS}
 
 

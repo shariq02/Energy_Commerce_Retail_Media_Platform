@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- DWD MISSING DATA
@@ -99,7 +99,7 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # COMMAND ----------
 
 # DBTITLE 1,dwd_missing_value_periods -- collect once, analyse in Python
-mv = spark.table(MISSING_TABLE)
+mv = bronze_frame(MISSING_TABLE)
 MV_COLS = mv.columns
 mv_recs = [x.asDict() for x in mv.collect()]
 total = len(mv_recs)
@@ -160,7 +160,7 @@ for sid, g in reported_gaps.items():
 
 # DBTITLE 1,Parameter-code domain -- reported codes vs measurement value columns
 observed_value_cols = {
-    c for t in MEASUREMENT_TABLES.values() for c in value_cols(spark.table(t))
+    c for t in MEASUREMENT_TABLES.values() for c in value_cols(bronze_frame(t))
 }
 reported_codes = {str(d[param_c]) for d in mv_recs} if param_c else set()
 codes_unknown = sorted(reported_codes - observed_value_cols)
@@ -174,7 +174,7 @@ print("measurement value columns never in a reported period:", codes_unused)
 station_roll = {}
 missing_rates = {}
 for m, t in MEASUREMENT_TABLES.items():
-    df = spark.table(t)
+    df = bronze_frame(t)
     s, dts = find_col(df, "STATIONS_ID"), find_col(df, "MESS_DATUM")
     vc = value_cols(df)
     exprs = [
@@ -210,7 +210,7 @@ for m, t in MEASUREMENT_TABLES.items():
 # DBTITLE 1,Regime evidence -- observed -999/blank rate by year per measurement (one scan each)
 missing_over_time = {}
 for m, t in MEASUREMENT_TABLES.items():
-    df = spark.table(t)
+    df = bronze_frame(t)
     dts = find_col(df, "MESS_DATUM")
     any_missing = F.lit(False)
     for c in value_cols(df):
@@ -241,7 +241,7 @@ reported_pairs = (
 )
 recon = []
 for m in MEASUREMENTS:
-    df = spark.table(MEASUREMENT_TABLES[m])
+    df = bronze_frame(MEASUREMENT_TABLES[m])
     vc = value_cols(df)
     for x in station_roll[m]:
         for c in vc:
