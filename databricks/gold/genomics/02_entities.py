@@ -67,13 +67,14 @@ PROFILES = {
         ["source_record_id"],
     ),
 }
-SITE_PARTS = (
-    "assembly",
-    "contig",
-    "start_position",
-    "reference_allele",
-    "tumor_allele",
-)
+# Gold site column -> Silver `somatic_mutation` column (the parts of the site key)
+SITE_PARTS = {
+    "assembly": "assembly",
+    "contig": "contig",
+    "start_position": "start_position",
+    "reference_allele": "reference_allele",
+    "tumor_allele": "tumor_allele2",
+}
 CHANGE_COLUMNS = [
     "variant_key",
     "classification_type",
@@ -179,7 +180,9 @@ TABLES["structural_variant_profile"] = (
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- somatic_site_profile (site attributes, site key parts)
-site_parts = F.split("site_key", ":")
+# The Silver site key skips an empty allele, so its parts cannot be split by
+# position; the parts come from `somatic_mutation` (a site key with more than one
+# distinct set of parts keeps them empty).
 sites = pivot_attributes(
     attributes,
     "somatic_site",
@@ -187,13 +190,37 @@ sites = pivot_attributes(
     key="site_key",
     **GATE,
 )
+site_parts = (
+    read_silver("somatic_mutation")
+    .groupBy(
+        F.concat_ws(
+            ":",
+            "assembly",
+            "contig",
+            F.col("start_position").cast("string"),
+            "reference_allele",
+            "tumor_allele2",
+        ).alias("site_key")
+    )
+    .agg(
+        F.countDistinct(F.struct(*SITE_PARTS.values())).alias("_part_sets"),
+        *[F.first(source).alias(name) for name, source in SITE_PARTS.items()],
+    )
+    .select(
+        "site_key",
+        *[
+            F.when(F.col("_part_sets") == 1, F.col(name)).alias(name)
+            for name in SITE_PARTS
+        ],
+    )
+)
 TABLES["somatic_site_profile"] = (
     add_provenance(
-        sites.select(
+        sites.join(site_parts, "site_key", "left").select(
             "site_key",
-            *[site_parts.getItem(i).alias(name) for i, name in enumerate(SITE_PARTS)],
+            *SITE_PARTS,
             *[c for c in sites.columns if c != "site_key"],
-        ).withColumn("start_position", F.col("start_position").cast("bigint")),
+        ),
         SOURCE,
         RID,
         ecosystem="genomics",
@@ -217,7 +244,7 @@ rank = F.create_map(*[F.lit(p) for i, label in enumerate(order) for p in (label,
 runs = (
     classification.select(*CHANGE_COLUMNS)
     .distinct()
-    .withColumn("_rank", rank[F.col("first_source_snapshot")])
+    .withColumn("_rank", F.try_element_at(rank, F.col("first_source_snapshot")))
 )
 in_order = Window.partitionBy("variant_key", "classification_type").orderBy(
     "_rank", "term"

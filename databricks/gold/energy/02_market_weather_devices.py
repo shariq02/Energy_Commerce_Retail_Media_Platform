@@ -287,7 +287,7 @@ window = [
 forecast = component.filter(F.col("component_group") == "forecast").withColumn(
     "_actual_label",
     F.coalesce(
-        label_map[F.col("forecast_scope")],
+        F.try_element_at(label_map, F.col("forecast_scope")),
         F.concat(F.lit("generation_"), F.col("forecast_scope")),
     ),
 )
