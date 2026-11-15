@@ -20,8 +20,9 @@
 # MAGIC that are not built yet.
 # MAGIC
 # MAGIC The `MODE` switch picks the list: `retire` (drop a Bronze layer after its Silver
-# MAGIC successor is checked) or `fresh` (drop the tables of the six Silver schemas, keep
-# MAGIC the schemas, before a rebuild from Bronze; the Bronze schemas must hold tables).
+# MAGIC successor is checked), `fresh` (drop the tables of the six Silver schemas, keep
+# MAGIC the schemas, before a rebuild from Bronze; the Bronze schemas must hold tables)
+# MAGIC or `fresh_gold` (the same for the Gold schemas before a rebuild from Silver).
 # MAGIC
 # MAGIC The default is a dry run: the notebook lists what it would drop and writes the
 # MAGIC findings file. The three drop switches stay off until you have read the plan.
@@ -42,7 +43,8 @@ FINDINGS_SUBDIR = "src/inventory"
 # "retire": drop a Bronze layer after its Silver successor is checked.
 # "fresh": drop the tables of the six Silver schemas (the schemas stay) before a
 # rebuild from Bronze; the Bronze schemas must hold tables first.
-MODE = "fresh"  # "retire"
+# "fresh_gold": drop the tables of the Gold schemas before a rebuild from Silver.
+MODE = "fresh"  # "retire", "fresh_gold"
 
 # name -> schemas to drop, and the schemas that must hold the data before the drop
 RETIREMENTS_BY_MODE = {
@@ -73,6 +75,24 @@ RETIREMENTS_BY_MODE = {
                 "genomics_silver_reference",
             ],
             "successor": ["bronze", "genomics_bronze"],
+            "keep_schema": True,
+        },
+    },
+    "fresh_gold": {
+        "gold (fresh rebuild)": {
+            "drop": [
+                "energy_gold",
+                "commerce_gold",
+                "genomics_gold",
+                "shared_conformed",
+            ],
+            "successor": [
+                "energy_silver",
+                "energy_silver_reference",
+                "commerce_silver",
+                "genomics_silver",
+                "genomics_silver_reference",
+            ],
             "keep_schema": True,
         },
     },

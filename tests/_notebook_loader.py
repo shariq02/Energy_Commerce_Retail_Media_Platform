@@ -102,12 +102,9 @@ def load_gold_common() -> dict:
 
 
 def load_ml_common() -> dict:
-    """Silver, Gold and Analytics shared libraries in order, then
-    `_ml_common.py` -- the same `%run` chain the ML notebooks use."""
+    """Silver and Gold shared libraries in order, then `_ml_common.py` -- the
+    same `%run` chain the ML notebooks use."""
     namespace = load_gold_common()
-    _exec_notebook(
-        REPO_ROOT / "databricks" / "analytics" / "_analytics_common.py", namespace
-    )
     return _exec_notebook(REPO_ROOT / "databricks" / "ml" / "_ml_common.py", namespace)
 
 

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # ML SHARED LIBRARY
@@ -22,8 +22,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Analytics and Gold shared libraries (read_gold, read_analytics, CATALOG, ...)
-# MAGIC %run ../analytics/_analytics_common
+# DBTITLE 1,Gold and Silver shared libraries (read_gold, CATALOG, ...)
+# MAGIC %run ../gold/_gold_common
 
 # COMMAND ----------
 

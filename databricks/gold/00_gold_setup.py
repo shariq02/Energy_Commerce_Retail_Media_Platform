@@ -10,18 +10,15 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** September 2026
+# MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** create the two Gold schemas (`energy_gold`, `commerce_gold`) and
+# MAGIC **Purpose:** create the Gold schemas (`energy_gold`, `commerce_gold`,
+# MAGIC `genomics_gold`, `shared_conformed`) and the analytics schemas
+# MAGIC (`energy_analytics`, `commerce_analytics`, `genomics_analytics`), and
 # MAGIC assert that the `quality` tables exist. Preflight: every Silver table named in a
 # MAGIC Gold `read_silver()` call must be registered in `quality.field_class_registry`;
-# MAGIC a missing one fails here, before any Gold run. `shared_conformed` comes from
-# MAGIC `02_create_shared_conformed.py`. Safe to re-run.
-
-# COMMAND ----------
-
-# DBTITLE 1,Shared Silver library (CATALOG, AUDIT_TABLE, WATERMARK_TABLE, ...)
-# MAGIC %run ../silver/_silver_common
+# MAGIC a missing one fails here, before any Gold run. `dim_date` comes from
+# MAGIC `setup/02_create_shared_conformed.py`. Safe to re-run.
 
 # COMMAND ----------
 
@@ -34,24 +31,27 @@
 GOLD_SCHEMAS = (
     "energy_gold",
     "commerce_gold",
+    GENOMICS_GOLD_SCHEMA,
+    SHARED_CONFORMED_SCHEMA,
+    *ANALYTICS_SCHEMAS.values(),
 )
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the Gold schemas
+# DBTITLE 1,Create the Gold and analytics schemas
 for schema in GOLD_SCHEMAS:
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{schema}")
     print(f"OK  schema ready: {CATALOG}.{schema}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Assert shared_conformed exists
-if not spark.catalog.databaseExists(f"{CATALOG}.{SHARED_CONFORMED_SCHEMA}"):
+# DBTITLE 1,Assert dim_date exists
+if not spark.catalog.tableExists(f"{CATALOG}.{SHARED_CONFORMED_SCHEMA}.dim_date"):
     raise RuntimeError(
-        f"{CATALOG}.{SHARED_CONFORMED_SCHEMA} missing -- run "
+        f"{CATALOG}.{SHARED_CONFORMED_SCHEMA}.dim_date missing -- run "
         "databricks/setup/02_create_shared_conformed.py first"
     )
-print(f"OK  present: {CATALOG}.{SHARED_CONFORMED_SCHEMA}")
+print(f"OK  present: {CATALOG}.{SHARED_CONFORMED_SCHEMA}.dim_date")
 
 # COMMAND ----------
 
@@ -103,6 +103,5 @@ print("GOLD SETUP SUMMARY")
 print("=" * 70)
 for schema in GOLD_SCHEMAS:
     print(f"Schema           : {CATALOG}.{schema}")
-print(f"Shared conformed : {CATALOG}.{SHARED_CONFORMED_SCHEMA}")
 print("RESULT: PASS")
 print("=" * 70)

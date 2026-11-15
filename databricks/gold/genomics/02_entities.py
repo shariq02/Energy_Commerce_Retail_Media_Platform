@@ -1,0 +1,253 @@
+# Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
+# MAGIC %md
+# MAGIC # GOLD GENOMICS -- ENTITIES
+# MAGIC
+# MAGIC **ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform**
+# MAGIC
+# MAGIC **Author:** Sharique Mohammad
+# MAGIC
+# MAGIC **Date:** November 2026
+# MAGIC
+# MAGIC **Purpose:** 14 `genomics_gold` tables: ten entity profiles (the entity rows
+# MAGIC with every attribute of their type; somatic mutations are keyed by their Silver
+# MAGIC record id), the gene-disease relations, structural
+# MAGIC variants (variant rows and variant x gene rows), somatic sites and the ClinVar
+# MAGIC class changes in snapshot order.
+
+# COMMAND ----------
+
+# DBTITLE 1,Gold library
+# MAGIC %run ../_gold_common
+
+# COMMAND ----------
+
+# DBTITLE 1,Configuration
+SOURCE = "genomics"
+COMPONENT = "gold/genomics/02_entities"
+RID = gold_run_id()
+GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
+COMMON = {**GATE, "schema": GENOMICS_GOLD_SCHEMA}
+MASTER_TYPES = ("transcript", "protein", "disease", "drug")
+# profile table -> (entity type, key, Silver table or None for entity_master, grain)
+PROFILES = {
+    **{f"{t}_profile": (t, f"{t}_key", None, [f"{t}_key"]) for t in MASTER_TYPES},
+    "cell_line_profile": ("cell_line", "cell_line_key", "cell_line", ["cell_line_key"]),
+    "genetic_test_profile": (
+        "genetic_test",
+        "test_key",
+        "genetic_test",
+        ["test_key", "source_record_id"],
+    ),
+    "clinical_trial_profile": (
+        "clinical_trial",
+        "nct_id",
+        "clinical_trial",
+        ["nct_id"],
+    ),
+    "epitope_profile": ("epitope", "epitope_id", "epitope", ["epitope_id"]),
+    "tumor_sample_profile": (
+        "tumor_sample",
+        "sample_barcode",
+        "tumor_sample",
+        ["sample_barcode"],
+    ),
+    "somatic_mutation_profile": (
+        "somatic_mutation",
+        "source_record_id",
+        "somatic_mutation",
+        ["source_record_id"],
+    ),
+}
+SITE_PARTS = (
+    "assembly",
+    "contig",
+    "start_position",
+    "reference_allele",
+    "tumor_allele",
+)
+CHANGE_COLUMNS = [
+    "variant_key",
+    "classification_type",
+    "term",
+    "clinical_significance_simple",
+    "first_source_snapshot",
+    "last_source_snapshot",
+]
+SNAPSHOT_DATES = load_yaml("src/schemas/mappings/genomics_rules.yml")[
+    "clinvar_snapshot_dates"
+]
+TABLES = {}
+
+# COMMAND ----------
+
+# DBTITLE 1,Read Silver
+attributes = read_silver("entity_derived_attribute")
+master = read_silver("entity_master")
+relation = read_silver("entity_relation")
+classification = read_silver("variant_classification")
+variant_labels = read_silver("variant").select(
+    "variant_key", "assembly", "contig", "position", "end_position", "variant_type"
+)
+bases = {
+    table: (
+        master_rows(master, entity_type, key)
+        if silver is None
+        else from_silver(read_silver(silver))
+    )
+    for table, (entity_type, key, silver, _) in PROFILES.items()
+}
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- the ten entity profiles
+for table, (entity_type, key, _, grain) in PROFILES.items():
+    TABLES[table] = (
+        full_profile(bases[table], attributes, entity_type, key=key, **GATE),
+        grain,
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- gene_disease_profile (relation rows, gene symbol, disease name)
+has_gene = F.col("gene_key").isNotNull() | F.col("source_gene_id").isNotNull()
+has_disease = F.col("disease_key").isNotNull() | F.col("source_disease_id").isNotNull()
+names = {
+    entity_type: master.filter(F.col("entity_type") == entity_type).select(
+        F.col("entity_key").alias(f"{entity_type}_key"), F.col(column).alias(alias)
+    )
+    for entity_type, column, alias in (
+        ("gene", "symbol", "gene_symbol"),
+        ("disease", "name", "disease_name"),
+    )
+}
+TABLES["gene_disease_profile"] = (
+    add_provenance(
+        drop_empty_columns(from_silver(relation).filter(has_gene & has_disease))
+        .join(names["gene"], "gene_key", "left")
+        .join(names["disease"], "disease_key", "left"),
+        SOURCE,
+        RID,
+        ecosystem="genomics",
+    ),
+    ["source_record_id"],
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- structural_variant_profile (variant rows, variant x gene rows)
+variant_rows = split_profile(
+    attributes,
+    "variant",
+    variant_labels,
+    key="variant_key",
+    rules=VARIANT_PROFILE_RULES["structural_variant_profile"],
+    **GATE,
+).withColumn("record_kind", F.lit("variant"))
+pair_rows = pivot_attributes(
+    attributes,
+    "structural_variant_gene",
+    attribute_columns(attributes, "structural_variant_gene"),
+    key="pair_key",
+    **GATE,
+)
+pair_rows = add_provenance(
+    pair_rows.withColumn("variant_key", F.substring_index("pair_key", "|", 1))
+    .withColumn("overlapping_gene_key", F.substring_index("pair_key", "|", -1))
+    .drop("pair_key")
+    .join(variant_labels, "variant_key", "left")
+    .withColumn("record_kind", F.lit("variant_gene")),
+    SOURCE,
+    RID,
+    ecosystem="genomics",
+)
+TABLES["structural_variant_profile"] = (
+    variant_rows.withColumn(
+        "overlapping_gene_key", F.lit(None).cast("string")
+    ).unionByName(pair_rows, allowMissingColumns=True),
+    ["record_kind", "variant_key", "overlapping_gene_key"],
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- somatic_site_profile (site attributes, site key parts)
+site_parts = F.split("site_key", ":")
+sites = pivot_attributes(
+    attributes,
+    "somatic_site",
+    attribute_columns(attributes, "somatic_site"),
+    key="site_key",
+    **GATE,
+)
+TABLES["somatic_site_profile"] = (
+    add_provenance(
+        sites.select(
+            "site_key",
+            *[site_parts.getItem(i).alias(name) for i, name in enumerate(SITE_PARTS)],
+            *[c for c in sites.columns if c != "site_key"],
+        ).withColumn("start_position", F.col("start_position").cast("bigint")),
+        SOURCE,
+        RID,
+        ecosystem="genomics",
+    ),
+    ["site_key"],
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- clinvar_classification_change (term and the term before it)
+labels = {
+    r[0]
+    for r in classification.select("first_source_snapshot")
+    .union(classification.select("last_source_snapshot"))
+    .distinct()
+    .collect()
+    if r[0]
+}
+order = sorted(labels, key=lambda label: str(SNAPSHOT_DATES.get(label, label)))
+rank = F.create_map(*[F.lit(p) for i, label in enumerate(order) for p in (label, i)])
+runs = (
+    classification.select(*CHANGE_COLUMNS)
+    .distinct()
+    .withColumn("_rank", rank[F.col("first_source_snapshot")])
+)
+in_order = Window.partitionBy("variant_key", "classification_type").orderBy(
+    "_rank", "term"
+)
+for column in CHANGE_COLUMNS[2:]:
+    runs = runs.withColumn(f"previous_{column}", F.lag(column).over(in_order))
+TABLES["clinvar_classification_change"] = (
+    add_provenance(
+        runs.filter(
+            F.col("previous_term").isNotNull()
+            & (F.col("previous_term") != F.col("term"))
+        ).drop("_rank"),
+        "clinvar",
+        RID,
+        ecosystem="genomics",
+    ),
+    CHANGE_COLUMNS,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Grain gate -- every table
+gate_tables(TABLES, **GATE)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write -- every table
+write_tables(TABLES, **COMMON)
+
+# COMMAND ----------
+
+# DBTITLE 1,Inspect and export -- every table
+inspect_tables(TABLES, findings="genomics", **COMMON)
+
+# COMMAND ----------
+
+# DBTITLE 1,Validation -- every table exists and has rows
+validate_tables(TABLES, **COMMON)

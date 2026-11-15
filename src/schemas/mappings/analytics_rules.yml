@@ -1,0 +1,71 @@
+# Analytics rules: the values the analytics marts use.
+# ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
+# Author: Sharique Mohammad
+# Date: November 2026
+#
+# Purpose: every cutoff, list and window of the analytics notebooks
+# (databricks/analytics/). A mart reads these values; no value is written in code.
+
+version: 1
+
+# Market area of the German register data (MaStR capacity joins only this area).
+home_market_area: de_lu
+
+# Carrier keys counted as renewable generation (energy_carrier_key values after
+# the synonyms of energy_carrier_synonyms.yml).
+renewable_carriers:
+  - biomass
+  - hydropower
+  - wind_offshore
+  - wind_onshore
+  - solar_radiation
+  - other_renewable
+
+# Carrier keys of the weather-dependent generation columns of weather_energy_daily.
+weather_generation_carriers:
+  solar: [solar_radiation]
+  wind: [wind_onshore, wind_offshore]
+
+# Counterpart of the total over all borders (exchange rows of energy_component).
+all_neighbours: all_neighbours
+
+# A price below this value is a negative price (EUR/MWh).
+negative_price_below: 0.0
+
+# Daily price percentiles of price_regime_daily.
+price_percentiles: {low: 0.1, high: 0.9}
+
+# Weather rows of the station day values: source and window length (seconds).
+station_weather_source: dwd
+station_weather_interval_seconds: 3600
+# DWD radiation is a 10-minute product (true solar time).
+station_radiation_interval_seconds: 600
+
+# Stress days: a station day value beyond the percentile of the same station and
+# calendar month. `above` = the value is above the percentile, else below.
+stress_kinds:
+  heat: {value: max_air_temperature_degc, percentile: 0.95, above: true}
+  cold: {value: min_air_temperature_degc, percentile: 0.05, above: false}
+  wind_gust: {value: max_wind_gust_m_per_s, percentile: 0.95, above: true}
+  heavy_precipitation: {value: precipitation_mm, percentile: 0.95, above: true}
+
+# First year of the operator concentration series (the last year is the current one).
+operator_concentration_first_year: 2015
+
+# Funnel steps of customer_journey_daily: source -> step -> event names.
+funnel_steps:
+  rees46:
+    view: [view]
+    cart: [cart]
+    purchase: [purchase]
+  ga4:
+    view: [view_item]
+    cart: [add_to_cart]
+    checkout: [begin_checkout]
+    purchase: [purchase]
+
+# Clinical significance labels of the variant review queue.
+review_queue_labels: [VUS, Conflicting]
+
+# Clinical significance labels of the variants of population_risk.
+population_risk_labels: [Pathogenic, Likely Pathogenic]

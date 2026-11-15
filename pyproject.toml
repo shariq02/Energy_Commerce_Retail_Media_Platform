@@ -89,33 +89,29 @@ extend-ignore = ["E402", "BLE001"]
 # (Databricks runtime magic). The common files themselves are NOT exempted.
 "databricks/bronze/0[1-3]_*.py" = ["F821"]
 "databricks/setup/01_create_landing_volume.py" = ["F821"]
-# Gold notebooks pull `%run ../silver/_silver_common` then `%run ../../_gold_common`
-# (Databricks runtime magic). _gold_common.py itself is the second link in that
-# chain (like _silver_inspect.py) and legitimately depends on _silver_common's
-# names (CATALOG, ecosystem_for, sha_key, AUDIT_TABLE, WATERMARK_TABLE, now_utc).
+# Gold notebooks pull `%run ../_gold_common` (energy notebooks also
+# `%run ../../silver/_semantic_common`), Databricks runtime magic. _gold_common.py
+# runs `_silver_common` and depends on its names (CATALOG, ecosystem_for, sha_key,
+# AUDIT_TABLE, WATERMARK_TABLE, now_utc, inspect_table).
 "databricks/gold/_gold_common.py" = ["F821"]
-"databricks/gold/_gold_inspect.py" = ["F821"]
 "databricks/gold/[0-9]*_*.py" = ["F821"]
 "databricks/gold/shared/*.py" = ["F821"]
 "databricks/gold/energy/**/*.py" = ["F821"]
 "databricks/gold/commerce/**/*.py" = ["F821"]
+"databricks/gold/genomics/**/*.py" = ["F821"]
 "databricks/utility/01_retire_layer.py" = ["F821"]
 "databricks/utility/02_catalog_inventory.py" = ["F821"]
 "databricks/utility/03_update_model_card_paths.py" = ["F821"]
 "databricks/utility/04_frozen_dataset_retention.py" = ["F821"]
 "databricks/utility/05_cpu_speed_probe.py" = ["F821"]
-# Analytics notebooks pull `%run ../gold/_gold_common` then `%run ./_analytics_common`
-# (Databricks runtime magic), same chain shape as Gold's own. _analytics_common.py
-# and _analytics_inspect.py are the second/third links, depending on _gold_common's
-# and _silver_common's names the same way _gold_inspect.py depends on _gold_common's.
-"databricks/analytics/_analytics_common.py" = ["F821"]
-"databricks/analytics/_analytics_inspect.py" = ["F821"]
-"databricks/analytics/[0-9]*_*.py" = ["F821"]
+# Analytics notebooks pull `%run ../../gold/_gold_common` (Databricks runtime
+# magic), which loads `_silver_common`; they use the names of both libraries.
 "databricks/analytics/energy/**/*.py" = ["F821"]
 "databricks/analytics/commerce/**/*.py" = ["F821"]
-# ML notebooks pull `%run ../analytics/_analytics_common` (which loads the Gold and
-# Silver libraries) and their own `_ml_*` libraries, the same chain shape as
-# Analytics; every ML file legitimately uses names from that chain.
+"databricks/analytics/genomics/**/*.py" = ["F821"]
+# ML notebooks pull `%run ../gold/_gold_common` (which loads the Silver library)
+# and their own `_ml_*` libraries; every ML file legitimately uses names from that
+# chain.
 "databricks/ml/**/*.py" = ["F821"]
 "databricks/models/**/*.py" = ["F821"]
 

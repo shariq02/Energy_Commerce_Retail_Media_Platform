@@ -10,22 +10,18 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** September 2026
+# MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the reusable Gold-transform plumbing pulled into every Gold
-# MAGIC notebook with `%run ../../_gold_common` (after `%run ../../_silver_common`,
-# MAGIC which this file also loads for `read_silver` / `sha_key` / `ecosystem_for`).
-# MAGIC Definitions only -- no side effects at import; the caller owns `spark`.
-# MAGIC
-# MAGIC Gold = the governed domain model per ecosystem -- dimensions, facts,
-# MAGIC additive bridges, conformed integration via `shared_conformed`. Unlike
-# MAGIC Silver's non-blocking field-class registry, the Silver-to-Gold gate is
-# MAGIC hard-fail: `check()` raises on a failed condition. No `*_ml_features`
-# MAGIC tables, no target columns, no model outputs written back to Gold.
+# MAGIC **Purpose:** the plumbing of the Gold, analytics and ML notebooks, loaded with
+# MAGIC `%run` (it loads `_silver_common`, whose audit, watermark and inspection code
+# MAGIC it reuses). A notebook puts its tables in one dict, table -> (frame, grain);
+# MAGIC one cell each gates, writes, inspects and validates every table. Gold joins
+# MAGIC parent attributes, unions, pivots Silver attributes, splits tables and adds
+# MAGIC keys; scores, classes, counts and flags come from Silver. Definitions only.
 
 # COMMAND ----------
 
-# DBTITLE 1,Shared Silver library (read_silver, sha_key, ecosystem_for, ...)
+# DBTITLE 1,Shared Silver library (audit, watermark, inspect_table, sha_key, ...)
 # MAGIC %run ../silver/_silver_common
 
 # COMMAND ----------
@@ -40,65 +36,78 @@ from pyspark.sql import functions as F
 
 # DBTITLE 1,Configuration constants
 GOLD_STAGE = "gold"
-
-# The two Gold schema families: one per ecosystem, plus the cross-ecosystem
-# conformed schema created separately by
-# databricks/setup/02_create_shared_conformed.py.
+ANALYTICS_STAGE = "analytics"
 SHARED_CONFORMED_SCHEMA = "shared_conformed"
+GENOMICS_GOLD_SCHEMA = "genomics_gold"
+ANALYTICS_SCHEMAS = {
+    "energy": "energy_analytics",
+    "commerce": "commerce_analytics",
+    "genomics": "genomics_analytics",
+}
+SILVER_TECHNICAL = ("_silver_loaded_at", "_silver_run_id")
+# Columns a parent join does not copy: the child keeps its own provenance.
+PARENT_SKIP = (
+    *SILVER_TECHNICAL,
+    "source_system",
+    "source_dataset",
+    "source_record_id",
+    "ecosystem",
+)
 
 
 def gold_schema_for(source: str) -> str:
-    """source_system -> its `{ecosystem}_gold` schema. Gold has no per-table
-    registry like Silver's field_class_registry -- one schema per ecosystem is
-    the whole rule."""
+    """source_system -> its `{ecosystem}_gold` schema."""
     return f"{ecosystem_for(source)}_gold"
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Run identity
+# DBTITLE 1,Run identity and provenance
+
+
+def stage_of(rid: str) -> str:
+    """`analytics` for an analytics run id, else `gold`."""
+    return ANALYTICS_STAGE if rid.startswith(f"{ANALYTICS_STAGE}-") else GOLD_STAGE
 
 
 def gold_run_id() -> str:
-    """A single deterministic-per-execution run id, timestamp-based. Distinct
-    from Silver's run_id() (different prefix) so a run_id alone tells you
-    which stage produced it."""
     return _dt.datetime.now(_dt.UTC).strftime("gold-%Y%m%dT%H%M%SZ")
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Deterministic surrogate keys
-
-
-def surrogate_key(*cols):
-    """Column expr: a deterministic Gold surrogate key -- the same mechanism as
-    Silver's sha_key, reused rather than reinvented so a key built from the same
-    inputs at either layer is identical."""
-    return sha_key(*cols)
+def analytics_run_id() -> str:
+    return _dt.datetime.now(_dt.UTC).strftime("analytics-%Y%m%dT%H%M%SZ")
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Gold provenance
-
-
-def add_gold_provenance(df: DataFrame, source_system: str, rid: str) -> DataFrame:
-    """Attach the fixed Gold identity/provenance columns. Unlike Silver's
-    add_provenance, this never renames a column to source_record_id -- a Gold
-    table's own surrogate key column is named by the caller (e.g.
-    `generation_unit_key`), not forced to one fixed name."""
-    return (
-        df.withColumn("source_system", F.lit(source_system))
-        .withColumn("ecosystem", F.lit(ecosystem_for(source_system)))
-        .withColumn("_gold_loaded_at", F.current_timestamp())
-        .withColumn("_gold_run_id", F.lit(rid))
+def add_provenance(
+    df: DataFrame, source_system: str, rid: str, ecosystem: str | None = None
+) -> DataFrame:
+    """The load columns of the stage (`_gold_*` or `_analytics_*`). A row keeps
+    its own `source_system` and `ecosystem`; the arguments fill missing ones."""
+    if "source_system" not in df.columns:
+        df = df.withColumn("source_system", F.lit(source_system))
+    if "ecosystem" not in df.columns:
+        df = df.withColumn(
+            "ecosystem", F.lit(ecosystem or ecosystem_for(source_system))
+        )
+    stage = stage_of(rid)
+    return df.withColumn(f"_{stage}_loaded_at", F.current_timestamp()).withColumn(
+        f"_{stage}_run_id", F.lit(rid)
     )
 
 
+def from_silver(df: DataFrame) -> DataFrame:
+    """A Silver frame without its Silver load columns."""
+    return df.drop(*[c for c in SILVER_TECHNICAL if c in df.columns])
+
+
+def from_gold(df: DataFrame) -> DataFrame:
+    """A Gold frame without its Gold load columns."""
+    return df.drop(*[c for c in ("_gold_loaded_at", "_gold_run_id") if c in df.columns])
+
+
 # COMMAND ----------
 
-# DBTITLE 1,Hard-fail Silver-to-Gold gate
+# DBTITLE 1,Hard-fail gate
 
 
 def check(
@@ -111,43 +120,29 @@ def check(
     metric_value: float | None = None,
     rid: str,
 ) -> None:
-    """The embedded Silver->Gold check(hard_fail) gate. Always logs to
-    quality_audit_log (stage='gold'); RAISES when `condition` is False -- unlike
-    Silver's audit(), a failed Gold check stops the notebook. Use for grain
-    assertions, referential-integrity thresholds, and any other Gold-specific
-    invariant the design calls for."""
-    status = "PASS" if condition else "FAIL"
-    row = spark.createDataFrame(
-        [
-            (
-                rid,
-                _dt.datetime.now(_dt.UTC).date(),
-                source,
-                GOLD_STAGE,
-                component,
-                metric_name,
-                metric_value,
-                status,
-                detail or None,
-                _dt.datetime.now(_dt.UTC),
-            )
-        ],
-        "run_id string, run_date date, source string, stage string, component string, "
-        "metric_name string, metric_value double, status string, error_detail string, "
-        "recorded_at timestamp",
+    """Logs the result (Silver `audit`, stage from the run id) and RAISES when
+    `condition` is False: a failed check stops the notebook."""
+    audit(
+        component,
+        source,
+        metric_name,
+        metric_value,
+        status="PASS" if condition else "FAIL",
+        error=detail or None,
+        rid=rid,
+        stage=stage_of(rid),
     )
-    row.write.format("delta").mode("append").saveAsTable(AUDIT_TABLE)
     if not condition:
         raise RuntimeError(
-            f"GOLD GATE FAILED: {component}.{metric_name} -- {detail or 'no detail given'}"
+            f"{stage_of(rid).upper()} GATE FAILED: {component}.{metric_name} -- "
+            f"{detail or 'no detail given'}"
         )
 
 
 def assert_unique_grain(
     df: DataFrame, key_cols: list[str], *, component: str, source: str, rid: str
 ) -> None:
-    """Hard-fail grain assertion -- the grain a Gold table's own header states
-    must actually hold. Raises via check() if any key_cols group has >1 row."""
+    """Raises via check() when a key_cols group has more than one row."""
     dup_n = df.groupBy(*key_cols).count().filter(F.col("count") > 1).count()
     check(
         component,
@@ -162,280 +157,386 @@ def assert_unique_grain(
 
 # COMMAND ----------
 
-# DBTITLE 1,SCD window repair + overlap guard (for a pit_join() dimension)
 
-
-def close_scd_gaps(
-    df: DataFrame,
-    key_col: str,
-    *,
-    valid_from_col: str = "valid_from",
-    valid_to_col: str = "valid_to",
-) -> DataFrame:
-    """Coalesce a NULL/open valid_to with the same key's next valid_from --
-    a source that leaves more than one row "still open" (blank end-date) per
-    key otherwise leaves every one of those rows open at once, so pit_join()
-    matches all of them for any fact timestamp from that point on. Only fills
-    a missing valid_to; an explicit one from the source is left as-is (a bad
-    explicit value is caught by assert_no_overlapping_windows, not silently
-    overwritten here)."""
-    w = Window.partitionBy(key_col).orderBy(valid_from_col)
-    return df.withColumn(
-        valid_to_col,
-        F.coalesce(F.col(valid_to_col), F.lead(valid_from_col).over(w)),
-    )
-
-
-def cap_scd_overlaps(
-    df: DataFrame,
-    key_col: str,
-    *,
-    valid_from_col: str = "valid_from",
-    valid_to_col: str = "valid_to",
-    capped_flag_col: str = "_scd_overlap_capped",
-) -> DataFrame:
-    """Cap each row's valid_to at the next row's valid_from, for the same
-    key, whenever a stale explicit valid_to runs past it -- close_scd_gaps()
-    only fills a NULL valid_to, not this case. One-sided: a valid_to that
-    already ends at or before the next valid_from (a genuine gap) is left
-    untouched. Adds `capped_flag_col` for reporting; run before
-    assert_no_overlapping_windows(), after close_scd_gaps()."""
-    w = Window.partitionBy(key_col).orderBy(valid_from_col)
-    next_start = F.lead(valid_from_col).over(w)
-    needs_cap = (
-        next_start.isNotNull()
-        & F.col(valid_to_col).isNotNull()
-        & (F.col(valid_to_col) > next_start)
-    )
-    return df.withColumn(capped_flag_col, needs_cap).withColumn(
-        valid_to_col, F.when(needs_cap, next_start).otherwise(F.col(valid_to_col))
-    )
-
-
-def assert_no_overlapping_windows(
-    df: DataFrame,
-    key_col: str,
-    *,
-    valid_from_col: str = "valid_from",
-    valid_to_col: str = "valid_to",
-    component: str,
-    source: str,
-    rid: str,
-) -> None:
-    """Hard-fail if any key has two windows covering the same instant -- the
-    invariant pit_join() needs to ever resolve to at most one dim row per
-    fact. Run this after close_scd_gaps(), not instead of it."""
-    w = Window.partitionBy(key_col).orderBy(valid_from_col)
-    chk = df.withColumn("_next_valid_from", F.lead(valid_from_col).over(w))
-    overlap_n = chk.filter(
-        F.col("_next_valid_from").isNotNull()
-        & F.col(valid_to_col).isNotNull()
-        & (F.col(valid_to_col) > F.col("_next_valid_from"))
-    ).count()
-    check(
-        component,
-        source,
-        "overlapping_scd_windows",
-        overlap_n == 0,
-        detail=f"key_col={key_col} overlapping_window_count={overlap_n}",
-        metric_value=float(overlap_n),
-        rid=rid,
-    )
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Point-in-time-correct dimension join
-
-
-def pit_join(
-    fact_df: DataFrame,
-    dim_df: DataFrame,
-    *,
-    fact_key_col: str,
-    fact_ts_col: str,
-    dim_key_col: str,
-    dim_valid_from_col: str = "valid_from",
-    dim_valid_to_col: str = "valid_to",
-    dim_select: list[str] | None = None,
-) -> DataFrame:
-    """Join `dim_df` (a time-varying/SCD dimension) onto `fact_df` on the
-    dimension row whose validity window covers the fact's own timestamp --
-    never a plain equi-join on the natural key alone, which silently resolves
-    to whichever row the join happens to pick. `dim_valid_to_col` NULL means
-    "still current"."""
-    d = dim_df if dim_select is None else dim_df.select(*dim_select)
-    d = d.withColumnRenamed(dim_key_col, "_pit_dim_key")
-    cond = (
-        (fact_df[fact_key_col] == d["_pit_dim_key"])
-        & (
-            F.col(dim_valid_from_col).isNull()
-            | (F.col(dim_valid_from_col) <= fact_df[fact_ts_col])
-        )
-        & (
-            F.col(dim_valid_to_col).isNull()
-            | (F.col(dim_valid_to_col) > fact_df[fact_ts_col])
-        )
-    )
-    return fact_df.join(d, cond, "left").drop("_pit_dim_key")
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Generic FK resolution
-
-
-def resolve_fk(
-    fact_df: DataFrame,
-    dim_df: DataFrame,
-    *,
-    fact_key_cols: list[str],
-    dim_key_cols: list[str],
-    dim_surrogate_col: str,
-    output_col: str,
-) -> DataFrame:
-    """Left-join `dim_df`'s surrogate key onto `fact_df` on a natural key
-    (single- or multi-column) and add it as `output_col` -- the
-    join+alias+drop-temp-columns pattern repeated across most Gold fact/
-    bridge notebooks (dim_power_plant's MaStR reconciliation,
-    fact_redispatch_measure, the location/actor/generation-unit bridges,
-    fact_ecommerce_item's parent-event link, ...). `fact_key_cols` and `dim_key_cols` must be the
-    same length and in matching order; an unmatched fact row gets NULL in
-    `output_col`, never a fabricated identity."""
-    tmp_names = [f"_rfk_{i}" for i in range(len(dim_key_cols))]
-    dim_slim = dim_df.select(
-        *[F.col(dc).alias(tn) for dc, tn in zip(dim_key_cols, tmp_names)],
-        F.col(dim_surrogate_col).alias("_rfk_key"),
-    )
-    cond = None
-    for fc, tn in zip(fact_key_cols, tmp_names):
-        c = fact_df[fc] == dim_slim[tn]
-        cond = c if cond is None else (cond & c)
-    out = fact_df.join(dim_slim, cond, "left").withColumn(output_col, F.col("_rfk_key"))
-    return out.drop(*tmp_names, "_rfk_key")
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Aggregate-before-join helper for M:N bridges
-
-
-def aggregate_bridge(
-    bridge_df: DataFrame,
-    group_col: str,
-    *,
-    count_alias: str = "linked_count",
-) -> DataFrame:
-    """Pre-aggregate an additive M:N bridge to one row per `group_col` before
-    it is joined onto a fact/dimension -- the mechanism that keeps every Gold
-    join from fanning a fact out across a bridge's linked rows. Callers needing
-    more than a count build their own `.groupBy(group_col).agg(...)`; this
-    covers the common case."""
-    return bridge_df.groupBy(group_col).agg(
-        F.count(F.lit(1)).alias(count_alias),
-    )
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Gold write
-
-
-def _delta_rows_written(table: str) -> int | None:
-    try:
-        m = (
-            spark.sql(f"DESCRIBE HISTORY {table} LIMIT 1")
-            .select("operationMetrics")
-            .first()[0]
-        )
-        return int(m.get("numOutputRows")) if m and "numOutputRows" in m else None
-    except Exception:
-        return None
-
-
-def write_gold(
-    df: DataFrame,
-    gold_table: str,
-    *,
-    schema: str | None = None,
-    source: str,
-    component: str,
-    rid: str,
-) -> int | None:
-    """Deterministic full overwrite into `{schema or gold_schema_for(source)}.
-    {gold_table}`. Prints the Delta rollback line, records rows_written from
-    Delta metrics (no pre-write count), writes a watermark row (stage='gold')."""
-    started = now_utc()
-    full = f"{CATALOG}.{schema or gold_schema_for(source)}.{gold_table}"
-    if spark.catalog.tableExists(full):
-        v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
-        print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
-    (
-        df.write.format("delta")
-        .mode("overwrite")
-        .option("overwriteSchema", "true")
-        .saveAsTable(full)
-    )
-    n = _delta_rows_written(full)
-    row = spark.createDataFrame(
-        [
-            (
-                rid,
-                source,
-                GOLD_STAGE,
-                component,
-                None,
-                None,
-                None if n is None else int(n),
-                "COMPLETE",
-                started,
-                _dt.datetime.now(_dt.UTC),
-            )
-        ],
-        "run_id string, source string, stage string, component string, "
-        "last_processed_ts timestamp, last_processed_row bigint, rows_written bigint, "
-        "status string, started_at timestamp, completed_at timestamp",
-    )
-    row.write.format("delta").mode("append").saveAsTable(WATERMARK_TABLE)
-    print(f"OK  {full}: {n if n is not None else '?'} rows")
-    return n
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Gold view -- the home for a structure Silver already has in the right shape
-
-
-def write_gold_view(
-    select_sql: str,
-    gold_table: str,
-    *,
-    schema: str | None = None,
-    source: str | None = None,
-) -> None:
-    """CREATE OR REPLACE VIEW -- no physical copy, used where Silver (or another
-    Gold table) is already the right shape. select_sql must reference catalog
-    tables by their fully-qualified name (silver_fqn()), never a session temp
-    view -- a persistent view cannot resolve a temp-view reference."""
-    full = f"{CATALOG}.{schema or gold_schema_for(source)}.{gold_table}"
-    spark.sql(f"CREATE OR REPLACE VIEW {full} AS\n{select_sql}")
-    print(f"OK  {full}: view created")
-
-
-def silver_fqn(table: str) -> str:
-    """Fully-qualified Silver table name, for building write_gold_view() SQL
-    directly against the catalog table."""
-    return f"{CATALOG}.{target_schema_for(table)}.{table}"
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Read a Gold table (for cross-notebook / cross-domain reads)
-
-
+# DBTITLE 1,Read
 def read_gold(table: str, *, source: str, schema: str | None = None) -> DataFrame:
     return spark.table(f"{CATALOG}.{schema or gold_schema_for(source)}.{table}")
 
 
 def read_shared_conformed(table: str) -> DataFrame:
     return spark.table(f"{CATALOG}.{SHARED_CONFORMED_SCHEMA}.{table}")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Gate, write, inspect and validate every table of a notebook
+# `tables` maps a table name to (frame, grain columns); `schema` is the target.
+
+
+def gate_tables(tables: dict, *, source: str, component: str, rid: str) -> None:
+    for frame, grain in tables.values():
+        assert_unique_grain(frame, grain, component=component, source=source, rid=rid)
+
+
+def write_tables(
+    tables: dict, *, schema: str, source: str, component: str, rid: str
+) -> None:
+    """Full overwrite of each table; prints the rollback line, writes a
+    watermark row (Silver `watermark`, stage from the run id)."""
+    for table, (frame, _) in tables.items():
+        started = now_utc()
+        full = f"{CATALOG}.{schema}.{table}"
+        if spark.catalog.tableExists(full):
+            v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
+            print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
+        frame.write.format("delta").mode("overwrite").option(
+            "overwriteSchema", "true"
+        ).saveAsTable(full)
+        n = _delta_rows_written(full)
+        watermark(component, source, n, "COMPLETE", rid, started, stage=stage_of(rid))
+        print(f"OK  {full}: {n if n is not None else '?'} rows")
+
+
+def inspect_tables(
+    tables: dict, *, schema: str, findings: str, source: str, component: str, rid: str
+) -> None:
+    """Silver `inspect_table` on each written table; the section goes to
+    `src/findings/<stage>_findings/<findings>.md`."""
+    for table, (_, grain) in tables.items():
+        full = f"{CATALOG}.{schema}.{table}"
+        blocks = inspect_table(
+            spark.table(full),
+            table,
+            source=findings,
+            component=component,
+            rid=rid,
+            key_cols=grain,
+            full_name=full,
+        )
+        write_silver_findings(
+            findings,
+            f"{component.split('/')[-1]}__{table}",
+            table,
+            blocks,
+            stage=stage_of(rid),
+        )
+
+
+def validate_tables(
+    tables, *, schema: str, source: str, component: str, rid: str
+) -> None:
+    """The last cell of a notebook: every table exists and has rows."""
+    for table in tables:
+        full = f"{CATALOG}.{schema}.{table}"
+        rows = spark.table(full).count() if spark.catalog.tableExists(full) else 0
+        check(
+            component,
+            source,
+            f"{table}_has_rows",
+            rows > 0,
+            detail=full,
+            metric_value=float(rows),
+            rid=rid,
+        )
+        print(f"OK  {full}: {rows} rows")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Column helpers
+
+
+def ratio(numerator, denominator):
+    """numerator / denominator; null when the denominator is 0."""
+    num = F.col(numerator) if isinstance(numerator, str) else numerator
+    den = F.col(denominator) if isinstance(denominator, str) else denominator
+    return num / F.nullif(den, F.lit(0))
+
+
+def sorted_values(column: str):
+    """The distinct values of a group as one `|`-separated sorted text."""
+    return F.concat_ws("|", F.array_sort(F.collect_set(column)))
+
+
+def one_resolution(df: DataFrame, keys: list[str], column: str, *, largest: bool):
+    """The rows whose `column` is the largest (or smallest) of their `keys`."""
+    window = Window.partitionBy(*keys)
+    pick = F.max(column) if largest else F.min(column)
+    return (
+        df.withColumn("_pick", pick.over(window))
+        .filter(F.col(column) == F.col("_pick"))
+        .drop("_pick")
+    )
+
+
+def columns_to_rows(df: DataFrame, keep: list[str], rows: list) -> DataFrame:
+    """One output row per struct of `rows` (same fields), with the `keep` columns."""
+    return df.select(*keep, F.explode(F.array(*rows)).alias("_row")).select(
+        *keep, "_row.*"
+    )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Joins of parent attributes
+
+
+def with_parent(
+    df: DataFrame,
+    parent: DataFrame,
+    *,
+    on: str,
+    prefix: str,
+    parent_key: str | None = None,
+) -> DataFrame:
+    """Left join of every parent column (provenance excluded), renamed
+    `<prefix><column>`; `parent_key` defaults to `on`."""
+    key = parent_key or on
+    columns = [c for c in parent.columns if c != key and c not in PARENT_SKIP]
+    slim = parent.select(
+        F.col(key).alias("_parent_key"), *[F.col(c).alias(prefix + c) for c in columns]
+    )
+    return df.join(slim, F.col(on) == F.col("_parent_key"), "left").drop("_parent_key")
+
+
+def drop_empty_columns(df: DataFrame) -> DataFrame:
+    """`df` without the columns that are null in every row (one aggregation)."""
+    counts = df.agg(*[F.count(F.col(c)).alias(c) for c in df.columns]).first()
+    return df.select(*[c for c in df.columns if counts[c]])
+
+
+def master_rows(master: DataFrame, entity_type: str, key: str) -> DataFrame:
+    """The `entity_master` rows of one entity type, keyed by `key`, without the
+    columns that no entity of the type fills."""
+    rows = from_silver(master).filter(F.col("entity_type") == entity_type)
+    return drop_empty_columns(rows.drop(key).withColumnRenamed("entity_key", key))
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Genomics profile split (rule name -> Gold table)
+# Gene and variant attributes of these rules go to the named table; the other
+# rules of the entity type go to `gene_profile` or `variant_profile`.
+GENE_PROFILE_RULES = {
+    "gene_clinical_profile": (
+        "clinical_features",
+        "disease_features",
+        "variant_impact_features",
+        "gene_disease_category",
+    ),
+    "gene_expression_profile": ("expression_features", "tissue_specificity"),
+    "gene_drug_profile": (
+        "pharmacogene",
+        "pharmacogene_features",
+        "pharmacogene_gene_features",
+        "druggability",
+        "genetic_test_features",
+    ),
+    "gene_cancer_profile": ("cancer_features",),
+}
+VARIANT_PROFILE_RULES = {
+    "variant_frequency_profile": ("frequency_bands", "frequency_flags"),
+    "variant_clinical_profile": (
+        "clinical_features",
+        "disease_features",
+        "clinical_significance_label",
+        "review_quality",
+        "clinvar_snapshot_history",
+        "pharmacogene_features",
+        "drug_response_features",
+        "population_features",
+    ),
+    "variant_impact_profile": (
+        "variant_impact_features",
+        "conservation",
+        "protein_impact",
+    ),
+    "structural_variant_profile": ("structural_variant_features",),
+}
+
+
+def mapped_rules(split: dict) -> tuple:
+    """Every rule that a split sends to a named table."""
+    return tuple(rule for rules in split.values() for rule in rules)
+
+
+def pick_column(df: DataFrame, attribute: str, rule: str | None = None) -> str:
+    """The column of a profile table that holds a pivoted Silver attribute: the
+    attribute name, else `<rule>__<attribute>` (the pivot name when two rules
+    share the attribute), else its one `<any rule>__<attribute>` name. Raises
+    when no column or more than one column matches."""
+    if attribute in df.columns:
+        return attribute
+    if rule and f"{rule}__{attribute}" in df.columns:
+        return f"{rule}__{attribute}"
+    found = [c for c in df.columns if c.endswith(f"__{attribute}")]
+    if len(found) != 1:
+        raise RuntimeError(f"attribute {attribute!r}: matching columns {found}")
+    return found[0]
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Pivot of Silver attributes (entity_derived_attribute)
+VALUE_COLUMNS = {
+    "text": "value_text",
+    "number": "value_number",
+    "boolean": "value_boolean",
+}
+
+
+def attribute_columns(attributes: DataFrame, entity_type: str) -> dict:
+    """(rule, attribute, value type) -> Gold column name for one entity type.
+    A name used by two rules becomes `<rule>__<attribute>`; a name with two
+    value types gets `__<type>`."""
+    names = (
+        attributes.filter(F.col("entity_type") == entity_type)
+        .select("rule_name", "attribute", "value_type")
+        .distinct()
+        .collect()
+    )
+    rules_of: dict[str, set] = {}
+    types_of: dict[tuple, set] = {}
+    for r in names:
+        rules_of.setdefault(r["attribute"], set()).add(r["rule_name"])
+        types_of.setdefault((r["rule_name"], r["attribute"]), set()).add(
+            r["value_type"]
+        )
+    columns = {}
+    for r in names:
+        rule, attribute, kind = r["rule_name"], r["attribute"], r["value_type"]
+        name = attribute if len(rules_of[attribute]) == 1 else f"{rule}__{attribute}"
+        if len(types_of[(rule, attribute)]) > 1:
+            name = f"{name}__{kind}"
+        columns[(rule, attribute, kind)] = name
+    return columns
+
+
+def pivot_attributes(
+    attributes: DataFrame,
+    entity_type: str,
+    columns: dict,
+    *,
+    key: str,
+    component: str,
+    source: str,
+    rid: str,
+    rules=None,
+    exclude=(),
+) -> DataFrame:
+    """One row per entity, one column per attribute of the chosen rules (all
+    rules but `exclude` when `rules` is None); a keyword match adds
+    `<column>__matched_text`. Raises when an entity has two values for one
+    column, so no value is dropped."""
+    chosen = {
+        k: name
+        for k, name in columns.items()
+        if (k[0] in rules if rules is not None else k[0] not in exclude)
+    }
+    names = spark.createDataFrame(
+        [(*k, name) for k, name in chosen.items()],
+        "rule_name string, attribute string, value_type string, _column string",
+    )
+    rows = attributes.filter(F.col("entity_type") == entity_type).join(
+        F.broadcast(names), ["rule_name", "attribute", "value_type"]
+    )
+    assert_unique_grain(
+        rows, ["entity_key", "_column"], component=component, source=source, rid=rid
+    )
+    parts = []
+    for kind, value in VALUE_COLUMNS.items():
+        values = sorted({n for k, n in chosen.items() if k[2] == kind})
+        if values:
+            parts.append(
+                rows.filter(F.col("value_type") == kind)
+                .groupBy("entity_key")
+                .pivot("_column", values)
+                .agg(F.first(value))
+            )
+    matched = rows.filter(F.col("matched_text").isNotNull())
+    matched_names = [
+        r["_column"] for r in matched.select("_column").distinct().collect()
+    ]
+    if matched_names:
+        parts.append(
+            matched.withColumn("_column", F.concat("_column", F.lit("__matched_text")))
+            .groupBy("entity_key")
+            .pivot("_column", sorted(f"{n}__matched_text" for n in matched_names))
+            .agg(F.first("matched_text"))
+        )
+    if not parts:
+        return rows.select(F.col("entity_key").alias(key)).limit(0)
+    out = parts[0]
+    for part in parts[1:]:
+        out = out.join(part, "entity_key", "full")
+    return out.withColumnRenamed("entity_key", key)
+
+
+def join_profile(
+    base: DataFrame, pivot: DataFrame, key: str, how: str = "full"
+) -> DataFrame:
+    """`base` joined with pivoted attributes; an attribute named like a base
+    column gets the suffix `__attribute`, so no column name repeats."""
+    for column in pivot.columns:
+        if column != key and column in base.columns:
+            pivot = pivot.withColumnRenamed(column, f"{column}__attribute")
+    return base.join(pivot, key, how)
+
+
+def full_profile(
+    base: DataFrame,
+    attributes: DataFrame,
+    entity_type: str,
+    *,
+    key: str,
+    component: str,
+    source: str,
+    rid: str,
+    exclude=(),
+    columns: dict | None = None,
+) -> DataFrame:
+    """`base` (one row per entity) and every attribute of the entity type but the
+    `exclude` rules; an entity in only one of the two keeps its row. `columns`
+    (from `attribute_columns`) is read once per entity type when not given."""
+    pivot = pivot_attributes(
+        attributes,
+        entity_type,
+        columns or attribute_columns(attributes, entity_type),
+        key=key,
+        exclude=exclude,
+        component=component,
+        source=source,
+        rid=rid,
+    )
+    return add_provenance(
+        join_profile(base, pivot, key), source, rid, ecosystem="genomics"
+    )
+
+
+def split_profile(
+    attributes: DataFrame,
+    entity_type: str,
+    labels: DataFrame,
+    *,
+    key: str,
+    rules,
+    component: str,
+    source: str,
+    rid: str,
+    columns: dict | None = None,
+) -> DataFrame:
+    """The attributes of `rules` of one entity type, one row per entity that
+    has one, with the `labels` columns of the entity (joined on `key`)."""
+    pivot = pivot_attributes(
+        attributes,
+        entity_type,
+        columns or attribute_columns(attributes, entity_type),
+        key=key,
+        rules=rules,
+        component=component,
+        source=source,
+        rid=rid,
+    )
+    return add_provenance(
+        join_profile(labels, pivot, key, "right"), source, rid, ecosystem="genomics"
+    )

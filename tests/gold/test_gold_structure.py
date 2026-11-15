@@ -26,16 +26,24 @@ from src.schemas._silver_notebook_scan import all_read_silver_tables
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
 _ROOT = Path(__file__).resolve().parents[2]
-_GOLD = _ROOT / "databricks" / "gold"
+_DATABRICKS = _ROOT / "databricks"
+_GOLD = _DATABRICKS / "gold"
+# The analytics notebooks write with the same library and the same gate.
+_ANALYTICS = _DATABRICKS / "analytics"
 
 _NOTEBOOKS = sorted(
     p
-    for p in _GOLD.rglob("*.py")
-    if p.name != "_gold_common.py" and not p.name.startswith("_")
+    for root in (_GOLD, _ANALYTICS)
+    for p in root.rglob("*.py")
+    if not p.name.startswith("_")
 )
 
-_GATE_CALLS = {"check", "assert_unique_grain"}
-_WRITE_CALL = "write_gold"
+_GATE_CALLS = {"check", "assert_unique_grain", "gate_tables"}
+_WRITE_CALL = "write_tables"
+
+
+def _name(path: Path) -> str:
+    return str(path.relative_to(_DATABRICKS))
 
 
 def _call_names(tree: ast.AST) -> set[str]:
@@ -46,12 +54,12 @@ def _call_names(tree: ast.AST) -> set[str]:
     return names
 
 
-@pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: str(p.relative_to(_GOLD)))
+@pytest.mark.parametrize("path", _NOTEBOOKS, ids=_name)
 def test_notebook_parses(path):
     ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
-@pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: str(p.relative_to(_GOLD)))
+@pytest.mark.parametrize("path", _NOTEBOOKS, ids=_name)
 def test_notebook_has_the_standard_databricks_header(path):
     first_line = path.read_text(encoding="utf-8").splitlines()[0]
     assert first_line == "# Databricks notebook source"
@@ -64,14 +72,25 @@ _WRITERS = [
 ]
 
 
-@pytest.mark.parametrize("path", _WRITERS, ids=lambda p: str(p.relative_to(_GOLD)))
+@pytest.mark.parametrize("path", _WRITERS, ids=_name)
 def test_every_notebook_that_writes_gold_also_calls_the_hard_fail_gate(path):
     calls = _call_names(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
     assert calls & _GATE_CALLS, (
-        f"{path.name} calls {_WRITE_CALL} without calling check() or "
-        "assert_unique_grain() -- a Gold table would be written with no "
+        f"{path.name} calls {_WRITE_CALL} without calling check(), "
+        "assert_unique_grain() or gate_tables() -- a table would be written with no "
         "Silver->Gold hard-fail gate exercised at all"
     )
+
+
+def test_no_gold_notebook_creates_a_view() -> None:
+    """Every Gold object is a table."""
+    creators = [
+        p.name
+        for p in _NOTEBOOKS
+        if "write_gold_view" in _call_names(ast.parse(p.read_text(encoding="utf-8")))
+        or "CREATE OR REPLACE VIEW" in p.read_text(encoding="utf-8").upper()
+    ]
+    assert not creators, f"Gold notebooks that create a view: {creators}"
 
 
 def test_every_gold_read_silver_target_is_registered() -> None:
