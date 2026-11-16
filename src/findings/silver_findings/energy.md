@@ -1917,7 +1917,7 @@ _Generated: 2026-11-15T14:10Z_
 <!-- BEGIN energy:04_mastr_registers__balancing_area -->
 ## balancing_area
 
-_Generated: 2026-11-16T14:53Z_
+_Generated: 2026-11-16T17:39Z_
 
 ### cardinality
 
@@ -1991,7 +1991,7 @@ _Generated: 2026-11-16T14:53Z_
 <!-- BEGIN energy:04_mastr_registers__generation_unit -->
 ## generation_unit
 
-_Generated: 2026-11-16T14:50Z_
+_Generated: 2026-11-16T17:36Z_
 
 ### cardinality
 
@@ -2126,7 +2126,7 @@ _Generated: 2026-11-16T14:50Z_
 | distinct:authorisation_count | approx_distinct | 2.0 |  | INFO | INFO |  |
 | distinct:repowering_count | approx_distinct | 7.0 |  | INFO | INFO |  |
 | distinct:support_registration_count | approx_distinct | 3.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 49.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 10.0 |  | INFO | INFO |  |
 | distinct:lifecycle_state | approx_distinct | 4.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -2366,7 +2366,7 @@ _Generated: 2026-11-16T14:50Z_
 <!-- BEGIN energy:04_mastr_registers__grid_connection_point -->
 ## grid_connection_point
 
-_Generated: 2026-11-16T14:53Z_
+_Generated: 2026-11-16T17:39Z_
 
 ### cardinality
 
@@ -2471,7 +2471,7 @@ _Generated: 2026-11-16T14:53Z_
 <!-- BEGIN energy:04_mastr_registers__grid_location -->
 ## grid_location
 
-_Generated: 2026-11-16T14:53Z_
+_Generated: 2026-11-16T17:39Z_
 
 ### cardinality
 
@@ -2561,7 +2561,7 @@ _Generated: 2026-11-16T14:53Z_
 <!-- BEGIN energy:04_mastr_registers__grid_network -->
 ## grid_network
 
-_Generated: 2026-11-16T14:53Z_
+_Generated: 2026-11-16T17:39Z_
 
 ### cardinality
 
@@ -2654,7 +2654,7 @@ _Generated: 2026-11-16T14:53Z_
 <!-- BEGIN energy:04_mastr_registers__market_actor -->
 ## market_actor
 
-_Generated: 2026-11-16T14:52Z_
+_Generated: 2026-11-16T17:38Z_
 
 ### cardinality
 
@@ -2851,7 +2851,7 @@ _Generated: 2026-11-16T14:52Z_
 <!-- BEGIN energy:04_mastr_registers__market_actor_role -->
 ## market_actor_role
 
-_Generated: 2026-11-16T14:52Z_
+_Generated: 2026-11-16T17:38Z_
 
 ### cardinality
 
@@ -2917,7 +2917,7 @@ _Generated: 2026-11-16T14:52Z_
 <!-- BEGIN energy:04_mastr_registers__reference_code_list -->
 ## reference_code_list -- mastr
 
-_Generated: 2026-11-16T14:44Z_
+_Generated: 2026-11-16T17:30Z_
 
 ### cardinality
 
@@ -2984,7 +2984,7 @@ _Generated: 2026-11-16T14:44Z_
 <!-- BEGIN energy:04_mastr_registers__register_change_event -->
 ## register_change_event
 
-_Generated: 2026-11-16T14:54Z_
+_Generated: 2026-11-16T17:40Z_
 
 ### cardinality
 
@@ -3106,7 +3106,7 @@ _Generated: 2026-11-16T14:54Z_
 <!-- BEGIN energy:04_mastr_registers__register_link -->
 ## register_link
 
-_Generated: 2026-11-16T14:55Z_
+_Generated: 2026-11-16T17:41Z_
 
 ### cardinality
 
@@ -3172,7 +3172,7 @@ _Generated: 2026-11-16T14:55Z_
 <!-- BEGIN energy:04_mastr_registers__rejected_values -->
 ## 04_mastr_registers -- rejected values
 
-_Generated: 2026-11-16T14:57Z_
+_Generated: 2026-11-16T17:43Z_
 
 ### rejected values
 
@@ -3321,7 +3321,7 @@ _Generated: 2026-11-16T14:57Z_
 <!-- BEGIN energy:04_mastr_registers__support_registration -->
 ## support_registration
 
-_Generated: 2026-11-16T14:51Z_
+_Generated: 2026-11-16T17:37Z_
 
 ### cardinality
 
@@ -3477,7 +3477,7 @@ _Generated: 2026-11-16T14:51Z_
 <!-- BEGIN energy:04_mastr_registers__unit_authorisation -->
 ## unit_authorisation
 
-_Generated: 2026-11-16T14:51Z_
+_Generated: 2026-11-16T17:38Z_
 
 ### cardinality
 
@@ -3557,7 +3557,7 @@ _Generated: 2026-11-16T14:51Z_
 <!-- BEGIN energy:04_mastr_registers__unit_repowering -->
 ## unit_repowering
 
-_Generated: 2026-11-16T14:52Z_
+_Generated: 2026-11-16T17:38Z_
 
 ### cardinality
 
@@ -4333,17 +4333,17 @@ _Generated: 2026-11-16T15:20Z_
 <!-- BEGIN energy:06_energy_validation__energy_carrier_map -->
 ## energy_carrier_map
 
-_Generated: 2026-11-16T15:23Z_
+_Generated: 2026-11-16T17:46Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| distinct:source_vocabulary | approx_distinct | 7.0 |  | INFO | INFO |  |
-| distinct:source_value | approx_distinct | 88.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 85.0 |  | INFO | INFO |  |
+| distinct:source_vocabulary | approx_distinct | 8.0 |  | INFO | INFO |  |
+| distinct:source_value | approx_distinct | 91.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 38.0 |  | INFO | INFO |  |
 | distinct:match_basis | approx_distinct | 2.0 |  | INFO | INFO |  |
-| distinct:row_count | approx_distinct | 76.0 |  | INFO | INFO |  |
+| distinct:row_count | approx_distinct | 79.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 5.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -4390,14 +4390,14 @@ _Generated: 2026-11-16T15:23Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 98.0 |  | INFO | INFO |  |
+| row_count | rows | 100.0 |  | INFO | INFO |  |
 
 <!-- END energy:06_energy_validation__energy_carrier_map -->
 
 <!-- BEGIN energy:06_energy_validation__validation -->
 ## energy validation
 
-_Generated: 2026-11-16T15:23Z_
+_Generated: 2026-11-16T17:46Z_
 
 ### checks
 
@@ -4544,7 +4544,7 @@ _Generated: 2026-11-16T15:23Z_
 
 | electricity.PV | electricity.CHP | electricity.total | cooling.cool_elec | heating_total_w | heating_combined_heat_and_power_heat_w | cooling_total_w |
 |---|---|---|---|---|---|---|
-| 0.9995245717302491 | 0.9948578568755434 | 0.9914835454175781 | 0.9631350194883449 | 0.931704777612963 | 0.9838492396571958 | 0.674717196974153 |
+| 0.9995245717302522 | 0.9948578568755448 | 0.991483545417577 | 0.9631350194883453 | 0.9317047776129639 | 0.9838492396571934 | 0.6747171969741522 |
 
 ### Honda W: share equal between 1 min and 1 h rows at the same instant
 

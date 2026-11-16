@@ -793,7 +793,7 @@ _Generated: 2026-11-16T16:13Z_
 <!-- BEGIN energy:02_asset_site_weather_marts__capacity_margin_yearly -->
 ## capacity_margin_yearly
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
@@ -868,14 +868,14 @@ _Generated: 2026-11-16T15:45Z_
 <!-- BEGIN energy:02_asset_site_weather_marts__capacity_registry -->
 ## capacity_registry
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:operator_id | approx_distinct | 79233.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 49.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 10.0 |  | INFO | INFO |  |
 | distinct:generation_technology | approx_distinct | 17.0 |  | INFO | INFO |  |
 | distinct:federal_state | approx_distinct | 17.0 |  | INFO | INFO |  |
 | distinct:voltage_levels | approx_distinct | 19.0 |  | INFO | INFO |  |
@@ -883,8 +883,8 @@ _Generated: 2026-11-16T15:45Z_
 | distinct:lifecycle_state | approx_distinct | 4.0 |  | INFO | INFO |  |
 | distinct:commissioning_year | approx_distinct | 128.0 |  | INFO | INFO |  |
 | distinct:unit_count | approx_distinct | 92.0 |  | INFO | INFO |  |
-| distinct:capacity_net_mw | approx_distinct | 5421.0 |  | INFO | INFO |  |
-| distinct:capacity_gross_mw | approx_distinct | 5018.0 |  | INFO | INFO |  |
+| distinct:capacity_net_mw | approx_distinct | 5494.0 |  | INFO | INFO |  |
+| distinct:capacity_gross_mw | approx_distinct | 4898.0 |  | INFO | INFO |  |
 | distinct:operator_name | approx_distinct | 46887.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -895,18 +895,18 @@ _Generated: 2026-11-16T15:45Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| null_rate:operator_id | null_rate | 0.023284627520298678 |  | INFO | INFO |  |
+| null_rate:operator_id | null_rate | 0.019352963162922048 |  | INFO | INFO |  |
 | null_rate:carrier_key | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:generation_technology | null_rate | 0.06265951910925355 |  | INFO | INFO |  |
-| null_rate:federal_state | null_rate | 8.259889152287576e-05 |  | INFO | INFO |  |
-| null_rate:voltage_levels | null_rate | 0.12147818976269338 |  | INFO | INFO |  |
-| null_rate:control_zones | null_rate | 0.12147818976269338 |  | INFO | INFO |  |
+| null_rate:generation_technology | null_rate | 0.06300926118194278 |  | INFO | INFO |  |
+| null_rate:federal_state | null_rate | 8.305992773786287e-05 |  | INFO | INFO |  |
+| null_rate:voltage_levels | null_rate | 0.11795340338053906 |  | INFO | INFO |  |
+| null_rate:control_zones | null_rate | 0.11795340338053906 |  | INFO | INFO |  |
 | null_rate:lifecycle_state | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:commissioning_year | null_rate | 0.024052797211461422 |  | INFO | INFO |  |
+| null_rate:commissioning_year | null_rate | 0.024162132978944307 |  | INFO | INFO |  |
 | null_rate:unit_count | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:capacity_net_mw | null_rate | 0.00018171756135032668 |  | INFO | INFO |  |
+| null_rate:capacity_net_mw | null_rate | 0.0001827318410232983 |  | INFO | INFO |  |
 | null_rate:capacity_gross_mw | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:operator_name | null_rate | 0.3809543475926553 |  | INFO | INFO |  |
+| null_rate:operator_name | null_rate | 0.3788529423979401 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:_analytics_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
@@ -942,28 +942,28 @@ _Generated: 2026-11-16T15:45Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 121067.0 |  | INFO | INFO |  |
+| row_count | rows | 120395.0 |  | INFO | INFO |  |
 
 <!-- END energy:02_asset_site_weather_marts__capacity_registry -->
 
 <!-- BEGIN energy:02_asset_site_weather_marts__capacity_utilisation_monthly -->
 ## capacity_utilisation_monthly
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:market_area_code | approx_distinct | 5.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 55.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 11.0 |  | INFO | INFO |  |
 | distinct:month | approx_distinct | 138.0 |  | INFO | INFO |  |
 | distinct:generation_mwh | approx_distinct | 2756.0 |  | INFO | INFO |  |
 | distinct:generation_day_count | approx_distinct | 8.0 |  | INFO | INFO |  |
-| distinct:capacity_net_mw | approx_distinct | 2660.0 |  | INFO | INFO |  |
-| distinct:unit_count | approx_distinct | 1703.0 |  | INFO | INFO |  |
+| distinct:capacity_net_mw | approx_distinct | 1034.0 |  | INFO | INFO |  |
+| distinct:unit_count | approx_distinct | 826.0 |  | INFO | INFO |  |
 | distinct:hours_in_month | approx_distinct | 4.0 |  | INFO | INFO |  |
-| distinct:utilisation | approx_distinct | 461.0 |  | INFO | INFO |  |
+| distinct:utilisation | approx_distinct | 1034.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_analytics_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -976,12 +976,12 @@ _Generated: 2026-11-16T15:45Z_
 | null_rate:market_area_code | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:carrier_key | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:month | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:generation_mwh | null_rate | 0.6877180739706908 |  | INFO | INFO |  |
-| null_rate:generation_day_count | null_rate | 0.6877180739706908 |  | INFO | INFO |  |
-| null_rate:capacity_net_mw | null_rate | 0.2552919283554315 |  | INFO | INFO |  |
-| null_rate:unit_count | null_rate | 0.2552919283554315 |  | INFO | INFO |  |
+| null_rate:generation_mwh | null_rate | 0.12168792934249265 |  | INFO | INFO |  |
+| null_rate:generation_day_count | null_rate | 0.12168792934249265 |  | INFO | INFO |  |
+| null_rate:capacity_net_mw | null_rate | 0.5433431468760223 |  | INFO | INFO |  |
+| null_rate:unit_count | null_rate | 0.5433431468760223 |  | INFO | INFO |  |
 | null_rate:hours_in_month | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:utilisation | null_rate | 0.9430100023261223 |  | INFO | INFO |  |
+| null_rate:utilisation | null_rate | 0.6650310762185149 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:_analytics_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1021,14 +1021,14 @@ _Generated: 2026-11-16T15:45Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 8598.0 |  | INFO | INFO |  |
+| row_count | rows | 3057.0 |  | INFO | INFO |  |
 
 <!-- END energy:02_asset_site_weather_marts__capacity_utilisation_monthly -->
 
 <!-- BEGIN energy:02_asset_site_weather_marts__extreme_weather_stress_event -->
 ## extreme_weather_stress_event
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
@@ -1107,7 +1107,7 @@ _Generated: 2026-11-16T15:45Z_
 <!-- BEGIN energy:02_asset_site_weather_marts__fleet_lifecycle_event -->
 ## fleet_lifecycle_event
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
@@ -1125,7 +1125,7 @@ _Generated: 2026-11-16T15:45Z_
 | distinct:repowering_type | approx_distinct | 8.0 |  | INFO | INFO |  |
 | distinct:capacity_increase | approx_distinct | 217.0 |  | INFO | INFO |  |
 | distinct:unit_type | approx_distinct | 6.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 49.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 10.0 |  | INFO | INFO |  |
 | distinct:generation_technology | approx_distinct | 17.0 |  | INFO | INFO |  |
 | distinct:federal_state | approx_distinct | 17.0 |  | INFO | INFO |  |
 | distinct:operator_id | approx_distinct | 79039.0 |  | INFO | INFO |  |
@@ -1195,22 +1195,22 @@ _Generated: 2026-11-16T15:45Z_
 <!-- BEGIN energy:02_asset_site_weather_marts__operator_concentration -->
 ## operator_concentration
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:operator_id | approx_distinct | 77253.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 48.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 9.0 |  | INFO | INFO |  |
 | distinct:federal_state | approx_distinct | 17.0 |  | INFO | INFO |  |
 | distinct:year | approx_distinct | 12.0 |  | INFO | INFO |  |
-| distinct:capacity_net_mw | approx_distinct | 9462.0 |  | INFO | INFO |  |
-| distinct:unit_count | approx_distinct | 264.0 |  | INFO | INFO |  |
-| distinct:market_capacity_net_mw | approx_distinct | 3087.0 |  | INFO | INFO |  |
-| distinct:capacity_share | approx_distinct | 211101.0 |  | INFO | INFO |  |
-| distinct:herfindahl_hirschman_index | approx_distinct | 3091.0 |  | INFO | INFO |  |
-| distinct:operator_count | approx_distinct | 726.0 |  | INFO | INFO |  |
+| distinct:capacity_net_mw | approx_distinct | 9201.0 |  | INFO | INFO |  |
+| distinct:unit_count | approx_distinct | 288.0 |  | INFO | INFO |  |
+| distinct:market_capacity_net_mw | approx_distinct | 1245.0 |  | INFO | INFO |  |
+| distinct:capacity_share | approx_distinct | 204964.0 |  | INFO | INFO |  |
+| distinct:herfindahl_hirschman_index | approx_distinct | 1089.0 |  | INFO | INFO |  |
+| distinct:operator_count | approx_distinct | 649.0 |  | INFO | INFO |  |
 | distinct:operator_name | approx_distinct | 44408.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1221,9 +1221,9 @@ _Generated: 2026-11-16T15:45Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| null_rate:operator_id | null_rate | 0.002947141340314489 |  | INFO | INFO |  |
+| null_rate:operator_id | null_rate | 0.001222743482482328 |  | INFO | INFO |  |
 | null_rate:carrier_key | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:federal_state | null_rate | 5.617882844671157e-05 |  | INFO | INFO |  |
+| null_rate:federal_state | null_rate | 5.671351959565529e-05 |  | INFO | INFO |  |
 | null_rate:year | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:capacity_net_mw | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:unit_count | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1231,7 +1231,7 @@ _Generated: 2026-11-16T15:45Z_
 | null_rate:capacity_share | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:herfindahl_hirschman_index | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:operator_count | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:operator_name | null_rate | 0.4386229445571142 |  | INFO | INFO |  |
+| null_rate:operator_name | null_rate | 0.44009010643993357 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:_analytics_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1273,14 +1273,14 @@ _Generated: 2026-11-16T15:45Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 890015.0 |  | INFO | INFO |  |
+| row_count | rows | 881624.0 |  | INFO | INFO |  |
 
 <!-- END energy:02_asset_site_weather_marts__operator_concentration -->
 
 <!-- BEGIN energy:02_asset_site_weather_marts__site_energy_weather_daily -->
 ## site_energy_weather_daily
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
@@ -1367,19 +1367,19 @@ _Generated: 2026-11-16T15:45Z_
 <!-- BEGIN energy:02_asset_site_weather_marts__support_scheme_buildout -->
 ## support_scheme_buildout
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:support_scheme | approx_distinct | 2.0 |  | INFO | INFO |  |
-| distinct:carrier_key | approx_distinct | 48.0 |  | INFO | INFO |  |
+| distinct:carrier_key | approx_distinct | 9.0 |  | INFO | INFO |  |
 | distinct:federal_state | approx_distinct | 17.0 |  | INFO | INFO |  |
 | distinct:vintage_year | approx_distinct | 126.0 |  | INFO | INFO |  |
-| distinct:registration_count | approx_distinct | 295.0 |  | INFO | INFO |  |
-| distinct:capacity_mw | approx_distinct | 3532.0 |  | INFO | INFO |  |
-| distinct:auction_award_count | approx_distinct | 89.0 |  | INFO | INFO |  |
+| distinct:registration_count | approx_distinct | 305.0 |  | INFO | INFO |  |
+| distinct:capacity_mw | approx_distinct | 2860.0 |  | INFO | INFO |  |
+| distinct:auction_award_count | approx_distinct | 88.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_analytics_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -1391,10 +1391,10 @@ _Generated: 2026-11-16T15:45Z_
 |---|---|---|---|---|---|---|
 | null_rate:support_scheme | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:carrier_key | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:federal_state | null_rate | 0.001002004008016032 |  | INFO | INFO |  |
+| null_rate:federal_state | null_rate | 0.0017843487127198571 |  | INFO | INFO |  |
 | null_rate:vintage_year | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:registration_count | null_rate | 0.0 |  | INFO | INFO |  |
-| null_rate:capacity_mw | null_rate | 0.000572573718866304 |  | INFO | INFO |  |
+| null_rate:capacity_mw | null_rate | 0.0005098139179199592 |  | INFO | INFO |  |
 | null_rate:auction_award_count | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
 | null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
@@ -1417,7 +1417,7 @@ _Generated: 2026-11-16T15:45Z_
 | negative_count:registration_count | count | 0.0 |  | INFO | INFO |  |
 | zero_count:capacity_mw | count | 0.0 |  | INFO | INFO |  |
 | negative_count:capacity_mw | count | 0.0 |  | INFO | INFO |  |
-| zero_count:auction_award_count | count | 6221.0 |  | INFO | INFO |  |
+| zero_count:auction_award_count | count | 3263.0 |  | INFO | INFO |  |
 | negative_count:auction_award_count | count | 0.0 |  | INFO | INFO |  |
 
 ### schema
@@ -1431,14 +1431,14 @@ _Generated: 2026-11-16T15:45Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 6986.0 |  | INFO | INFO |  |
+| row_count | rows | 3923.0 |  | INFO | INFO |  |
 
 <!-- END energy:02_asset_site_weather_marts__support_scheme_buildout -->
 
 <!-- BEGIN energy:02_asset_site_weather_marts__weather_energy_daily -->
 ## weather_energy_daily
 
-_Generated: 2026-11-16T15:45Z_
+_Generated: 2026-11-16T17:55Z_
 
 ### cardinality
 
