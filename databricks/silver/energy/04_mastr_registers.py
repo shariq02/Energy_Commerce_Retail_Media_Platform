@@ -374,15 +374,11 @@ areas = within_group_ordinal(
 )
 per_area = (
     STRUCTURES["grid_connection_point"]
-    .groupBy(
-        F.col("balancing_area_connection_point_id").alias(
-            "balancing_area_connection_point"
-        )
-    )
+    .groupBy(F.col("balancing_area_connection_point_id").alias(_id))
     .agg(F.countDistinct("connection_point_id").alias("connection_point_count"))
 )
 areas = (
-    areas.join(per_area, "balancing_area_connection_point", "left")
+    areas.join(per_area, _id, "left")
     .fillna(0, ["connection_point_count"])
     .withColumn("_srid", sha_key(_id, "_source_id_ordinal"))
 )

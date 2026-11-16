@@ -29,6 +29,19 @@ weather_generation_carriers:
 # Counterpart of the total over all borders (exchange rows of energy_component).
 all_neighbours: all_neighbours
 
+# Market area of the day-ahead price of a neighbour (exchange counterpart -> area).
+counterpart_price_area:
+  austria: at
+  belgium: be
+  czech_republic: cz
+  denmark_1: dk1
+  denmark_2: dk2
+  france: fr
+  netherlands: nl
+  norway_2: no2
+  poland: pl
+  switzerland: ch
+
 # A price below this value is a negative price (EUR/MWh).
 negative_price_below: 0.0
 
@@ -38,8 +51,8 @@ price_percentiles: {low: 0.1, high: 0.9}
 # Weather rows of the station day values: source and window length (seconds).
 station_weather_source: dwd
 station_weather_interval_seconds: 3600
-# DWD radiation is a 10-minute product (true solar time).
-station_radiation_interval_seconds: 600
+# DWD radiation is an hourly product (true solar time).
+station_radiation_interval_seconds: 3600
 
 # Stress days: a station day value beyond the percentile of the same station and
 # calendar month. `above` = the value is above the percentile, else below.

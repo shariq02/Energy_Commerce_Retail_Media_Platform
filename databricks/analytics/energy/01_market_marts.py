@@ -242,11 +242,9 @@ exchange_window = (
         F.sum(F.when(KIND == "commercial_net_export", ENERGY)).alias(
             "commercial_net_export_mwh"
         ),
-        F.sum(F.when(KIND == "commercial_net_import", ENERGY)).alias(
-            "commercial_net_import_mwh"
-        ),
         F.sum(F.when(KIND == "physical_flow", ENERGY)).alias("physical_net_import_mwh"),
     )
+    .withColumn("commercial_net_import_mwh", -F.col("commercial_net_export_mwh"))
 )
 priced = market_price.select(
     *WINDOW,
@@ -337,8 +335,11 @@ border = ["market_area_code", "counterpart_area_code", *WINDOW[1:]]
 area_price = market_price.select(
     *price_key, F.col(PRICE).alias("home_price_eur_per_mwh")
 )
+price_area = F.create_map(
+    *[F.lit(part) for pair in RULES["counterpart_price_area"].items() for part in pair]
+)
 counterpart_price = market_price.select(
-    F.col("market_area_code").alias("counterpart_area_code"),
+    F.col("market_area_code").alias("_price_area"),
     *price_key[1:],
     F.col(PRICE).alias("counterpart_price_eur_per_mwh"),
 )
@@ -356,7 +357,11 @@ TABLES["cross_border_trade"] = (
             F.sum(F.when(KIND == "physical_flow", ENERGY)).alias("physical_import_mwh"),
         )
         .join(area_price, price_key, "left")
-        .join(counterpart_price, ["counterpart_area_code", *price_key[1:]], "left")
+        .withColumn(
+            "_price_area", F.try_element_at(price_area, F.col("counterpart_area_code"))
+        )
+        .join(counterpart_price, ["_price_area", *price_key[1:]], "left")
+        .drop("_price_area")
         .withColumn(
             "price_spread_eur_per_mwh",
             F.col("counterpart_price_eur_per_mwh") - F.col("home_price_eur_per_mwh"),

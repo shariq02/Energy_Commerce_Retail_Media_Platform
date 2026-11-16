@@ -41,6 +41,16 @@ FORECAST_ACTUAL_LABELS = {
     "consumption_total": "total_power_consumption",
     "residual_load": "residual_load",
 }
+# DWD precipitation form code -> text (codes 2 and 3 are undefined by the source)
+PRECIPITATION_FORM_LABELS = {
+    "0": "no precipitation",
+    "1": "rain only",
+    "4": "form unknown although precipitation was reported",
+    "6": "liquid precipitation",
+    "7": "solid precipitation",
+    "8": "liquid and solid precipitation",
+    "9": "missing value, form not determinable",
+}
 WEATHER_THEMES = {
     "weather_air_state": ("temperature", "humidity", "pressure"),
     "weather_wind_precipitation": ("wind", "precipitation"),
@@ -325,22 +335,28 @@ TABLES["forecast_actual"] = (
 
 # DBTITLE 1,Transform -- the four weather themes (columns and rows of their families)
 context = [name for name, _ in WEATHER_OBSERVATION_CONTEXT]
+form_text = F.create_map(
+    *[F.lit(part) for pair in PRECIPITATION_FORM_LABELS.items() for part in pair]
+)
 for table, families in WEATHER_THEMES.items():
     blocks = [name for family in families for name, _ in _weather_family_block(family)]
     has_value = F.lit(False)
     for family in families:
         for name, _ in WEATHER_FAMILY_MEASUREMENTS[family]:
             has_value = has_value | F.col(name).isNotNull()
-    TABLES[table] = (
-        add_provenance(
-            silver["weather_observation"]
-            .filter(has_value)
-            .select(*context, *blocks, "source_record_id"),
-            "dwd",
-            RID,
-        ),
-        ["observation_key"],
+    rows = (
+        silver["weather_observation"]
+        .filter(has_value)
+        .select(*context, *blocks, "source_record_id")
     )
+    if "precipitation" in families:
+        code = (
+            F.col("precipitation_form_code").cast("double").cast("int").cast("string")
+        )
+        rows = rows.withColumn(
+            "precipitation_form_text", F.try_element_at(form_text, code)
+        )
+    TABLES[table] = (add_provenance(rows, "dwd", RID), ["observation_key"])
 
 # COMMAND ----------
 

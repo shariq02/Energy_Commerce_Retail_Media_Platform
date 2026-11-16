@@ -138,7 +138,7 @@ for parent, on, parent_key, prefix in (
     (
         "balancing_area",
         "balancing_area_connection_point_id",
-        "balancing_area_connection_point",
+        "balancing_area_id",
         "balancing_area_",
     ),
     ("market_actor", "grid_operator_id", "market_actor_id", "operator_"),

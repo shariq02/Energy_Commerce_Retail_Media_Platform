@@ -399,12 +399,12 @@ TABLES["support_scheme_buildout"] = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- station day values (DWD rows: hourly, radiation 10-minute)
+# DBTITLE 1,Transform -- station day values (DWD rows: hourly, radiation true solar time)
 is_source = F.col("source_system") == WEATHER_SOURCE
 hourly = is_source & (
     F.col("interval_seconds") == RULES["station_weather_interval_seconds"]
 )
-ten_minute = is_source & (
+radiation_rows = is_source & (
     F.col("interval_seconds") == RULES["station_radiation_interval_seconds"]
 )
 station_air = (
@@ -433,12 +433,12 @@ station_wind = (
 )
 ground_sun = gold["weather_ground_sun"]
 station_radiation = (
-    ground_sun.filter(ten_minute)
+    ground_sun.filter(radiation_rows)
     .groupBy(*STATION_DAY)
     .agg(F.avg("global_radiation_w_per_m2").alias("mean_global_radiation_w_per_m2"))
 )
 station_sunshine = (
-    ground_sun.filter(hourly)
+    ground_sun.filter(hourly & (F.col("interval_reference") == "clock"))
     .groupBy(*STATION_DAY)
     .agg(F.sum("sunshine_duration_minutes").alias("sunshine_duration_minutes"))
 )

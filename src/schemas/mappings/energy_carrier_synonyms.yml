@@ -6,10 +6,17 @@
 # Read by databricks/silver/_semantic_common.py (energy_carrier_key). A source
 # carrier value becomes a token (lower case, every run of other characters one
 # underscore); a token listed here takes the listed carrier key. The pairs come
-# from the SMARD balance decode map and the power plant list energy carrier map.
+# from the SMARD balance decode map and the power plant list energy carrier map;
+# the register fuel tokens link the MaStR fuels to the SMARD carriers.
 
 synonyms:
   hydro: hydropower
   offshore_wind: wind_offshore
   onshore_wind: wind_onshore
   photovoltaic: solar_radiation
+  steinkohlen: hard_coal
+  rohbraunkohlen: lignite
+  braunkohlenbriketts: lignite
+  erdgas_erd_lgas: natural_gas
+  kernkraft: nuclear
+  wasser: hydropower
