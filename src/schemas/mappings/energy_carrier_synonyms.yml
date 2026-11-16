@@ -20,3 +20,50 @@ synonyms:
   erdgas_erd_lgas: natural_gas
   kernkraft: nuclear
   wasser: hydropower
+  # the wind units: the sea or land column of the unit
+  windkraft_an_land: wind_onshore
+  windkraft_auf_see: wind_offshore
+  staub_und_trockenkohle: lignite
+  # biomass
+  biomasse: biomass
+  biogas: biomass
+  biomethan_bioerdgas: biomass
+  biomethanol: biomass
+  biodiesel: biomass
+  palm_l_u_a_pflanzen_le: biomass
+  fl_ssige_biogene_stoffe_und_abf_lle: biomass
+  feste_biogene_stoffe: biomass
+  feste_biogene_stoffe_und_abf_lle_ohne_holz: biomass
+  wald_holzhackschnitzel_wald_scheitholz_kronenholz: biomass
+  wald_stammholz_rundholz: biomass
+  holz_pellets_holz_briketts: biomass
+  holzreste_z_b_aus_schreinereien_auch_spanholz: biomass
+  rinde_und_landschaftspflegeholz: biomass
+  altholz_gebrauchtholz_holz_sperr_m_ll: biomass
+  holzsp_ne_s_gemehl: biomass
+  stroh_strohpellets: biomass
+  holzgas_gas_biomasse: biomass
+  brennlauge_schwarzlauge_sulfitablauge: biomass
+  # other renewable
+  geothermie_gsgk: other_renewable
+  deponiegas: other_renewable
+  kl_rgas: other_renewable
+  wasserstoff: other_renewable
+  # other conventional
+  heiz_l_leicht: other_conventional
+  heiz_l_schwer: other_conventional
+  dieselkraftstoff: other_conventional
+  andere_mineral_lprodukte: other_conventional
+  fl_ssiggas: other_conventional
+  andere_gase: other_conventional
+  sonstige_hergestellte_gase: other_conventional
+  hochofengas_konvertergas: other_conventional
+  kokereigas: other_conventional
+  raffineriegas: other_conventional
+  grubengas: other_conventional
+  abfall_hausm_ll_siedl_abf: other_conventional
+  industrieabfall: other_conventional
+  w_rme: other_conventional
+  dampf_zum_beispiel_prozessw_rme: other_conventional
+  verbrennung: other_conventional
+  wirbelschichtkohle: other_conventional

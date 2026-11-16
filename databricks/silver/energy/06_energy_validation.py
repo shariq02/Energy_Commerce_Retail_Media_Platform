@@ -37,7 +37,12 @@ FINDINGS = "energy"
 RID = run_id()
 # Table -> its carrier value columns (the rows of energy_carrier_map).
 CARRIER_SOURCES = {
-    "generation_unit": ("main_fuel", "biomass_type", "unit_type"),
+    "generation_unit": (
+        "main_fuel",
+        "biomass_type",
+        "wind_onshore_or_offshore",
+        "unit_type",
+    ),
     "power_plant_register": ("energy_carrier",),
     "power_plant_capacity_plan": ("energy_carrier",),
     "energy_component": ("carrier_code",),

@@ -164,7 +164,8 @@ for unit_type in UNIT_TYPES:
 
 # Counts of the unit's support ids and of the authorisation and repowering records
 # that name it; the carrier key prefers the main fuel, then the biomass type, then
-# the unit type; the lifecycle state comes from the unit's own dates.
+# the sea or land of a wind unit, then the unit type; the lifecycle state comes from
+# the unit's own dates.
 authorisations = (
     link_pairs(read_bronze(AUTHORISATION_BT), "GenMastrNummer", LINKED_UNITS)
     .groupBy(F.col("linked_id").alias("unit_id"))
@@ -189,6 +190,7 @@ units = (
         F.coalesce(
             energy_carrier_key(F.col("main_fuel")),
             energy_carrier_key(F.col("biomass_type")),
+            energy_carrier_key(F.col("wind_onshore_or_offshore")),
             energy_carrier_key(F.col("unit_type")),
         ),
     )
