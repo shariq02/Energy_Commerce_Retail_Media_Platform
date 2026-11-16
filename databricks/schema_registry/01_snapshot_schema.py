@@ -14,8 +14,8 @@
 # MAGIC
 # MAGIC **Purpose:** Capture the current schema (schema, table, column, datatype,
 # MAGIC nullable, ordinal position) of every table in each layer and store it as a
-# MAGIC versioned Markdown file. One notebook covers Bronze, Silver, Gold, ML and
-# MAGIC models. Schemas are found live with `SHOW SCHEMAS` and `SHOW TABLES`. A
+# MAGIC versioned Markdown file. One notebook covers Bronze, Silver, Gold, analytics,
+# MAGIC ML and models. Schemas are found live with `SHOW SCHEMAS` and `SHOW TABLES`. A
 # MAGIC layer with no schema is skipped, so a layer built later needs no new
 # MAGIC notebook. Each series has its own versions: `v001` is the baseline; an
 # MAGIC unchanged schema writes nothing; a changed schema is written as the next
@@ -58,6 +58,13 @@ SERIES = {
         "gold-schema-hash",
         "Gold",
         lambda s: s.endswith("_gold") or s == SHARED_CONFORMED_SCHEMA,
+    ),
+    "analytics": (
+        "analytics_registry",
+        "analytics_schema",
+        "analytics-schema-hash",
+        "Analytics",
+        lambda s: s.endswith("_analytics"),
     ),
     "ml": (
         "ml_registry",

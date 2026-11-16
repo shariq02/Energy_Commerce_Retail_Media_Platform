@@ -338,9 +338,11 @@ area_price = market_price.select(
 price_area = F.create_map(
     *[F.lit(part) for pair in RULES["counterpart_price_area"].items() for part in pair]
 )
-counterpart_price = market_price.select(
+counterpart_price = market_price.filter(
+    F.col("interval_seconds") == RULES["counterpart_price_interval_seconds"]
+).select(
     F.col("market_area_code").alias("_price_area"),
-    *price_key[1:],
+    F.col("observation_timestamp_utc").alias("_price_hour"),
     F.col(PRICE).alias("counterpart_price_eur_per_mwh"),
 )
 TABLES["cross_border_trade"] = (
@@ -360,8 +362,9 @@ TABLES["cross_border_trade"] = (
         .withColumn(
             "_price_area", F.try_element_at(price_area, F.col("counterpart_area_code"))
         )
-        .join(counterpart_price, ["_price_area", *price_key[1:]], "left")
-        .drop("_price_area")
+        .withColumn("_price_hour", F.date_trunc("hour", "observation_timestamp_utc"))
+        .join(counterpart_price, ["_price_area", "_price_hour"], "left")
+        .drop("_price_area", "_price_hour")
         .withColumn(
             "price_spread_eur_per_mwh",
             F.col("counterpart_price_eur_per_mwh") - F.col("home_price_eur_per_mwh"),

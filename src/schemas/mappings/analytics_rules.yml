@@ -42,6 +42,10 @@ counterpart_price_area:
   poland: pl
   switzerland: ch
 
+# Window length (seconds) of the neighbour prices; an exchange row takes the price of
+# its clock hour.
+counterpart_price_interval_seconds: 3600
+
 # A price below this value is a negative price (EUR/MWh).
 negative_price_below: 0.0
 
