@@ -751,10 +751,10 @@ if facet_hists(
 
 
 def _ts_draw(pdf):
-    def draw(ax):
+    def draw_series(ax):
         ax.plot(range(len(pdf)), pdf["value"], linewidth=0.7)
 
-    return draw
+    return draw_series
 
 
 if _facet_grid(

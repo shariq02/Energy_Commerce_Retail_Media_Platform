@@ -241,11 +241,11 @@ if not ts_pdf.empty:
 
 
 def _diurnal_draw(c):
-    def draw(ax):
+    def draw_diurnal(ax):
         ax.plot([h["hod"] for h in hourly], [h[c] for h in hourly], marker="o")
         ax.set_xlabel("hour", fontsize=7)
 
-    return draw
+    return draw_diurnal
 
 
 if _facet_grid(
