@@ -321,34 +321,6 @@ Mean by calendar month and by hour of day of MESS_DATUM (as stored, all stations
 - Out-of-range non-sentinel values are flagged suspicious, not proven wrong -> keep raw + a quality flag.
 - Decode QN against the DWD scheme valid for the record's era (see Regime / Version Evidence).
 
-### Figure -- DWD measurement overview
-
-![DWD measurement overview](figures/dwd_measurement_overview.png)
-
-### Figure -- DWD QN quality-flag distribution
-
-![DWD QN quality-flag distribution](figures/dwd_qn_distribution.png)
-
-### Figure -- DWD duplicate key composition
-
-![DWD duplicate key composition](figures/dwd_duplicate_key_composition.png)
-
-### Figure -- DWD hourly coverage % per station
-
-![DWD hourly coverage % per station](figures/dwd_hourly_coverage_pct.png)
-
-### Figure -- DWD longest missing-hours gap per station
-
-![DWD longest missing-hours gap per station](figures/dwd_longest_gap_hours.png)
-
-### Figure -- DWD station x measurement coverage
-
-![DWD station x measurement coverage](figures/dwd_station_x_measurement_coverage.png)
-
-### Figure -- DWD value column spread per measurement
-
-![DWD value column spread per measurement](figures/dwd_value_column_spread.png)
-
 <!-- END dwd:01_weather_measurements -->
 
 <!-- BEGIN dwd:02_station_metadata -->
@@ -517,22 +489,6 @@ station_name_history name/operator changes:
 - station_name_history has >1 name/operator per station over time -> a second time-varying attribute stream.
 - device_instrument / parameter_unit are small static lookups -> reference dimensions; reconcile parameter codes with the measurement value-column names (list above).
 
-### Figure -- DWD station_geography -- station locations & relocations
-
-![DWD station_geography -- station locations & relocations](figures/dwd_station_geography.png)
-
-### Figure -- DWD metadata -- overview
-
-![DWD metadata -- overview](figures/dwd_metadata_overview.png)
-
-### Figure -- DWD metadata -- rows per station, by table
-
-![DWD metadata -- rows per station, by table](figures/dwd_metadata_rows_per_station.png)
-
-### Figure -- DWD metadata -- validity-period row composition, by table
-
-![DWD metadata -- validity-period row composition, by table](figures/dwd_metadata_validity_periods.png)
-
 <!-- END dwd:02_station_metadata -->
 
 <!-- BEGIN dwd:03_missing_data -->
@@ -643,26 +599,6 @@ Per-station observed distinct hours (measurement completeness proxy):
 - Keep `dwd_missing_value_periods` as a reference table keyed by (station, parameter, from_ts, to_ts).
 - REPORTED and OBSERVED missingness disagree for some station x parameter (counts above) -> do NOT reconcile by deleting rows; flag with a data-quality column.
 - Missingness is time-varying (year plots) -> no uniform-completeness assumption; any imputation is an explicit, evidenced choice.
-
-### Figure -- DWD observed missingness rate by station x parameter
-
-![DWD observed missingness rate by station x parameter](figures/dwd_missingness_heatmap.png)
-
-### Figure -- DWD missing_value_periods -- reported windows
-
-![DWD missing_value_periods -- reported windows](figures/dwd_reported_missing_periods.png)
-
-### Figure -- DWD observed -999/blank rate by year, per measurement
-
-![DWD observed -999/blank rate by year, per measurement](figures/dwd_missing_rate_by_year.png)
-
-### Figure -- DWD missing / -999 rate by value column, per measurement
-
-![DWD missing / -999 rate by value column, per measurement](figures/dwd_missing_rate_by_column.png)
-
-### Figure -- DWD distinct observed hours per station, per measurement
-
-![DWD distinct observed hours per station, per measurement](figures/dwd_distinct_hours_per_station.png)
 
 <!-- END dwd:03_missing_data -->
 
@@ -798,26 +734,6 @@ Station means over the same window against station coordinates and elevation, 28
 - Some measurement hours fall outside the station's geography validity window -> extend the window or flag; do not silently drop.
 - `city` is consistent 1:1 with station_id here -> safe to carry as a station attribute.
 - A cross-measurement wide 'all weather at station S, hour H' table drops rows (overlap numbers above) -> that is a Gold consolidation, not Silver.
-
-### Figure -- DWD cross-measurement (station, timestamp) overlap per pair
-
-![DWD cross-measurement (station, timestamp) overlap per pair](figures/dwd_cross_measurement_overlap.png)
-
-### Figure -- DWD distinct stations per Bronze table
-
-![DWD distinct stations per Bronze table](figures/dwd_stations_per_bronze_table.png)
-
-### Figure -- DWD stations absent from each measurement
-
-![DWD stations absent from each measurement](figures/dwd_stations_absent_per_measurement.png)
-
-### Figure -- DWD referential integrity: measurements <-> metadata
-
-![DWD referential integrity: measurements <-> metadata](figures/dwd_referential_integrity.png)
-
-### Figure -- DWD distinct stations per city
-
-![DWD distinct stations per city](figures/dwd_stations_per_city.png)
 
 <!-- END dwd:04_relationships_and_findings -->
 
@@ -979,17 +895,5 @@ Per-decade row count and QN vocabulary. The deepening network came online at dif
 - Value-column plausibility bounds were not assumed here -> define them from the distributions above before an out-of-range quality flag.
 - missing_value_periods declares known gap windows per station/parameter -> reconcile against the observed hourly-coverage gaps rather than assuming every gap is undeclared.
 - Decode QN against the DWD scheme valid for the record's era (see Regime / Version Evidence).
-
-### Figure -- DWD deepening -- measurement overview
-
-![DWD deepening -- measurement overview](figures/dwd_deepening_overview.png)
-
-### Figure -- DWD deepening -- QN quality-flag distribution
-
-![DWD deepening -- QN quality-flag distribution](figures/dwd_deepening_qn_distribution.png)
-
-### Figure -- DWD deepening -- hourly coverage % per station
-
-![DWD deepening -- hourly coverage % per station](figures/dwd_deepening_hourly_coverage_pct.png)
 
 <!-- END dwd:05_deepening -->

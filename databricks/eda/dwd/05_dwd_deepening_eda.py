@@ -91,31 +91,16 @@ frames = {m: bronze_frame(t) for m, t in TABLES.items()}
 prof = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    cols = df.columns
     ts_col = find_col(df, "MESS_DATUM")
-    exprs = [F.count(F.lit(1)).alias("__rows")]
-    if ts_col:
-        exprs += [F.min(ts_col).alias("__min_ts"), F.max(ts_col).alias("__max_ts")]
-    for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-        exprs += [
-            F.sum(miss.cast("long")).alias(c + "__m"),
-            F.approx_count_distinct(c).alias(c + "__d"),
-        ]
-    r = df.agg(*exprs).first().asDict()
-    prof[m] = {
-        "cols": cols,
-        "total": r["__rows"],
-        "min_ts": r.get("__min_ts"),
-        "max_ts": r.get("__max_ts"),
-        "miss": {c: r[c + "__m"] for c in cols},
-        "acd": {c: r[c + "__d"] for c in cols},
-    }
+    extra = {"min_ts": F.min(ts_col), "max_ts": F.max(ts_col)} if ts_col else {}
+    prof[m] = profile_frame(df, extra=extra)
+    prof[m].update({"min_ts": None, "max_ts": None, **prof[m].pop("extra", {})})
+    cols = prof[m]["cols"]
     sid = find_col(df, "STATIONS_ID")
     print(
         "=" * 90,
-        f"\n{m}  rows={r['__rows']}  {r.get('__min_ts')}..{r.get('__max_ts')}  "
-        f"stations~={r.get(sid + '__d') if sid else 'n/a'}\n",
+        f"\n{m}  rows={prof[m]['total']}  {prof[m]['min_ts']}..{prof[m]['max_ts']}  "
+        f"stations~={prof[m]['acd'][sid] if sid else 'n/a'}\n",
         "=" * 90,
     )
     for c in cols:
@@ -125,9 +110,7 @@ for m in MEASUREMENTS:
         )
     print("constant columns:", [c for c in cols if prof[m]["acd"][c] <= 1])
 totals = {m: prof[m]["total"] for m in MEASUREMENTS}
-constant_cols = {
-    m: [c for c in prof[m]["cols"] if prof[m]["acd"][c] <= 1] for m in MEASUREMENTS
-}
+constant_cols = {m: constant_column_names(frames[m], prof[m]) for m in MEASUREMENTS}
 
 # COMMAND ----------
 

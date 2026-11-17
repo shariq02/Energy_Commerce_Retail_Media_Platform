@@ -1149,14 +1149,6 @@ This table is a current-state snapshot: a unit decommissioned before the export 
 - Coordinates that fall outside Germany / sit at (0,0) are a quarantine class, not a silent NULL.
 - Generation-unit tables are one physical unit per row; a unit appears in >1 carrier table only on a carrier-type change -> reconcile at Gold, confirmed in 06, not assumed absent.
 
-### Figure -- MaStR generation units -- overview
-
-![MaStR generation units -- overview](figures/mastr_generation_units_overview.png)
-
-### Figure -- MaStR generation units -- first categorical column per table
-
-![MaStR generation units -- first categorical column per table](figures/mastr_generation_units_categorical.png)
-
 <!-- END mastr:01_generation_units -->
 
 <!-- BEGIN mastr:02_eeg_support_and_authorisation -->
@@ -1452,14 +1444,6 @@ Concentration: Gini 0.5623, top-10% share 0.4657. anlagen_kwk and anlagen_eeg_wi
 - Constant columns carry no information and can be dropped at Silver.
 - Cast amount columns with an explicit unit; quarantine values that fail numeric parsing or are negative.
 - EEG-support / KWK-bonus / authorisation records are 1:1 or 1:N against a unit depending on scheme changes -> use the cardinality confirmed in 06, not an assumed 1:1 join.
-
-### Figure -- MaStR EEG support & authorisation -- overview
-
-![MaStR EEG support & authorisation -- overview](figures/mastr_eeg_support_overview.png)
-
-### Figure -- MaStR EEG support & authorisation -- first categorical column per table
-
-![MaStR EEG support & authorisation -- first categorical column per table](figures/mastr_eeg_support_categorical.png)
 
 <!-- END mastr:02_eeg_support_and_authorisation -->
 
@@ -1764,18 +1748,6 @@ marktakteure / netzanschlusspunkte / lokationen are 5-7M rows; netze / bilanzier
 - lokationen's delimited MaStR-Nummer link columns must be split/exploded into a proper M:N bridge table at Silver before any join to Einheiten or Netzanschlusspunkte.
 - marktakteure and marktakteure_und_rollen are a candidate 1:N role-assignment split -- confirm on the shared MastrNummer key (06) before merging.
 
-### Figure -- MaStR market actors & network -- overview
-
-![MaStR market actors & network -- overview](figures/mastr_market_network_overview.png)
-
-### Figure -- MaStR lokationen -- rows with a non-empty MastrNummer link array
-
-![MaStR lokationen -- rows with a non-empty MastrNummer link array](figures/mastr_lokationen_link_arrays.png)
-
-### Figure -- MaStR market actors & network -- first categorical column per table
-
-![MaStR market actors & network -- first categorical column per table](figures/mastr_market_network_categorical.png)
-
 <!-- END mastr:03_market_actors_and_network -->
 
 <!-- BEGIN mastr:04_change_history -->
@@ -1908,14 +1880,6 @@ The date column in the two deletion tables is {'geloeschte_deaktivierte_einheite
 - Parse each date column with the explicit format list; quarantine values that fail to parse or fall outside 2000..now (the figure already excludes them).
 - einheiten_aenderung_netzbetreiberzuordnungen carries BOTH a registration date and an effective date -> keep both; the effective date is the event time, the registration date is when it became knowable.
 
-### Figure -- MaStR change history -- overview
-
-![MaStR change history -- overview](figures/mastr_change_history_overview.png)
-
-### Figure -- MaStR change history -- rows per year (plausible years only)
-
-![MaStR change history -- rows per year (plausible years only)](figures/mastr_change_history_temporal.png)
-
 <!-- END mastr:04_change_history -->
 
 <!-- BEGIN mastr:05_reference_catalogs -->
@@ -1982,10 +1946,6 @@ These six tables are the authoritative code sets for the categorical columns pro
 
 - All six tables are static lookups -> Silver reference dimensions, SCD type 1 (overwrite on reload) unless a future MaStR release adds a validity-period column.
 - Pin the MaStR catalog release used -- code meanings change between register versions, so a code decoded against the wrong catalog vintage is a silent label error downstream.
-
-### Figure -- MaStR reference catalogs -- rows per table
-
-![MaStR reference catalogs -- rows per table](figures/mastr_reference_catalogs_overview.png)
 
 <!-- END mastr:05_reference_catalogs -->
 
@@ -2192,13 +2152,5 @@ marktakteure / netzanschlusspunkte / lokationen are ~5-7M rows each; the generat
 - Subset relationships with real orphans (['einheiten_genehmigung.GenMastrNummer', 'netzanschlusspunkte.LokationMaStRNummer', 'netzanschlusspunkte.NetzbetreiberMaStRNummer']) -> LEFT join with an explicit unmatched flag; never inner.
 - Deregistered-entity and deferred-scope logs are disjoint from the live tables by design -- do not 'fix' their orphan rate by dropping rows; carry them as separate history facts.
 - 1:N relationships identified above -> aggregate the child to the parent grain, or keep it as a separate fact; never fold it into the parent's attribute row.
-
-### Figure -- MaStR rows per Bronze table (all 28)
-
-![MaStR rows per Bronze table (all 28)](figures/mastr_rows_per_table.png)
-
-### Figure -- MaStR -- orphan-key rate per explicit relationship
-
-![MaStR -- orphan-key rate per explicit relationship](figures/mastr_eeg_fk_orphans.png)
 
 <!-- END mastr:06_relationships_and_findings -->

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- REDISPATCH MEASURES
@@ -57,27 +57,11 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # DBTITLE 1,Profile -- rows, missingness, approx distinct, constant columns (one agg)
 df = spark.table(TABLE)
 COLS = df.columns
-exprs = [F.count(F.lit(1)).alias("__rows")]
-for c in COLS:
-    miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-    exprs += [
-        F.sum(miss.cast("long")).alias(c + "__m"),
-        F.approx_count_distinct(c).alias(c + "__d"),
-    ]
-r = df.agg(*exprs).first().asDict()
-total = r["__rows"]
-acd = {c: r[c + "__d"] for c in COLS}
-miss = {c: r[c + "__m"] for c in COLS}
-constant_cands = [c for c in COLS if acd[c] <= 1]
-constant_cols = (
-    sorted(
-        c
-        for c in constant_cands
-        if (df.agg(F.countDistinct(F.col(c)).alias(c)).first()[c] or 0) <= 1
-    )
-    if constant_cands
-    else []
-)
+P = profile_frame(df)
+total = P["total"]
+acd = P["acd"]
+miss = P["miss"]
+constant_cols = constant_column_names(df, P)
 distinct_rows = total - full_row_dup_count(df, total)
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:

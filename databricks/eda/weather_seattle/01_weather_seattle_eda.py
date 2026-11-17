@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- WEATHER (DAILY TEMPERATURE HISTORY, SAMPLES)
@@ -29,10 +29,6 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %run ../_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_samples_eda_common
 
 # COMMAND ----------
 
@@ -137,7 +133,7 @@ for k, df in DFS.items():
 # DBTITLE 1,Constant columns + full-row duplicates
 for k, df in DFS.items():
     d = df.drop("__file")
-    prof[k]["constant"] = constant_cols(d, prof[k])
+    prof[k]["constant"] = constant_column_names(d, prof[k])
     prof[k]["dups"] = full_row_dup_count(d, prof[k]["total"])
     print(f"{k}: constant={prof[k]['constant']}  full-row duplicates={prof[k]['dups']}")
 

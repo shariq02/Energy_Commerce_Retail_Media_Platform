@@ -114,39 +114,29 @@ frames = {m: bronze_frame(t) for m, t in TABLES.items()}
 prof = {}
 for m in MEASUREMENTS:
     df = frames[m]
-    cols = df.columns
-    exprs = [
-        F.count(F.lit(1)).alias("__rows"),
-        F.min(find_col(df, "MESS_DATUM")).alias("__min_ts"),
-        F.max(find_col(df, "MESS_DATUM")).alias("__max_ts"),
-    ]
-    for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
-        exprs += [
-            F.sum(miss.cast("long")).alias(c + "__m"),
-            F.approx_count_distinct(c).alias(c + "__d"),
-        ]
-    r = df.agg(*exprs).first().asDict()
-    prof[m] = {
-        "cols": cols,
-        "total": r["__rows"],
-        "min_ts": r["__min_ts"],
-        "max_ts": r["__max_ts"],
-        "miss": {c: r[c + "__m"] for c in cols},
-        "acd": {c: r[c + "__d"] for c in cols},
-    }
+    prof[m] = profile_frame(
+        df,
+        extra={
+            "min_ts": F.min(find_col(df, "MESS_DATUM")),
+            "max_ts": F.max(find_col(df, "MESS_DATUM")),
+        },
+    )
+    prof[m].update(prof[m].pop("extra"))
+    cols = prof[m]["cols"]
     sid, city = find_col(df, "STATIONS_ID"), find_col(df, "city")
     print(
         "=" * 90,
-        f"\n{m}  rows={r['__rows']}  {r['__min_ts']}..{r['__max_ts']}  "
-        f"stations~={r[sid + '__d']}  cities~={r[city + '__d']}\n",
+        f"\n{m}  rows={prof[m]['total']}  {prof[m]['min_ts']}..{prof[m]['max_ts']}  "
+        f"stations~={prof[m]['acd'][sid]}  cities~={prof[m]['acd'][city]}\n",
         "=" * 90,
     )
     for c in cols:
         print(
-            f"  {c:<26} missing={r[c + '__m']:>12} rate={r[c + '__m'] / r['__rows']:.4f} approx_distinct={r[c + '__d']}"
+            f"  {c:<26} missing={prof[m]['miss'][c]:>12} "
+            f"rate={prof[m]['miss'][c] / prof[m]['total']:.4f} "
+            f"approx_distinct={prof[m]['acd'][c]}"
         )
-    print("constant columns:", [c for c in cols if r[c + "__d"] <= 1])
+    print("constant columns:", [c for c in cols if prof[m]["acd"][c] <= 1])
 totals = {m: prof[m]["total"] for m in MEASUREMENTS}
 coverage = {
     m: {
@@ -157,9 +147,7 @@ coverage = {
     }
     for m in MEASUREMENTS
 }
-constant_cols = {
-    m: [c for c in prof[m]["cols"] if prof[m]["acd"][c] <= 1] for m in MEASUREMENTS
-}
+constant_cols = {m: constant_column_names(frames[m], prof[m]) for m in MEASUREMENTS}
 
 # COMMAND ----------
 

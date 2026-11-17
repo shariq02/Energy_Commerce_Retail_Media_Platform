@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- SMARD ENERGY TIME SERIES
@@ -97,35 +97,19 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 # DBTITLE 1,Profile -- rows, missingness, approx distinct, constant columns (one agg)
 df = spark.table(TABLE)
 COLS = df.columns
-exprs = [F.count(F.lit(1)).alias("__rows")]
-for c in COLS:
-    miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-    exprs += [
-        F.sum(miss.cast("long")).alias(c + "__m"),
-        F.approx_count_distinct(c).alias(c + "__d"),
-    ]
-r = df.agg(*exprs).first().asDict()
-total = r["__rows"]
-acd = {c: r[c + "__d"] for c in COLS}
-constant_cands = [c for c in COLS if acd[c] <= 1]
-constant_cols = (
-    sorted(
-        c
-        for c in constant_cands
-        if (df.agg(F.countDistinct(F.col(c)).alias(c)).first()[c] or 0) <= 1
-    )
-    if constant_cands
-    else []
-)
-distinct_rows = df.distinct().count()
+P = profile_frame(df)
+total = P["total"]
+acd = P["acd"]
+constant_cols = constant_column_names(df, P)
+duplicate_rows = full_row_dup_count(df, total)
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:
     print(
-        f"  {c:<14} missing={r[c + '__m']:>12} "
-        f"rate={r[c + '__m'] / total:.4f} approx_distinct={acd[c]}"
+        f"  {c:<14} missing={P['miss'][c]:>12} "
+        f"rate={P['miss'][c] / total:.4f} approx_distinct={acd[c]}"
     )
 print("constant columns (exact):", constant_cols)
-print("exact full-row duplicates:", total - distinct_rows)
+print("exact full-row duplicates:", duplicate_rows)
 
 # COMMAND ----------
 
@@ -833,7 +817,7 @@ if grid.size:
 print("constant columns:", constant_cols)
 print(
     "exact duplicates:",
-    total - distinct_rows,
+    duplicate_rows,
     " conflicting (series,ts):",
     db["conflicting"],
 )
@@ -845,7 +829,7 @@ print("5-sigma outliers per metric:", outliers)
 # DBTITLE 1,Export profiling findings -> src/schemas/profiling/smard.md
 _prof = ["| column | missing | rate | approx_distinct |", "|---|---|---|---|"]
 for c in COLS:
-    _prof.append(f"| {c} | {r[c + '__m']} | {r[c + '__m'] / total:.4f} | {acd[c]} |")
+    _prof.append(f"| {c} | {P['miss'][c]} | {P['miss'][c] / total:.4f} | {acd[c]} |")
 _prof += [
     "",
     para(
@@ -855,7 +839,7 @@ _prof += [
 ]
 
 _dq = [
-    f"Exact full-row duplicates: {total - distinct_rows}.",
+    f"Exact full-row duplicates: {duplicate_rows}.",
     para(
         f"(series, timestamp_utc) duplicate groups: {db['dup_groups']}",
         f"(identical: {db['identical']}, conflicting: {db['conflicting']}).",
@@ -1121,8 +1105,8 @@ for m, x in by_metric.items():
 _findings = []
 if constant_cols:
     _findings.append(f"- Constant columns: {constant_cols}.")
-if total - distinct_rows:
-    _findings.append(f"- {total - distinct_rows} exact duplicate rows.")
+if duplicate_rows:
+    _findings.append(f"- {duplicate_rows} exact duplicate rows.")
 if db["conflicting"]:
     _findings.append(
         f"- {db['conflicting']} (series, timestamp) keys have conflicting values."
@@ -1159,7 +1143,7 @@ if db["conflicting"]:
     _silver.append(
         "- De-duplicate (series key, timestamp_utc) with a deterministic value-selection rule."
     )
-elif total - distinct_rows:
+elif duplicate_rows:
     _silver.append("- Apply distinct on load to drop exact duplicate rows.")
 if _nn:
     _silver.append("- Cast `value` to double; quarantine non-numeric values.")
@@ -1318,7 +1302,7 @@ _areas = {
         f"regions {regions}; regional series exist only for {[m for m, rg in metric_regions.items() if len(rg) > 1]}"
     ],
     "Data quality": [
-        f"exact duplicates {total - distinct_rows}; conflicting (series, ts) duplicates {db['conflicting']}",
+        f"exact duplicates {duplicate_rows}; conflicting (series, ts) duplicates {db['conflicting']}",
         f"missing values {sum(x['missing'] for x in by_metric.values())}; mirrored metric pairs {[(a, b) for a, b, _ in mirrors] or 'none'}",
     ],
     "Statistical patterns": [

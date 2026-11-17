@@ -287,20 +287,4 @@ A model must not pool a metric's regional breakdowns with its DE-LU total, nor i
 - Attach the physical unit per metric from the SMARD filter catalog at Silver.
 - Preserve gaps; do not forward-fill without a stated, per-resolution rule.
 
-### Figure -- SMARD series overview
-
-![SMARD series overview](figures/smard_series_overview.png)
-
-### Figure -- SMARD value distribution per metric (sampled)
-
-![SMARD value distribution per metric (sampled)](figures/smard_value_distributions.png)
-
-### Figure -- SMARD -- one representative series per metric (chronological)
-
-![SMARD -- one representative series per metric (chronological)](figures/smard_time_series.png)
-
-### Figure -- SMARD metric|region x resolution presence
-
-![SMARD metric|region x resolution presence](figures/smard_coverage_matrix.png)
-
 <!-- END smard:01_smard -->

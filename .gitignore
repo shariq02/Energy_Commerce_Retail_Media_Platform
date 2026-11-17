@@ -108,9 +108,11 @@ htmlcov/
 # Ruff
 .ruff_cache/
 
+# EDA figures are shown in the notebooks and never stored
+src/schemas/profiling/figures/
+
 # Local developer utilities (not part of the pipeline)
 scripts/utilities/lint.py
-scripts/utilities/clean_cache.py
 scripts/utilities/check_curated_retrieval.py
 scripts/utilities/check_service_principal.py
 scripts/utilities/make_tool_tokens.py

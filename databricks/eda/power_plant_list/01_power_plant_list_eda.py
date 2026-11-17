@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- POWER PLANT LIST (BNETZA KRAFTWERKSLISTE)
@@ -100,19 +100,9 @@ for name, df in frames.items():
 # DBTITLE 1,Profile each table -- rows, missingness, approx distinct (one agg per table)
 prof = {}
 for name, df in frames.items():
-    cols = df.columns
-    exprs = [F.count(F.lit(1)).alias("__rows")]
-    for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-        exprs += [
-            F.sum(miss.cast("long")).alias(c + "__m"),
-            F.approx_count_distinct(c).alias(c + "__d"),
-        ]
-    r = df.agg(*exprs).first().asDict()
-    total = r["__rows"]
-    acd = {c: r[c + "__d"] for c in cols}
-    miss = {c: r[c + "__m"] for c in cols}
-    prof[name] = {"cols": cols, "total": total, "acd": acd, "miss": miss}
+    prof[name] = profile_frame(df)
+    cols, total = prof[name]["cols"], prof[name]["total"]
+    acd, miss = prof[name]["acd"], prof[name]["miss"]
     print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}")
     for c in cols:
         print(
@@ -123,16 +113,7 @@ for name, df in frames.items():
 
 # DBTITLE 1,Confirm constant columns exactly + full-row duplicates
 for name, df in frames.items():
-    cands = [c for c in prof[name]["cols"] if prof[name]["acd"][c] <= 1]
-    if cands:
-        rr = (
-            df.agg(*[F.countDistinct(F.col(c)).alias(c) for c in cands])
-            .first()
-            .asDict()
-        )
-        prof[name]["constant"] = sorted(c for c in cands if (rr[c] or 0) <= 1)
-    else:
-        prof[name]["constant"] = []
+    prof[name]["constant"] = constant_column_names(df, prof[name])
     prof[name]["dups"] = full_row_dup_count(df, prof[name]["total"])
     print(
         f"{name}: constant={prof[name]['constant']}  full-row duplicates={prof[name]['dups']}"
@@ -192,7 +173,7 @@ for name, df in frames.items():
 
 
 def is_null_or_blank(colname):
-    return _qc(colname).isNull() | (F.trim(_qc(colname).cast("string")) == "")
+    return qcol(colname).isNull() | (F.trim(qcol(colname).cast("string")) == "")
 
 
 # COMMAND ----------
@@ -290,9 +271,9 @@ for name, df in frames.items():
     tc = next((c for c in df.columns if "datensatztyp" in c.lower()), None)
     blank = is_null_or_blank(id_c)
     present = df.where(~blank)
-    per = present.groupBy(_qc(id_c).alias("id")).agg(
+    per = present.groupBy(qcol(id_c).alias("id")).agg(
         F.count(F.lit(1)).alias("n"),
-        *[F.countDistinct(_qc(c)).alias(f"d{i}") for i, c in enumerate(df.columns)],
+        *[F.countDistinct(qcol(c)).alias(f"d{i}") for i, c in enumerate(df.columns)],
     )
     sizes = per.groupBy("n").count().orderBy("n").collect()
     rep = per.where(F.col("n") > 1)
@@ -312,8 +293,8 @@ for name, df in frames.items():
     examples = []
     for x in rep.orderBy(F.desc("n")).limit(2).collect():
         rows = (
-            present.where(_qc(id_c) == x["id"])
-            .select(*[_qc(c) for c in show])
+            present.where(qcol(id_c) == x["id"])
+            .select(*[qcol(c) for c in show])
             .limit(6)
             .collect()
         )
@@ -330,7 +311,7 @@ for name, df in frames.items():
         [
             (x["t"], x["n"])
             for x in df.where(blank)
-            .groupBy(_qc(tc).alias("t"))
+            .groupBy(qcol(tc).alias("t"))
             .agg(F.count(F.lit(1)).alias("n"))
             .collect()
         ]

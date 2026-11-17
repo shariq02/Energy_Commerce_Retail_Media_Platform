@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- WIKIPEDIA ARTICLE TEXT (SAMPLES)
@@ -28,14 +28,6 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %run ../_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_samples_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_wikipedia_eda_common
 
 # COMMAND ----------
 
@@ -155,7 +147,7 @@ for c in prof["cols"]:
 # COMMAND ----------
 
 # DBTITLE 1,Constant columns
-prof["constant"] = constant_cols(d0, prof)
+prof["constant"] = constant_column_names(d0, prof)
 print(f"constant={prof['constant']}")
 
 # COMMAND ----------

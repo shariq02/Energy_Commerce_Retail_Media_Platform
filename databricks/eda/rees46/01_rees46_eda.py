@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- REES46 ECOMMERCE EVENTS
@@ -61,22 +61,16 @@ COLS = df.columns
 ts = F.try_to_timestamp(F.substring("event_time", 1, 19))
 price = safe_num("price")
 
-prof_exprs = [F.count(F.lit(1)).alias("__rows")]
-for c in COLS:
-    miss = F.col(c).isNull() | (F.trim(F.col(c)) == "")
-    prof_exprs += [
-        F.sum(miss.cast("long")).alias(c + "__m"),
-        F.approx_count_distinct(c).alias(c + "__d"),
-    ]
-r = df.agg(*prof_exprs).first().asDict()
-total = r["__rows"]
-missrates = {c: r[c + "__m"] / total for c in COLS}
-approx_card = {c: r[c + "__d"] for c in COLS}
-constant_cols = [c for c in COLS if r[c + "__d"] <= 1]
+P = profile_frame(df)
+total = P["total"]
+missrates = {c: P["miss"][c] / total for c in COLS}
+approx_card = P["acd"]
+constant_cols = constant_column_names(df, P)
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:
     print(
-        f"  {c:<16} missing={r[c + '__m']:>14} rate={missrates[c]:.4f} approx_distinct={r[c + '__d']}"
+        f"  {c:<16} missing={P['miss'][c]:>14} "
+        f"rate={missrates[c]:.4f} approx_distinct={approx_card[c]}"
     )
 print("constant columns:", constant_cols)
 print(

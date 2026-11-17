@@ -1195,12 +1195,4 @@ The catalog comment (see Provenance) states the scope of the sample; the data it
 - The forecast/historical overlap results decide how a forecast row and an observed row for the same key can be related.
 - Cap-like columns and all-missing columns need an explicit keep / null / drop rule.
 
-### Figure -- AccuWeather -- overview
-
-![AccuWeather -- overview](figures/accuweather_overview.png)
-
-### Figure -- AccuWeather -- first categorical column per table
-
-![AccuWeather -- first categorical column per table](figures/accuweather_categorical.png)
-
 <!-- END accuweather:01_accuweather -->

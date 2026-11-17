@@ -200,12 +200,4 @@ Redispatch reporting moved to the 'NABEG 2.0 / Redispatch 2.0' regime in Oct 202
 - Keep BETROFFENE_ANLAGE / *_UENB as text; reconcile the affected-plant name to a power_plant_list / MaStR unit id at Silver (fuzzy match -- there is no shared key).
 - Silver grain: one row per redispatch measure/event; combine BEGINN_DATUM+UHRZEIT and ENDE_DATUM+UHRZEIT into UTC start/end timestamps and validate start <= end.
 
-### Figure -- Redispatch measures -- overview
-
-![Redispatch measures -- overview](figures/redispatch_overview.png)
-
-### Figure -- Redispatch -- rows per year (BEGINN_DATUM)
-
-![Redispatch -- rows per year (BEGINN_DATUM)](figures/redispatch_rows_per_year.png)
-
 <!-- END redispatch:01_redispatch -->

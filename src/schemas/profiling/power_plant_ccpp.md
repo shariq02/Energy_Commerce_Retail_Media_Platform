@@ -167,12 +167,4 @@ One plant, one operating regime is implied; there is no site, unit or load-mode 
 - Rows repeat across files -> decide the de-duplication rule before use; the per-file identity result in Data Quality shows whether the files are copies of one row set.
 - Values beyond the expected physical bounds exist (see Unit & Semantic Validation) -> decide whether to keep, cap or quarantine them.
 
-### Figure -- Power plant -- rows per source file
-
-![Power plant -- rows per source file](figures/power_plant_ccpp_overview.png)
-
-### Figure -- Power plant -- value distributions
-
-![Power plant -- value distributions](figures/power_plant_ccpp_distributions.png)
-
 <!-- END power_plant_ccpp:01_power_plant_ccpp -->

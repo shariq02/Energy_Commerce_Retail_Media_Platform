@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- IOT DEVICE TELEMETRY (SAMPLES)
@@ -31,10 +31,6 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %run ../_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_samples_eda_common
 
 # COMMAND ----------
 
@@ -141,7 +137,7 @@ for c in prof["cols"]:
 
 # DBTITLE 1,Constant columns + full-row duplicates
 d0 = df.drop("__file")
-prof["constant"] = constant_cols(d0, prof)
+prof["constant"] = constant_column_names(d0, prof)
 prof["dups"] = full_row_dup_count(d0, prof["total"])
 print(f"constant={prof['constant']}  full-row duplicates={prof['dups']}")
 

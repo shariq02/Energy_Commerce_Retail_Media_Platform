@@ -261,30 +261,6 @@ Mean of each P column by UTC hour of day, weekday (1 = Sunday) and month, 1h fre
 - Series are not necessarily dense (coverage / gaps above) -> observed points only; resampling is a downstream choice.
 - Stuck-sensor runs and 5-sigma spikes -> data-quality flag, keep raw.
 
-### Figure -- Honda energy -- rows per frequency, by table
-
-![Honda energy -- rows per frequency, by table](figures/honda_energy_rows_per_frequency.png)
-
-### Figure -- Honda energy -- coverage % by frequency
-
-![Honda energy -- coverage % by frequency](figures/honda_energy_coverage_pct.png)
-
-### Figure -- Honda energy -- duplicate (frequency, datetime_utc) groups
-
-![Honda energy -- duplicate (frequency, datetime_utc) groups](figures/honda_energy_duplicate_groups.png)
-
-### Figure -- Honda energy -- value distribution per table.column
-
-![Honda energy -- value distribution per table.column](figures/honda_energy_value_distributions.png)
-
-### Figure -- Honda energy -- first 2000 hourly points, by table
-
-![Honda energy -- first 2000 hourly points, by table](figures/honda_energy_first_hourly_points.png)
-
-### Figure -- Honda energy -- P vs W per metric
-
-![Honda energy -- P vs W per metric](figures/honda_energy_p_vs_w_scatter.png)
-
 <!-- END honda_iot:01_energy -->
 
 <!-- BEGIN honda_iot:02_weather -->
@@ -374,22 +350,6 @@ This weather series is the feature side of the energy<->weather join (03); if it
 
 - Type conversion: datetime_utc -> timestamp (UTC); value columns -> double.
 - Keep `frequency` in the grain; do not resample or blend resolutions at Silver.
-
-### Figure -- Honda weather -- frequency overview
-
-![Honda weather -- frequency overview](figures/honda_weather_frequency.png)
-
-### Figure -- Honda weather -- value distribution per column
-
-![Honda weather -- value distribution per column](figures/honda_weather_value_distributions.png)
-
-### Figure -- Honda weather -- first 3000 hourly points per column
-
-![Honda weather -- first 3000 hourly points per column](figures/honda_weather_hourly_window.png)
-
-### Figure -- Honda weather -- mean value by hour of day
-
-![Honda weather -- mean value by hour of day](figures/honda_weather_diurnal_profiles.png)
 
 <!-- END honda_iot:02_weather -->
 
@@ -536,17 +496,5 @@ A shared 1:1 key exists. A wide 'all Honda metrics at (frequency, datetime_utc)'
 ### Silver Implications
 
 - Silver grain: one fact table per dataset keyed on (frequency, datetime_utc); join P+W per metric where a combined metric fact is needed.
-
-### Figure -- Honda pairwise (frequency, datetime_utc) overlap
-
-![Honda pairwise (frequency, datetime_utc) overlap](figures/honda_overlap_matrix.png)
-
-### Figure -- Honda -- keys missing from each table vs the union
-
-![Honda -- keys missing from each table vs the union](figures/honda_keys_missing_vs_union.png)
-
-### Figure -- Honda -- energy <-> weather join yield
-
-![Honda -- energy <-> weather join yield](figures/honda_energy_weather_join_yield.png)
 
 <!-- END honda_iot:03_relationships_and_findings -->

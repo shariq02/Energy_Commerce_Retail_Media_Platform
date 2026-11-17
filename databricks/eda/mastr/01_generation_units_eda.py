@@ -75,28 +75,9 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 frames = {d: bronze_frame(t) for d, t in TABLES.items()}
 prof = {}
 for name, df in frames.items():
-    cols = df.columns
-    exprs = [F.count(F.lit(1)).alias("__rows")]
-    for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-        exprs += [
-            F.sum(miss.cast("long")).alias(c + "__m"),
-            F.approx_count_distinct(c).alias(c + "__d"),
-        ]
-    r = df.agg(*exprs).first().asDict()
-    total = r["__rows"]
-    acd = {c: r[c + "__d"] for c in cols}
-    miss = {c: r[c + "__m"] for c in cols}
-    # approx_count_distinct <= 1 can misfire near the boundary; confirm constant
-    # columns exactly below before reporting them.
-    constant_candidates = [c for c in cols if acd[c] <= 1]
-    prof[name] = {
-        "cols": cols,
-        "total": total,
-        "acd": acd,
-        "miss": miss,
-        "constant_candidates": constant_candidates,
-    }
+    prof[name] = profile_frame(df)
+    cols, total = prof[name]["cols"], prof[name]["total"]
+    acd, miss = prof[name]["acd"], prof[name]["miss"]
     print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}")
     for c in cols:
         rate = miss[c] / total if total else 0
@@ -109,12 +90,7 @@ for name, df in frames.items():
 # DBTITLE 1,Confirm constant columns exactly (approx_count_distinct is only a screen)
 constant_cols = {}
 for name, df in frames.items():
-    cands = prof[name]["constant_candidates"]
-    if not cands:
-        constant_cols[name] = []
-        continue
-    r = df.agg(*[F.countDistinct(F.col(c)).alias(c) for c in cands]).first().asDict()
-    constant_cols[name] = sorted(c for c in cands if (r[c] or 0) <= 1)
+    constant_cols[name] = constant_column_names(df, prof[name])
     prof[name]["constant"] = constant_cols[name]
     print(f"{name}: constant columns (exact) = {constant_cols[name]}")
 for name in DATASETS:

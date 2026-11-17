@@ -357,12 +357,4 @@ power_plant_capacity_additions is a forward-looking planning summary (2026-2029)
 - power_plant_capacity_additions is a projection summary -> model as a Silver planning/forecast fact, never merged into current-state plant attributes.
 - Reconcile the plant identifier to a MaStR unit id at Silver -- power_plant_list covers only large plants, so the join is a subset, not a 1:1.
 
-### Figure -- Power plant list -- overview
-
-![Power plant list -- overview](figures/power_plant_list_overview.png)
-
-### Figure -- Power plant list -- first categorical column per table
-
-![Power plant list -- first categorical column per table](figures/power_plant_list_categorical.png)
-
 <!-- END power_plant_list:01_power_plant_list -->

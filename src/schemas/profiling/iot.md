@@ -174,12 +174,4 @@ Coverage of the file cannot be checked against an external reference: the README
 - Whether a device identifier is a stable entity key depends on the readings-per-device finding above.
 - Provenance and real/synthetic status are unresolved in the data itself; label the table accordingly.
 
-### Figure -- IoT -- sensor value distributions
-
-![IoT -- sensor value distributions](figures/iot_distributions.png)
-
-### Figure -- IoT -- categorical columns
-
-![IoT -- categorical columns](figures/iot_categorical.png)
-
 <!-- END iot:01_iot_devices -->

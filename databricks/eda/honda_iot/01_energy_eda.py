@@ -77,26 +77,14 @@ frames = {
 prof = {}
 for e in ENERGY:
     df = frames[e]
-    cols = df.columns
-    exprs = [F.count(F.lit(1)).alias("__rows")]
-    for c in cols:
-        miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-        exprs += [
-            F.sum(miss.cast("long")).alias(c + "__m"),
-            F.approx_count_distinct(c).alias(c + "__d"),
-        ]
-    r = df.agg(*exprs).first().asDict()
-    prof[e] = {
-        "cols": cols,
-        "total": r["__rows"],
-        "acd": {c: r[c + "__d"] for c in cols},
-        "miss": {c: r[c + "__m"] for c in cols},
-    }
-    print("=" * 88, f"\n{e}  rows={r['__rows']}  ->  {cols}")
+    prof[e] = profile_frame(df)
+    cols = prof[e]["cols"]
+    print("=" * 88, f"\n{e}  rows={prof[e]['total']}  ->  {cols}")
     for c in cols:
         print(
-            f"  {c:<28} missing={r[c + '__m']:>12} "
-            f"rate={r[c + '__m'] / r['__rows']:.4f} approx_distinct={r[c + '__d']}"
+            f"  {c:<28} missing={prof[e]['miss'][c]:>12} "
+            f"rate={prof[e]['miss'][c] / prof[e]['total']:.4f} "
+            f"approx_distinct={prof[e]['acd'][c]}"
         )
 totals = {e: prof[e]["total"] for e in ENERGY}
 VCOLS = {e: [c for c in prof[e]["cols"] if c not in VALUE_EXCLUDE] for e in ENERGY}
@@ -106,12 +94,7 @@ VCOLS = {e: [c for c in prof[e]["cols"] if c not in VALUE_EXCLUDE] for e in ENER
 # DBTITLE 1,Confirm constant columns exactly
 constant_cols = {}
 for e in ENERGY:
-    cands = [c for c in prof[e]["cols"] if prof[e]["acd"][c] <= 1]
-    if cands:
-        r = frames[e].agg(*[F.countDistinct(F.col(c)).alias(c) for c in cands]).first()
-        constant_cols[e] = sorted(c for c in cands if (r[c] or 0) <= 1)
-    else:
-        constant_cols[e] = []
+    constant_cols[e] = constant_column_names(frames[e], prof[e])
     prof[e]["constant"] = constant_cols[e]
     print(f"{e}: constant columns (exact) = {constant_cols[e]}")
 

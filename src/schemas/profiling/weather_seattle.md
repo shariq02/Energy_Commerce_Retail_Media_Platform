@@ -149,16 +149,4 @@ One site, one short window; the data does not carry the site name, the station i
 - The data has no station or location column: any location label must be supplied and flagged as derived from the README, not from the data.
 - Two rows per date and no role column: the only high/low label is the source file name, so `__file` must be carried into Silver to keep the role.
 
-### Figure -- Weather -- seasonal profile
-
-![Weather -- seasonal profile](figures/weather_seattle_seasonal.png)
-
-### Figure -- Weather -- temperature distribution
-
-![Weather -- temperature distribution](figures/weather_seattle_distribution.png)
-
-### Figure -- Weather -- rows per month
-
-![Weather -- rows per month](figures/weather_seattle_rows_per_month.png)
-
 <!-- END weather_seattle:01_weather_seattle -->

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- ACCUWEATHER (SAMPLES CATALOG SCHEMA)
@@ -33,10 +33,6 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %run ../_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_samples_eda_common
 
 # COMMAND ----------
 
@@ -234,7 +230,7 @@ for t, df in DFS.items():
 # DBTITLE 1,Constant columns, all-missing columns and full-row duplicates
 for t, df in DFS.items():
     p = prof[t]
-    p["constant"] = constant_cols(df, p)
+    p["constant"] = constant_column_names(df, p)
     p["all_missing"] = sorted(
         c for c in p["cols"] if p["total"] and p["miss"][c] == p["total"]
     )

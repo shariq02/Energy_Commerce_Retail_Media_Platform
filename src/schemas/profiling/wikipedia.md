@@ -92,10 +92,6 @@ Key candidates (column: distinct / ratio-to-rows / unique):
 - Selection: the domain-term counts are a proxy only; the articles carry no category column unless listed in the structure block.
 - Freshness: the revision timestamps above are the only date evidence in the copy; the upstream source is not read here.
 
-### Figure -- Wikipedia articles -- text length (power-of-two buckets)
-
-![Wikipedia articles -- text length (power-of-two buckets)](figures/wikipedia_article_length.png)
-
 <!-- END wikipedia:01_wikipedia_articles -->
 
 <!-- BEGIN wikipedia:02_wikipedia_clickstream -->
@@ -179,10 +175,6 @@ Self-loops (rows where both ends are equal): {'prev_id==curr_id': 37486, 'prev_t
 - Non-link edges: the other types are external or empty referrers and are not page-to-page relations; their counts are above.
 - Weight: click counts are a measured weight; the concentration figures show how skewed they are.
 - Date: the copy carries no time column; the file name is the only date evidence (read in the provenance block).
-
-### Figure -- Wikipedia clickstream -- edge types and click counts
-
-![Wikipedia clickstream -- edge types and click counts](figures/wikipedia_clickstream.png)
 
 <!-- END wikipedia:02_wikipedia_clickstream -->
 

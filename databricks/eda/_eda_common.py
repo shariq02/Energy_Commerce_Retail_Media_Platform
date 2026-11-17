@@ -15,14 +15,17 @@
 # MAGIC **Purpose:** Shared profiling plumbing (repo-root discovery, the
 # MAGIC `src/schemas/profiling/<source>.md` writer, figure helpers) and the
 # MAGIC reusable data-quality / modelling-risk checks used by every source EDA
-# MAGIC notebook. Pulled in with `%run ../_eda_common`. Definitions only -- no
-# MAGIC side effects at import; the caller owns `spark` / `dbutils`.
+# MAGIC notebook, plus the helpers of the Samples Volume sources, article text and
+# MAGIC link graphs, and the genomics Gold tables. Pulled in with
+# MAGIC `%run ../_eda_common`. Definitions only -- no side effects at import; the
+# MAGIC caller owns `spark` / `dbutils`.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
 import contextlib
 import datetime as _dt
+import math
 import os as _os
 import re as _re
 
@@ -83,6 +86,56 @@ LEAKAGE_CATEGORIES = (
     "Sample-vs-full divergence",
 )
 
+# Sources read in place from the Databricks Samples Volume.
+SAMPLES_VOLUME_ROOT = "/Volumes/samples/databricks/datasets"
+SUPPORT_HINTS = ("readme", "license", "licence", "description", "citation", "notice")
+DELIMITERS = {"\t": "tab", ";": "semicolon", ",": "comma", "|": "pipe"}
+SEP_CHOICES = ("\t", ";", ",", "|")
+
+# Article text and link-graph sources.
+# Words per section above which a section probably exceeds a 256-token chunk.
+WORDS_PER_CHUNK_PROXY = 190
+QUANTILE_PROBS = (0.01, 0.25, 0.5, 0.75, 0.95, 0.99)
+# An inline section heading such as "== History ==" inside one-line text.
+HEADING_PATTERN = r"\s={2,}[^=\n]{1,100}?={2,}\s"
+CLEAN_STEPS = (
+    (r"(?s)<ref[^>/]*>.*?</ref>", ""),
+    (r"<ref[^>]*/>", ""),
+    (r"\{\{[^{}]*\}\}", ""),
+    (r"\{\{[^{}]*\}\}", ""),
+    (r"\{\{[^{}]*\}\}", ""),
+    (r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", "$1"),
+    (r"\[https?://[^\s\]]+\s?([^\]]*)\]", "$1"),
+    (r"<[^>]+>", ""),
+    (r"https?://\S+", ""),
+    (r"'{2,5}", ""),
+    (r"\s+", " "),
+)
+MARKUP_PATTERNS = {
+    "newline": r"\n",
+    "inline_heading": HEADING_PATTERN,
+    "wiki_link": r"\[\[",
+    "template_brace": r"\{\{",
+    "html_tag": r"<[a-zA-Z/][^>]*>",
+    "url": r"https?://",
+    "redirect": r"(?i)^\s*#redirect",
+}
+
+# Genomics Gold tables.
+PROVENANCE_COLUMNS = ("source_system", "ecosystem", "_gold_loaded_at", "_gold_run_id")
+NUMERIC_DTYPES = ("int", "bigint", "smallint", "tinyint", "double", "float")
+KEY_SUFFIXES = ("_key", "_id")
+KEY_CANDIDATES = 4
+HIGH_NULL_RATE = 0.5
+FLAG_SEPARATION = 0.9
+LEAK_CORRELATION = 0.9
+PAIR_COLUMNS = 30
+MISSING_GAP = 0.2
+TEXT_ENUM_MAX = 20
+NEAR_UNIQUE = 0.9
+LIST_LIMIT = 15
+GROUP_EDGES = ((1, "1"), (2, "2"), (3, "3 to 5"), (6, "6 or more"))
+
 # COMMAND ----------
 
 # DBTITLE 1,Repo-root discovery + profiling export path
@@ -118,7 +171,7 @@ def _repo_root():
 
 def _profiling_dir():
     d = _os.path.join(_repo_root(), "src", "schemas", "profiling")
-    _os.makedirs(_os.path.join(d, "figures"), exist_ok=True)
+    _os.makedirs(d, exist_ok=True)
     return d
 
 
@@ -130,24 +183,25 @@ BRONZE_MERGES = _os.path.join("src", "schemas", "mappings", "bronze_merges.yml")
 
 def bronze_frame(full_name):
     """A Bronze table by its full name; a table merged into another
-    (bronze_merges.yml) is read from the merged table, filtered by its value."""
+    (bronze_merges.yml) is read from the merged table, filtered by its value. The
+    `kept` values of an appended table are named `<source>_<value>`."""
     catalog, schema, table = full_name.split(".")
     with open(_os.path.join(_repo_root(), BRONZE_MERGES), encoding="utf-8") as fh:
         merges = yaml.safe_load(fh)["merges"]
     for merge in merges:
         column = merge["discriminator"]
-        for value, part in merge["parts"].items():
-            if column and (merge["schema"], part) == (schema, table):
-                return (
-                    spark.table(f"{catalog}.{schema}.{merge['table']}")
-                    .filter(F.col(column) == value)
-                    .drop(column)
-                )
+        if not column or merge["schema"] != schema:
+            continue
+        source = merge["table"].rsplit("_", 1)[0]
+        names = {part: value for value, part in merge["parts"].items()}
+        names.update({f"{source}_{value}": value for value in merge.get("kept", [])})
+        if table in names:
+            return (
+                spark.table(f"{catalog}.{schema}.{merge['table']}")
+                .filter(F.col(column) == names[table])
+                .drop(column)
+            )
     return spark.table(full_name)
-
-
-def fig_path(name):
-    return _os.path.join(_profiling_dir(), "figures", name)
 
 
 # COMMAND ----------
@@ -163,7 +217,7 @@ def find_col(df, *cands):
     return None
 
 
-def _qc(name):
+def qcol(name):
     # Column reference that survives names with dots / spaces / hyphens -- German
     # government CSV headers carry them (e.g. dwd_station_geography."Geogr.Breite",
     # dwd_parameter_unit."Zusatz-Info"). A bare F.col("a.b") is read as struct
@@ -188,7 +242,7 @@ def safe_num(colname):
     # row holds a blank or non-numeric string -- Bronze is all-string, so that is
     # a real hazard. `when(rlike, ...)` short-circuits so the cast only runs on
     # values that are already valid numbers.
-    s = _de_number(F.trim(_qc(colname).cast("string")))
+    s = _de_number(F.trim(qcol(colname).cast("string")))
     return F.when(s.rlike(r"^-?\d+(\.\d+)?$"), s.cast("double"))
 
 
@@ -204,7 +258,7 @@ def full_row_dup_count(df, total=None):
     if total is None:
         total = df.count()
     distinct = (
-        df.select(F.xxhash64(*[_qc(c) for c in df.columns]).alias("__h"))
+        df.select(F.xxhash64(*[qcol(c) for c in df.columns]).alias("__h"))
         .distinct()
         .count()
     )
@@ -223,14 +277,14 @@ def dup_key_composition(df, key_cols, hash_cols=None, conflict_cols=None):
     hash_cols = hash_cols or df.columns
     conflict_cols = conflict_cols or hash_cols
     sel = [
-        *[_qc(c) for c in key_cols],
-        F.xxhash64(*[_qc(c) for c in hash_cols]).alias("__h"),
+        *[qcol(c) for c in key_cols],
+        F.xxhash64(*[qcol(c) for c in hash_cols]).alias("__h"),
     ]
     if conflict_cols != hash_cols:
-        sel.append(F.xxhash64(*[_qc(c) for c in conflict_cols]).alias("__c"))
+        sel.append(F.xxhash64(*[qcol(c) for c in conflict_cols]).alias("__c"))
     h = df.select(*sel)
     _cv = "__c" if conflict_cols != hash_cols else "__h"
-    per_key = h.groupBy(*[_qc(c) for c in key_cols]).agg(
+    per_key = h.groupBy(*[qcol(c) for c in key_cols]).agg(
         F.count(F.lit(1)).alias("n"),
         F.approx_count_distinct("__h").alias("row_variants"),
         F.approx_count_distinct(_cv).alias("conflict_variants"),
@@ -302,18 +356,12 @@ def _apply_xlabels(ax, labels, rot):
     )
 
 
-def _save_and_show(fig, filename):
-    # Save the PNG under src/schemas/profiling/figures/, print where it landed
-    # (so a run makes it obvious whether files are being written), then render
-    # it inline and close it. Prefer Databricks' display() -- it serialises the
-    # figure to PNG itself, so it renders regardless of the matplotlib backend
-    # (plt.show() is a silent no-op if the session's backend is non-interactive,
-    # e.g. left on "Agg" by an earlier run in the same Python session).
-    if filename:
-        path = fig_path(filename)
-        fig.savefig(path, dpi=110, bbox_inches="tight")
-        size = _os.path.getsize(path) if _os.path.exists(path) else -1
-        print(f"  figure saved -> {path}  ({size} bytes)")
+def _save_and_show(fig):
+    # Render the figure inline and close it; a figure is never written to a file,
+    # so no data reaches the repository. Prefer Databricks' display() -- it
+    # serialises the figure to PNG itself, so it renders regardless of the
+    # matplotlib backend (plt.show() is a silent no-op if the session's backend is
+    # non-interactive, e.g. left on "Agg" by an earlier run in the same session).
     try:
         display(fig)
     except NameError:
@@ -331,9 +379,8 @@ def barplot(
     logy=False,
     filename=None,
 ):
-    # Returns True only if a figure with data was written -- callers gate the
-    # markdown figure reference on the return value so an empty result never
-    # leaves a blank PNG referenced in the profile.
+    # Returns True only if a figure with data was shown. `filename` only labels the
+    # "no data" message: a figure is shown in the notebook and never stored.
     pairs = [p for p in pairs if p is not None]
     if not pairs:
         print(f"  barplot: no data -> {filename} (figure not written)")
@@ -351,7 +398,7 @@ def barplot(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     fig.tight_layout()
-    _save_and_show(fig, filename)
+    _save_and_show(fig)
     return True
 
 
@@ -368,7 +415,7 @@ def histplot(
     ax.set_xlabel(xlabel)
     ax.set_ylabel("count")
     fig.tight_layout()
-    _save_and_show(fig, filename)
+    _save_and_show(fig)
     return True
 
 
@@ -394,7 +441,7 @@ def lineplot(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     fig.tight_layout()
-    _save_and_show(fig, filename)
+    _save_and_show(fig)
     return True
 
 
@@ -417,7 +464,7 @@ def _facet_grid(items, suptitle, filename, ncols=3, panel=(4.6, 3.2)):
         ax.set_visible(False)
     fig.suptitle(suptitle)
     fig.tight_layout()
-    _save_and_show(fig, filename)
+    _save_and_show(fig)
     return True
 
 
@@ -487,6 +534,7 @@ def lines_grid(series, suptitle, filename, ncols=4, panel=(4.0, 2.6)):
 def write_profiling(source, notebook_key, section_title, blocks, figures=None):
     # One <source>.md per source; each notebook owns one marker-delimited
     # `## ` section, re-run replaces its own, others preserved, order by key.
+    # `figures` is accepted and ignored: figures are shown in the notebook only.
     d = _profiling_dir()
     md = _os.path.join(d, source + ".md")
     lines = [f"<!-- BEGIN {source}:{notebook_key} -->", f"## {section_title}", ""]
@@ -494,11 +542,6 @@ def write_profiling(source, notebook_key, section_title, blocks, figures=None):
         if body is None or str(body).strip() == "":
             continue
         lines += [f"### {heading}", "", str(body).rstrip(), ""]
-    for cap, name in figures or []:
-        if not _os.path.exists(_os.path.join(d, "figures", name)):
-            print(f"  profiling export: skipping absent figure {name}")
-            continue
-        lines += [f"### Figure -- {cap}", "", f"![{cap}](figures/{name})", ""]
     lines.append(f"<!-- END {source}:{notebook_key} -->")
     block = "\n".join(lines)
     existing = ""
@@ -566,13 +609,14 @@ def exact_uniqueness(df, cols):
     aggs = [F.count(F.lit(1)).alias("__n")]
     for c in cols:
         aggs += [
-            F.countDistinct(_qc(c)).alias(c + "__d"),
-            F.sum(_qc(c).isNull().cast("long")).alias(c + "__nulls"),
+            F.countDistinct(qcol(c)).alias(c + "__d"),
+            F.sum(qcol(c).isNull().cast("long")).alias(c + "__nulls"),
         ]
     r = df.agg(*aggs).first().asDict()
     n = r["__n"] or 0
     return {
         c: {
+            "rows": n,
             "distinct": r[c + "__d"],
             "nulls": r[c + "__nulls"],
             "ratio": round(r[c + "__d"] / n, 6) if n else 0.0,
@@ -599,7 +643,7 @@ def pick_entity_key(uniq, candidates, prefer=()):
 def collect_key_set(df, colname):
     return {
         r[0]
-        for r in df.select(_qc(colname).cast("string")).distinct().collect()
+        for r in df.select(qcol(colname).cast("string")).distinct().collect()
         if r[0] is not None and str(r[0]).strip() != ""
     }
 
@@ -665,7 +709,7 @@ def ri_interpretation(ri):
 
 
 def parse_ts_multi(colname, formats=GERMAN_TS_FORMATS):
-    s = _qc(colname).cast("string")
+    s = qcol(colname).cast("string")
     expr = F.try_to_timestamp(s)
     for fmt in formats:
         expr = F.coalesce(expr, F.try_to_timestamp(s, F.lit(fmt)))
@@ -679,7 +723,7 @@ def timestamp_semantics(
     # observed range, implausible (pre-`valid_from` / future) rows, sub-day
     # granularity, and a timezone/DST note. One aggregation pass for the
     # summary + one for the per-format counts + a tiny sample of unparsed text.
-    s = _qc(colname).cast("string")
+    s = qcol(colname).cast("string")
     present = s.isNotNull() & (F.trim(s) != "")
     parsed = parse_ts_multi(colname, formats)
     lo = F.lit(valid_from).cast("timestamp")
@@ -770,7 +814,7 @@ def numeric_parseability(df, colname, decimal_comma=True):
     # double (after optional German comma-decimal normalisation). This stops a
     # free-text column (e.g. an affected-plant name) being reported as a numeric
     # column with "0 of N parsed".
-    s = _qc(colname).cast("string")
+    s = qcol(colname).cast("string")
     norm = F.trim(s)
     if decimal_comma:
         # German convention: "1.234,56" -> "1234.56" (lookaround-free -- see
@@ -903,11 +947,11 @@ def continuity_grid(df, ts_col, step, entity_col=None, grid_start=None, grid_end
     t = (
         parse_ts_multi(ts_col)
         if dict(df.dtypes).get(ts_col) == "string"
-        else _qc(ts_col)
+        else qcol(ts_col)
     )
     epoch = F.unix_timestamp(t.cast("timestamp"))
     base = df.select(
-        epoch.alias("e"), *([_qc(entity_col).alias("k")] if entity_col else [])
+        epoch.alias("e"), *([qcol(entity_col).alias("k")] if entity_col else [])
     )
     base = base.where(F.col("e").isNotNull())
     gkeys = ["k"] if entity_col else []
@@ -1028,7 +1072,7 @@ def categorical_domain(df, colname, allowed, name=None, normalize=None):
     norm = normalize or (lambda x: x)
     present = {
         r[0]
-        for r in df.select(_qc(colname).cast("string")).distinct().collect()
+        for r in df.select(qcol(colname).cast("string")).distinct().collect()
         if r[0] is not None and str(r[0]).strip() != ""
     }
     present_n = {norm(v) for v in present}
@@ -1130,7 +1174,7 @@ def reconcile_codes(df, colname, catalog, category_hint=None):
     # name matches a catalog category name, the check is scoped to that category;
     # otherwise it falls back to global value-id membership, which cannot prove a
     # code is valid FOR THIS column, only that MaStR uses it somewhere.
-    vc = df.groupBy(_qc(colname).cast("string").alias("v")).count().collect()
+    vc = df.groupBy(qcol(colname).cast("string").alias("v")).count().collect()
     counts = {}
     for r in vc:
         v = r["v"].strip() if r["v"] is not None else None
@@ -1166,7 +1210,7 @@ def cardinality_profile(child_df, ccol, child_key_set, parent_set):
     # child-rows-per-parent distribution (p50/p90/p99 + max fan-out). `ccol` is
     # the FK on the child; because the FK value IS the parent key, rows grouped by
     # `ccol` is exactly the per-parent child count.
-    key = _qc(ccol).cast("string")
+    key = qcol(ccol).cast("string")
     per_key = (
         child_df.where(key.isNotNull() & (F.trim(key) != ""))
         .groupBy(key.alias("k"))
@@ -1242,13 +1286,13 @@ def regime_population_shift(df, date_col, cols, cut_iso, formats=GERMAN_TS_FORMA
     cols = [c for c in cols if c in df.columns and c != date_col]
     aggs = [F.count(F.lit(1)).alias("n")]
     for c in cols:
-        miss = _qc(c).isNull() | (F.trim(_qc(c).cast("string")) == "")
+        miss = qcol(c).isNull() | (F.trim(qcol(c).cast("string")) == "")
         aggs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
             # approx (HLL) -- exact countDistinct per column here means an Expand
             # union of the whole table once per column (crippling on 10^8 rows);
             # the distinct count is only used to characterise the two cohorts.
-            F.approx_count_distinct(_qc(c)).alias(c + "__d"),
+            F.approx_count_distinct(qcol(c)).alias(c + "__d"),
         ]
     rows = {
         r["__s"]: r.asDict()
@@ -1290,8 +1334,8 @@ def group_attribute_spread(df, group_col, value_col, transform=None):
     # transformed) does it carry -- an internal geographic / attribute
     # consistency probe that needs no external reference. `inconsistent_groups`
     # is the count with more than one, i.e. a contradiction within the entity.
-    g = _qc(group_col).cast("string")
-    v = _qc(value_col).cast("string")
+    g = qcol(group_col).cast("string")
+    v = qcol(value_col).cast("string")
     if transform == "prefix2":
         v = F.substring(F.regexp_replace(v, r"\s", ""), 1, 2)
     valid = g.isNotNull() & (F.trim(g) != "") & v.isNotNull() & (F.trim(v) != "")
@@ -1324,12 +1368,12 @@ def monotonic_series_check(df, value_col, order_col, partition_col=None):
     v = safe_num(value_col)
     keys = [partition_col] if partition_col else []
     win = (
-        _W.partitionBy(*[_qc(k) for k in keys]).orderBy(_qc(order_col))
+        _W.partitionBy(*[qcol(k) for k in keys]).orderBy(qcol(order_col))
         if keys
-        else _W.orderBy(_qc(order_col))
+        else _W.orderBy(qcol(order_col))
     )
     d = df.select(
-        *[_qc(k) for k in keys],
+        *[qcol(k) for k in keys],
         v.alias("__v"),
         (v - F.lag(v).over(win)).alias("__d"),
     )
@@ -1436,15 +1480,15 @@ def population_by_group(df, group_col, cols):
     cols = [c for c in cols if c in df.columns and c != group_col]
     aggs = [F.count(F.lit(1)).alias("__n")]
     for c in cols:
-        miss = _qc(c).isNull() | (F.trim(_qc(c).cast("string")) == "")
+        miss = qcol(c).isNull() | (F.trim(qcol(c).cast("string")) == "")
         aggs += [
             F.sum(miss.cast("long")).alias(c + "__m"),
             # approx (HLL): exact per-column countDistinct here is an Expand
             # union of the full table once per column.
-            F.approx_count_distinct(_qc(c)).alias(c + "__d"),
+            F.approx_count_distinct(qcol(c)).alias(c + "__d"),
         ]
     rows = (
-        df.withColumn("__g", _qc(group_col).cast("string"))
+        df.withColumn("__g", qcol(group_col).cast("string"))
         .groupBy("__g")
         .agg(*aggs)
         .collect()
@@ -1564,4 +1608,1219 @@ def area_block(evidence):
                 else "no supporting evidence in the data read here."
             )
         )
+    return "\n".join(lines)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Samples Volume -- file listing, delimiter sniffing and reads
+
+
+def list_tree(root, max_depth=3, cap=400):
+    # Recursive dbutils.fs.ls, depth- and count-capped so an unexpectedly large
+    # Volume directory cannot flood the notebook.
+    out = []
+    stack = [(root.rstrip("/"), 0)]
+    while stack and len(out) < cap:
+        path, depth = stack.pop()
+        for fi in dbutils.fs.ls(path):
+            if fi.name.endswith("/"):
+                if depth + 1 <= max_depth:
+                    stack.append((fi.path.rstrip("/"), depth + 1))
+                continue
+            out.append({"path": fi.path, "name": fi.name, "size": fi.size})
+            if len(out) >= cap:
+                break
+    return sorted(out, key=lambda x: x["path"])
+
+
+def file_kind(name):
+    n = name.lower()
+    n = n.removesuffix(".gz")
+    if any(h in n for h in SUPPORT_HINTS) or n.endswith((".md", ".rst")):
+        return "support"
+    ext = n.rsplit(".", 1)[-1] if "." in n else ""
+    if ext in ("csv", "tsv", "txt", "dat", "data", "tab"):
+        return "delimited"
+    if ext in ("json", "jsonl", "ndjson"):
+        return "json"
+    if ext == "parquet":
+        return "parquet"
+    return "other"
+
+
+def classify_files(entries):
+    kinds = {}
+    for e in entries:
+        kinds.setdefault(file_kind(e["name"]), []).append(e)
+    return kinds
+
+
+def head_lines(path, n=3):
+    return [r[0] for r in spark.read.text(path).limit(n).collect()]
+
+
+def sniff_sep(line):
+    counts = {s: line.count(s) for s in SEP_CHOICES}
+    best = max(counts, key=counts.get)
+    return best if counts[best] > 0 else ","
+
+
+def group_delimited(entries):
+    # One group per distinct header line, so files with different columns are
+    # never read through a single header.
+    groups = {}
+    for e in entries:
+        lines = head_lines(e["path"], 1)
+        first = lines[0] if lines else ""
+        groups.setdefault(first, []).append(e["path"])
+    return groups
+
+
+def read_delimited(paths, sep):
+    df = (
+        spark.read.option("header", True)
+        .option("inferSchema", False)
+        .option("sep", sep)
+        .csv(paths)
+    )
+    return df.select("*", F.col("_metadata.file_name").alias("__file"))
+
+
+def read_json_any(paths):
+    df = spark.read.json(paths)
+    if df.columns == ["_corrupt_record"]:
+        df = spark.read.option("multiLine", True).json(paths)
+    return df.select("*", F.col("_metadata.file_name").alias("__file"))
+
+
+def read_parquet_any(paths):
+    df = spark.read.parquet(*paths)
+    return df.select("*", F.col("_metadata.file_name").alias("__file"))
+
+
+def looks_delimited(path):
+    lines = head_lines(path, 1)
+    return bool(lines) and any(sep in lines[0] for sep in SEP_CHOICES)
+
+
+def load_volume_frames(root, max_depth=3, cap=400):
+    # Lists a Volume directory and returns (entries, kinds, frames). One frame
+    # per distinct delimited header (or per JSON / Parquet file set), each with
+    # a `__file` column so multi-file datasets stay separable. When no file has
+    # a recognised extension, extensionless / unknown files whose first line
+    # holds a separator are read as delimited text.
+    entries = list_tree(root, max_depth, cap)
+    kinds = classify_files(entries)
+    delim = kinds.get("delimited", [])
+    js = [e["path"] for e in kinds.get("json", [])]
+    pq = [e["path"] for e in kinds.get("parquet", [])]
+    if not (delim or js or pq):
+        delim = [e for e in kinds.get("other", []) if looks_delimited(e["path"])]
+        if delim:
+            kinds["delimited"] = delim
+    frames = {}
+    for i, (first, paths) in enumerate(group_delimited(delim).items(), start=1):
+        sep = sniff_sep(first)
+        frames[f"delimited_{i}"] = {
+            "df": read_delimited(paths, sep),
+            "paths": paths,
+            "sep": DELIMITERS.get(sep, sep),
+        }
+    if js:
+        frames["json"] = {"df": read_json_any(js), "paths": js, "sep": None}
+    if pq:
+        frames["parquet"] = {"df": read_parquet_any(pq), "paths": pq, "sep": None}
+    return entries, kinds, frames
+
+
+def require_frames(frames, root, kinds):
+    # Fail fast with the file-kind counts instead of letting every later loop
+    # run over nothing.
+    if not frames:
+        counts = {k: len(v) for k, v in kinds.items()}
+        raise RuntimeError(
+            f"No readable data file under {root}; file kinds found: {counts}"
+        )
+
+
+def read_support_text(kinds, n=80):
+    # First lines of each support file (README / licence) -- provenance evidence.
+    out = {}
+    for e in kinds.get("support", []):
+        out[e["name"]] = head_lines(e["path"], n)
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Single-pass profile, numeric scan, epoch timestamps, markdown helpers
+
+
+def as_str(name):
+    return qcol(name).cast("string")
+
+
+def is_missing(name):
+    return qcol(name).isNull() | (F.trim(as_str(name)) == "")
+
+
+def to_double(name):
+    return F.expr(
+        "try_cast(trim(cast(`"
+        + str(name).replace("`", "``")
+        + "` as string)) as double)"
+    )
+
+
+def hint_cols(cols, hints):
+    return [c for c in cols if any(h in c.lower() for h in hints)]
+
+
+def profile_frame(df, extra=None):
+    # Rows, per-column missingness and approx distinct in ONE aggregation. extra
+    # maps a name to a further aggregate expression of the same pass.
+    cols = df.columns
+    exprs = [F.count(F.lit(1)).alias("__rows")]
+    for i, c in enumerate(cols):
+        exprs += [
+            F.sum(is_missing(c).cast("long")).alias(f"m{i}"),
+            F.approx_count_distinct(as_str(c)).alias(f"d{i}"),
+        ]
+    exprs += [e.alias(f"x_{n}") for n, e in (extra or {}).items()]
+    r = df.agg(*exprs).first().asDict()
+    out = {
+        "cols": cols,
+        "total": r["__rows"],
+        "miss": {c: r[f"m{i}"] or 0 for i, c in enumerate(cols)},
+        "acd": {c: r[f"d{i}"] for i, c in enumerate(cols)},
+    }
+    if extra:
+        out["extra"] = {n: r[f"x_{n}"] for n in extra}
+    return out
+
+
+def numeric_scan(df, cols):
+    # Per-column numeric parse yield and moments in ONE aggregation. A column is
+    # numeric only if ~all non-empty values parse (>= 95%).
+    if not cols:
+        return {}
+    exprs = []
+    for i, c in enumerate(cols):
+        v = to_double(c)
+        good = ~is_missing(c)
+        exprs += [
+            F.sum(good.cast("long")).alias(f"n{i}"),
+            F.sum(v.isNotNull().cast("long")).alias(f"p{i}"),
+            F.min(v).alias(f"lo{i}"),
+            F.max(v).alias(f"hi{i}"),
+            F.avg(v).alias(f"mu{i}"),
+            F.stddev(v).alias(f"sd{i}"),
+            F.sum((v == 0).cast("long")).alias(f"z{i}"),
+            F.sum((v < 0).cast("long")).alias(f"ng{i}"),
+        ]
+    r = df.agg(*exprs).first().asDict()
+    out = {}
+    for i, c in enumerate(cols):
+        nn = r[f"n{i}"] or 0
+        yld = (r[f"p{i}"] or 0) / nn if nn else 0.0
+        out[c] = {
+            "non_null": nn,
+            "yield": round(yld, 4),
+            "is_numeric": nn > 0 and yld >= 0.95,
+            "min": r[f"lo{i}"],
+            "max": r[f"hi{i}"],
+            "mean": r[f"mu{i}"],
+            "sd": r[f"sd{i}"],
+            "zero": r[f"z{i}"],
+            "negative": r[f"ng{i}"],
+        }
+    return out
+
+
+def constant_column_names(df, prof):
+    # Exact check of the columns that approx_count_distinct shows with one value.
+    cands = [c for c in prof["cols"] if prof["acd"][c] <= 1]
+    if not cands:
+        return []
+    r = df.agg(*[F.countDistinct(qcol(c)).alias(f"k{i}") for i, c in enumerate(cands)])
+    r = r.first().asDict()
+    return sorted(c for i, c in enumerate(cands) if (r[f"k{i}"] or 0) <= 1)
+
+
+def quantiles(df, name, probs=(0.01, 0.25, 0.5, 0.75, 0.99)):
+    v = to_double(name)
+    q = df.select(v.alias("__v")).where(F.col("__v").isNotNull())
+    return dict(zip(probs, q.approxQuantile("__v", list(probs), 0.001), strict=False))
+
+
+def hist_counts(df, name, lo, hi, bins=40):
+    # Fixed-width histogram computed in Spark (no collect of raw values).
+    if lo is None or hi is None or hi <= lo:
+        return []
+    w = (hi - lo) / bins
+    idx = F.floor((to_double(name) - F.lit(float(lo))) / F.lit(float(w))).cast("int")
+    b = F.least(idx, F.lit(bins - 1))
+    rows = (
+        df.select(b.alias("__b"))
+        .where(F.col("__b").isNotNull())
+        .groupBy("__b")
+        .count()
+        .collect()
+    )
+    m = {r["__b"]: r["count"] for r in rows}
+    return [(f"{lo + i * w:.3g}", m.get(i, 0)) for i in range(bins)]
+
+
+def epoch_scan(df, name):
+    # Numeric timestamp columns: infer the unit from the magnitude, then report
+    # range / granularity in UTC.
+    v = to_double(name)
+    r = df.agg(
+        F.min(v).alias("lo"),
+        F.max(v).alias("hi"),
+        F.sum(v.isNotNull().cast("long")).alias("n"),
+    ).first()
+    hi, n = r["hi"], r["n"] or 0
+    if not n or hi is None:
+        return {"column": name, "n": 0}
+    top = abs(hi)
+    unit = "seconds"
+    div = 1.0
+    if top >= 1e17:
+        unit, div = "nanoseconds", 1e9
+    elif top >= 1e14:
+        unit, div = "microseconds", 1e6
+    elif top >= 1e11:
+        unit, div = "milliseconds", 1e3
+    ts = F.to_timestamp(F.from_unixtime((v / F.lit(div)).cast("long")))
+    g = (
+        df.select(ts.alias("__t"))
+        .agg(
+            F.min("__t").alias("min_ts"),
+            F.max("__t").alias("max_ts"),
+            F.countDistinct(F.to_date("__t")).alias("distinct_days"),
+            F.countDistinct("__t").alias("distinct_ts"),
+        )
+        .first()
+    )
+    return {
+        "column": name,
+        "n": n,
+        "unit": unit,
+        "min_ts": str(g["min_ts"]),
+        "max_ts": str(g["max_ts"]),
+        "distinct_days": g["distinct_days"],
+        "distinct_ts": g["distinct_ts"],
+        "div": div,
+    }
+
+
+def md_table(header, rows):
+    out = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    for row in rows:
+        out.append("| " + " | ".join(str(x) for x in row) + " |")
+    return "\n".join(out)
+
+
+def fmt_num(x, nd=4):
+    if x is None:
+        return "-"
+    if isinstance(x, float):
+        return f"{x:.{nd}g}"
+    return str(x)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Article text and link graph -- length, markup, titles, key overlap, degrees
+
+
+def resolve_roles(columns, hints):
+    # First column whose lower-case name equals one of the hints, per role.
+    return {
+        role: next((c for h in names for c in columns if c.lower() == h), None)
+        for role, names in hints.items()
+    }
+
+
+def longest_text_col(df, cols, n=500):
+    # Fallback when no name hint matches: the string column with the longest
+    # average value in the first n rows.
+    str_cols = [c for c in cols if dict(df.dtypes).get(c) == "string"]
+    if not str_cols:
+        return None
+    r = (
+        df.limit(n)
+        .agg(*[F.avg(F.length(qcol(c))).alias(f"a{i}") for i, c in enumerate(str_cols)])
+        .first()
+        .asDict()
+    )
+    best = max(range(len(str_cols)), key=lambda i: r[f"a{i}"] or 0)
+    return str_cols[best]
+
+
+def title_norm(col):
+    return F.lower(F.trim(F.regexp_replace(as_str(col), "_", " ")))
+
+
+def word_count(text_col):
+    # Whitespace-separated words; an empty or blank string has zero words.
+    t = F.trim(text_col)
+    return F.when(F.length(t) == 0, F.lit(0)).otherwise(F.size(F.split(t, r"\s+")))
+
+
+def text_stats(df, col):
+    txt = as_str(col)
+    base = df.select(F.length(txt).alias("__chars"), word_count(txt).alias("__words"))
+    probs = ",".join(str(p) for p in QUANTILE_PROBS)
+    r = (
+        base.agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.sum((F.col("__words") == 0).cast("long")).alias("empty"),
+            F.sum((F.col("__chars") < 200).cast("long")).alias("under_200_chars"),
+            F.sum((F.col("__words") > WORDS_PER_CHUNK_PROXY).cast("long")).alias(
+                "over_proxy_words"
+            ),
+            F.sum("__words").alias("total_words"),
+            F.max("__chars").alias("max_chars"),
+            F.expr(f"percentile_approx(__chars, array({probs}))").alias("chars_q"),
+            F.expr(f"percentile_approx(__words, array({probs}))").alias("words_q"),
+        )
+        .first()
+        .asDict()
+    )
+    r["chars_q"] = dict(zip(QUANTILE_PROBS, r["chars_q"], strict=True))
+    r["words_q"] = dict(zip(QUANTILE_PROBS, r["words_q"], strict=True))
+    return r
+
+
+def section_stats(df, col, fraction=1.0, seed=7):
+    # Sections are the pieces between inline heading markers. Computed on a row
+    # sample when fraction < 1.
+    src = df.select(as_str(col).alias("__t"))
+    if fraction < 1.0:
+        src = src.sample(fraction=fraction, seed=seed)
+    parts = src.select(F.split(F.col("__t"), HEADING_PATTERN).alias("__p"))
+    per_article = (
+        parts.agg(
+            F.count(F.lit(1)).alias("articles"),
+            F.sum((F.size("__p") > 1).cast("long")).alias("with_marker"),
+            F.expr("percentile_approx(size(__p), array(0.5, 0.95))").alias("per_q"),
+            F.max(F.size("__p")).alias("per_max"),
+        )
+        .first()
+        .asDict()
+    )
+    flat = (
+        parts.select(F.explode("__p").alias("__x"))
+        .where(F.trim(F.col("__x")) != "")
+        .select(word_count(F.col("__x")).alias("__w"))
+    )
+    probs = ",".join(str(p) for p in QUANTILE_PROBS)
+    r = (
+        flat.agg(
+            F.count(F.lit(1)).alias("sections"),
+            F.sum((F.col("__w") > WORDS_PER_CHUNK_PROXY).cast("long")).alias(
+                "over_proxy"
+            ),
+            F.max("__w").alias("max_words"),
+            F.expr(f"percentile_approx(__w, array({probs}))").alias("words_q"),
+        )
+        .first()
+        .asDict()
+    )
+    r["words_q"] = dict(zip(QUANTILE_PROBS, r["words_q"], strict=True))
+    r["sample_fraction"] = fraction
+    r["sampled_articles"] = per_article["articles"]
+    r["with_marker"] = per_article["with_marker"]
+    r["per_article_p50_p95"] = per_article["per_q"]
+    r["per_article_max"] = per_article["per_max"]
+    return r
+
+
+def clean_text(text_col):
+    # Approximate wikitext stripping by regular expressions.
+    out = text_col
+    for pattern, repl in CLEAN_STEPS:
+        out = F.regexp_replace(out, pattern, repl)
+    return out
+
+
+def cleaned_length_stats(df, col, fraction=1.0, seed=7):
+    src = df.select(as_str(col).alias("__t"))
+    if fraction < 1.0:
+        src = src.sample(fraction=fraction, seed=seed)
+    w = src.select(
+        word_count(F.col("__t")).alias("__raw"),
+        word_count(clean_text(F.col("__t"))).alias("__clean"),
+    )
+    probs = ",".join(str(p) for p in QUANTILE_PROBS)
+    r = (
+        w.agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.sum("__raw").alias("raw_words"),
+            F.sum("__clean").alias("clean_words"),
+            F.sum((F.col("__clean") < 50).cast("long")).alias("under_50"),
+            F.sum((F.col("__clean") > WORDS_PER_CHUNK_PROXY).cast("long")).alias(
+                "over_proxy"
+            ),
+            F.expr(f"percentile_approx(__clean, array({probs}))").alias("words_q"),
+        )
+        .first()
+        .asDict()
+    )
+    r["words_q"] = dict(zip(QUANTILE_PROBS, r["words_q"], strict=True))
+    r["kept_share"] = (
+        round(r["clean_words"] / r["raw_words"], 4) if r["raw_words"] else None
+    )
+    r["sample_fraction"] = fraction
+    return r
+
+
+def key_duplicate_profile(df, key_col, vary):
+    # vary: name -> Column expression. For each repeated key, whether the rows
+    # differ in that expression (HLL distinct count, exact for 1 versus more).
+    per = df.groupBy(as_str(key_col).alias("__k")).agg(
+        F.count(F.lit(1)).alias("__n"),
+        *[F.approx_count_distinct(e).alias(f"__v_{n}") for n, e in vary.items()],
+    )
+    exprs = [
+        F.count(F.lit(1)).alias("keys"),
+        F.sum((F.col("__n") > 1).cast("long")).alias("dup_keys"),
+        F.sum(F.when(F.col("__n") > 1, F.col("__n")).otherwise(0)).alias(
+            "rows_in_dup_keys"
+        ),
+        F.max("__n").alias("max_rows_per_key"),
+    ]
+    exprs += [
+        F.sum(((F.col("__n") > 1) & (F.col(f"__v_{n}") > 1)).cast("long")).alias(
+            f"varies_{n}"
+        )
+        for n in vary
+    ]
+    return per.agg(*exprs).first().asDict()
+
+
+def timestamp_profile(df, col, top=12):
+    ts = qcol(col)
+    r = (
+        df.agg(
+            F.min(ts).alias("lo"),
+            F.max(ts).alias("hi"),
+            F.sum(ts.isNull().cast("long")).alias("nulls"),
+        )
+        .first()
+        .asDict()
+    )
+    by_year = (
+        df.select(F.year(ts).alias("__y"))
+        .groupBy("__y")
+        .count()
+        .orderBy("__y")
+        .collect()
+    )
+    by_month = (
+        df.select(F.date_format(ts, "yyyy-MM").alias("__m"))
+        .groupBy("__m")
+        .count()
+        .orderBy(F.desc("count"))
+        .limit(top)
+        .collect()
+    )
+    r["years"] = [(x["__y"], x["count"]) for x in by_year]
+    r["top_months"] = [(x["__m"], x["count"]) for x in by_month]
+    return r
+
+
+def log2_histogram(df, value_col):
+    # Counts per power-of-two bucket of a numeric Column expression.
+    b = F.floor(F.log2(value_col + 1)).cast("int")
+    rows = (
+        df.select(b.alias("__b"))
+        .where(F.col("__b").isNotNull())
+        .groupBy("__b")
+        .count()
+        .orderBy("__b")
+        .collect()
+    )
+    return [(f"2^{r['__b']}", r["count"]) for r in rows]
+
+
+def markup_indicators(df, col, patterns=None):
+    # Rows containing each markup pattern at least once.
+    patterns = patterns or MARKUP_PATTERNS
+    txt = as_str(col)
+    exprs = [F.count(F.lit(1)).alias("rows")]
+    exprs += [F.sum(txt.rlike(p).cast("long")).alias(n) for n, p in patterns.items()]
+    return df.agg(*exprs).first().asDict()
+
+
+def char_issues(df, col):
+    txt = as_str(col)
+    non_ascii = F.length(txt) - F.length(F.regexp_replace(txt, r"[^\x00-\x7F]", ""))
+    r = (
+        df.agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.sum(txt.rlike("�").cast("long")).alias("replacement_char_rows"),
+            F.sum(txt.rlike(r"[\x00-\x08\x0B\x0C\x0E-\x1F]").cast("long")).alias(
+                "control_char_rows"
+            ),
+            F.sum(txt.rlike(r"[^\x00-\x7F]").cast("long")).alias("non_ascii_rows"),
+            F.sum(non_ascii).alias("non_ascii_chars"),
+            F.sum(F.length(txt)).alias("chars"),
+        )
+        .first()
+        .asDict()
+    )
+    r["non_ascii_char_share"] = (
+        round(r["non_ascii_chars"] / r["chars"], 6) if r["chars"] else None
+    )
+    return r
+
+
+def text_duplicates(df, col):
+    # Exact duplicate texts through one 64-bit hash per row.
+    per = df.select(F.xxhash64(as_str(col)).alias("__h")).groupBy("__h").count()
+    return (
+        per.agg(
+            F.sum("count").alias("rows"),
+            F.count(F.lit(1)).alias("distinct_texts"),
+            F.sum((F.col("count") > 1).cast("long")).alias("dup_groups"),
+            F.sum(F.when(F.col("count") > 1, F.col("count")).otherwise(0)).alias(
+                "rows_in_dup_groups"
+            ),
+        )
+        .first()
+        .asDict()
+    )
+
+
+def title_forms(df, col):
+    t = as_str(col)
+    r = (
+        df.agg(
+            F.count(F.lit(1)).alias("rows"),
+            F.sum(is_missing(col).cast("long")).alias("empty"),
+            F.sum(t.contains("_").cast("long")).alias("with_underscore"),
+            F.sum((t != F.trim(t)).cast("long")).alias("edge_space"),
+            F.sum(t.contains(":").cast("long")).alias("with_colon"),
+            F.sum(t.rlike(r"(?i)\(disambiguation\)").cast("long")).alias(
+                "disambiguation"
+            ),
+            F.sum(t.rlike(r"(?i)^list[ _]of").cast("long")).alias("list_titles"),
+            F.sum(t.rlike(r"^\d+$").cast("long")).alias("digits_only"),
+            F.sum(t.rlike(r"^[a-z]").cast("long")).alias("starts_lowercase"),
+        )
+        .first()
+        .asDict()
+    )
+    coll = (
+        df.select(title_norm(col).alias("__n"))
+        .groupBy("__n")
+        .count()
+        .agg(
+            F.sum((F.col("count") > 1).cast("long")).alias("collision_groups"),
+            F.sum(F.when(F.col("count") > 1, F.col("count")).otherwise(0)).alias(
+                "collision_rows"
+            ),
+        )
+        .first()
+        .asDict()
+    )
+    return {**r, **coll}
+
+
+def domain_term_hits(df, col, terms_by_domain, fraction=1.0, seed=7):
+    # Rows matching any term of each domain (whole words, case-insensitive).
+    src = df.select(as_str(col).alias("__t"))
+    if fraction < 1.0:
+        src = src.sample(fraction=fraction, seed=seed)
+    exprs = [F.count(F.lit(1)).alias("rows")]
+    for name, terms in terms_by_domain.items():
+        pat = r"(?i)\b(" + "|".join(terms) + r")\b"
+        exprs.append(F.sum(F.col("__t").rlike(pat).cast("long")).alias(name))
+    r = src.agg(*exprs).first().asDict()
+    r["sample_fraction"] = fraction
+    return r
+
+
+def title_term_mass(df, title_col, weight_col, terms_by_domain):
+    # Total weight and weight on titles matching each domain's terms.
+    t = as_str(title_col)
+    w = to_double(weight_col)
+    exprs = [F.sum(w).alias("weight")]
+    for name, terms in terms_by_domain.items():
+        pat = r"(?i)\b(" + "|".join(terms) + r")\b"
+        exprs.append(F.sum(F.when(t.rlike(pat), w).otherwise(0.0)).alias(name))
+    return df.agg(*exprs).first().asDict()
+
+
+def key_overlap(a, col_a, b, col_b, normalise=True):
+    # Distinct keys in a, in b and in both, from one tagged union.
+    def key(col):
+        return title_norm(col) if normalise else as_str(col)
+
+    ka = a.select(key(col_a).alias("__k")).where(F.col("__k") != "").distinct()
+    kb = b.select(key(col_b).alias("__k")).where(F.col("__k") != "").distinct()
+    tagged = ka.select("__k", F.lit(1).alias("__a"), F.lit(0).alias("__b")).unionByName(
+        kb.select("__k", F.lit(0).alias("__a"), F.lit(1).alias("__b"))
+    )
+    r = (
+        tagged.groupBy("__k")
+        .agg(F.max("__a").alias("a"), F.max("__b").alias("b"))
+        .agg(
+            F.sum("a").alias("a_distinct"),
+            F.sum("b").alias("b_distinct"),
+            F.sum(((F.col("a") + F.col("b")) == 2).cast("long")).alias("both"),
+        )
+        .first()
+        .asDict()
+    )
+    r["a_not_in_b"] = (r["a_distinct"] or 0) - (r["both"] or 0)
+    r["a_share_in_b"] = (
+        round(r["both"] / r["a_distinct"], 4) if r["a_distinct"] else None
+    )
+    r["b_share_in_a"] = (
+        round(r["both"] / r["b_distinct"], 4) if r["b_distinct"] else None
+    )
+    return r
+
+
+def weighted_coverage(edges, title_col, weight_col, known, known_col):
+    # Share of edges and of edge weight whose title is a known (article) title.
+    ref = (
+        known.select(title_norm(known_col).alias("__k"))
+        .distinct()
+        .withColumn("__known", F.lit(1))
+    )
+    e = edges.select(
+        title_norm(title_col).alias("__k"), to_double(weight_col).alias("__w")
+    )
+    hit = F.col("__known").isNotNull()
+    r = (
+        e.join(ref, "__k", "left")
+        .agg(
+            F.count(F.lit(1)).alias("edges"),
+            F.sum(hit.cast("long")).alias("edges_matched"),
+            F.sum("__w").alias("weight"),
+            F.sum(F.when(hit, F.col("__w")).otherwise(0.0)).alias("weight_matched"),
+        )
+        .first()
+        .asDict()
+    )
+    r["edge_share"] = round(r["edges_matched"] / r["edges"], 4) if r["edges"] else None
+    r["weight_share"] = (
+        round(r["weight_matched"] / r["weight"], 4) if r["weight"] else None
+    )
+    return r
+
+
+def degree_table(edges, key_col, weight_col):
+    # One row per node: edge count and total weight.
+    return edges.groupBy(as_str(key_col).alias("__k")).agg(
+        F.count(F.lit(1)).alias("edges"), F.sum(to_double(weight_col)).alias("clicks")
+    )
+
+
+def degree_summary(tbl, top=10):
+    r = (
+        tbl.agg(
+            F.count(F.lit(1)).alias("nodes"),
+            F.expr("percentile_approx(edges, array(0.5, 0.9, 0.99))").alias("edges_q"),
+            F.max("edges").alias("edges_max"),
+            F.expr("percentile_approx(clicks, array(0.5, 0.9, 0.99))").alias(
+                "clicks_q"
+            ),
+            F.max("clicks").alias("clicks_max"),
+            F.sum("clicks").alias("clicks_total"),
+            F.expr("percentile_approx(clicks, 0.99)").alias("clicks_p99"),
+        )
+        .first()
+        .asDict()
+    )
+    top_mass = (
+        tbl.where(F.col("clicks") >= F.lit(r["clicks_p99"]))
+        .agg(F.sum("clicks").alias("m"))
+        .first()["m"]
+    )
+    r["top1pct_click_share"] = (
+        round(top_mass / r["clicks_total"], 4) if r["clicks_total"] else None
+    )
+    r["top"] = [
+        (row["__k"], row["clicks"], row["edges"])
+        for row in tbl.orderBy(F.desc("clicks")).limit(top).collect()
+    ]
+    return r
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Genomics Gold tables -- profile, label association, links, findings blocks
+
+
+def read_tables(catalog, schema, names):
+    return {name: spark.table(f"{catalog}.{schema}.{name}") for name in names}
+
+
+def column_kinds(df):
+    kinds = {
+        "boolean": [],
+        "numeric": [],
+        "text": [],
+        "timestamp": [],
+        "provenance": [],
+        "other": [],
+    }
+    for name, dtype in df.dtypes:
+        if name in PROVENANCE_COLUMNS:
+            kind = "provenance"
+        elif dtype == "boolean":
+            kind = "boolean"
+        elif dtype in NUMERIC_DTYPES or dtype.startswith("decimal"):
+            kind = "numeric"
+        elif dtype == "string":
+            kind = "text"
+        elif dtype == "date" or dtype.startswith("timestamp"):
+            kind = "timestamp"
+        else:
+            kind = "other"
+        kinds[kind].append(name)
+    return kinds
+
+
+def table_profile(df):
+    prof = profile_frame(df)
+    total = prof["total"]
+    empty = [c for c in prof["cols"] if total and prof["miss"][c] == total]
+    constant = [c for c in constant_column_names(df, prof) if c not in empty]
+    return {
+        "rows": total,
+        "columns": len(prof["cols"]),
+        "kinds": {k: len(v) for k, v in column_kinds(df).items()},
+        "empty": empty,
+        "constant": constant,
+        "null_rate": {
+            c: round(prof["miss"][c] / total, 4) if total else None
+            for c in prof["cols"]
+        },
+        "distinct": prof["acd"],
+    }
+
+
+def table_key_report(df, preferred=("source_record_id",)):
+    # The key is chosen by the exact distinct count, as in the source EDA notebooks.
+    candidates = [c for c in preferred if c in df.columns]
+    candidates += [
+        c for c in df.columns if c.endswith(KEY_SUFFIXES) and c not in candidates
+    ]
+    candidates = candidates[:KEY_CANDIDATES]
+    uniq = exact_uniqueness(df, candidates)
+    key, info = pick_entity_key(uniq, candidates, prefer=preferred)
+    if key is None:
+        return {"key": None, "tested": candidates}
+    out = {
+        "key": key,
+        "ratio": info["ratio"],
+        "unique": info["unique"],
+        "nulls": info["nulls"],
+        "tested": candidates,
+    }
+    if not info["unique"]:
+        out["duplicates"] = dup_key_composition(df, [key])
+    return out
+
+
+def boolean_rates(df, cols):
+    if not cols:
+        return {}
+    exprs = [F.count(F.lit(1)).alias("__n")]
+    for i, c in enumerate(cols):
+        exprs += [
+            F.sum(F.when(qcol(c), 1).otherwise(0)).alias(f"t{i}"),
+            F.sum(F.when(~qcol(c), 1).otherwise(0)).alias(f"f{i}"),
+        ]
+    r = df.agg(*exprs).first().asDict()
+    n = r["__n"] or 0
+    out = {}
+    for i, c in enumerate(cols):
+        t, f = r[f"t{i}"] or 0, r[f"f{i}"] or 0
+        out[c] = {
+            "true": round(t / n, 4) if n else None,
+            "false": round(f / n, 4) if n else None,
+            "null": round((n - t - f) / n, 4) if n else None,
+        }
+    return out
+
+
+def value_counts(df, col, limit=30):
+    # (value, rows, share) of one column, a missing value shown as "(missing)".
+    rows = df.groupBy(qcol(col).cast("string").alias("v")).count().collect()
+    total = sum(r["count"] for r in rows)
+    rows = sorted(rows, key=lambda r: -r["count"])[:limit]
+    return [
+        (r["v"] if r["v"] is not None else "(missing)", r["count"], r["count"] / total)
+        for r in rows
+    ]
+
+
+def group_size_shares(df, key_cols):
+    # Share of groups by their row count: 1, 2, 3 to 5, 6 or more.
+    sizes = df.groupBy(*[qcol(c) for c in key_cols]).count()
+    exprs = [F.count(F.lit(1)).alias("__groups")]
+    for i, (low, _label) in enumerate(GROUP_EDGES):
+        high = GROUP_EDGES[i + 1][0] if i + 1 < len(GROUP_EDGES) else None
+        cond = F.col("count") >= low
+        if high is not None:
+            cond = cond & (F.col("count") < high)
+        exprs.append(F.sum(F.when(cond, 1).otherwise(0)).alias(f"s{i}"))
+    r = sizes.agg(*exprs).first().asDict()
+    groups = r["__groups"] or 0
+    return {
+        "groups": groups,
+        **{
+            label: round((r[f"s{i}"] or 0) / groups, 4) if groups else None
+            for i, (_low, label) in enumerate(GROUP_EDGES)
+        },
+    }
+
+
+def with_target(df, positive_col, negative_col):
+    # Rows with a known class; __pos is 1.0 for the positive class, else 0.0.
+    known = qcol(positive_col) | qcol(negative_col)
+    return df.filter(known).withColumn(
+        "__pos", F.when(qcol(positive_col), 1.0).otherwise(0.0)
+    )
+
+
+def flag_vs_label(df, flag_cols):
+    # df has __pos. Per flag: how often the flag is true, how often the positive
+    # class holds when it is true and when it is not (rates only).
+    if not flag_cols:
+        return {}
+    pos = F.col("__pos")
+    exprs = [F.count(F.lit(1)).alias("__n"), F.sum(pos).alias("__p")]
+    for i, c in enumerate(flag_cols):
+        on = qcol(c)
+        exprs += [
+            F.sum(F.when(on, 1).otherwise(0)).alias(f"n{i}"),
+            F.sum(F.when(on, pos).otherwise(0.0)).alias(f"p{i}"),
+        ]
+    r = df.agg(*exprs).first().asDict()
+    n, p = r["__n"] or 0, r["__p"] or 0.0
+    out = {}
+    for i, c in enumerate(flag_cols):
+        on_n, on_p = r[f"n{i}"] or 0, r[f"p{i}"] or 0.0
+        off_n, off_p = n - on_n, p - on_p
+        when_true = on_p / on_n if on_n else None
+        when_false = off_p / off_n if off_n else None
+        gap = (
+            abs(when_true - when_false)
+            if when_true is not None and when_false is not None
+            else None
+        )
+        out[c] = {
+            "coverage": round(on_n / n, 4) if n else None,
+            "positive_when_true": round(when_true, 4) if on_n else None,
+            "positive_when_false": round(when_false, 4) if off_n else None,
+            "separation": round(gap, 4) if gap is not None else None,
+        }
+    return out
+
+
+def score_vs_label(df, num_cols):
+    # df has __pos. Per numeric column: correlation with the class and the
+    # difference between the missing rate in each class.
+    if not num_cols:
+        return {}
+    pos = F.col("__pos")
+    exprs = [
+        F.sum(pos).alias("__p"),
+        F.sum(1.0 - pos).alias("__q"),
+    ]
+    for i, c in enumerate(num_cols):
+        v = qcol(c).cast("double")
+        exprs += [
+            F.corr(v, pos).alias(f"c{i}"),
+            F.sum(F.when(v.isNull(), pos).otherwise(0.0)).alias(f"mp{i}"),
+            F.sum(F.when(v.isNull(), 1.0 - pos).otherwise(0.0)).alias(f"mq{i}"),
+        ]
+    r = df.agg(*exprs).first().asDict()
+    p, q = r["__p"] or 0.0, r["__q"] or 0.0
+    out = {}
+    for i, c in enumerate(num_cols):
+        corr = r[f"c{i}"]
+        if corr is not None and math.isnan(corr):
+            corr = None
+        miss_pos = (r[f"mp{i}"] or 0.0) / p if p else None
+        miss_neg = (r[f"mq{i}"] or 0.0) / q if q else None
+        out[c] = {
+            "correlation": round(corr, 4) if corr is not None else None,
+            "missing_positive": round(miss_pos, 4) if miss_pos is not None else None,
+            "missing_negative": round(miss_neg, 4) if miss_neg is not None else None,
+            "missing_gap": (
+                round(abs(miss_pos - miss_neg), 4)
+                if miss_pos is not None and miss_neg is not None
+                else None
+            ),
+        }
+    return out
+
+
+def pair_correlations(df, num_cols, threshold=LEAK_CORRELATION):
+    # Pairs of numeric columns above the threshold, computed in one aggregation.
+    cols = num_cols[:PAIR_COLUMNS]
+    pairs = [(a, b) for i, a in enumerate(cols) for b in cols[i + 1 :]]
+    if not pairs:
+        return []
+    exprs = [
+        F.corr(qcol(a).cast("double"), qcol(b).cast("double")).alias(f"r{i}")
+        for i, (a, b) in enumerate(pairs)
+    ]
+    r = df.agg(*exprs).first().asDict()
+    found = [
+        (a, b, round(r[f"r{i}"], 4))
+        for i, (a, b) in enumerate(pairs)
+        if r[f"r{i}"] is not None
+        and not math.isnan(r[f"r{i}"])
+        and abs(r[f"r{i}"]) >= threshold
+    ]
+    return sorted(found, key=lambda t: -abs(t[2]))
+
+
+def top_by(table, field, limit=LIST_LIMIT):
+    # Rows of a {column: {field: value}} table ranked by the absolute field value.
+    ranked = [(c, v[field]) for c, v in table.items() if v.get(field) is not None]
+    return sorted(ranked, key=lambda t: -abs(t[1]))[:limit]
+
+
+def coverage_by_source(df, prof, group_col="source_system", limit=40):
+    # Null rate and distinct count of the columns that are partly filled, per
+    # group; a group with one value only gives one row.
+    if group_col not in df.columns:
+        return {}
+    partly = [
+        c
+        for c, rate in prof["null_rate"].items()
+        if rate is not None and 0.01 <= rate <= 0.99 and c != group_col
+    ]
+    if not partly:
+        return {}
+    return population_by_group(df, group_col, partly[:limit])
+
+
+def coverage_block(coverage):
+    # Per table: source groups and the columns whose null rate differs between
+    # the groups by the missing gap or more.
+    lines = []
+    for name, groups in coverage.items():
+        columns = next(iter(groups.values()))["columns"] if groups else {}
+        spread = {}
+        for c in columns:
+            rates = [g["columns"][c]["null_rate"] for g in groups.values()]
+            rates = [r for r in rates if r is not None]
+            if len(rates) > 1:
+                spread[c] = round(max(rates) - min(rates), 4)
+        wide = sorted(
+            ((c, s) for c, s in spread.items() if s >= MISSING_GAP),
+            key=lambda t: -t[1],
+        )
+        lines.append(
+            para(
+                f"- {name}: source groups {len(groups)};",
+                f"partly filled columns compared {len(columns)};",
+                f"null rate differs by {MISSING_GAP} or more between groups in",
+                f"{len(wide)} columns",
+                f"({', '.join(c for c, _ in wide[:10])}).",
+            )
+        )
+    return "\n".join(lines)
+
+
+def link_fill(profiles):
+    # Null rate of every column ending in _key, per table.
+    return {
+        name: {
+            c: r
+            for c, r in p["null_rate"].items()
+            if c.endswith("_key") and r is not None
+        }
+        for name, p in profiles.items()
+    }
+
+
+def fill_lines(fill):
+    # {table: {column: null rate}} as markdown lines.
+    lines = []
+    for name, cols in fill.items():
+        lines.append(f"**{name}** ({len(cols)} columns)")
+        lines.append(fmt_pairs([(c, pct(r)) for c, r in cols.items()]) or "- none")
+    return "\n".join(lines)
+
+
+def share_in_several_groups(df, key_col, group_col):
+    # Keys that appear in more than one group (for example a split), as a count
+    # and as a share of the distinct keys.
+    per_key = (
+        df.where(qcol(key_col).isNotNull())
+        .groupBy(qcol(key_col))
+        .agg(F.countDistinct(qcol(group_col)).alias("g"))
+    )
+    r = per_key.agg(
+        F.count(F.lit(1)).alias("keys"),
+        F.sum(F.when(F.col("g") > 1, 1).otherwise(0)).alias("several"),
+    ).first()
+    keys, several = r["keys"] or 0, r["several"] or 0
+    return {
+        "keys": keys,
+        "in_several": several,
+        "share": round(several / keys, 4) if keys else None,
+    }
+
+
+def pct(x):
+    return "-" if x is None else f"{100 * x:.2f}%"
+
+
+def profile_block(profiles):
+    rows = [
+        (
+            name,
+            f"{p['rows']:,}",
+            p["columns"],
+            p["kinds"]["numeric"],
+            p["kinds"]["boolean"],
+            p["kinds"]["text"],
+            len(p["empty"]),
+            len(p["constant"]),
+        )
+        for name, p in profiles.items()
+    ]
+    header = (
+        "table",
+        "rows",
+        "columns",
+        "numeric",
+        "boolean",
+        "text",
+        "empty",
+        "const",
+    )
+    return md_table(header, rows)
+
+
+def quality_block(profiles):
+    lines = []
+    for name, p in profiles.items():
+        high = [
+            (c, pct(r))
+            for c, r in sorted(p["null_rate"].items(), key=lambda t: -(t[1] or 0))
+            if r is not None and HIGH_NULL_RATE <= r < 1.0
+        ]
+        empty = ", ".join(p["empty"][:25])
+        constant = ", ".join(p["constant"][:25])
+        lines.append(f"**{name}**")
+        lines.append(f"- empty columns ({len(p['empty'])}): {empty}")
+        lines.append(f"- constant columns ({len(p['constant'])}): {constant}")
+        lines.append(
+            f"- null rate of {pct(HIGH_NULL_RATE)} or more, not empty ({len(high)}):"
+        )
+        lines.append(fmt_pairs(high, LIST_LIMIT))
+    return "\n".join(lines)
+
+
+def key_block(keys):
+    rows = []
+    for name, k in keys.items():
+        dup = k.get("duplicates") or {}
+        rows.append(
+            (
+                name,
+                k["key"] or "-",
+                "yes" if k.get("unique") else "no",
+                k.get("ratio", "-"),
+                k.get("nulls", "-"),
+                dup.get("dup_groups", 0),
+                dup.get("conflicting", 0),
+            )
+        )
+    header = ("table", "key", "unique", "distinct/rows", "nulls", "dups", "conflicting")
+    return md_table(header, rows)
+
+
+def shape_lists(profile, kinds):
+    # Text columns with few values (enumerations) and near-unique text columns.
+    rows = profile["rows"] or 0
+    text = kinds["text"]
+    few = [c for c in text if 0 < profile["distinct"][c] <= TEXT_ENUM_MAX]
+    unique = [c for c in text if rows and profile["distinct"][c] >= NEAR_UNIQUE * rows]
+    return {"enumeration": few, "near_unique": unique}
+
+
+def distribution_block(profiles, kinds, booleans, scans):
+    # scans: numeric_scan result per table (counts of zero and negative values).
+    lines = []
+    for name, p in profiles.items():
+        rows = p["rows"] or 0
+        shape = shape_lists(p, kinds[name])
+        always = [c for c, v in booleans[name].items() if (v["true"] or 0) >= 0.99]
+        never = [c for c, v in booleans[name].items() if (v["true"] or 0) <= 0.01]
+        mostly_null = [c for c, v in booleans[name].items() if (v["null"] or 0) >= 0.99]
+        zeros = [
+            c for c, v in scans[name].items() if rows and (v["zero"] or 0) / rows >= 0.5
+        ]
+        negatives = [c for c, v in scans[name].items() if (v["negative"] or 0) > 0]
+        lines += [
+            f"**{name}**",
+            para(
+                f"- boolean columns: {len(booleans[name])};",
+                f"true on 99% or more of rows: {len(always)};",
+                f"true on 1% or less: {len(never)};",
+                f"null on 99% or more: {len(mostly_null)}",
+            ),
+            para(
+                f"- numeric columns: {len(scans[name])};",
+                f"zero on half the rows or more: {len(zeros)};",
+                f"with negative values: {len(negatives)}",
+            ),
+            para(
+                f"- text columns with at most {TEXT_ENUM_MAX} values:",
+                f"{len(shape['enumeration'])};",
+                f"near-unique text columns: {len(shape['near_unique'])}",
+            ),
+        ]
+    return "\n".join(lines)
+
+
+def table_findings_lines(profiles, keys):
+    rows = sum(p["rows"] or 0 for p in profiles.values())
+    repeated = [n for n, k in keys.items() if not k.get("unique")]
+    with_empty = {n: len(p["empty"]) for n, p in profiles.items() if p["empty"]}
+    lines = [
+        f"- {len(profiles)} tables, {rows:,} rows in total.",
+        f"- tables whose best key is not unique: {', '.join(repeated) or 'none'}.",
+        "- tables with fully empty columns: "
+        + (", ".join(f"{n} ({c})" for n, c in with_empty.items()) or "none")
+        + ".",
+    ]
+    return "\n".join(lines)
+
+
+def association_lines(label, flags, scores):
+    # Ranked names and rates only (no data values).
+    lines = [f"**{label}**"]
+    lines.append("- flags by separation (coverage in brackets):")
+    lines.append(
+        fmt_pairs(
+            [
+                (c, f"{v} ({pct(flags[c]['coverage'])})")
+                for c, v in top_by(flags, "separation")
+            ],
+            LIST_LIMIT,
+        )
+    )
+    lines.append("- numeric columns by correlation with the class:")
+    lines.append(fmt_pairs(top_by(scores, "correlation"), LIST_LIMIT))
+    lines.append("- numeric columns by gap between the missing rate of the classes:")
+    lines.append(fmt_pairs(top_by(scores, "missing_gap"), LIST_LIMIT))
     return "\n".join(lines)

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- HONDA IOT WEATHER
@@ -56,50 +56,33 @@ print(f"OK  profiling directory: {PROFILING_DIR}")
 df = spark.table(TABLE)
 COLS = df.columns
 VCOLS = [c for c in COLS if c not in ("frequency", "datetime_utc")]
-exprs = [F.count(F.lit(1)).alias("__rows")]
-for c in COLS:
-    miss = F.col(c).isNull() | (F.trim(F.col(c).cast("string")) == "")
-    exprs += [
-        F.sum(miss.cast("long")).alias(c + "__m"),
-        F.approx_count_distinct(c).alias(c + "__d"),
-    ]
+ranges = {}
 for c in VCOLS:
     v = safe_num(c)
     b = PLAUSIBLE.get(c.split("_")[-1])
-    exprs += [
-        F.min(v).alias(c + "_min"),
-        F.max(v).alias(c + "_max"),
-        F.avg(v).alias(c + "_avg"),
-        F.stddev(v).alias(c + "_sd"),
-        F.percentile_approx(v, [0.01, 0.5, 0.99]).alias(c + "_p"),
-        F.sum((v == 0).cast("long")).alias(c + "_zero"),
-        F.sum((v < 0).cast("long")).alias(c + "_negative"),
-        F.sum(
+    ranges |= {
+        c + "_min": F.min(v),
+        c + "_max": F.max(v),
+        c + "_avg": F.avg(v),
+        c + "_sd": F.stddev(v),
+        c + "_p": F.percentile_approx(v, [0.01, 0.5, 0.99]),
+        c + "_zero": F.sum((v == 0).cast("long")),
+        c + "_negative": F.sum((v < 0).cast("long")),
+        c + "_non_numeric": F.sum(
             (F.col(c).isNotNull() & (F.trim(F.col(c)) != "") & v.isNull()).cast("long")
-        ).alias(c + "_non_numeric"),
-        *(
-            [F.sum(((v < b[0]) | (v > b[1])).cast("long")).alias(c + "_out_of_range")]
-            if b
-            else []
         ),
-    ]
-S = df.agg(*exprs).first().asDict()
-total = S["__rows"]
-constant_cands = [c for c in COLS if S[c + "__d"] <= 1]
-constant_cols = (
-    sorted(
-        c
-        for c in constant_cands
-        if (df.agg(F.countDistinct(F.col(c)).alias(c)).first()[c] or 0) <= 1
-    )
-    if constant_cands
-    else []
-)
+    }
+    if b:
+        ranges[c + "_out_of_range"] = F.sum(((v < b[0]) | (v > b[1])).cast("long"))
+P = profile_frame(df, extra=ranges)
+S = P["extra"]
+total = P["total"]
+constant_cols = constant_column_names(df, P)
 print(f"rows={total}  columns={len(COLS)}  ->  {COLS}")
 for c in COLS:
     print(
-        f"  {c:<32} missing={S[c + '__m']:>10} "
-        f"rate={S[c + '__m'] / total:.4f} approx_distinct={S[c + '__d']}"
+        f"  {c:<32} missing={P['miss'][c]:>10} "
+        f"rate={P['miss'][c] / total:.4f} approx_distinct={P['acd'][c]}"
     )
 print("constant columns (exact):", constant_cols)
 for c in VCOLS:
@@ -292,7 +275,7 @@ print("stuck runs:", stuck)
 _prof = ["| column | missing | rate | approx_distinct |", "|---|---|---|---|"]
 for c in COLS:
     _prof.append(
-        f"| {c} | {S[c + '__m']} | {S[c + '__m'] / total:.4f} | {S[c + '__d']} |"
+        f"| {c} | {P['miss'][c]} | {P['miss'][c] / total:.4f} | {P['acd'][c]} |"
     )
 _prof.append("")
 _prof.append(f"Rows: {total}. Constant columns (exact): {constant_cols or 'none'}.")

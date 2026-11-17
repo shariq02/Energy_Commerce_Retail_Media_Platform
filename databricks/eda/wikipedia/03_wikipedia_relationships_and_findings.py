@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # EDA -- WIKIPEDIA RELATIONSHIPS AND FINDINGS
@@ -26,14 +26,6 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %run ../_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_samples_eda_common
-
-# COMMAND ----------
-
-# MAGIC %run ../_wikipedia_eda_common
 
 # COMMAND ----------
 

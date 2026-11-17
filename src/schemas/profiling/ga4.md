@@ -146,24 +146,4 @@ Category paths use '/' as a separator, and some labels contain '/' themselves, s
 - Normalise GA4's '(not set)'/'(none)' sentinel to null on item_id/item_name/item_category/ecommerce.transaction_id at Silver -- Bronze intentionally keeps it raw.
 - Model item_id from promotion events (view_promotion/select_promotion) separately from product item_id -- they are different entity types sharing one field.
 
-### Figure -- GA4 event_name funnel
-
-![GA4 event_name funnel](figures/ga4_funnel.png)
-
-### Figure -- GA4 sessions reaching each funnel stage
-
-![GA4 sessions reaching each funnel stage](figures/ga4_session_funnel.png)
-
-### Figure -- GA4 events per day
-
-![GA4 events per day](figures/ga4_events_per_day.png)
-
-### Figure -- GA4 top item_category by event volume
-
-![GA4 top item_category by event volume](figures/ga4_top_categories.png)
-
-### Figure -- GA4 item price distribution (sampled)
-
-![GA4 item price distribution (sampled)](figures/ga4_price_distribution.png)
-
 <!-- END ga4:01_events -->
