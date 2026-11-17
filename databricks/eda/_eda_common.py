@@ -179,12 +179,33 @@ def _profiling_dir():
 
 # DBTITLE 1,Bronze read (tables merged into another table)
 BRONZE_MERGES = _os.path.join("src", "schemas", "mappings", "bronze_merges.yml")
+CONTRACTS_DIR = _os.path.join("src", "schemas", "contracts")
+
+
+def _part_columns():
+    """(merged table, discriminator value) -> column names of that part, from the
+    contracts. A dataset that shares a table with another (P and W) lists the same
+    columns, so the first one is enough."""
+    parts = {}
+    folder = _os.path.join(_repo_root(), CONTRACTS_DIR)
+    for name in sorted(_os.listdir(folder)):
+        if not name.endswith(".yml"):
+            continue
+        with open(_os.path.join(folder, name), encoding="utf-8") as fh:
+            contract = yaml.safe_load(fh) or {}
+        for dataset in contract.get("tables") or []:
+            bronze = dataset.get("bronze")
+            if bronze:
+                columns = {c["name"] for c in dataset.get("columns", [])}
+                parts.setdefault((bronze["table"], bronze["value"]), columns)
+    return parts
 
 
 def bronze_frame(full_name):
     """A Bronze table by its full name; a table merged into another
-    (bronze_merges.yml) is read from the merged table, filtered by its value. The
-    `kept` values of an appended table are named `<source>_<value>`."""
+    (bronze_merges.yml) is read from the merged table, filtered by its value, and
+    without the columns that only the other parts have. The `kept` values of an
+    appended table are named `<source>_<value>`."""
     catalog, schema, table = full_name.split(".")
     with open(_os.path.join(_repo_root(), BRONZE_MERGES), encoding="utf-8") as fh:
         merges = yaml.safe_load(fh)["merges"]
@@ -196,10 +217,20 @@ def bronze_frame(full_name):
         names = {part: value for value, part in merge["parts"].items()}
         names.update({f"{source}_{value}": value for value in merge.get("kept", [])})
         if table in names:
+            value = names[table]
+            parts = _part_columns()
+            foreign = set()
+            if (merge["table"], value) in parts:
+                foreign = {
+                    c
+                    for (t, v), columns in parts.items()
+                    if t == merge["table"] and v != value
+                    for c in columns
+                } - parts[(merge["table"], value)]
             return (
                 spark.table(f"{catalog}.{schema}.{merge['table']}")
-                .filter(F.col(column) == names[table])
-                .drop(column)
+                .filter(F.col(column) == value)
+                .drop(column, *sorted(foreign))
             )
     return spark.table(full_name)
 
