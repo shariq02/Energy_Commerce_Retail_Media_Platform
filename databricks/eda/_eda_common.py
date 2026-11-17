@@ -192,7 +192,7 @@ def bronze_frame(full_name):
         column = merge["discriminator"]
         if not column or merge["schema"] != schema:
             continue
-        source = merge["table"].rsplit("_", 1)[0]
+        source = merge["table"].split("_", 1)[0]
         names = {part: value for value, part in merge["parts"].items()}
         names.update({f"{source}_{value}": value for value in merge.get("kept", [])})
         if table in names:
@@ -356,9 +356,9 @@ def _apply_xlabels(ax, labels, rot):
     )
 
 
-def _save_and_show(fig):
+def _save_and_show(fig, filename=None):
     # Render the figure inline and close it; a figure is never written to a file,
-    # so no data reaches the repository. Prefer Databricks' display() -- it
+    # so no data reaches the repository (`filename` is accepted and ignored). Prefer Databricks' display() -- it
     # serialises the figure to PNG itself, so it renders regardless of the
     # matplotlib backend (plt.show() is a silent no-op if the session's backend is
     # non-interactive, e.g. left on "Agg" by an earlier run in the same session).
