@@ -147,7 +147,7 @@ Redispatch reporting moved to the 'NABEG 2.0 / Redispatch 2.0' regime in Oct 202
 - Sonstiges: 8684
 - None: 73
 - Erneuerbar: 26
-- `GESAMTE_ARBEIT_MWH`: min=0.0, max=55914.0, mean=1675.341968941622, sd=3017.225926617537, parsed 40118 of 40118 non-null.
+- `GESAMTE_ARBEIT_MWH`: min=0.0, max=55914.0, mean=1675.341968941622, sd=3017.2259266175365, parsed 40118 of 40118 non-null.
 - `MAXIMALE_LEISTUNG_MW`: min=0.0, max=4478.0, mean=290.02086594546086, sd=317.00707588719615, parsed 40118 of 40118 non-null.
 - `MITTLERE_LEISTUNG_MW`: min=0.0, max=4338.0, mean=228.59076898150457, sd=244.582514178272, parsed 40118 of 40118 non-null.
 

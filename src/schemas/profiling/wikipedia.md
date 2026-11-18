@@ -142,10 +142,10 @@ Self-loops (rows where both ends are equal): {'prev_id==curr_id': 37486, 'prev_t
 - type `redlink`: 113880 edges, 3.509e+06 clicks.
 - type `None`: 9 edges, 363 clicks.
 - `n`: numeric yield 100.0%, range 10.0..111855861.0, mean 145.8, zero 0, negative 0.
-- `n` quantiles p1/p25/p50/p75/p99: ['10', '15', '26', '62', '1779'].
-- in-degree by current title (link edges): 2046152 titles; edges per title p50/p90/p99 [2, 12, 64], max 3981; clicks per title p50/p90/p99 [71.0, 877.0, 7099.0], max 843235.0; the top 1% of titles hold 0.3371 of the clicks.
+- `n` quantiles p1/p25/p50/p75/p99: ['10', '15', '26', '62', '1855'].
+- in-degree by current title (link edges): 2046152 titles; edges per title p50/p90/p99 [2, 12, 64], max 3981; clicks per title p50/p90/p99 [71.0, 878.0, 7099.0], max 843235.0; the top 1% of titles hold 0.3371 of the clicks.
   top titles (title, clicks, edges): [('Deaths_in_2015', 843235.0, 35), ('Fifty_Shades_of_Grey_(film)', 560081.0, 79), ('87th_Academy_Awards', 442508.0, 277), ('Birdman_(film)', 412150.0, 163), ('Islamic_State_of_Iraq_and_the_Levant', 398371.0, 510), ('Dakota_Johnson', 376379.0, 45), ('Fifty_Shades_Darker', 318767.0, 8), ('Jamie_Dornan', 298281.0, 51), ('Fifty_Shades_Freed', 296862.0, 7), ('Jane_Wilde_Hawking', 267953.0, 18)]
-- out-degree by previous title (link edges): 1383299 titles; edges per title p50/p90/p99 [3, 21, 91], max 1340; clicks per title p50/p90/p99 [74.0, 1097.0, 10802.0], max 1939796.0; the top 1% of titles hold 0.424 of the clicks.
+- out-degree by previous title (link edges): 1383299 titles; edges per title p50/p90/p99 [3, 21, 91], max 1340; clicks per title p50/p90/p99 [74.0, 1097.0, 10836.0], max 1939796.0; the top 1% of titles hold 0.4235 of the clicks.
   top titles (title, clicks, edges): [('Main_Page', 1939796.0, 95), ('87th_Academy_Awards', 1657681.0, 516), ('Fifty_Shades_of_Grey_(film)', 1338492.0, 177), ('Fifty_Shades_of_Grey', 1132281.0, 122), ('2015_in_film', 1022382.0, 1178), ('Deaths_in_2015', 936162.0, 771), ('The_Walking_Dead_(TV_series)', 842315.0, 242), ('Better_Call_Saul', 798072.0, 101), ('Chris_Kyle', 788700.0, 103), ('Birdman_(film)', 752277.0, 162)]
 
 ### Distributions
@@ -163,7 +163,7 @@ Self-loops (rows where both ends are equal): {'prev_id==curr_id': 37486, 'prev_t
 - **Temporal:** no time column in the edge frame
 - **Spatial:** no supporting evidence in the data read here.
 - **Data quality:** duplicate edge keys 14; self-loops {'prev_id==curr_id': 37486, 'prev_title==curr_title': 37490}; id-to-title inconsistencies: [('curr_id', 1), ('prev_id', 1)]
-- **Statistical patterns:** click-count quantiles ['10', '15', '26', '62', '1779']; click concentration in the top 1% of current titles: 0.3371
+- **Statistical patterns:** click-count quantiles ['10', '15', '26', '62', '1855']; click concentration in the top 1% of current titles: 0.3371
 - **Relationships:** graph: 2046152 titles with inbound link edges, 1383299 with outbound
 - **Analytics use:** measure: click count; dimensions: edge type, previous and current title (type values 4)
 - **ML use:** no supporting evidence in the data read here.
@@ -210,7 +210,7 @@ Self-loops (rows where both ends are equal): {'prev_id==curr_id': 37486, 'prev_t
 - **Spatial:** no supporting evidence in the data read here.
 - **Data quality:** edge titles without an article: 383744 of 2044911 distinct current titles
 - **Statistical patterns:** click weight on known articles: 0.7651 (landing), 0.7728 (leaving)
-- **Relationships:** title overlap shares: article keys in edges 0.3753, edge keys with an article 0.8123; id overlap: {'a_distinct': 4428568, 'b_distinct': 2046153, 'both': 1676085, 'a_share_in_b': 0.3785, 'b_share_in_a': 0.8191}
+- **Relationships:** title overlap shares: article keys in edges 0.3753, edge keys with an article 0.8123; id overlap: {'a_distinct': 4428568, 'b_distinct': 2046153, 'both': 1676085, 'a_not_in_b': 2752483, 'a_share_in_b': 0.3785, 'b_share_in_a': 0.8191}
 - **Analytics use:** link clicks on domain-term titles: {'energy': '2.748e+04', 'weather': '1.909e+04', 'commerce': '2.464e+04', 'aviation': '9.474e+04', 'mobility': '4353'}
 - **ML use:** no supporting evidence in the data read here.
 - **AI / knowledge use:** articles and link edges join on the normalised title; the overlap shares above decide how much of the graph attaches to article text

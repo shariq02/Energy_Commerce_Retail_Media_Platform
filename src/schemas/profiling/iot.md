@@ -121,8 +121,8 @@ Coverage of the file cannot be checked against an external reference: the README
 
 ### Distributions
 
-- `battery_level` quantiles (p1/p25/p50/p75/p99): 0, 2, 4, 7, 9
-- `c02_level` quantiles (p1/p25/p50/p75/p99): 808, 1000, 1199, 1399, 1591
+- `battery_level` quantiles (p1/p25/p50/p75/p99): 0, 2, 5, 7, 9
+- `c02_level` quantiles (p1/p25/p50/p75/p99): 808, 1000, 1199, 1400, 1591
 - `humidity` quantiles (p1/p25/p50/p75/p99): 25, 43, 62, 81, 99
 - `temp` quantiles (p1/p25/p50/p75/p99): 10, 16, 22, 28, 34
 - `battery_level`: - 7: 19915 - 1: 19876 - 0: 19851 - 5: 19843 - 8: 19822 - 9: 19800 - 2: 19774 - 3: 19766 - 4: 19764 - 6: 19753

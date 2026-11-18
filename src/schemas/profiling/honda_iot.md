@@ -35,22 +35,22 @@ Stuck-run rows (value == value 1 and 9 steps back, 1h): {'electricity_p': {'tota
 ### Unit & Semantic Validation
 
 Value columns cast to double; P tables are assumed to be instantaneous power/flow and W tables a cumulative energy meter, with no unit in the data -- the direction and scale checks below test this:
-- electricity_p.`total`: range -663729.1614583333..788591.3170904393, mean 169774.77319271534, sd 131559.439786418, negative rows 251753, zero 0, non-numeric 0
-- electricity_p.`PV`: range -719598.0706801552..228.05301725539397, mean -62397.16406067588, sd 117531.80186667206, negative rows 2123870, zero 902, non-numeric 22
-- electricity_p.`CHP`: range -282561.8727453294..27705.3, mean -64429.824339454, sd 80113.580470931, negative rows 1424715, zero 2269, non-numeric 1
-- electricity_w.`total`: range -104.47653333339258..8918860.985849153, mean 5083922.119569838, sd 2516610.5823399858, negative rows 225, zero 3, non-numeric 0
-- electricity_w.`PV`: range -2464379.466175354..0.0, mean -1046181.1668661179, sd 795057.0078034733, negative rows 2569378, zero 3, non-numeric 1
-- electricity_w.`CHP`: range -3390184.498498443..0.0, mean -1695281.213488044, sd 974507.2024406932, negative rows 3417892, zero 3, non-numeric 0
-- heating_p.`total`: range 0.0..2193300.0, mean 245947.95250695854, sd 203773.06045464557, negative rows 0, zero 567358, non-numeric 20
-- heating_p.`CHP_heat`: range 0.0..459285.1413232855, mean 106099.61714698598, sd 128533.62655661607, negative rows 0, zero 1837745, non-numeric 13
-- heating_p.`CHP_elec`: range -282561.8727453294..27705.3, mean -64429.82433945399, sd 80113.58047093102, negative rows 1424715, zero 2269, non-numeric 1
-- heating_w.`total`: range 0.0..12975100.000000002, mean 6690127.604245759, sd 3900559.891992282, negative rows 0, zero 20, non-numeric 0
-- heating_w.`CHP_heat`: range 0.0..5583000.0, mean 2765359.135908648, sd 1613442.8019178219, negative rows 0, zero 9, non-numeric 0
-- heating_w.`CHP_elec`: range -3390184.498498443..0.0, mean -1695255.4217999058, sd 974522.2229910549, negative rows 3417892, zero 55, non-numeric 0
-- cooling_p.`total`: range 0.0..3717000.0, mean 43054.7894697851, sd 54535.94502971595, negative rows 0, zero 167258, non-numeric 92
-- cooling_p.`cool_elec`: range 0.0..332024.7807491248, mean 19460.582344276118, sd 27250.084640577727, negative rows 0, zero 3, non-numeric 0
-- cooling_w.`total`: range 0.0..2270133.4562972225, mean 1154458.3248297796, sd 664635.5387939214, negative rows 0, zero 3960, non-numeric 0
-- cooling_w.`cool_elec`: range 0.0..1024963.8347382598, mean 516459.9854415728, sd 302073.95176798716, negative rows 0, zero 3, non-numeric 0
+- electricity_p.`total`: range -663729.1614583333..788591.3170904393, mean 169774.77319271534, sd 131559.43978641808, negative rows 251753, zero 0, non-numeric 0
+- electricity_p.`PV`: range -719598.0706801552..228.05301725539397, mean -62397.16406067587, sd 117531.801866672, negative rows 2123870, zero 902, non-numeric 22
+- electricity_p.`CHP`: range -282561.8727453294..27705.3, mean -64429.82433945396, sd 80113.58047093105, negative rows 1424715, zero 2269, non-numeric 1
+- electricity_w.`total`: range -104.47653333339258..8918860.985849153, mean 5083922.119569844, sd 2516610.582339985, negative rows 225, zero 3, non-numeric 0
+- electricity_w.`PV`: range -2464379.466175354..0.0, mean -1046181.1668661181, sd 795057.0078034734, negative rows 2569378, zero 3, non-numeric 1
+- electricity_w.`CHP`: range -3390184.498498443..0.0, mean -1695281.2134880477, sd 974507.2024406925, negative rows 3417892, zero 3, non-numeric 0
+- heating_p.`total`: range 0.0..2193300.0, mean 245947.95250695865, sd 203773.0604546457, negative rows 0, zero 567358, non-numeric 20
+- heating_p.`CHP_heat`: range 0.0..459285.1413232855, mean 106099.61714698582, sd 128533.62655661606, negative rows 0, zero 1837745, non-numeric 13
+- heating_p.`CHP_elec`: range -282561.8727453294..27705.3, mean -64429.82433945396, sd 80113.58047093105, negative rows 1424715, zero 2269, non-numeric 1
+- heating_w.`total`: range 0.0..12975100.000000002, mean 6690127.604245767, sd 3900559.8919922807, negative rows 0, zero 20, non-numeric 0
+- heating_w.`CHP_heat`: range 0.0..5583000.0, mean 2765359.135908647, sd 1613442.801917822, negative rows 0, zero 9, non-numeric 0
+- heating_w.`CHP_elec`: range -3390184.498498443..0.0, mean -1695255.4217999068, sd 974522.2229910558, negative rows 3417892, zero 55, non-numeric 0
+- cooling_p.`total`: range 0.0..3717000.0, mean 43054.78946978502, sd 54535.945029715935, negative rows 0, zero 167258, non-numeric 92
+- cooling_p.`cool_elec`: range 0.0..332024.7807491248, mean 19460.58234427614, sd 27250.08464057771, negative rows 0, zero 3, non-numeric 0
+- cooling_w.`total`: range 0.0..2270133.4562972225, mean 1154458.3248297835, sd 664635.5387939216, negative rows 0, zero 3960, non-numeric 0
+- cooling_w.`cool_elec`: range 0.0..1024963.8347382598, mean 516459.98544157296, sd 302073.95176798716, negative rows 0, zero 3, non-numeric 0
 
 Exact-copy / sign-mirror column pairs (circular-feature risk):
 - `electricity_p.CHP` <-> `heating_p.CHP_elec`: identical distribution -- one column duplicates the other
@@ -177,9 +177,9 @@ Single building, single sensor set -- no entity dimension; the only split axis i
 ### Relationships
 
 P<->W value relationship per metric (inner join on (frequency, datetime_utc), Pearson corr):
-- electricity: {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}
-- heating: {'matched': 3417946, 'corr_total': -0.0609474328312038, 'corr_CHP_heat': 0.012585981650599671, 'corr_CHP_elec': -0.0011251212780575815}
-- cooling: {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}
+- electricity: {'matched': 3417956, 'corr_total': -0.32050197740453484, 'corr_PV': 0.12365026267641674, 'corr_CHP': -0.0010887437831838239}
+- heating: {'matched': 3417946, 'corr_total': -0.06094743283121021, 'corr_CHP_heat': 0.012585981650605357, 'corr_CHP_elec': -0.0011251212780512183}
+- cooling: {'matched': 3417895, 'corr_total': -0.027257124565178002, 'corr_cool_elec': -0.014216150000299875}
 P/W schema parity: {'electricity': True, 'heating': True, 'cooling': True}
 
 ### Energy Profiles
@@ -213,10 +213,10 @@ Mean of each P column by UTC hour of day, weekday (1 = Sunday) and month, 1h fre
 ### EDA Findings
 
 - dup composition: {'electricity_p': {'distinct_keys': 3417959, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'electricity_w': {'distinct_keys': 3417957, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_p': {'distinct_keys': 3417959, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'heating_w': {'distinct_keys': 3417947, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_p': {'distinct_keys': 3417960, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}, 'cooling_w': {'distinct_keys': 3417895, 'dup_groups': 0, 'identical': 0, 'conflicting': 0}}
-- continuity (coverage % / longest gap steps): {'electricity_p': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'electricity_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'heating_p': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'heating_w': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'cooling_p': {'15min': (100.0, 0.0), '1h': (100.0, 0.0), '1min': (100.0, 0.0)}, 'cooling_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}}
+- continuity (coverage % / longest gap steps): {'electricity_p': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'electricity_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'heating_p': {'15min': (100.0, 0.0), '1min': (100.0, 0.0), '1h': (100.0, 0.0)}, 'heating_w': {'15min': (100.0, 0.0), '1min': (100.0, 0.0), '1h': (100.0, 0.0)}, 'cooling_p': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'cooling_w': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}}
 - 5-sigma outliers: {'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}
 - mirror/duplicate columns: [('electricity_p.CHP', 'heating_p.CHP_elec', 'identical distribution -- one column duplicates the other')]
-- P<->W relationship: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}, 'heating': {'matched': 3417946, 'corr_total': -0.0609474328312038, 'corr_CHP_heat': 0.012585981650599671, 'corr_CHP_elec': -0.0011251212780575815}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}
+- P<->W relationship: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740453484, 'corr_PV': 0.12365026267641674, 'corr_CHP': -0.0010887437831838239}, 'heating': {'matched': 3417946, 'corr_total': -0.06094743283121021, 'corr_CHP_heat': 0.012585981650605357, 'corr_CHP_elec': -0.0011251212780512183}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565178002, 'corr_cool_elec': -0.014216150000299875}}
 
 ### ML-Readiness Evidence
 
@@ -242,11 +242,11 @@ Mean of each P column by UTC hour of day, weekday (1 = Sunday) and month, 1h fre
 
 - **Domain understanding:** one building's electricity, heating and cooling series, each as a P and a W table, at 1min / 15min / 1h; total plus sub-channels (PV, CHP, cooling electricity); sign conventions: {'electricity_w.total': 'mixed', 'electricity_w.PV': 'non-positive', 'electricity_w.CHP': 'non-positive', 'heating_w.total': 'non-negative', 'heating_w.CHP_heat': 'non-negative', 'heating_w.CHP_elec': 'non-positive', 'cooling_w.total': 'non-negative', 'cooling_w.cool_elec': 'non-negative'}; P vs W-increment relationship: [('electricity', 'PV', '1min'), ('electricity', 'total', '15min'), ('electricity', 'PV', '15min'), ('electricity', 'CHP', '15min'), ('electricity', 'total', '1h'), ('electricity', 'PV', '1h'), ('electricity', 'CHP', '1h'), ('heating', 'CHP_heat', '15min'), ('heating', 'CHP_elec', '15min'), ('heating', 'total', '1h'), ('heating', 'CHP_heat', '1h'), ('heating', 'CHP_elec', '1h'), ('cooling', 'cool_elec', '1h')]
 - **Structure and engineering:** 6 Bronze tables with key (frequency, datetime_utc); rows {'electricity_p': 3417959, 'electricity_w': 3417957, 'heating_p': 3417959, 'heating_w': 3417947, 'cooling_p': 3417960, 'cooling_w': 3417895}; the same signal is stored at three resolutions in one table; no unit column; P/W schema parity {'electricity': True, 'heating': True, 'cooling': True}; the CHP electricity column appears in two tables (mirror pairs: [('electricity_p.CHP', 'heating_p.CHP_elec')])
-- **Temporal:** coverage/longest gap per table: {'electricity_p': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'electricity_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'heating_p': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'heating_w': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'cooling_p': {'15min': (100.0, 0.0), '1h': (100.0, 0.0), '1min': (100.0, 0.0)}, 'cooling_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}}; hour, weekday and month profiles for ['electricity_p', 'heating_p', 'cooling_p']
+- **Temporal:** coverage/longest gap per table: {'electricity_p': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'electricity_w': {'1h': (100.0, 0.0), '15min': (100.0, 0.0), '1min': (100.0, 0.0)}, 'heating_p': {'15min': (100.0, 0.0), '1min': (100.0, 0.0), '1h': (100.0, 0.0)}, 'heating_w': {'15min': (100.0, 0.0), '1min': (100.0, 0.0), '1h': (100.0, 0.0)}, 'cooling_p': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}, 'cooling_w': {'1h': (100.0, 0.0), '1min': (100.0, 0.0), '15min': (100.0, 0.0)}}; hour, weekday and month profiles for ['electricity_p', 'heating_p', 'cooling_p']
 - **Spatial:** single site; no location column
 - **Data quality:** duplicate key groups none; 5-sigma outliers {'electricity_p': {'total': 159, 'PV': 13, 'CHP': 0}, 'electricity_w': {'total': 0, 'PV': 0, 'CHP': 0}, 'heating_p': {'total': 680, 'CHP_heat': 0, 'CHP_elec': 0}, 'heating_w': {'total': 0, 'CHP_heat': 0, 'CHP_elec': 0}, 'cooling_p': {'total': 7384, 'cool_elec': 8430}, 'cooling_w': {'total': 0, 'cool_elec': 0}}; W meters counted with a negative sign or decreasing: {'electricity_w': ['PV', 'CHP'], 'heating_w': ['CHP_elec'], 'cooling_w': []}
 - **Statistical patterns:** diurnal, weekday and seasonal profiles of each P channel (see Energy Profiles); value ranges and negative-value counts per column: {'electricity_p.total': 251753, 'electricity_p.PV': 2123870, 'electricity_p.CHP': 1424715, 'electricity_w.total': 225, 'electricity_w.PV': 2569378, 'electricity_w.CHP': 3417892, 'heating_p.CHP_elec': 1424715, 'heating_w.CHP_elec': 3417892}
-- **Relationships:** P vs W (same timestamp) correlation: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740454167, 'corr_PV': 0.12365026267641793, 'corr_CHP': -0.001088743783184895}, 'heating': {'matched': 3417946, 'corr_total': -0.0609474328312038, 'corr_CHP_heat': 0.012585981650599671, 'corr_CHP_elec': -0.0011251212780575815}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565173024, 'corr_cool_elec': -0.014216150000298407}}; P vs W-increment best alignment: ('electricity', 'PV', '1h')
+- **Relationships:** P vs W (same timestamp) correlation: {'electricity': {'matched': 3417956, 'corr_total': -0.32050197740453484, 'corr_PV': 0.12365026267641674, 'corr_CHP': -0.0010887437831838239}, 'heating': {'matched': 3417946, 'corr_total': -0.06094743283121021, 'corr_CHP_heat': 0.012585981650605357, 'corr_CHP_elec': -0.0011251212780512183}, 'cooling': {'matched': 3417895, 'corr_total': -0.027257124565178002, 'corr_cool_elec': -0.014216150000299875}}; P vs W-increment best alignment: ('electricity', 'PV', '1h')
 - **Analytics use:** load and generation channels for one site at minute resolution; supports profile and balance analysis once the P/W meaning is fixed
 - **ML use:** candidate targets are the P channels; whether W leaks future energy relative to P depends on the unresolved P/W meaning (see ML-Readiness)
 - **AI / knowledge use:** no text or label column; channel names carry the only semantics
@@ -286,8 +286,8 @@ Stuck-run rows (value == value 1 and 11 steps back, 1h): {'WeatherStation_Weathe
 ### Unit & Semantic Validation
 
 Value columns: Ta = air temperature (degC), Igm = global irradiance (W/m2). Plausible bounds {'Ta': (-40.0, 50.0), 'Igm': (0.0, 1500.0)}.
-- WeatherStation_Weather_Ta: range -11.6211330890655..39.89799912770584, mean 12.404227616478074, out-of-plausible-range rows 0, negative 128708, non-numeric 7
-- WeatherStation_Weather_Igm: range 0.0..1140.98239746091, mean 133.5618535195616, out-of-plausible-range rows 0, negative 0, non-numeric 881
+- WeatherStation_Weather_Ta: range -11.6211330890655..39.89799912770584, mean 12.404227616478085, out-of-plausible-range rows 0, negative 128708, non-numeric 7
+- WeatherStation_Weather_Igm: range 0.0..1140.98239746091, mean 133.56185351956162, out-of-plausible-range rows 0, negative 0, non-numeric 881
 Igm at night is 0 by physics -- a large zero count is expected, not missingness; a negative Igm or an Igm far above ~1200 W/m2 in Germany is a sensor fault.
 
 ### Categorical / Domain Validation
@@ -319,8 +319,8 @@ This weather series is the feature side of the energy<->weather join (03); if it
 
 | column | min | p01 | p50 | p99 | max | mean | sd | zero | negative | non_numeric |
 |---|---|---|---|---|---|---|---|---|---|---|
-| WeatherStation_Weather_Ta | -11.6211330890655 | -3.108776317702389 | 11.800457827249776 | 30.87661711374917 | 39.89799912770584 | 12.404227616478074 | 7.975105939313824 | 0 | 128708 | 7 |
-| WeatherStation_Weather_Igm | 0.0 | 0.0 | 2.8015878200531 | 845.778789639606 | 1140.98239746091 | 133.5618535195616 | 220.26298763615017 | 1455479 | 0 | 881 |
+| WeatherStation_Weather_Ta | -11.6211330890655 | -3.1046586036682 | 11.800457827249776 | 30.87661711374917 | 39.89799912770584 | 12.404227616478085 | 7.975105939313824 | 0 | 128708 | 7 |
+| WeatherStation_Weather_Igm | 0.0 | 0.0 | 2.8015878200531 | 845.778789639606 | 1140.98239746091 | 133.56185351956162 | 220.26298763615017 | 1455479 | 0 | 881 |
 
 ### EDA Findings
 

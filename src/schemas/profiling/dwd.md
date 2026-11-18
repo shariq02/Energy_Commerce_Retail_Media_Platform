@@ -36,7 +36,7 @@ Highest-missingness column per measurement (missing includes blank):
 | precipitation | 196992 | 196992 | 0 | WRTR=3369655 | R1=0 |
 | pressure | 204288 | 204288 | 0 | P0=3931010 | P0=757644 |
 | sun | 123226 | 123226 | 0 | SD_SO=4164 | SD_SO=0 |
-| wind | 202865 | 182082 | 20783 | D=3217996 | D=40722 |
+| wind | 202865 | 182072 | 20793 | D=3217996 | D=40722 |
 
 QN quality flag vs -999 sentinel / out-of-range rows:
 - air_temperature: {'QN_9': '3', 'rows': 8341093, 'rows_with_-999': 8425, 'rows_out_of_range': 0}; {'QN_9': '5', 'rows': 6374150, 'rows_with_-999': 45563, 'rows_out_of_range': 1}; {'QN_9': '10', 'rows': 2555902, 'rows_with_-999': 465, 'rows_out_of_range': 0}; {'QN_9': '1', 'rows': 65243, 'rows_with_-999': 35, 'rows_out_of_range': 0}
@@ -54,7 +54,7 @@ Candidate special codes (-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9
   - `TT_TU` = -999.0: 5727 rows (0.033%); by quality level (level, rows with the code, rows at level) [('3', 5695, 8341093), ('10', 28, 2555902), ('1', 4, 65243)]; by decade (decade, rows) [(1980, 9), (1990, 38), (2000, 13), (2010, 1765), (2020, 3902)]; top stations (station, rows) [('2564', 564), ('2014', 499), ('5100', 451)] = 0.264 of the code's rows.
   - `RF_TU` = -999.0: 54428 rows (0.314%); by quality level (level, rows with the code, rows at level) [('5', 45563, 6374150), ('3', 8393, 8341093), ('10', 437, 2555902), ('1', 35, 65243)]; by decade (decade, rows) [(1950, 35063), (1960, 10499), (1970, 1), (1980, 26), (1990, 378), (2000, 322), (2010, 2890), (2020, 5249)]; top stations (station, rows) [('880', 43982), ('4336', 1837), ('4271', 939)] = 0.859 of the code's rows.
 - cloudiness: rows with k candidate codes per row (k, rows): [(0, 12523904), (1, 449412)].
-  - `V_N` = -1.0: 449412 rows (3.464%); by quality level (level, rows with the code, rows at level) [('3', 96587, 5177331), ('1', 352825, 7795985)]; by decade (decade, rows) [(1940, 3700), (1950, 40910), (1960, 38382), (1970, 41601), (1980, 94981), (1990, 90541), (2000, 84426), (2010, 51025)] (+1 more); top stations (station, rows) [('5792', 133755), ('1346', 115496), ('2290', 58286)] = 0.684 of the code's rows.
+  - `V_N` = -1.0: 449412 rows (3.464%); by quality level (level, rows with the code, rows at level) [('1', 352825, 7795985), ('3', 96587, 5177331)]; by decade (decade, rows) [(1940, 3700), (1950, 40910), (1960, 38382), (1970, 41601), (1980, 94981), (1990, 90541), (2000, 84426), (2010, 51025)] (+1 more); top stations (station, rows) [('5792', 133755), ('1346', 115496), ('2290', 58286)] = 0.684 of the code's rows.
 - moisture: rows with k candidate codes per row (k, rows): [(0, 12315505), (2, 128575), (3, 21), (5, 5725), (6, 32)].
   - `ABSF_STD` = -99.9: 5757 rows (0.046%); by quality level (level, rows with the code, rows at level) [('3', 5757, 12449858)]; by decade (decade, rows) [(1940, 36), (1950, 268), (1960, 95), (1970, 337), (1980, 3766), (1990, 1025), (2000, 73), (2010, 85)] (+1 more); top stations (station, rows) [('5792', 3285), ('1346', 399), ('2564', 310)] = 0.694 of the code's rows.
   - `VP_STD` = -99.9: 5757 rows (0.046%); by quality level (level, rows with the code, rows at level) [('3', 5757, 12449858)]; by decade (decade, rows) [(1940, 36), (1950, 268), (1960, 95), (1970, 337), (1980, 3766), (1990, 1025), (2000, 73), (2010, 85)] (+1 more); top stations (station, rows) [('5792', 3285), ('1346', 399), ('2564', 310)] = 0.694 of the code's rows.
@@ -64,14 +64,14 @@ Candidate special codes (-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9
   - `RF_STD` = -99.9: 5758 rows (0.046%); by quality level (level, rows with the code, rows at level) [('3', 5758, 12449858)]; by decade (decade, rows) [(1940, 36), (1950, 268), (1960, 95), (1970, 337), (1980, 3766), (1990, 1026), (2000, 73), (2010, 85)] (+1 more); top stations (station, rows) [('5792', 3285), ('1346', 399), ('2564', 310)] = 0.694 of the code's rows.
   - `TD_STD` = -99.9: 5757 rows (0.046%); by quality level (level, rows with the code, rows at level) [('3', 5757, 12449858)]; by decade (decade, rows) [(1940, 36), (1950, 268), (1960, 95), (1970, 337), (1980, 3766), (1990, 1025), (2000, 73), (2010, 85)] (+1 more); top stations (station, rows) [('5792', 3285), ('1346', 399), ('2564', 310)] = 0.694 of the code's rows.
 - precipitation: rows with k candidate codes per row (k, rows): [(0, 3737548), (1, 3360161), (2, 47158), (3, 9434)].
-  - `R1` = -999.0: 56600 rows (0.791%); by quality level (level, rows with the code, rows at level) [('3', 32652, 5119301), ('1', 23948, 2035000)]; by decade (decade, rows) [(2000, 47979), (2010, 3975), (2020, 4646)]; top stations (station, rows) [('1346', 47094), ('2290', 1671), ('1270', 925)] = 0.878 of the code's rows.
-  - `RS_IND` = -999.0: 56524 rows (0.790%); by quality level (level, rows with the code, rows at level) [('3', 32650, 5119301), ('1', 23874, 2035000)]; by decade (decade, rows) [(2000, 47905), (2010, 3973), (2020, 4646)]; top stations (station, rows) [('1346', 47093), ('2290', 1671), ('1270', 925)] = 0.879 of the code's rows.
-  - `WRTR` = -999.0: 3369655 rows (47.100%); by quality level (level, rows with the code, rows at level) [('3', 1890417, 5119301), ('1', 1479238, 2035000)]; by decade (decade, rows) [(1990, 830620), (2000, 1078439), (2010, 1234517), (2020, 226079)]; top stations (station, rows) [('1550', 195668), ('433', 191645), ('1303', 180508)] = 0.169 of the code's rows.
+  - `R1` = -999.0: 56600 rows (0.791%); by quality level (level, rows with the code, rows at level) [('1', 23948, 2035000), ('3', 32652, 5119301)]; by decade (decade, rows) [(2000, 47979), (2010, 3975), (2020, 4646)]; top stations (station, rows) [('1346', 47094), ('2290', 1671), ('1270', 925)] = 0.878 of the code's rows.
+  - `RS_IND` = -999.0: 56524 rows (0.790%); by quality level (level, rows with the code, rows at level) [('1', 23874, 2035000), ('3', 32650, 5119301)]; by decade (decade, rows) [(2000, 47905), (2010, 3973), (2020, 4646)]; top stations (station, rows) [('1346', 47093), ('2290', 1671), ('1270', 925)] = 0.879 of the code's rows.
+  - `WRTR` = -999.0: 3369655 rows (47.100%); by quality level (level, rows with the code, rows at level) [('1', 1479238, 2035000), ('3', 1890417, 5119301)]; by decade (decade, rows) [(1990, 830620), (2000, 1078439), (2010, 1234517), (2020, 226079)]; top stations (station, rows) [('1550', 195668), ('433', 191645), ('1303', 180508)] = 0.169 of the code's rows.
 - pressure: rows with k candidate codes per row (k, rows): [(0, 8275006), (1, 3855135), (2, 1097781)].
   - `P` = -999.0: 2119687 rows (16.024%); by quality level (level, rows with the code, rows at level) [('3', 593907, 5470295), ('1', 1525780, 7757627)]; by decade (decade, rows) [(1940, 18003), (1950, 332527), (1960, 484228), (1970, 152614), (1980, 150340), (1990, 250241), (2000, 264435), (2010, 265871)] (+1 more); top stations (station, rows) [('2290', 469275), ('5792', 340889), ('1346', 334184)] = 0.54 of the code's rows.
   - `P0` = -999.0: 3931010 rows (29.718%); by quality level (level, rows with the code, rows at level) [('3', 5755, 5470295), ('1', 3925255, 7757627)]; by decade (decade, rows) [(1940, 70149), (1950, 744383), (1960, 870423), (1970, 673089), (1980, 1514878), (1990, 51945), (2000, 442), (2010, 2573)] (+1 more); top stations (station, rows) [('2014', 326303), ('433', 282424), ('1420', 281977)] = 0.227 of the code's rows.
 - sun: rows with k candidate codes per row (k, rows): [(0, 12646400), (1, 4164)].
-  - `SD_SO` = -999.0: 4164 rows (0.033%); by quality level (level, rows with the code, rows at level) [('3', 4036, 2959847), ('10', 21, 5087935), ('1', 89, 32328), ('5', 18, 4570452)]; by decade (decade, rows) [(1980, 18), (2000, 1279), (2010, 2060), (2020, 807)]; top stations (station, rows) [('2564', 3318), ('5100', 744), ('3126', 18)] = 0.98 of the code's rows.
+  - `SD_SO` = -999.0: 4164 rows (0.033%); by quality level (level, rows with the code, rows at level) [('5', 18, 4570452), ('3', 4036, 2959847), ('1', 89, 32328), ('10', 21, 5087935)]; by decade (decade, rows) [(1980, 18), (2000, 1279), (2010, 2060), (2020, 807)]; top stations (station, rows) [('2564', 3318), ('5100', 744), ('2667', 18)] = 0.98 of the code's rows.
 - wind: rows with k candidate codes per row (k, rows): [(0, 12694723), (1, 3259614), (2, 2861)].
   - `F` = -999.0: 6618 rows (0.041%); by quality level (level, rows with the code, rows at level) [('10', 3745, 9962165), ('3', 2063, 1043429), ('1', 810, 49056)]; by decade (decade, rows) [(1990, 41), (2000, 283), (2010, 2714), (2020, 3580)]; top stations (station, rows) [('2014', 2623), ('1048', 617), ('1270', 409)] = 0.551 of the code's rows.
   - `D` = -999.0: 3217996 rows (20.166%); by quality level (level, rows with the code, rows at level) [('10', 1750, 9962165), ('3', 2065, 1043429), ('1', 801, 49056), ('5', 3213380, 4902548)]; by decade (decade, rows) [(1890, 61344), (1900, 87648), (1910, 78168), (1920, 87672), (1930, 131282), (1940, 209058), (1950, 714192), (1960, 1170336)] (+6 more); top stations (station, rows) [('3987', 604338), ('2290', 314263), ('691', 254287)] = 0.364 of the code's rows.
@@ -231,24 +231,24 @@ Station presence is uneven -- an inner join across all 7 measurements silently d
 
 ### Distributions
 
-- air_temperature.`TT_TU`: min/max(no sentinel)=-32.7/40.8, p01/p50/p99=[-11.6, 8.6, 27.2], mean=8.597377520684287, sd=8.30773079731752, zero rows=67676, -999=5727, out-of-range=0
+- air_temperature.`TT_TU`: min/max(no sentinel)=-32.7/40.8, p01/p50/p99=[-11.6, 8.6, 27.2], mean=8.597377520684287, sd=8.307730797317534, zero rows=67676, -999=5727, out-of-range=0
 - air_temperature.`RF_TU`: min/max(no sentinel)=1.0/101.0, p01/p50/p99=[30.0, 83.0, 100.0], mean=78.42010564773904, sd=17.327941774352823, zero rows=0, -999=54428, out-of-range=1
-- cloudiness.`V_N`: min/max(no sentinel)=-1.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=5.0976243853152114, sd=3.0820865463605807, zero rows=1460740, -999=0, out-of-range=449412
-- moisture.`ABSF_STD`: min/max(no sentinel)=-99.9/46.1, p01/p50/p99=[1.5, 6.8, 14.6], mean=7.156621714078992, sd=3.804477405586806, zero rows=13, -999=0
+- cloudiness.`V_N`: min/max(no sentinel)=-1.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=5.0976243853152114, sd=3.082086546360582, zero rows=1460740, -999=0, out-of-range=449412
+- moisture.`ABSF_STD`: min/max(no sentinel)=-99.9/46.1, p01/p50/p99=[1.5, 6.8, 14.6], mean=7.156621714078992, sd=3.8044774055868036, zero rows=13, -999=0
 - moisture.`VP_STD`: min/max(no sentinel)=-99.9/66.3, p01/p50/p99=[1.8, 8.9, 19.9], mean=9.437526259335632, sd=4.805446268826531, zero rows=13, -999=0
-- moisture.`TF_STD`: min/max(no sentinel)=-99.9/38.0, p01/p50/p99=[-11.6, 7.2, 19.5], mean=6.793167026615071, sd=7.330519405045283, zero rows=41581, -999=128648, out-of-range=5718
-- moisture.`P_STD`: min/max(no sentinel)=227.0/1099.8, p01/p50/p99=[696.0, 998.3, 1028.6], mean=976.3805819639445, sd=66.23220254645527, zero rows=0, -999=128648
-- moisture.`TT_STD`: min/max(no sentinel)=-60.0/56.0, p01/p50/p99=[-11.0, 9.0, 27.6], mean=8.975967926702461, sd=8.280163469422718, zero rows=76358, -999=0
-- moisture.`RF_STD`: min/max(no sentinel)=-99.9/100.0, p01/p50/p99=[29.2, 81.9, 100.0], mean=77.67704790689172, sd=17.911026727873413, zero rows=0, -999=0
-- moisture.`TD_STD`: min/max(no sentinel)=-99.9/38.0, p01/p50/p99=[-15.8, 5.2, 17.4], mean=4.739769449579262, sd=7.443486202461734, zero rows=113926, -999=0
-- precipitation.`R1`: min/max(no sentinel)=0.0/59.9, p01/p50/p99=[0.0, 0.0, 1.9], mean=0.08265114295459901, sd=0.5002707684768429, zero rows=6340975, -999=56600, out-of-range=0
-- precipitation.`RS_IND`: min/max(no sentinel)=0.0/1.0, p01/p50/p99=[0.0, 0.0, 1.0], mean=0.2372006052035729, sd=0.42536631693944454, zero rows=5414180, -999=56524, out-of-range=0
-- precipitation.`WRTR`: min/max(no sentinel)=0.0/9.0, p01/p50/p99=[0.0, 0.0, 8.0], mean=1.4120107930834218, sd=2.6061796093557215, zero rows=2917717, -999=3369655
-- pressure.`P`: min/max(no sentinel)=900.0/1074.0, p01/p50/p99=[990.0, 1016.4, 1037.5], mean=1015.8670775330176, sd=10.226050882492096, zero rows=0, -999=2119687, out-of-range=0
-- pressure.`P0`: min/max(no sentinel)=227.0/1099.8, p01/p50/p99=[703.9, 996.9, 1030.0], mean=976.9323389529764, sd=64.21537706559778, zero rows=0, -999=3931010, out-of-range=757644
-- sun.`SD_SO`: min/max(no sentinel)=0.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=15.476596897140688, sd=23.37445049153833, zero rows=7738482, -999=4164, out-of-range=0
-- wind.`F`: min/max(no sentinel)=0.0/46.4, p01/p50/p99=[0.0, 3.5, 14.0], mean=4.1197021801088125, sd=2.8921446382161897, zero rows=184561, -999=6618, out-of-range=0
-- wind.`D`: min/max(no sentinel)=0.0/990.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=194.7532112294004, sd=103.96101111574575, zero rows=148966, -999=3217996, out-of-range=40722
+- moisture.`TF_STD`: min/max(no sentinel)=-99.9/38.0, p01/p50/p99=[-11.6, 7.2, 19.5], mean=6.793167026615071, sd=7.330519405045289, zero rows=41581, -999=128648, out-of-range=5718
+- moisture.`P_STD`: min/max(no sentinel)=227.0/1099.8, p01/p50/p99=[696.0, 998.3, 1028.6], mean=976.3805819639445, sd=66.2322025464553, zero rows=0, -999=128648
+- moisture.`TT_STD`: min/max(no sentinel)=-60.0/56.0, p01/p50/p99=[-11.0, 9.0, 27.6], mean=8.975967926702461, sd=8.280163469422726, zero rows=76358, -999=0
+- moisture.`RF_STD`: min/max(no sentinel)=-99.9/100.0, p01/p50/p99=[29.2, 81.9, 100.0], mean=77.67704790689172, sd=17.911026727873406, zero rows=0, -999=0
+- moisture.`TD_STD`: min/max(no sentinel)=-99.9/38.0, p01/p50/p99=[-15.8, 5.2, 17.4], mean=4.739769449579262, sd=7.4434862024617345, zero rows=113926, -999=0
+- precipitation.`R1`: min/max(no sentinel)=0.0/59.9, p01/p50/p99=[0.0, 0.0, 1.9], mean=0.08265114295459898, sd=0.5002707684768439, zero rows=6340975, -999=56600, out-of-range=0
+- precipitation.`RS_IND`: min/max(no sentinel)=0.0/1.0, p01/p50/p99=[0.0, 0.0, 1.0], mean=0.2372006052035729, sd=0.425366316939444, zero rows=5414180, -999=56524, out-of-range=0
+- precipitation.`WRTR`: min/max(no sentinel)=0.0/9.0, p01/p50/p99=[0.0, 0.0, 8.0], mean=1.4120107930834218, sd=2.606179609355727, zero rows=2917717, -999=3369655
+- pressure.`P`: min/max(no sentinel)=900.0/1074.0, p01/p50/p99=[990.0, 1016.4, 1037.5], mean=1015.8670775330176, sd=10.226050882492114, zero rows=0, -999=2119687, out-of-range=0
+- pressure.`P0`: min/max(no sentinel)=227.0/1099.8, p01/p50/p99=[703.9, 996.9, 1030.0], mean=976.9323389529764, sd=64.21537706559775, zero rows=0, -999=3931010, out-of-range=757644
+- sun.`SD_SO`: min/max(no sentinel)=0.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=15.476596897140688, sd=23.374450491538344, zero rows=7738482, -999=4164, out-of-range=0
+- wind.`F`: min/max(no sentinel)=0.0/46.4, p01/p50/p99=[0.0, 3.5, 14.0], mean=4.1197021801088125, sd=2.8921446382161924, zero rows=184561, -999=6618, out-of-range=0
+- wind.`D`: min/max(no sentinel)=0.0/990.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=194.7532112294004, sd=103.9610111157457, zero rows=148966, -999=3217996, out-of-range=40722
 
 ### Seasonal and Diurnal Profiles
 
@@ -276,7 +276,7 @@ Mean by calendar month and by hour of day of MESS_DATUM (as stored, all stations
 - precipitation: rows=7154301, stations=28, hourly coverage 82.17-99.87%, longest gap 24492.0h, dup identical=196992/conflicting=0, constant cols=['eor']
 - pressure: rows=13227922, stations=29, hourly coverage 64.99-99.9%, longest gap 55560.0h, dup identical=204288/conflicting=0, constant cols=['eor']
 - sun: rows=12650564, stations=29, hourly coverage 60.94-74.98%, longest gap 113958.0h, dup identical=123226/conflicting=0, constant cols=['eor']
-- wind: rows=15957198, stations=29, hourly coverage 63.37-99.97%, longest gap 217113.0h, dup identical=182082/conflicting=20783, constant cols=['eor']
+- wind: rows=15957198, stations=29, hourly coverage 63.37-99.97%, longest gap 217113.0h, dup identical=182072/conflicting=20793, constant cols=['eor']
 
 ### ML-Readiness Evidence
 
@@ -289,7 +289,7 @@ Mean by calendar month and by hour of day of MESS_DATUM (as stored, all stations
 - **Historical-reference (point-in-time) leakage:** Station location / name / instrument are time-varying (metadata, 02) -- a climatology or a station attribute joined to a historical row must use the value valid at that row's MESS_DATUM, not the latest.
 - **Survivorship / coverage bias:** Hourly coverage above shows the real gaps; the station x measurement matrix shows uneven instrumentation. A pooled statistic is dominated by the long-history, fully-instrumented stations.
 - **Missingness leakage:** -999 / blank rate correlates with station, parameter and era (Regime / Version Evidence) -- an 'is-missing' feature can leak an outage window.
-- **Duplicate-event leakage:** Conflicting (station, ts) duplicates per measurement: {'air_temperature': 0, 'cloudiness': 6, 'moisture': 0, 'precipitation': 0, 'pressure': 0, 'sun': 0, 'wind': 20783} -- resolve before counting or splitting.
+- **Duplicate-event leakage:** Conflicting (station, ts) duplicates per measurement: {'air_temperature': 0, 'cloudiness': 6, 'moisture': 0, 'precipitation': 0, 'pressure': 0, 'sun': 0, 'wind': 20793} -- resolve before counting or splitting.
 - **Target / feature temporal misalignment:** MESS_DATUM is the observation hour; a feature/target pair must align to one hour convention (interval start vs end).
 - **Unit / sign / circular-feature leakage:** Units are not in Bronze (reconcile via parameter_unit, 02). Net vs gross / related parameters within a measurement can be near-collinear.
 - **Data-generation-process leakage:** QN_* encodes DWD's QC decision, not the physical weather -- a feature keyed on it encodes the QC pipeline.
@@ -304,7 +304,7 @@ Mean by calendar month and by hour of day of MESS_DATUM (as stored, all stations
 - **Structure and engineering:** 7 Bronze tables keyed (station, MESS_DATUM); all columns are strings and are cast with a safe numeric parse; timestamps arrive as yyyyMMddHH, sometimes with a trailing .0; quality-level column per table: {'air_temperature': 'QN_9', 'cloudiness': 'QN_8', 'moisture': 'QN_8', 'precipitation': 'QN_8', 'pressure': 'QN_8', 'sun': 'QN_7', 'wind': 'QN_3'}
 - **Temporal:** spans {'air_temperature': ('1893010101', '2026090323'), 'cloudiness': ('1949010100', '2026090323'), 'moisture': ('1949010100', '2026090323'), 'precipitation': ('1995090100', '2026090323'), 'pressure': ('1949010100', '2026090323'), 'sun': ('1893010103', '2026090323'), 'wind': ('1893010100', '2026090323')}; longest station gap (hours) per measurement {'air_temperature': 217113.0, 'cloudiness': 121571.0, 'moisture': 80304.0, 'precipitation': 24492.0, 'pressure': 55560.0, 'sun': 113958.0, 'wind': 217113.0}
 - **Spatial:** 28 stations; station-level spatial patterns are in the relationships notebook
-- **Data quality:** duplicate keys {'air_temperature': (204288, 0), 'cloudiness': (203021, 6), 'moisture': (202195, 0), 'precipitation': (196992, 0), 'pressure': (204288, 0), 'sun': (123226, 0), 'wind': (202865, 20783)} (groups, conflicting); -999 rows {'air_temperature': 60155, 'cloudiness': 0, 'moisture': 257296, 'precipitation': 3482779, 'pressure': 6050697, 'sun': 4164, 'wind': 3224614}; other candidate codes: see Special Values
+- **Data quality:** duplicate keys {'air_temperature': (204288, 0), 'cloudiness': (203021, 6), 'moisture': (202195, 0), 'precipitation': (196992, 0), 'pressure': (204288, 0), 'sun': (123226, 0), 'wind': (202865, 20793)} (groups, conflicting); -999 rows {'air_temperature': 60155, 'cloudiness': 0, 'moisture': 257296, 'precipitation': 3482779, 'pressure': 6050697, 'sun': 4164, 'wind': 3224614}; other candidate codes: see Special Values
 - **Statistical patterns:** month and hour profiles (see Seasonal and Diurnal Profiles); value ranges per column in Distributions
 - **Relationships:** cross-variable checks are in the relationships notebook
 - **Analytics use:** long hourly history at a small set of stations, with a quality flag per row
@@ -610,7 +610,7 @@ Per-station observed distinct hours (measurement completeness proxy):
 Distinct station ids per Bronze table: {'air_temperature': 28, 'cloudiness': 28, 'moisture': 28, 'precipitation': 27, 'pressure': 28, 'sun': 28, 'wind': 28, 'station_geography': 28, 'station_name_history': 34, 'parameter_unit': 34, 'device_instrument': 33}
 Union of stations across the 7 measurements: 28 -> ['1048', '1262', '1270', '1303', '1346', '1420', '1550', '1684', '1975', '2014', '2290', '2564', '2667', '2928', '3032', '3126', '3631', '3668', '3987', '4271', '433', '4336', '4928', '5100', '5792', '662', '691', '880']
 Stations absent from each measurement (vs the union): {'air_temperature': 0, 'cloudiness': 0, 'moisture': 0, 'precipitation': 1, 'pressure': 0, 'sun': 0, 'wind': 0}
-Stations mapped to >1 city: {}   |   distinct stations per city: {'leipzig': 1, 'essen': 1, 'hohenpeissenberg': 1, 'frankfurt_am_main': 1, 'garmisch_partenkirchen': 1, 'berlin': 1, 'stuttgart': 1, 'bremen': 1, 'nuremberg': 1, 'zugspitze': 1, 'magdeburg': 1, 'potsdam': 1, 'kiel': 1, 'trier': 1, 'hannover': 1, 'saarbruecken': 1, 'goerlitz': 1, 'erfurt': 1, 'norderney': 1, 'rostock_warnemuende': 1, 'hamburg': 1, 'sylt': 1, 'cologne_bonn': 1, 'dresden': 1, 'feldberg_schwarzwald': 1, 'braunschweig': 1, 'cottbus': 1, 'munich': 1}
+Stations mapped to >1 city: {}   |   distinct stations per city: {'leipzig': 1, 'essen': 1, 'hohenpeissenberg': 1, 'frankfurt_am_main': 1, 'berlin': 1, 'garmisch_partenkirchen': 1, 'stuttgart': 1, 'bremen': 1, 'zugspitze': 1, 'nuremberg': 1, 'magdeburg': 1, 'potsdam': 1, 'kiel': 1, 'trier': 1, 'hannover': 1, 'saarbruecken': 1, 'goerlitz': 1, 'erfurt': 1, 'norderney': 1, 'rostock_warnemuende': 1, 'hamburg': 1, 'sylt': 1, 'cologne_bonn': 1, 'dresden': 1, 'feldberg_schwarzwald': 1, 'braunschweig': 1, 'cottbus': 1, 'munich': 1}
 
 ### Relationships
 
@@ -672,11 +672,11 @@ Coordinate-level spatial validity is in section 02. There is no second coordinat
 ### Cross-variable Checks
 
 Cross-variable checks on the hourly rows from 2016-01-01 onward (the wind direction check uses the full history). Candidate special codes [-999.0, -99.9, -99.0, -9.9, -9.0, -1.0, 990.0, 999.0, 9999.0] are set aside per column only where they lie outside the column's plausible range {'TT_TU': (-70.0, 60.0), 'TT_STD': (-70.0, 60.0), 'TF_STD': (-70.0, 60.0), 'TD_STD': (-70.0, 60.0), 'RF_TU': (0.0, 101.0), 'RF_STD': (0.0, 101.0), 'P': (300.0, 1100.0), 'P0': (200.0, 1100.0), 'P_STD': (200.0, 1100.0), 'V_N': (0.0, 8.0), 'R1': (0.0, 300.0), 'RS_IND': (0.0, 1.0), 'SD_SO': (0.0, 60.0), 'F': (0.0, 100.0), 'D': (0.0, 360.0)}.
-- air_temperature.TT_TU vs moisture.TT_STD: 3211089 hourly pairs, mean absolute difference 3.220091377099795e-05, 3211001 within 0.5 degree, correlation 0.9999997841130572.
-- air_temperature.RF_TU vs moisture.RF_STD: 3209459 pairs, mean absolute difference 0.2700010500212039, correlation 0.9998282742654672.
-- dew point above air temperature (moisture.TD_STD > TT_STD + 0.1): 0 of 3210998 pairs; mean dew-point depression 4.728688619550683.
+- air_temperature.TT_TU vs moisture.TT_STD: 3211089 hourly pairs, mean absolute difference 3.220091377099795e-05, 3211001 within 0.5 degree, correlation 0.999999784113052.
+- air_temperature.RF_TU vs moisture.RF_STD: 3209459 pairs, mean absolute difference 0.27000105002120395, correlation 0.9998282742654763.
+- dew point above air temperature (moisture.TD_STD > TT_STD + 0.1): 0 of 3210998 pairs; mean dew-point depression 4.728688619550684.
 - precipitation R1 > 0 against RS_IND (amount positive, indicator, hours): [{'amount_positive': False, 'indicator': 0.0, 'count': 2106632}, {'amount_positive': False, 'indicator': 1.0, 'count': 325264}, {'amount_positive': True, 'indicator': 1.0, 'count': 279712}].
-- sunshine minutes by cloud-cover code (code, hours, mean minutes): [(-1.0, 12013, 1.87), (0.0, 323212, 36.19), (1.0, 87997, 38.07), (2.0, 69316, 35.88), (3.0, 69233, 34.66), (4.0, 65180, 32.2), (5.0, 77445, 29.86), (6.0, 102894, 25.46), (7.0, 432885, 11.51), (8.0, 862959, 5.38)]; correlation with the codes set aside -0.5087736012866463.
+- sunshine minutes by cloud-cover code (code, hours, mean minutes): [(-1.0, 12013, 1.87), (0.0, 323212, 36.19), (1.0, 87997, 38.07), (2.0, 69316, 35.88), (3.0, 69233, 34.66), (4.0, 65180, 32.2), (5.0, 77445, 29.86), (6.0, 102894, 25.46), (7.0, 432885, 11.51), (8.0, 862959, 5.38)]; correlation with the codes set aside -0.5087736012866246.
 - wind speed by direction class over the full history (990 and -999 only occur outside the recent window): [{'direction_class': 'D=-999', 'hours': 3215136, 'mean_speed': 4.415966945089935, 'max_speed': 36.0, 'median_speed': 3.9}, {'direction_class': 'D=0', 'hours': 148905, 'mean_speed': 0.006966858063866262, 'max_speed': 2.4, 'median_speed': 0.0}, {'direction_class': 'D=990', 'hours': 40721, 'mean_speed': 1.080941037793754, 'max_speed': 4.0, 'median_speed': 1.0}, {'direction_class': 'other', 'hours': 12545818, 'mean_speed': 4.102454738330835, 'max_speed': 46.4, 'median_speed': 3.5}].
 - hours with direction 990 or 0 by decade (decade, class, hours): [(1960, 'D=0', 218), (1970, 'D=0', 37947), (1970, 'D=990', 9104), (1980, 'D=0', 71363), (1980, 'D=990', 20633), (1990, 'D=0', 29874), (1990, 'D=990', 10823), (2000, 'D=0', 7402), (2000, 'D=990', 161), (2010, 'D=0', 1642), (2020, 'D=0', 459)].
 
@@ -759,7 +759,7 @@ Station means over the same window against station coordinates and elevation, 28
 | measurement | dup key groups | identical | conflicting |
 |---|---|---|---|
 | dew_point | 204288 | 204288 | 0 |
-| soil_temperature | 196534 | 189250 | 7284 |
+| soil_temperature | 196534 | 189253 | 7281 |
 | visibility | 203353 | 203353 | 0 |
 | cloud_type | 203021 | 203015 | 6 |
 | wind_synop | 204288 | 204288 | 0 |
@@ -819,46 +819,46 @@ Per-decade row count and QN vocabulary. The deepening network came online at dif
 
 ### Distributions
 
-- dew_point.`TT`: min/max=-999.0/56.0, p01/p50/p99=[-999.0, 8.0, 27.3], mean=-59.428403627621925, sd=253.58451592108224, zero rows=95695, -999 sentinel rows=917439
-- dew_point.`TD`: min/max=-999.0/46.5, p01/p50/p99=[-999.0, 4.5, 17.3], mean=-63.94961752066563, sd=253.565414301759, zero rows=129466, -999 sentinel rows=925822
-- soil_temperature.`V_TE002`: min/max=-999.0/49.7, p01/p50/p99=[-999.0, -999.0, 19.8], mean=-917.1660788063748, sd=275.4190050741, zero rows=11793, -999 sentinel rows=6600469
-- soil_temperature.`V_TE005`: min/max=-999.0/51.4, p01/p50/p99=[-2.3, 10.4, 33.3], mean=10.045840879849807, sd=36.184877217548845, zero rows=120973, -999 sentinel rows=8684
-- soil_temperature.`V_TE010`: min/max=-999.0/42.3, p01/p50/p99=[-1.5, 10.6, 30.1], mean=10.135810511878649, sd=34.61837660349163, zero rows=80197, -999 sentinel rows=7970
-- soil_temperature.`V_TE020`: min/max=-999.0/37.1, p01/p50/p99=[-0.6, 10.8, 27.2], mean=10.223648525049889, sd=32.771589617188575, zero rows=45385, -999 sentinel rows=7158
-- soil_temperature.`V_TE050`: min/max=-999.0/30.1, p01/p50/p99=[-999.0, 10.5, 24.1], mean=-21.509449111026154, sd=179.06536505164632, zero rows=6277, -999 sentinel rows=232932
-- soil_temperature.`V_TE100`: min/max=-999.0/25.8, p01/p50/p99=[-999.0, 8.8, 21.5], mean=-162.24554658310902, sd=381.12034150280607, zero rows=136, -999 sentinel rows=1233998
-- visibility.`V_VV`: min/max=0.0/99990.0, p01/p50/p99=[0.0, 18000.0, 75000.0], mean=23123.29969899232, sd=19763.87521094002, zero rows=177550, -999 sentinel rows=0
+- dew_point.`TT`: min/max=-999.0/56.0, p01/p50/p99=[-999.0, 8.0, 27.3], mean=-59.428403627621925, sd=253.58451592108187, zero rows=95695, -999 sentinel rows=917439
+- dew_point.`TD`: min/max=-999.0/46.5, p01/p50/p99=[-999.0, 4.5, 17.3], mean=-63.94961752066563, sd=253.5654143017585, zero rows=129466, -999 sentinel rows=925822
+- soil_temperature.`V_TE002`: min/max=-999.0/49.7, p01/p50/p99=[-999.0, -999.0, 19.8], mean=-917.1660788063748, sd=275.4190050740998, zero rows=11793, -999 sentinel rows=6600469
+- soil_temperature.`V_TE005`: min/max=-999.0/51.4, p01/p50/p99=[-2.3, 10.4, 33.3], mean=10.04584087984982, sd=36.18487721754875, zero rows=120973, -999 sentinel rows=8684
+- soil_temperature.`V_TE010`: min/max=-999.0/42.3, p01/p50/p99=[-1.5, 10.6, 30.1], mean=10.135810511878649, sd=34.61837660349162, zero rows=80197, -999 sentinel rows=7970
+- soil_temperature.`V_TE020`: min/max=-999.0/37.1, p01/p50/p99=[-0.6, 10.8, 27.2], mean=10.223648525049878, sd=32.77158961718854, zero rows=45385, -999 sentinel rows=7158
+- soil_temperature.`V_TE050`: min/max=-999.0/30.1, p01/p50/p99=[-999.0, 10.5, 24.1], mean=-21.509449111026203, sd=179.06536505164684, zero rows=6277, -999 sentinel rows=232932
+- soil_temperature.`V_TE100`: min/max=-999.0/25.8, p01/p50/p99=[-999.0, 8.8, 21.5], mean=-162.24554658310885, sd=381.120341502806, zero rows=136, -999 sentinel rows=1233998
+- visibility.`V_VV`: min/max=0.0/99990.0, p01/p50/p99=[0.0, 18000.0, 75000.0], mean=23123.29969899232, sd=19763.875210940038, zero rows=177550, -999 sentinel rows=0
 - cloud_type.`V_N`: min/max=-999.0/8.0, p01/p50/p99=[-1.0, 7.0, 8.0], mean=-4.72357636700573, sd=98.8655422744278, zero rows=1460740, -999 sentinel rows=128147
-- cloud_type.`V_S1_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, 0.0, 8.0], mean=-422.88773749923956, sd=496.6473581778606, zero rows=709072, -999 sentinel rows=5585466
-- cloud_type.`V_S1_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-902.6854297029934, sd=294.69553568529267, zero rows=0, -999 sentinel rows=5585466
-- cloud_type.`V_S1_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, 450.0, 9000.0], mean=978.3868547352307, sd=2386.673992474371, zero rows=48617, -999 sentinel rows=4083007
-- cloud_type.`V_S1_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, 2.0, 8.0], mean=-295.35522559579795, sd=458.8521423159634, zero rows=24, -999 sentinel rows=3908968
-- cloud_type.`V_S2_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-717.0873033797828, sd=450.8850272683891, zero rows=539074, -999 sentinel rows=9419190
+- cloud_type.`V_S1_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, 0.0, 8.0], mean=-422.88773749923956, sd=496.6473581778598, zero rows=709072, -999 sentinel rows=5585466
+- cloud_type.`V_S1_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-902.6854297029934, sd=294.6955356852926, zero rows=0, -999 sentinel rows=5585466
+- cloud_type.`V_S1_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, 450.0, 9000.0], mean=978.3868547352307, sd=2386.673992474376, zero rows=48617, -999 sentinel rows=4083007
+- cloud_type.`V_S1_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, 2.0, 8.0], mean=-295.35522559579795, sd=458.852142315963, zero rows=24, -999 sentinel rows=3908968
+- cloud_type.`V_S2_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-717.0873033797828, sd=450.8850272683901, zero rows=539074, -999 sentinel rows=9419190
 - cloud_type.`V_S2_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-968.3875616107636, sd=172.08746373836058, zero rows=0, -999 sentinel rows=9419190
-- cloud_type.`V_S2_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 9000.0], mean=403.7016436256012, sd=2510.716520289071, zero rows=79, -999 sentinel rows=8406087
-- cloud_type.`V_S2_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-638.3283666869876, sd=481.99630791657734, zero rows=15, -999 sentinel rows=8398714
-- cloud_type.`V_S3_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 6.0], mean=-938.0691914330483, sd=239.43435749107667, zero rows=111834, -999 sentinel rows=12304620
-- cloud_type.`V_S3_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-986.0690582539489, sd=112.8621798031413, zero rows=0, -999 sentinel rows=12304620
-- cloud_type.`V_S3_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 8560.0], mean=-486.31269339920283, sd=1780.912211477934, zero rows=14, -999 sentinel rows=11721931
-- cloud_type.`V_S3_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-892.8742181693755, sd=309.04241607673947, zero rows=10, -999 sentinel rows=11719446
+- cloud_type.`V_S2_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 9000.0], mean=403.7016436256012, sd=2510.716520289079, zero rows=79, -999 sentinel rows=8406087
+- cloud_type.`V_S2_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-638.3283666869876, sd=481.9963079165777, zero rows=15, -999 sentinel rows=8398714
+- cloud_type.`V_S3_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, 6.0], mean=-938.0691914330483, sd=239.43435749107664, zero rows=111834, -999 sentinel rows=12304620
+- cloud_type.`V_S3_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -1.0], mean=-986.0690582539489, sd=112.86217980314136, zero rows=0, -999 sentinel rows=12304620
+- cloud_type.`V_S3_HHS`: min/max=-999.0/21000.0, p01/p50/p99=[-999.0, -999.0, 8560.0], mean=-486.31269339920283, sd=1780.9122114779404, zero rows=14, -999 sentinel rows=11721931
+- cloud_type.`V_S3_NS`: min/max=-999.0/8.0, p01/p50/p99=[-999.0, -999.0, 8.0], mean=-892.8742181693755, sd=309.0424160767397, zero rows=10, -999 sentinel rows=11719446
 - cloud_type.`V_S4_CS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5172130013267, sd=92.06764412148425, zero rows=1917, -999 sentinel rows=12991179
 - cloud_type.`V_S4_CSA`: min/max=-999.0/-1.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-998.9999231786489, sd=0.2768893432385547, zero rows=0, -999 sentinel rows=12991179
-- cloud_type.`V_S4_HHS`: min/max=-999.0/13500.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-982.0906229327213, sd=200.82786849688122, zero rows=15, -999 sentinel rows=12993221
-- cloud_type.`V_S4_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5641988226811, sd=91.55778045780258, zero rows=0, -999 sentinel rows=12991179
-- wind_synop.`FF`: min/max=-999.0/44.7, p01/p50/p99=[0.0, 3.5, 14.4], mean=1.4330123078499934, sd=51.415442953890235, zero rows=350764, -999 sentinel rows=35512
+- cloud_type.`V_S4_HHS`: min/max=-999.0/13500.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-982.0906229327213, sd=200.8278684968812, zero rows=15, -999 sentinel rows=12993221
+- cloud_type.`V_S4_NS`: min/max=-999.0/9.0, p01/p50/p99=[-999.0, -999.0, -999.0], mean=-990.5641988226811, sd=91.55778045780256, zero rows=0, -999 sentinel rows=12991179
+- wind_synop.`FF`: min/max=-999.0/44.7, p01/p50/p99=[0.0, 3.5, 14.4], mean=1.4330123078499934, sd=51.415442953890256, zero rows=350764, -999 sentinel rows=35512
 - wind_synop.`DD`: min/max=-999.0/360.0, p01/p50/p99=[0.0, 210.0, 360.0], mean=184.82263693251122, sd=114.81833027587764, zero rows=416097, -999 sentinel rows=36400
-- extreme_wind.`FX_911`: min/max=-999.0/67.0, p01/p50/p99=[1.0, 6.0, 22.1], mean=7.224335538214628, sd=5.869683875063618, zero rows=692, -999 sentinel rows=89
+- extreme_wind.`FX_911`: min/max=-999.0/67.0, p01/p50/p99=[1.0, 6.0, 22.2], mean=7.224335538214627, sd=5.869683875063616, zero rows=692, -999 sentinel rows=89
 - weather_phenomena.`WW`: min/max=-1.0/189.0, p01/p50/p99=[-1.0, 2.0, 161.0], mean=21.572701592097676, sd=38.391963533856355, zero rows=1010262, -999 sentinel rows=0
-- solar.`ATMO_LBERG`: min/max=-999.0/992.0, p01/p50/p99=[-999.0, -999.0, 141.0], mean=-661.066340588947, sd=511.86262156053107, zero rows=762, -999 sentinel rows=4045166
-- solar.`FD_LBERG`: min/max=-999.0/494.0, p01/p50/p99=[-999.0, 0.0, 136.0], mean=-86.06972605236925, sd=313.91978981891697, zero rows=2774851, -999 sentinel rows=608615
-- solar.`FG_LBERG`: min/max=-999.0/490.0, p01/p50/p99=[-999.0, 1.0, 294.0], mean=23.159174619645327, sd=165.75839648195813, zero rows=2780178, -999 sentinel rows=120254
-- solar.`SD_LBERG`: min/max=-999.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=3.861942223512884, sd=92.56278603548601, zero rows=4018759, -999 sentinel rows=46456
-- solar.`ZENIT`: min/max=24.72/155.28, p01/p50/p99=[30.29, 89.62, 149.47], mean=89.61520203386017, sd=30.379924277345566, zero rows=0, -999 sentinel rows=0
+- solar.`ATMO_LBERG`: min/max=-999.0/992.0, p01/p50/p99=[-999.0, -999.0, 141.0], mean=-661.066340588947, sd=511.86262156053135, zero rows=762, -999 sentinel rows=4045166
+- solar.`FD_LBERG`: min/max=-999.0/494.0, p01/p50/p99=[-999.0, 0.0, 136.0], mean=-86.06972605236925, sd=313.9197898189164, zero rows=2774851, -999 sentinel rows=608615
+- solar.`FG_LBERG`: min/max=-999.0/490.0, p01/p50/p99=[-999.0, 1.0, 294.0], mean=23.159174619645327, sd=165.75839648195793, zero rows=2780178, -999 sentinel rows=120254
+- solar.`SD_LBERG`: min/max=-999.0/60.0, p01/p50/p99=[0.0, 0.0, 60.0], mean=3.861942223512884, sd=92.56278603548597, zero rows=4018759, -999 sentinel rows=46456
+- solar.`ZENIT`: min/max=24.72/155.28, p01/p50/p99=[30.31, 89.62, 149.5], mean=89.61520203386024, sd=30.37992427734558, zero rows=0, -999 sentinel rows=0
 
 ### EDA Findings
 
 - dew_point: rows=13524783, stations=28, hourly coverage 64.99-99.9%, longest gap 55560.0h, dup identical=204288/conflicting=0, constant cols=['eor']
-- soil_temperature: rows=7183226, stations=27, hourly coverage 41.02-99.93%, longest gap 6245.0h, dup identical=189250/conflicting=7284, constant cols=['eor']
+- soil_temperature: rows=7183226, stations=27, hourly coverage 41.02-99.93%, longest gap 6245.0h, dup identical=189253/conflicting=7281, constant cols=['eor']
 - visibility: rows=13124582, stations=28, hourly coverage 63.88-99.75%, longest gap 121571.0h, dup identical=203353/conflicting=0, constant cols=['eor']
 - cloud_type: rows=13101463, stations=28, hourly coverage 56.22-99.8%, longest gap 121571.0h, dup identical=203015/conflicting=6, constant cols=['eor']
 - wind_synop: rows=13524783, stations=28, hourly coverage 64.99-99.9%, longest gap 55560.0h, dup identical=204288/conflicting=0, constant cols=['eor']
@@ -877,7 +877,7 @@ Per-decade row count and QN vocabulary. The deepening network came online at dif
 - **Historical-reference (point-in-time) leakage:** Station attributes are time-varying (02) -- join on the validity window, not the latest metadata row.
 - **Survivorship / coverage bias:** The deepening network came online per parameter over time (Regime / Version Evidence) -- early years under-represent the newer parameters.
 - **Missingness leakage:** -999 / blank rate correlates with station, parameter and era -- an 'is-missing' feature can leak an outage window.
-- **Duplicate-event leakage:** Conflicting (station, ts) duplicates: {'dew_point': 0, 'soil_temperature': 7284, 'visibility': 0, 'cloud_type': 6, 'wind_synop': 0, 'extreme_wind': 0, 'weather_phenomena': 0, 'solar': 0} -- resolve before counting or splitting.
+- **Duplicate-event leakage:** Conflicting (station, ts) duplicates: {'dew_point': 0, 'soil_temperature': 7281, 'visibility': 0, 'cloud_type': 6, 'wind_synop': 0, 'extreme_wind': 0, 'weather_phenomena': 0, 'solar': 0} -- resolve before counting or splitting.
 - **Target / feature temporal misalignment:** MESS_DATUM is the observation hour -- align a feature/target pair to one hour convention.
 - **Unit / sign / circular-feature leakage:** Units are not in Bronze and plausibility bounds are not assumed here -- reconcile via parameter_unit (02) before combining parameters.
 - **Data-generation-process leakage:** QN_* encodes DWD's QC decision, not the physical weather -- a feature keyed on it encodes the QC pipeline.
