@@ -395,8 +395,18 @@ keep(
 # COMMAND ----------
 
 # DBTITLE 1,Check -- MaStR units and registrations
-_dup_units = T["generation_unit"].groupBy("unit_id").count().filter("count > 1").count()
-report("generation_unit unit_id unique", _dup_units == 0, f"duplicates {_dup_units}")
+_dup_units = (
+    T["generation_unit"]
+    .groupBy("unit_type", "unit_id")
+    .count()
+    .filter("count > 1")
+    .count()
+)
+report(
+    "generation_unit unit_type and unit_id unique",
+    _dup_units == 0,
+    f"duplicates {_dup_units}",
+)
 _shared_ids = (
     T["support_registration"]
     .groupBy("support_registration_id")

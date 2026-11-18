@@ -33,7 +33,7 @@ COMMON = {**GATE, "schema": gold_schema_for(SOURCE)}
 RECORD = ["source_record_id"]
 # Silver table -> Gold table and grain, copied as they are
 COPIES = {
-    "generation_unit": ("generation_unit", ["unit_id"]),
+    "generation_unit": ("generation_unit", ["unit_type", "unit_id"]),
     "support_registration": ("support_registration", RECORD),
     "storage_plant": ("storage_plant", RECORD),
     "power_plant_register": (

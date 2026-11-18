@@ -242,7 +242,7 @@ generation_unit = write_inspect_export(
     component=COMPONENT,
     rid=RID,
     findings=FINDINGS,
-    key_cols=["unit_id"],
+    key_cols=["unit_type", "unit_id"],
     writer=write_semantic,
     extra_checks=lambda t: {
         "rows_by_unit_type": {
