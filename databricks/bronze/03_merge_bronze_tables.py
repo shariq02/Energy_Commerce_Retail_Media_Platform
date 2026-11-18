@@ -16,8 +16,8 @@
 # MAGIC from its existing part tables, with the discriminator column first, check the
 # MAGIC rows and columns of every part, and write the findings. No table is dropped.
 # MAGIC Safe to run again: a merged table is rebuilt, an appended part is added once.
-# MAGIC After the parts are dropped (`utility/01_retire_layer.py`, `merged_parts`),
-# MAGIC this notebook stops at the check "part tables not found".
+# MAGIC A merge whose part tables are all dropped (`utility/01_retire_layer.py`,
+# MAGIC `merged_parts`) is skipped; a merge with only some of its part tables stops.
 
 # COMMAND ----------
 
@@ -36,26 +36,40 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-RUN_TABLES = []  # empty = every merge of the list that is not built at load
+RUN_TABLES = []  # empty = every merge (not built at load) that still has a part table
 FINDINGS = "src/findings/consolidation_findings/bronze_merge.md"
-
-merges = [m for m in load_merges() if not m.get("at_load")]
-if RUN_TABLES:
-    merges = [m for m in merges if m["table"] in RUN_TABLES]
-if not merges:
-    raise RuntimeError(f"FAIL  no merge selected: {RUN_TABLES}")
 
 
 def fqn(schema: str, table: str) -> str:
     return f"{CATALOG}.{schema}.{table}"
 
 
+def parts_to_merge(merge: dict) -> list[str]:
+    """The part tables of a merge; a `kept` value is in the merged table already."""
+    kept = merge.get("kept", [])
+    return [part for value, part in merge["parts"].items() if value not in kept]
+
+
+merges = [m for m in load_merges() if not m.get("at_load")]
+if RUN_TABLES:
+    merges = [m for m in merges if m["table"] in RUN_TABLES]
+else:  # a merge whose part tables are all dropped is done
+    merges = [
+        m
+        for m in merges
+        if any(
+            spark.catalog.tableExists(fqn(m["schema"], part))
+            for part in parts_to_merge(m)
+        )
+    ]
+if not merges:
+    raise RuntimeError(f"FAIL  no merge selected: {RUN_TABLES}")
+
 missing = [
     fqn(m["schema"], part)
     for m in merges
-    for value, part in m["parts"].items()
-    if value not in m.get("kept", [])  # a kept part is in the merged table already
-    and not spark.catalog.tableExists(fqn(m["schema"], part))
+    for part in parts_to_merge(m)
+    if not spark.catalog.tableExists(fqn(m["schema"], part))
 ]
 if missing:
     raise RuntimeError(f"FAIL  part tables not found: {missing}")
