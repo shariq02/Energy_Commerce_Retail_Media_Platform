@@ -3,8 +3,8 @@
 # Author: Sharique Mohammad
 # Date: September 2026
 #
-# Purpose: formal contract for the German Marktstammdatenregister source -- 28
-# logical datasets (25 Bronze tables: the four small code lookups share one)
+# Purpose: formal contract for the German Marktstammdatenregister source -- 37
+# logical datasets (26 Bronze tables: the four small code lookups share one)
 # covering generation units, EEG / KWK support & authorisation,
 # market actors, grid connection points / grids / locations / balancing zones,
 # change-history logs, and the MaStR reference catalogs. Every *_observed value
@@ -30,8 +30,9 @@ description: >
   KWK support and its authorisation, the market actors, the grid connection
   topology, and MaStR's own change history and code catalogs. A single
   Gesamtdatenexport snapshot. Static one-time acquisition, public download,
-  no auth. Solar and pure-storage object types are deferred from staging in
-  this snapshot (they explain several 'partial-scope' orphan rates below).
+  no auth. The solar, storage and gas object types were staged in a second
+  pass from the same export (the 'partial-scope' orphan rates below were
+  measured before that pass).
 profiling_evidence: src/schemas/profiling/mastr.md
 bronze_physical_types: string
 bronze_layout: >
@@ -39,9 +40,12 @@ bronze_layout: >
   mastr_marktfunktionen, mastr_marktrollen; each Id / Wert) and
   mastr_katalogwerte share one Bronze table, mastr_code_lookup, told apart by a
   leading catalog_kind column (the lookup's name without the mastr_ prefix).
-  The six einheiten_* tables share mastr_einheiten and the four anlagen_eeg_*
-  tables share mastr_anlagen_eeg, told apart by a leading energy_source column
-  (the table name suffix). Each of those entries below is one logical dataset;
+  The eleven einheiten_* tables (six carriers, solar, electricity storage and
+  three gas types) share mastr_einheiten and the six anlagen_eeg_* tables share
+  mastr_anlagen_eeg, told apart by a leading energy_source column (the table
+  name suffix, in English for the second pass). The two storage plant tables
+  share mastr_anlagen_speicher, told apart by storage_kind. Each of those
+  entries below is one logical dataset;
   its bronze: block names the physical table and the value. The leading column
   is not one of the source columns listed here. Every other table below is its
   own Bronze table.
@@ -683,6 +687,371 @@ tables:
       - { name: AnlageBetriebsstatus,         type: string,    required: false, nullable: true,  notes: "catalog category Betriebsstatus" }
       - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true }
       - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
+
+  # ---- Solar, storage and gas (second staging pass; columns counted over all rows,
+  # none of them empty; every row of the export, gzip CSV) -----------------------
+  - name: mastr_einheiten_solar
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: solar }
+    kind: light
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 6460359
+    columns:
+      - { name: EinheitMastrNummer, type: string, required: true, nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: LokationMaStRNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_lokationen" }
+      - { name: NetzbetreiberpruefungStatus, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum, type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_marktakteure" }
+      - { name: Land, type: string, required: false, nullable: true }
+      - { name: Bundesland, type: string, required: false, nullable: true }
+      - { name: Landkreis, type: string, required: false, nullable: true }
+      - { name: Gemeinde, type: string, required: false, nullable: true }
+      - { name: Gemeindeschluessel, type: string, required: false, nullable: true }
+      - { name: Postleitzahl, type: string, required: false, nullable: true }
+      - { name: Ort, type: string, required: false, nullable: true }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: Inbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus, type: string, required: false, nullable: true }
+      - { name: EinheitBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true }
+      - { name: NameStromerzeugungseinheit, type: string, required: false, nullable: true }
+      - { name: Weic_nv, type: string, required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv, type: string, required: false, nullable: true }
+      - { name: Energietraeger, type: string, required: false, nullable: true, notes: "carrier code, one value in this table" }
+      - { name: Bruttoleistung, type: double, required: true, nullable: true, notes: "kW" }
+      - { name: Nettonennleistung, type: double, required: true, nullable: true }
+      - { name: FernsteuerbarkeitNb, type: string, required: false, nullable: true }
+      - { name: Einspeisungsart, type: string, required: false, nullable: true }
+      - { name: ZugeordneteWirkleistungWechselrichter, type: double, required: false, nullable: true, notes: "assigned inverter active power, kW" }
+      - { name: AnzahlModule, type: string, required: false, nullable: true }
+      - { name: ArtDerSolaranlage, type: string, required: false, nullable: true }
+      - { name: Leistungsbegrenzung, type: string, required: false, nullable: true }
+      - { name: EinheitlicheAusrichtungUndNeigungswinkel, type: string, required: false, nullable: true }
+      - { name: Hauptausrichtung, type: string, required: false, nullable: true }
+      - { name: HauptausrichtungNeigungswinkel, type: string, required: false, nullable: true }
+      - { name: Nutzungsbereich, type: string, required: false, nullable: true }
+      - { name: EegMaStRNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_anlagen_eeg_solar" }
+      - { name: SpeicherAmGleichenOrt, type: string, required: false, nullable: true }
+      - { name: Nebenausrichtung, type: string, required: false, nullable: true }
+      - { name: NebenausrichtungNeigungswinkel, type: string, required: false, nullable: true }
+      - { name: Strasse, type: string, required: false, nullable: true }
+      - { name: StrasseNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Hausnummer_nv, type: string, required: false, nullable: true }
+      - { name: HausnummerNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Laengengrad, type: double, required: false, nullable: true }
+      - { name: Breitengrad, type: double, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: Hausnummer, type: string, required: false, nullable: true }
+      - { name: Adresszusatz, type: string, required: false, nullable: true }
+      - { name: FernsteuerbarkeitDv, type: string, required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: Gemarkung, type: string, required: false, nullable: true }
+      - { name: FlurFlurstuecknummern, type: string, required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: GroesseDerInAnspruchGenommenenFlaecheInHektar, type: string, required: false, nullable: true }
+      - { name: VorherigerNutzungsartenbereichDerFlaeche, type: string, required: false, nullable: true }
+      - { name: UeberwiegendeNutzungsartDerFlaecheVorErrichtung, type: string, required: false, nullable: true }
+      - { name: NameDesSolarparks, type: string, required: false, nullable: true }
+      - { name: ZusaetzlicheMerkmaleDerFlaecheUndDerAktuellenFlaechennutzung, type: string, required: false, nullable: true }
+      - { name: GenMastrNummer, type: string, required: false, nullable: true }
+      - { name: InbetriebnahmedatumAmAktuellenStandort, type: timestamp, required: false, nullable: true }
+      - { name: Einsatzverantwortlicher, type: string, required: false, nullable: true }
+      - { name: Buergerenergie, type: string, required: false, nullable: true }
+      - { name: DatumWiederaufnahmeBetrieb, type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: LichteHoehe, type: double, required: false, nullable: true }
+      - { name: WeicDisplayName, type: string, required: false, nullable: true }
+      - { name: Kraftwerksnummer, type: string, required: false, nullable: true }
+      - { name: Weic, type: string, required: false, nullable: true }
+
+  - name: mastr_anlagen_eeg_solar
+    bronze: { table: mastr_anlagen_eeg, discriminator: energy_source, value: solar }
+    kind: light
+    grain: { key: [EegMaStRNummer], unique: true }
+    row_count_observed: 6460359
+    relationship_to_unit: { via: EegMaStRNummer, target: mastr_einheiten_solar, cardinality: one_to_one }
+    columns:
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: EegInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EegMaStRNummer, type: string, required: true, nullable: false, notes: "EEG record id (PK, unique)" }
+      - { name: InanspruchnahmeZahlungNachEeg, type: string, required: false, nullable: true }
+      - { name: AnlagenschluesselEeg, type: string, required: false, nullable: true }
+      - { name: AnlagenkennzifferAnlagenregister_nv, type: string, required: false, nullable: true }
+      - { name: InstallierteLeistung, type: double, required: true, nullable: true, notes: "installed capacity, kW" }
+      - { name: RegistrierungsnummerPvMeldeportal_nv, type: string, required: false, nullable: true }
+      - { name: AnlageBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: RegistrierungsnummerPvMeldeportal, type: string, required: false, nullable: true }
+      - { name: MieterstromZugeordnet, type: string, required: false, nullable: true }
+      - { name: AusschreibungZuschlag, type: string, required: false, nullable: true }
+      - { name: MieterstromMeldedatum, type: timestamp, required: false, nullable: true }
+      - { name: MieterstromErsteZuordnungZuschlag, type: string, required: false, nullable: true }
+      - { name: AnlagenkennzifferAnlagenregister, type: string, required: false, nullable: true }
+      - { name: ZugeordneteGebotsmenge, type: string, required: false, nullable: true }
+      - { name: Zuschlagsnummer, type: string, required: false, nullable: true }
+
+  - name: mastr_einheiten_stromspeicher
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: electricity_storage }
+    kind: light
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 2774472
+    columns:
+      - { name: EinheitMastrNummer, type: string, required: true, nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: LokationMaStRNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_lokationen" }
+      - { name: NetzbetreiberpruefungStatus, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum, type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_marktakteure" }
+      - { name: Land, type: string, required: false, nullable: true }
+      - { name: Bundesland, type: string, required: false, nullable: true }
+      - { name: Landkreis, type: string, required: false, nullable: true }
+      - { name: Gemeinde, type: string, required: false, nullable: true }
+      - { name: Gemeindeschluessel, type: string, required: false, nullable: true }
+      - { name: Postleitzahl, type: string, required: false, nullable: true }
+      - { name: Ort, type: string, required: false, nullable: true }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: Inbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus, type: string, required: false, nullable: true }
+      - { name: EinheitBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true }
+      - { name: NameStromerzeugungseinheit, type: string, required: false, nullable: true }
+      - { name: Weic_nv, type: string, required: false, nullable: true }
+      - { name: Kraftwerksnummer_nv, type: string, required: false, nullable: true }
+      - { name: Energietraeger, type: string, required: false, nullable: true, notes: "carrier code, one value in this table" }
+      - { name: Bruttoleistung, type: double, required: true, nullable: true, notes: "kW" }
+      - { name: Nettonennleistung, type: double, required: true, nullable: true }
+      - { name: FernsteuerbarkeitNb, type: string, required: false, nullable: true }
+      - { name: Einspeisungsart, type: string, required: false, nullable: true }
+      - { name: AcDcKoppelung, type: string, required: false, nullable: true }
+      - { name: Batterietechnologie, type: string, required: false, nullable: true }
+      - { name: ZugeordnenteWirkleistungWechselrichter, type: double, required: false, nullable: true, notes: "assigned inverter active power, kW (source spelling)" }
+      - { name: SpeMastrNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_anlagen_stromspeicher" }
+      - { name: EegMaStRNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_anlagen_eeg_speicher" }
+      - { name: EegAnlagentyp, type: string, required: false, nullable: true }
+      - { name: Technologie, type: string, required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: FernsteuerbarkeitDv, type: string, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: DatumWiederaufnahmeBetrieb, type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: Strasse, type: string, required: false, nullable: true }
+      - { name: StrasseNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Hausnummer, type: string, required: false, nullable: true }
+      - { name: Hausnummer_nv, type: string, required: false, nullable: true }
+      - { name: HausnummerNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Laengengrad, type: double, required: false, nullable: true }
+      - { name: Breitengrad, type: double, required: false, nullable: true }
+      - { name: Einsatzort, type: string, required: false, nullable: true }
+      - { name: Notstromaggregat, type: string, required: false, nullable: true }
+      - { name: InbetriebnahmedatumAmAktuellenStandort, type: timestamp, required: false, nullable: true }
+      - { name: Adresszusatz, type: string, required: false, nullable: true }
+      - { name: AnschlussAnHoechstOderHochSpannung, type: string, required: false, nullable: true }
+      - { name: Gemarkung, type: string, required: false, nullable: true }
+      - { name: FlurFlurstuecknummern, type: string, required: false, nullable: true }
+      - { name: BestandteilGrenzkraftwerk, type: string, required: false, nullable: true }
+      - { name: GenMastrNummer, type: string, required: false, nullable: true }
+      - { name: Weic, type: string, required: false, nullable: true }
+      - { name: WeicDisplayName, type: string, required: false, nullable: true }
+      - { name: Kraftwerksnummer, type: string, required: false, nullable: true }
+      - { name: Einsatzverantwortlicher, type: string, required: false, nullable: true }
+      - { name: PumpbetriebLeistungsaufnahme, type: string, required: false, nullable: true }
+      - { name: PumpbetriebKontinuierlichRegelbar, type: string, required: false, nullable: true }
+      - { name: Pumpspeichertechnologie, type: string, required: false, nullable: true }
+      - { name: NetzreserveZugeordnet, type: string, required: false, nullable: true }
+      - { name: KapazitaetsreserveZugeordnet, type: string, required: false, nullable: true }
+      - { name: GemeinsamRegistrierteSolareinheitMastrNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_einheiten_solar" }
+      - { name: NettonennleistungDeutschland, type: double, required: false, nullable: true }
+      - { name: DatumKapazitaetsreserve, type: timestamp, required: false, nullable: true }
+
+  - name: mastr_anlagen_eeg_speicher
+    bronze: { table: mastr_anlagen_eeg, discriminator: energy_source, value: storage }
+    kind: light
+    grain: { key: [EegMaStRNummer], unique: true }
+    row_count_observed: 2717856
+    relationship_to_unit: { via: EegMaStRNummer, target: mastr_einheiten_stromspeicher, cardinality: one_to_one }
+    columns:
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: EegInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EegMaStRNummer, type: string, required: true, nullable: false, notes: "EEG record id (PK, unique)" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: AnlagenschluesselEeg, type: string, required: false, nullable: true }
+      - { name: AusschreibungZuschlag, type: string, required: false, nullable: true }
+      - { name: Zuschlagsnummer, type: string, required: false, nullable: true }
+
+  - name: mastr_anlagen_stromspeicher
+    bronze: { table: mastr_anlagen_speicher, discriminator: storage_kind, value: electricity }
+    kind: light
+    grain: { key: [MaStRNummer], unique: true }
+    row_count_observed: 2774391
+    relationship_to_unit: { via: MaStRNummer, target: mastr_einheiten_stromspeicher, cardinality: one_to_one }
+    columns:
+      - { name: MaStRNummer, type: string, required: true, nullable: false, notes: "storage plant id (PK, unique)" }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: NutzbareSpeicherkapazitaet, type: double, required: false, nullable: true, notes: "usable storage capacity, kWh" }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: AnlageBetriebsstatus, type: string, required: false, nullable: true }
+
+  - name: mastr_anlagen_gasspeicher
+    bronze: { table: mastr_anlagen_speicher, discriminator: storage_kind, value: gas }
+    kind: light
+    grain: { key: [MaStRNummer], unique: true }
+    row_count_observed: 55
+    relationship_to_unit: { via: MaStRNummer, target: mastr_einheiten_gasspeicher, cardinality: one_to_many }
+    columns:
+      - { name: MaStRNummer, type: string, required: true, nullable: false, notes: "storage plant id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: Speichername, type: string, required: false, nullable: true }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: AnlageBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+
+  - name: mastr_einheiten_gaserzeuger
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: gas_producer }
+    kind: light
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 398
+    columns:
+      - { name: EinheitMastrNummer, type: string, required: true, nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: LokationMaStRNummer, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungStatus, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum, type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: Land, type: string, required: false, nullable: true }
+      - { name: Bundesland, type: string, required: false, nullable: true }
+      - { name: Landkreis, type: string, required: false, nullable: true }
+      - { name: Gemeinde, type: string, required: false, nullable: true }
+      - { name: Gemeindeschluessel, type: string, required: false, nullable: true }
+      - { name: Postleitzahl, type: string, required: false, nullable: true }
+      - { name: Ort, type: string, required: false, nullable: true }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: Inbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus, type: string, required: false, nullable: true }
+      - { name: EinheitBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true }
+      - { name: NameGaserzeugungseinheit, type: string, required: false, nullable: true }
+      - { name: SpeicherMaStRNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_anlagen_gasspeicher" }
+      - { name: Strasse, type: string, required: false, nullable: true }
+      - { name: StrasseNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Hausnummer, type: string, required: false, nullable: true }
+      - { name: Hausnummer_nv, type: string, required: false, nullable: true }
+      - { name: HausnummerNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Laengengrad, type: double, required: false, nullable: true }
+      - { name: Breitengrad, type: double, required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: Technologie, type: string, required: false, nullable: true }
+      - { name: Erzeugungsleistung, type: string, required: false, nullable: true }
+      - { name: Gemarkung, type: string, required: false, nullable: true }
+      - { name: FlurFlurstuecknummern, type: string, required: false, nullable: true }
+      - { name: Adresszusatz, type: string, required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+
+  - name: mastr_einheiten_gasspeicher
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: gas_storage }
+    kind: light
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 56
+    columns:
+      - { name: EinheitMastrNummer, type: string, required: true, nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: LokationMaStRNummer, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungStatus, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum, type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: Land, type: string, required: false, nullable: true }
+      - { name: Bundesland, type: string, required: false, nullable: true }
+      - { name: Landkreis, type: string, required: false, nullable: true }
+      - { name: Gemeinde, type: string, required: false, nullable: true }
+      - { name: Gemeindeschluessel, type: string, required: false, nullable: true }
+      - { name: Postleitzahl, type: string, required: false, nullable: true }
+      - { name: Strasse, type: string, required: false, nullable: true }
+      - { name: StrasseNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Hausnummer, type: string, required: false, nullable: true }
+      - { name: Hausnummer_nv, type: string, required: false, nullable: true }
+      - { name: HausnummerNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Ort, type: string, required: false, nullable: true }
+      - { name: Laengengrad, type: double, required: false, nullable: true }
+      - { name: Breitengrad, type: double, required: false, nullable: true }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: Inbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus, type: string, required: false, nullable: true }
+      - { name: EinheitBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true }
+      - { name: NameGasspeicher, type: string, required: false, nullable: true }
+      - { name: Speicherart, type: string, required: false, nullable: true }
+      - { name: MaximalNutzbaresArbeitsgasvolumen, type: string, required: false, nullable: true }
+      - { name: MaximaleEinspeicherleistung, type: string, required: false, nullable: true }
+      - { name: MaximaleAusspeicherleistung, type: string, required: false, nullable: true }
+      - { name: DurchschnittlicherBrennwert, type: string, required: false, nullable: true }
+      - { name: Weic_Na, type: string, required: false, nullable: true }
+      - { name: SpeicherMaStRNummer, type: string, required: false, nullable: true, notes: "FK -> mastr_anlagen_gasspeicher" }
+      - { name: Gemarkung, type: string, required: false, nullable: true }
+      - { name: FlurFlurstuecknummern, type: string, required: false, nullable: true }
+      - { name: Weic, type: string, required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumEndgueltigeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: Adresszusatz, type: string, required: false, nullable: true }
+
+  - name: mastr_einheiten_gasverbraucher
+    bronze: { table: mastr_einheiten, discriminator: energy_source, value: gas_consumer }
+    kind: light
+    grain: { key: [EinheitMastrNummer], unique: true }
+    row_count_observed: 902
+    columns:
+      - { name: EinheitMastrNummer, type: string, required: true, nullable: false, notes: "unit id (PK, unique)" }
+      - { name: DatumLetzteAktualisierung, type: timestamp, required: true, nullable: true }
+      - { name: LokationMaStRNummer, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungStatus, type: string, required: false, nullable: true }
+      - { name: NetzbetreiberpruefungDatum, type: timestamp, required: false, nullable: true }
+      - { name: AnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: Land, type: string, required: false, nullable: true }
+      - { name: Bundesland, type: string, required: false, nullable: true }
+      - { name: Landkreis, type: string, required: false, nullable: true }
+      - { name: Gemeinde, type: string, required: false, nullable: true }
+      - { name: Gemeindeschluessel, type: string, required: false, nullable: true }
+      - { name: Postleitzahl, type: string, required: false, nullable: true }
+      - { name: Strasse, type: string, required: false, nullable: true }
+      - { name: StrasseNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Hausnummer, type: string, required: false, nullable: true }
+      - { name: Hausnummer_nv, type: string, required: false, nullable: true }
+      - { name: HausnummerNichtGefunden, type: string, required: false, nullable: true }
+      - { name: Ort, type: string, required: false, nullable: true }
+      - { name: Laengengrad, type: double, required: false, nullable: true }
+      - { name: Breitengrad, type: double, required: false, nullable: true }
+      - { name: Registrierungsdatum, type: timestamp, required: true, nullable: true }
+      - { name: Inbetriebnahmedatum, type: timestamp, required: false, nullable: true }
+      - { name: EinheitSystemstatus, type: string, required: false, nullable: true }
+      - { name: EinheitBetriebsstatus, type: string, required: false, nullable: true }
+      - { name: NichtVorhandenInMigriertenEinheiten, type: string, required: false, nullable: true }
+      - { name: NameGasverbrauchsseinheit, type: string, required: false, nullable: true }
+      - { name: EinheitDientDerStromerzeugung, type: string, required: false, nullable: true }
+      - { name: MaximaleGasbezugsleistung, type: string, required: false, nullable: true }
+      - { name: VerknuepfteEinheitenMaStRNummern, type: string, required: false, nullable: true, notes: "linked unit ids (delimited list)" }
+      - { name: DatumEndgueltigeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: DatumBeginnVoruebergehendeStilllegung, type: timestamp, required: false, nullable: true }
+      - { name: Adresszusatz, type: string, required: false, nullable: true }
+      - { name: Gemarkung, type: string, required: false, nullable: true }
+      - { name: FlurFlurstuecknummern, type: string, required: false, nullable: true }
+      - { name: AltAnlagenbetreiberMastrNummer, type: string, required: false, nullable: true }
+      - { name: DatumDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: DatumRegistrierungDesBetreiberwechsels, type: timestamp, required: false, nullable: true }
+      - { name: GeplantesInbetriebnahmedatum, type: timestamp, required: false, nullable: true }
 
   - name: mastr_anlagen_kwk
     kind: deep

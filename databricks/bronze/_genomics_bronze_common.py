@@ -44,7 +44,7 @@ SOURCES = {
     "cadd": ["scores"],
     "chembl": ["compounds", "uniprot_mapping"],
     "clingen": ["dosage_sensitivity", "gene_validity"],
-    "clinvar": ["variant_summary", "variation_allele"],
+    "clinvar": ["variant_position_grch37", "variant_summary", "variation_allele"],
     "clinvar_vs_benign": ["variants"],
     "collectri": ["regulons"],
     "cpic": ["pairs"],

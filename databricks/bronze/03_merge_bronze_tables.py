@@ -53,8 +53,9 @@ def fqn(schema: str, table: str) -> str:
 missing = [
     fqn(m["schema"], part)
     for m in merges
-    for part in m["parts"].values()
-    if not spark.catalog.tableExists(fqn(m["schema"], part))
+    for value, part in m["parts"].items()
+    if value not in m.get("kept", [])  # a kept part is in the merged table already
+    and not spark.catalog.tableExists(fqn(m["schema"], part))
 ]
 if missing:
     raise RuntimeError(f"FAIL  part tables not found: {missing}")
@@ -118,6 +119,8 @@ for result in build_results:
     merged = spark.table(target)
     counts = {r[0]: r[1] for r in merged.groupBy(column).count().collect()}
     for value, part_name in merge["parts"].items():
+        if value in merge.get("kept", []):
+            continue
         part = spark.table(fqn(merge["schema"], part_name))
         part_rows = part.count()
         lost = sorted(set(part.columns) - set(merged.columns))

@@ -125,6 +125,7 @@ def keep_clinvar_variants(frame: pd.DataFrame) -> pd.Series:
 
 
 FILTERS = {
+    "assembly_grch37": lambda f: f["Assembly"] == "GRCh37",
     "assembly_grch38": lambda f: f["Assembly"] == "GRCh38",
     "tax_id_human": lambda f: f["tax_id"] == HUMAN_TAX_ID,
     "not_suppressed": lambda f: f["SUPPRESS"] != "Y",

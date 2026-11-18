@@ -30,21 +30,38 @@ merges:
   - schema: bronze
     table: mastr_einheiten
     discriminator: energy_source
+    append: true
+    kept: [biomasse, geothermie_gsgk, kernkraft, verbrennung, wasser, wind]
     parts:
       biomasse: mastr_einheiten_biomasse
+      electricity_storage: mastr_einheiten_stromspeicher
+      gas_consumer: mastr_einheiten_gasverbraucher
+      gas_producer: mastr_einheiten_gaserzeuger
+      gas_storage: mastr_einheiten_gasspeicher
       geothermie_gsgk: mastr_einheiten_geothermie_gsgk
       kernkraft: mastr_einheiten_kernkraft
+      solar: mastr_einheiten_solar
       verbrennung: mastr_einheiten_verbrennung
       wasser: mastr_einheiten_wasser
       wind: mastr_einheiten_wind
   - schema: bronze
     table: mastr_anlagen_eeg
     discriminator: energy_source
+    append: true
+    kept: [biomasse, geothermie_gsgk, wasser, wind]
     parts:
       biomasse: mastr_anlagen_eeg_biomasse
       geothermie_gsgk: mastr_anlagen_eeg_geothermie_gsgk
+      solar: mastr_anlagen_eeg_solar
+      storage: mastr_anlagen_eeg_speicher
       wasser: mastr_anlagen_eeg_wasser
       wind: mastr_anlagen_eeg_wind
+  - schema: bronze
+    table: mastr_anlagen_speicher
+    discriminator: storage_kind
+    parts:
+      electricity: mastr_anlagen_stromspeicher
+      gas: mastr_anlagen_gasspeicher
   - schema: bronze
     table: honda_iot_meter
     discriminator: meter_kind

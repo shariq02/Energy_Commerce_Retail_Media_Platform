@@ -22,6 +22,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 _MERGES = _ROOT / "src" / "schemas" / "mappings" / "bronze_merges.yml"
 _SNAPSHOT = _ROOT / "src" / "schemas" / "bronze_registry" / "bronze_schema_v005.md"
 _GENOMICS_BRONZE = _ROOT / "databricks" / "bronze" / "_genomics_bronze_common.py"
+_ENERGY_LOADER = _ROOT / "databricks" / "bronze" / "01_load_energy_commerce_bronze.py"
 _DWD_NON_VALUE = re.compile(r"^(STATIONS_ID|city|MESS_DATUM|QN_\d+|eor)$")
 
 
@@ -71,14 +72,34 @@ def test_a_table_and_a_part_appear_once(merges):
     assert not set(parts) & {t for t, m in zip(tables, merges) if not m.get("append")}
 
 
+def _energy_loaded_tables() -> set[str]:
+    """`mastr_<dataset>` for every MaStR dataset the energy loader writes."""
+    tree = ast.parse(_ENERGY_LOADER.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "MASTR_DATASETS" for t in node.targets
+        ):
+            return {f"mastr_{d}" for d in ast.literal_eval(node.value)}
+    message = "MASTR_DATASETS not found in the energy Bronze loader"
+    raise AssertionError(message)
+
+
 def test_parts_are_loaded_or_staged_tables(merges, snapshot):
     staged = _staged_tables()
+    loaded = _energy_loaded_tables()
     for merge in merges:
         for part in merge["parts"].values():
             if merge.get("at_load"):
                 assert part in staged, part
             else:
-                assert (merge["schema"], part) in snapshot, part
+                # a table of the snapshot, or one that the energy loader writes
+                assert (merge["schema"], part) in snapshot or part in loaded, part
+
+
+def test_an_appended_merge_lists_its_kept_values_as_parts(merges):
+    for merge in merges:
+        if merge.get("append") and merge["table"] != "mastr_code_lookup":
+            assert set(merge["kept"]) <= set(merge["parts"]), merge["table"]
 
 
 def test_a_merge_without_a_discriminator_is_built_at_load(merges):

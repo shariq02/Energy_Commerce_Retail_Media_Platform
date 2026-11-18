@@ -35,6 +35,7 @@ RECORD = ["source_record_id"]
 COPIES = {
     "generation_unit": ("generation_unit", ["unit_id"]),
     "support_registration": ("support_registration", RECORD),
+    "storage_plant": ("storage_plant", RECORD),
     "power_plant_register": (
         "power_plant",
         ["mastr_unit_id", "plant_name", "commissioning_year", "_source_id_ordinal"],

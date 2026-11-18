@@ -95,6 +95,15 @@ MASTR_DATASETS = [
     "ertuechtigungen",
     "katalogkategorien",
     "katalogwerte",
+    "einheiten_solar",
+    "anlagen_eeg_solar",
+    "einheiten_stromspeicher",
+    "anlagen_eeg_speicher",
+    "anlagen_stromspeicher",
+    "einheiten_gaserzeuger",
+    "einheiten_gasspeicher",
+    "anlagen_gasspeicher",
+    "einheiten_gasverbraucher",
 ]
 # Four small code lists with the same Id / Wert shape share one table.
 MASTR_CODE_LISTS = [
@@ -317,6 +326,9 @@ for source in selected:
         full_name = f"{CATALOG}.{BRONZE_SCHEMA}.{table}"
         files = [f for d, _ in members for f in plan[source][d]]
         missing = [d for d, _ in members if not plan[source][d]]
+        if not files:  # a later run of a source holds only the files it adds
+            print(f"SKIP  {table}: no file in the landing Volume")
+            continue
         result = {
             "source": source,
             "table": full_name,

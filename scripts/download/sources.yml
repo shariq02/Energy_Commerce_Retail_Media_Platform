@@ -73,6 +73,17 @@ stages:
         file: "variant_summary_{item}-01.txt.gz"
     parser: {name: table, dataset: variant_summary, keep: assembly_grch38, tag_column: snapshot}
     refresh_when_files_added: true
+  # The GRCh37 positions of the current file: TCGA mutations are on GRCh37, and these
+  # keys link them to a ClinVar allele (the GRCh38 rows above keep no GRCh37 position).
+  - source: clinvar
+    datasets: [variant_position_grch37]
+    files:
+      - {tag: current, url: "{clinvar}/variant_summary.txt.gz", file: variant_summary.txt.gz}
+    parser:
+      name: table
+      dataset: variant_position_grch37
+      keep: assembly_grch37
+      usecols_in: ["#AlleleID", Assembly, Chromosome, PositionVCF, ReferenceAlleleVCF, AlternateAlleleVCF]
   - source: clinvar
     datasets: [variation_allele]
     files:

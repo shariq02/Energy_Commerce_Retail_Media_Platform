@@ -23,12 +23,15 @@ targets:
   - canonical_dimension: dim_generation_unit
     from_tables: [mastr_einheiten_wind, mastr_einheiten_biomasse, mastr_einheiten_wasser,
                   mastr_einheiten_verbrennung, mastr_einheiten_kernkraft,
-                  mastr_einheiten_geothermie_gsgk]
+                  mastr_einheiten_geothermie_gsgk, mastr_einheiten_solar,
+                  mastr_einheiten_stromspeicher, mastr_einheiten_gaserzeuger,
+                  mastr_einheiten_gasspeicher, mastr_einheiten_gasverbraucher]
     canonical_grain: [generation_unit_key]
     key: EinheitMastrNummer
     shape: >
-      one row per generation unit, unioned across the six carrier tables with
-      carrier as an attribute. This is the COMPLETE German register (contrast
+      one row per generation unit, unioned across the eleven unit tables (six
+      carriers, solar, electricity storage and three gas types) with the unit
+      type as an attribute. This is the COMPLETE German register (contrast
       power_plant_list, the >10 MW subset). Carrier-specific columns (wind hub
       height, hydro inflow type, offshore sea area, combustion fuels) are kept
       as nullable carrier-scoped attributes.
@@ -53,7 +56,8 @@ targets:
 
   - canonical_fact: fact_eeg_support
     from_tables: [mastr_anlagen_eeg_wind, mastr_anlagen_eeg_biomasse, mastr_anlagen_eeg_wasser,
-                  mastr_anlagen_eeg_geothermie_gsgk]
+                  mastr_anlagen_eeg_geothermie_gsgk, mastr_anlagen_eeg_solar,
+                  mastr_anlagen_eeg_speicher]
     canonical_grain: [eeg_support_key]
     key: EegMaStRNummer
     shape: >
@@ -71,6 +75,17 @@ targets:
       - { source: VerknuepfteEinheitenMaStRNummern, canonical: "linked_unit_ids -- explode to an eeg_support_unit bridge at Silver" }
       - { source: ErtuechtigungIds,           canonical: "linked_repowering_ids (wasser) -> fact_repowering" }
     provenance: { source_system: mastr, source_record_id: EegMaStRNummer }
+
+  - canonical_dimension: dim_storage_plant
+    from_tables: [mastr_anlagen_stromspeicher, mastr_anlagen_gasspeicher]
+    canonical_grain: [storage_plant_key]
+    key: MaStRNummer
+    shape: "one row per storage plant, electricity and gas in one table (storage_kind); the units of a plant link through VerknuepfteEinheitenMaStRNummern and the unit column SpeMastrNummer / SpeicherMaStRNummer"
+    field_map:
+      - { source: MaStRNummer,                canonical: "storage_plant_id (natural key)" }
+      - { source: "NutzbareSpeicherkapazitaet / Speichername", canonical: "usable_storage_capacity_kwh / storage_name" }
+      - { source: VerknuepfteEinheitenMaStRNummern, canonical: "linked_unit_ids -> storage_plant_unit link" }
+    provenance: { source_system: mastr, source_record_id: MaStRNummer }
 
   - canonical_fact: fact_kwk_support
     from_tables: [mastr_anlagen_kwk]
@@ -380,6 +395,52 @@ business_names:
     WeicDisplayName:                                     resource_energy_identification_code_display_name
     WeitereBrennstoffe:                                  additional_fuels
     Yeic:                                                area_energy_identification_code
+    # solar, storage and gas units and plants
+    AcDcKoppelung:                                       ac_dc_coupling
+    AnzahlModule:                                        number_of_modules
+    ArtDerSolaranlage:                                   solar_plant_type
+    Batterietechnologie:                                 battery_technology
+    DurchschnittlicherBrennwert:                         average_calorific_value
+    EegAnlagentyp:                                       renewable_energy_act_plant_type
+    EinheitDientDerStromerzeugung:                       unit_serves_electricity_generation
+    EinheitlicheAusrichtungUndNeigungswinkel:            uniform_orientation_and_tilt_angle
+    Erzeugungsleistung:                                  gas_production_capacity
+    GemeinsamRegistrierteSolareinheitMastrNummer:        jointly_registered_solar_unit_id
+    GroesseDerInAnspruchGenommenenFlaecheInHektar:       land_area_used_hectare
+    Hauptausrichtung:                                    main_orientation
+    HauptausrichtungNeigungswinkel:                      main_orientation_tilt_angle
+    InanspruchnahmeZahlungNachEeg:                       renewable_energy_act_payment_claimed
+    LichteHoehe:                                         clear_height_m
+    Leistungsbegrenzung:                                 power_limitation
+    MaximalNutzbaresArbeitsgasvolumen:                   maximum_usable_working_gas_volume
+    MaximaleAusspeicherleistung:                         maximum_withdrawal_capacity
+    MaximaleEinspeicherleistung:                         maximum_injection_capacity
+    MaximaleGasbezugsleistung:                           maximum_gas_supply_capacity
+    MieterstromErsteZuordnungZuschlag:                   tenant_electricity_first_award_assignment
+    MieterstromMeldedatum:                               tenant_electricity_report_date
+    MieterstromZugeordnet:                               tenant_electricity_assigned
+    NameDesSolarparks:                                   solar_park_name
+    NameGaserzeugungseinheit:                            unit_name
+    NameGasspeicher:                                     unit_name
+    NameGasverbrauchsseinheit:                           unit_name
+    Nebenausrichtung:                                    secondary_orientation
+    NebenausrichtungNeigungswinkel:                      secondary_orientation_tilt_angle
+    NutzbareSpeicherkapazitaet:                          usable_storage_capacity_kwh
+    Nutzungsbereich:                                     use_area
+    PumpbetriebKontinuierlichRegelbar:                   pumping_continuously_controllable
+    PumpbetriebLeistungsaufnahme:                        pumping_power_consumption
+    Pumpspeichertechnologie:                             pumped_storage_technology
+    RegistrierungsnummerPvMeldeportal:                   photovoltaic_reporting_portal_registration_number
+    SpeMastrNummer:                                      storage_plant_id
+    SpeicherAmGleichenOrt:                               storage_at_same_location
+    SpeicherMaStRNummer:                                 storage_plant_id
+    Speicherart:                                         gas_storage_type
+    Speichername:                                        storage_name
+    Weic_Na:                                             resource_energy_identification_code_not_applicable
+    ZugeordnenteWirkleistungWechselrichter:              assigned_inverter_active_power_kw
+    ZugeordneteGebotsmenge:                              assigned_bid_quantity
+    ZugeordneteWirkleistungWechselrichter:               assigned_inverter_active_power_kw
+    ZusaetzlicheMerkmaleDerFlaecheUndDerAktuellenFlaechennutzung: additional_land_and_current_land_use_features
     # authorisation
     Art:                           authorisation_type
     Datum:                         decision_date

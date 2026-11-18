@@ -13,8 +13,9 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** the German market master data register (MaStR): its code lists (the
-# MAGIC `reference_code_list` rows of MaStR), the generation units of six technologies in
-# MAGIC one table, the support registrations, authorisations, repowering records, market
+# MAGIC `reference_code_list` rows of MaStR), the generation units of eleven types (six
+# MAGIC technologies, solar, storage and gas) in one table, the storage plants, the
+# MAGIC support registrations, authorisations, repowering records, market
 # MAGIC actors and roles, the grid locations, connection points, networks and balancing
 # MAGIC areas, the register change events (deletions and grid-operator changes in one
 # MAGIC table) and the typed links between the register entities. The counts, the
@@ -42,14 +43,28 @@ NAME_MAP = flatten_business_names(MAPPING, SOURCE)
 CODED = coded_columns(MAPPING, SOURCE)
 # Constant by construction in each single-technology table.
 STRUCTURAL_CONSTANT_COLS = ["Energietraeger", "Land"]
-UNIT_TYPES = (
-    "wind",
-    "biomasse",
-    "wasser",
-    "verbrennung",
-    "kernkraft",
-    "geothermie_gsgk",
-)
+# unit type -> Bronze table (the type of a first-pass table is its suffix)
+UNIT_TABLES = {
+    **{
+        t: f"mastr_einheiten_{t}"
+        for t in (
+            "wind",
+            "biomasse",
+            "wasser",
+            "verbrennung",
+            "kernkraft",
+            "geothermie_gsgk",
+        )
+    },
+    "solar": "mastr_einheiten_solar",
+    "electricity_storage": "mastr_einheiten_stromspeicher",
+    "gas_producer": "mastr_einheiten_gaserzeuger",
+    "gas_storage": "mastr_einheiten_gasspeicher",
+    "gas_consumer": "mastr_einheiten_gasverbraucher",
+}
+# The gas units are no electricity carrier: no carrier key.
+NO_CARRIER_TYPES = ("gas_producer", "gas_storage", "gas_consumer")
+STORAGE_PLANT_TABLES = ("mastr_anlagen_stromspeicher", "mastr_anlagen_gasspeicher")
 # Bronze table -> (support_scheme, unit_type, registration id column)
 SUPPORT = {
     "mastr_anlagen_eeg_wind": ("renewable_energy_act", "wind", "EegMaStRNummer"),
@@ -59,6 +74,12 @@ SUPPORT = {
         "EegMaStRNummer",
     ),
     "mastr_anlagen_eeg_wasser": ("renewable_energy_act", "wasser", "EegMaStRNummer"),
+    "mastr_anlagen_eeg_solar": ("renewable_energy_act", "solar", "EegMaStRNummer"),
+    "mastr_anlagen_eeg_speicher": (
+        "renewable_energy_act",
+        "electricity_storage",
+        "EegMaStRNummer",
+    ),
     "mastr_anlagen_eeg_geothermie_gsgk": (
         "renewable_energy_act",
         "geothermie_gsgk",
@@ -147,10 +168,9 @@ write_inspect_export(
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- generation_unit (six technologies, one table with unit_type)
+# DBTITLE 1,Transform -- generation_unit (eleven unit types, one table with unit_type)
 units = None
-for unit_type in UNIT_TYPES:
-    bt = f"mastr_einheiten_{unit_type}"
+for unit_type, bt in UNIT_TABLES.items():
     df = _drop_structural_constants(
         mastr_standardise(read_bronze(bt), NAME_MAP, CODED, table=bt)
     )
@@ -191,7 +211,10 @@ units = (
             energy_carrier_key(F.col("main_fuel")),
             energy_carrier_key(F.col("biomass_type")),
             energy_carrier_key(F.col("wind_onshore_or_offshore")),
-            energy_carrier_key(F.col("unit_type")),
+            F.when(
+                ~F.col("unit_type").isin(*NO_CARRIER_TYPES),
+                energy_carrier_key(F.col("unit_type")),
+            ),
         ),
     )
     .withColumn(
@@ -266,6 +289,17 @@ STRUCTURES = {"support_registration": registrations}
 for name, (bt, id_col) in SINGLE.items():
     STRUCTURES[name] = mastr_structure(
         bronze_single[name], bt, id_col, name_map=NAME_MAP, coded_map=CODED, rid=RID
+    )
+# Electricity and gas storage plants in one table, each keyed by its MaStR number.
+STRUCTURES["storage_plant"] = None
+for bt in STORAGE_PLANT_TABLES:
+    plants = mastr_structure(
+        read_bronze(bt), bt, "MaStRNummer", name_map=NAME_MAP, coded_map=CODED, rid=RID
+    )
+    STRUCTURES["storage_plant"] = (
+        plants
+        if STRUCTURES["storage_plant"] is None
+        else STRUCTURES["storage_plant"].unionByName(plants, allowMissingColumns=True)
     )
 
 # Units an actor operates and its market roles; connection points and locations of
@@ -486,6 +520,8 @@ _EEG = [
     "mastr_anlagen_eeg_biomasse",
     "mastr_anlagen_eeg_wasser",
     "mastr_anlagen_eeg_geothermie_gsgk",
+    "mastr_anlagen_eeg_solar",
+    "mastr_anlagen_eeg_speicher",
 ]
 # relationship_type -> (parent_type, linked_type, Bronze tables, parent col, link col)
 LINKS = {
@@ -516,6 +552,13 @@ LINKS = {
         [REPOWERING_BT],
         "Id",
         "EegMastrNummer",
+    ),
+    "storage_plant_unit": (
+        "storage_plant",
+        "generation_unit",
+        list(STORAGE_PLANT_TABLES),
+        "MaStRNummer",
+        LINKED_UNITS,
     ),
     "location_unit": (
         "grid_location",
@@ -580,6 +623,7 @@ link_ids = register_link_ids(
                 "unit_repowering",
                 "grid_connection_point",
                 "market_actor",
+                "storage_plant",
             )
         },
     }

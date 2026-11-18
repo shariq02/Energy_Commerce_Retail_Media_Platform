@@ -1137,7 +1137,7 @@ def bundesland_ags(name_col):
 
 
 _MASTR_NUM_SUFFIX = ("_kw", "_m", "_km")
-_MASTR_NUM_EXACT = {"capacity_increase"}
+_MASTR_NUM_EXACT = {"capacity_increase", "usable_storage_capacity_kwh"}
 _MASTR_FLAG_COLS = ("FernsteuerbarkeitNb", "FernsteuerbarkeitDv")
 # Date columns whose English name has no date word.
 _MASTR_DATE_EXACT = {"biomethane_first_use"}

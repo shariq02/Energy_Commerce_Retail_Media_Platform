@@ -154,6 +154,41 @@ mutation = link_entities(
     "rsid_variant_key",
     "rsid_method",
 )
+# GRCh37 position and alleles of a single-base change -> the one ClinVar allele with
+# that key (a key held by several alleles links nothing).
+position_keys = (
+    read_genomics_bronze("clinvar_variant_position_grch37")
+    .select(
+        chromosome_expr(F.col("Chromosome")).alias("_contig37"),
+        F.col("PositionVCF").cast("bigint").alias("_position37"),
+        F.col("ReferenceAlleleVCF").alias("_reference37"),
+        F.col("AlternateAlleleVCF").alias("_alternate37"),
+        F.col("AlleleID").alias("_allele37"),
+    )
+    .groupBy("_contig37", "_position37", "_reference37", "_alternate37")
+    .agg(
+        F.countDistinct("_allele37").alias("_alleles"),
+        F.min("_allele37").alias("position_allele_id"),
+    )
+    .filter(F.col("_alleles") == 1)
+    .drop("_alleles")
+)
+mutation = mutation.join(
+    position_keys,
+    (text("Variant_Type") == "SNP")
+    & (chromosome_expr(text("Chromosome")) == F.col("_contig37"))
+    & (number("Start_Position", "bigint") == F.col("_position37"))
+    & (text("Reference_Allele") == F.col("_reference37"))
+    & (text("Tumor_Seq_Allele2") == F.col("_alternate37")),
+    "left",
+).drop("_contig37", "_position37", "_reference37", "_alternate37")
+mutation = link_entities(
+    mutation,
+    [(F.col("position_allele_id"), "clinvar_allele")],
+    variant_map,
+    "position_variant_key",
+    "position_method",
+)
 mutation = parse_distinct(
     mutation.withColumn("protein_change_text", text("HGVSp_Short")),
     ["protein_change_text"],
@@ -222,8 +257,11 @@ somatic = (
         number("t_alt_count", "int").alias("tumor_alt_count"),
         text("IMPACT").alias("impact"),
         text("FILTER").alias("filter_status"),
-        F.coalesce("rsid_variant_key", "change_variant_key").alias("variant_key"),
+        F.coalesce(
+            "rsid_variant_key", "position_variant_key", "change_variant_key"
+        ).alias("variant_key"),
         F.when(F.col("rsid_variant_key").isNotNull(), F.lit("rsid"))
+        .when(F.col("position_variant_key").isNotNull(), F.lit("grch37_position"))
         .when(
             F.col("change_variant_key").isNotNull(),
             F.lit("transcript_protein_change"),

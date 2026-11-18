@@ -270,6 +270,11 @@ TOPOLOGY: dict[str, dict] = {
             "mastr_einheiten_verbrennung",
             "mastr_einheiten_kernkraft",
             "mastr_einheiten_geothermie_gsgk",
+            "mastr_einheiten_solar",
+            "mastr_einheiten_stromspeicher",
+            "mastr_einheiten_gaserzeuger",
+            "mastr_einheiten_gasspeicher",
+            "mastr_einheiten_gasverbraucher",
         },
         "bridges": {
             "mastr_eeg_support_unit_bridge",

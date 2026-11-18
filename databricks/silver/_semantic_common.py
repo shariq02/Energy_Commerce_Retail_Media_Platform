@@ -429,6 +429,7 @@ REGISTER_LINK_ID_COLUMN = {
     "grid_location": "source_record_id",
     "grid_connection_point": "source_record_id",
     "market_actor": "source_record_id",
+    "storage_plant": "source_record_id",
     "reference_code_list": "code_id",
 }
 
@@ -805,6 +806,8 @@ MASTR_KEY_NAMES = {
     "mastr_marktakteure_und_rollen": {"MastrNummer": "market_actor_role_id"},
     "mastr_lokationen": {"MastrNummer": "location_id"},
     "mastr_netze": {"MastrNummer": "grid_id"},
+    "mastr_anlagen_stromspeicher": {"MaStRNummer": "storage_plant_id"},
+    "mastr_anlagen_gasspeicher": {"MaStRNummer": "storage_plant_id"},
 }
 
 SEMANTIC_MEMBER_STRUCTURES = {
@@ -816,6 +819,11 @@ SEMANTIC_MEMBER_STRUCTURES = {
             "mastr_einheiten_verbrennung",
             "mastr_einheiten_kernkraft",
             "mastr_einheiten_geothermie_gsgk",
+            "mastr_einheiten_solar",
+            "mastr_einheiten_stromspeicher",
+            "mastr_einheiten_gaserzeuger",
+            "mastr_einheiten_gasspeicher",
+            "mastr_einheiten_gasverbraucher",
         ],
         [
             "unit_type",
@@ -832,9 +840,15 @@ SEMANTIC_MEMBER_STRUCTURES = {
             "mastr_anlagen_eeg_biomasse",
             "mastr_anlagen_eeg_wasser",
             "mastr_anlagen_eeg_geothermie_gsgk",
+            "mastr_anlagen_eeg_solar",
+            "mastr_anlagen_eeg_speicher",
             "mastr_anlagen_kwk",
         ],
         ["support_scheme", "unit_type", "support_registration_id"],
+    ),
+    "storage_plant": (
+        ["mastr_anlagen_stromspeicher", "mastr_anlagen_gasspeicher"],
+        [],
     ),
     "unit_authorisation": (["mastr_einheiten_genehmigung"], []),
     "unit_repowering": (["mastr_ertuechtigungen"], []),

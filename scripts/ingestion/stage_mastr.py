@@ -12,19 +12,10 @@
 # Local file operations only -- does not upload anywhere. data/raw/ is
 # read-only throughout.
 #
-# Deferred this pass, not staged: EinheitenSolar, AnlagenEegSolar,
-# EinheitenStromSpeicher, AnlagenEegSpeicher, AnlagenStromSpeicher.
-# These four solar/storage tables use the identical schema and
-# relationship pattern (unit -> market actor, unit -> location/grid
-# connection, unit -> EEG record) already established and staged by
-# every other generation-technology table below -- deferring them adds
-# no new relationship type, only additional row-count depth within a
-# pattern already proven. They are ~41 GB of the ~59 GB in-scope total
-# and are a follow-up staging pass, not a scope change (still MaStR
-# source-family scope) and not silently dropped -- logged explicitly.
-#
-# Not staged at all (out of source-family scope): gas-side objects and
-# large electricity/gas consumer units.
+# Second pass: the solar, storage and gas types (ADDED_PREFIXES) are staged as
+# gzip CSV, from the same export that the first pass used. main() stages only
+# these; the types of the first pass (the two dicts below) are staged and loaded.
+# Not staged: EinheitenStromVerbraucher (electricity consumers).
 
 import sys
 import xml.etree.ElementTree as ET
@@ -90,13 +81,18 @@ REFERENCE_PREFIXES = {
     "Marktrollen": "marktrollen",
 }
 
-DEFERRED_PREFIXES = [
-    "EinheitenSolar",
-    "AnlagenEegSolar",
-    "EinheitenStromSpeicher",
-    "AnlagenEegSpeicher",
-    "AnlagenStromSpeicher",
-]
+# Second pass (solar, storage, gas), staged as analytical gzip CSV.
+ADDED_PREFIXES = {
+    "EinheitenSolar": "einheiten_solar",
+    "AnlagenEegSolar": "anlagen_eeg_solar",
+    "EinheitenStromSpeicher": "einheiten_stromspeicher",
+    "AnlagenEegSpeicher": "anlagen_eeg_speicher",
+    "AnlagenStromSpeicher": "anlagen_stromspeicher",
+    "EinheitenGasErzeuger": "einheiten_gaserzeuger",
+    "EinheitenGasSpeicher": "einheiten_gasspeicher",
+    "AnlagenGasSpeicher": "anlagen_gasspeicher",
+    "EinheitenGasverbraucher": "einheiten_gasverbraucher",
+}
 
 
 def _shard_names(zf: zipfile.ZipFile, prefix: str) -> list[str]:
@@ -137,16 +133,24 @@ def _column_union(zf: zipfile.ZipFile, shards: list[str]) -> list[str]:
     text is read and the tree is cleared per record, so this is far cheaper
     than the staging pass itself."""
     seen: dict[str, None] = {}
-    for shard_name in shards:
+    for number, shard_name in enumerate(shards, start=1):
         for row in _iter_records(zf, shard_name):
             for tag in row:
                 if tag not in seen:
                     seen[tag] = None
+        logger.info(
+            f"MaStR column pass: {shard_name} read ({number}/{len(shards)}), "
+            f"{len(seen)} field(s) so far"
+        )
     return list(seen)
 
 
 def stage_object_type(
-    prefix: str, dataset_name: str, subfolder: str, monitor: PeakRSSMonitor
+    prefix: str,
+    dataset_name: str,
+    subfolder: str,
+    monitor: PeakRSSMonitor,
+    compress: bool = False,
 ) -> tuple[int, list[Path]]:
     out_dir = STAGING_MASTR_DIR / subfolder
 
@@ -175,15 +179,20 @@ def stage_object_type(
             dataset=dataset_name,
             max_bytes=MAX_CHUNK_BYTES,
             columns=columns,
+            compress=compress,
         )
 
-        for shard_name in shards:
+        for number, shard_name in enumerate(shards, start=1):
             for row in _iter_records(zf, shard_name):
                 batch.append(row)
                 if len(batch) >= BATCH_SIZE:
                     writer.write(pd.DataFrame(batch, columns=columns))
                     batch = []
                     monitor.check()
+            logger.info(
+                f"Staged {shard_name} ({number}/{len(shards)}) -- "
+                f"{writer.total_rows + len(batch)} rows so far"
+            )
 
     if batch:
         writer.write(pd.DataFrame(batch, columns=columns))
@@ -200,20 +209,15 @@ def main() -> None:
     monitor = PeakRSSMonitor()
     results = {}
 
-    for prefix, dataset_name in ANALYTICAL_PREFIXES.items():
-        rows, paths = stage_object_type(prefix, dataset_name, "analytical", monitor)
-        results[dataset_name] = (rows, paths)
-
-    for prefix, dataset_name in REFERENCE_PREFIXES.items():
-        rows, paths = stage_object_type(prefix, dataset_name, "reference", monitor)
+    for prefix, dataset_name in ADDED_PREFIXES.items():
+        rows, paths = stage_object_type(
+            prefix, dataset_name, "analytical", monitor, compress=True
+        )
         results[dataset_name] = (rows, paths)
 
     logger.info("MaStR staging complete.")
     for name, (rows, path) in results.items():
         logger.info(f"  {name}: {rows} rows -> {path}")
-    logger.warning(
-        f"Deferred this pass (not staged, not scope-excluded): {', '.join(DEFERRED_PREFIXES)}"
-    )
     logger.info(
         f"Peak RSS observed: {monitor.peak_rss_mb:.1f} MB "
         f"(safety threshold {monitor.safety_threshold_bytes / 1024 / 1024:.0f} MB)"

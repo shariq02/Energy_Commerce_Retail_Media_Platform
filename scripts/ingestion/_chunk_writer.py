@@ -18,6 +18,7 @@
 # ChunkedJSONLWriter below is for sources whose staged records carry
 # nested/variable structure that a fixed CSV column order can't hold.
 
+import gzip
 import json
 from pathlib import Path
 
@@ -38,13 +39,17 @@ class ChunkedCSVWriter:
         extension: str = "csv",
         sep: str = ",",
         columns: list[str] | None = None,
+        compress: bool = False,
     ):
         self.out_dir = out_dir
         self.source = source
         self.dataset = dataset
         self.max_rows = max_rows
         self.max_bytes = max_bytes
-        self.extension = extension
+        # `compress`: each write is one gzip member; the members add up to a valid
+        # .csv.gz file. The byte cap still counts the uncompressed bytes.
+        self.compress = compress
+        self.extension = f"{extension}.gz" if compress else extension
         self.sep = sep
 
         # The chunk header is written once (first batch) and every later
@@ -95,7 +100,7 @@ class ChunkedCSVWriter:
         # this is the first write to the chunk.
         mode = "ab" if self._current_has_header else "wb"
         with open(self._current_path, mode) as f:
-            f.write(data)
+            f.write(gzip.compress(data) if self.compress else data)
         self._current_has_header = True
         self._current_rows += rows
         self._current_bytes += len(data)

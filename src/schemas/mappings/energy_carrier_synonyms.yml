@@ -14,6 +14,7 @@ synonyms:
   offshore_wind: wind_offshore
   onshore_wind: wind_onshore
   photovoltaic: solar_radiation
+  solar: solar_radiation
   steinkohlen: hard_coal
   rohbraunkohlen: lignite
   braunkohlenbriketts: lignite

@@ -8,6 +8,7 @@ Date: September 2026
 
 from __future__ import annotations
 
+import gzip
 import json
 
 import pandas as pd
@@ -27,6 +28,21 @@ def test_csv_writer_writes_header_once_across_multiple_write_calls(tmp_path):
     assert len(writer.chunk_paths) == 1
     content = writer.chunk_paths[0].read_text(encoding="utf-8")
     assert content.count("a,b") == 1  # header appears once, not once per write()
+    assert writer.total_rows == 3
+
+
+def test_csv_writer_with_compress_writes_one_valid_gzip_file_per_chunk(tmp_path):
+    writer = ChunkedCSVWriter(
+        tmp_path, source="test", dataset="rows", max_rows=1000, compress=True
+    )
+    writer.write(pd.DataFrame({"a": [1, 2], "b": ["x", "y"]}))
+    writer.write(pd.DataFrame({"a": [3], "b": ["z"]}))  # a second gzip member
+    writer.close()
+
+    assert writer.chunk_paths[0].name == "test_rows_chunk_00001.csv.gz"
+    with gzip.open(writer.chunk_paths[0], "rt", encoding="utf-8") as handle:
+        content = handle.read()
+    assert content.count("a,b") == 1
     assert writer.total_rows == 3
 
 
