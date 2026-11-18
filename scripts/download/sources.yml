@@ -83,7 +83,7 @@ stages:
       name: table
       dataset: variant_position_grch37
       keep: assembly_grch37
-      usecols_in: ["#AlleleID", Assembly, Chromosome, PositionVCF, ReferenceAlleleVCF, AlternateAlleleVCF]
+      usecols_in: [AlleleID, Assembly, Chromosome, PositionVCF, ReferenceAlleleVCF, AlternateAlleleVCF]
   - source: clinvar
     datasets: [variation_allele]
     files:

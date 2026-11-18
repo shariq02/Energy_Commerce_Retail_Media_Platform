@@ -1049,11 +1049,17 @@ def coded_columns(mapping: dict, source: str) -> dict:
 
 def apply_renames(df: DataFrame, name_map: dict, skip=()) -> DataFrame:
     """Rename every present Bronze column to its English business name. Skips a
-    target that already exists (a decode already produced it) and `skip` names."""
+    target that already exists (a decode already produced it) and `skip` names.
+    Two source columns with one name (parts of a merged table) are combined."""
+    renamed = set()
     for src, tgt in name_map.items():
-        if src in skip or src == tgt or src not in df.columns or tgt in df.columns:
+        if src in skip or src == tgt or src not in df.columns:
             continue
-        df = df.withColumnRenamed(src, tgt)
+        if tgt in renamed:
+            df = df.withColumn(tgt, F.coalesce(F.col(tgt), F.col(src))).drop(src)
+        elif tgt not in df.columns:
+            df = df.withColumnRenamed(src, tgt)
+            renamed.add(tgt)
     return df
 
 
