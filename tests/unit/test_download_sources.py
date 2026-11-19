@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.unit]
 
 ROOT = Path(__file__).resolve().parents[2]
 DOWNLOAD_DIR = ROOT / "scripts" / "download"
-BRONZE_CONFIG = ROOT / "databricks" / "bronze" / "_genomics_bronze_common.py"
+BRONZE_CONFIG = ROOT / "databricks" / "bronze" / "02_load_genomics_bronze.py"
 
 
 def _bronze_sources() -> dict[str, list[str]]:
@@ -334,3 +334,40 @@ def test_mmcif_confidence_reads_c_alpha_rows(genomics):
         "#\n"
     )
     assert genomics.ca_confidence(text) == [("1", "MET", "51.2"), ("2", "ALA", "88.0")]
+
+
+def test_gtf_structure_rows_keep_only_the_columns_silver_reads(genomics, tmp_path):
+    attributes = 'gene_id "G1"; gene_name "ABC"; transcript_id "T1"; gene_type "x";'
+    path = tmp_path / "annotation.gtf"
+    path.write_text(
+        f"chr1\tHAVANA\tgene\t10\t90\t.\t+\t.\t{attributes}\n"
+        f"chr1\tHAVANA\texon\t10\t40\t.\t+\t.\t{attributes}\n",
+        encoding="utf-8",
+    )
+    batches = list(genomics.parse_gtf(path, ""))
+    frame = batches[0][0]["annotation"].set_index("feature")
+
+    assert frame.loc["gene", "gene_name"] == "ABC"
+    assert frame.loc["gene", "attributes"] == attributes
+    assert frame.loc["exon", "transcript_id"] == "T1"
+    assert frame.loc["exon", "start"] == "10"
+    for column in ("source", "attributes", "gene_id", "gene_name", "gene_type"):
+        assert frame[column].isna()["exon"], column
+
+
+def test_a_zip_member_keeps_only_its_usecols_and_reads_quotes(genomics, tmp_path):
+    path = tmp_path / "flat.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "conditions.txt",
+            'id|nct_id|name|downcase_name\n1|NCT1|"Heart | Disease"|"heart | disease"\n',
+        )
+    parse = genomics.zipped(
+        {"conditions": {"file": "conditions.txt", "usecols": ["nct_id", "name"]}},
+        read={"sep": "|", "quoted": True},
+    )
+    batches = list(parse(path, ""))
+    frame = batches[0][0]["conditions"]
+
+    assert list(frame.columns) == ["nct_id", "name"]
+    assert frame.loc[0, "name"] == "Heart | Disease"

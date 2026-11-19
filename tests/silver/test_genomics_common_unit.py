@@ -24,7 +24,7 @@ from tests._notebook_loader import REPO_ROOT, load_genomics_common
 
 pytestmark = [pytest.mark.unit]
 
-_BRONZE_CONFIG = REPO_ROOT / "databricks" / "bronze" / "_genomics_bronze_common.py"
+_BRONZE_CONFIG = REPO_ROOT / "databricks" / "bronze" / "02_load_genomics_bronze.py"
 _GOVERNANCE = {
     "source_system",
     "source_record_id",

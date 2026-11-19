@@ -231,8 +231,11 @@ def stage(
     pause_seconds: float = 0,
     force: bool = False,
     timeout_seconds: float = REQUEST_TIMEOUT,
-) -> None:
+    compress: bool = False,
+) -> bool:
     """Download each file, stage its batches, delete it; record when all are done.
+    Returns False when the stage was not staged (a manual file is missing, or a
+    file was skipped).
 
     When a dataset in `capped` reaches STAGE_CAP_BYTES, the parse and the
     remaining files stop; list a capped dataset last in `datasets` and in the
@@ -240,17 +243,19 @@ def stage(
     by hand; `pause_seconds` waits between downloads (rate-limited APIs);
     `force` stages even when the stage is recorded (the caller decided);
     `timeout_seconds` is the request timeout (a server that builds its answer
-    first needs more)."""
+    first needs more); `compress` writes `.csv.gz` chunks."""
     key = "+".join(datasets)
     if not force and (source, key) in recorded():
         logger.info(f"{source}/{key}: already staged, skipping")
-        return
+        return True
 
     out_dir = DATA_STAGING_DIR / source
     for dataset in datasets:
-        for old in out_dir.glob(f"{source}_{dataset}_chunk_*.csv"):
+        for old in out_dir.glob(f"{source}_{dataset}_chunk_*.csv*"):
             old.unlink()
-    writers = {d: ChunkedCSVWriter(out_dir, source, d) for d in datasets}
+    writers = {
+        d: ChunkedCSVWriter(out_dir, source, d, compress=compress) for d in datasets
+    }
     monitor = PeakRSSMonitor()
     rows = []
 
@@ -262,14 +267,14 @@ def stage(
                     f"{source}/{key}: not staged; save {url.removeprefix(MANUAL)} "
                     f"in a browser as {dest}"
                 )
-                return
+                return False
             facts = {"bytes": dest.stat().st_size, "last_modified": ""}
         else:
             facts = download(url, dest, timeout_seconds)
             time.sleep(pause_seconds)
         if facts is None:
             logger.error(f"{source}/{key}: not staged, {name} was skipped")
-            return
+            return False
         read = kept = 0
         cut = False
         with closing(parse(dest, tag)) as parsed:
@@ -322,6 +327,7 @@ def stage(
             f"{len(writer.chunk_paths)} chunks -> {out_dir}"
         )
     logger.info(f"{source}/{key}: peak memory {monitor.peak_rss_mb:.0f} MB")
+    return True
 
 
 def table_parser(

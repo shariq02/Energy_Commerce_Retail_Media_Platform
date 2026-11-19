@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.schema, pytest.mark.unit]
 _ROOT = Path(__file__).resolve().parents[2]
 _MERGES = _ROOT / "src" / "schemas" / "mappings" / "bronze_merges.yml"
 _SNAPSHOT = _ROOT / "src" / "schemas" / "bronze_registry" / "bronze_schema_v005.md"
-_GENOMICS_BRONZE = _ROOT / "databricks" / "bronze" / "_genomics_bronze_common.py"
+_GENOMICS_BRONZE = _ROOT / "databricks" / "bronze" / "02_load_genomics_bronze.py"
 _ENERGY_LOADER = _ROOT / "databricks" / "bronze" / "01_load_energy_commerce_bronze.py"
 _DWD_NON_VALUE = re.compile(r"^(STATIONS_ID|city|MESS_DATUM|QN_\d+|eor)$")
 
@@ -100,6 +100,15 @@ def test_an_appended_merge_lists_its_kept_values_as_parts(merges):
     for merge in merges:
         if merge.get("append") and merge["table"] != "mastr_code_lookup":
             assert set(merge["kept"]) <= set(merge["parts"]), merge["table"]
+
+
+def test_a_replaced_value_is_a_part_of_an_appended_merge_and_not_kept(merges):
+    for merge in merges:
+        replaced = set(merge.get("replace", []))
+        if replaced:
+            assert merge.get("append"), merge["table"]
+            assert replaced <= set(merge["parts"]), merge["table"]
+            assert not replaced & set(merge["kept"]), merge["table"]
 
 
 def test_a_merge_without_a_discriminator_is_built_at_load(merges):

@@ -137,6 +137,7 @@ desktop.ini
 graphify-out/
 # Claude Code local settings and hooks
 .claude/
+tests/hooks/
 
 # access matrix of the tool servers 
 src/findings/tools_findings/boundary.md

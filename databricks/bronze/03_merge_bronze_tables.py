@@ -15,7 +15,8 @@
 # MAGIC **Purpose:** build each merged Bronze table of `bronze_merges.yml` (not `at_load`)
 # MAGIC from its existing part tables, with the discriminator column first, check the
 # MAGIC rows and columns of every part, and write the findings. No table is dropped.
-# MAGIC Safe to run again: a merged table is rebuilt, an appended part is added once.
+# MAGIC Safe to run again: a merged table is rebuilt, an appended part is added once
+# MAGIC (a `replace` part is rebuilt: its rows are deleted and added again).
 # MAGIC A merge whose part tables are all dropped (`utility/01_retire_layer.py`,
 # MAGIC `merged_parts`) is skipped; a merge with only some of its part tables stops.
 
@@ -107,7 +108,15 @@ for merge in merges:
             lacking = sorted(set(merge["kept"]) - present)
             if lacking:
                 raise RuntimeError(f"{column} lacks {lacking}")
-            values = [v for v in values if v not in present]
+            # A `replace` value whose part table exists is rebuilt: its rows go first.
+            replaced = [
+                v
+                for v in merge.get("replace", [])
+                if spark.catalog.tableExists(fqn(merge["schema"], merge["parts"][v]))
+            ]
+            values = [v for v in values if v not in present or v in replaced]
+            for value in replaced:
+                spark.sql(f"DELETE FROM {target} WHERE {column} = '{value}'")
             if values:
                 write_bronze(merged_frame(merge, values), target, "append")
         else:

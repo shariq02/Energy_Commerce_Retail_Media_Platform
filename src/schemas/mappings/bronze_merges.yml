@@ -4,7 +4,8 @@
 # `at_load`, the staged dataset table name). `at_load: true` = built by the loader
 # from the landing files; otherwise built by bronze/03_merge_bronze_tables.py from
 # the existing tables. `append: true` = the parts are added to an existing table
-# whose current rows carry the `kept` values. Silver reads a part through
+# whose current rows carry the `kept` values; a `replace` value is a part whose rows
+# are deleted and added again from its part table. Silver reads a part through
 # `read_bronze` with its old name.
 version: 1
 merges:
@@ -130,6 +131,9 @@ merges:
   - schema: genomics_bronze
     table: genome_annotation
     discriminator: annotation_set
+    append: true
+    kept: [refseq]
+    replace: [gencode]
     parts:
       gencode: gencode_annotation
       refseq: refseq_annotation

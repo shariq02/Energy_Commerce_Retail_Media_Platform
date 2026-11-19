@@ -1125,10 +1125,12 @@ GENOMICS_STRUCTURES.update(
             *[(name, "string") for name in IEDB_EPITOPE_COLUMNS.values()],
             *_text("protein_key", "protein_link_method", "source_dataset"),
         ],
-        # The yearly Open Targets association score of a gene and a disease.
+        # The yearly Open Targets association score of a gene and a disease; the
+        # keys and link methods are on the `entity_relation` row of the association.
+        # A row per change of a value (first, last, after a gap): a year in between
+        # repeats the row before it.
         "gene_disease_score_year": [
-            *_text("gene_key", "disease_key", "source_gene_id", "source_disease_id"),
-            *_text("gene_link_method", "disease_link_method"),
+            *_text("source_gene_id", "source_disease_id"),
             *_text("association_level", "datasource_id"),
             ("year", "int"),
             *_number("double", "association_score", "novelty", "yearly_evidence_count"),
@@ -1205,13 +1207,6 @@ def genomics_target_schema(table: str) -> str:
 # COMMAND ----------
 
 # DBTITLE 1,Source check (strict)
-
-
-def assert_genomics_source(source: str) -> None:
-    """Fail when SOURCE is not a genomics source of the governed map."""
-    if ecosystem_for(source, strict=True) != GENOMICS_ECOSYSTEM:
-        message = f"source {source!r} is not mapped to the genomics ecosystem"
-        raise ValueError(message)
 
 
 def read_genomics_bronze(table: str):

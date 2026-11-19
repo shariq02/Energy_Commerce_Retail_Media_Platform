@@ -471,9 +471,9 @@ TABLE_COLUMN_RENAME_OVERRIDES = {
 }
 
 # Semantic Silver structures: tables and columns are declared once in
-# databricks/silver/_semantic_common.py (SEMANTIC_STRUCTURES). A column is
+# databricks/silver/_energy_commerce_common.py (SEMANTIC_STRUCTURES). A column is
 # derived when the build computes it; otherwise it carries source values.
-SEMANTIC_COMMON = SILVER_ROOT / "_semantic_common.py"
+SEMANTIC_COMMON = SILVER_ROOT / "_energy_commerce_common.py"
 SEMANTIC_DERIVED = {
     "observation_key",
     "location_key",

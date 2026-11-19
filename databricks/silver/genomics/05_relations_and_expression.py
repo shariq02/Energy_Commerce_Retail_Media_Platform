@@ -25,6 +25,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
+from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 SOURCE = "genomics"
@@ -1387,11 +1388,13 @@ write_inspect_export(
 # COMMAND ----------
 
 # DBTITLE 1,Build -- gene_disease_score_year
-# -- Read Silver -- id maps
-xwalk = read_silver("entity_id_crosswalk")
-linked = pair_linker(
-    entity_id_map(xwalk, "gene"), "gene", entity_id_map(xwalk, "disease"), "disease"
-)
+# The gene and disease keys and their link methods are not repeated on every year
+# row: they are on the `entity_relation` rows of the same association (join on
+# source_gene_id, source_disease_id, level and datasource). The yearly series of
+# Open Targets is continuous; a year equal to the year before it in all three
+# values adds nothing, so only the first year, the years where a value changes,
+# the year after a gap and the last year are kept (a missing year repeats the
+# row before it).
 YEAR_SCHEMA = (
     "array<struct<year:double,associationScore:double,novelty:double,"
     "yearlyEvidenceCount:double>>"
@@ -1411,21 +1414,13 @@ for table, dataset, level in (
         "datasource",
     ),
 ):
-    part = linked(
-        read_genomics_bronze(table).withColumn(
-            "point", F.explode(F.from_json("timeseries", YEAR_SCHEMA))
-        ),
-        [(text("targetId", dataset), "ensembl")],
-        [(text("diseaseId", dataset), "opentargets_disease")],
+    part = read_genomics_bronze(table).withColumn(
+        "point", F.explode(F.from_json("timeseries", YEAR_SCHEMA))
     )
     years.append(
         part.select(
-            "gene_key",
-            "disease_key",
             text("targetId", dataset).alias("source_gene_id"),
             text("diseaseId", dataset).alias("source_disease_id"),
-            "gene_link_method",
-            "disease_link_method",
             F.lit(level).alias("association_level"),
             (
                 text("aggregationValue", dataset)
@@ -1439,10 +1434,26 @@ for table, dataset, level in (
             F.lit(dataset).alias("source_dataset"),
         )
     )
+series = Window.partitionBy(
+    "source_gene_id", "source_disease_id", "association_level", "datasource_id"
+).orderBy("year")
+unchanged = F.lit(True)
+for column in ("association_score", "novelty", "yearly_evidence_count"):
+    unchanged = unchanged & F.col(column).eqNullSafe(F.lag(column).over(series))
 score_year = (
     _union(years)
     .filter(F.col("year").isNotNull())
     .distinct()
+    .withColumn("_previous_year", F.lag("year").over(series))
+    .withColumn("_next_year", F.lead("year").over(series))
+    .withColumn("_unchanged", unchanged)
+    .filter(
+        F.col("_previous_year").isNull()
+        | (F.col("year") - F.col("_previous_year") != 1)
+        | ~F.col("_unchanged")
+        | F.col("_next_year").isNull()
+    )
+    .drop("_previous_year", "_next_year", "_unchanged")
     .withColumn(
         "_srid",
         sha_key(
@@ -1482,7 +1493,6 @@ write_inspect_export(
         ),
         "years": lambda t: t.select("year").distinct().count(),
     },
-    link_method_counts=True,
 )
 
 # COMMAND ----------

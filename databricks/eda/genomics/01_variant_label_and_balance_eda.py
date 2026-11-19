@@ -41,7 +41,7 @@ TABLES = [CLINICAL, CHANGES]
 LABEL_TEXT = "clinical_significance_label"
 POSITIVE = "is_pathogenic"
 NEGATIVE = "is_benign"
-CLASS_FLAGS = (POSITIVE, NEGATIVE, "is_vus", "clinical_significance_is_uncertain")
+CLASS_FLAGS = (POSITIVE, NEGATIVE, "is_vus", "has_no_review_stars")
 OWN_LABEL_COLUMNS = {LABEL_TEXT, *CLASS_FLAGS}
 
 # COMMAND ----------

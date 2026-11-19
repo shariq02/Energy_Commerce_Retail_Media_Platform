@@ -181,42 +181,51 @@ texts = (
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- keyword flags of genes
-function_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="function_text",
-    group="gene_function",
-    text_source="gene.full_name+description+function_descriptions",
-    **COMMON,
+GENE_KEYWORD_GROUPS = (
+    (
+        "function_text",
+        "gene_function",
+        "gene.full_name+description+function_descriptions",
+    ),
+    (
+        "location_text",
+        "gene_location",
+        "subcellular_locations+gene.description+designations",
+    ),
+    ("process_text", "gene_process", "gene.description+function_descriptions"),
+    ("description_text", "gene_description", "gene.description"),
+    ("designation_text", "gene_designation", "designations"),
+    (
+        "keyword_text",
+        "gene_description_keywords",
+        "gene.description+function_descriptions+full_name",
+    ),
+    (
+        "keyword_text",
+        "gene_category_text",
+        "gene.description+function_descriptions+full_name",
+    ),
 )
-location_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="location_text",
-    group="gene_location",
-    text_source="subcellular_locations+gene.description+designations",
-    **COMMON,
-)
-process_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="process_text",
-    group="gene_process",
-    text_source="gene.description+function_descriptions",
-    **COMMON,
-)
-description_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="description_text",
-    group="gene_description",
-    text_source="gene.description",
-    **COMMON,
-)
+(
+    function_flags,
+    location_flags,
+    process_flags,
+    description_flags,
+    designation_flags,
+    keyword_flags,
+    category_text_flags,
+) = [
+    keyword_rows(
+        texts,
+        entity_type="gene",
+        key="gene_key",
+        text=text,
+        group=group,
+        text_source=text_source,
+        **COMMON,
+    )
+    for text, group, text_source in GENE_KEYWORD_GROUPS
+]
 description_values = captured_rows(
     texts,
     entity_type="gene",
@@ -225,33 +234,6 @@ description_values = captured_rows(
     group="gene_description_value",
     text_source="gene.description",
     numbers=("member_number", "type_number"),
-    **COMMON,
-)
-designation_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="designation_text",
-    group="gene_designation",
-    text_source="designations",
-    **COMMON,
-)
-keyword_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="keyword_text",
-    group="gene_description_keywords",
-    text_source="gene.description+function_descriptions+full_name",
-    **COMMON,
-)
-category_text_flags = keyword_rows(
-    texts,
-    entity_type="gene",
-    key="gene_key",
-    text="keyword_text",
-    group="gene_category_text",
-    text_source="gene.description+function_descriptions+full_name",
     **COMMON,
 )
 
@@ -1966,7 +1948,7 @@ clinical_variant_rows = attribute_rows(
             F.col("severity").isNotNull() & F.col("has_conservation_data"),
             "flag",
         ),
-        ("clinical_significance_is_uncertain", F.col("review_stars") == 0, "flag"),
+        ("has_no_review_stars", F.col("review_stars") == 0, "flag"),
         ("inheritance_pattern", inheritance, "text"),
         ("is_mitochondrial_variant", F.col("contig") == "MT", "flag"),
         ("is_y_linked_variant", F.col("contig") == "Y", "flag"),

@@ -20,7 +20,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Semantic structures library (meter channels, weather families, grain)
-# MAGIC %run ../../silver/_semantic_common
+# MAGIC %run ../../silver/_energy_commerce_common
 
 # COMMAND ----------
 

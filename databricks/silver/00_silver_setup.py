@@ -100,7 +100,7 @@ from src.schemas._generate_field_classes import (
 _generated_rows = build_rows()
 # Hard-fails here, before any Silver notebook runs, if a real write_silver()
 # or write_semantic() target has no declared classification -- never guessed,
-# never silently defaulted. Semantic structures come from _semantic_common.
+# never silently defaulted. Semantic structures come from _energy_commerce_common.
 assert_registry_complete(_generated_rows)
 
 rows = [

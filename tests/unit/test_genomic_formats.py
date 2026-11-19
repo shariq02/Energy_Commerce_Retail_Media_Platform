@@ -68,6 +68,19 @@ def test_comment_lines_before_the_header_are_skipped(tmp_path):
     assert frame["AlleleID"].tolist() == ["15041"]
 
 
+def test_a_quoted_field_keeps_its_separator_and_loses_its_quotes(tmp_path):
+    path = _plain(
+        tmp_path / "studies.txt",
+        'nct_id|brief_title|overall_status\nNCT1|"Trial A | B ""x"""|COMPLETED\n',
+    )
+    quoted = pd.concat(read_table(path, sep="|", quoted=True))
+    plain = pd.concat(read_table(path, sep="|"))
+
+    assert quoted.loc[0, "brief_title"] == 'Trial A | B "x"'
+    assert quoted.loc[0, "overall_status"] == "COMPLETED"
+    assert plain.loc[0, "brief_title"].startswith('"')  # the default stays as it was
+
+
 def test_skip_lines_finds_the_gct_header(tmp_path):
     path = _plain(
         tmp_path / "median.gct",

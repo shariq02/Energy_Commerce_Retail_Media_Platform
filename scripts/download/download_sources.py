@@ -90,6 +90,9 @@ UNIPROT_ENTRY_COLUMNS = [
 ]
 UNIPROT_FEATURE_COLUMNS = ["accession", "feature_type", "location", "qualifiers"]
 GTF_FEATURES = {"gene", "transcript", "exon", "CDS", "UTR"}
+# Silver reads an exon, CDS or UTR row with these columns only; the others stay empty.
+GTF_STRUCTURE_FEATURES = {"exon", "CDS", "UTR"}
+GTF_STRUCTURE_COLUMNS = ["seqname", "feature", "start", "end", "transcript_id"]
 GTF_ATTRIBUTES = [
     "gene_id",
     "gene_name",
@@ -188,14 +191,10 @@ def parse_gtf(path: Path, tag: str):
     for frame in read_table(path, names=GTF_COLUMNS):
         read = len(frame)
         frame = frame.loc[frame["feature"].isin(GTF_FEATURES)].copy()
-        yield (
-            {
-                "annotation": add_fields(
-                    frame, "attributes", GTF_ATTRIBUTES, GTF_ATTRIBUTE_PATTERN
-                )
-            },
-            read,
-        )
+        frame = add_fields(frame, "attributes", GTF_ATTRIBUTES, GTF_ATTRIBUTE_PATTERN)
+        unused = [c for c in frame.columns if c not in GTF_STRUCTURE_COLUMNS]
+        frame.loc[frame["feature"].isin(GTF_STRUCTURE_FEATURES), unused] = None
+        yield {"annotation": frame}, read
 
 
 def parse_clingen_validity(path: Path, tag: str):
@@ -507,21 +506,28 @@ def parse_depmap_effect(path: Path, tag: str):
 
 
 def zipped(members: dict, read=None):
-    """Delimited members of a zip, matched by file-name pattern ({tag} filled)."""
+    """Delimited members of a zip, matched by file-name pattern ({tag} filled). A
+    member is a pattern, or a mapping with `file` and the `usecols` to keep."""
 
     def parse(path: Path, tag: str):
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
             for dataset, pattern in members.items():
+                options = dict(read or {})
+                if isinstance(pattern, dict):
+                    options["usecols"] = pattern["usecols"]
+                    pattern = pattern["file"]
                 dataset, pattern = dataset.format(tag=tag), pattern.format(tag=tag)
                 member = next(
                     (n for n in names if fnmatch(Path(n).name, pattern)), None
                 )
                 if member is None:
                     raise RuntimeError(f"{path.name}: no member matches {pattern}")
+                size_mb = archive.getinfo(member).file_size / 1024**2
+                logger.info(f"{path.name}: extracting {member} ({size_mb:.0f} MB)")
                 extracted = Path(archive.extract(member, path.parent))
                 try:
-                    for frame in read_table(extracted, **(read or {})):
+                    for frame in read_table(extracted, **options):
                         yield {dataset: frame}, len(frame)
                 finally:
                     extracted.unlink()
@@ -716,7 +722,7 @@ def csv(dataset, rename=None):
 
 
 def open_targets(dataset, dropped=()):
-    # Nested time series make the association rows very large; Silver never reads them.
+    # The yearly time series stay as JSON text; Silver reads them into years.
     def parse(path: Path, tag: str):
         for frame in read_parquet(path, chunksize=OPEN_TARGETS_BATCH_ROWS):
             frame = frame.drop(columns=list(dropped), errors="ignore")
@@ -906,6 +912,7 @@ def main() -> None:
     only = {s.strip() for s in arguments.only.split(",") if s.strip()}
     config = load_sources()
     failed: list[str] = []
+    not_staged: list[str] = []
     for name in [] if arguments.skip_before else config.get("before", []):
         try:
             importlib.import_module(name).main()
@@ -917,11 +924,13 @@ def main() -> None:
             continue
         label = f"{entry['source']}/{'+'.join(entry['datasets'])}"
         try:
+            logger.info(f"{label}: listing the files")
             files = stage_files(entry, config["vars"])
+            logger.info(f"{label}: {len(files)} file(s) listed")
             if not needs_staging(entry, files):
                 logger.info(f"{label}: already staged, skipping")
                 continue
-            stage(
+            staged = stage(
                 entry["source"],
                 entry["datasets"],
                 files,
@@ -931,13 +940,19 @@ def main() -> None:
                 pause_seconds=entry.get("pause_seconds", 0),
                 force=True,
                 timeout_seconds=entry.get("timeout_seconds", REQUEST_TIMEOUT),
+                compress=entry.get("compress", False),
             )
+            if not staged:
+                not_staged.append(label)
         except Exception:
             logger.exception(f"{label}: failed; continuing with the next stage")
             failed.append(label)
     if failed:
         logger.error(f"Failed: {', '.join(failed)}")
         sys.exit(1)
+    if not_staged:
+        logger.warning(f"Not staged: {', '.join(not_staged)}")
+        return
     logger.info("All sources staged.")
 
 

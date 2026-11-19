@@ -396,17 +396,18 @@ stages:
       name: table
       dataset: uniprot_mapping
       read: {names: [uniprot_accession, chembl_target_id, target_name, target_type]}
-  # Nested time series make the association rows very large; Silver never reads them.
+  # The yearly time series make the association rows large (Silver reads them into
+  # gene_disease_score_year): no cap, staged as .csv.gz.
   - source: opentargets
     datasets: [association_overall_direct]
     files: {from: opentargets_parts}
-    parser: {name: open_targets, dataset: association_overall_direct, dropped: [timeseries]}
-    capped: [association_overall_direct]
+    parser: {name: open_targets, dataset: association_overall_direct}
+    compress: true
   - source: opentargets
     datasets: [association_by_datasource_direct]
     files: {from: opentargets_parts}
-    parser: {name: open_targets, dataset: association_by_datasource_direct, dropped: [timeseries]}
-    capped: [association_by_datasource_direct]
+    parser: {name: open_targets, dataset: association_by_datasource_direct}
+    compress: true
   - source: opentargets
     datasets: [target]
     files: {from: opentargets_parts}
@@ -654,7 +655,8 @@ stages:
   - source: aact
     datasets: [studies, conditions, browse_conditions, interventions, browse_interventions, keywords, eligibilities]
     # The AACT download page could not be read by script: save the newest
-    # pipe-delimited flat-file zip by hand under this name.
+    # pipe-delimited flat-file zip by hand under this name. A field in double
+    # quotes may hold a `|`, a line break or a quote: read it quoted.
     files:
       - tag: ""
         url: "manual:https://aact.ctti-clinicaltrials.org/"
@@ -662,15 +664,35 @@ stages:
     keep_manual: true
     parser:
       name: zipped
-      read: {sep: "|"}
+      read: {sep: "|", quoted: true}
+      # Only the columns Silver reads (studies: all of them).
       members:
         studies: studies.txt
-        conditions: conditions.txt
-        browse_conditions: browse_conditions.txt
-        interventions: interventions.txt
-        browse_interventions: browse_interventions.txt
-        keywords: keywords.txt
-        eligibilities: eligibilities.txt
+        conditions: {file: conditions.txt, usecols: [nct_id, name]}
+        browse_conditions:
+          file: browse_conditions.txt
+          usecols: [nct_id, mesh_term, mesh_type]
+        interventions: {file: interventions.txt, usecols: [nct_id, name]}
+        browse_interventions:
+          file: browse_interventions.txt
+          usecols: [nct_id, mesh_term, mesh_type]
+        keywords: {file: keywords.txt, usecols: [nct_id, name]}
+        eligibilities:
+          file: eligibilities.txt
+          usecols:
+            - nct_id
+            - sampling_method
+            - gender
+            - minimum_age
+            - maximum_age
+            - healthy_volunteers
+            - population
+            - criteria
+            - gender_description
+            - gender_based
+            - adult
+            - child
+            - older_adult
     capped: [eligibilities]
   - source: ddinter
     datasets: [interactions]

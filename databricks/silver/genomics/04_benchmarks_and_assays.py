@@ -233,19 +233,16 @@ benchmark = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- benchmark_variant
-write_silver(
-    benchmark, "benchmark_variant", source=SOURCE, component=COMPONENT, rid=RID
-)
-
-written = spark.table(genomics_table("benchmark_variant"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    benchmark,
     "benchmark_variant",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "sets": str(
             {
                 r["benchmark_set"]: r["count"]
@@ -255,24 +252,7 @@ blocks = inspect_table(
         "records_without_a_variant_key": written.filter(
             F.col("variant_key").isNull() & F.col("contig").isNotNull()
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__benchmark_variant",
-    "benchmark_variant",
-    blocks,
 )
 
 # COMMAND ----------
@@ -309,17 +289,16 @@ split = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- embedding_split
-write_silver(split, "embedding_split", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("embedding_split"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    split,
     "embedding_split",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["split_file"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "split_files": written.count(),
         "files_with_several_index_values": written.filter(
             F.col("distinct_index_values") > 1
@@ -327,24 +306,7 @@ blocks = inspect_table(
         "files_with_several_mean_embedding_values": written.filter(
             F.col("distinct_mean_embedding_values") > 1
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__embedding_split",
-    "embedding_split",
-    blocks,
 )
 
 # COMMAND ----------
@@ -454,17 +416,16 @@ assay = conform_genomics(add_genomics_provenance(assay, "_srid", RID), "dms_assa
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- dms_assay
-write_silver(assay, "dms_assay", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("dms_assay"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    assay,
     "dms_assay",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["assay_set", "assay_id"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "assays": str(
             {
                 r["assay_set"]: r["count"]
@@ -474,21 +435,7 @@ blocks = inspect_table(
         "dms_assays_without_a_protein_key": written.filter(
             (F.col("assay_set") == "dms") & F.col("protein_key").isNull()
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS, f"{COMPONENT.split('/')[-1]}__dms_assay", "dms_assay", blocks
 )
 
 # COMMAND ----------
@@ -557,17 +504,16 @@ mutant = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- dms_assay_mutant
-write_silver(mutant, "dms_assay_mutant", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("dms_assay_mutant"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    mutant,
     "dms_assay_mutant",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "assay_sets": str(
             {
                 r["assay_set"]: r["count"]
@@ -578,24 +524,7 @@ blocks = inspect_table(
         "single_mutants_not_parsed": written.filter(
             (F.col("mutation_count") == 1) & F.col("position").isNull()
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__dms_assay_mutant",
-    "dms_assay_mutant",
-    blocks,
 )
 
 # COMMAND ----------

@@ -17,7 +17,7 @@ pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
 _ROOT = Path(__file__).resolve().parents[2]
 _MAP_PATH = _ROOT / "src" / "schemas" / "reference" / "source_ecosystem_map.yml"
-_GENOMICS_BRONZE = _ROOT / "databricks" / "bronze" / "_genomics_bronze_common.py"
+_GENOMICS_BRONZE = _ROOT / "databricks" / "bronze" / "02_load_genomics_bronze.py"
 
 
 def _genomics_sources() -> set[str]:

@@ -2133,17 +2133,13 @@ crosswalk = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_id_crosswalk
-write_silver(
-    crosswalk, "entity_id_crosswalk", source=SOURCE, component=COMPONENT, rid=RID
-)
-
-written = spark.table(genomics_table("entity_id_crosswalk"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    crosswalk,
     "entity_id_crosswalk",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=[
         "entity_type",
         "entity_key",
@@ -2152,7 +2148,8 @@ blocks = inspect_table(
         "source_dataset",
         "source_field",
     ],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "entity_types": written.select("entity_type").distinct().count(),
         "methods_without_a_rank": str(
             sorted(
@@ -2171,24 +2168,7 @@ blocks = inspect_table(
         .select("entity_type", "id_type", "id_value")
         .distinct()
         .count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__entity_id_crosswalk",
-    "entity_id_crosswalk",
-    blocks,
 )
 
 print(
@@ -2221,17 +2201,16 @@ names = conform_genomics(add_genomics_provenance(names, "_srid", RID), "entity_n
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_name
-write_silver(names, "entity_name", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("entity_name"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    names,
     "entity_name",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "entity_types": written.select("entity_type").distinct().count(),
         "terms_held_by_several_entities": written.filter(
             F.col("entities_sharing_term") > 1
@@ -2239,21 +2218,7 @@ blocks = inspect_table(
         .select("entity_type", F.upper("term"))
         .distinct()
         .count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_name", "entity_name", blocks
 )
 
 # COMMAND ----------
@@ -2319,17 +2284,16 @@ claims = conform_genomics(add_genomics_provenance(claims, "_srid", RID), "entity
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_claim
-write_silver(claims, "entity_claim", source=SOURCE, component=COMPONENT, rid=RID)
-
-written = spark.table(genomics_table("entity_claim"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    claims,
     "entity_claim",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "entity_types": written.select("entity_type").distinct().count(),
         "claims_without_rank": written.filter(F.col("source_rank").isNull()).count(),
         "llm_generated_claims": written.filter(
@@ -2347,21 +2311,7 @@ blocks = inspect_table(
         "claim_runs_in_current_clinvar": written.filter(
             F.col("last_source_snapshot") == RULES["clinvar_current_snapshot"]
         ).count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS, f"{COMPONENT.split('/')[-1]}__entity_claim", "entity_claim", blocks
 )
 
 # COMMAND ----------
@@ -2405,19 +2355,16 @@ coordinates = conform_genomics(
 # COMMAND ----------
 
 # DBTITLE 1,Write, inspect and export -- entity_coordinate
-write_silver(
-    coordinates, "entity_coordinate", source=SOURCE, component=COMPONENT, rid=RID
-)
-
-written = spark.table(genomics_table("entity_coordinate"))
-blocks = inspect_table(
-    written,
+write_inspect_export(
+    coordinates,
     "entity_coordinate",
-    source=FINDINGS,
+    source=SOURCE,
     component=COMPONENT,
     rid=RID,
+    findings=FINDINGS,
     key_cols=["source_record_id"],
-    extra_checks={
+    link_method_counts=True,
+    extra_checks=lambda written: {
         "entity_types": written.select("entity_type").distinct().count(),
         "intervals_with_start_after_end": written.filter(
             F.col("start_position") > F.col("end_position")
@@ -2435,24 +2382,7 @@ blocks = inspect_table(
             "left_anti",
         )
         .count(),
-        **{
-            f"{column}_counts": str(
-                {
-                    r[column]: r["count"]
-                    for r in written.groupBy(column).count().collect()
-                }
-            )
-            for column in written.columns
-            if column.endswith("_link_method")
-        },
     },
-)
-
-write_silver_findings(
-    FINDINGS,
-    f"{COMPONENT.split('/')[-1]}__entity_coordinate",
-    "entity_coordinate",
-    blocks,
 )
 
 # COMMAND ----------

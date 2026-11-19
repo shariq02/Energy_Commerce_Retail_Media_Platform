@@ -16,7 +16,7 @@
 # MAGIC of the source notebooks (time columns, place keys, column conformance,
 # MAGIC cleaning of Bronze, wide joins on a grain, per-source writes) and the
 # MAGIC constants of the weather, MaStR and Honda sources. A notebook pulls it in
-# MAGIC with one `%run ../_semantic_common`; the library runs `_silver_common`
+# MAGIC with one `%run ../_energy_commerce_common`; the library runs `_silver_common`
 # MAGIC itself. No Silver column is an array, struct or map.
 
 # COMMAND ----------
@@ -1020,14 +1020,6 @@ def lit_map(d: dict):
     return F.create_map([F.lit(x) for kv in d.items() for x in kv])
 
 
-def from_spec(df, columns: dict, keep: list | None = None):
-    """Add each column of `columns` (name -> source column name or Column);
-    with `keep`, keep only the rows where at least one of those columns is set."""
-    for name, source in columns.items():
-        df = df.withColumn(name, F.col(source) if isinstance(source, str) else source)
-    return any_present(df, keep) if keep else df
-
-
 def any_present(df, cols: list):
     """Filter to rows where at least one of `cols` is non-NULL, so a source
     row that populates none of a family's fields doesn't produce a junk row."""
@@ -1129,33 +1121,6 @@ def energy_carrier_match_basis(col):
     return F.when(_carrier_token(col).isNull(), F.lit(None)).otherwise(
         F.when(authored, F.lit("authored")).otherwise(F.lit("exact"))
     )
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Helper -- clean one Bronze table (collapse identical rows, quarantine conflicts)
-
-
-def clean_bronze(
-    df,
-    key_cols: list,
-    content_cols: list,
-    *,
-    source: str,
-    bronze_table: str,
-    rid: str,
-    qn_col: str | None = None,
-    raw_bronze_df=None,
-):
-    """(kept, stats): identical rows collapsed, same-key conflicts quarantined
-    (written to the quarantine table), and the reconciliation numbers for the
-    findings."""
-    kept, quarantined = resolve_conflicts(
-        df, key_cols, content_cols, qn_col=qn_col, bronze_table=bronze_table
-    )
-    write_quarantine(quarantined.withColumn("source_system", F.lit(source)), rid)
-    stats = reconciliation_stats(df, kept, quarantined, raw_bronze_df=raw_bronze_df)
-    return kept, stats
 
 
 # COMMAND ----------

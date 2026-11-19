@@ -51,7 +51,9 @@ def open_text(path: Path):
     return open(path, encoding="utf-8", errors="replace")
 
 
-def _read_csv(source, sep: str, names: list[str], usecols, **options):
+def _read_csv(
+    source, sep: str, names: list[str], usecols, quoting=csv.QUOTE_NONE, **options
+):
     return pd.read_csv(
         source,
         sep=sep,
@@ -62,7 +64,7 @@ def _read_csv(source, sep: str, names: list[str], usecols, **options):
         dtype=str,
         keep_default_na=False,
         na_values=[""],
-        quoting=csv.QUOTE_NONE,
+        quoting=quoting,
         **options,
     )
 
@@ -100,8 +102,10 @@ def read_table(
     names: list[str] | None = None,
     usecols=None,
     chunksize: int = BATCH_ROWS,
+    quoted: bool = False,
 ) -> Iterator[pd.DataFrame]:
-    """Yield batches of a delimited file."""
+    """Yield batches of a delimited file. `quoted`: a field in double quotes may
+    hold the separator, a line break or a doubled quote (the quotes are removed)."""
     start, columns = _data_start(path, sep, skip_lines, names)
     with open_text(path) as f:
         yield from _read_csv(
@@ -109,6 +113,7 @@ def read_table(
             sep,
             columns,
             usecols if usecols is not None else range(len(columns)),
+            quoting=csv.QUOTE_MINIMAL if quoted else csv.QUOTE_NONE,
             skiprows=start,
             chunksize=chunksize,
         )

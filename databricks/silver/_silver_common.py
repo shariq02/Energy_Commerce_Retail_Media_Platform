@@ -13,7 +13,7 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** the reusable Silver-transform plumbing, the post-Silver
-# MAGIC inspection functions and `write_inspect_export`. `_semantic_common` and
+# MAGIC inspection functions and `write_inspect_export`. `_energy_commerce_common` and
 # MAGIC `_genomics_common` pull it in with `%run ./_silver_common`, so a notebook
 # MAGIC has one `%run` cell. Definitions only -- no side effects at import; the
 # MAGIC caller owns `spark` / `dbutils`.
@@ -290,20 +290,6 @@ def read_bronze(table: str, schema: str | None = None) -> DataFrame:
     return df if keep else df.drop(column)
 
 
-_LOGICAL_TO_SPARK = {
-    "string": "string",
-    "int": "int",
-    "integer": "int",
-    "long": "bigint",
-    "double": "double",
-    "float": "double",
-    "decimal": "double",
-    "boolean": "boolean",
-    "date": "date",
-    "timestamp": "timestamp",
-}
-
-
 def strip_sentinels(df: DataFrame, cols, sentinels=DWD_SENTINELS) -> DataFrame:
     """Replace sentinel strings with NULL in the named columns, before any cast."""
     for c in cols:
@@ -328,20 +314,6 @@ def german_decimal(colname: str):
     return F.when(cleaned.rlike(r"^-?\d+(\.\d+)?$"), cleaned.cast("double")).otherwise(
         F.lit(None).cast("double")
     )
-
-
-def cast_logical(df: DataFrame, columns: list[dict]) -> DataFrame:
-    """Cast every contract column to its logical Spark type. `decimal`/`double`
-    columns known to carry a German comma are handled by the caller before this;
-    here a plain `.cast` is used."""
-    for col in columns:
-        name, ltype = col["name"], col["type"]
-        if name not in df.columns or ltype == "string":
-            continue
-        df = df.withColumn(
-            name, F.col(name).cast(_LOGICAL_TO_SPARK.get(ltype, "string"))
-        )
-    return df
 
 
 # COMMAND ----------
@@ -631,16 +603,6 @@ def decode_via_ref(
         )
         .drop("_lk")
     )
-
-
-def decode_via_map(
-    df: DataFrame, src_col: str, out_col: str, mapping: dict
-) -> DataFrame:
-    """Add `<out_col>` = English label for `src_col`'s value via an authored map;
-    the source value is kept in `src_col`. Unknown values -> NULL (caller
-    quarantines)."""
-    m = F.create_map([F.lit(x) for kv in mapping.items() for x in kv])
-    return df.withColumn(out_col, m[F.col(src_col)])
 
 
 # COMMAND ----------
@@ -1073,19 +1035,6 @@ DWD_QN_LABELS = {
     "9": "not_all_parameters_corrected",
     "10": "quality_check_and_correction_complete",
 }
-
-
-def decode_qn(df: DataFrame, qn_src_col: str) -> DataFrame:
-    """Add the DWD quality-level triple: `qn_level_code` (source code verbatim),
-    `qn_level_label_de` (no German gloss is published -- NULL) and `qn_level`
-    (English label). The source QN column is left in place unchanged."""
-    m = F.create_map([F.lit(x) for kv in DWD_QN_LABELS.items() for x in kv])
-    code = F.regexp_replace(F.trim(F.col(qn_src_col)), r"\.0$", "")
-    return (
-        df.withColumn("qn_level_code", code)
-        .withColumn("qn_level_label_de", F.lit(None).cast("string"))
-        .withColumn("qn_level", m[code])
-    )
 
 
 def decode_via_labeled_map(
@@ -1554,8 +1503,6 @@ def inspect_table(
     ]
     for i, c in enumerate(numeric_cols):
         exprs += [
-            F.min(c).alias(f"_min_{i}"),
-            F.max(c).alias(f"_max_{i}"),
             F.sum((F.col(c) == 0).cast("int")).alias(f"_zero_{i}"),
             F.sum((F.col(c) < 0).cast("int")).alias(f"_negative_{i}"),
         ]
@@ -1629,8 +1576,6 @@ def inspect_table(
 
     # Numeric behaviour
     for i, c in enumerate(numeric_cols):
-        add("numeric", f"min:{c}", "min", stats[f"_min_{i}"], None, "INFO", "INFO")
-        add("numeric", f"max:{c}", "max", stats[f"_max_{i}"], None, "INFO", "INFO")
         add(
             "numeric",
             f"zero_count:{c}",

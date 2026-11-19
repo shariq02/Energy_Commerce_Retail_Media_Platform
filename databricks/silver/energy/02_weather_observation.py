@@ -22,7 +22,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Semantic structures library
-# MAGIC %run ../_semantic_common
+# MAGIC %run ../_energy_commerce_common
 
 # COMMAND ----------
 
