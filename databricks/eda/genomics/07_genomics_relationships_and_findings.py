@@ -31,9 +31,8 @@ SOURCE = "genomics"
 NB_KEY = "07_relationships_and_findings"
 SECTION_TITLE = "Cross-table relationships and multi-value tables"
 ALL_TABLES = [
-    "benchmark_coding_variant",
-    "benchmark_population_variant",
-    "benchmark_regulatory_variant",
+    "benchmark_variant",
+    "case_assay_record",
     "cell_line_profile",
     "clinical_trial_profile",
     "clinvar_classification_change",
@@ -42,27 +41,22 @@ ALL_TABLES = [
     "dms_assay_mutant",
     "drug_profile",
     "embedding_split",
+    "entity_identity_record",
     "epitope_profile",
-    "gene_cancer_profile",
-    "gene_clinical_profile",
     "gene_disease_profile",
-    "gene_drug_profile",
-    "gene_expression_profile",
+    "gene_measurement",
     "gene_profile",
     "genetic_test_profile",
     "multi_value_attribute",
     "multi_value_score",
     "protein_profile",
+    "protein_variant_record",
     "somatic_mutation_profile",
     "somatic_site_profile",
     "structural_variant_profile",
     "transcript_profile",
     "tumor_sample_profile",
-    "variant_clinical_profile",
-    "variant_frequency_profile",
-    "variant_impact_profile",
     "variant_profile",
-    "variant_score_profile",
 ]
 MULTI_ATTRIBUTE = "multi_value_attribute"
 MULTI_SCORE = "multi_value_score"

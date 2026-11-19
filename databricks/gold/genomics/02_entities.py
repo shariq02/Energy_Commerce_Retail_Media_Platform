@@ -12,11 +12,12 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** 14 `genomics_gold` tables: ten entity profiles (the entity rows
+# MAGIC **Purpose:** 18 `genomics_gold` tables: ten entity profiles (the entity rows
 # MAGIC with every attribute of their type; somatic mutations are keyed by their Silver
 # MAGIC record id), the gene-disease relations, structural
-# MAGIC variants (variant rows and variant x gene rows), somatic sites and the ClinVar
-# MAGIC class changes in snapshot order.
+# MAGIC variants (variant rows and variant x gene rows), somatic sites, the ClinVar
+# MAGIC class changes in snapshot order and four typed tables that hold the many-side
+# MAGIC Silver rows (`record_kind` names the Silver table of a row).
 
 # COMMAND ----------
 
@@ -86,6 +87,47 @@ CHANGE_COLUMNS = [
 SNAPSHOT_DATES = load_yaml("src/schemas/mappings/genomics_rules.yml")[
     "clinvar_snapshot_dates"
 ]
+# typed table -> Silver table -> the columns that make one row of it unique
+SEQUENCE = ["quarter", "primary_id", "drug_sequence", "dose_record_number"]
+RECORD = ["source_record_id"]
+MANY_SIDE = {
+    "gene_measurement": {
+        "gene_dependency": RECORD,
+        "gene_expression_median": ["gene_ensembl_id", "tissue_key"],
+        "perturbation_expression": RECORD,
+        "perturbation_sample": RECORD,
+        "gene_disease_score_year": RECORD,
+        "regulatory_element_gene_link": RECORD,
+    },
+    "protein_variant_record": {
+        "protein_residue_score": RECORD,
+        "protein_feature": RECORD,
+        "protein_gene_link": RECORD,
+        "variant_hgvs": RECORD,
+        "variant_condition": RECORD,
+        "variant_feature_overlap": RECORD,
+    },
+    "case_assay_record": {
+        "faers_case": ["quarter", "primary_id"],
+        "faers_case_drug": SEQUENCE,
+        "faers_case_item": RECORD,
+        "epitope_mhc_assay": ["assay_id"],
+    },
+    "entity_identity_record": {
+        "entity_id_crosswalk": [
+            "entity_type",
+            "entity_key",
+            "id_type",
+            "id_value",
+            "source_dataset",
+            "source_field",
+        ],
+        "entity_name": RECORD,
+        "entity_claim": RECORD,
+        "entity_coordinate": RECORD,
+        "ontology_relation": RECORD,
+    },
+}
 TABLES = {}
 
 # COMMAND ----------
@@ -145,13 +187,19 @@ TABLES["gene_disease_profile"] = (
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- structural_variant_profile (variant rows, variant x gene rows)
-variant_rows = split_profile(
+variant_attributes = pivot_attributes(
     attributes,
     "variant",
-    variant_labels,
+    attribute_columns(attributes, "variant"),
     key="variant_key",
-    rules=VARIANT_PROFILE_RULES["structural_variant_profile"],
+    rules=STRUCTURAL_RULES,
     **GATE,
+)
+variant_rows = add_provenance(
+    join_profile(variant_labels, variant_attributes, "variant_key", "right"),
+    SOURCE,
+    RID,
+    ecosystem="genomics",
 ).withColumn("record_kind", F.lit("variant"))
 pair_rows = pivot_attributes(
     attributes,
@@ -263,6 +311,15 @@ TABLES["clinvar_classification_change"] = (
     ),
     CHANGE_COLUMNS,
 )
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- the typed tables of the many-side Silver rows
+for table, members in MANY_SIDE.items():
+    frame, grain = typed_table(
+        {name: (from_silver(read_silver(name)), keys) for name, keys in members.items()}
+    )
+    TABLES[table] = (add_provenance(frame, SOURCE, RID, ecosystem="genomics"), grain)
 
 # COMMAND ----------
 

@@ -12,7 +12,7 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** Profile `variant_clinical_profile` and
+# MAGIC **Purpose:** Profile `variant_profile` and
 # MAGIC `clinvar_classification_change` in genomics Gold: nulls, constant columns, key,
 # MAGIC the label text and the class flags, class balance, review quality against the
 # MAGIC class, flag and score association with the class, snapshot history and the
@@ -34,8 +34,8 @@ CATALOG = "energy_commerce_retail_media"
 SCHEMA = "genomics_gold"
 SOURCE = "genomics"
 NB_KEY = "01_variant_label_and_balance"
-SECTION_TITLE = "Variant label and balance (variant_clinical_profile)"
-CLINICAL = "variant_clinical_profile"
+SECTION_TITLE = "Variant label and balance (variant_profile)"
+CLINICAL = "variant_profile"
 CHANGES = "clinvar_classification_change"
 TABLES = [CLINICAL, CHANGES]
 LABEL_TEXT = "clinical_significance_label"

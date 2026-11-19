@@ -12,9 +12,10 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the six `shared_conformed` tables: the carrier map and carriers,
+# MAGIC **Purpose:** the `shared_conformed` tables: the carrier map and carriers,
 # MAGIC the reference code list, the date dimension (widened to the oldest Gold date),
-# MAGIC the places and the weather series coverage.
+# MAGIC the places, the weather series coverage and `metric_definition` (one row per
+# MAGIC energy and commerce metric, read from `analytics_rules.yml`).
 
 # COMMAND ----------
 
@@ -30,6 +31,15 @@ RID = gold_run_id()
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": SHARED_CONFORMED_SCHEMA}
 DATE_HORIZON_END = _dt.date(2031, 12, 31)
+METRIC_COLUMNS = [
+    "ecosystem",
+    "metric_key",
+    "definition",
+    "formula",
+    "source_mart",
+    "grain",
+    "source_system",
+]
 TABLES = {}
 
 # COMMAND ----------
@@ -145,6 +155,22 @@ for kind, frame in coverage_parts.items():
 TABLES["series_coverage"] = (
     add_provenance(series_coverage, SOURCE, RID),
     ["record_kind", "source_record_id"],
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- metric_definition (one row per metric, all ecosystems)
+metrics = load_yaml("src/schemas/mappings/analytics_rules.yml")["metrics"]
+TABLES["metric_definition"] = (
+    add_provenance(
+        spark.createDataFrame(
+            [tuple(m.get(c) for c in METRIC_COLUMNS) for m in metrics],
+            ", ".join(f"{c} string" for c in METRIC_COLUMNS),
+        ),
+        SOURCE,
+        RID,
+    ),
+    ["ecosystem", "metric_key"],
 )
 
 # COMMAND ----------

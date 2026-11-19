@@ -12,10 +12,10 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 7 `commerce_gold` tables: sessions, users and products (the
-# MAGIC Silver aggregates) and the events split by meaning (REES46 view, cart and
-# MAGIC purchase, GA4 web events), all with the conformed session, user and product
-# MAGIC keys. The last cell checks that every Silver event is in one Gold table.
+# MAGIC **Purpose:** the 3 `commerce_gold` tables: sessions (with the columns of their
+# MAGIC user), products and `commerce_event` (REES46 view, cart and purchase events
+# MAGIC and GA4 web events), all with the conformed session, user and product keys.
+# MAGIC The last cell checks that every Silver event is in the Gold table.
 
 # COMMAND ----------
 
@@ -30,35 +30,33 @@ COMPONENT = "gold/commerce/01_commerce"
 RID = gold_run_id()
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": gold_schema_for(SOURCE)}
-ENTITY_KEYS = {
-    "commerce_session": "session_key",
-    "commerce_user": "user_key",
-    "commerce_product": "product_key",
-}
-# table -> (source_system, REES46 event type or None for every event of the source)
-EVENT_TABLES = {
-    "commerce_view_event": ("rees46", "view"),
-    "commerce_cart_event": ("rees46", "cart"),
-    "commerce_purchase_event": ("rees46", "purchase"),
-    "commerce_web_event": ("ga4", None),
-}
+ENTITY_KEYS = {"commerce_session": "session_key", "commerce_product": "product_key"}
+# table -> (parent table, join column, column prefix): the parent columns are joined in
+PARENTS = {"commerce_session": ("commerce_user", "user_key", "user_")}
 TABLES = {}
 
 # COMMAND ----------
 
 # DBTITLE 1,Read Silver
-entities = {table: from_silver(read_silver(table)) for table in ENTITY_KEYS}
+entities = {
+    table: from_silver(read_silver(table))
+    for table in (*ENTITY_KEYS, *(p[0] for p in PARENTS.values()))
+}
 commerce_event = from_silver(read_silver("commerce_event"))
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- commerce_session, commerce_user, commerce_product
+# DBTITLE 1,Transform -- commerce_session (with its user) and commerce_product
 for table, key in ENTITY_KEYS.items():
-    TABLES[table] = (add_provenance(entities[table], SOURCE, RID), [key])
+    frame = entities[table]
+    if table in PARENTS:
+        parent, on, prefix = PARENTS[table]
+        frame = with_parent(frame, entities[parent], on=on, prefix=prefix)
+    TABLES[table] = (add_provenance(frame, SOURCE, RID), [key])
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- the four event tables (keys as in Silver commerce)
+# DBTITLE 1,Transform -- commerce_event (keys as in Silver commerce)
 user_id = F.coalesce(F.col("user_id"), F.col("user_pseudo_id"))
 session_id = F.coalesce(F.col("user_session"), F.col("session_id").cast("string"))
 events = (
@@ -71,11 +69,7 @@ events = (
         F.when(F.col("product_id").isNotNull(), sha_key("source_system", "product_id")),
     )
 )
-for table, (source_system, event_type) in EVENT_TABLES.items():
-    rows = events.filter(F.col("source_system") == source_system)
-    if event_type is not None:
-        rows = rows.filter(F.col("event_type") == event_type)
-    TABLES[table] = (add_provenance(rows, source_system, RID), ["event_key"])
+TABLES["commerce_event"] = (add_provenance(events, SOURCE, RID), ["event_key"])
 
 # COMMAND ----------
 
@@ -94,14 +88,14 @@ inspect_tables(TABLES, findings="commerce", **COMMON)
 
 # COMMAND ----------
 
-# DBTITLE 1,Validation -- tables have rows and together hold every Silver event
+# DBTITLE 1,Validation -- tables have rows and the Gold table holds every Silver event
 validate_tables(TABLES, **COMMON)
-gold_rows = sum(read_gold(t, source=SOURCE).count() for t in EVENT_TABLES)
+gold_rows = read_gold("commerce_event", source=SOURCE).count()
 silver_rows = commerce_event.count()
 check(
     COMPONENT,
     SOURCE,
-    "every_commerce_event_in_one_gold_table",
+    "every_commerce_event_in_the_gold_table",
     gold_rows == silver_rows,
     detail=f"gold={gold_rows} silver={silver_rows}",
     metric_value=float(gold_rows - silver_rows),

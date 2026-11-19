@@ -54,13 +54,6 @@ def test_gold_schema_for_matches_the_governed_ecosystem_map(gold, source, expect
     assert gold["gold_schema_for"](source) == expected
 
 
-@pytest.mark.parametrize("split", ["GENE_PROFILE_RULES", "VARIANT_PROFILE_RULES"])
-def test_a_rule_goes_to_one_split_table_only(gold, split):
-    # A rule in two tables would put the same columns in both.
-    rules = gold["mapped_rules"](gold[split])
-    assert len(rules) == len(set(rules))
-
-
 def _silver_rules() -> dict[str, set[str]]:
     """Entity type -> the rule names that genomics Silver `08` writes with a
     literal entity type and rule name (row helpers, `derived_rows` and keyword
@@ -85,14 +78,32 @@ def _silver_rules() -> dict[str, set[str]]:
     return rules
 
 
+def test_every_structural_rule_is_a_rule_that_silver_writes(gold):
+    # A rule name that Silver does not write keeps nothing out of variant_profile.
+    unknown = set(gold["STRUCTURAL_RULES"]) - _silver_rules()["variant"]
+    assert not unknown, f"rules Silver 08 does not write: {sorted(unknown)}"
+
+
 @pytest.mark.parametrize(
-    ("split", "entity_type"),
-    [("GENE_PROFILE_RULES", "gene"), ("VARIANT_PROFILE_RULES", "variant")],
+    ("dtypes", "expected"),
+    [
+        ([[("a", "int"), ("b", "string")], [("a", "int")]], set()),
+        ([[("a", "int")], [("a", "string"), ("b", "int")]], {"a"}),
+        ([], set()),
+    ],
 )
-def test_every_split_rule_is_a_rule_that_silver_writes(gold, split, entity_type):
-    # A rule name that Silver does not write sends nothing to its table.
-    unknown = set(gold["mapped_rules"](gold[split])) - _silver_rules()[entity_type]
-    assert not unknown, f"{split}: rules Silver 08 does not write: {sorted(unknown)}"
+def test_mixed_columns_names_a_column_with_two_types(gold, dtypes, expected):
+    assert gold["mixed_columns"](dtypes) == expected
+
+
+def test_unfed_tables_lists_the_silver_tables_no_gold_table_uses(gold):
+    feeds = {"gene_profile": ("entity_master",), "benchmark": ("variant",)}
+    catalog = {"entity_master", "variant", "locus_score"}
+    assert gold["unfed_tables"](feeds, catalog) == ["locus_score"]
+
+
+def test_the_typed_table_width_is_the_owner_ceiling(gold):
+    assert gold["MAX_TYPED_COLUMNS"] == 140
 
 
 @pytest.mark.parametrize(
@@ -139,11 +150,6 @@ def test_findings_keep_counts_and_drop_data_values(gold):
 def test_stage_of_tells_gold_and_analytics_run_ids_apart(gold):
     assert gold["stage_of"](gold["analytics_run_id"]()) == "analytics"
     assert gold["stage_of"](gold["gold_run_id"]()) == "gold"
-
-
-def test_mapped_rules_lists_every_rule_of_the_split(gold):
-    split = {"table_a": ("rule_1", "rule_2"), "table_b": ("rule_3",)}
-    assert gold["mapped_rules"](split) == ("rule_1", "rule_2", "rule_3")
 
 
 def test_gold_run_id_has_the_gold_prefix_and_is_distinct_from_silver(gold):

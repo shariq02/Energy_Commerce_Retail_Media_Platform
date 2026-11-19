@@ -12,13 +12,11 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 10 gene and variant tables of `genomics_gold`,
-# MAGIC `multi_value_attribute` and `multi_value_score`. The Silver attributes are
-# MAGIC pivoted to columns and split by rule (`GENE_PROFILE_RULES`,
-# MAGIC `VARIANT_PROFILE_RULES`); a rule not in a split goes to `gene_profile` or
-# MAGIC `variant_profile`. Variant scores and population frequencies become columns.
-# MAGIC A cell with more than one value stays empty; its rows go to
-# MAGIC `multi_value_attribute` (attributes) or `multi_value_score` (scores).
+# MAGIC **Purpose:** `gene_profile`, `variant_profile`, `multi_value_attribute` and
+# MAGIC `multi_value_score` of `genomics_gold`. The Silver attributes are pivoted to
+# MAGIC columns; `variant_profile` also holds the variant scores and the population
+# MAGIC frequencies as columns. A cell with more than one value stays empty; its rows
+# MAGIC go to `multi_value_attribute` (attributes) or `multi_value_score` (scores).
 
 # COMMAND ----------
 
@@ -34,17 +32,6 @@ RID = gold_run_id()
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": GENOMICS_GOLD_SCHEMA}
 POSITION_ASSEMBLY = "GRCh38"  # phyloP and phastCons 100-way are GRCh38 tracks
-LABELS = [
-    "variant_key",
-    "assembly",
-    "contig",
-    "position",
-    "reference_allele",
-    "alternate_allele",
-    "gene_key",
-]
-# variant tables built here by the rule split alone (with the rsid as a label)
-VARIANT_SPLITS = ("variant_clinical_profile", "variant_impact_profile")
 FREQUENCY_VALUES = (
     "allele_frequency",
     "allele_count",
@@ -82,7 +69,7 @@ def combo_name(pair_datasets, dataset, population, measure):
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- multi_value_attribute, gene_profile and the gene split tables
+# DBTITLE 1,Transform -- multi_value_attribute and gene_profile (every gene rule)
 TABLES["multi_value_attribute"] = (
     add_provenance(
         multi_value_attributes(attributes), SOURCE, RID, ecosystem="genomics"
@@ -94,55 +81,15 @@ TABLES["gene_profile"] = (
         genes,
         entity_type="gene",
         key="gene_key",
-        exclude=mapped_rules(GENE_PROFILE_RULES),
         columns=gene_columns,
         **PROFILE,
     ),
     ["gene_key"],
 )
-for table, rules in GENE_PROFILE_RULES.items():
-    TABLES[table] = (
-        split_profile(
-            entity_type="gene",
-            labels=genes.select("gene_key", "symbol"),
-            key="gene_key",
-            rules=rules,
-            columns=gene_columns,
-            **PROFILE,
-        ),
-        ["gene_key"],
-    )
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- variant_profile and the variant tables of the rule split
-TABLES["variant_profile"] = (
-    full_profile(
-        variant,
-        entity_type="variant",
-        key="variant_key",
-        exclude=mapped_rules(VARIANT_PROFILE_RULES),
-        columns=variant_columns,
-        **PROFILE,
-    ),
-    ["variant_key"],
-)
-for table in VARIANT_SPLITS:
-    TABLES[table] = (
-        split_profile(
-            entity_type="variant",
-            labels=variant.select(*LABELS, "rsid"),
-            key="variant_key",
-            rules=VARIANT_PROFILE_RULES[table],
-            columns=variant_columns,
-            **PROFILE,
-        ),
-        ["variant_key"],
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- variant_score_profile and multi_value_score
+# DBTITLE 1,Transform -- variant scores (columns) and multi_value_score
 # A variant with more than one row of a score (AlphaMissense: one per transcript)
 # keeps the profile cell empty; its rows go to multi_value_score.
 variant_scores = locus_score.filter(F.col("variant_key").isNotNull()).withColumn(
@@ -186,21 +133,11 @@ by_position = (
     .join(by_position, ["contig", "position"])
     .drop("contig", "position")
 )
-TABLES["variant_score_profile"] = (
-    add_provenance(
-        variant.select(*LABELS).join(
-            by_variant.join(by_position, "variant_key", "full"), "variant_key", "right"
-        ),
-        SOURCE,
-        RID,
-        ecosystem="genomics",
-    ),
-    ["variant_key"],
-)
+by_score = by_variant.join(by_position, "variant_key", "full")
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- variant_frequency_profile (population x measure columns)
+# DBTITLE 1,Transform -- population frequencies (population x measure columns)
 combos = population_frequency.select("source_dataset", "population", "measure")
 combos = [tuple(r) for r in combos.distinct().collect()]
 pair_datasets = {}
@@ -228,27 +165,22 @@ by_population = (
     .pivot("_combo", sorted(set(combo_names.values())))
     .agg(*[F.first(v).alias(v) for v in FREQUENCY_VALUES])
 )
-frequency_attributes = pivot_attributes(
-    attributes,
-    "variant",
-    variant_columns,
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- variant_profile (attributes, scores and frequencies)
+# The structural rules stay in structural_variant_profile (gold/genomics/02).
+variant_profile = full_profile(
+    variant,
+    entity_type="variant",
     key="variant_key",
-    rules=VARIANT_PROFILE_RULES["variant_frequency_profile"],
-    **GATE,
+    exclude=STRUCTURAL_RULES,
+    columns=variant_columns,
+    **PROFILE,
 )
-TABLES["variant_frequency_profile"] = (
-    add_provenance(
-        variant.select(*LABELS).join(
-            by_population.join(frequency_attributes, "variant_key", "full"),
-            "variant_key",
-            "right",
-        ),
-        SOURCE,
-        RID,
-        ecosystem="genomics",
-    ),
-    ["variant_key"],
-)
+for part, suffix in ((by_score, "__score"), (by_population, "__frequency")):
+    variant_profile = join_profile(variant_profile, part, "variant_key", "left", suffix)
+TABLES["variant_profile"] = (variant_profile, ["variant_key"])
 
 # COMMAND ----------
 

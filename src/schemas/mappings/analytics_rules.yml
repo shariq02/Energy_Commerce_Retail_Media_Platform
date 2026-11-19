@@ -86,3 +86,102 @@ review_queue_labels: [VUS, Conflicting]
 
 # Clinical significance labels of the variants of population_risk.
 population_risk_labels: [Pathogenic, Likely Pathogenic]
+
+# The rows of shared_conformed.metric_definition (written by gold/shared/01): one
+# row per metric of an ecosystem, the mart that holds it and its grain.
+metrics:
+  - ecosystem: energy
+    metric_key: generation_by_carrier
+    definition: "Electricity generation, by resolved energy carrier, per market area and day."
+    formula: "sum(generation_mwh) grouped by market_area_code, local_date, carrier_key"
+    source_mart: generation_by_carrier_daily
+    grain: "market_area_code x local_date x carrier_key"
+  - ecosystem: energy
+    metric_key: average_market_price
+    definition: "Mean day-ahead electricity price per market area and day."
+    formula: "avg(price_eur_per_mwh) grouped by market_area_code, local_date, interval_seconds"
+    source_mart: market_price_daily
+    grain: "market_area_code x local_date x interval_seconds"
+  - ecosystem: energy
+    metric_key: price_volatility
+    definition: "Within-day dispersion of the day-ahead price."
+    formula: "stddev_pop(price_eur_per_mwh) grouped by market_area_code, local_date, interval_seconds"
+    source_mart: market_price_daily
+    grain: "market_area_code x local_date x interval_seconds"
+  - ecosystem: energy
+    metric_key: negative_price_intervals
+    definition: "Number of day-ahead price windows below zero per market area and day."
+    formula: "count(price_eur_per_mwh < 0) grouped by market_area_code, local_date, interval_seconds"
+    source_mart: market_price_daily
+    grain: "market_area_code x local_date x interval_seconds"
+  - ecosystem: energy
+    metric_key: site_energy_consumption
+    definition: "Daily site energy flow per subsystem/channel, additive readings only."
+    formula: "sum(value) where value_kind = 'increment', grouped by location_key, local_date, subsystem, channel, resolution_seconds"
+    source_mart: site_energy_weather_daily
+    grain: "location_key x local_date x subsystem x channel x resolution_seconds"
+  - ecosystem: energy
+    metric_key: site_energy_weather_context
+    definition: "Site daily energy paired with that site's own mean air temperature."
+    formula: "site daily energy joined to the site daily air temperature"
+    source_mart: site_energy_weather_daily
+    grain: "location_key x local_date x subsystem x channel x resolution_seconds"
+  - ecosystem: energy
+    metric_key: renewable_share
+    definition: "Share of renewable carriers in the generation of the priced windows of a day."
+    formula: "sum(renewable_generation_mwh) / sum(generation_mwh) grouped by market_area_code, local_date, interval_seconds"
+    source_mart: market_price_daily
+    grain: "market_area_code x local_date x interval_seconds"
+  - ecosystem: energy
+    metric_key: forecast_mean_absolute_error
+    definition: "Mean absolute difference between a forecast and its actual per day."
+    formula: "avg(abs(energy_mwh - actual_energy_mwh)) grouped by source_system, market_area_code, local_date, forecast_scope, interval_seconds"
+    source_mart: forecast_accuracy
+    grain: "source_system x market_area_code x local_date x forecast_scope x interval_seconds"
+  - ecosystem: energy
+    metric_key: grid_intervention_energy
+    definition: "Energy of the grid interventions per instructing operator and day."
+    formula: "sum(energy_mwh) grouped by instructing_market_area_code, local_date, direction, reason"
+    source_mart: grid_intervention_daily
+    grain: "instructing_market_area_code x local_date x direction x reason"
+  - ecosystem: energy
+    metric_key: national_mean_air_temperature
+    definition: "Mean over the weather stations of the daily mean air temperature."
+    formula: "avg(mean_air_temperature_degc) of the station days grouped by local_date"
+    source_mart: weather_energy_daily
+    grain: "market_area_code x local_date"
+  - ecosystem: commerce
+    metric_key: ga4_sessions
+    definition: "Daily GA4 session count, by country."
+    formula: "count(*) grouped by geo_country, local_date"
+    source_mart: ga4_demand_daily
+    grain: "geo_country x local_date"
+    source_system: ga4
+  - ecosystem: commerce
+    metric_key: ga4_revenue
+    definition: "Daily GA4 purchase revenue, by country."
+    formula: "sum(revenue) grouped by geo_country, local_date"
+    source_mart: ga4_demand_daily
+    grain: "geo_country x local_date"
+    source_system: ga4
+  - ecosystem: commerce
+    metric_key: rees46_event_demand
+    definition: "Daily REES46 event volume, by category. No currency -- relative measure only."
+    formula: "sum(view_count + cart_count + purchase_count) grouped by category_l1, local_date"
+    source_mart: product_demand_daily
+    grain: "category_l1 x category_l2 x local_date"
+    source_system: rees46
+  - ecosystem: commerce
+    metric_key: purchase_session_share
+    definition: "Share of the sessions of a day with at least one purchase event, by source."
+    formula: "purchase_session_count / session_count grouped by source_system, local_date"
+    source_mart: customer_journey_daily
+    grain: "source_system x local_date"
+    source_system: rees46
+  - ecosystem: commerce
+    metric_key: category_purchases
+    definition: "Daily REES46 purchase events, by product category."
+    formula: "purchase_count grouped by category_l1, category_l2, local_date"
+    source_mart: product_demand_daily
+    grain: "category_l1 x category_l2 x local_date"
+    source_system: rees46

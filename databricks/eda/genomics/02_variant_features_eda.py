@@ -13,11 +13,10 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the variant feature tables of genomics Gold
-# MAGIC (`variant_profile`, `variant_impact_profile`, `variant_score_profile`,
-# MAGIC `variant_frequency_profile`, `structural_variant_profile`): nulls, constant
+# MAGIC (`variant_profile`, `structural_variant_profile`): nulls, constant
 # MAGIC columns, key, rates per column kind, coverage by source, and which flags and
-# MAGIC scores carry the pathogenic or benign class of `variant_clinical_profile` --
-# MAGIC as evidence.
+# MAGIC scores carry the pathogenic or benign class of `variant_profile` -- as
+# MAGIC evidence.
 
 # COMMAND ----------
 
@@ -31,14 +30,8 @@ SCHEMA = "genomics_gold"
 SOURCE = "genomics"
 NB_KEY = "02_variant_features"
 SECTION_TITLE = "Variant feature tables and the class they carry"
-TABLES = [
-    "variant_profile",
-    "variant_impact_profile",
-    "variant_score_profile",
-    "variant_frequency_profile",
-    "structural_variant_profile",
-]
-CLINICAL = "variant_clinical_profile"
+TABLES = ["variant_profile", "structural_variant_profile"]
+CLINICAL = "variant_profile"
 POSITIVE = "is_pathogenic"
 NEGATIVE = "is_benign"
 NOT_FEATURES = {"position", "end_position"}
@@ -117,7 +110,7 @@ for name, groups in COVERAGE.items():
 
 # COMMAND ----------
 
-# DBTITLE 1,Class slice of variant_clinical_profile
+# DBTITLE 1,Class slice of variant_profile
 CLINICAL_FRAME = spark.table(f"{CATALOG}.{SCHEMA}.{CLINICAL}")
 LABEL = with_target(CLINICAL_FRAME, POSITIVE, NEGATIVE).select("variant_key", "__pos")
 LABEL_ROWS = LABEL.count()

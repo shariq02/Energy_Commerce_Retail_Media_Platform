@@ -12,11 +12,11 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** 9 `energy_analytics` tables from Gold: generation by carrier and
-# MAGIC price statistics per day, one row per market window, price formation per day,
-# MAGIC negative price events, cross-border trade, grid interventions per operator and
-# MAGIC day, forecast errors per day, and `metric_definition`. Values come from
-# MAGIC `analytics_rules.yml`.
+# MAGIC **Purpose:** 7 `energy_analytics` tables from Gold: generation by carrier per
+# MAGIC day, price statistics and price formation per day (`market_price_daily`), one
+# MAGIC row per market window, negative price events, cross-border trade, grid
+# MAGIC interventions per operator and day and forecast errors per day. Values come
+# MAGIC from `analytics_rules.yml`.
 
 # COMMAND ----------
 
@@ -33,6 +33,7 @@ RULES = load_yaml("src/schemas/mappings/analytics_rules.yml")
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": ANALYTICS_SCHEMAS["energy"]}
 HOME = RULES["home_market_area"]
+SITE_SOURCE = "honda_iot"
 PRICE = "price_eur_per_mwh"
 WINDOW = [
     "market_area_code",
@@ -43,93 +44,6 @@ WINDOW = [
 DAY = ["market_area_code", "local_date", "interval_seconds"]
 KIND = F.col("component_kind")
 ENERGY = F.col("energy_mwh")
-METRICS = [
-    (
-        "generation_by_carrier",
-        "Electricity generation, by resolved energy carrier, per market area and day.",
-        "sum(generation_mwh) grouped by market_area_code, local_date, carrier_key",
-        "generation_by_carrier_daily",
-        "market_area_code x local_date x carrier_key",
-    ),
-    (
-        "average_market_price",
-        "Mean day-ahead electricity price per market area and day.",
-        "avg(price_eur_per_mwh) grouped by market_area_code, local_date",
-        "market_price_daily",
-        "market_area_code x local_date",
-    ),
-    (
-        "price_volatility",
-        "Within-day dispersion of the day-ahead price.",
-        "stddev_pop(price_eur_per_mwh) grouped by market_area_code, local_date",
-        "market_price_daily",
-        "market_area_code x local_date",
-    ),
-    (
-        "negative_price_intervals",
-        "Number of day-ahead price windows below zero per market area and day.",
-        "count(price_eur_per_mwh < 0) grouped by market_area_code, local_date",
-        "market_price_daily",
-        "market_area_code x local_date",
-    ),
-    (
-        "site_energy_consumption",
-        "Daily site energy flow per subsystem/channel, additive readings only.",
-        (
-            "sum(value) where value_kind = 'increment', grouped by location_key, "
-            "local_date, subsystem, channel, resolution_seconds"
-        ),
-        "site_energy_weather_daily",
-        "location_key x local_date x subsystem x channel x resolution_seconds",
-    ),
-    (
-        "site_energy_weather_context",
-        "Site daily energy paired with that site's own mean air temperature.",
-        "site daily energy joined to the site daily air temperature",
-        "site_energy_weather_daily",
-        "location_key x local_date x subsystem x channel x resolution_seconds",
-    ),
-    (
-        "renewable_share",
-        "Share of renewable carriers in the generation of the priced windows of a day.",
-        (
-            "sum(renewable_generation_mwh) / sum(generation_mwh) grouped by "
-            "market_area_code, local_date, interval_seconds"
-        ),
-        "price_formation_daily",
-        "market_area_code x local_date x interval_seconds",
-    ),
-    (
-        "forecast_mean_absolute_error",
-        "Mean absolute difference between a forecast and its actual per day.",
-        (
-            "avg(abs(energy_mwh - actual_energy_mwh)) grouped by source_system, "
-            "market_area_code, local_date, forecast_scope, interval_seconds"
-        ),
-        "forecast_accuracy",
-        (
-            "source_system x market_area_code x local_date x forecast_scope x "
-            "interval_seconds"
-        ),
-    ),
-    (
-        "grid_intervention_energy",
-        "Energy of the grid interventions per instructing operator and day.",
-        (
-            "sum(energy_mwh) grouped by instructing_market_area_code, local_date, "
-            "direction, reason"
-        ),
-        "grid_intervention_daily",
-        "instructing_market_area_code x local_date x direction x reason",
-    ),
-    (
-        "national_mean_air_temperature",
-        "Mean over the weather stations of the daily mean air temperature.",
-        "avg(mean_air_temperature_degc) of the station days grouped by local_date",
-        "weather_energy_daily",
-        "market_area_code x local_date",
-    ),
-]
 TABLES = {}
 
 # COMMAND ----------
@@ -152,7 +66,9 @@ def window_join(left, right):
 
 # DBTITLE 1,Read Gold
 market_price = read_gold("market_price", source=SOURCE)
-component = read_gold("market_energy_component", source=SOURCE)
+component = read_gold("energy_component", source=SOURCE).filter(
+    F.col("source_system") != SITE_SOURCE
+)
 forecast_actual = read_gold("forecast_actual", source=SOURCE)
 grid_intervention = read_gold("grid_intervention_event", source=SOURCE)
 balance = component.filter(F.col("component_group") == "balance")
@@ -180,44 +96,6 @@ TABLES["generation_by_carrier_daily"] = (
         RID,
     ),
     ["market_area_code", "local_date", "carrier_key", "resolution_seconds"],
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- market_price_daily (price statistics per market area and day)
-percentiles = RULES["price_percentiles"]
-TABLES["market_price_daily"] = (
-    add_provenance(
-        market_price.groupBy("market_area_code", "local_date")
-        .agg(
-            F.avg(PRICE).alias("mean_price_eur_per_mwh"),
-            F.percentile_approx(PRICE, 0.5).alias("median_price_eur_per_mwh"),
-            F.percentile_approx(PRICE, percentiles["low"]).alias(
-                "low_percentile_price_eur_per_mwh"
-            ),
-            F.percentile_approx(PRICE, percentiles["high"]).alias(
-                "high_percentile_price_eur_per_mwh"
-            ),
-            F.min(PRICE).alias("min_price_eur_per_mwh"),
-            F.max(PRICE).alias("max_price_eur_per_mwh"),
-            F.stddev_pop(PRICE).alias("price_volatility_eur_per_mwh"),
-            F.count(F.when(F.col(PRICE) < RULES["negative_price_below"], 1)).alias(
-                "negative_interval_count"
-            ),
-            F.count(PRICE).alias("interval_count"),
-            F.avg("balancing_price_eur_per_mwh").alias(
-                "mean_balancing_price_eur_per_mwh"
-            ),
-            F.count("balancing_price_eur_per_mwh").alias("balancing_interval_count"),
-        )
-        .withColumn(
-            "price_spread_eur_per_mwh",
-            F.col("max_price_eur_per_mwh") - F.col("min_price_eur_per_mwh"),
-        ),
-        SOURCE,
-        RID,
-    ),
-    ["market_area_code", "local_date"],
 )
 
 # COMMAND ----------
@@ -260,27 +138,51 @@ TABLES["market_timeseries"] = (add_provenance(market_timeseries, SOURCE, RID), W
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- price_formation_daily (price against load and renewables)
-TABLES["price_formation_daily"] = (
-    add_provenance(
-        market_timeseries.groupBy(*DAY)
-        .agg(
-            F.avg(PRICE).alias("mean_price_eur_per_mwh"),
-            F.sum("generation_mwh").alias("generation_mwh"),
-            F.sum("renewable_generation_mwh").alias("renewable_generation_mwh"),
-            F.sum("consumption_mwh").alias("consumption_mwh"),
-            F.sum("residual_load_mwh").alias("residual_load_mwh"),
-            F.sum("physical_net_import_mwh").alias("physical_net_import_mwh"),
-            F.corr(PRICE, "residual_load_mwh").alias("price_residual_load_correlation"),
-            F.corr(PRICE, "renewable_share").alias("price_renewable_share_correlation"),
-            F.count(PRICE).alias("interval_count"),
-        )
-        .withColumn(
-            "renewable_share", ratio("renewable_generation_mwh", "generation_mwh")
+# DBTITLE 1,Transform -- market_price_daily (price statistics, price against load)
+# One row per market area, day and resolution: the price statistics of the priced
+# windows and the day sums of the market window table.
+percentiles = RULES["price_percentiles"]
+price_statistics = (
+    market_price.groupBy(*DAY)
+    .agg(
+        F.avg(PRICE).alias("mean_price_eur_per_mwh"),
+        F.percentile_approx(PRICE, 0.5).alias("median_price_eur_per_mwh"),
+        F.percentile_approx(PRICE, percentiles["low"]).alias(
+            "low_percentile_price_eur_per_mwh"
         ),
-        SOURCE,
-        RID,
-    ),
+        F.percentile_approx(PRICE, percentiles["high"]).alias(
+            "high_percentile_price_eur_per_mwh"
+        ),
+        F.min(PRICE).alias("min_price_eur_per_mwh"),
+        F.max(PRICE).alias("max_price_eur_per_mwh"),
+        F.stddev_pop(PRICE).alias("price_volatility_eur_per_mwh"),
+        F.count(F.when(F.col(PRICE) < RULES["negative_price_below"], 1)).alias(
+            "negative_interval_count"
+        ),
+        F.count(PRICE).alias("interval_count"),
+        F.avg("balancing_price_eur_per_mwh").alias("mean_balancing_price_eur_per_mwh"),
+        F.count("balancing_price_eur_per_mwh").alias("balancing_interval_count"),
+    )
+    .withColumn(
+        "price_spread_eur_per_mwh",
+        F.col("max_price_eur_per_mwh") - F.col("min_price_eur_per_mwh"),
+    )
+)
+price_formation = (
+    market_timeseries.groupBy(*DAY)
+    .agg(
+        F.sum("generation_mwh").alias("generation_mwh"),
+        F.sum("renewable_generation_mwh").alias("renewable_generation_mwh"),
+        F.sum("consumption_mwh").alias("consumption_mwh"),
+        F.sum("residual_load_mwh").alias("residual_load_mwh"),
+        F.sum("physical_net_import_mwh").alias("physical_net_import_mwh"),
+        F.corr(PRICE, "residual_load_mwh").alias("price_residual_load_correlation"),
+        F.corr(PRICE, "renewable_share").alias("price_renewable_share_correlation"),
+    )
+    .withColumn("renewable_share", ratio("renewable_generation_mwh", "generation_mwh"))
+)
+TABLES["market_price_daily"] = (
+    add_provenance(price_statistics.join(price_formation, DAY, "left"), SOURCE, RID),
     DAY,
 )
 
@@ -433,22 +335,6 @@ TABLES["forecast_accuracy"] = (
         RID,
     ),
     forecast_grain,
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Transform -- metric_definition (one row per energy metric)
-TABLES["metric_definition"] = (
-    add_provenance(
-        spark.createDataFrame(
-            METRICS,
-            "metric_key string, definition string, formula string, "
-            "source_mart string, grain string",
-        ),
-        SOURCE,
-        RID,
-    ),
-    ["metric_key"],
 )
 
 # COMMAND ----------

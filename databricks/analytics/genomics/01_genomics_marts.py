@@ -33,8 +33,6 @@ RULES = load_yaml("src/schemas/mappings/analytics_rules.yml")
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": ANALYTICS_SCHEMAS["genomics"]}
 GOLD = {"source": SOURCE, "schema": GENOMICS_GOLD_SCHEMA}
-GENE_TABLES = ("gene_profile", *GENE_PROFILE_RULES)
-SHARED = ("gene_key", "symbol", "source_system", "ecosystem")
 # Silver attribute -> its rule (the pivot name when two rules share it)
 GENE_VALUES = {
     "gene_importance_score": "gene_importance",
@@ -71,28 +69,20 @@ VARIANT_LABELS = [
 ]
 LABEL = ("clinical_significance_label", "clinical_significance_label")
 DRUG_VARIANT = ("is_pharmgkb_annotated_variant", "drug_response_features")
-# table -> Silver attribute -> its rule
+# Silver attribute -> its rule
 REVIEW_VALUES = {
-    "variant_clinical_profile": {
-        "quality_tier": "review_quality",
-        "review_quality_score": "review_quality",
-    },
-    "variant_impact_profile": {
-        "predicted_pathogenicity": "protein_impact",
-        "pathogenicity_score": "protein_impact",
-        "mutation_severity_score": "protein_impact",
-        "protein_impact_category": "protein_impact",
-        "is_loss_of_function": "protein_impact",
-        "conservation_level": "conservation",
-    },
-    "variant_frequency_profile": {
-        "frequency_band": "frequency_bands",
-        "max_population_frequency": "frequency_bands",
-    },
-    "variant_profile": {
-        "days_since_evaluation": "review_recency",
-        "is_recently_evaluated": "review_recency",
-    },
+    "quality_tier": "review_quality",
+    "review_quality_score": "review_quality",
+    "predicted_pathogenicity": "protein_impact",
+    "pathogenicity_score": "protein_impact",
+    "mutation_severity_score": "protein_impact",
+    "protein_impact_category": "protein_impact",
+    "is_loss_of_function": "protein_impact",
+    "conservation_level": "conservation",
+    "frequency_band": "frequency_bands",
+    "max_population_frequency": "frequency_bands",
+    "days_since_evaluation": "review_recency",
+    "is_recently_evaluated": "review_recency",
 }
 FREQUENCY_VALUES = {
     "allele_frequency": "double",
@@ -113,32 +103,14 @@ TABLES = {}
 # COMMAND ----------
 
 # DBTITLE 1,Read Gold
-gene_tables = {t: from_gold(read_gold(t, **GOLD)) for t in GENE_TABLES}
-variant_tables = {t: read_gold(t, **GOLD) for t in REVIEW_VALUES}
+genes = from_gold(read_gold("gene_profile", **GOLD))
+clinical = read_gold("variant_profile", **GOLD)
 disease_profile = from_gold(read_gold("disease_profile", **GOLD))
 gene_disease = read_gold("gene_disease_profile", **GOLD)
 genetic_test = read_gold("genetic_test_profile", **GOLD)
 classification_change = read_gold("clinvar_classification_change", **GOLD)
-clinical = variant_tables["variant_clinical_profile"]
 label = pick_column(clinical, *LABEL)
-gene_symbols = gene_tables["gene_profile"].select(
-    "gene_key", F.col("symbol").alias("gene_symbol")
-)
-genes = gene_tables["gene_profile"]
-for table in GENE_TABLES[1:]:
-    part = gene_tables[table]
-    genes = genes.join(
-        part.select(
-            "gene_key",
-            *[
-                F.col(c).alias(f"{table}__{c}" if c in genes.columns else c)
-                for c in part.columns
-                if c not in SHARED
-            ],
-        ),
-        "gene_key",
-        "left",
-    )
+gene_symbols = genes.select("gene_key", F.col("symbol").alias("gene_symbol"))
 
 # COMMAND ----------
 
@@ -236,19 +208,17 @@ TABLES["genetic_test_panel"] = (
 queue = clinical.filter(F.col(label).isin(RULES["review_queue_labels"])).select(
     *VARIANT_LABELS, F.col(label).alias("clinical_significance_label")
 )
-for table, values in REVIEW_VALUES.items():
-    frame = variant_tables[table]
-    queue = queue.join(
-        frame.select(
-            "variant_key",
-            *[
-                F.col(pick_column(frame, name, rule)).alias(name)
-                for name, rule in values.items()
-            ],
-        ),
+queue = queue.join(
+    clinical.select(
         "variant_key",
-        "left",
-    )
+        *[
+            F.col(pick_column(clinical, name, rule)).alias(name)
+            for name, rule in REVIEW_VALUES.items()
+        ],
+    ),
+    "variant_key",
+    "left",
+)
 in_queue = Window.orderBy(
     F.col("pathogenicity_score").desc_nulls_last(),
     F.col("review_quality_score").asc_nulls_first(),
@@ -269,9 +239,15 @@ TABLES["variant_review_queue"] = (
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- population_risk (pathogenic variants x population group)
-frequency = variant_tables["variant_frequency_profile"]
 suffix = "_allele_frequency"
-groups = sorted(c[: -len(suffix)] for c in frequency.columns if c.endswith(suffix))
+columns = set(clinical.columns)
+# A population group has all of its measure columns (variant_profile holds more
+# columns than the frequency ones).
+groups = sorted(
+    group
+    for group in (c[: -len(suffix)] for c in columns if c.endswith(suffix))
+    if all(f"{group}_{name}" in columns for name in FREQUENCY_VALUES)
+)
 group_rows = [
     F.struct(
         F.lit(group).alias("population_group"),
@@ -287,7 +263,7 @@ pathogenic = clinical.filter(F.col(label).isin(RULES["population_risk_labels"]))
 )
 TABLES["population_risk"] = (
     add_provenance(
-        columns_to_rows(frequency, ["variant_key", "gene_key"], group_rows)
+        columns_to_rows(clinical, ["variant_key", "gene_key"], group_rows)
         .filter(F.col("allele_frequency").isNotNull())
         .join(pathogenic, "variant_key")
         .join(gene_symbols, "gene_key", "left"),

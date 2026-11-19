@@ -12,10 +12,11 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 14 market, site, weather and device tables of `energy_gold`:
-# MAGIC prices, Honda channel readings (long form), market and site energy components,
-# MAGIC forecast and actual pairs, daily and four themed weather tables, devices, plant
-# MAGIC samples, entity links and grid interventions.
+# MAGIC **Purpose:** the 10 market, site, weather and device tables of `energy_gold`:
+# MAGIC prices, Honda channel readings (long form), the energy components, forecast and
+# MAGIC actual pairs, daily weather and `weather_observation` (every weather family with
+# MAGIC the columns of its place), devices, plant samples, entity links and grid
+# MAGIC interventions.
 
 # COMMAND ----------
 
@@ -51,22 +52,6 @@ PRECIPITATION_FORM_LABELS = {
     "8": "liquid and solid precipitation",
     "9": "missing value, form not determinable",
 }
-WEATHER_THEMES = {
-    "weather_air_state": ("temperature", "humidity", "pressure"),
-    "weather_wind_precipitation": ("wind", "precipitation"),
-    "weather_sky": ("cloud", "visibility", "present_weather"),
-    "weather_ground_sun": (
-        "soil_temperature",
-        "solar_radiation",
-        "longwave_radiation",
-        "sunshine_duration",
-        "solar_geometry",
-        "uv_index",
-    ),
-}
-unthemed = set(WEATHER_FAMILIES) ^ {f for fs in WEATHER_THEMES.values() for f in fs}
-if unthemed:
-    raise RuntimeError(f"weather families without one theme: {sorted(unthemed)}")
 # Silver table -> Gold table and grain, copied as they are
 COPIES = {
     "weather_daily": ("weather_daily", ["daily_key"]),
@@ -177,6 +162,7 @@ silver = {
         "energy_observation",
         "energy_component",
         "weather_observation",
+        "weather_location",
         "register_link",
         *{link[0] for link in ATTRIBUTE_LINKS},
     )
@@ -273,13 +259,11 @@ TABLES["channel_reading"] = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- market_energy_component and site_energy_component
-is_site = F.col("source_system") == SITE_SOURCE
-for table, rows in (
-    ("market_energy_component", component.filter(~is_site)),
-    ("site_energy_component", component.filter(is_site)),
-):
-    TABLES[table] = (add_provenance(rows, SOURCE, RID), ["source_record_id"])
+# DBTITLE 1,Transform -- energy_component (market and site rows)
+TABLES["energy_component"] = (
+    add_provenance(component, SOURCE, RID),
+    ["source_record_id"],
+)
 
 # COMMAND ----------
 
@@ -333,30 +317,36 @@ TABLES["forecast_actual"] = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- the four weather themes (columns and rows of their families)
+# DBTITLE 1,Transform -- weather_observation (every family, with its place columns)
+# The rows are those that hold a value in at least one weather family.
 context = [name for name, _ in WEATHER_OBSERVATION_CONTEXT]
 form_text = F.create_map(
     *[F.lit(part) for pair in PRECIPITATION_FORM_LABELS.items() for part in pair]
 )
-for table, families in WEATHER_THEMES.items():
-    blocks = [name for family in families for name, _ in _weather_family_block(family)]
-    has_value = F.lit(False)
-    for family in families:
-        for name, _ in WEATHER_FAMILY_MEASUREMENTS[family]:
-            has_value = has_value | F.col(name).isNotNull()
-    rows = (
-        silver["weather_observation"]
-        .filter(has_value)
-        .select(*context, *blocks, "source_record_id")
-    )
-    if "precipitation" in families:
-        code = (
-            F.col("precipitation_form_code").cast("double").cast("int").cast("string")
-        )
-        rows = rows.withColumn(
-            "precipitation_form_text", F.try_element_at(form_text, code)
-        )
-    TABLES[table] = (add_provenance(rows, "dwd", RID), ["observation_key"])
+blocks = [
+    name for family in WEATHER_FAMILIES for name, _ in _weather_family_block(family)
+]
+has_value = F.lit(False)
+for family in WEATHER_FAMILIES:
+    for name, _ in WEATHER_FAMILY_MEASUREMENTS[family]:
+        has_value = has_value | F.col(name).isNotNull()
+code = F.col("precipitation_form_code").cast("double").cast("int").cast("string")
+weather = (
+    silver["weather_observation"]
+    .filter(has_value)
+    .select(*context, *blocks, "source_record_id")
+    .withColumn("precipitation_form_text", F.try_element_at(form_text, code))
+)
+TABLES["weather_observation"] = (
+    add_provenance(
+        with_parent(
+            weather, silver["weather_location"], on="location_key", prefix="place_"
+        ),
+        "dwd",
+        RID,
+    ),
+    ["observation_key"],
+)
 
 # COMMAND ----------
 

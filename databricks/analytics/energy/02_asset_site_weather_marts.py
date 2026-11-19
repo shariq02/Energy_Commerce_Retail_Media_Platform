@@ -84,15 +84,12 @@ gold = {
     for table in (
         "generation_unit",
         "unit_event",
-        "support_registration",
         "capacity_plan",
         "grid_connection_point",
         "market_actor",
-        "market_energy_component",
+        "energy_component",
         "channel_reading",
-        "weather_air_state",
-        "weather_wind_precipitation",
-        "weather_ground_sun",
+        "weather_observation",
         "weather_daily",
         "grid_intervention_event",
     )
@@ -107,8 +104,9 @@ operator_names = (
     .groupBy(F.col("market_actor_id").alias("operator_id"))
     .agg(F.min("company_name").alias("operator_name"))
 )
-consumption = gold["market_energy_component"].filter(
-    (F.col("component_group") == "balance")
+consumption = gold["energy_component"].filter(
+    (F.col("source_system") != SITE_SOURCE)
+    & (F.col("component_group") == "balance")
     & (F.col("component_kind") == "consumption")
     & (F.col("market_area_code") == HOME)
 )
@@ -360,26 +358,33 @@ TABLES["operator_concentration"] = (
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- support_scheme_buildout (registrations by carrier and vintage)
-unit_by_support = (
-    units.select(
-        F.col("renewable_energy_act_support_id").alias("_support_id"),
-        "carrier_key",
-        "federal_state",
-    )
-    .unionByName(
-        units.select(
-            F.col("combined_heat_and_power_support_id").alias("_support_id"),
-            "carrier_key",
-            "federal_state",
+# The support registrations are columns of generation_unit (prefix per support id);
+# one registration is rebuilt from the units that carry its id.
+SUPPORT_COLUMNS = [
+    "support_scheme",
+    "installed_capacity_kw",
+    "electrical_combined_heat_and_power_capacity_kw",
+    "renewable_energy_act_commissioning_date",
+    "commissioning_date",
+    "registration_date",
+    "auction_award_number",
+]
+
+
+def registrations_of(id_column, prefix):
+    """One row per support registration, with the carrier and state of its units."""
+    return (
+        units.filter(F.col(id_column).isNotNull())
+        .groupBy(id_column)
+        .agg(
+            F.min("carrier_key").alias("carrier_key"),
+            F.min("federal_state").alias("federal_state"),
+            *[F.first(f"{prefix}{name}").alias(name) for name in SUPPORT_COLUMNS],
         )
+        .drop(id_column)
     )
-    .filter(F.col("_support_id").isNotNull())
-    .groupBy("_support_id")
-    .agg(
-        F.min("carrier_key").alias("carrier_key"),
-        F.min("federal_state").alias("federal_state"),
-    )
-)
+
+
 buildout_grain = ["support_scheme", "carrier_key", "federal_state", "vintage_year"]
 
 capacity_kw = F.coalesce(
@@ -387,12 +392,9 @@ capacity_kw = F.coalesce(
 )
 TABLES["support_scheme_buildout"] = (
     add_provenance(
-        gold["support_registration"]
-        .withColumn(
-            "_support_id",
-            F.coalesce(
-                "renewable_energy_act_support_id", "combined_heat_and_power_support_id"
-            ),
+        registrations_of("renewable_energy_act_support_id", "renewable_support_")
+        .unionByName(
+            registrations_of("combined_heat_and_power_support_id", "chp_support_")
         )
         .withColumn(
             "vintage_year",
@@ -404,7 +406,6 @@ TABLES["support_scheme_buildout"] = (
                 )
             ),
         )
-        .join(unit_by_support, "_support_id", "left")
         .groupBy(*buildout_grain)
         .agg(
             F.count(F.lit(1)).alias("registration_count"),
@@ -441,9 +442,16 @@ station_air = (
         ],
     )
 )
+weather = gold["weather_observation"]
 station_wind = (
-    gold["weather_wind_precipitation"]
-    .filter(hourly)
+    weather.filter(
+        hourly
+        & (
+            F.col("wind_mean_speed_m_per_s").isNotNull()
+            | F.col("wind_max_gust_m_per_s").isNotNull()
+            | F.col("precipitation_mm").isNotNull()
+        )
+    )
     .groupBy(*STATION_DAY)
     .agg(
         F.avg("wind_mean_speed_m_per_s").alias("mean_wind_speed_m_per_s"),
@@ -451,14 +459,17 @@ station_wind = (
         F.sum("precipitation_mm").alias("precipitation_mm"),
     )
 )
-ground_sun = gold["weather_ground_sun"]
 station_radiation = (
-    ground_sun.filter(radiation_rows)
+    weather.filter(radiation_rows & F.col("global_radiation_w_per_m2").isNotNull())
     .groupBy(*STATION_DAY)
     .agg(F.avg("global_radiation_w_per_m2").alias("mean_global_radiation_w_per_m2"))
 )
 station_sunshine = (
-    ground_sun.filter(hourly & (F.col("interval_reference") == "clock"))
+    weather.filter(
+        hourly
+        & (F.col("interval_reference") == "clock")
+        & F.col("sunshine_duration_minutes").isNotNull()
+    )
     .groupBy(*STATION_DAY)
     .agg(F.sum("sunshine_duration_minutes").alias("sunshine_duration_minutes"))
 )
@@ -470,8 +481,7 @@ for part in (station_wind, station_radiation, station_sunshine):
 
 # DBTITLE 1,Transform -- site_energy_weather_daily (site energy per resolution, weather)
 site_weather = (
-    gold["weather_air_state"]
-    .filter(
+    weather.filter(
         (F.col("source_system") == SITE_SOURCE)
         & F.col("air_temperature_degc").isNotNull()
     )

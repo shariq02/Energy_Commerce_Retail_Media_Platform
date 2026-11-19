@@ -13,8 +13,7 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the benchmark tables of genomics Gold
-# MAGIC (`benchmark_coding_variant`, `benchmark_population_variant`,
-# MAGIC `benchmark_regulatory_variant`, `dms_assay`, `dms_assay_mutant`,
+# MAGIC (`benchmark_variant`, `dms_assay`, `dms_assay_mutant`,
 # MAGIC `embedding_split`): nulls, constant columns, key, rates per column kind,
 # MAGIC coverage by source, label balance per split, keys that sit in more than one
 # MAGIC split, overlap with the labelled ClinVar variants, and the assay rows against
@@ -37,15 +36,11 @@ SCHEMA = "genomics_gold"
 SOURCE = "genomics"
 NB_KEY = "06_benchmarks"
 SECTION_TITLE = "Benchmark, assay and embedding split tables"
-BENCHMARKS = [
-    "benchmark_coding_variant",
-    "benchmark_population_variant",
-    "benchmark_regulatory_variant",
-]
+BENCHMARKS = ["benchmark_variant"]
 ASSAY = "dms_assay"
 MUTANT = "dms_assay_mutant"
 TABLES = [*BENCHMARKS, ASSAY, MUTANT, "embedding_split"]
-CLINICAL = "variant_clinical_profile"
+CLINICAL = "variant_profile"
 SPLIT_KEYS = ("variant_key", "protein_id", "gene")
 
 # COMMAND ----------
@@ -139,7 +134,7 @@ for name in BENCHMARKS:
 
 # COMMAND ----------
 
-# DBTITLE 1,Overlap with the variants of variant_clinical_profile
+# DBTITLE 1,Overlap with the variants of variant_profile
 CLINICAL_FRAME = spark.table(f"{CATALOG}.{SCHEMA}.{CLINICAL}")
 CLINICAL_OVERLAP = {
     name: key_overlap(

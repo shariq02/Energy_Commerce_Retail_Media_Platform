@@ -12,10 +12,10 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 11 register tables of `energy_gold`: units, unit events,
-# MAGIC support registrations, plants, the capacity plan (year columns as rows), market
-# MAGIC actors and roles, grid locations, networks, connection points (with their
-# MAGIC parent attributes) and balancing areas.
+# MAGIC **Purpose:** the 11 register tables of `energy_gold`: units (with the columns of
+# MAGIC their support registrations), unit events, plants (with their unit), the
+# MAGIC capacity plan (year columns as rows), market actors and roles, grid locations,
+# MAGIC networks, connection points (with their parent attributes) and balancing areas.
 
 # COMMAND ----------
 
@@ -32,14 +32,21 @@ GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": gold_schema_for(SOURCE)}
 RECORD = ["source_record_id"]
 # Silver table -> Gold table and grain, copied as they are
+UNIT_GRAIN = ["unit_type", "unit_id"]
+PLANT_GRAIN = [
+    "mastr_unit_id",
+    "plant_name",
+    "commissioning_year",
+    "_source_id_ordinal",
+]
+# unit column -> prefix of the support registration columns joined to the unit
+# (each support id is unique in `support_registration`, and no row has both ids)
+SUPPORT_IDS = {
+    "renewable_energy_act_support_id": "renewable_support_",
+    "combined_heat_and_power_support_id": "chp_support_",
+}
 COPIES = {
-    "generation_unit": ("generation_unit", ["unit_type", "unit_id"]),
-    "support_registration": ("support_registration", RECORD),
     "storage_plant": ("storage_plant", RECORD),
-    "power_plant_register": (
-        "power_plant",
-        ["mastr_unit_id", "plant_name", "commissioning_year", "_source_id_ordinal"],
-    ),
     "market_actor": ("market_actor", RECORD),
     "grid_location": ("grid_location", RECORD),
     "grid_network": ("grid_network", RECORD),
@@ -54,6 +61,9 @@ silver = {
     name: from_silver(read_silver(name))
     for name in (
         *COPIES,
+        "generation_unit",
+        "support_registration",
+        "power_plant_register",
         "unit_authorisation",
         "unit_repowering",
         "register_change_event",
@@ -68,6 +78,32 @@ silver = {
 # DBTITLE 1,Transform -- the tables copied from Silver
 for name, (table, grain) in COPIES.items():
     TABLES[table] = (add_provenance(silver[name], SOURCE, RID), grain)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- generation_unit (with the support registrations of its units)
+units = silver["generation_unit"]
+for column, prefix in SUPPORT_IDS.items():
+    units = with_parent(units, silver["support_registration"], on=column, prefix=prefix)
+TABLES["generation_unit"] = (add_provenance(units, SOURCE, RID), UNIT_GRAIN)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- power_plant (with the unit that its MaStR unit id names)
+# A plant matches no unit or one unit; the 56 repeated unit ids match no plant.
+plant_units = silver["generation_unit"].join(
+    silver["power_plant_register"].select(F.col("mastr_unit_id").alias("unit_id")),
+    "unit_id",
+    "left_semi",
+)
+plant = with_parent(
+    silver["power_plant_register"],
+    plant_units,
+    on="mastr_unit_id",
+    parent_key="unit_id",
+    prefix="unit_",
+)
+TABLES["power_plant"] = (add_provenance(plant, SOURCE, RID), PLANT_GRAIN)
 
 # COMMAND ----------
 

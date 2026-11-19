@@ -16,8 +16,9 @@
 # MAGIC `%run` (it loads `_silver_common`, whose audit, watermark and inspection code
 # MAGIC it reuses). A notebook puts its tables in one dict, table -> (frame, grain);
 # MAGIC one cell each gates, writes, inspects and validates every table. Gold joins
-# MAGIC parent attributes, unions, pivots Silver attributes, splits tables and adds
-# MAGIC keys; scores, classes, counts and flags come from Silver. Definitions only.
+# MAGIC parent attributes, unions, pivots Silver attributes, builds typed tables
+# MAGIC (`typed_table`) and adds keys; scores, classes, counts and flags come from
+# MAGIC Silver. Definitions only.
 
 # COMMAND ----------
 
@@ -332,50 +333,63 @@ def master_rows(master: DataFrame, entity_type: str, key: str) -> DataFrame:
 
 # COMMAND ----------
 
-# DBTITLE 1,Genomics profile split (rule name -> Gold table)
-# Gene and variant attributes of these rules go to the named table; the other
-# rules of the entity type go to `gene_profile` or `variant_profile`.
-GENE_PROFILE_RULES = {
-    "gene_clinical_profile": (
-        "clinical_features",
-        "disease_features",
-        "variant_impact_features",
-        "gene_disease_category",
-    ),
-    "gene_expression_profile": ("expression_features", "tissue_specificity"),
-    "gene_drug_profile": (
-        "pharmacogene",
-        "pharmacogene_features",
-        "pharmacogene_gene_features",
-        "druggability",
-        "genetic_test_features",
-    ),
-    "gene_cancer_profile": ("cancer_features",),
-}
-VARIANT_PROFILE_RULES = {
-    "variant_frequency_profile": ("frequency_bands", "frequency_flags"),
-    "variant_clinical_profile": (
-        "clinical_features",
-        "disease_features",
-        "clinical_significance_label",
-        "review_quality",
-        "clinvar_snapshot_history",
-        "pharmacogene_features",
-        "drug_response_features",
-        "population_features",
-    ),
-    "variant_impact_profile": (
-        "variant_impact_features",
-        "conservation",
-        "protein_impact",
-    ),
-    "structural_variant_profile": ("structural_variant_features",),
-}
+# DBTITLE 1,Genomics profile rules and typed tables
+# Variant rules kept out of `variant_profile`: `structural_variant_profile` holds
+# their attributes (variant rows and variant x gene rows).
+STRUCTURAL_RULES = ("structural_variant_features",)
+# The widest typed table (owner, 2026-11): record kinds that would pass it stay apart.
+MAX_TYPED_COLUMNS = 140
+GENOMICS_SILVER_SCHEMAS = ("genomics_silver", "genomics_silver_reference")
 
 
-def mapped_rules(split: dict) -> tuple:
-    """Every rule that a split sends to a named table."""
-    return tuple(rule for rules in split.values() for rule in rules)
+def mixed_columns(dtypes: list) -> set:
+    """The column names that have more than one type in the (name, type) lists."""
+    seen: dict[str, set] = {}
+    for listing in dtypes:
+        for name, dtype in listing:
+            seen.setdefault(name, set()).add(dtype)
+    return {name for name, kinds in seen.items() if len(kinds) > 1}
+
+
+def typed_table(parts: dict) -> tuple:
+    """One table from `parts`, kind -> (frame, key columns). The columns are the
+    union of the parts; `record_kind` names the part and `record_key` is the hash
+    of the kind and the part's key columns. A name with two types becomes text in
+    every part. Returns (frame, grain); raises when the table is wider than
+    MAX_TYPED_COLUMNS (two Gold load columns are added after this call)."""
+    mixed = mixed_columns([frame.dtypes for frame, _ in parts.values()])
+    out = None
+    for kind, (frame, keys) in parts.items():
+        for name in mixed & set(frame.columns):
+            frame = frame.withColumn(name, F.col(name).cast("string"))
+        part = frame.withColumn("record_kind", F.lit(kind)).withColumn(
+            "record_key", sha_key("record_kind", *keys)
+        )
+        out = part if out is None else out.unionByName(part, allowMissingColumns=True)
+    first = ["record_kind", "record_key"]
+    out = out.select(*first, *[c for c in out.columns if c not in first])
+    if len(out.columns) + 2 > MAX_TYPED_COLUMNS:
+        raise RuntimeError(
+            f"typed table of {sorted(parts)} has {len(out.columns) + 2} columns, "
+            f"more than {MAX_TYPED_COLUMNS}"
+        )
+    return out, first
+
+
+def unfed_tables(feeds: dict, catalog: set) -> list:
+    """The Silver tables of `catalog` that no Gold table of `feeds` (Gold table ->
+    its Silver tables) is built from."""
+    fed = {name for names in feeds.values() for name in names}
+    return sorted(catalog - fed)
+
+
+def silver_tables(schemas) -> set:
+    """The table names of the given Silver schemas."""
+    return {
+        row["tableName"]
+        for schema in schemas
+        for row in spark.sql(f"SHOW TABLES IN {CATALOG}.{schema}").collect()
+    }
 
 
 def pick_column(df: DataFrame, attribute: str, rule: str | None = None) -> str:
@@ -522,13 +536,17 @@ def pivot_attributes(
 
 
 def join_profile(
-    base: DataFrame, pivot: DataFrame, key: str, how: str = "full"
+    base: DataFrame,
+    pivot: DataFrame,
+    key: str,
+    how: str = "full",
+    suffix: str = "__attribute",
 ) -> DataFrame:
-    """`base` joined with pivoted attributes; an attribute named like a base
-    column gets the suffix `__attribute`, so no column name repeats."""
+    """`base` joined with pivoted columns; a column named like a base column gets
+    `suffix`, so no column name repeats."""
     for column in pivot.columns:
         if column != key and column in base.columns:
-            pivot = pivot.withColumnRenamed(column, f"{column}__attribute")
+            pivot = pivot.withColumnRenamed(column, f"{column}{suffix}")
     return base.join(pivot, key, how)
 
 
@@ -559,33 +577,4 @@ def full_profile(
     )
     return add_provenance(
         join_profile(base, pivot, key), source, rid, ecosystem="genomics"
-    )
-
-
-def split_profile(
-    attributes: DataFrame,
-    entity_type: str,
-    labels: DataFrame,
-    *,
-    key: str,
-    rules,
-    component: str,
-    source: str,
-    rid: str,
-    columns: dict | None = None,
-) -> DataFrame:
-    """The attributes of `rules` of one entity type, one row per entity that
-    has one, with the `labels` columns of the entity (joined on `key`)."""
-    pivot = pivot_attributes(
-        attributes,
-        entity_type,
-        columns or attribute_columns(attributes, entity_type),
-        key=key,
-        rules=rules,
-        component=component,
-        source=source,
-        rid=rid,
-    )
-    return add_provenance(
-        join_profile(labels, pivot, key, "right"), source, rid, ecosystem="genomics"
     )

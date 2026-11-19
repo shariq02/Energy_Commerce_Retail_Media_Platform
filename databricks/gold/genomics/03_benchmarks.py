@@ -12,10 +12,10 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the three benchmark tables (sets with the same columns together),
-# MAGIC the DMS assays, mutants and embedding splits. Runs last of the genomics Gold
-# MAGIC notebooks: the last cell checks that every Silver attribute is a column of a
-# MAGIC Gold table.
+# MAGIC **Purpose:** `benchmark_variant` (every benchmark set, the columns that a set
+# MAGIC fills), the DMS assays, mutants and embedding splits. Runs last of the
+# MAGIC genomics Gold notebooks: its last two cells check that every Silver attribute
+# MAGIC is a column of a Gold table and that every Silver table feeds a Gold table.
 
 # COMMAND ----------
 
@@ -30,21 +30,11 @@ COMPONENT = "gold/genomics/03_benchmarks"
 RID = gold_run_id()
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": GENOMICS_GOLD_SCHEMA}
-BENCHMARK_TABLES = {
-    "benchmark_population_variant": ("gnomad_balanced", "maps"),
-    "benchmark_regulatory_variant": ("pathogenic_non_coding", "causal_eqtl"),
-    "benchmark_coding_variant": (
-        "pathogenic_coding",
-        "clinvar_vs_benign",
-        "proteingym_clinical",
-        "spectralbio",
-    ),
-}
 COPIES = ("dms_assay", "dms_assay_mutant", "embedding_split")
 # entity type of entity_derived_attribute -> the Gold tables that hold its columns
 ATTRIBUTE_TABLES = {
-    "gene": ("gene_profile", *GENE_PROFILE_RULES),
-    "variant": ("variant_profile", *VARIANT_PROFILE_RULES),
+    "gene": ("gene_profile",),
+    "variant": ("variant_profile", "structural_variant_profile"),
     "structural_variant_gene": ("structural_variant_profile",),
     "transcript": ("transcript_profile",),
     "protein": ("protein_profile",),
@@ -58,6 +48,65 @@ ATTRIBUTE_TABLES = {
     "somatic_site": ("somatic_site_profile",),
     "somatic_mutation": ("somatic_mutation_profile",),
 }
+# Gold table -> the Silver tables it is built from (gold/genomics/01, 02, 03)
+GOLD_FEEDS = {
+    "gene_profile": ("entity_master", "entity_derived_attribute"),
+    "variant_profile": (
+        "variant",
+        "entity_derived_attribute",
+        "locus_score",
+        "variant_population_frequency",
+    ),
+    "multi_value_attribute": ("entity_derived_attribute",),
+    "multi_value_score": ("locus_score",),
+    "transcript_profile": ("entity_master", "entity_derived_attribute"),
+    "protein_profile": ("entity_master", "entity_derived_attribute"),
+    "disease_profile": ("entity_master", "entity_derived_attribute"),
+    "drug_profile": ("entity_master", "entity_derived_attribute"),
+    "cell_line_profile": ("cell_line", "entity_derived_attribute"),
+    "genetic_test_profile": ("genetic_test", "entity_derived_attribute"),
+    "clinical_trial_profile": ("clinical_trial", "entity_derived_attribute"),
+    "epitope_profile": ("epitope", "entity_derived_attribute"),
+    "tumor_sample_profile": ("tumor_sample", "entity_derived_attribute"),
+    "somatic_mutation_profile": ("somatic_mutation", "entity_derived_attribute"),
+    "somatic_site_profile": ("somatic_mutation", "entity_derived_attribute"),
+    "gene_disease_profile": ("entity_relation", "entity_master"),
+    "structural_variant_profile": ("variant", "entity_derived_attribute"),
+    "clinvar_classification_change": ("variant_classification",),
+    "benchmark_variant": ("benchmark_variant",),
+    "dms_assay": ("dms_assay",),
+    "dms_assay_mutant": ("dms_assay_mutant",),
+    "embedding_split": ("embedding_split",),
+    "gene_measurement": (
+        "gene_dependency",
+        "gene_expression_median",
+        "perturbation_expression",
+        "perturbation_sample",
+        "gene_disease_score_year",
+        "regulatory_element_gene_link",
+    ),
+    "protein_variant_record": (
+        "protein_residue_score",
+        "protein_feature",
+        "protein_gene_link",
+        "variant_hgvs",
+        "variant_condition",
+        "variant_feature_overlap",
+    ),
+    "case_assay_record": (
+        "faers_case",
+        "faers_case_drug",
+        "faers_case_item",
+        "epitope_mhc_assay",
+    ),
+    "entity_identity_record": (
+        "entity_id_crosswalk",
+        "entity_name",
+        "entity_claim",
+        "entity_coordinate",
+        "ontology_relation",
+    ),
+}
 TABLES = {}
 
 # COMMAND ----------
@@ -68,13 +117,11 @@ copies = {table: from_silver(read_silver(table)) for table in COPIES}
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- the benchmark tables (only the columns their sets fill)
-for table, sets in BENCHMARK_TABLES.items():
-    rows = benchmark.filter(F.col("benchmark_set").isin(list(sets)))
-    TABLES[table] = (
-        add_provenance(drop_empty_columns(rows), SOURCE, RID, ecosystem="genomics"),
-        ["source_record_id"],
-    )
+# DBTITLE 1,Transform -- benchmark_variant (the columns that a set fills)
+TABLES["benchmark_variant"] = (
+    add_provenance(drop_empty_columns(benchmark), SOURCE, RID, ecosystem="genomics"),
+    ["source_record_id"],
+)
 
 # COMMAND ----------
 
@@ -104,14 +151,13 @@ inspect_tables(TABLES, findings="genomics", **COMMON)
 
 # DBTITLE 1,Validation -- tables have rows and hold every benchmark row
 validate_tables(TABLES, **COMMON)
-benchmark_rows = sum(
-    read_gold(t, source=SOURCE, schema=GENOMICS_GOLD_SCHEMA).count()
-    for t in BENCHMARK_TABLES
-)
+benchmark_rows = read_gold(
+    "benchmark_variant", source=SOURCE, schema=GENOMICS_GOLD_SCHEMA
+).count()
 check(
     COMPONENT,
     SOURCE,
-    "every_benchmark_row_in_one_gold_table",
+    "every_benchmark_row_in_the_gold_table",
     benchmark_rows == benchmark.count(),
     detail=f"gold={benchmark_rows}",
     metric_value=float(benchmark_rows),
@@ -143,5 +189,19 @@ check(
     not missing,
     detail=", ".join(missing[:50]),
     metric_value=float(len(missing)),
+    rid=RID,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Validation -- every Silver table feeds a Gold table
+unfed = unfed_tables(GOLD_FEEDS, silver_tables(GENOMICS_SILVER_SCHEMAS))
+check(
+    COMPONENT,
+    SOURCE,
+    "every_silver_table_feeds_a_gold_table",
+    not unfed,
+    detail=", ".join(unfed),
+    metric_value=float(len(unfed)),
     rid=RID,
 )
