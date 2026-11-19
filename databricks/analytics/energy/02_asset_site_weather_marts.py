@@ -157,10 +157,12 @@ TABLES["capacity_registry"] = (
 by_support = units.select(
     F.col("renewable_energy_act_support_id").alias("_support_id"),
     F.col("unit_id").alias("_support_unit"),
+    F.col("unit_type").alias("_support_unit_type"),
 ).filter(F.col("_support_id").isNotNull())
 by_authorisation = units.select(
     F.col("authorisation_id").alias("_authorisation_id"),
     F.col("unit_id").alias("_authorisation_unit"),
+    F.col("unit_type").alias("_authorisation_unit_type"),
 ).filter(F.col("_authorisation_id").isNotNull())
 lifecycle = (
     gold["unit_event"]
@@ -178,6 +180,9 @@ lifecycle = (
         "event_kind",
         "source_record_id",
         F.coalesce("unit_id", "_support_unit", "_authorisation_unit").alias("unit_id"),
+        F.coalesce("_support_unit_type", "_authorisation_unit_type").alias(
+            "event_unit_type"
+        ),
         F.to_date(
             F.coalesce(
                 "decision_date",
@@ -202,15 +207,30 @@ for column, kind in UNIT_DATES.items():
             F.lit(kind).alias("event_kind"),
             "source_record_id",
             "unit_id",
+            F.col("unit_type").alias("event_unit_type"),
             F.to_date(column).alias("event_date"),
         ),
         allowMissingColumns=True,
     )
+# a unit listed under two unit types (same unit_id) keeps one row per unit type
+unit_attributes = units.select(*UNIT_ATTRIBUTES)
 TABLES["fleet_lifecycle_event"] = (
     add_provenance(
-        lifecycle.join(units.select(*UNIT_ATTRIBUTES), "unit_id", "left"), SOURCE, RID
+        lifecycle.join(
+            unit_attributes,
+            (lifecycle["unit_id"] == unit_attributes["unit_id"])
+            & (
+                lifecycle["event_unit_type"].isNull()
+                | (lifecycle["event_unit_type"] == unit_attributes["unit_type"])
+            ),
+            "left",
+        )
+        .drop(unit_attributes["unit_id"])
+        .drop("event_unit_type"),
+        SOURCE,
+        RID,
     ),
-    ["event_kind", "source_record_id", "unit_id"],
+    ["event_kind", "source_record_id", "unit_id", "unit_type"],
 )
 
 # COMMAND ----------
