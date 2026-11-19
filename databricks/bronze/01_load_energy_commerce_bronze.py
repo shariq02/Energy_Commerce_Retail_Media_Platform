@@ -283,18 +283,16 @@ def prepare_frame(source: str, dataset: str, value, files: list[str]):
 # COMMAND ----------
 
 # DBTITLE 1,Select the sources and map each dataset to its files
-# A file counts when it sits in its source folder or loose in the landing root.
+# A file counts when its name matches a dataset, in any folder of the landing root.
 if RUN_SOURCES:
     unknown = [s for s in RUN_SOURCES if s not in SOURCES]
     if unknown:
         raise RuntimeError(f"not an energy or commerce source: {unknown}")
-folders, loose = set(landing_sources()), loose_files()
+paths = landing_files()
+seen = set(paths)
 
 plan: dict[str, dict[str, list[str]]] = {}
-seen: set[str] = set()
 for source in RUN_SOURCES or SOURCES:
-    paths = candidate_files(source, folders, loose)
-    seen.update(paths)
     ext = r"jsonl" if SOURCES[source].get("format") == "json" else CSV_EXTENSIONS
     plan[source] = {}
     for dataset, _table, _value in SOURCES[source]["datasets"]:
@@ -380,7 +378,7 @@ for result in load_results:
 for source in selected:
     results = [r for r in load_results if r["source"] == source]
     if all(r["validated"] for r in results):
-        remove_source(source, [p for r in results for p in r["paths"]])
+        remove_loaded([p for r in results for p in r["paths"]])
         print(f"REMOVED    files of {source}")
     else:
         print(f"PRESERVED  files of {source} (a table did not pass)")

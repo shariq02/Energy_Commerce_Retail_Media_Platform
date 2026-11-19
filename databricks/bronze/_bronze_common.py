@@ -43,17 +43,6 @@ def landing_root() -> str:
     return f"/Volumes/{CATALOG}/{LANDING_SCHEMA}/{LANDING_VOLUME}"
 
 
-def landing_path(source: str) -> str:
-    return f"{landing_root()}/{source}"
-
-
-def landing_sources() -> list[str]:
-    """Names of the source folders that hold files now."""
-    return sorted(
-        item.name.rstrip("/") for item in dbutils.fs.ls(landing_root()) if item.isDir()
-    )
-
-
 def list_files(path: str) -> list[str]:
     """Every file under a folder, sub-folders included."""
     found: list[str] = []
@@ -70,20 +59,22 @@ def remove_files(paths: list[str]) -> None:
         dbutils.fs.rm(path)
 
 
-def loose_files() -> list[str]:
-    """Files put directly in the landing root, outside any source folder."""
-    return [item.path for item in dbutils.fs.ls(landing_root()) if not item.isDir()]
-
-
-def candidate_files(source: str, folders: set[str], loose: list[str]) -> list[str]:
-    """The files of the source folder (if it exists) and the loose files."""
-    inside = list_files(landing_path(source)) if source in folders else []
-    return inside + loose
+def landing_files() -> list[str]:
+    """Every file under the landing root, in any folder. A file name that
+    appears twice stops the run (the copy would load twice)."""
+    paths = list_files(landing_root())
+    names: dict[str, list[str]] = {}
+    for path in paths:
+        names.setdefault(path.rsplit("/", 1)[-1], []).append(path)
+    repeated = {name: found for name, found in names.items() if len(found) > 1}
+    if repeated:
+        raise RuntimeError(f"FAIL  a file name is in several folders: {repeated}")
+    return paths
 
 
 def claim_files(plan: dict[str, dict[str, list[str]]], seen: set[str]) -> None:
-    """Fail when one file matches two sources; report the seen files (in a source
-    folder or loose) that match no dataset of this notebook."""
+    """Fail when one file matches two sources; report how many landing files
+    match no dataset of this notebook."""
     owners: dict[str, list[str]] = {}
     for source, datasets in plan.items():
         for path in {p for files in datasets.values() for p in files}:
@@ -93,15 +84,25 @@ def claim_files(plan: dict[str, dict[str, list[str]]], seen: set[str]) -> None:
         raise RuntimeError(f"FAIL  a file matches several sources: {shared}")
     unclaimed = sorted(path for path in seen if path not in owners)
     if unclaimed:
-        print(f"WARN  files this notebook does not load: {unclaimed}")
+        print(f"WARN  {len(unclaimed)} landing file(s) this notebook does not load")
 
 
-def remove_source(source: str, paths: list[str]) -> None:
-    """Remove the loaded files, then the source folder once it holds no file."""
+def remove_empty_folders(path: str | None = None) -> None:
+    """Remove every folder under the landing root that holds no file."""
+    is_root = path is None
+    path = path or landing_root()
+    for item in dbutils.fs.ls(path):
+        if item.isDir():
+            remove_empty_folders(item.path)
+    if not is_root and not dbutils.fs.ls(path):
+        dbutils.fs.rm(path, recurse=True)
+        print(f"REMOVED    empty folder {path}")
+
+
+def remove_loaded(paths: list[str]) -> None:
+    """Remove the loaded files, then the folders left empty."""
     remove_files(paths)
-    if source in landing_sources() and not list_files(landing_path(source)):
-        dbutils.fs.rm(landing_path(source), recurse=True)
-        print(f"REMOVED    empty folder {source}/")
+    remove_empty_folders()
 
 
 # COMMAND ----------

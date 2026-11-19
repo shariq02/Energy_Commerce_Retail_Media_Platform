@@ -168,13 +168,11 @@ def clean_columns(columns: list[str]) -> list[str]:
 # COMMAND ----------
 
 # DBTITLE 1,Map each dataset to its uploaded files
-# A file counts when it sits in its source folder or loose in the landing root.
-folders, loose = set(landing_sources()), loose_files()
+# A file counts when its name matches a dataset, in any folder of the landing root.
+paths = landing_files()
+seen = set(paths)
 plan: dict[str, dict[str, list[str]]] = {}
-seen: set[str] = set()
 for source in RUN_SOURCES or SOURCES:
-    paths = candidate_files(source, folders, loose)
-    seen.update(paths)
     found: dict[str, list[str]] = {}
     for dataset in SOURCES[source]:
         pattern = file_pattern(source, dataset)
@@ -302,7 +300,7 @@ for result in load_results:
 for source in plan:
     results = [r for r in load_results if r["source"] == source]
     if results and all(r["validated"] for r in results):
-        remove_source(source, [p for r in results for p in r["paths"]])
+        remove_loaded([p for r in results for p in r["paths"]])
         print(f"REMOVED    files of {source}")
     else:
         print(f"PRESERVED  files of {source}")
