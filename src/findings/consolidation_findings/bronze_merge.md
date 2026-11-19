@@ -1,6 +1,6 @@
 # Bronze table merge
 
-**Run:** 2026-11-18 14:58 UTC
+**Run:** 2026-11-19 18:00 UTC
 
 | merged table | value | part table | part rows | merged rows | check | note |
 |---|---|---|---|---|---|---|
@@ -13,3 +13,6 @@
 | mastr_anlagen_eeg | storage | mastr_anlagen_eeg_speicher | 2,717,856 | 2,717,856 | PASS |  |
 | mastr_anlagen_speicher | electricity | mastr_anlagen_stromspeicher | 2,774,391 | 2,774,391 | PASS |  |
 | mastr_anlagen_speicher | gas | mastr_anlagen_gasspeicher | 55 | 55 | PASS |  |
+| opentargets_association_direct | datasource | opentargets_association_by_datasource_direct | 7,522,466 | 7,522,466 | PASS |  |
+| opentargets_association_direct | overall | opentargets_association_overall_direct | 7,225,847 | 7,225,847 | PASS |  |
+| genome_annotation | gencode | gencode_annotation | 6,888,656 | 6,888,656 | PASS |  |
