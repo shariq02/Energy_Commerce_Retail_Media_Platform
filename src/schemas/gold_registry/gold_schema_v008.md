@@ -1,0 +1,5700 @@
+# Gold schema snapshot v008
+
+<!-- gold-schema-hash: 79a306edbb6ff165ae7149462433b9bb843f13a3b159ca083438db1d8a945fca -->
+
+**Captured:** 2026-11-19T22:14:57Z
+**Catalog / schemas:** `energy_commerce_retail_media.{commerce_gold, energy_gold, genomics_gold, shared_conformed}`
+**Tables:** 84  |  **Columns:** 4859
+
+## Change summary
+
+Compared with v007.
+
+**Tables added:** commerce_gold.commerce_event, energy_gold.energy_component, energy_gold.weather_observation, genomics_gold.benchmark_variant, genomics_gold.case_assay_record, genomics_gold.entity_identity_record, genomics_gold.gene_measurement, genomics_gold.protein_variant_record, shared_conformed.metric_definition
+**Tables removed:** (none)
+
+**commerce_gold.commerce_session**
+- column added: `user_add_payment_info_event_count` (bigint, nullable)
+- column added: `user_add_shipping_info_event_count` (bigint, nullable)
+- column added: `user_add_to_cart_event_count` (bigint, nullable)
+- column added: `user_begin_checkout_event_count` (bigint, nullable)
+- column added: `user_cart_event_count` (bigint, nullable)
+- column added: `user_currency_unknown` (boolean, nullable)
+- column added: `user_distinct_product_count` (bigint, nullable)
+- column added: `user_event_count` (bigint, nullable)
+- column added: `user_first_event_utc` (timestamp, nullable)
+- column added: `user_geo_country` (string, nullable)
+- column added: `user_last_event_utc` (timestamp, nullable)
+- column added: `user_measurement_basis` (string, nullable)
+- column added: `user_purchase_event_count` (bigint, nullable)
+- column added: `user_revenue` (double, nullable)
+- column added: `user_select_item_event_count` (bigint, nullable)
+- column added: `user_select_promotion_event_count` (bigint, nullable)
+- column added: `user_session_count` (bigint, nullable)
+- column added: `user_source_user_id` (string, nullable)
+- column added: `user_transaction_count` (bigint, nullable)
+- column added: `user_view_event_count` (bigint, nullable)
+- column added: `user_view_item_event_count` (bigint, nullable)
+- column added: `user_view_item_list_event_count` (bigint, nullable)
+- column added: `user_view_promotion_event_count` (bigint, nullable)
+- column added: `user_view_search_results_event_count` (bigint, nullable)
+- 3 column(s) changed ordinal position
+
+**energy_gold.generation_unit**
+- column added: `chp_support__unmatched_code_columns` (string, nullable)
+- column added: `chp_support_assigned_bid_quantity` (string, nullable)
+- column added: `chp_support_auction_award_flag` (string, nullable)
+- column added: `chp_support_auction_award_number` (string, nullable)
+- column added: `chp_support_biogas_capacity_increase_date` (timestamp, nullable)
+- column added: `chp_support_biogas_capacity_increase_extent` (string, nullable)
+- column added: `chp_support_biogas_capacity_increased` (string, nullable)
+- column added: `chp_support_biogas_flexibility_premium_claim_date` (timestamp, nullable)
+- column added: `chp_support_biogas_flexibility_premium_claimed` (string, nullable)
+- column added: `chp_support_biogas_gas_production_capacity` (string, nullable)
+- column added: `chp_support_biogas_gas_production_capacity_not_available` (boolean, nullable)
+- column added: `chp_support_biogas_maximum_rated_capacity` (string, nullable)
+- column added: `chp_support_biomethane_first_use` (timestamp, nullable)
+- column added: `chp_support_biomethane_first_use_not_available` (boolean, nullable)
+- column added: `chp_support_commissioning_date` (timestamp, nullable)
+- column added: `chp_support_electrical_combined_heat_and_power_capacity_kw` (double, nullable)
+- column added: `chp_support_exclusive_use_of_biomass` (string, nullable)
+- column added: `chp_support_installation_register_identifier` (string, nullable)
+- column added: `chp_support_installation_register_identifier_not_available` (boolean, nullable)
+- column added: `chp_support_installed_capacity_kw` (double, nullable)
+- column added: `chp_support_last_updated_at` (timestamp, nullable)
+- column added: `chp_support_linked_unit_ids` (string, nullable)
+- column added: `chp_support_photovoltaic_reporting_portal_registration_number` (string, nullable)
+- column added: `chp_support_photovoltaic_reporting_portal_registration_number_not_available` (boolean, nullable)
+- column added: `chp_support_pilot_plant_flag` (string, nullable)
+- column added: `chp_support_prototype_plant_flag` (string, nullable)
+- column added: `chp_support_reference_yield_to_actual_yield_ratio_10_years` (string, nullable)
+- column added: `chp_support_reference_yield_to_actual_yield_ratio_10_years_not_available` (boolean, nullable)
+- column added: `chp_support_reference_yield_to_actual_yield_ratio_15_years` (string, nullable)
+- column added: `chp_support_reference_yield_to_actual_yield_ratio_15_years_not_available` (boolean, nullable)
+- column added: `chp_support_reference_yield_to_actual_yield_ratio_5_years` (string, nullable)
+- column added: `chp_support_reference_yield_to_actual_yield_ratio_5_years_not_available` (boolean, nullable)
+- column added: `chp_support_registration_date` (timestamp, nullable)
+- column added: `chp_support_renewable_energy_act_commissioning_date` (timestamp, nullable)
+- column added: `chp_support_renewable_energy_act_installation_key` (string, nullable)
+- column added: `chp_support_renewable_energy_act_payment_claimed` (string, nullable)
+- column added: `chp_support_renewable_energy_act_support_id` (string, nullable)
+- column added: `chp_support_retrofit_ids` (string, nullable)
+- column added: `chp_support_support_registration_id` (string, nullable)
+- column added: `chp_support_support_scheme` (string, nullable)
+- column added: `chp_support_support_status` (string, nullable)
+- column added: `chp_support_support_status_code` (string, nullable)
+- column added: `chp_support_support_status_label_de` (string, nullable)
+- column added: `chp_support_tenant_electricity_assigned` (string, nullable)
+- column added: `chp_support_tenant_electricity_first_award_assignment` (string, nullable)
+- column added: `chp_support_tenant_electricity_report_date` (timestamp, nullable)
+- column added: `chp_support_unit_type` (string, nullable)
+- column added: `chp_support_useful_thermal_output_kw` (double, nullable)
+- column added: `chp_support_yield_estimate_to_reference_yield_ratio` (string, nullable)
+- column added: `chp_support_yield_estimate_to_reference_yield_ratio_not_available` (boolean, nullable)
+- column added: `renewable_support__unmatched_code_columns` (string, nullable)
+- column added: `renewable_support_assigned_bid_quantity` (string, nullable)
+- column added: `renewable_support_auction_award_flag` (string, nullable)
+- column added: `renewable_support_auction_award_number` (string, nullable)
+- column added: `renewable_support_biogas_capacity_increase_date` (timestamp, nullable)
+- column added: `renewable_support_biogas_capacity_increase_extent` (string, nullable)
+- column added: `renewable_support_biogas_capacity_increased` (string, nullable)
+- column added: `renewable_support_biogas_flexibility_premium_claim_date` (timestamp, nullable)
+- column added: `renewable_support_biogas_flexibility_premium_claimed` (string, nullable)
+- column added: `renewable_support_biogas_gas_production_capacity` (string, nullable)
+- column added: `renewable_support_biogas_gas_production_capacity_not_available` (boolean, nullable)
+- column added: `renewable_support_biogas_maximum_rated_capacity` (string, nullable)
+- column added: `renewable_support_biomethane_first_use` (timestamp, nullable)
+- column added: `renewable_support_biomethane_first_use_not_available` (boolean, nullable)
+- column added: `renewable_support_combined_heat_and_power_support_id` (string, nullable)
+- column added: `renewable_support_commissioning_date` (timestamp, nullable)
+- column added: `renewable_support_electrical_combined_heat_and_power_capacity_kw` (double, nullable)
+- column added: `renewable_support_exclusive_use_of_biomass` (string, nullable)
+- column added: `renewable_support_installation_register_identifier` (string, nullable)
+- column added: `renewable_support_installation_register_identifier_not_available` (boolean, nullable)
+- column added: `renewable_support_installed_capacity_kw` (double, nullable)
+- column added: `renewable_support_last_updated_at` (timestamp, nullable)
+- column added: `renewable_support_linked_unit_ids` (string, nullable)
+- column added: `renewable_support_photovoltaic_reporting_portal_registration_number` (string, nullable)
+- column added: `renewable_support_photovoltaic_reporting_portal_registration_number_not_available` (boolean, nullable)
+- column added: `renewable_support_pilot_plant_flag` (string, nullable)
+- column added: `renewable_support_prototype_plant_flag` (string, nullable)
+- column added: `renewable_support_reference_yield_to_actual_yield_ratio_10_years` (string, nullable)
+- column added: `renewable_support_reference_yield_to_actual_yield_ratio_10_years_not_available` (boolean, nullable)
+- column added: `renewable_support_reference_yield_to_actual_yield_ratio_15_years` (string, nullable)
+- column added: `renewable_support_reference_yield_to_actual_yield_ratio_15_years_not_available` (boolean, nullable)
+- column added: `renewable_support_reference_yield_to_actual_yield_ratio_5_years` (string, nullable)
+- column added: `renewable_support_reference_yield_to_actual_yield_ratio_5_years_not_available` (boolean, nullable)
+- column added: `renewable_support_registration_date` (timestamp, nullable)
+- column added: `renewable_support_renewable_energy_act_commissioning_date` (timestamp, nullable)
+- column added: `renewable_support_renewable_energy_act_installation_key` (string, nullable)
+- column added: `renewable_support_renewable_energy_act_payment_claimed` (string, nullable)
+- column added: `renewable_support_retrofit_ids` (string, nullable)
+- column added: `renewable_support_support_registration_id` (string, nullable)
+- column added: `renewable_support_support_scheme` (string, nullable)
+- column added: `renewable_support_support_status` (string, nullable)
+- column added: `renewable_support_support_status_code` (string, nullable)
+- column added: `renewable_support_support_status_label_de` (string, nullable)
+- column added: `renewable_support_tenant_electricity_assigned` (string, nullable)
+- column added: `renewable_support_tenant_electricity_first_award_assignment` (string, nullable)
+- column added: `renewable_support_tenant_electricity_report_date` (timestamp, nullable)
+- column added: `renewable_support_unit_type` (string, nullable)
+- column added: `renewable_support_useful_thermal_output_kw` (double, nullable)
+- column added: `renewable_support_yield_estimate_to_reference_yield_ratio` (string, nullable)
+- column added: `renewable_support_yield_estimate_to_reference_yield_ratio_not_available` (boolean, nullable)
+- 3 column(s) changed ordinal position
+
+**energy_gold.power_plant**
+- column added: `unit__unmatched_code_columns` (string, nullable)
+- column added: `unit_ac_dc_coupling` (string, nullable)
+- column added: `unit_additional_fuels` (string, nullable)
+- column added: `unit_additional_land_and_current_land_use_features` (string, nullable)
+- column added: `unit_additional_main_fuel` (string, nullable)
+- column added: `unit_additional_main_fuel_code` (string, nullable)
+- column added: `unit_additional_main_fuel_label_de` (string, nullable)
+- column added: `unit_address_supplement` (string, nullable)
+- column added: `unit_assigned_inverter_active_power_kw` (double, nullable)
+- column added: `unit_assigned_to_capacity_reserve` (string, nullable)
+- column added: `unit_assigned_to_grid_reserve` (string, nullable)
+- column added: `unit_authorisation_count` (bigint, nullable)
+- column added: `unit_authorisation_id` (string, nullable)
+- column added: `unit_average_calorific_value` (string, nullable)
+- column added: `unit_baltic_sea_area_development_plan_zone` (string, nullable)
+- column added: `unit_battery_technology` (string, nullable)
+- column added: `unit_biomass_type` (string, nullable)
+- column added: `unit_cadastral_district` (string, nullable)
+- column added: `unit_capacity_gross_kw` (double, nullable)
+- column added: `unit_capacity_net_germany_kw` (double, nullable)
+- column added: `unit_capacity_net_kw` (double, nullable)
+- column added: `unit_capacity_reserve_date` (timestamp, nullable)
+- column added: `unit_carrier_key` (string, nullable)
+- column added: `unit_citizen_energy` (string, nullable)
+- column added: `unit_clear_height_m` (double, nullable)
+- column added: `unit_combined_heat_and_power_support_id` (string, nullable)
+- column added: `unit_combined_operation_net_rated_capacity_increase` (string, nullable)
+- column added: `unit_combined_operation_unit_ids` (string, nullable)
+- column added: `unit_commissioning_date` (timestamp, nullable)
+- column added: `unit_commissioning_date_current_site` (timestamp, nullable)
+- column added: `unit_connected_to_extra_high_or_high_voltage` (string, nullable)
+- column added: `unit_construction_start_date` (timestamp, nullable)
+- column added: `unit_curtailment_condition_animal_protection` (string, nullable)
+- column added: `unit_curtailment_condition_ice_throw` (string, nullable)
+- column added: `unit_curtailment_condition_noise_protection_day` (string, nullable)
+- column added: `unit_curtailment_condition_noise_protection_night` (string, nullable)
+- column added: `unit_curtailment_condition_other` (string, nullable)
+- column added: `unit_curtailment_condition_power_limit` (string, nullable)
+- column added: `unit_curtailment_condition_shadow_flicker` (string, nullable)
+- column added: `unit_deployment_location` (string, nullable)
+- column added: `unit_deployment_location_code` (string, nullable)
+- column added: `unit_deployment_location_label_de` (string, nullable)
+- column added: `unit_distance_to_coast_km` (double, nullable)
+- column added: `unit_district` (string, nullable)
+- column added: `unit_electricity_generation_reduction` (string, nullable)
+- column added: `unit_emergency_generator` (string, nullable)
+- column added: `unit_exclusive_use_in_combined_operation` (string, nullable)
+- column added: `unit_federal_state` (string, nullable)
+- column added: `unit_federal_state_code` (string, nullable)
+- column added: `unit_federal_state_label_de` (string, nullable)
+- column added: `unit_feed_in_type` (string, nullable)
+- column added: `unit_feed_in_type_code` (string, nullable)
+- column added: `unit_feed_in_type_label_de` (string, nullable)
+- column added: `unit_final_decommissioning_date` (timestamp, nullable)
+- column added: `unit_gas_production_capacity` (string, nullable)
+- column added: `unit_gas_storage_type` (string, nullable)
+- column added: `unit_generation_technology` (string, nullable)
+- column added: `unit_generation_technology_code` (string, nullable)
+- column added: `unit_generation_technology_label_de` (string, nullable)
+- column added: `unit_grid_operator_check_date` (timestamp, nullable)
+- column added: `unit_grid_operator_check_status` (string, nullable)
+- column added: `unit_grid_reserve_date` (timestamp, nullable)
+- column added: `unit_house_number` (string, nullable)
+- column added: `unit_house_number_not_available` (boolean, nullable)
+- column added: `unit_house_number_not_found` (string, nullable)
+- column added: `unit_hub_height_m` (double, nullable)
+- column added: `unit_hydro_inflow_type` (string, nullable)
+- column added: `unit_hydro_plant_type` (string, nullable)
+- column added: `unit_hydro_plant_type_code` (string, nullable)
+- column added: `unit_hydro_plant_type_label_de` (string, nullable)
+- column added: `unit_jointly_registered_solar_unit_id` (string, nullable)
+- column added: `unit_land_area_used` (string, nullable)
+- column added: `unit_land_area_used_hectare` (string, nullable)
+- column added: `unit_land_parcel_numbers` (string, nullable)
+- column added: `unit_last_updated_at` (timestamp, nullable)
+- column added: `unit_latitude` (double, nullable)
+- column added: `unit_lifecycle_state` (string, nullable)
+- column added: `unit_linked_unit_ids` (string, nullable)
+- column added: `unit_locality` (string, nullable)
+- column added: `unit_location_id` (string, nullable)
+- column added: `unit_longitude` (double, nullable)
+- column added: `unit_main_fuel` (string, nullable)
+- column added: `unit_main_fuel_code` (string, nullable)
+- column added: `unit_main_fuel_label_de` (string, nullable)
+- column added: `unit_main_orientation` (string, nullable)
+- column added: `unit_main_orientation_tilt_angle` (string, nullable)
+- column added: `unit_manufacturer` (string, nullable)
+- column added: `unit_maximum_gas_supply_capacity` (string, nullable)
+- column added: `unit_maximum_injection_capacity` (string, nullable)
+- column added: `unit_maximum_usable_working_gas_volume` (string, nullable)
+- column added: `unit_maximum_withdrawal_capacity` (string, nullable)
+- column added: `unit_migration_absence_flag` (string, nullable)
+- column added: `unit_model_designation` (string, nullable)
+- column added: `unit_municipality` (string, nullable)
+- column added: `unit_night_marking` (string, nullable)
+- column added: `unit_north_sea_area_development_plan_zone` (string, nullable)
+- column added: `unit_number_of_modules` (string, nullable)
+- column added: `unit_official_municipality_key` (string, nullable)
+- column added: `unit_official_municipality_key_level` (string, nullable)
+- column added: `unit_official_municipality_key_method` (string, nullable)
+- column added: `unit_offshore_sea_area` (string, nullable)
+- column added: `unit_offshore_sea_area_code` (string, nullable)
+- column added: `unit_offshore_sea_area_label_de` (string, nullable)
+- column added: `unit_operating_status` (string, nullable)
+- column added: `unit_operating_status_code` (string, nullable)
+- column added: `unit_operating_status_label_de` (string, nullable)
+- column added: `unit_operationally_responsible_party` (string, nullable)
+- column added: `unit_operator_change_date` (timestamp, nullable)
+- column added: `unit_operator_change_registration_date` (timestamp, nullable)
+- column added: `unit_operator_id` (string, nullable)
+- column added: `unit_part_of_cross_border_plant` (string, nullable)
+- column added: `unit_planned_commissioning_date` (timestamp, nullable)
+- column added: `unit_plant_block_name` (string, nullable)
+- column added: `unit_plant_name` (string, nullable)
+- column added: `unit_postcode` (string, nullable)
+- column added: `unit_power_limitation` (string, nullable)
+- column added: `unit_power_plant_number` (string, nullable)
+- column added: `unit_power_plant_number_not_available` (boolean, nullable)
+- column added: `unit_predominant_land_use_before_construction` (string, nullable)
+- column added: `unit_previous_land_use_category` (string, nullable)
+- column added: `unit_previous_operator_id` (string, nullable)
+- column added: `unit_provisional_shutdown_start_date` (timestamp, nullable)
+- column added: `unit_pumped_storage_technology` (string, nullable)
+- column added: `unit_pumping_continuously_controllable` (string, nullable)
+- column added: `unit_pumping_power_consumption` (string, nullable)
+- column added: `unit_recommissioning_date` (timestamp, nullable)
+- column added: `unit_registration_date` (timestamp, nullable)
+- column added: `unit_remote_control_by_direct_marketer` (boolean, nullable)
+- column added: `unit_remote_control_by_grid_operator` (boolean, nullable)
+- column added: `unit_renewable_energy_act_plant_type` (string, nullable)
+- column added: `unit_renewable_energy_act_support_id` (string, nullable)
+- column added: `unit_repowering_count` (bigint, nullable)
+- column added: `unit_resource_energy_identification_code` (string, nullable)
+- column added: `unit_resource_energy_identification_code_display_name` (string, nullable)
+- column added: `unit_resource_energy_identification_code_not_applicable` (string, nullable)
+- column added: `unit_resource_energy_identification_code_not_available` (boolean, nullable)
+- column added: `unit_rotor_blade_deicing_system` (string, nullable)
+- column added: `unit_rotor_diameter_m` (double, nullable)
+- column added: `unit_secondary_orientation` (string, nullable)
+- column added: `unit_secondary_orientation_tilt_angle` (string, nullable)
+- column added: `unit_security_standby_start_date` (timestamp, nullable)
+- column added: `unit_solar_park_name` (string, nullable)
+- column added: `unit_solar_plant_type` (string, nullable)
+- column added: `unit_source_municipality_key` (string, nullable)
+- column added: `unit_storage_at_same_location` (string, nullable)
+- column added: `unit_storage_plant_id` (string, nullable)
+- column added: `unit_street` (string, nullable)
+- column added: `unit_street_not_found` (string, nullable)
+- column added: `unit_support_registration_count` (int, nullable)
+- column added: `unit_system_status` (string, nullable)
+- column added: `unit_system_status_code` (string, nullable)
+- column added: `unit_system_status_label_de` (string, nullable)
+- column added: `unit_uniform_orientation_and_tilt_angle` (string, nullable)
+- column added: `unit_unit_is_in_combined_operation` (string, nullable)
+- column added: `unit_unit_name` (string, nullable)
+- column added: `unit_unit_serves_electricity_generation` (string, nullable)
+- column added: `unit_unit_type` (string, nullable)
+- column added: `unit_use_area` (string, nullable)
+- column added: `unit_water_depth_m` (double, nullable)
+- column added: `unit_wind_farm_name` (string, nullable)
+- column added: `unit_wind_onshore_or_offshore` (string, nullable)
+- column added: `unit_wind_onshore_or_offshore_code` (string, nullable)
+- column added: `unit_wind_onshore_or_offshore_label_de` (string, nullable)
+- 3 column(s) changed ordinal position
+
+**genomics_gold.gene_profile**
+- column added: `annotation_priority_level` (string, nullable)
+- column added: `average_pathogenicity_score` (double, nullable)
+- column added: `cancer_expression_relevance` (string, nullable)
+- column added: `cancer_expression_score` (double, nullable)
+- column added: `cancer_features__is_cancer_gene` (boolean, nullable)
+- column added: `cancer_mutation_burden` (string, nullable)
+- column added: `cancer_mutation_burden_score` (double, nullable)
+- column added: `cancer_priority_score` (double, nullable)
+- column added: `carrier_screening_relevant` (boolean, nullable)
+- column added: `clinical_actionability_tier` (string, nullable)
+- column added: `clinical_features__average_expression_transcripts_per_million` (double, nullable)
+- column added: `clinical_features__is_cancer_gene` (boolean, nullable)
+- column added: `clinical_features__is_highly_expressed` (boolean, nullable)
+- column added: `clinical_features__max_expression_transcripts_per_million` (double, nullable)
+- column added: `clinical_relevance_score` (double, nullable)
+- column added: `clinical_test_utility_score` (double, nullable)
+- column added: `complete_test_count` (double, nullable)
+- column added: `disease_association_strength` (double, nullable)
+- column added: `disease_category_count` (double, nullable)
+- column added: `disease_count_category` (string, nullable)
+- column added: `disease_expression_score` (double, nullable)
+- column added: `disease_impact_category` (string, nullable)
+- column added: `disease_relationships` (double, nullable)
+- column added: `disease_specific_expression_pattern` (string, nullable)
+- column added: `disease_test_correlation` (string, nullable)
+- column added: `domain_expression_correlation` (string, nullable)
+- column added: `drug_interaction_score` (double, nullable)
+- column added: `drug_metabolism_context` (string, nullable)
+- column added: `drug_metabolism_tissue_expression` (string, nullable)
+- column added: `drug_relationships` (double, nullable)
+- column added: `drug_target_category` (string, nullable)
+- column added: `druggability_score` (double, nullable)
+- column added: `enhanced_druggability_score` (double, nullable)
+- column added: `entity_type_count` (double, nullable)
+- column added: `evidence_count` (double, nullable)
+- column added: `expression_breadth` (string, nullable)
+- column added: `expression_breadth_category` (string, nullable)
+- column added: `expression_context` (string, nullable)
+- column added: `expression_features__average_expression_transcripts_per_million` (double, nullable)
+- column added: `expression_features__is_highly_expressed` (boolean, nullable)
+- column added: `expression_features__max_expression_transcripts_per_million` (double, nullable)
+- column added: `expression_function_correlation` (string, nullable)
+- column added: `expression_level_category` (string, nullable)
+- column added: `expression_priority` (string, nullable)
+- column added: `expression_significance_score` (double, nullable)
+- column added: `frequent_test_count` (double, nullable)
+- column added: `functional_expression_score` (double, nullable)
+- column added: `functional_impact_score` (double, nullable)
+- column added: `gene_annotation_score` (double, nullable)
+- column added: `gene_average_druggability` (double, nullable)
+- column added: `gene_average_impact_score` (double, nullable)
+- column added: `gene_average_review_quality` (double, nullable)
+- column added: `gene_benign_count` (double, nullable)
+- column added: `gene_benign_ratio` (double, nullable)
+- column added: `gene_cancer_role` (string, nullable)
+- column added: `gene_clinical_utility_score` (double, nullable)
+- column added: `gene_description_length` (double, nullable)
+- column added: `gene_description_mentions_drug` (boolean, nullable)
+- column added: `gene_disease_diversity` (double, nullable)
+- column added: `gene_domain_affecting_count` (double, nullable)
+- column added: `gene_domain_count` (double, nullable)
+- column added: `gene_drug_interaction_variants` (double, nullable)
+- column added: `gene_frameshift_count` (double, nullable)
+- column added: `gene_has_ensembl` (boolean, nullable)
+- column added: `gene_has_high_loss_of_function_burden` (boolean, nullable)
+- column added: `gene_has_multiple_drug_variants` (boolean, nullable)
+- column added: `gene_has_omim` (boolean, nullable)
+- column added: `gene_has_quality_annotations` (boolean, nullable)
+- column added: `gene_high_impact_count` (double, nullable)
+- column added: `gene_high_quality_count` (double, nullable)
+- column added: `gene_impact_burden` (string, nullable)
+- column added: `gene_is_benign_enriched` (boolean, nullable)
+- column added: `gene_is_pathogenic_enriched` (boolean, nullable)
+- column added: `gene_is_validated` (boolean, nullable)
+- column added: `gene_is_vus_enriched` (boolean, nullable)
+- column added: `gene_is_well_characterized` (boolean, nullable)
+- column added: `gene_loss_of_function_count` (double, nullable)
+- column added: `gene_loss_of_function_tolerance` (string, nullable)
+- column added: `gene_loss_of_function_variant_ratio` (double, nullable)
+- column added: `gene_max_impact_score` (double, nullable)
+- column added: `gene_metabolizer_variants` (double, nullable)
+- column added: `gene_missense_count` (double, nullable)
+- column added: `gene_mondo_variants` (double, nullable)
+- column added: `gene_mutation_burden` (string, nullable)
+- column added: `gene_nonsense_count` (double, nullable)
+- column added: `gene_omim_variants` (double, nullable)
+- column added: `gene_pathogenic_count` (double, nullable)
+- column added: `gene_pathogenic_ratio` (double, nullable)
+- column added: `gene_pharmacogene_burden` (string, nullable)
+- column added: `gene_pharmacogene_pathogenic` (double, nullable)
+- column added: `gene_pharmacogene_priority` (string, nullable)
+- column added: `gene_pharmacogene_variants` (double, nullable)
+- column added: `gene_priority_tier` (string, nullable)
+- column added: `gene_splice_count` (double, nullable)
+- column added: `gene_splice_variant_count` (double, nullable)
+- column added: `gene_total_variants` (double, nullable)
+- column added: `gene_transporter_variants` (double, nullable)
+- column added: `gene_variant_profile` (string, nullable)
+- column added: `gene_very_high_impact_count` (double, nullable)
+- column added: `gene_vus_count` (double, nullable)
+- column added: `gene_vus_ratio` (double, nullable)
+- column added: `gene_well_annotated_variants` (double, nullable)
+- column added: `genetic_test_features__clinical_utility_score` (double, nullable)
+- column added: `has_cancer_disease` (boolean, nullable)
+- column added: `has_cancer_disease__matched_text` (string, nullable)
+- column added: `has_cardiovascular_disease` (boolean, nullable)
+- column added: `has_cardiovascular_disease__matched_text` (string, nullable)
+- column added: `has_clinical_test` (boolean, nullable)
+- column added: `has_comprehensive_testing` (boolean, nullable)
+- column added: `has_developmental_disease` (boolean, nullable)
+- column added: `has_developmental_disease__matched_text` (string, nullable)
+- column added: `has_excellent_annotation` (boolean, nullable)
+- column added: `has_expression_variants` (boolean, nullable)
+- column added: `has_hereditary_disease` (boolean, nullable)
+- column added: `has_hereditary_disease__matched_text` (string, nullable)
+- column added: `has_high_druggability` (boolean, nullable)
+- column added: `has_immune_disease` (boolean, nullable)
+- column added: `has_immune_disease__matched_text` (string, nullable)
+- column added: `has_kinase_domain` (boolean, nullable)
+- column added: `has_metabolic_disease` (boolean, nullable)
+- column added: `has_metabolic_disease__matched_text` (string, nullable)
+- column added: `has_multiple_tests` (boolean, nullable)
+- column added: `has_muscular_disease` (boolean, nullable)
+- column added: `has_muscular_disease__matched_text` (string, nullable)
+- column added: `has_neurological_disease` (boolean, nullable)
+- column added: `has_neurological_disease__matched_text` (string, nullable)
+- column added: `has_pharmacogene_variants` (boolean, nullable)
+- column added: `has_pharmgkb_annotation` (boolean, nullable)
+- column added: `hereditary_cancer_testing` (boolean, nullable)
+- column added: `is_broadly_expressed` (boolean, nullable)
+- column added: `is_cancer_drug_target` (boolean, nullable)
+- column added: `is_cancer_hotspot_gene` (boolean, nullable)
+- column added: `is_cancer_panel_gene` (boolean, nullable)
+- column added: `is_clinically_actionable` (boolean, nullable)
+- column added: `is_disease_associated_gene` (boolean, nullable)
+- column added: `is_disease_gene` (boolean, nullable)
+- column added: `is_drug_metabolizer` (boolean, nullable)
+- column added: `is_drug_target` (boolean, nullable)
+- column added: `is_drug_target_gene` (boolean, nullable)
+- column added: `is_drug_transporter` (boolean, nullable)
+- column added: `is_drug_transporter_gene` (boolean, nullable)
+- column added: `is_frequently_mutated_gene` (boolean, nullable)
+- column added: `is_hepatic_metabolizer` (boolean, nullable)
+- column added: `is_kidney_expressed` (boolean, nullable)
+- column added: `is_kinase_inhibitor_target` (boolean, nullable)
+- column added: `is_liver_expressed` (boolean, nullable)
+- column added: `is_lowly_expressed` (boolean, nullable)
+- column added: `is_metabolizing_enzyme` (boolean, nullable)
+- column added: `is_multi_disease_gene` (boolean, nullable)
+- column added: `is_omim_gene` (boolean, nullable)
+- column added: `is_oncogene_candidate` (boolean, nullable)
+- column added: `is_oncology_drug_target` (boolean, nullable)
+- column added: `is_oncology_target` (boolean, nullable)
+- column added: `is_pharmacogene` (boolean, nullable)
+- column added: `is_renal_transporter` (boolean, nullable)
+- column added: `is_research_candidate` (boolean, nullable)
+- column added: `is_tissue_specific` (boolean, nullable)
+- column added: `is_tumor_suppressor_candidate` (boolean, nullable)
+- column added: `is_ubiquitously_expressed` (boolean, nullable)
+- column added: `is_validated_cancer_target` (boolean, nullable)
+- column added: `is_well_tested_gene` (boolean, nullable)
+- column added: `max_median_transcripts_per_million` (double, nullable)
+- column added: `metabolism_context_score` (double, nullable)
+- column added: `metabolizing_enzyme_type` (string, nullable)
+- column added: `missense_mutations` (double, nullable)
+- column added: `multi_disease_testing` (boolean, nullable)
+- column added: `omim_disease_count` (double, nullable)
+- column added: `pathogenic_variants_in_tested_gene` (double, nullable)
+- column added: `pharmacogene_category` (string, nullable)
+- column added: `pharmacogene_category_enhanced` (string, nullable)
+- column added: `pharmacogene_evidence_level` (string, nullable)
+- column added: `pharmacogene_evidence_score` (double, nullable)
+- column added: `pharmacogene_features__primary_indication_category` (string, nullable)
+- column added: `pharmacogene_gene_features__clinical_utility_score` (double, nullable)
+- column added: `pharmacogene_gene_features__primary_indication_category` (string, nullable)
+- column added: `pharmacogene_priority` (string, nullable)
+- column added: `pharmacogene_source_count` (double, nullable)
+- column added: `pharmacogene_variant_impact_score` (double, nullable)
+- column added: `population_test_priority` (string, nullable)
+- column added: `population_test_relevance_score` (double, nullable)
+- column added: `primary_test_type` (string, nullable)
+- column added: `primary_tissue` (string, nullable)
+- column added: `primary_tissue_count` (double, nullable)
+- column added: `rare_pathogenic_variants` (double, nullable)
+- column added: `silent_mutations` (double, nullable)
+- column added: `test_accessibility_score` (double, nullable)
+- column added: `test_availability_category` (string, nullable)
+- column added: `test_covered_variants` (double, nullable)
+- column added: `test_disease_count` (double, nullable)
+- column added: `test_priority` (string, nullable)
+- column added: `test_quality_score` (double, nullable)
+- column added: `test_recommendation_tier` (string, nullable)
+- column added: `tests_with_disease_info` (double, nullable)
+- column added: `tests_with_gene_info` (double, nullable)
+- column added: `tissue_specificity_category` (string, nullable)
+- column added: `tissue_specificity_score` (double, nullable)
+- column added: `tissues_expressed` (double, nullable)
+- column added: `tissues_expressed_count` (double, nullable)
+- column added: `total_relationships` (double, nullable)
+- column added: `total_samples_affected` (double, nullable)
+- column added: `total_test_count` (double, nullable)
+- column added: `total_tissues_expressed` (double, nullable)
+- column added: `truncating_mutations` (double, nullable)
+- column added: `unique_mutation_sites` (double, nullable)
+- column added: `unique_samples_affected` (double, nullable)
+- column added: `unique_test_count` (double, nullable)
+- column added: `variant_impact_burden` (string, nullable)
+- column added: `variant_relationships` (double, nullable)
+- column added: `variant_test_coverage_level` (string, nullable)
+- column added: `variant_test_coverage_score` (double, nullable)
+- 232 column(s) changed ordinal position
+
+**genomics_gold.variant_profile**
+- column added: `affects_drug_efficacy` (boolean, nullable)
+- column added: `affects_drug_metabolism` (boolean, nullable)
+- column added: `affects_functional_domain` (boolean, nullable)
+- column added: `afr_filtering_allele_frequency_95_allele_count` (bigint, nullable)
+- column added: `afr_filtering_allele_frequency_95_allele_frequency` (double, nullable)
+- column added: `afr_filtering_allele_frequency_95_allele_number` (bigint, nullable)
+- column added: `afr_filtering_allele_frequency_95_filter_status` (string, nullable)
+- column added: `afr_filtering_allele_frequency_95_homozygote_count` (bigint, nullable)
+- column added: `afr_highest_group_allele_frequency_allele_count` (bigint, nullable)
+- column added: `afr_highest_group_allele_frequency_allele_frequency` (double, nullable)
+- column added: `afr_highest_group_allele_frequency_allele_number` (bigint, nullable)
+- column added: `afr_highest_group_allele_frequency_filter_status` (string, nullable)
+- column added: `afr_highest_group_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `all_heteroplasmic_allele_frequency_allele_count` (bigint, nullable)
+- column added: `all_heteroplasmic_allele_frequency_allele_frequency` (double, nullable)
+- column added: `all_heteroplasmic_allele_frequency_allele_number` (bigint, nullable)
+- column added: `all_heteroplasmic_allele_frequency_filter_status` (string, nullable)
+- column added: `all_heteroplasmic_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `all_homoplasmic_allele_frequency_allele_count` (bigint, nullable)
+- column added: `all_homoplasmic_allele_frequency_allele_frequency` (double, nullable)
+- column added: `all_homoplasmic_allele_frequency_allele_number` (bigint, nullable)
+- column added: `all_homoplasmic_allele_frequency_filter_status` (string, nullable)
+- column added: `all_homoplasmic_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `all_maximum_observed_heteroplasmy_allele_count` (bigint, nullable)
+- column added: `all_maximum_observed_heteroplasmy_allele_frequency` (double, nullable)
+- column added: `all_maximum_observed_heteroplasmy_allele_number` (bigint, nullable)
+- column added: `all_maximum_observed_heteroplasmy_filter_status` (string, nullable)
+- column added: `all_maximum_observed_heteroplasmy_homozygote_count` (bigint, nullable)
+- column added: `alphamissense_pathogenicity_context` (string, nullable)
+- column added: `alphamissense_pathogenicity_label` (string, nullable)
+- column added: `alphamissense_pathogenicity_value` (double, nullable)
+- column added: `ami_allele_frequency_allele_count` (bigint, nullable)
+- column added: `ami_allele_frequency_allele_frequency` (double, nullable)
+- column added: `ami_allele_frequency_allele_number` (bigint, nullable)
+- column added: `ami_allele_frequency_filter_status` (string, nullable)
+- column added: `ami_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `amr_filtering_allele_frequency_95_allele_count` (bigint, nullable)
+- column added: `amr_filtering_allele_frequency_95_allele_frequency` (double, nullable)
+- column added: `amr_filtering_allele_frequency_95_allele_number` (bigint, nullable)
+- column added: `amr_filtering_allele_frequency_95_filter_status` (string, nullable)
+- column added: `amr_filtering_allele_frequency_95_homozygote_count` (bigint, nullable)
+- column added: `amr_highest_group_allele_frequency_allele_count` (bigint, nullable)
+- column added: `amr_highest_group_allele_frequency_allele_frequency` (double, nullable)
+- column added: `amr_highest_group_allele_frequency_allele_number` (bigint, nullable)
+- column added: `amr_highest_group_allele_frequency_filter_status` (string, nullable)
+- column added: `amr_highest_group_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `asj_allele_frequency_allele_count` (bigint, nullable)
+- column added: `asj_allele_frequency_allele_frequency` (double, nullable)
+- column added: `asj_allele_frequency_allele_number` (bigint, nullable)
+- column added: `asj_allele_frequency_filter_status` (string, nullable)
+- column added: `asj_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `cadd_phred_context` (string, nullable)
+- column added: `cadd_phred_label` (string, nullable)
+- column added: `cadd_phred_value` (double, nullable)
+- column added: `cancer_variant_priority` (string, nullable)
+- column added: `carrier_frequency_by_disease` (string, nullable)
+- column added: `carrier_risk_score` (double, nullable)
+- column added: `carrier_risk_score_adjusted` (double, nullable)
+- column added: `clinical_actionability` (string, nullable)
+- column added: `clinical_impact_priority` (string, nullable)
+- column added: `clinical_significance_frequency_score` (double, nullable)
+- column added: `clinical_significance_label` (string, nullable)
+- column added: `clinical_significance_label__matched_text` (string, nullable)
+- column added: `clinvar_first_snapshot` (string, nullable)
+- column added: `clinvar_last_snapshot` (string, nullable)
+- column added: `clinvar_snapshot_count` (double, nullable)
+- column added: `combined_impact_score` (double, nullable)
+- column added: `combined_pathogenicity_risk` (double, nullable)
+- column added: `common_benign_validation` (boolean, nullable)
+- column added: `conservation_impact_class` (string, nullable)
+- column added: `conservation_level` (double, nullable)
+- column added: `disease_allele_frequency` (string, nullable)
+- column added: `disease_database_coverage` (double, nullable)
+- column added: `disease_features__has_high_conservation` (boolean, nullable)
+- column added: `disease_interaction_count` (double, nullable)
+- column added: `disease_is_well_annotated` (boolean, nullable)
+- column added: `disease_specific_priority` (string, nullable)
+- column added: `domain_impact_severity` (string, nullable)
+- column added: `domain_type_count` (double, nullable)
+- column added: `drug_interaction_count` (double, nullable)
+- column added: `drug_response_category` (string, nullable)
+- column added: `drug_response_features__drug_response_frequency_context` (string, nullable)
+- column added: `drug_response_features__has_high_conservation` (boolean, nullable)
+- column added: `drug_response_impact` (string, nullable)
+- column added: `drug_response_priority` (string, nullable)
+- column added: `drug_response_priority_score` (double, nullable)
+- column added: `drug_response_significance_points` (double, nullable)
+- column added: `eas_filtering_allele_frequency_95_allele_count` (bigint, nullable)
+- column added: `eas_filtering_allele_frequency_95_allele_frequency` (double, nullable)
+- column added: `eas_filtering_allele_frequency_95_allele_number` (bigint, nullable)
+- column added: `eas_filtering_allele_frequency_95_filter_status` (string, nullable)
+- column added: `eas_filtering_allele_frequency_95_homozygote_count` (bigint, nullable)
+- column added: `eas_highest_group_allele_frequency_allele_count` (bigint, nullable)
+- column added: `eas_highest_group_allele_frequency_allele_frequency` (double, nullable)
+- column added: `eas_highest_group_allele_frequency_allele_number` (bigint, nullable)
+- column added: `eas_highest_group_allele_frequency_filter_status` (string, nullable)
+- column added: `eas_highest_group_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `eur_allele_frequency_allele_count` (bigint, nullable)
+- column added: `eur_allele_frequency_allele_frequency` (double, nullable)
+- column added: `eur_allele_frequency_allele_number` (bigint, nullable)
+- column added: `eur_allele_frequency_filter_status` (string, nullable)
+- column added: `eur_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `evidence_count` (double, nullable)
+- column added: `expression_frequency_correlation` (string, nullable)
+- column added: `expression_impact_context` (string, nullable)
+- column added: `fin_allele_frequency_allele_count` (bigint, nullable)
+- column added: `fin_allele_frequency_allele_frequency` (double, nullable)
+- column added: `fin_allele_frequency_allele_number` (bigint, nullable)
+- column added: `fin_allele_frequency_filter_status` (string, nullable)
+- column added: `fin_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `frequency_band` (string, nullable)
+- column added: `frequency_band__matched_text` (string, nullable)
+- column added: `frequency_flags__is_common_variant` (boolean, nullable)
+- column added: `frequency_pathogenicity_conflict` (boolean, nullable)
+- column added: `frequency_tier` (string, nullable)
+- column added: `functional_impact_score` (double, nullable)
+- column added: `gene_constraint_score` (double, nullable)
+- column added: `gene_mutation_tolerance` (string, nullable)
+- column added: `gene_variant_impact_priority` (string, nullable)
+- column added: `germline_cancer_predisposition` (boolean, nullable)
+- column added: `gnomad_variants_afr_allele_frequency_allele_count` (bigint, nullable)
+- column added: `gnomad_variants_afr_allele_frequency_allele_frequency` (double, nullable)
+- column added: `gnomad_variants_afr_allele_frequency_allele_number` (bigint, nullable)
+- column added: `gnomad_variants_afr_allele_frequency_filter_status` (string, nullable)
+- column added: `gnomad_variants_afr_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `gnomad_variants_all_allele_frequency_allele_count` (bigint, nullable)
+- column added: `gnomad_variants_all_allele_frequency_allele_frequency` (double, nullable)
+- column added: `gnomad_variants_all_allele_frequency_allele_number` (bigint, nullable)
+- column added: `gnomad_variants_all_allele_frequency_filter_status` (string, nullable)
+- column added: `gnomad_variants_all_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `gnomad_variants_amr_allele_frequency_allele_count` (bigint, nullable)
+- column added: `gnomad_variants_amr_allele_frequency_allele_frequency` (double, nullable)
+- column added: `gnomad_variants_amr_allele_frequency_allele_number` (bigint, nullable)
+- column added: `gnomad_variants_amr_allele_frequency_filter_status` (string, nullable)
+- column added: `gnomad_variants_amr_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `gnomad_variants_eas_allele_frequency_allele_count` (bigint, nullable)
+- column added: `gnomad_variants_eas_allele_frequency_allele_frequency` (double, nullable)
+- column added: `gnomad_variants_eas_allele_frequency_allele_number` (bigint, nullable)
+- column added: `gnomad_variants_eas_allele_frequency_filter_status` (string, nullable)
+- column added: `gnomad_variants_eas_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `gnomad_variants_sas_allele_frequency_allele_count` (bigint, nullable)
+- column added: `gnomad_variants_sas_allele_frequency_allele_frequency` (double, nullable)
+- column added: `gnomad_variants_sas_allele_frequency_allele_number` (bigint, nullable)
+- column added: `gnomad_variants_sas_allele_frequency_filter_status` (string, nullable)
+- column added: `gnomad_variants_sas_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `gpn_star_m447_context` (string, nullable)
+- column added: `gpn_star_m447_label` (string, nullable)
+- column added: `gpn_star_m447_value` (double, nullable)
+- column added: `gpn_star_p243_context` (string, nullable)
+- column added: `gpn_star_p243_label` (string, nullable)
+- column added: `gpn_star_p243_value` (double, nullable)
+- column added: `gpn_star_v100_context` (string, nullable)
+- column added: `gpn_star_v100_label` (string, nullable)
+- column added: `gpn_star_v100_value` (double, nullable)
+- column added: `has_cadd_score` (boolean, nullable)
+- column added: `has_complete_annotation` (boolean, nullable)
+- column added: `has_conservation_data` (boolean, nullable)
+- column added: `has_drug_interaction_potential` (boolean, nullable)
+- column added: `has_mondo_disease` (boolean, nullable)
+- column added: `has_multiple_domain_types` (boolean, nullable)
+- column added: `has_no_review_stars` (boolean, nullable)
+- column added: `has_omim_disease` (boolean, nullable)
+- column added: `has_orphanet_disease` (boolean, nullable)
+- column added: `has_strong_evidence` (boolean, nullable)
+- column added: `in_current_clinvar` (boolean, nullable)
+- column added: `indication_specific_actionability` (boolean, nullable)
+- column added: `inheritance_pathogenicity_modifier` (string, nullable)
+- column added: `inheritance_pattern` (string, nullable)
+- column added: `interaction_type_count` (double, nullable)
+- column added: `is_autosomal_variant` (boolean, nullable)
+- column added: `is_benign` (boolean, nullable)
+- column added: `is_cancer_relevant_variant` (boolean, nullable)
+- column added: `is_carrier_screening_candidate` (boolean, nullable)
+- column added: `is_clinically_actionable_rare_variant` (boolean, nullable)
+- column added: `is_coding_variant` (boolean, nullable)
+- column added: `is_common` (boolean, nullable)
+- column added: `is_common_pharmacogene_variant` (boolean, nullable)
+- column added: `is_conservation_constrained` (boolean, nullable)
+- column added: `is_deleterious_by_cadd` (boolean, nullable)
+- column added: `is_druggable_gene` (boolean, nullable)
+- column added: `is_frameshift_variant` (boolean, nullable)
+- column added: `is_hepatic_drug_metabolism_variant` (boolean, nullable)
+- column added: `is_high_impact` (boolean, nullable)
+- column added: `is_high_impact_variant` (boolean, nullable)
+- column added: `is_highly_conserved_region` (boolean, nullable)
+- column added: `is_key_protein_type` (boolean, nullable)
+- column added: `is_loss_of_function` (boolean, nullable)
+- column added: `is_low_frequency_variant` (boolean, nullable)
+- column added: `is_metabolizer_variant` (boolean, nullable)
+- column added: `is_missense_variant` (boolean, nullable)
+- column added: `is_mitochondrial_variant` (boolean, nullable)
+- column added: `is_nonsense_variant` (boolean, nullable)
+- column added: `is_pathogenic` (boolean, nullable)
+- column added: `is_pharmgkb_annotated_variant` (boolean, nullable)
+- column added: `is_potential_resistance_variant` (boolean, nullable)
+- column added: `is_rare` (boolean, nullable)
+- column added: `is_rare_variant` (boolean, nullable)
+- column added: `is_regulatory_variant` (boolean, nullable)
+- column added: `is_splice_affecting` (boolean, nullable)
+- column added: `is_splice_site_variant` (boolean, nullable)
+- column added: `is_transporter_variant` (boolean, nullable)
+- column added: `is_ultra_rare` (boolean, nullable)
+- column added: `is_ultra_rare_variant` (boolean, nullable)
+- column added: `is_very_high_impact` (boolean, nullable)
+- column added: `is_very_rare_variant` (boolean, nullable)
+- column added: `is_vus` (boolean, nullable)
+- column added: `is_x_linked_variant` (boolean, nullable)
+- column added: `is_y_linked_variant` (boolean, nullable)
+- column added: `kinase_variant_therapeutic_relevance` (string, nullable)
+- column added: `loss_of_function_category` (string, nullable)
+- column added: `max_ancestry_highest_ancestry_allele_frequency_allele_count` (bigint, nullable)
+- column added: `max_ancestry_highest_ancestry_allele_frequency_allele_frequency` (double, nullable)
+- column added: `max_ancestry_highest_ancestry_allele_frequency_allele_number` (bigint, nullable)
+- column added: `max_ancestry_highest_ancestry_allele_frequency_filter_status` (string, nullable)
+- column added: `max_ancestry_highest_ancestry_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `max_population_frequency` (double, nullable)
+- column added: `metabolizer_phenotype_risk` (string, nullable)
+- column added: `mid_allele_frequency_allele_count` (bigint, nullable)
+- column added: `mid_allele_frequency_allele_frequency` (double, nullable)
+- column added: `mid_allele_frequency_allele_number` (bigint, nullable)
+- column added: `mid_allele_frequency_filter_status` (string, nullable)
+- column added: `mid_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `mutation_severity_score` (double, nullable)
+- column added: `nfe_allele_frequency_allele_count` (bigint, nullable)
+- column added: `nfe_allele_frequency_allele_frequency` (double, nullable)
+- column added: `nfe_allele_frequency_allele_number` (bigint, nullable)
+- column added: `nfe_allele_frequency_filter_status` (string, nullable)
+- column added: `nfe_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `nfe_filtering_allele_frequency_95_allele_count` (bigint, nullable)
+- column added: `nfe_filtering_allele_frequency_95_allele_frequency` (double, nullable)
+- column added: `nfe_filtering_allele_frequency_95_allele_number` (bigint, nullable)
+- column added: `nfe_filtering_allele_frequency_95_filter_status` (string, nullable)
+- column added: `nfe_filtering_allele_frequency_95_homozygote_count` (bigint, nullable)
+- column added: `nfe_highest_group_allele_frequency_allele_count` (bigint, nullable)
+- column added: `nfe_highest_group_allele_frequency_allele_frequency` (double, nullable)
+- column added: `nfe_highest_group_allele_frequency_allele_number` (bigint, nullable)
+- column added: `nfe_highest_group_allele_frequency_filter_status` (string, nullable)
+- column added: `nfe_highest_group_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `overlapping_coding_sequence_count` (double, nullable)
+- column added: `overlapping_exon_count` (double, nullable)
+- column added: `overlapping_untranslated_region_count` (double, nullable)
+- column added: `pathogenicity_frequency_conflict` (boolean, nullable)
+- column added: `pathogenicity_likelihood_refined` (double, nullable)
+- column added: `pathogenicity_likelihood_score` (double, nullable)
+- column added: `pathogenicity_score` (double, nullable)
+- column added: `pharmacogene_annotation_score` (double, nullable)
+- column added: `pharmacogene_features__drug_response_frequency_context` (string, nullable)
+- column added: `phastcons_100way` (double, nullable)
+- column added: `phylop_100way` (double, nullable)
+- column added: `polygenic_risk_contribution` (string, nullable)
+- column added: `population_adjusted_score` (double, nullable)
+- column added: `population_features__is_common_variant` (boolean, nullable)
+- column added: `population_priority` (string, nullable)
+- column added: `predicted_pathogenicity` (string, nullable)
+- column added: `primary_indication_category` (string, nullable)
+- column added: `protein_impact_category` (string, nullable)
+- column added: `quality_tier` (string, nullable)
+- column added: `rare_pathogenic_variant` (boolean, nullable)
+- column added: `rarity_score` (double, nullable)
+- column added: `remaining_allele_frequency_allele_count` (bigint, nullable)
+- column added: `remaining_allele_frequency_allele_frequency` (double, nullable)
+- column added: `remaining_allele_frequency_allele_number` (bigint, nullable)
+- column added: `remaining_allele_frequency_filter_status` (string, nullable)
+- column added: `remaining_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `review_quality_score` (double, nullable)
+- column added: `sas_filtering_allele_frequency_95_allele_count` (bigint, nullable)
+- column added: `sas_filtering_allele_frequency_95_allele_frequency` (double, nullable)
+- column added: `sas_filtering_allele_frequency_95_allele_number` (bigint, nullable)
+- column added: `sas_filtering_allele_frequency_95_filter_status` (string, nullable)
+- column added: `sas_filtering_allele_frequency_95_homozygote_count` (bigint, nullable)
+- column added: `sas_highest_group_allele_frequency_allele_count` (bigint, nullable)
+- column added: `sas_highest_group_allele_frequency_allele_frequency` (double, nullable)
+- column added: `sas_highest_group_allele_frequency_allele_number` (bigint, nullable)
+- column added: `sas_highest_group_allele_frequency_filter_status` (string, nullable)
+- column added: `sas_highest_group_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `screening_recommendation` (string, nullable)
+- column added: `somatic_frequency` (double, nullable)
+- column added: `splice_impact_severity` (string, nullable)
+- column added: `thousand_genomes_variants_afr_allele_frequency_allele_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_afr_allele_frequency_allele_frequency` (double, nullable)
+- column added: `thousand_genomes_variants_afr_allele_frequency_allele_number` (bigint, nullable)
+- column added: `thousand_genomes_variants_afr_allele_frequency_filter_status` (string, nullable)
+- column added: `thousand_genomes_variants_afr_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_all_allele_frequency_allele_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_all_allele_frequency_allele_frequency` (double, nullable)
+- column added: `thousand_genomes_variants_all_allele_frequency_allele_number` (bigint, nullable)
+- column added: `thousand_genomes_variants_all_allele_frequency_filter_status` (string, nullable)
+- column added: `thousand_genomes_variants_all_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_amr_allele_frequency_allele_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_amr_allele_frequency_allele_frequency` (double, nullable)
+- column added: `thousand_genomes_variants_amr_allele_frequency_allele_number` (bigint, nullable)
+- column added: `thousand_genomes_variants_amr_allele_frequency_filter_status` (string, nullable)
+- column added: `thousand_genomes_variants_amr_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_eas_allele_frequency_allele_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_eas_allele_frequency_allele_frequency` (double, nullable)
+- column added: `thousand_genomes_variants_eas_allele_frequency_allele_number` (bigint, nullable)
+- column added: `thousand_genomes_variants_eas_allele_frequency_filter_status` (string, nullable)
+- column added: `thousand_genomes_variants_eas_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_sas_allele_frequency_allele_count` (bigint, nullable)
+- column added: `thousand_genomes_variants_sas_allele_frequency_allele_frequency` (double, nullable)
+- column added: `thousand_genomes_variants_sas_allele_frequency_allele_number` (bigint, nullable)
+- column added: `thousand_genomes_variants_sas_allele_frequency_filter_status` (string, nullable)
+- column added: `thousand_genomes_variants_sas_allele_frequency_homozygote_count` (bigint, nullable)
+- column added: `tissue_specific_allele_effects` (boolean, nullable)
+- column added: `tissue_specific_response_score` (double, nullable)
+- column added: `total_interactions` (double, nullable)
+- column added: `transporter_impact_level` (string, nullable)
+- column added: `variant_disease_link_quality` (string, nullable)
+- column added: `variant_impact_tier` (string, nullable)
+- column added: `x_linked_risk_modifier` (string, nullable)
+- 33 column(s) changed ordinal position
+
+## Schema
+
+| schema | table | # | column | type | nullable |
+|---|---|---|---|---|---|
+| commerce_gold | commerce_cart_event | 1 | event_key | string | true |
+| commerce_gold | commerce_cart_event | 2 | event_date_native | string | true |
+| commerce_gold | commerce_cart_event | 3 | event_timestamp_native | string | true |
+| commerce_gold | commerce_cart_event | 4 | event_timestamp_utc | timestamp | true |
+| commerce_gold | commerce_cart_event | 5 | event_timestamp_project | timestamp | true |
+| commerce_gold | commerce_cart_event | 6 | local_date | date | true |
+| commerce_gold | commerce_cart_event | 7 | event_type | string | true |
+| commerce_gold | commerce_cart_event | 8 | event_name | string | true |
+| commerce_gold | commerce_cart_event | 9 | user_id | string | true |
+| commerce_gold | commerce_cart_event | 10 | user_session | string | true |
+| commerce_gold | commerce_cart_event | 11 | product_id | string | true |
+| commerce_gold | commerce_cart_event | 12 | category_id | string | true |
+| commerce_gold | commerce_cart_event | 13 | category_code | string | true |
+| commerce_gold | commerce_cart_event | 14 | category_l1 | string | true |
+| commerce_gold | commerce_cart_event | 15 | category_l2 | string | true |
+| commerce_gold | commerce_cart_event | 16 | category_l3 | string | true |
+| commerce_gold | commerce_cart_event | 17 | brand | string | true |
+| commerce_gold | commerce_cart_event | 18 | price | double | true |
+| commerce_gold | commerce_cart_event | 19 | currency_unknown | boolean | true |
+| commerce_gold | commerce_cart_event | 20 | user_pseudo_id | string | true |
+| commerce_gold | commerce_cart_event | 21 | session_id | bigint | true |
+| commerce_gold | commerce_cart_event | 22 | session_number | bigint | true |
+| commerce_gold | commerce_cart_event | 23 | page_location | string | true |
+| commerce_gold | commerce_cart_event | 24 | page_title | string | true |
+| commerce_gold | commerce_cart_event | 25 | search_term | string | true |
+| commerce_gold | commerce_cart_event | 26 | unique_search_term | string | true |
+| commerce_gold | commerce_cart_event | 27 | geo_country | string | true |
+| commerce_gold | commerce_cart_event | 28 | transaction_id | string | true |
+| commerce_gold | commerce_cart_event | 29 | purchase_revenue | double | true |
+| commerce_gold | commerce_cart_event | 30 | unique_items | bigint | true |
+| commerce_gold | commerce_cart_event | 31 | total_item_quantity | bigint | true |
+| commerce_gold | commerce_cart_event | 32 | key_conflict_resolved | boolean | true |
+| commerce_gold | commerce_cart_event | 33 | bot_burst_suspected | boolean | true |
+| commerce_gold | commerce_cart_event | 34 | category_code_ambiguous | boolean | true |
+| commerce_gold | commerce_cart_event | 35 | measurement_basis | string | true |
+| commerce_gold | commerce_cart_event | 36 | source_system | string | true |
+| commerce_gold | commerce_cart_event | 37 | source_dataset | string | true |
+| commerce_gold | commerce_cart_event | 38 | source_record_id | string | true |
+| commerce_gold | commerce_cart_event | 39 | session_key | string | true |
+| commerce_gold | commerce_cart_event | 40 | user_key | string | true |
+| commerce_gold | commerce_cart_event | 41 | product_key | string | true |
+| commerce_gold | commerce_cart_event | 42 | ecosystem | string | true |
+| commerce_gold | commerce_cart_event | 43 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_cart_event | 44 | _gold_run_id | string | true |
+| commerce_gold | commerce_event | 1 | event_key | string | true |
+| commerce_gold | commerce_event | 2 | event_date_native | string | true |
+| commerce_gold | commerce_event | 3 | event_timestamp_native | string | true |
+| commerce_gold | commerce_event | 4 | event_timestamp_utc | timestamp | true |
+| commerce_gold | commerce_event | 5 | event_timestamp_project | timestamp | true |
+| commerce_gold | commerce_event | 6 | local_date | date | true |
+| commerce_gold | commerce_event | 7 | event_type | string | true |
+| commerce_gold | commerce_event | 8 | event_name | string | true |
+| commerce_gold | commerce_event | 9 | user_id | string | true |
+| commerce_gold | commerce_event | 10 | user_session | string | true |
+| commerce_gold | commerce_event | 11 | product_id | string | true |
+| commerce_gold | commerce_event | 12 | category_id | string | true |
+| commerce_gold | commerce_event | 13 | category_code | string | true |
+| commerce_gold | commerce_event | 14 | category_l1 | string | true |
+| commerce_gold | commerce_event | 15 | category_l2 | string | true |
+| commerce_gold | commerce_event | 16 | category_l3 | string | true |
+| commerce_gold | commerce_event | 17 | brand | string | true |
+| commerce_gold | commerce_event | 18 | price | double | true |
+| commerce_gold | commerce_event | 19 | currency_unknown | boolean | true |
+| commerce_gold | commerce_event | 20 | user_pseudo_id | string | true |
+| commerce_gold | commerce_event | 21 | session_id | bigint | true |
+| commerce_gold | commerce_event | 22 | session_number | bigint | true |
+| commerce_gold | commerce_event | 23 | page_location | string | true |
+| commerce_gold | commerce_event | 24 | page_title | string | true |
+| commerce_gold | commerce_event | 25 | search_term | string | true |
+| commerce_gold | commerce_event | 26 | unique_search_term | string | true |
+| commerce_gold | commerce_event | 27 | geo_country | string | true |
+| commerce_gold | commerce_event | 28 | transaction_id | string | true |
+| commerce_gold | commerce_event | 29 | purchase_revenue | double | true |
+| commerce_gold | commerce_event | 30 | unique_items | bigint | true |
+| commerce_gold | commerce_event | 31 | total_item_quantity | bigint | true |
+| commerce_gold | commerce_event | 32 | key_conflict_resolved | boolean | true |
+| commerce_gold | commerce_event | 33 | bot_burst_suspected | boolean | true |
+| commerce_gold | commerce_event | 34 | category_code_ambiguous | boolean | true |
+| commerce_gold | commerce_event | 35 | measurement_basis | string | true |
+| commerce_gold | commerce_event | 36 | source_system | string | true |
+| commerce_gold | commerce_event | 37 | source_dataset | string | true |
+| commerce_gold | commerce_event | 38 | source_record_id | string | true |
+| commerce_gold | commerce_event | 39 | session_key | string | true |
+| commerce_gold | commerce_event | 40 | user_key | string | true |
+| commerce_gold | commerce_event | 41 | product_key | string | true |
+| commerce_gold | commerce_event | 42 | ecosystem | string | true |
+| commerce_gold | commerce_event | 43 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_event | 44 | _gold_run_id | string | true |
+| commerce_gold | commerce_product | 1 | product_key | string | true |
+| commerce_gold | commerce_product | 2 | source_product_id | string | true |
+| commerce_gold | commerce_product | 3 | category_id | string | true |
+| commerce_gold | commerce_product | 4 | category_code | string | true |
+| commerce_gold | commerce_product | 5 | category_l1 | string | true |
+| commerce_gold | commerce_product | 6 | category_l2 | string | true |
+| commerce_gold | commerce_product | 7 | category_l3 | string | true |
+| commerce_gold | commerce_product | 8 | brand | string | true |
+| commerce_gold | commerce_product | 9 | item_name | string | true |
+| commerce_gold | commerce_product | 10 | item_category | string | true |
+| commerce_gold | commerce_product | 11 | first_event_utc | timestamp | true |
+| commerce_gold | commerce_product | 12 | last_event_utc | timestamp | true |
+| commerce_gold | commerce_product | 13 | event_count | bigint | true |
+| commerce_gold | commerce_product | 14 | view_event_count | bigint | true |
+| commerce_gold | commerce_product | 15 | cart_event_count | bigint | true |
+| commerce_gold | commerce_product | 16 | purchase_event_count | bigint | true |
+| commerce_gold | commerce_product | 17 | view_item_event_count | bigint | true |
+| commerce_gold | commerce_product | 18 | view_promotion_event_count | bigint | true |
+| commerce_gold | commerce_product | 19 | add_to_cart_event_count | bigint | true |
+| commerce_gold | commerce_product | 20 | begin_checkout_event_count | bigint | true |
+| commerce_gold | commerce_product | 21 | select_item_event_count | bigint | true |
+| commerce_gold | commerce_product | 22 | view_search_results_event_count | bigint | true |
+| commerce_gold | commerce_product | 23 | add_shipping_info_event_count | bigint | true |
+| commerce_gold | commerce_product | 24 | add_payment_info_event_count | bigint | true |
+| commerce_gold | commerce_product | 25 | select_promotion_event_count | bigint | true |
+| commerce_gold | commerce_product | 26 | view_item_list_event_count | bigint | true |
+| commerce_gold | commerce_product | 27 | distinct_user_count | bigint | true |
+| commerce_gold | commerce_product | 28 | minimum_price | double | true |
+| commerce_gold | commerce_product | 29 | maximum_price | double | true |
+| commerce_gold | commerce_product | 30 | mean_price | double | true |
+| commerce_gold | commerce_product | 31 | total_quantity | bigint | true |
+| commerce_gold | commerce_product | 32 | revenue | double | true |
+| commerce_gold | commerce_product | 33 | currency_unknown | boolean | true |
+| commerce_gold | commerce_product | 34 | measurement_basis | string | true |
+| commerce_gold | commerce_product | 35 | source_system | string | true |
+| commerce_gold | commerce_product | 36 | source_dataset | string | true |
+| commerce_gold | commerce_product | 37 | source_record_id | string | true |
+| commerce_gold | commerce_product | 38 | ecosystem | string | true |
+| commerce_gold | commerce_product | 39 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_product | 40 | _gold_run_id | string | true |
+| commerce_gold | commerce_purchase_event | 1 | event_key | string | true |
+| commerce_gold | commerce_purchase_event | 2 | event_date_native | string | true |
+| commerce_gold | commerce_purchase_event | 3 | event_timestamp_native | string | true |
+| commerce_gold | commerce_purchase_event | 4 | event_timestamp_utc | timestamp | true |
+| commerce_gold | commerce_purchase_event | 5 | event_timestamp_project | timestamp | true |
+| commerce_gold | commerce_purchase_event | 6 | local_date | date | true |
+| commerce_gold | commerce_purchase_event | 7 | event_type | string | true |
+| commerce_gold | commerce_purchase_event | 8 | event_name | string | true |
+| commerce_gold | commerce_purchase_event | 9 | user_id | string | true |
+| commerce_gold | commerce_purchase_event | 10 | user_session | string | true |
+| commerce_gold | commerce_purchase_event | 11 | product_id | string | true |
+| commerce_gold | commerce_purchase_event | 12 | category_id | string | true |
+| commerce_gold | commerce_purchase_event | 13 | category_code | string | true |
+| commerce_gold | commerce_purchase_event | 14 | category_l1 | string | true |
+| commerce_gold | commerce_purchase_event | 15 | category_l2 | string | true |
+| commerce_gold | commerce_purchase_event | 16 | category_l3 | string | true |
+| commerce_gold | commerce_purchase_event | 17 | brand | string | true |
+| commerce_gold | commerce_purchase_event | 18 | price | double | true |
+| commerce_gold | commerce_purchase_event | 19 | currency_unknown | boolean | true |
+| commerce_gold | commerce_purchase_event | 20 | user_pseudo_id | string | true |
+| commerce_gold | commerce_purchase_event | 21 | session_id | bigint | true |
+| commerce_gold | commerce_purchase_event | 22 | session_number | bigint | true |
+| commerce_gold | commerce_purchase_event | 23 | page_location | string | true |
+| commerce_gold | commerce_purchase_event | 24 | page_title | string | true |
+| commerce_gold | commerce_purchase_event | 25 | search_term | string | true |
+| commerce_gold | commerce_purchase_event | 26 | unique_search_term | string | true |
+| commerce_gold | commerce_purchase_event | 27 | geo_country | string | true |
+| commerce_gold | commerce_purchase_event | 28 | transaction_id | string | true |
+| commerce_gold | commerce_purchase_event | 29 | purchase_revenue | double | true |
+| commerce_gold | commerce_purchase_event | 30 | unique_items | bigint | true |
+| commerce_gold | commerce_purchase_event | 31 | total_item_quantity | bigint | true |
+| commerce_gold | commerce_purchase_event | 32 | key_conflict_resolved | boolean | true |
+| commerce_gold | commerce_purchase_event | 33 | bot_burst_suspected | boolean | true |
+| commerce_gold | commerce_purchase_event | 34 | category_code_ambiguous | boolean | true |
+| commerce_gold | commerce_purchase_event | 35 | measurement_basis | string | true |
+| commerce_gold | commerce_purchase_event | 36 | source_system | string | true |
+| commerce_gold | commerce_purchase_event | 37 | source_dataset | string | true |
+| commerce_gold | commerce_purchase_event | 38 | source_record_id | string | true |
+| commerce_gold | commerce_purchase_event | 39 | session_key | string | true |
+| commerce_gold | commerce_purchase_event | 40 | user_key | string | true |
+| commerce_gold | commerce_purchase_event | 41 | product_key | string | true |
+| commerce_gold | commerce_purchase_event | 42 | ecosystem | string | true |
+| commerce_gold | commerce_purchase_event | 43 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_purchase_event | 44 | _gold_run_id | string | true |
+| commerce_gold | commerce_session | 1 | session_key | string | true |
+| commerce_gold | commerce_session | 2 | user_key | string | true |
+| commerce_gold | commerce_session | 3 | source_user_id | string | true |
+| commerce_gold | commerce_session | 4 | source_session_id | string | true |
+| commerce_gold | commerce_session | 5 | session_number | bigint | true |
+| commerce_gold | commerce_session | 6 | first_event_utc | timestamp | true |
+| commerce_gold | commerce_session | 7 | last_event_utc | timestamp | true |
+| commerce_gold | commerce_session | 8 | local_date | date | true |
+| commerce_gold | commerce_session | 9 | event_count | bigint | true |
+| commerce_gold | commerce_session | 10 | view_event_count | bigint | true |
+| commerce_gold | commerce_session | 11 | cart_event_count | bigint | true |
+| commerce_gold | commerce_session | 12 | purchase_event_count | bigint | true |
+| commerce_gold | commerce_session | 13 | view_item_event_count | bigint | true |
+| commerce_gold | commerce_session | 14 | view_promotion_event_count | bigint | true |
+| commerce_gold | commerce_session | 15 | add_to_cart_event_count | bigint | true |
+| commerce_gold | commerce_session | 16 | begin_checkout_event_count | bigint | true |
+| commerce_gold | commerce_session | 17 | select_item_event_count | bigint | true |
+| commerce_gold | commerce_session | 18 | view_search_results_event_count | bigint | true |
+| commerce_gold | commerce_session | 19 | add_shipping_info_event_count | bigint | true |
+| commerce_gold | commerce_session | 20 | add_payment_info_event_count | bigint | true |
+| commerce_gold | commerce_session | 21 | select_promotion_event_count | bigint | true |
+| commerce_gold | commerce_session | 22 | view_item_list_event_count | bigint | true |
+| commerce_gold | commerce_session | 23 | distinct_product_count | bigint | true |
+| commerce_gold | commerce_session | 24 | distinct_category_count | bigint | true |
+| commerce_gold | commerce_session | 25 | transaction_count | bigint | true |
+| commerce_gold | commerce_session | 26 | revenue | double | true |
+| commerce_gold | commerce_session | 27 | currency_unknown | boolean | true |
+| commerce_gold | commerce_session | 28 | bot_burst_suspected | boolean | true |
+| commerce_gold | commerce_session | 29 | geo_country | string | true |
+| commerce_gold | commerce_session | 30 | measurement_basis | string | true |
+| commerce_gold | commerce_session | 31 | source_system | string | true |
+| commerce_gold | commerce_session | 32 | source_dataset | string | true |
+| commerce_gold | commerce_session | 33 | source_record_id | string | true |
+| commerce_gold | commerce_session | 34 | user_source_user_id | string | true |
+| commerce_gold | commerce_session | 35 | user_first_event_utc | timestamp | true |
+| commerce_gold | commerce_session | 36 | user_last_event_utc | timestamp | true |
+| commerce_gold | commerce_session | 37 | user_session_count | bigint | true |
+| commerce_gold | commerce_session | 38 | user_event_count | bigint | true |
+| commerce_gold | commerce_session | 39 | user_view_event_count | bigint | true |
+| commerce_gold | commerce_session | 40 | user_cart_event_count | bigint | true |
+| commerce_gold | commerce_session | 41 | user_purchase_event_count | bigint | true |
+| commerce_gold | commerce_session | 42 | user_view_item_event_count | bigint | true |
+| commerce_gold | commerce_session | 43 | user_view_promotion_event_count | bigint | true |
+| commerce_gold | commerce_session | 44 | user_add_to_cart_event_count | bigint | true |
+| commerce_gold | commerce_session | 45 | user_begin_checkout_event_count | bigint | true |
+| commerce_gold | commerce_session | 46 | user_select_item_event_count | bigint | true |
+| commerce_gold | commerce_session | 47 | user_view_search_results_event_count | bigint | true |
+| commerce_gold | commerce_session | 48 | user_add_shipping_info_event_count | bigint | true |
+| commerce_gold | commerce_session | 49 | user_add_payment_info_event_count | bigint | true |
+| commerce_gold | commerce_session | 50 | user_select_promotion_event_count | bigint | true |
+| commerce_gold | commerce_session | 51 | user_view_item_list_event_count | bigint | true |
+| commerce_gold | commerce_session | 52 | user_distinct_product_count | bigint | true |
+| commerce_gold | commerce_session | 53 | user_transaction_count | bigint | true |
+| commerce_gold | commerce_session | 54 | user_revenue | double | true |
+| commerce_gold | commerce_session | 55 | user_currency_unknown | boolean | true |
+| commerce_gold | commerce_session | 56 | user_geo_country | string | true |
+| commerce_gold | commerce_session | 57 | user_measurement_basis | string | true |
+| commerce_gold | commerce_session | 58 | ecosystem | string | true |
+| commerce_gold | commerce_session | 59 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_session | 60 | _gold_run_id | string | true |
+| commerce_gold | commerce_user | 1 | user_key | string | true |
+| commerce_gold | commerce_user | 2 | source_user_id | string | true |
+| commerce_gold | commerce_user | 3 | first_event_utc | timestamp | true |
+| commerce_gold | commerce_user | 4 | last_event_utc | timestamp | true |
+| commerce_gold | commerce_user | 5 | session_count | bigint | true |
+| commerce_gold | commerce_user | 6 | event_count | bigint | true |
+| commerce_gold | commerce_user | 7 | view_event_count | bigint | true |
+| commerce_gold | commerce_user | 8 | cart_event_count | bigint | true |
+| commerce_gold | commerce_user | 9 | purchase_event_count | bigint | true |
+| commerce_gold | commerce_user | 10 | view_item_event_count | bigint | true |
+| commerce_gold | commerce_user | 11 | view_promotion_event_count | bigint | true |
+| commerce_gold | commerce_user | 12 | add_to_cart_event_count | bigint | true |
+| commerce_gold | commerce_user | 13 | begin_checkout_event_count | bigint | true |
+| commerce_gold | commerce_user | 14 | select_item_event_count | bigint | true |
+| commerce_gold | commerce_user | 15 | view_search_results_event_count | bigint | true |
+| commerce_gold | commerce_user | 16 | add_shipping_info_event_count | bigint | true |
+| commerce_gold | commerce_user | 17 | add_payment_info_event_count | bigint | true |
+| commerce_gold | commerce_user | 18 | select_promotion_event_count | bigint | true |
+| commerce_gold | commerce_user | 19 | view_item_list_event_count | bigint | true |
+| commerce_gold | commerce_user | 20 | distinct_product_count | bigint | true |
+| commerce_gold | commerce_user | 21 | transaction_count | bigint | true |
+| commerce_gold | commerce_user | 22 | revenue | double | true |
+| commerce_gold | commerce_user | 23 | currency_unknown | boolean | true |
+| commerce_gold | commerce_user | 24 | geo_country | string | true |
+| commerce_gold | commerce_user | 25 | measurement_basis | string | true |
+| commerce_gold | commerce_user | 26 | source_system | string | true |
+| commerce_gold | commerce_user | 27 | source_dataset | string | true |
+| commerce_gold | commerce_user | 28 | source_record_id | string | true |
+| commerce_gold | commerce_user | 29 | ecosystem | string | true |
+| commerce_gold | commerce_user | 30 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_user | 31 | _gold_run_id | string | true |
+| commerce_gold | commerce_view_event | 1 | event_key | string | true |
+| commerce_gold | commerce_view_event | 2 | event_date_native | string | true |
+| commerce_gold | commerce_view_event | 3 | event_timestamp_native | string | true |
+| commerce_gold | commerce_view_event | 4 | event_timestamp_utc | timestamp | true |
+| commerce_gold | commerce_view_event | 5 | event_timestamp_project | timestamp | true |
+| commerce_gold | commerce_view_event | 6 | local_date | date | true |
+| commerce_gold | commerce_view_event | 7 | event_type | string | true |
+| commerce_gold | commerce_view_event | 8 | event_name | string | true |
+| commerce_gold | commerce_view_event | 9 | user_id | string | true |
+| commerce_gold | commerce_view_event | 10 | user_session | string | true |
+| commerce_gold | commerce_view_event | 11 | product_id | string | true |
+| commerce_gold | commerce_view_event | 12 | category_id | string | true |
+| commerce_gold | commerce_view_event | 13 | category_code | string | true |
+| commerce_gold | commerce_view_event | 14 | category_l1 | string | true |
+| commerce_gold | commerce_view_event | 15 | category_l2 | string | true |
+| commerce_gold | commerce_view_event | 16 | category_l3 | string | true |
+| commerce_gold | commerce_view_event | 17 | brand | string | true |
+| commerce_gold | commerce_view_event | 18 | price | double | true |
+| commerce_gold | commerce_view_event | 19 | currency_unknown | boolean | true |
+| commerce_gold | commerce_view_event | 20 | user_pseudo_id | string | true |
+| commerce_gold | commerce_view_event | 21 | session_id | bigint | true |
+| commerce_gold | commerce_view_event | 22 | session_number | bigint | true |
+| commerce_gold | commerce_view_event | 23 | page_location | string | true |
+| commerce_gold | commerce_view_event | 24 | page_title | string | true |
+| commerce_gold | commerce_view_event | 25 | search_term | string | true |
+| commerce_gold | commerce_view_event | 26 | unique_search_term | string | true |
+| commerce_gold | commerce_view_event | 27 | geo_country | string | true |
+| commerce_gold | commerce_view_event | 28 | transaction_id | string | true |
+| commerce_gold | commerce_view_event | 29 | purchase_revenue | double | true |
+| commerce_gold | commerce_view_event | 30 | unique_items | bigint | true |
+| commerce_gold | commerce_view_event | 31 | total_item_quantity | bigint | true |
+| commerce_gold | commerce_view_event | 32 | key_conflict_resolved | boolean | true |
+| commerce_gold | commerce_view_event | 33 | bot_burst_suspected | boolean | true |
+| commerce_gold | commerce_view_event | 34 | category_code_ambiguous | boolean | true |
+| commerce_gold | commerce_view_event | 35 | measurement_basis | string | true |
+| commerce_gold | commerce_view_event | 36 | source_system | string | true |
+| commerce_gold | commerce_view_event | 37 | source_dataset | string | true |
+| commerce_gold | commerce_view_event | 38 | source_record_id | string | true |
+| commerce_gold | commerce_view_event | 39 | session_key | string | true |
+| commerce_gold | commerce_view_event | 40 | user_key | string | true |
+| commerce_gold | commerce_view_event | 41 | product_key | string | true |
+| commerce_gold | commerce_view_event | 42 | ecosystem | string | true |
+| commerce_gold | commerce_view_event | 43 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_view_event | 44 | _gold_run_id | string | true |
+| commerce_gold | commerce_web_event | 1 | event_key | string | true |
+| commerce_gold | commerce_web_event | 2 | event_date_native | string | true |
+| commerce_gold | commerce_web_event | 3 | event_timestamp_native | string | true |
+| commerce_gold | commerce_web_event | 4 | event_timestamp_utc | timestamp | true |
+| commerce_gold | commerce_web_event | 5 | event_timestamp_project | timestamp | true |
+| commerce_gold | commerce_web_event | 6 | local_date | date | true |
+| commerce_gold | commerce_web_event | 7 | event_type | string | true |
+| commerce_gold | commerce_web_event | 8 | event_name | string | true |
+| commerce_gold | commerce_web_event | 9 | user_id | string | true |
+| commerce_gold | commerce_web_event | 10 | user_session | string | true |
+| commerce_gold | commerce_web_event | 11 | product_id | string | true |
+| commerce_gold | commerce_web_event | 12 | category_id | string | true |
+| commerce_gold | commerce_web_event | 13 | category_code | string | true |
+| commerce_gold | commerce_web_event | 14 | category_l1 | string | true |
+| commerce_gold | commerce_web_event | 15 | category_l2 | string | true |
+| commerce_gold | commerce_web_event | 16 | category_l3 | string | true |
+| commerce_gold | commerce_web_event | 17 | brand | string | true |
+| commerce_gold | commerce_web_event | 18 | price | double | true |
+| commerce_gold | commerce_web_event | 19 | currency_unknown | boolean | true |
+| commerce_gold | commerce_web_event | 20 | user_pseudo_id | string | true |
+| commerce_gold | commerce_web_event | 21 | session_id | bigint | true |
+| commerce_gold | commerce_web_event | 22 | session_number | bigint | true |
+| commerce_gold | commerce_web_event | 23 | page_location | string | true |
+| commerce_gold | commerce_web_event | 24 | page_title | string | true |
+| commerce_gold | commerce_web_event | 25 | search_term | string | true |
+| commerce_gold | commerce_web_event | 26 | unique_search_term | string | true |
+| commerce_gold | commerce_web_event | 27 | geo_country | string | true |
+| commerce_gold | commerce_web_event | 28 | transaction_id | string | true |
+| commerce_gold | commerce_web_event | 29 | purchase_revenue | double | true |
+| commerce_gold | commerce_web_event | 30 | unique_items | bigint | true |
+| commerce_gold | commerce_web_event | 31 | total_item_quantity | bigint | true |
+| commerce_gold | commerce_web_event | 32 | key_conflict_resolved | boolean | true |
+| commerce_gold | commerce_web_event | 33 | bot_burst_suspected | boolean | true |
+| commerce_gold | commerce_web_event | 34 | category_code_ambiguous | boolean | true |
+| commerce_gold | commerce_web_event | 35 | measurement_basis | string | true |
+| commerce_gold | commerce_web_event | 36 | source_system | string | true |
+| commerce_gold | commerce_web_event | 37 | source_dataset | string | true |
+| commerce_gold | commerce_web_event | 38 | source_record_id | string | true |
+| commerce_gold | commerce_web_event | 39 | session_key | string | true |
+| commerce_gold | commerce_web_event | 40 | user_key | string | true |
+| commerce_gold | commerce_web_event | 41 | product_key | string | true |
+| commerce_gold | commerce_web_event | 42 | ecosystem | string | true |
+| commerce_gold | commerce_web_event | 43 | _gold_loaded_at | timestamp | true |
+| commerce_gold | commerce_web_event | 44 | _gold_run_id | string | true |
+| energy_gold | balancing_area | 1 | balancing_area_id | string | true |
+| energy_gold | balancing_area | 2 | area_energy_identification_code | string | true |
+| energy_gold | balancing_area | 3 | control_zone | string | true |
+| energy_gold | balancing_area | 4 | balancing_area_connection_point | string | true |
+| energy_gold | balancing_area | 5 | _unmatched_code_columns | string | true |
+| energy_gold | balancing_area | 6 | _source_id_ordinal | int | true |
+| energy_gold | balancing_area | 7 | _source_id_disambiguated | boolean | true |
+| energy_gold | balancing_area | 8 | connection_point_count | bigint | true |
+| energy_gold | balancing_area | 9 | source_record_id | string | true |
+| energy_gold | balancing_area | 10 | source_dataset | string | true |
+| energy_gold | balancing_area | 11 | source_system | string | true |
+| energy_gold | balancing_area | 12 | ecosystem | string | true |
+| energy_gold | balancing_area | 13 | _gold_loaded_at | timestamp | true |
+| energy_gold | balancing_area | 14 | _gold_run_id | string | true |
+| energy_gold | capacity_plan | 1 | energy_carrier | string | true |
+| energy_gold | capacity_plan | 2 | retiring_capacity_total_2026_2029_mw | double | true |
+| energy_gold | capacity_plan | 3 | capacity_section | string | true |
+| energy_gold | capacity_plan | 4 | is_total | boolean | true |
+| energy_gold | capacity_plan | 5 | carrier_key | string | true |
+| energy_gold | capacity_plan | 6 | _source_id_ordinal | int | true |
+| energy_gold | capacity_plan | 7 | _source_id_disambiguated | boolean | true |
+| energy_gold | capacity_plan | 8 | source_record_id | string | true |
+| energy_gold | capacity_plan | 9 | source_dataset | string | true |
+| energy_gold | capacity_plan | 10 | source_system | string | true |
+| energy_gold | capacity_plan | 11 | year | int | true |
+| energy_gold | capacity_plan | 12 | capacity_mw | double | true |
+| energy_gold | capacity_plan | 13 | ecosystem | string | true |
+| energy_gold | capacity_plan | 14 | _gold_loaded_at | timestamp | true |
+| energy_gold | capacity_plan | 15 | _gold_run_id | string | true |
+| energy_gold | channel_reading | 1 | observation_key | string | true |
+| energy_gold | channel_reading | 2 | location_key | string | true |
+| energy_gold | channel_reading | 3 | source_location_id | string | true |
+| energy_gold | channel_reading | 4 | market_area_code | string | true |
+| energy_gold | channel_reading | 5 | observation_timestamp_native | string | true |
+| energy_gold | channel_reading | 6 | time_basis | string | true |
+| energy_gold | channel_reading | 7 | utc_offset_hours | double | true |
+| energy_gold | channel_reading | 8 | observation_timestamp_utc | timestamp | true |
+| energy_gold | channel_reading | 9 | observation_timestamp_project | timestamp | true |
+| energy_gold | channel_reading | 10 | local_date | date | true |
+| energy_gold | channel_reading | 11 | interval_seconds | int | true |
+| energy_gold | channel_reading | 12 | interval_reference | string | true |
+| energy_gold | channel_reading | 13 | increment_derivation_rule | string | true |
+| energy_gold | channel_reading | 14 | sign_convention | string | true |
+| energy_gold | channel_reading | 15 | measurement_basis | string | true |
+| energy_gold | channel_reading | 16 | source_system | string | true |
+| energy_gold | channel_reading | 17 | source_dataset | string | true |
+| energy_gold | channel_reading | 18 | source_record_id | string | true |
+| energy_gold | channel_reading | 19 | source_column | string | true |
+| energy_gold | channel_reading | 20 | subsystem | string | true |
+| energy_gold | channel_reading | 21 | channel | string | true |
+| energy_gold | channel_reading | 22 | value_kind | string | true |
+| energy_gold | channel_reading | 23 | value | double | true |
+| energy_gold | channel_reading | 24 | unit | string | true |
+| energy_gold | channel_reading | 25 | is_outlier_five_sigma | boolean | true |
+| energy_gold | channel_reading | 26 | is_stuck_reading | boolean | true |
+| energy_gold | channel_reading | 27 | is_magnitude_decrease | boolean | true |
+| energy_gold | channel_reading | 28 | spans_gap | boolean | true |
+| energy_gold | channel_reading | 29 | ecosystem | string | true |
+| energy_gold | channel_reading | 30 | _gold_loaded_at | timestamp | true |
+| energy_gold | channel_reading | 31 | _gold_run_id | string | true |
+| energy_gold | energy_component | 1 | observation_key | string | true |
+| energy_gold | energy_component | 2 | location_key | string | true |
+| energy_gold | energy_component | 3 | source_location_id | string | true |
+| energy_gold | energy_component | 4 | market_area_code | string | true |
+| energy_gold | energy_component | 5 | observation_timestamp_native | string | true |
+| energy_gold | energy_component | 6 | time_basis | string | true |
+| energy_gold | energy_component | 7 | utc_offset_hours | double | true |
+| energy_gold | energy_component | 8 | observation_timestamp_utc | timestamp | true |
+| energy_gold | energy_component | 9 | observation_timestamp_project | timestamp | true |
+| energy_gold | energy_component | 10 | local_date | date | true |
+| energy_gold | energy_component | 11 | interval_seconds | int | true |
+| energy_gold | energy_component | 12 | interval_reference | string | true |
+| energy_gold | energy_component | 13 | component_group | string | true |
+| energy_gold | energy_component | 14 | component_kind | string | true |
+| energy_gold | energy_component | 15 | forecast_scope | string | true |
+| energy_gold | energy_component | 16 | carrier_code | string | true |
+| energy_gold | energy_component | 17 | carrier_key | string | true |
+| energy_gold | energy_component | 18 | native_label | string | true |
+| energy_gold | energy_component | 19 | energy_mwh | double | true |
+| energy_gold | energy_component | 20 | power_w | double | true |
+| energy_gold | energy_component | 21 | semantic_status | string | true |
+| energy_gold | energy_component | 22 | semantic_issue_ref | string | true |
+| energy_gold | energy_component | 23 | source_series | string | true |
+| energy_gold | energy_component | 24 | source_filter_id | string | true |
+| energy_gold | energy_component | 25 | counterpart_area_code | string | true |
+| energy_gold | energy_component | 26 | source_license | string | true |
+| energy_gold | energy_component | 27 | is_outlier_five_sigma | boolean | true |
+| energy_gold | energy_component | 28 | is_stuck_reading | boolean | true |
+| energy_gold | energy_component | 29 | sign_convention | string | true |
+| energy_gold | energy_component | 30 | measurement_basis | string | true |
+| energy_gold | energy_component | 31 | source_system | string | true |
+| energy_gold | energy_component | 32 | source_dataset | string | true |
+| energy_gold | energy_component | 33 | source_record_id | string | true |
+| energy_gold | energy_component | 34 | ecosystem | string | true |
+| energy_gold | energy_component | 35 | _gold_loaded_at | timestamp | true |
+| energy_gold | energy_component | 36 | _gold_run_id | string | true |
+| energy_gold | entity_link | 1 | relationship_type | string | true |
+| energy_gold | entity_link | 2 | parent_type | string | true |
+| energy_gold | entity_link | 3 | parent_id | string | true |
+| energy_gold | entity_link | 4 | linked_type | string | true |
+| energy_gold | entity_link | 5 | linked_id | string | true |
+| energy_gold | entity_link | 6 | link_basis | string | true |
+| energy_gold | entity_link | 7 | match_confidence | string | true |
+| energy_gold | entity_link | 8 | parent_resolved | boolean | true |
+| energy_gold | entity_link | 9 | linked_resolved | boolean | true |
+| energy_gold | entity_link | 10 | source_record_id | string | true |
+| energy_gold | entity_link | 11 | source_dataset | string | true |
+| energy_gold | entity_link | 12 | source_system | string | true |
+| energy_gold | entity_link | 13 | ecosystem | string | true |
+| energy_gold | entity_link | 14 | _gold_loaded_at | timestamp | true |
+| energy_gold | entity_link | 15 | _gold_run_id | string | true |
+| energy_gold | forecast_actual | 1 | observation_key | string | true |
+| energy_gold | forecast_actual | 2 | location_key | string | true |
+| energy_gold | forecast_actual | 3 | source_location_id | string | true |
+| energy_gold | forecast_actual | 4 | market_area_code | string | true |
+| energy_gold | forecast_actual | 5 | observation_timestamp_native | string | true |
+| energy_gold | forecast_actual | 6 | time_basis | string | true |
+| energy_gold | forecast_actual | 7 | utc_offset_hours | double | true |
+| energy_gold | forecast_actual | 8 | observation_timestamp_utc | timestamp | true |
+| energy_gold | forecast_actual | 9 | observation_timestamp_project | timestamp | true |
+| energy_gold | forecast_actual | 10 | local_date | date | true |
+| energy_gold | forecast_actual | 11 | interval_seconds | int | true |
+| energy_gold | forecast_actual | 12 | interval_reference | string | true |
+| energy_gold | forecast_actual | 13 | component_group | string | true |
+| energy_gold | forecast_actual | 14 | component_kind | string | true |
+| energy_gold | forecast_actual | 15 | forecast_scope | string | true |
+| energy_gold | forecast_actual | 16 | carrier_code | string | true |
+| energy_gold | forecast_actual | 17 | carrier_key | string | true |
+| energy_gold | forecast_actual | 18 | native_label | string | true |
+| energy_gold | forecast_actual | 19 | energy_mwh | double | true |
+| energy_gold | forecast_actual | 20 | power_w | double | true |
+| energy_gold | forecast_actual | 21 | semantic_status | string | true |
+| energy_gold | forecast_actual | 22 | semantic_issue_ref | string | true |
+| energy_gold | forecast_actual | 23 | source_series | string | true |
+| energy_gold | forecast_actual | 24 | source_filter_id | string | true |
+| energy_gold | forecast_actual | 25 | counterpart_area_code | string | true |
+| energy_gold | forecast_actual | 26 | source_license | string | true |
+| energy_gold | forecast_actual | 27 | is_outlier_five_sigma | boolean | true |
+| energy_gold | forecast_actual | 28 | is_stuck_reading | boolean | true |
+| energy_gold | forecast_actual | 29 | sign_convention | string | true |
+| energy_gold | forecast_actual | 30 | measurement_basis | string | true |
+| energy_gold | forecast_actual | 31 | source_system | string | true |
+| energy_gold | forecast_actual | 32 | source_dataset | string | true |
+| energy_gold | forecast_actual | 33 | source_record_id | string | true |
+| energy_gold | forecast_actual | 34 | actual_energy_mwh | double | true |
+| energy_gold | forecast_actual | 35 | actual_native_label | string | true |
+| energy_gold | forecast_actual | 36 | actual_carrier_key | string | true |
+| energy_gold | forecast_actual | 37 | actual_source_filter_id | string | true |
+| energy_gold | forecast_actual | 38 | actual_source_series | string | true |
+| energy_gold | forecast_actual | 39 | actual_is_outlier_five_sigma | boolean | true |
+| energy_gold | forecast_actual | 40 | actual_source_record_id | string | true |
+| energy_gold | forecast_actual | 41 | ecosystem | string | true |
+| energy_gold | forecast_actual | 42 | _gold_loaded_at | timestamp | true |
+| energy_gold | forecast_actual | 43 | _gold_run_id | string | true |
+| energy_gold | generation_unit | 1 | renewable_energy_act_support_id | string | true |
+| energy_gold | generation_unit | 2 | unit_id | string | true |
+| energy_gold | generation_unit | 3 | last_updated_at | timestamp | true |
+| energy_gold | generation_unit | 4 | location_id | string | true |
+| energy_gold | generation_unit | 5 | grid_operator_check_status | string | true |
+| energy_gold | generation_unit | 6 | grid_operator_check_date | timestamp | true |
+| energy_gold | generation_unit | 7 | operator_id | string | true |
+| energy_gold | generation_unit | 8 | district | string | true |
+| energy_gold | generation_unit | 9 | municipality | string | true |
+| energy_gold | generation_unit | 10 | source_municipality_key | string | true |
+| energy_gold | generation_unit | 11 | postcode | string | true |
+| energy_gold | generation_unit | 12 | street | string | true |
+| energy_gold | generation_unit | 13 | street_not_found | string | true |
+| energy_gold | generation_unit | 14 | house_number | string | true |
+| energy_gold | generation_unit | 15 | house_number_not_found | string | true |
+| energy_gold | generation_unit | 16 | locality | string | true |
+| energy_gold | generation_unit | 17 | longitude | double | true |
+| energy_gold | generation_unit | 18 | latitude | double | true |
+| energy_gold | generation_unit | 19 | registration_date | timestamp | true |
+| energy_gold | generation_unit | 20 | commissioning_date | timestamp | true |
+| energy_gold | generation_unit | 21 | migration_absence_flag | string | true |
+| energy_gold | generation_unit | 22 | unit_name | string | true |
+| energy_gold | generation_unit | 23 | capacity_gross_kw | double | true |
+| energy_gold | generation_unit | 24 | capacity_net_kw | double | true |
+| energy_gold | generation_unit | 25 | remote_control_by_grid_operator | boolean | true |
+| energy_gold | generation_unit | 26 | remote_control_by_direct_marketer | boolean | true |
+| energy_gold | generation_unit | 27 | authorisation_id | string | true |
+| energy_gold | generation_unit | 28 | biomass_type | string | true |
+| energy_gold | generation_unit | 29 | combined_heat_and_power_support_id | string | true |
+| energy_gold | generation_unit | 30 | final_decommissioning_date | timestamp | true |
+| energy_gold | generation_unit | 31 | cadastral_district | string | true |
+| energy_gold | generation_unit | 32 | land_parcel_numbers | string | true |
+| energy_gold | generation_unit | 33 | previous_operator_id | string | true |
+| energy_gold | generation_unit | 34 | operator_change_date | timestamp | true |
+| energy_gold | generation_unit | 35 | operator_change_registration_date | timestamp | true |
+| energy_gold | generation_unit | 36 | provisional_shutdown_start_date | timestamp | true |
+| energy_gold | generation_unit | 37 | address_supplement | string | true |
+| energy_gold | generation_unit | 38 | connected_to_extra_high_or_high_voltage | string | true |
+| energy_gold | generation_unit | 39 | resource_energy_identification_code | string | true |
+| energy_gold | generation_unit | 40 | resource_energy_identification_code_display_name | string | true |
+| energy_gold | generation_unit | 41 | assigned_to_grid_reserve | string | true |
+| energy_gold | generation_unit | 42 | assigned_to_capacity_reserve | string | true |
+| energy_gold | generation_unit | 43 | recommissioning_date | timestamp | true |
+| energy_gold | generation_unit | 44 | planned_commissioning_date | timestamp | true |
+| energy_gold | generation_unit | 45 | power_plant_number | string | true |
+| energy_gold | generation_unit | 46 | commissioning_date_current_site | timestamp | true |
+| energy_gold | generation_unit | 47 | operationally_responsible_party | string | true |
+| energy_gold | generation_unit | 48 | plant_name | string | true |
+| energy_gold | generation_unit | 49 | plant_block_name | string | true |
+| energy_gold | generation_unit | 50 | unit_is_in_combined_operation | string | true |
+| energy_gold | generation_unit | 51 | part_of_cross_border_plant | string | true |
+| energy_gold | generation_unit | 52 | emergency_generator | string | true |
+| energy_gold | generation_unit | 53 | combined_operation_net_rated_capacity_increase | string | true |
+| energy_gold | generation_unit | 54 | combined_operation_unit_ids | string | true |
+| energy_gold | generation_unit | 55 | additional_fuels | string | true |
+| energy_gold | generation_unit | 56 | grid_reserve_date | timestamp | true |
+| energy_gold | generation_unit | 57 | exclusive_use_in_combined_operation | string | true |
+| energy_gold | generation_unit | 58 | capacity_net_germany_kw | double | true |
+| energy_gold | generation_unit | 59 | security_standby_start_date | timestamp | true |
+| energy_gold | generation_unit | 60 | capacity_reserve_date | timestamp | true |
+| energy_gold | generation_unit | 61 | construction_start_date | timestamp | true |
+| energy_gold | generation_unit | 62 | electricity_generation_reduction | string | true |
+| energy_gold | generation_unit | 63 | hydro_inflow_type | string | true |
+| energy_gold | generation_unit | 64 | wind_farm_name | string | true |
+| energy_gold | generation_unit | 65 | manufacturer | string | true |
+| energy_gold | generation_unit | 66 | model_designation | string | true |
+| energy_gold | generation_unit | 67 | hub_height_m | double | true |
+| energy_gold | generation_unit | 68 | rotor_diameter_m | double | true |
+| energy_gold | generation_unit | 69 | rotor_blade_deicing_system | string | true |
+| energy_gold | generation_unit | 70 | curtailment_condition_power_limit | string | true |
+| energy_gold | generation_unit | 71 | curtailment_condition_noise_protection_night | string | true |
+| energy_gold | generation_unit | 72 | curtailment_condition_noise_protection_day | string | true |
+| energy_gold | generation_unit | 73 | curtailment_condition_shadow_flicker | string | true |
+| energy_gold | generation_unit | 74 | curtailment_condition_animal_protection | string | true |
+| energy_gold | generation_unit | 75 | curtailment_condition_ice_throw | string | true |
+| energy_gold | generation_unit | 76 | curtailment_condition_other | string | true |
+| energy_gold | generation_unit | 77 | night_marking | string | true |
+| energy_gold | generation_unit | 78 | citizen_energy | string | true |
+| energy_gold | generation_unit | 79 | land_area_used | string | true |
+| energy_gold | generation_unit | 80 | predominant_land_use_before_construction | string | true |
+| energy_gold | generation_unit | 81 | previous_land_use_category | string | true |
+| energy_gold | generation_unit | 82 | north_sea_area_development_plan_zone | string | true |
+| energy_gold | generation_unit | 83 | water_depth_m | double | true |
+| energy_gold | generation_unit | 84 | distance_to_coast_km | double | true |
+| energy_gold | generation_unit | 85 | baltic_sea_area_development_plan_zone | string | true |
+| energy_gold | generation_unit | 86 | ac_dc_coupling | string | true |
+| energy_gold | generation_unit | 87 | battery_technology | string | true |
+| energy_gold | generation_unit | 88 | assigned_inverter_active_power_kw | double | true |
+| energy_gold | generation_unit | 89 | storage_plant_id | string | true |
+| energy_gold | generation_unit | 90 | renewable_energy_act_plant_type | string | true |
+| energy_gold | generation_unit | 91 | pumping_power_consumption | string | true |
+| energy_gold | generation_unit | 92 | pumping_continuously_controllable | string | true |
+| energy_gold | generation_unit | 93 | pumped_storage_technology | string | true |
+| energy_gold | generation_unit | 94 | jointly_registered_solar_unit_id | string | true |
+| energy_gold | generation_unit | 95 | unit_serves_electricity_generation | string | true |
+| energy_gold | generation_unit | 96 | maximum_gas_supply_capacity | string | true |
+| energy_gold | generation_unit | 97 | linked_unit_ids | string | true |
+| energy_gold | generation_unit | 98 | gas_production_capacity | string | true |
+| energy_gold | generation_unit | 99 | gas_storage_type | string | true |
+| energy_gold | generation_unit | 100 | maximum_usable_working_gas_volume | string | true |
+| energy_gold | generation_unit | 101 | maximum_injection_capacity | string | true |
+| energy_gold | generation_unit | 102 | maximum_withdrawal_capacity | string | true |
+| energy_gold | generation_unit | 103 | average_calorific_value | string | true |
+| energy_gold | generation_unit | 104 | resource_energy_identification_code_not_applicable | string | true |
+| energy_gold | generation_unit | 105 | number_of_modules | string | true |
+| energy_gold | generation_unit | 106 | solar_plant_type | string | true |
+| energy_gold | generation_unit | 107 | power_limitation | string | true |
+| energy_gold | generation_unit | 108 | uniform_orientation_and_tilt_angle | string | true |
+| energy_gold | generation_unit | 109 | main_orientation | string | true |
+| energy_gold | generation_unit | 110 | main_orientation_tilt_angle | string | true |
+| energy_gold | generation_unit | 111 | use_area | string | true |
+| energy_gold | generation_unit | 112 | storage_at_same_location | string | true |
+| energy_gold | generation_unit | 113 | secondary_orientation | string | true |
+| energy_gold | generation_unit | 114 | secondary_orientation_tilt_angle | string | true |
+| energy_gold | generation_unit | 115 | land_area_used_hectare | string | true |
+| energy_gold | generation_unit | 116 | solar_park_name | string | true |
+| energy_gold | generation_unit | 117 | additional_land_and_current_land_use_features | string | true |
+| energy_gold | generation_unit | 118 | clear_height_m | double | true |
+| energy_gold | generation_unit | 119 | house_number_not_available | boolean | true |
+| energy_gold | generation_unit | 120 | resource_energy_identification_code_not_available | boolean | true |
+| energy_gold | generation_unit | 121 | power_plant_number_not_available | boolean | true |
+| energy_gold | generation_unit | 122 | federal_state_code | string | true |
+| energy_gold | generation_unit | 123 | federal_state_label_de | string | true |
+| energy_gold | generation_unit | 124 | federal_state | string | true |
+| energy_gold | generation_unit | 125 | wind_onshore_or_offshore_code | string | true |
+| energy_gold | generation_unit | 126 | wind_onshore_or_offshore_label_de | string | true |
+| energy_gold | generation_unit | 127 | wind_onshore_or_offshore | string | true |
+| energy_gold | generation_unit | 128 | operating_status_code | string | true |
+| energy_gold | generation_unit | 129 | operating_status_label_de | string | true |
+| energy_gold | generation_unit | 130 | operating_status | string | true |
+| energy_gold | generation_unit | 131 | system_status_code | string | true |
+| energy_gold | generation_unit | 132 | system_status_label_de | string | true |
+| energy_gold | generation_unit | 133 | system_status | string | true |
+| energy_gold | generation_unit | 134 | feed_in_type_code | string | true |
+| energy_gold | generation_unit | 135 | feed_in_type_label_de | string | true |
+| energy_gold | generation_unit | 136 | feed_in_type | string | true |
+| energy_gold | generation_unit | 137 | main_fuel_code | string | true |
+| energy_gold | generation_unit | 138 | main_fuel_label_de | string | true |
+| energy_gold | generation_unit | 139 | main_fuel | string | true |
+| energy_gold | generation_unit | 140 | additional_main_fuel_code | string | true |
+| energy_gold | generation_unit | 141 | additional_main_fuel_label_de | string | true |
+| energy_gold | generation_unit | 142 | additional_main_fuel | string | true |
+| energy_gold | generation_unit | 143 | generation_technology_code | string | true |
+| energy_gold | generation_unit | 144 | generation_technology_label_de | string | true |
+| energy_gold | generation_unit | 145 | generation_technology | string | true |
+| energy_gold | generation_unit | 146 | offshore_sea_area_code | string | true |
+| energy_gold | generation_unit | 147 | offshore_sea_area_label_de | string | true |
+| energy_gold | generation_unit | 148 | offshore_sea_area | string | true |
+| energy_gold | generation_unit | 149 | hydro_plant_type_code | string | true |
+| energy_gold | generation_unit | 150 | hydro_plant_type_label_de | string | true |
+| energy_gold | generation_unit | 151 | hydro_plant_type | string | true |
+| energy_gold | generation_unit | 152 | deployment_location_code | string | true |
+| energy_gold | generation_unit | 153 | deployment_location_label_de | string | true |
+| energy_gold | generation_unit | 154 | deployment_location | string | true |
+| energy_gold | generation_unit | 155 | _unmatched_code_columns | string | true |
+| energy_gold | generation_unit | 156 | official_municipality_key | string | true |
+| energy_gold | generation_unit | 157 | official_municipality_key_level | string | true |
+| energy_gold | generation_unit | 158 | official_municipality_key_method | string | true |
+| energy_gold | generation_unit | 159 | unit_type | string | true |
+| energy_gold | generation_unit | 160 | source_dataset | string | true |
+| energy_gold | generation_unit | 161 | authorisation_count | bigint | true |
+| energy_gold | generation_unit | 162 | repowering_count | bigint | true |
+| energy_gold | generation_unit | 163 | support_registration_count | int | true |
+| energy_gold | generation_unit | 164 | carrier_key | string | true |
+| energy_gold | generation_unit | 165 | lifecycle_state | string | true |
+| energy_gold | generation_unit | 166 | source_record_id | string | true |
+| energy_gold | generation_unit | 167 | source_system | string | true |
+| energy_gold | generation_unit | 168 | renewable_support_registration_date | timestamp | true |
+| energy_gold | generation_unit | 169 | renewable_support_last_updated_at | timestamp | true |
+| energy_gold | generation_unit | 170 | renewable_support_renewable_energy_act_commissioning_date | timestamp | true |
+| energy_gold | generation_unit | 171 | renewable_support_renewable_energy_act_installation_key | string | true |
+| energy_gold | generation_unit | 172 | renewable_support_installed_capacity_kw | double | true |
+| energy_gold | generation_unit | 173 | renewable_support_exclusive_use_of_biomass | string | true |
+| energy_gold | generation_unit | 174 | renewable_support_auction_award_flag | string | true |
+| energy_gold | generation_unit | 175 | renewable_support_biogas_flexibility_premium_claimed | string | true |
+| energy_gold | generation_unit | 176 | renewable_support_biogas_flexibility_premium_claim_date | timestamp | true |
+| energy_gold | generation_unit | 177 | renewable_support_biogas_capacity_increased | string | true |
+| energy_gold | generation_unit | 178 | renewable_support_biogas_gas_production_capacity | string | true |
+| energy_gold | generation_unit | 179 | renewable_support_biogas_maximum_rated_capacity | string | true |
+| energy_gold | generation_unit | 180 | renewable_support_linked_unit_ids | string | true |
+| energy_gold | generation_unit | 181 | renewable_support_auction_award_number | string | true |
+| energy_gold | generation_unit | 182 | renewable_support_biogas_capacity_increase_date | timestamp | true |
+| energy_gold | generation_unit | 183 | renewable_support_biogas_capacity_increase_extent | string | true |
+| energy_gold | generation_unit | 184 | renewable_support_biomethane_first_use | timestamp | true |
+| energy_gold | generation_unit | 185 | renewable_support_installation_register_identifier | string | true |
+| energy_gold | generation_unit | 186 | renewable_support_retrofit_ids | string | true |
+| energy_gold | generation_unit | 187 | renewable_support_pilot_plant_flag | string | true |
+| energy_gold | generation_unit | 188 | renewable_support_yield_estimate_to_reference_yield_ratio | string | true |
+| energy_gold | generation_unit | 189 | renewable_support_reference_yield_to_actual_yield_ratio_5_years | string | true |
+| energy_gold | generation_unit | 190 | renewable_support_prototype_plant_flag | string | true |
+| energy_gold | generation_unit | 191 | renewable_support_reference_yield_to_actual_yield_ratio_10_years | string | true |
+| energy_gold | generation_unit | 192 | renewable_support_reference_yield_to_actual_yield_ratio_15_years | string | true |
+| energy_gold | generation_unit | 193 | renewable_support_renewable_energy_act_payment_claimed | string | true |
+| energy_gold | generation_unit | 194 | renewable_support_photovoltaic_reporting_portal_registration_number | string | true |
+| energy_gold | generation_unit | 195 | renewable_support_tenant_electricity_assigned | string | true |
+| energy_gold | generation_unit | 196 | renewable_support_tenant_electricity_report_date | timestamp | true |
+| energy_gold | generation_unit | 197 | renewable_support_tenant_electricity_first_award_assignment | string | true |
+| energy_gold | generation_unit | 198 | renewable_support_assigned_bid_quantity | string | true |
+| energy_gold | generation_unit | 199 | renewable_support_installation_register_identifier_not_available | boolean | true |
+| energy_gold | generation_unit | 200 | renewable_support_biogas_gas_production_capacity_not_available | boolean | true |
+| energy_gold | generation_unit | 201 | renewable_support_biomethane_first_use_not_available | boolean | true |
+| energy_gold | generation_unit | 202 | renewable_support_yield_estimate_to_reference_yield_ratio_not_available | boolean | true |
+| energy_gold | generation_unit | 203 | renewable_support_reference_yield_to_actual_yield_ratio_5_years_not_available | boolean | true |
+| energy_gold | generation_unit | 204 | renewable_support_reference_yield_to_actual_yield_ratio_10_years_not_available | boolean | true |
+| energy_gold | generation_unit | 205 | renewable_support_reference_yield_to_actual_yield_ratio_15_years_not_available | boolean | true |
+| energy_gold | generation_unit | 206 | renewable_support_photovoltaic_reporting_portal_registration_number_not_available | boolean | true |
+| energy_gold | generation_unit | 207 | renewable_support_support_status_code | string | true |
+| energy_gold | generation_unit | 208 | renewable_support_support_status_label_de | string | true |
+| energy_gold | generation_unit | 209 | renewable_support_support_status | string | true |
+| energy_gold | generation_unit | 210 | renewable_support__unmatched_code_columns | string | true |
+| energy_gold | generation_unit | 211 | renewable_support_support_registration_id | string | true |
+| energy_gold | generation_unit | 212 | renewable_support_support_scheme | string | true |
+| energy_gold | generation_unit | 213 | renewable_support_unit_type | string | true |
+| energy_gold | generation_unit | 214 | renewable_support_combined_heat_and_power_support_id | string | true |
+| energy_gold | generation_unit | 215 | renewable_support_commissioning_date | timestamp | true |
+| energy_gold | generation_unit | 216 | renewable_support_useful_thermal_output_kw | double | true |
+| energy_gold | generation_unit | 217 | renewable_support_electrical_combined_heat_and_power_capacity_kw | double | true |
+| energy_gold | generation_unit | 218 | chp_support_registration_date | timestamp | true |
+| energy_gold | generation_unit | 219 | chp_support_last_updated_at | timestamp | true |
+| energy_gold | generation_unit | 220 | chp_support_renewable_energy_act_commissioning_date | timestamp | true |
+| energy_gold | generation_unit | 221 | chp_support_renewable_energy_act_support_id | string | true |
+| energy_gold | generation_unit | 222 | chp_support_renewable_energy_act_installation_key | string | true |
+| energy_gold | generation_unit | 223 | chp_support_installed_capacity_kw | double | true |
+| energy_gold | generation_unit | 224 | chp_support_exclusive_use_of_biomass | string | true |
+| energy_gold | generation_unit | 225 | chp_support_auction_award_flag | string | true |
+| energy_gold | generation_unit | 226 | chp_support_biogas_flexibility_premium_claimed | string | true |
+| energy_gold | generation_unit | 227 | chp_support_biogas_flexibility_premium_claim_date | timestamp | true |
+| energy_gold | generation_unit | 228 | chp_support_biogas_capacity_increased | string | true |
+| energy_gold | generation_unit | 229 | chp_support_biogas_gas_production_capacity | string | true |
+| energy_gold | generation_unit | 230 | chp_support_biogas_maximum_rated_capacity | string | true |
+| energy_gold | generation_unit | 231 | chp_support_linked_unit_ids | string | true |
+| energy_gold | generation_unit | 232 | chp_support_auction_award_number | string | true |
+| energy_gold | generation_unit | 233 | chp_support_biogas_capacity_increase_date | timestamp | true |
+| energy_gold | generation_unit | 234 | chp_support_biogas_capacity_increase_extent | string | true |
+| energy_gold | generation_unit | 235 | chp_support_biomethane_first_use | timestamp | true |
+| energy_gold | generation_unit | 236 | chp_support_installation_register_identifier | string | true |
+| energy_gold | generation_unit | 237 | chp_support_retrofit_ids | string | true |
+| energy_gold | generation_unit | 238 | chp_support_pilot_plant_flag | string | true |
+| energy_gold | generation_unit | 239 | chp_support_yield_estimate_to_reference_yield_ratio | string | true |
+| energy_gold | generation_unit | 240 | chp_support_reference_yield_to_actual_yield_ratio_5_years | string | true |
+| energy_gold | generation_unit | 241 | chp_support_prototype_plant_flag | string | true |
+| energy_gold | generation_unit | 242 | chp_support_reference_yield_to_actual_yield_ratio_10_years | string | true |
+| energy_gold | generation_unit | 243 | chp_support_reference_yield_to_actual_yield_ratio_15_years | string | true |
+| energy_gold | generation_unit | 244 | chp_support_renewable_energy_act_payment_claimed | string | true |
+| energy_gold | generation_unit | 245 | chp_support_photovoltaic_reporting_portal_registration_number | string | true |
+| energy_gold | generation_unit | 246 | chp_support_tenant_electricity_assigned | string | true |
+| energy_gold | generation_unit | 247 | chp_support_tenant_electricity_report_date | timestamp | true |
+| energy_gold | generation_unit | 248 | chp_support_tenant_electricity_first_award_assignment | string | true |
+| energy_gold | generation_unit | 249 | chp_support_assigned_bid_quantity | string | true |
+| energy_gold | generation_unit | 250 | chp_support_installation_register_identifier_not_available | boolean | true |
+| energy_gold | generation_unit | 251 | chp_support_biogas_gas_production_capacity_not_available | boolean | true |
+| energy_gold | generation_unit | 252 | chp_support_biomethane_first_use_not_available | boolean | true |
+| energy_gold | generation_unit | 253 | chp_support_yield_estimate_to_reference_yield_ratio_not_available | boolean | true |
+| energy_gold | generation_unit | 254 | chp_support_reference_yield_to_actual_yield_ratio_5_years_not_available | boolean | true |
+| energy_gold | generation_unit | 255 | chp_support_reference_yield_to_actual_yield_ratio_10_years_not_available | boolean | true |
+| energy_gold | generation_unit | 256 | chp_support_reference_yield_to_actual_yield_ratio_15_years_not_available | boolean | true |
+| energy_gold | generation_unit | 257 | chp_support_photovoltaic_reporting_portal_registration_number_not_available | boolean | true |
+| energy_gold | generation_unit | 258 | chp_support_support_status_code | string | true |
+| energy_gold | generation_unit | 259 | chp_support_support_status_label_de | string | true |
+| energy_gold | generation_unit | 260 | chp_support_support_status | string | true |
+| energy_gold | generation_unit | 261 | chp_support__unmatched_code_columns | string | true |
+| energy_gold | generation_unit | 262 | chp_support_support_registration_id | string | true |
+| energy_gold | generation_unit | 263 | chp_support_support_scheme | string | true |
+| energy_gold | generation_unit | 264 | chp_support_unit_type | string | true |
+| energy_gold | generation_unit | 265 | chp_support_commissioning_date | timestamp | true |
+| energy_gold | generation_unit | 266 | chp_support_useful_thermal_output_kw | double | true |
+| energy_gold | generation_unit | 267 | chp_support_electrical_combined_heat_and_power_capacity_kw | double | true |
+| energy_gold | generation_unit | 268 | ecosystem | string | true |
+| energy_gold | generation_unit | 269 | _gold_loaded_at | timestamp | true |
+| energy_gold | generation_unit | 270 | _gold_run_id | string | true |
+| energy_gold | grid_connection_point | 1 | connection_point_id | string | true |
+| energy_gold | grid_connection_point | 2 | last_changed_at | timestamp | true |
+| energy_gold | grid_connection_point | 3 | location_id | string | true |
+| energy_gold | grid_connection_point | 4 | technical_location_name | string | true |
+| energy_gold | grid_connection_point | 5 | location_type | string | true |
+| energy_gold | grid_connection_point | 6 | metering_location | string | true |
+| energy_gold | grid_connection_point | 7 | voltage_level | string | true |
+| energy_gold | grid_connection_point | 8 | net_bottleneck_capacity_kw | double | true |
+| energy_gold | grid_connection_point | 9 | balancing_area_connection_point_id | string | true |
+| energy_gold | grid_connection_point | 10 | control_zone | string | true |
+| energy_gold | grid_connection_point | 11 | grid_id | string | true |
+| energy_gold | grid_connection_point | 12 | still_in_planning_flag | string | true |
+| energy_gold | grid_connection_point | 13 | grid_operator_id | string | true |
+| energy_gold | grid_connection_point | 14 | connection_point_name | string | true |
+| energy_gold | grid_connection_point | 15 | max_withdrawal_power_kw | double | true |
+| energy_gold | grid_connection_point | 16 | gas_quality | string | true |
+| energy_gold | grid_connection_point | 17 | grid_connection_capacity_kw | double | true |
+| energy_gold | grid_connection_point | 18 | max_feed_in_power_kw | double | true |
+| energy_gold | grid_connection_point | 19 | _unmatched_code_columns | string | true |
+| energy_gold | grid_connection_point | 20 | source_record_id | string | true |
+| energy_gold | grid_connection_point | 21 | source_dataset | string | true |
+| energy_gold | grid_connection_point | 22 | source_system | string | true |
+| energy_gold | grid_connection_point | 23 | network_last_updated_at | timestamp | true |
+| energy_gold | grid_connection_point | 24 | network_grid_sector | string | true |
+| energy_gold | grid_connection_point | 25 | network_customers_connected_flag | string | true |
+| energy_gold | grid_connection_point | 26 | network_is_closed_distribution_network | string | true |
+| energy_gold | grid_connection_point | 27 | network_name | string | true |
+| energy_gold | grid_connection_point | 28 | network_balancing_areas | string | true |
+| energy_gold | grid_connection_point | 29 | network_market_area | string | true |
+| energy_gold | grid_connection_point | 30 | network_federal_state_code | string | true |
+| energy_gold | grid_connection_point | 31 | network_federal_state_label_de | string | true |
+| energy_gold | grid_connection_point | 32 | network_federal_state | string | true |
+| energy_gold | grid_connection_point | 33 | network__unmatched_code_columns | string | true |
+| energy_gold | grid_connection_point | 34 | network_connection_point_count | bigint | true |
+| energy_gold | grid_connection_point | 35 | network_location_count | bigint | true |
+| energy_gold | grid_connection_point | 36 | location_last_updated_at | timestamp | true |
+| energy_gold | grid_connection_point | 37 | location_technical_location_name | string | true |
+| energy_gold | grid_connection_point | 38 | location_location_type | string | true |
+| energy_gold | grid_connection_point | 39 | location_linked_unit_ids | string | true |
+| energy_gold | grid_connection_point | 40 | location_connection_point_ids | string | true |
+| energy_gold | grid_connection_point | 41 | location__unmatched_code_columns | string | true |
+| energy_gold | grid_connection_point | 42 | location_distinct_coordinate_count | bigint | true |
+| energy_gold | grid_connection_point | 43 | location_coordinate_conflict | boolean | true |
+| energy_gold | grid_connection_point | 44 | location_unit_count | int | true |
+| energy_gold | grid_connection_point | 45 | location_connection_point_count | int | true |
+| energy_gold | grid_connection_point | 46 | balancing_area_area_energy_identification_code | string | true |
+| energy_gold | grid_connection_point | 47 | balancing_area_control_zone | string | true |
+| energy_gold | grid_connection_point | 48 | balancing_area_balancing_area_connection_point | string | true |
+| energy_gold | grid_connection_point | 49 | balancing_area__unmatched_code_columns | string | true |
+| energy_gold | grid_connection_point | 50 | balancing_area__source_id_ordinal | int | true |
+| energy_gold | grid_connection_point | 51 | balancing_area__source_id_disambiguated | boolean | true |
+| energy_gold | grid_connection_point | 52 | balancing_area_connection_point_count | bigint | true |
+| energy_gold | grid_connection_point | 53 | operator_last_updated_at | timestamp | true |
+| energy_gold | grid_connection_point | 54 | operator_actor_person_type | string | true |
+| energy_gold | grid_connection_point | 55 | operator_company_name | string | true |
+| energy_gold | grid_connection_point | 56 | operator_market_function | string | true |
+| energy_gold | grid_connection_point | 57 | operator_legal_form | string | true |
+| energy_gold | grid_connection_point | 58 | operator_country | string | true |
+| energy_gold | grid_connection_point | 59 | operator_street | string | true |
+| energy_gold | grid_connection_point | 60 | operator_house_number | string | true |
+| energy_gold | grid_connection_point | 61 | operator_postcode | string | true |
+| energy_gold | grid_connection_point | 62 | operator_locality | string | true |
+| energy_gold | grid_connection_point | 63 | operator_telephone | string | true |
+| energy_gold | grid_connection_point | 64 | operator_activity_start_date | timestamp | true |
+| energy_gold | grid_connection_point | 65 | operator_federal_network_agency_operating_number | string | true |
+| energy_gold | grid_connection_point | 66 | operator_delivery_address_country | string | true |
+| energy_gold | grid_connection_point | 67 | operator_delivery_address_postcode | string | true |
+| energy_gold | grid_connection_point | 68 | operator_delivery_address_city | string | true |
+| energy_gold | grid_connection_point | 69 | operator_delivery_address_street | string | true |
+| energy_gold | grid_connection_point | 70 | operator_delivery_address_house_number | string | true |
+| energy_gold | grid_connection_point | 71 | operator_market_actor_registration_date | timestamp | true |
+| energy_gold | grid_connection_point | 72 | operator_email | string | true |
+| energy_gold | grid_connection_point | 73 | operator_foreign_registry_court | string | true |
+| energy_gold | grid_connection_point | 74 | operator_market_roles | string | true |
+| energy_gold | grid_connection_point | 75 | operator_grid | string | true |
+| energy_gold | grid_connection_point | 76 | operator_website | string | true |
+| energy_gold | grid_connection_point | 77 | operator_registry_court | string | true |
+| energy_gold | grid_connection_point | 78 | operator_registry_number_prefix | string | true |
+| energy_gold | grid_connection_point | 79 | operator_registry_number | string | true |
+| energy_gold | grid_connection_point | 80 | operator_energy_regulators_agency_code | string | true |
+| energy_gold | grid_connection_point | 81 | operator_value_added_tax_identification_number | string | true |
+| energy_gold | grid_connection_point | 82 | operator_fax | string | true |
+| energy_gold | grid_connection_point | 83 | operator_address_supplement | string | true |
+| energy_gold | grid_connection_point | 84 | operator_activity_end_date | timestamp | true |
+| energy_gold | grid_connection_point | 85 | operator_grid_operator_web_portal | string | true |
+| energy_gold | grid_connection_point | 86 | operator_delivery_address_supplement | string | true |
+| energy_gold | grid_connection_point | 87 | operator_region | string | true |
+| energy_gold | grid_connection_point | 88 | operator_european_statistical_region_level_2 | string | true |
+| energy_gold | grid_connection_point | 89 | operator_market_actor_first_name | string | true |
+| energy_gold | grid_connection_point | 90 | operator_market_actor_last_name | string | true |
+| energy_gold | grid_connection_point | 91 | operator_other_legal_form | string | true |
+| energy_gold | grid_connection_point | 92 | operator_is_small_or_medium_enterprise | string | true |
+| energy_gold | grid_connection_point | 93 | operator_main_economic_sector_division | string | true |
+| energy_gold | grid_connection_point | 94 | operator_main_economic_sector_group | string | true |
+| energy_gold | grid_connection_point | 95 | operator_economic_sector_section | string | true |
+| energy_gold | grid_connection_point | 96 | operator_direct_marketing_company | string | true |
+| energy_gold | grid_connection_point | 97 | operator_supplies_end_consumers_electricity | string | true |
+| energy_gold | grid_connection_point | 98 | operator_supplies_household_customers_electricity | string | true |
+| energy_gold | grid_connection_point | 99 | operator_electricity_wholesaler | string | true |
+| energy_gold | grid_connection_point | 100 | operator_gas_wholesaler | string | true |
+| energy_gold | grid_connection_point | 101 | operator_supplies_end_consumers_gas | string | true |
+| energy_gold | grid_connection_point | 102 | operator_supplies_household_customers_gas | string | true |
+| energy_gold | grid_connection_point | 103 | operator_foreign_registry_number | string | true |
+| energy_gold | grid_connection_point | 104 | operator_market_actor_salutation | string | true |
+| energy_gold | grid_connection_point | 105 | operator_house_number_not_available | boolean | true |
+| energy_gold | grid_connection_point | 106 | operator_fax_not_available | boolean | true |
+| energy_gold | grid_connection_point | 107 | operator_website_not_available | boolean | true |
+| energy_gold | grid_connection_point | 108 | operator_energy_regulators_agency_code_not_available | boolean | true |
+| energy_gold | grid_connection_point | 109 | operator_value_added_tax_identification_number_not_available | boolean | true |
+| energy_gold | grid_connection_point | 110 | operator_federal_network_agency_operating_number_not_available | boolean | true |
+| energy_gold | grid_connection_point | 111 | operator_delivery_address_house_number_not_available | boolean | true |
+| energy_gold | grid_connection_point | 112 | operator_federal_state_code | string | true |
+| energy_gold | grid_connection_point | 113 | operator_federal_state_label_de | string | true |
+| energy_gold | grid_connection_point | 114 | operator_federal_state | string | true |
+| energy_gold | grid_connection_point | 115 | operator__unmatched_code_columns | string | true |
+| energy_gold | grid_connection_point | 116 | operator_operated_unit_count | bigint | true |
+| energy_gold | grid_connection_point | 117 | operator_market_role_count | bigint | true |
+| energy_gold | grid_connection_point | 118 | ecosystem | string | true |
+| energy_gold | grid_connection_point | 119 | _gold_loaded_at | timestamp | true |
+| energy_gold | grid_connection_point | 120 | _gold_run_id | string | true |
+| energy_gold | grid_intervention_event | 1 | event_key | string | true |
+| energy_gold | grid_intervention_event | 2 | event_start_native | string | true |
+| energy_gold | grid_intervention_event | 3 | event_end_native | string | true |
+| energy_gold | grid_intervention_event | 4 | time_basis | string | true |
+| energy_gold | grid_intervention_event | 5 | event_start_utc | timestamp | true |
+| energy_gold | grid_intervention_event | 6 | event_end_utc | timestamp | true |
+| energy_gold | grid_intervention_event | 7 | event_start_project | timestamp | true |
+| energy_gold | grid_intervention_event | 8 | event_end_project | timestamp | true |
+| energy_gold | grid_intervention_event | 9 | duration_hours | double | true |
+| energy_gold | grid_intervention_event | 10 | reason_native | string | true |
+| energy_gold | grid_intervention_event | 11 | reason | string | true |
+| energy_gold | grid_intervention_event | 12 | direction_native | string | true |
+| energy_gold | grid_intervention_event | 13 | direction | string | true |
+| energy_gold | grid_intervention_event | 14 | mean_power_mw | double | true |
+| energy_gold | grid_intervention_event | 15 | max_power_mw | double | true |
+| energy_gold | grid_intervention_event | 16 | energy_mwh | double | true |
+| energy_gold | grid_intervention_event | 17 | instructing_transmission_system_operator_native | string | true |
+| energy_gold | grid_intervention_event | 18 | instructing_market_area_code | string | true |
+| energy_gold | grid_intervention_event | 19 | requesting_transmission_system_operator_native | string | true |
+| energy_gold | grid_intervention_event | 20 | requested_by_de_lu | boolean | true |
+| energy_gold | grid_intervention_event | 21 | requested_by_fifty_hertz | boolean | true |
+| energy_gold | grid_intervention_event | 22 | requested_by_amprion | boolean | true |
+| energy_gold | grid_intervention_event | 23 | requested_by_tennet_de | boolean | true |
+| energy_gold | grid_intervention_event | 24 | requested_by_transnetbw | boolean | true |
+| energy_gold | grid_intervention_event | 25 | requested_by_pse_poland | boolean | true |
+| energy_gold | grid_intervention_event | 26 | affected_asset_text | string | true |
+| energy_gold | grid_intervention_event | 27 | affected_unit_match_name | string | true |
+| energy_gold | grid_intervention_event | 28 | affected_unit_match_confidence | string | true |
+| energy_gold | grid_intervention_event | 29 | primary_energy_type_native | string | true |
+| energy_gold | grid_intervention_event | 30 | primary_energy_type | string | true |
+| energy_gold | grid_intervention_event | 31 | carrier_key | string | true |
+| energy_gold | grid_intervention_event | 32 | negative_duration | boolean | true |
+| energy_gold | grid_intervention_event | 33 | mean_power_above_maximum_power | boolean | true |
+| energy_gold | grid_intervention_event | 34 | energy_differs_from_power_times_duration | boolean | true |
+| energy_gold | grid_intervention_event | 35 | measurement_basis | string | true |
+| energy_gold | grid_intervention_event | 36 | source_system | string | true |
+| energy_gold | grid_intervention_event | 37 | source_dataset | string | true |
+| energy_gold | grid_intervention_event | 38 | source_record_id | string | true |
+| energy_gold | grid_intervention_event | 39 | ecosystem | string | true |
+| energy_gold | grid_intervention_event | 40 | _gold_loaded_at | timestamp | true |
+| energy_gold | grid_intervention_event | 41 | _gold_run_id | string | true |
+| energy_gold | grid_location | 1 | location_id | string | true |
+| energy_gold | grid_location | 2 | last_updated_at | timestamp | true |
+| energy_gold | grid_location | 3 | technical_location_name | string | true |
+| energy_gold | grid_location | 4 | location_type | string | true |
+| energy_gold | grid_location | 5 | linked_unit_ids | string | true |
+| energy_gold | grid_location | 6 | connection_point_ids | string | true |
+| energy_gold | grid_location | 7 | _unmatched_code_columns | string | true |
+| energy_gold | grid_location | 8 | source_record_id | string | true |
+| energy_gold | grid_location | 9 | source_dataset | string | true |
+| energy_gold | grid_location | 10 | source_system | string | true |
+| energy_gold | grid_location | 11 | distinct_coordinate_count | bigint | true |
+| energy_gold | grid_location | 12 | coordinate_conflict | boolean | true |
+| energy_gold | grid_location | 13 | unit_count | int | true |
+| energy_gold | grid_location | 14 | connection_point_count | int | true |
+| energy_gold | grid_location | 15 | ecosystem | string | true |
+| energy_gold | grid_location | 16 | _gold_loaded_at | timestamp | true |
+| energy_gold | grid_location | 17 | _gold_run_id | string | true |
+| energy_gold | grid_network | 1 | grid_id | string | true |
+| energy_gold | grid_network | 2 | last_updated_at | timestamp | true |
+| energy_gold | grid_network | 3 | grid_sector | string | true |
+| energy_gold | grid_network | 4 | customers_connected_flag | string | true |
+| energy_gold | grid_network | 5 | is_closed_distribution_network | string | true |
+| energy_gold | grid_network | 6 | name | string | true |
+| energy_gold | grid_network | 7 | balancing_areas | string | true |
+| energy_gold | grid_network | 8 | market_area | string | true |
+| energy_gold | grid_network | 9 | federal_state_code | string | true |
+| energy_gold | grid_network | 10 | federal_state_label_de | string | true |
+| energy_gold | grid_network | 11 | federal_state | string | true |
+| energy_gold | grid_network | 12 | _unmatched_code_columns | string | true |
+| energy_gold | grid_network | 13 | source_record_id | string | true |
+| energy_gold | grid_network | 14 | source_dataset | string | true |
+| energy_gold | grid_network | 15 | source_system | string | true |
+| energy_gold | grid_network | 16 | connection_point_count | bigint | true |
+| energy_gold | grid_network | 17 | location_count | bigint | true |
+| energy_gold | grid_network | 18 | ecosystem | string | true |
+| energy_gold | grid_network | 19 | _gold_loaded_at | timestamp | true |
+| energy_gold | grid_network | 20 | _gold_run_id | string | true |
+| energy_gold | iot_device | 1 | device_key | string | true |
+| energy_gold | iot_device | 2 | source_device_id | string | true |
+| energy_gold | iot_device | 3 | device_name | string | true |
+| energy_gold | iot_device | 4 | ip_address | string | true |
+| energy_gold | iot_device | 5 | latitude | double | true |
+| energy_gold | iot_device | 6 | longitude | double | true |
+| energy_gold | iot_device | 7 | country_code | string | true |
+| energy_gold | iot_device | 8 | country_code_alpha3 | string | true |
+| energy_gold | iot_device | 9 | country_name | string | true |
+| energy_gold | iot_device | 10 | observation_timestamp_native | string | true |
+| energy_gold | iot_device | 11 | observation_timestamp_utc | timestamp | true |
+| energy_gold | iot_device | 12 | temperature_degc | double | true |
+| energy_gold | iot_device | 13 | humidity_percent | double | true |
+| energy_gold | iot_device | 14 | co2_level | double | true |
+| energy_gold | iot_device | 15 | battery_level | double | true |
+| energy_gold | iot_device | 16 | lcd_label | string | true |
+| energy_gold | iot_device | 17 | data_origin | string | true |
+| energy_gold | iot_device | 18 | measurement_basis | string | true |
+| energy_gold | iot_device | 19 | source_system | string | true |
+| energy_gold | iot_device | 20 | source_dataset | string | true |
+| energy_gold | iot_device | 21 | source_record_id | string | true |
+| energy_gold | iot_device | 22 | ecosystem | string | true |
+| energy_gold | iot_device | 23 | _gold_loaded_at | timestamp | true |
+| energy_gold | iot_device | 24 | _gold_run_id | string | true |
+| energy_gold | market_actor | 1 | market_actor_id | string | true |
+| energy_gold | market_actor | 2 | last_updated_at | timestamp | true |
+| energy_gold | market_actor | 3 | actor_person_type | string | true |
+| energy_gold | market_actor | 4 | company_name | string | true |
+| energy_gold | market_actor | 5 | market_function | string | true |
+| energy_gold | market_actor | 6 | legal_form | string | true |
+| energy_gold | market_actor | 7 | country | string | true |
+| energy_gold | market_actor | 8 | street | string | true |
+| energy_gold | market_actor | 9 | house_number | string | true |
+| energy_gold | market_actor | 10 | postcode | string | true |
+| energy_gold | market_actor | 11 | locality | string | true |
+| energy_gold | market_actor | 12 | telephone | string | true |
+| energy_gold | market_actor | 13 | activity_start_date | timestamp | true |
+| energy_gold | market_actor | 14 | federal_network_agency_operating_number | string | true |
+| energy_gold | market_actor | 15 | delivery_address_country | string | true |
+| energy_gold | market_actor | 16 | delivery_address_postcode | string | true |
+| energy_gold | market_actor | 17 | delivery_address_city | string | true |
+| energy_gold | market_actor | 18 | delivery_address_street | string | true |
+| energy_gold | market_actor | 19 | delivery_address_house_number | string | true |
+| energy_gold | market_actor | 20 | market_actor_registration_date | timestamp | true |
+| energy_gold | market_actor | 21 | email | string | true |
+| energy_gold | market_actor | 22 | foreign_registry_court | string | true |
+| energy_gold | market_actor | 23 | market_roles | string | true |
+| energy_gold | market_actor | 24 | grid | string | true |
+| energy_gold | market_actor | 25 | website | string | true |
+| energy_gold | market_actor | 26 | registry_court | string | true |
+| energy_gold | market_actor | 27 | registry_number_prefix | string | true |
+| energy_gold | market_actor | 28 | registry_number | string | true |
+| energy_gold | market_actor | 29 | energy_regulators_agency_code | string | true |
+| energy_gold | market_actor | 30 | value_added_tax_identification_number | string | true |
+| energy_gold | market_actor | 31 | fax | string | true |
+| energy_gold | market_actor | 32 | address_supplement | string | true |
+| energy_gold | market_actor | 33 | activity_end_date | timestamp | true |
+| energy_gold | market_actor | 34 | grid_operator_web_portal | string | true |
+| energy_gold | market_actor | 35 | delivery_address_supplement | string | true |
+| energy_gold | market_actor | 36 | region | string | true |
+| energy_gold | market_actor | 37 | european_statistical_region_level_2 | string | true |
+| energy_gold | market_actor | 38 | market_actor_first_name | string | true |
+| energy_gold | market_actor | 39 | market_actor_last_name | string | true |
+| energy_gold | market_actor | 40 | other_legal_form | string | true |
+| energy_gold | market_actor | 41 | is_small_or_medium_enterprise | string | true |
+| energy_gold | market_actor | 42 | main_economic_sector_division | string | true |
+| energy_gold | market_actor | 43 | main_economic_sector_group | string | true |
+| energy_gold | market_actor | 44 | economic_sector_section | string | true |
+| energy_gold | market_actor | 45 | direct_marketing_company | string | true |
+| energy_gold | market_actor | 46 | supplies_end_consumers_electricity | string | true |
+| energy_gold | market_actor | 47 | supplies_household_customers_electricity | string | true |
+| energy_gold | market_actor | 48 | electricity_wholesaler | string | true |
+| energy_gold | market_actor | 49 | gas_wholesaler | string | true |
+| energy_gold | market_actor | 50 | supplies_end_consumers_gas | string | true |
+| energy_gold | market_actor | 51 | supplies_household_customers_gas | string | true |
+| energy_gold | market_actor | 52 | foreign_registry_number | string | true |
+| energy_gold | market_actor | 53 | market_actor_salutation | string | true |
+| energy_gold | market_actor | 54 | house_number_not_available | boolean | true |
+| energy_gold | market_actor | 55 | fax_not_available | boolean | true |
+| energy_gold | market_actor | 56 | website_not_available | boolean | true |
+| energy_gold | market_actor | 57 | energy_regulators_agency_code_not_available | boolean | true |
+| energy_gold | market_actor | 58 | value_added_tax_identification_number_not_available | boolean | true |
+| energy_gold | market_actor | 59 | federal_network_agency_operating_number_not_available | boolean | true |
+| energy_gold | market_actor | 60 | delivery_address_house_number_not_available | boolean | true |
+| energy_gold | market_actor | 61 | federal_state_code | string | true |
+| energy_gold | market_actor | 62 | federal_state_label_de | string | true |
+| energy_gold | market_actor | 63 | federal_state | string | true |
+| energy_gold | market_actor | 64 | _unmatched_code_columns | string | true |
+| energy_gold | market_actor | 65 | source_record_id | string | true |
+| energy_gold | market_actor | 66 | source_dataset | string | true |
+| energy_gold | market_actor | 67 | source_system | string | true |
+| energy_gold | market_actor | 68 | operated_unit_count | bigint | true |
+| energy_gold | market_actor | 69 | market_role_count | bigint | true |
+| energy_gold | market_actor | 70 | ecosystem | string | true |
+| energy_gold | market_actor | 71 | _gold_loaded_at | timestamp | true |
+| energy_gold | market_actor | 72 | _gold_run_id | string | true |
+| energy_gold | market_actor_role | 1 | market_actor_id | string | true |
+| energy_gold | market_actor_role | 2 | last_updated_at | timestamp | true |
+| energy_gold | market_actor_role | 3 | market_actor_role_id | string | true |
+| energy_gold | market_actor_role | 4 | market_role | string | true |
+| energy_gold | market_actor_role | 5 | federal_network_agency_operating_number | string | true |
+| energy_gold | market_actor_role | 6 | market_role_contact_details | string | true |
+| energy_gold | market_actor_role | 7 | market_partner_identification_number | string | true |
+| energy_gold | market_actor_role | 8 | federal_network_agency_operating_number_not_available | boolean | true |
+| energy_gold | market_actor_role | 9 | market_partner_identification_number_not_available | boolean | true |
+| energy_gold | market_actor_role | 10 | _unmatched_code_columns | string | true |
+| energy_gold | market_actor_role | 11 | source_record_id | string | true |
+| energy_gold | market_actor_role | 12 | source_dataset | string | true |
+| energy_gold | market_actor_role | 13 | source_system | string | true |
+| energy_gold | market_actor_role | 14 | actor_last_updated_at | timestamp | true |
+| energy_gold | market_actor_role | 15 | actor_actor_person_type | string | true |
+| energy_gold | market_actor_role | 16 | actor_company_name | string | true |
+| energy_gold | market_actor_role | 17 | actor_market_function | string | true |
+| energy_gold | market_actor_role | 18 | actor_legal_form | string | true |
+| energy_gold | market_actor_role | 19 | actor_country | string | true |
+| energy_gold | market_actor_role | 20 | actor_street | string | true |
+| energy_gold | market_actor_role | 21 | actor_house_number | string | true |
+| energy_gold | market_actor_role | 22 | actor_postcode | string | true |
+| energy_gold | market_actor_role | 23 | actor_locality | string | true |
+| energy_gold | market_actor_role | 24 | actor_telephone | string | true |
+| energy_gold | market_actor_role | 25 | actor_activity_start_date | timestamp | true |
+| energy_gold | market_actor_role | 26 | actor_federal_network_agency_operating_number | string | true |
+| energy_gold | market_actor_role | 27 | actor_delivery_address_country | string | true |
+| energy_gold | market_actor_role | 28 | actor_delivery_address_postcode | string | true |
+| energy_gold | market_actor_role | 29 | actor_delivery_address_city | string | true |
+| energy_gold | market_actor_role | 30 | actor_delivery_address_street | string | true |
+| energy_gold | market_actor_role | 31 | actor_delivery_address_house_number | string | true |
+| energy_gold | market_actor_role | 32 | actor_market_actor_registration_date | timestamp | true |
+| energy_gold | market_actor_role | 33 | actor_email | string | true |
+| energy_gold | market_actor_role | 34 | actor_foreign_registry_court | string | true |
+| energy_gold | market_actor_role | 35 | actor_market_roles | string | true |
+| energy_gold | market_actor_role | 36 | actor_grid | string | true |
+| energy_gold | market_actor_role | 37 | actor_website | string | true |
+| energy_gold | market_actor_role | 38 | actor_registry_court | string | true |
+| energy_gold | market_actor_role | 39 | actor_registry_number_prefix | string | true |
+| energy_gold | market_actor_role | 40 | actor_registry_number | string | true |
+| energy_gold | market_actor_role | 41 | actor_energy_regulators_agency_code | string | true |
+| energy_gold | market_actor_role | 42 | actor_value_added_tax_identification_number | string | true |
+| energy_gold | market_actor_role | 43 | actor_fax | string | true |
+| energy_gold | market_actor_role | 44 | actor_address_supplement | string | true |
+| energy_gold | market_actor_role | 45 | actor_activity_end_date | timestamp | true |
+| energy_gold | market_actor_role | 46 | actor_grid_operator_web_portal | string | true |
+| energy_gold | market_actor_role | 47 | actor_delivery_address_supplement | string | true |
+| energy_gold | market_actor_role | 48 | actor_region | string | true |
+| energy_gold | market_actor_role | 49 | actor_european_statistical_region_level_2 | string | true |
+| energy_gold | market_actor_role | 50 | actor_market_actor_first_name | string | true |
+| energy_gold | market_actor_role | 51 | actor_market_actor_last_name | string | true |
+| energy_gold | market_actor_role | 52 | actor_other_legal_form | string | true |
+| energy_gold | market_actor_role | 53 | actor_is_small_or_medium_enterprise | string | true |
+| energy_gold | market_actor_role | 54 | actor_main_economic_sector_division | string | true |
+| energy_gold | market_actor_role | 55 | actor_main_economic_sector_group | string | true |
+| energy_gold | market_actor_role | 56 | actor_economic_sector_section | string | true |
+| energy_gold | market_actor_role | 57 | actor_direct_marketing_company | string | true |
+| energy_gold | market_actor_role | 58 | actor_supplies_end_consumers_electricity | string | true |
+| energy_gold | market_actor_role | 59 | actor_supplies_household_customers_electricity | string | true |
+| energy_gold | market_actor_role | 60 | actor_electricity_wholesaler | string | true |
+| energy_gold | market_actor_role | 61 | actor_gas_wholesaler | string | true |
+| energy_gold | market_actor_role | 62 | actor_supplies_end_consumers_gas | string | true |
+| energy_gold | market_actor_role | 63 | actor_supplies_household_customers_gas | string | true |
+| energy_gold | market_actor_role | 64 | actor_foreign_registry_number | string | true |
+| energy_gold | market_actor_role | 65 | actor_market_actor_salutation | string | true |
+| energy_gold | market_actor_role | 66 | actor_house_number_not_available | boolean | true |
+| energy_gold | market_actor_role | 67 | actor_fax_not_available | boolean | true |
+| energy_gold | market_actor_role | 68 | actor_website_not_available | boolean | true |
+| energy_gold | market_actor_role | 69 | actor_energy_regulators_agency_code_not_available | boolean | true |
+| energy_gold | market_actor_role | 70 | actor_value_added_tax_identification_number_not_available | boolean | true |
+| energy_gold | market_actor_role | 71 | actor_federal_network_agency_operating_number_not_available | boolean | true |
+| energy_gold | market_actor_role | 72 | actor_delivery_address_house_number_not_available | boolean | true |
+| energy_gold | market_actor_role | 73 | actor_federal_state_code | string | true |
+| energy_gold | market_actor_role | 74 | actor_federal_state_label_de | string | true |
+| energy_gold | market_actor_role | 75 | actor_federal_state | string | true |
+| energy_gold | market_actor_role | 76 | actor__unmatched_code_columns | string | true |
+| energy_gold | market_actor_role | 77 | actor_operated_unit_count | bigint | true |
+| energy_gold | market_actor_role | 78 | actor_market_role_count | bigint | true |
+| energy_gold | market_actor_role | 79 | ecosystem | string | true |
+| energy_gold | market_actor_role | 80 | _gold_loaded_at | timestamp | true |
+| energy_gold | market_actor_role | 81 | _gold_run_id | string | true |
+| energy_gold | market_energy_component | 1 | observation_key | string | true |
+| energy_gold | market_energy_component | 2 | location_key | string | true |
+| energy_gold | market_energy_component | 3 | source_location_id | string | true |
+| energy_gold | market_energy_component | 4 | market_area_code | string | true |
+| energy_gold | market_energy_component | 5 | observation_timestamp_native | string | true |
+| energy_gold | market_energy_component | 6 | time_basis | string | true |
+| energy_gold | market_energy_component | 7 | utc_offset_hours | double | true |
+| energy_gold | market_energy_component | 8 | observation_timestamp_utc | timestamp | true |
+| energy_gold | market_energy_component | 9 | observation_timestamp_project | timestamp | true |
+| energy_gold | market_energy_component | 10 | local_date | date | true |
+| energy_gold | market_energy_component | 11 | interval_seconds | int | true |
+| energy_gold | market_energy_component | 12 | interval_reference | string | true |
+| energy_gold | market_energy_component | 13 | component_group | string | true |
+| energy_gold | market_energy_component | 14 | component_kind | string | true |
+| energy_gold | market_energy_component | 15 | forecast_scope | string | true |
+| energy_gold | market_energy_component | 16 | carrier_code | string | true |
+| energy_gold | market_energy_component | 17 | carrier_key | string | true |
+| energy_gold | market_energy_component | 18 | native_label | string | true |
+| energy_gold | market_energy_component | 19 | energy_mwh | double | true |
+| energy_gold | market_energy_component | 20 | power_w | double | true |
+| energy_gold | market_energy_component | 21 | semantic_status | string | true |
+| energy_gold | market_energy_component | 22 | semantic_issue_ref | string | true |
+| energy_gold | market_energy_component | 23 | source_series | string | true |
+| energy_gold | market_energy_component | 24 | source_filter_id | string | true |
+| energy_gold | market_energy_component | 25 | counterpart_area_code | string | true |
+| energy_gold | market_energy_component | 26 | source_license | string | true |
+| energy_gold | market_energy_component | 27 | is_outlier_five_sigma | boolean | true |
+| energy_gold | market_energy_component | 28 | is_stuck_reading | boolean | true |
+| energy_gold | market_energy_component | 29 | sign_convention | string | true |
+| energy_gold | market_energy_component | 30 | measurement_basis | string | true |
+| energy_gold | market_energy_component | 31 | source_system | string | true |
+| energy_gold | market_energy_component | 32 | source_dataset | string | true |
+| energy_gold | market_energy_component | 33 | source_record_id | string | true |
+| energy_gold | market_energy_component | 34 | ecosystem | string | true |
+| energy_gold | market_energy_component | 35 | _gold_loaded_at | timestamp | true |
+| energy_gold | market_energy_component | 36 | _gold_run_id | string | true |
+| energy_gold | market_price | 1 | observation_key | string | true |
+| energy_gold | market_price | 2 | location_key | string | true |
+| energy_gold | market_price | 3 | source_location_id | string | true |
+| energy_gold | market_price | 4 | market_area_code | string | true |
+| energy_gold | market_price | 5 | observation_timestamp_native | string | true |
+| energy_gold | market_price | 6 | time_basis | string | true |
+| energy_gold | market_price | 7 | utc_offset_hours | double | true |
+| energy_gold | market_price | 8 | observation_timestamp_utc | timestamp | true |
+| energy_gold | market_price | 9 | observation_timestamp_project | timestamp | true |
+| energy_gold | market_price | 10 | local_date | date | true |
+| energy_gold | market_price | 11 | interval_seconds | int | true |
+| energy_gold | market_price | 12 | interval_reference | string | true |
+| energy_gold | market_price | 13 | price_eur_per_mwh | double | true |
+| energy_gold | market_price | 14 | balancing_price_eur_per_mwh | double | true |
+| energy_gold | market_price | 15 | price_eur_per_mwh_outlier_five_sigma | boolean | true |
+| energy_gold | market_price | 16 | sign_convention | string | true |
+| energy_gold | market_price | 17 | measurement_basis | string | true |
+| energy_gold | market_price | 18 | source_system | string | true |
+| energy_gold | market_price | 19 | source_dataset | string | true |
+| energy_gold | market_price | 20 | source_record_id | string | true |
+| energy_gold | market_price | 21 | ecosystem | string | true |
+| energy_gold | market_price | 22 | _gold_loaded_at | timestamp | true |
+| energy_gold | market_price | 23 | _gold_run_id | string | true |
+| energy_gold | plant_sensor_observation | 1 | sample_key | string | true |
+| energy_gold | plant_sensor_observation | 2 | ambient_temperature_degc | double | true |
+| energy_gold | plant_sensor_observation | 3 | exhaust_vacuum_cm_of_mercury | double | true |
+| energy_gold | plant_sensor_observation | 4 | ambient_pressure_mbar | double | true |
+| energy_gold | plant_sensor_observation | 5 | relative_humidity_percent | double | true |
+| energy_gold | plant_sensor_observation | 6 | net_electrical_output_mw | double | true |
+| energy_gold | plant_sensor_observation | 7 | repeat_index | int | true |
+| energy_gold | plant_sensor_observation | 8 | exact_repeat | boolean | true |
+| energy_gold | plant_sensor_observation | 9 | relative_humidity_above_100 | boolean | true |
+| energy_gold | plant_sensor_observation | 10 | measurement_basis | string | true |
+| energy_gold | plant_sensor_observation | 11 | source_system | string | true |
+| energy_gold | plant_sensor_observation | 12 | source_dataset | string | true |
+| energy_gold | plant_sensor_observation | 13 | source_record_id | string | true |
+| energy_gold | plant_sensor_observation | 14 | ecosystem | string | true |
+| energy_gold | plant_sensor_observation | 15 | _gold_loaded_at | timestamp | true |
+| energy_gold | plant_sensor_observation | 16 | _gold_run_id | string | true |
+| energy_gold | power_plant | 1 | mastr_unit_id | string | true |
+| energy_gold | power_plant | 2 | operator_name | string | true |
+| energy_gold | power_plant | 3 | plant_name | string | true |
+| energy_gold | power_plant | 4 | postcode | string | true |
+| energy_gold | power_plant | 5 | municipality | string | true |
+| energy_gold | power_plant | 6 | street | string | true |
+| energy_gold | power_plant | 7 | house_number | string | true |
+| energy_gold | power_plant | 8 | federal_state | string | true |
+| energy_gold | power_plant | 9 | country | string | true |
+| energy_gold | power_plant | 10 | commissioning_year | int | true |
+| energy_gold | power_plant | 11 | decommissioning_year | int | true |
+| energy_gold | power_plant | 12 | main_fuel | string | true |
+| energy_gold | power_plant | 13 | is_combined_heat_and_power | boolean | true |
+| energy_gold | power_plant | 14 | is_renewable_carrier | boolean | true |
+| energy_gold | power_plant | 15 | capacity_gross_mw | double | true |
+| energy_gold | power_plant | 16 | capacity_net_mw | double | true |
+| energy_gold | power_plant | 17 | generation_technology | string | true |
+| energy_gold | power_plant | 18 | grid_voltage_level | string | true |
+| energy_gold | power_plant | 19 | connecting_grid_operator | string | true |
+| energy_gold | power_plant | 20 | is_border_plant | boolean | true |
+| energy_gold | power_plant | 21 | border_plant_net_capacity_mw | double | true |
+| energy_gold | power_plant | 22 | record_type_code | string | true |
+| energy_gold | power_plant | 23 | record_type_label_de | string | true |
+| energy_gold | power_plant | 24 | record_type | string | true |
+| energy_gold | power_plant | 25 | operating_status_code | string | true |
+| energy_gold | power_plant | 26 | operating_status_label_de | string | true |
+| energy_gold | power_plant | 27 | operating_status | string | true |
+| energy_gold | power_plant | 28 | energy_carrier_code | string | true |
+| energy_gold | power_plant | 29 | energy_carrier_label_de | string | true |
+| energy_gold | power_plant | 30 | energy_carrier | string | true |
+| energy_gold | power_plant | 31 | feed_in_type_code | string | true |
+| energy_gold | power_plant | 32 | feed_in_type_label_de | string | true |
+| energy_gold | power_plant | 33 | feed_in_type | string | true |
+| energy_gold | power_plant | 34 | official_municipality_key | string | true |
+| energy_gold | power_plant | 35 | official_municipality_key_level | string | true |
+| energy_gold | power_plant | 36 | official_municipality_key_method | string | true |
+| energy_gold | power_plant | 37 | _bundesland_out_of_set | boolean | true |
+| energy_gold | power_plant | 38 | energy_carrier_mastr_matched | boolean | true |
+| energy_gold | power_plant | 39 | unit_resolved | boolean | true |
+| energy_gold | power_plant | 40 | carrier_key | string | true |
+| energy_gold | power_plant | 41 | _source_id_ordinal | int | true |
+| energy_gold | power_plant | 42 | _source_id_disambiguated | boolean | true |
+| energy_gold | power_plant | 43 | source_record_id | string | true |
+| energy_gold | power_plant | 44 | source_dataset | string | true |
+| energy_gold | power_plant | 45 | source_system | string | true |
+| energy_gold | power_plant | 46 | unit_renewable_energy_act_support_id | string | true |
+| energy_gold | power_plant | 47 | unit_last_updated_at | timestamp | true |
+| energy_gold | power_plant | 48 | unit_location_id | string | true |
+| energy_gold | power_plant | 49 | unit_grid_operator_check_status | string | true |
+| energy_gold | power_plant | 50 | unit_grid_operator_check_date | timestamp | true |
+| energy_gold | power_plant | 51 | unit_operator_id | string | true |
+| energy_gold | power_plant | 52 | unit_district | string | true |
+| energy_gold | power_plant | 53 | unit_municipality | string | true |
+| energy_gold | power_plant | 54 | unit_source_municipality_key | string | true |
+| energy_gold | power_plant | 55 | unit_postcode | string | true |
+| energy_gold | power_plant | 56 | unit_street | string | true |
+| energy_gold | power_plant | 57 | unit_street_not_found | string | true |
+| energy_gold | power_plant | 58 | unit_house_number | string | true |
+| energy_gold | power_plant | 59 | unit_house_number_not_found | string | true |
+| energy_gold | power_plant | 60 | unit_locality | string | true |
+| energy_gold | power_plant | 61 | unit_longitude | double | true |
+| energy_gold | power_plant | 62 | unit_latitude | double | true |
+| energy_gold | power_plant | 63 | unit_registration_date | timestamp | true |
+| energy_gold | power_plant | 64 | unit_commissioning_date | timestamp | true |
+| energy_gold | power_plant | 65 | unit_migration_absence_flag | string | true |
+| energy_gold | power_plant | 66 | unit_unit_name | string | true |
+| energy_gold | power_plant | 67 | unit_capacity_gross_kw | double | true |
+| energy_gold | power_plant | 68 | unit_capacity_net_kw | double | true |
+| energy_gold | power_plant | 69 | unit_remote_control_by_grid_operator | boolean | true |
+| energy_gold | power_plant | 70 | unit_remote_control_by_direct_marketer | boolean | true |
+| energy_gold | power_plant | 71 | unit_authorisation_id | string | true |
+| energy_gold | power_plant | 72 | unit_biomass_type | string | true |
+| energy_gold | power_plant | 73 | unit_combined_heat_and_power_support_id | string | true |
+| energy_gold | power_plant | 74 | unit_final_decommissioning_date | timestamp | true |
+| energy_gold | power_plant | 75 | unit_cadastral_district | string | true |
+| energy_gold | power_plant | 76 | unit_land_parcel_numbers | string | true |
+| energy_gold | power_plant | 77 | unit_previous_operator_id | string | true |
+| energy_gold | power_plant | 78 | unit_operator_change_date | timestamp | true |
+| energy_gold | power_plant | 79 | unit_operator_change_registration_date | timestamp | true |
+| energy_gold | power_plant | 80 | unit_provisional_shutdown_start_date | timestamp | true |
+| energy_gold | power_plant | 81 | unit_address_supplement | string | true |
+| energy_gold | power_plant | 82 | unit_connected_to_extra_high_or_high_voltage | string | true |
+| energy_gold | power_plant | 83 | unit_resource_energy_identification_code | string | true |
+| energy_gold | power_plant | 84 | unit_resource_energy_identification_code_display_name | string | true |
+| energy_gold | power_plant | 85 | unit_assigned_to_grid_reserve | string | true |
+| energy_gold | power_plant | 86 | unit_assigned_to_capacity_reserve | string | true |
+| energy_gold | power_plant | 87 | unit_recommissioning_date | timestamp | true |
+| energy_gold | power_plant | 88 | unit_planned_commissioning_date | timestamp | true |
+| energy_gold | power_plant | 89 | unit_power_plant_number | string | true |
+| energy_gold | power_plant | 90 | unit_commissioning_date_current_site | timestamp | true |
+| energy_gold | power_plant | 91 | unit_operationally_responsible_party | string | true |
+| energy_gold | power_plant | 92 | unit_plant_name | string | true |
+| energy_gold | power_plant | 93 | unit_plant_block_name | string | true |
+| energy_gold | power_plant | 94 | unit_unit_is_in_combined_operation | string | true |
+| energy_gold | power_plant | 95 | unit_part_of_cross_border_plant | string | true |
+| energy_gold | power_plant | 96 | unit_emergency_generator | string | true |
+| energy_gold | power_plant | 97 | unit_combined_operation_net_rated_capacity_increase | string | true |
+| energy_gold | power_plant | 98 | unit_combined_operation_unit_ids | string | true |
+| energy_gold | power_plant | 99 | unit_additional_fuels | string | true |
+| energy_gold | power_plant | 100 | unit_grid_reserve_date | timestamp | true |
+| energy_gold | power_plant | 101 | unit_exclusive_use_in_combined_operation | string | true |
+| energy_gold | power_plant | 102 | unit_capacity_net_germany_kw | double | true |
+| energy_gold | power_plant | 103 | unit_security_standby_start_date | timestamp | true |
+| energy_gold | power_plant | 104 | unit_capacity_reserve_date | timestamp | true |
+| energy_gold | power_plant | 105 | unit_construction_start_date | timestamp | true |
+| energy_gold | power_plant | 106 | unit_electricity_generation_reduction | string | true |
+| energy_gold | power_plant | 107 | unit_hydro_inflow_type | string | true |
+| energy_gold | power_plant | 108 | unit_wind_farm_name | string | true |
+| energy_gold | power_plant | 109 | unit_manufacturer | string | true |
+| energy_gold | power_plant | 110 | unit_model_designation | string | true |
+| energy_gold | power_plant | 111 | unit_hub_height_m | double | true |
+| energy_gold | power_plant | 112 | unit_rotor_diameter_m | double | true |
+| energy_gold | power_plant | 113 | unit_rotor_blade_deicing_system | string | true |
+| energy_gold | power_plant | 114 | unit_curtailment_condition_power_limit | string | true |
+| energy_gold | power_plant | 115 | unit_curtailment_condition_noise_protection_night | string | true |
+| energy_gold | power_plant | 116 | unit_curtailment_condition_noise_protection_day | string | true |
+| energy_gold | power_plant | 117 | unit_curtailment_condition_shadow_flicker | string | true |
+| energy_gold | power_plant | 118 | unit_curtailment_condition_animal_protection | string | true |
+| energy_gold | power_plant | 119 | unit_curtailment_condition_ice_throw | string | true |
+| energy_gold | power_plant | 120 | unit_curtailment_condition_other | string | true |
+| energy_gold | power_plant | 121 | unit_night_marking | string | true |
+| energy_gold | power_plant | 122 | unit_citizen_energy | string | true |
+| energy_gold | power_plant | 123 | unit_land_area_used | string | true |
+| energy_gold | power_plant | 124 | unit_predominant_land_use_before_construction | string | true |
+| energy_gold | power_plant | 125 | unit_previous_land_use_category | string | true |
+| energy_gold | power_plant | 126 | unit_north_sea_area_development_plan_zone | string | true |
+| energy_gold | power_plant | 127 | unit_water_depth_m | double | true |
+| energy_gold | power_plant | 128 | unit_distance_to_coast_km | double | true |
+| energy_gold | power_plant | 129 | unit_baltic_sea_area_development_plan_zone | string | true |
+| energy_gold | power_plant | 130 | unit_ac_dc_coupling | string | true |
+| energy_gold | power_plant | 131 | unit_battery_technology | string | true |
+| energy_gold | power_plant | 132 | unit_assigned_inverter_active_power_kw | double | true |
+| energy_gold | power_plant | 133 | unit_storage_plant_id | string | true |
+| energy_gold | power_plant | 134 | unit_renewable_energy_act_plant_type | string | true |
+| energy_gold | power_plant | 135 | unit_pumping_power_consumption | string | true |
+| energy_gold | power_plant | 136 | unit_pumping_continuously_controllable | string | true |
+| energy_gold | power_plant | 137 | unit_pumped_storage_technology | string | true |
+| energy_gold | power_plant | 138 | unit_jointly_registered_solar_unit_id | string | true |
+| energy_gold | power_plant | 139 | unit_unit_serves_electricity_generation | string | true |
+| energy_gold | power_plant | 140 | unit_maximum_gas_supply_capacity | string | true |
+| energy_gold | power_plant | 141 | unit_linked_unit_ids | string | true |
+| energy_gold | power_plant | 142 | unit_gas_production_capacity | string | true |
+| energy_gold | power_plant | 143 | unit_gas_storage_type | string | true |
+| energy_gold | power_plant | 144 | unit_maximum_usable_working_gas_volume | string | true |
+| energy_gold | power_plant | 145 | unit_maximum_injection_capacity | string | true |
+| energy_gold | power_plant | 146 | unit_maximum_withdrawal_capacity | string | true |
+| energy_gold | power_plant | 147 | unit_average_calorific_value | string | true |
+| energy_gold | power_plant | 148 | unit_resource_energy_identification_code_not_applicable | string | true |
+| energy_gold | power_plant | 149 | unit_number_of_modules | string | true |
+| energy_gold | power_plant | 150 | unit_solar_plant_type | string | true |
+| energy_gold | power_plant | 151 | unit_power_limitation | string | true |
+| energy_gold | power_plant | 152 | unit_uniform_orientation_and_tilt_angle | string | true |
+| energy_gold | power_plant | 153 | unit_main_orientation | string | true |
+| energy_gold | power_plant | 154 | unit_main_orientation_tilt_angle | string | true |
+| energy_gold | power_plant | 155 | unit_use_area | string | true |
+| energy_gold | power_plant | 156 | unit_storage_at_same_location | string | true |
+| energy_gold | power_plant | 157 | unit_secondary_orientation | string | true |
+| energy_gold | power_plant | 158 | unit_secondary_orientation_tilt_angle | string | true |
+| energy_gold | power_plant | 159 | unit_land_area_used_hectare | string | true |
+| energy_gold | power_plant | 160 | unit_solar_park_name | string | true |
+| energy_gold | power_plant | 161 | unit_additional_land_and_current_land_use_features | string | true |
+| energy_gold | power_plant | 162 | unit_clear_height_m | double | true |
+| energy_gold | power_plant | 163 | unit_house_number_not_available | boolean | true |
+| energy_gold | power_plant | 164 | unit_resource_energy_identification_code_not_available | boolean | true |
+| energy_gold | power_plant | 165 | unit_power_plant_number_not_available | boolean | true |
+| energy_gold | power_plant | 166 | unit_federal_state_code | string | true |
+| energy_gold | power_plant | 167 | unit_federal_state_label_de | string | true |
+| energy_gold | power_plant | 168 | unit_federal_state | string | true |
+| energy_gold | power_plant | 169 | unit_wind_onshore_or_offshore_code | string | true |
+| energy_gold | power_plant | 170 | unit_wind_onshore_or_offshore_label_de | string | true |
+| energy_gold | power_plant | 171 | unit_wind_onshore_or_offshore | string | true |
+| energy_gold | power_plant | 172 | unit_operating_status_code | string | true |
+| energy_gold | power_plant | 173 | unit_operating_status_label_de | string | true |
+| energy_gold | power_plant | 174 | unit_operating_status | string | true |
+| energy_gold | power_plant | 175 | unit_system_status_code | string | true |
+| energy_gold | power_plant | 176 | unit_system_status_label_de | string | true |
+| energy_gold | power_plant | 177 | unit_system_status | string | true |
+| energy_gold | power_plant | 178 | unit_feed_in_type_code | string | true |
+| energy_gold | power_plant | 179 | unit_feed_in_type_label_de | string | true |
+| energy_gold | power_plant | 180 | unit_feed_in_type | string | true |
+| energy_gold | power_plant | 181 | unit_main_fuel_code | string | true |
+| energy_gold | power_plant | 182 | unit_main_fuel_label_de | string | true |
+| energy_gold | power_plant | 183 | unit_main_fuel | string | true |
+| energy_gold | power_plant | 184 | unit_additional_main_fuel_code | string | true |
+| energy_gold | power_plant | 185 | unit_additional_main_fuel_label_de | string | true |
+| energy_gold | power_plant | 186 | unit_additional_main_fuel | string | true |
+| energy_gold | power_plant | 187 | unit_generation_technology_code | string | true |
+| energy_gold | power_plant | 188 | unit_generation_technology_label_de | string | true |
+| energy_gold | power_plant | 189 | unit_generation_technology | string | true |
+| energy_gold | power_plant | 190 | unit_offshore_sea_area_code | string | true |
+| energy_gold | power_plant | 191 | unit_offshore_sea_area_label_de | string | true |
+| energy_gold | power_plant | 192 | unit_offshore_sea_area | string | true |
+| energy_gold | power_plant | 193 | unit_hydro_plant_type_code | string | true |
+| energy_gold | power_plant | 194 | unit_hydro_plant_type_label_de | string | true |
+| energy_gold | power_plant | 195 | unit_hydro_plant_type | string | true |
+| energy_gold | power_plant | 196 | unit_deployment_location_code | string | true |
+| energy_gold | power_plant | 197 | unit_deployment_location_label_de | string | true |
+| energy_gold | power_plant | 198 | unit_deployment_location | string | true |
+| energy_gold | power_plant | 199 | unit__unmatched_code_columns | string | true |
+| energy_gold | power_plant | 200 | unit_official_municipality_key | string | true |
+| energy_gold | power_plant | 201 | unit_official_municipality_key_level | string | true |
+| energy_gold | power_plant | 202 | unit_official_municipality_key_method | string | true |
+| energy_gold | power_plant | 203 | unit_unit_type | string | true |
+| energy_gold | power_plant | 204 | unit_authorisation_count | bigint | true |
+| energy_gold | power_plant | 205 | unit_repowering_count | bigint | true |
+| energy_gold | power_plant | 206 | unit_support_registration_count | int | true |
+| energy_gold | power_plant | 207 | unit_carrier_key | string | true |
+| energy_gold | power_plant | 208 | unit_lifecycle_state | string | true |
+| energy_gold | power_plant | 209 | ecosystem | string | true |
+| energy_gold | power_plant | 210 | _gold_loaded_at | timestamp | true |
+| energy_gold | power_plant | 211 | _gold_run_id | string | true |
+| energy_gold | site_energy_component | 1 | observation_key | string | true |
+| energy_gold | site_energy_component | 2 | location_key | string | true |
+| energy_gold | site_energy_component | 3 | source_location_id | string | true |
+| energy_gold | site_energy_component | 4 | market_area_code | string | true |
+| energy_gold | site_energy_component | 5 | observation_timestamp_native | string | true |
+| energy_gold | site_energy_component | 6 | time_basis | string | true |
+| energy_gold | site_energy_component | 7 | utc_offset_hours | double | true |
+| energy_gold | site_energy_component | 8 | observation_timestamp_utc | timestamp | true |
+| energy_gold | site_energy_component | 9 | observation_timestamp_project | timestamp | true |
+| energy_gold | site_energy_component | 10 | local_date | date | true |
+| energy_gold | site_energy_component | 11 | interval_seconds | int | true |
+| energy_gold | site_energy_component | 12 | interval_reference | string | true |
+| energy_gold | site_energy_component | 13 | component_group | string | true |
+| energy_gold | site_energy_component | 14 | component_kind | string | true |
+| energy_gold | site_energy_component | 15 | forecast_scope | string | true |
+| energy_gold | site_energy_component | 16 | carrier_code | string | true |
+| energy_gold | site_energy_component | 17 | carrier_key | string | true |
+| energy_gold | site_energy_component | 18 | native_label | string | true |
+| energy_gold | site_energy_component | 19 | energy_mwh | double | true |
+| energy_gold | site_energy_component | 20 | power_w | double | true |
+| energy_gold | site_energy_component | 21 | semantic_status | string | true |
+| energy_gold | site_energy_component | 22 | semantic_issue_ref | string | true |
+| energy_gold | site_energy_component | 23 | source_series | string | true |
+| energy_gold | site_energy_component | 24 | source_filter_id | string | true |
+| energy_gold | site_energy_component | 25 | counterpart_area_code | string | true |
+| energy_gold | site_energy_component | 26 | source_license | string | true |
+| energy_gold | site_energy_component | 27 | is_outlier_five_sigma | boolean | true |
+| energy_gold | site_energy_component | 28 | is_stuck_reading | boolean | true |
+| energy_gold | site_energy_component | 29 | sign_convention | string | true |
+| energy_gold | site_energy_component | 30 | measurement_basis | string | true |
+| energy_gold | site_energy_component | 31 | source_system | string | true |
+| energy_gold | site_energy_component | 32 | source_dataset | string | true |
+| energy_gold | site_energy_component | 33 | source_record_id | string | true |
+| energy_gold | site_energy_component | 34 | ecosystem | string | true |
+| energy_gold | site_energy_component | 35 | _gold_loaded_at | timestamp | true |
+| energy_gold | site_energy_component | 36 | _gold_run_id | string | true |
+| energy_gold | storage_plant | 1 | storage_plant_id | string | true |
+| energy_gold | storage_plant | 2 | registration_date | timestamp | true |
+| energy_gold | storage_plant | 3 | last_updated_at | timestamp | true |
+| energy_gold | storage_plant | 4 | usable_storage_capacity_kwh | double | true |
+| energy_gold | storage_plant | 5 | linked_unit_ids | string | true |
+| energy_gold | storage_plant | 6 | storage_name | string | true |
+| energy_gold | storage_plant | 7 | support_status_code | string | true |
+| energy_gold | storage_plant | 8 | support_status_label_de | string | true |
+| energy_gold | storage_plant | 9 | support_status | string | true |
+| energy_gold | storage_plant | 10 | _unmatched_code_columns | string | true |
+| energy_gold | storage_plant | 11 | source_record_id | string | true |
+| energy_gold | storage_plant | 12 | source_dataset | string | true |
+| energy_gold | storage_plant | 13 | source_system | string | true |
+| energy_gold | storage_plant | 14 | ecosystem | string | true |
+| energy_gold | storage_plant | 15 | _gold_loaded_at | timestamp | true |
+| energy_gold | storage_plant | 16 | _gold_run_id | string | true |
+| energy_gold | support_registration | 1 | registration_date | timestamp | true |
+| energy_gold | support_registration | 2 | last_updated_at | timestamp | true |
+| energy_gold | support_registration | 3 | renewable_energy_act_commissioning_date | timestamp | true |
+| energy_gold | support_registration | 4 | renewable_energy_act_support_id | string | true |
+| energy_gold | support_registration | 5 | renewable_energy_act_installation_key | string | true |
+| energy_gold | support_registration | 6 | installed_capacity_kw | double | true |
+| energy_gold | support_registration | 7 | exclusive_use_of_biomass | string | true |
+| energy_gold | support_registration | 8 | auction_award_flag | string | true |
+| energy_gold | support_registration | 9 | biogas_flexibility_premium_claimed | string | true |
+| energy_gold | support_registration | 10 | biogas_flexibility_premium_claim_date | timestamp | true |
+| energy_gold | support_registration | 11 | biogas_capacity_increased | string | true |
+| energy_gold | support_registration | 12 | biogas_gas_production_capacity | string | true |
+| energy_gold | support_registration | 13 | biogas_maximum_rated_capacity | string | true |
+| energy_gold | support_registration | 14 | linked_unit_ids | string | true |
+| energy_gold | support_registration | 15 | auction_award_number | string | true |
+| energy_gold | support_registration | 16 | biogas_capacity_increase_date | timestamp | true |
+| energy_gold | support_registration | 17 | biogas_capacity_increase_extent | string | true |
+| energy_gold | support_registration | 18 | biomethane_first_use | timestamp | true |
+| energy_gold | support_registration | 19 | installation_register_identifier | string | true |
+| energy_gold | support_registration | 20 | retrofit_ids | string | true |
+| energy_gold | support_registration | 21 | pilot_plant_flag | string | true |
+| energy_gold | support_registration | 22 | yield_estimate_to_reference_yield_ratio | string | true |
+| energy_gold | support_registration | 23 | reference_yield_to_actual_yield_ratio_5_years | string | true |
+| energy_gold | support_registration | 24 | prototype_plant_flag | string | true |
+| energy_gold | support_registration | 25 | reference_yield_to_actual_yield_ratio_10_years | string | true |
+| energy_gold | support_registration | 26 | reference_yield_to_actual_yield_ratio_15_years | string | true |
+| energy_gold | support_registration | 27 | renewable_energy_act_payment_claimed | string | true |
+| energy_gold | support_registration | 28 | photovoltaic_reporting_portal_registration_number | string | true |
+| energy_gold | support_registration | 29 | tenant_electricity_assigned | string | true |
+| energy_gold | support_registration | 30 | tenant_electricity_report_date | timestamp | true |
+| energy_gold | support_registration | 31 | tenant_electricity_first_award_assignment | string | true |
+| energy_gold | support_registration | 32 | assigned_bid_quantity | string | true |
+| energy_gold | support_registration | 33 | installation_register_identifier_not_available | boolean | true |
+| energy_gold | support_registration | 34 | biogas_gas_production_capacity_not_available | boolean | true |
+| energy_gold | support_registration | 35 | biomethane_first_use_not_available | boolean | true |
+| energy_gold | support_registration | 36 | yield_estimate_to_reference_yield_ratio_not_available | boolean | true |
+| energy_gold | support_registration | 37 | reference_yield_to_actual_yield_ratio_5_years_not_available | boolean | true |
+| energy_gold | support_registration | 38 | reference_yield_to_actual_yield_ratio_10_years_not_available | boolean | true |
+| energy_gold | support_registration | 39 | reference_yield_to_actual_yield_ratio_15_years_not_available | boolean | true |
+| energy_gold | support_registration | 40 | photovoltaic_reporting_portal_registration_number_not_available | boolean | true |
+| energy_gold | support_registration | 41 | support_status_code | string | true |
+| energy_gold | support_registration | 42 | support_status_label_de | string | true |
+| energy_gold | support_registration | 43 | support_status | string | true |
+| energy_gold | support_registration | 44 | _unmatched_code_columns | string | true |
+| energy_gold | support_registration | 45 | support_registration_id | string | true |
+| energy_gold | support_registration | 46 | support_scheme | string | true |
+| energy_gold | support_registration | 47 | unit_type | string | true |
+| energy_gold | support_registration | 48 | source_dataset | string | true |
+| energy_gold | support_registration | 49 | combined_heat_and_power_support_id | string | true |
+| energy_gold | support_registration | 50 | commissioning_date | timestamp | true |
+| energy_gold | support_registration | 51 | useful_thermal_output_kw | double | true |
+| energy_gold | support_registration | 52 | electrical_combined_heat_and_power_capacity_kw | double | true |
+| energy_gold | support_registration | 53 | source_record_id | string | true |
+| energy_gold | support_registration | 54 | source_system | string | true |
+| energy_gold | support_registration | 55 | ecosystem | string | true |
+| energy_gold | support_registration | 56 | _gold_loaded_at | timestamp | true |
+| energy_gold | support_registration | 57 | _gold_run_id | string | true |
+| energy_gold | unit_event | 1 | last_updated_at | timestamp | true |
+| energy_gold | unit_event | 2 | unit_id | string | true |
+| energy_gold | unit_event | 3 | unit_type | string | true |
+| energy_gold | unit_event | 4 | operating_status_code | string | true |
+| energy_gold | unit_event | 5 | operating_status_label_de | string | true |
+| energy_gold | unit_event | 6 | operating_status | string | true |
+| energy_gold | unit_event | 7 | system_status_code | string | true |
+| energy_gold | unit_event | 8 | system_status_label_de | string | true |
+| energy_gold | unit_event | 9 | system_status | string | true |
+| energy_gold | unit_event | 10 | _unmatched_code_columns | string | true |
+| energy_gold | unit_event | 11 | source_record_id | string | true |
+| energy_gold | unit_event | 12 | source_dataset | string | true |
+| energy_gold | unit_event | 13 | source_system | string | true |
+| energy_gold | unit_event | 14 | event_kind | string | true |
+| energy_gold | unit_event | 15 | market_actor_id | string | true |
+| energy_gold | unit_event | 16 | actor_status_code | string | true |
+| energy_gold | unit_event | 17 | actor_status_label_de | string | true |
+| energy_gold | unit_event | 18 | actor_status | string | true |
+| energy_gold | unit_event | 19 | location_id | string | true |
+| energy_gold | unit_event | 20 | previous_grid_operator_id | string | true |
+| energy_gold | unit_event | 21 | new_grid_operator_id | string | true |
+| energy_gold | unit_event | 22 | change_type | string | true |
+| energy_gold | unit_event | 23 | grid_operator_change_registered_date | timestamp | true |
+| energy_gold | unit_event | 24 | grid_operator_change_effective_date | timestamp | true |
+| energy_gold | unit_event | 25 | connection_point_id | string | true |
+| energy_gold | unit_event | 26 | _source_id_ordinal | int | true |
+| energy_gold | unit_event | 27 | _source_id_disambiguated | boolean | true |
+| energy_gold | unit_event | 28 | _date_order_violation_registered_before_effective | boolean | true |
+| energy_gold | unit_event | 29 | _date_order_violation_commissioning_after_change | boolean | true |
+| energy_gold | unit_event | 30 | authorisation_id | string | true |
+| energy_gold | unit_event | 31 | decision_date | timestamp | true |
+| energy_gold | unit_event | 32 | issuing_authority | string | true |
+| energy_gold | unit_event | 33 | file_reference | string | true |
+| energy_gold | unit_event | 34 | authorisation_deadline | timestamp | true |
+| energy_gold | unit_event | 35 | registration_date | timestamp | true |
+| energy_gold | unit_event | 36 | linked_unit_ids | string | true |
+| energy_gold | unit_event | 37 | application_date | timestamp | true |
+| energy_gold | unit_event | 38 | water_rights_number | string | true |
+| energy_gold | unit_event | 39 | water_rights_expiry_date | timestamp | true |
+| energy_gold | unit_event | 40 | authorisation_deadline_not_available | boolean | true |
+| energy_gold | unit_event | 41 | water_rights_expiry_date_not_available | boolean | true |
+| energy_gold | unit_event | 42 | authorisation_type_code | string | true |
+| energy_gold | unit_event | 43 | authorisation_type_label_de | string | true |
+| energy_gold | unit_event | 44 | authorisation_type | string | true |
+| energy_gold | unit_event | 45 | repowering_id | string | true |
+| energy_gold | unit_event | 46 | renewable_energy_act_support_id | string | true |
+| energy_gold | unit_event | 47 | capacity_increase | double | true |
+| energy_gold | unit_event | 48 | recommissioning_date | timestamp | true |
+| energy_gold | unit_event | 49 | repowering_type | string | true |
+| energy_gold | unit_event | 50 | repowering_approval_required_flag | string | true |
+| energy_gold | unit_event | 51 | ecosystem | string | true |
+| energy_gold | unit_event | 52 | _gold_loaded_at | timestamp | true |
+| energy_gold | unit_event | 53 | _gold_run_id | string | true |
+| energy_gold | weather_air_state | 1 | observation_key | string | true |
+| energy_gold | weather_air_state | 2 | location_key | string | true |
+| energy_gold | weather_air_state | 3 | source_location_id | string | true |
+| energy_gold | weather_air_state | 4 | observation_timestamp_native | string | true |
+| energy_gold | weather_air_state | 5 | time_basis | string | true |
+| energy_gold | weather_air_state | 6 | utc_offset_hours | double | true |
+| energy_gold | weather_air_state | 7 | observation_timestamp_utc | timestamp | true |
+| energy_gold | weather_air_state | 8 | observation_timestamp_project | timestamp | true |
+| energy_gold | weather_air_state | 9 | local_date | date | true |
+| energy_gold | weather_air_state | 10 | interval_seconds | int | true |
+| energy_gold | weather_air_state | 11 | interval_reference | string | true |
+| energy_gold | weather_air_state | 12 | true_solar_time_native | string | true |
+| energy_gold | weather_air_state | 13 | measurement_basis | string | true |
+| energy_gold | weather_air_state | 14 | source_system | string | true |
+| energy_gold | weather_air_state | 15 | air_temperature_degc | double | true |
+| energy_gold | weather_air_state | 16 | dew_point_temperature_degc | double | true |
+| energy_gold | weather_air_state | 17 | wet_bulb_temperature_degc | double | true |
+| energy_gold | weather_air_state | 18 | air_temperature_moisture_degc | double | true |
+| energy_gold | weather_air_state | 19 | air_temperature_moisture_quality_code | string | true |
+| energy_gold | weather_air_state | 20 | air_temperature_dew_point_degc | double | true |
+| energy_gold | weather_air_state | 21 | air_temperature_dew_point_quality_code | string | true |
+| energy_gold | weather_air_state | 22 | dew_point_temperature_moisture_degc | double | true |
+| energy_gold | weather_air_state | 23 | dew_point_temperature_moisture_quality_code | string | true |
+| energy_gold | weather_air_state | 24 | dew_point_above_air_temperature | boolean | true |
+| energy_gold | weather_air_state | 25 | temperature_quality_code | string | true |
+| energy_gold | weather_air_state | 26 | temperature_quality_label | string | true |
+| energy_gold | weather_air_state | 27 | temperature_source_dataset | string | true |
+| energy_gold | weather_air_state | 28 | temperature_key_conflict_resolved | boolean | true |
+| energy_gold | weather_air_state | 29 | temperature_qn_missing | boolean | true |
+| energy_gold | weather_air_state | 30 | temperature_stuck_reading | boolean | true |
+| energy_gold | weather_air_state | 31 | relative_humidity_percent | double | true |
+| energy_gold | weather_air_state | 32 | absolute_humidity_g_per_m3 | double | true |
+| energy_gold | weather_air_state | 33 | vapour_pressure_hpa | double | true |
+| energy_gold | weather_air_state | 34 | relative_humidity_moisture_percent | double | true |
+| energy_gold | weather_air_state | 35 | relative_humidity_moisture_quality_code | string | true |
+| energy_gold | weather_air_state | 36 | relative_humidity_above_100 | boolean | true |
+| energy_gold | weather_air_state | 37 | humidity_quality_code | string | true |
+| energy_gold | weather_air_state | 38 | humidity_quality_label | string | true |
+| energy_gold | weather_air_state | 39 | humidity_source_dataset | string | true |
+| energy_gold | weather_air_state | 40 | humidity_key_conflict_resolved | boolean | true |
+| energy_gold | weather_air_state | 41 | humidity_qn_missing | boolean | true |
+| energy_gold | weather_air_state | 42 | humidity_stuck_reading | boolean | true |
+| energy_gold | weather_air_state | 43 | pressure_station_hpa | double | true |
+| energy_gold | weather_air_state | 44 | pressure_station_native_value | double | true |
+| energy_gold | weather_air_state | 45 | pressure_station_native_unit | string | true |
+| energy_gold | weather_air_state | 46 | pressure_station_moisture_hpa | double | true |
+| energy_gold | weather_air_state | 47 | pressure_station_moisture_quality_code | string | true |
+| energy_gold | weather_air_state | 48 | pressure_sea_level_hpa | double | true |
+| energy_gold | weather_air_state | 49 | pressure_sea_level_native_value | double | true |
+| energy_gold | weather_air_state | 50 | pressure_sea_level_native_unit | string | true |
+| energy_gold | weather_air_state | 51 | pressure_quality_code | string | true |
+| energy_gold | weather_air_state | 52 | pressure_quality_label | string | true |
+| energy_gold | weather_air_state | 53 | pressure_source_dataset | string | true |
+| energy_gold | weather_air_state | 54 | pressure_key_conflict_resolved | boolean | true |
+| energy_gold | weather_air_state | 55 | pressure_qn_missing | boolean | true |
+| energy_gold | weather_air_state | 56 | pressure_stuck_reading | boolean | true |
+| energy_gold | weather_air_state | 57 | source_record_id | string | true |
+| energy_gold | weather_air_state | 58 | ecosystem | string | true |
+| energy_gold | weather_air_state | 59 | _gold_loaded_at | timestamp | true |
+| energy_gold | weather_air_state | 60 | _gold_run_id | string | true |
+| energy_gold | weather_daily | 1 | daily_key | string | true |
+| energy_gold | weather_daily | 2 | location_key | string | true |
+| energy_gold | weather_daily | 3 | source_location_id | string | true |
+| energy_gold | weather_daily | 4 | local_date | date | true |
+| energy_gold | weather_daily | 5 | variable | string | true |
+| energy_gold | weather_daily | 6 | statistic | string | true |
+| energy_gold | weather_daily | 7 | level | string | true |
+| energy_gold | weather_daily | 8 | is_primary | boolean | true |
+| energy_gold | weather_daily | 9 | date_native | string | true |
+| energy_gold | weather_daily | 10 | time_basis | string | true |
+| energy_gold | weather_daily | 11 | value_native | double | true |
+| energy_gold | weather_daily | 12 | unit_native | string | true |
+| energy_gold | weather_daily | 13 | value | double | true |
+| energy_gold | weather_daily | 14 | unit | string | true |
+| energy_gold | weather_daily | 15 | value_origin | string | true |
+| energy_gold | weather_daily | 16 | derivation_rule | string | true |
+| energy_gold | weather_daily | 17 | observation_count | int | true |
+| energy_gold | weather_daily | 18 | measurement_basis | string | true |
+| energy_gold | weather_daily | 19 | source_system | string | true |
+| energy_gold | weather_daily | 20 | source_dataset | string | true |
+| energy_gold | weather_daily | 21 | source_column | string | true |
+| energy_gold | weather_daily | 22 | source_record_id | string | true |
+| energy_gold | weather_daily | 23 | ecosystem | string | true |
+| energy_gold | weather_daily | 24 | _gold_loaded_at | timestamp | true |
+| energy_gold | weather_daily | 25 | _gold_run_id | string | true |
+| energy_gold | weather_ground_sun | 1 | observation_key | string | true |
+| energy_gold | weather_ground_sun | 2 | location_key | string | true |
+| energy_gold | weather_ground_sun | 3 | source_location_id | string | true |
+| energy_gold | weather_ground_sun | 4 | observation_timestamp_native | string | true |
+| energy_gold | weather_ground_sun | 5 | time_basis | string | true |
+| energy_gold | weather_ground_sun | 6 | utc_offset_hours | double | true |
+| energy_gold | weather_ground_sun | 7 | observation_timestamp_utc | timestamp | true |
+| energy_gold | weather_ground_sun | 8 | observation_timestamp_project | timestamp | true |
+| energy_gold | weather_ground_sun | 9 | local_date | date | true |
+| energy_gold | weather_ground_sun | 10 | interval_seconds | int | true |
+| energy_gold | weather_ground_sun | 11 | interval_reference | string | true |
+| energy_gold | weather_ground_sun | 12 | true_solar_time_native | string | true |
+| energy_gold | weather_ground_sun | 13 | measurement_basis | string | true |
+| energy_gold | weather_ground_sun | 14 | source_system | string | true |
+| energy_gold | weather_ground_sun | 15 | soil_temperature_2cm_degc | double | true |
+| energy_gold | weather_ground_sun | 16 | soil_temperature_5cm_degc | double | true |
+| energy_gold | weather_ground_sun | 17 | soil_temperature_10cm_degc | double | true |
+| energy_gold | weather_ground_sun | 18 | soil_temperature_20cm_degc | double | true |
+| energy_gold | weather_ground_sun | 19 | soil_temperature_50cm_degc | double | true |
+| energy_gold | weather_ground_sun | 20 | soil_temperature_100cm_degc | double | true |
+| energy_gold | weather_ground_sun | 21 | soil_temperature_quality_code | string | true |
+| energy_gold | weather_ground_sun | 22 | soil_temperature_quality_label | string | true |
+| energy_gold | weather_ground_sun | 23 | soil_temperature_source_dataset | string | true |
+| energy_gold | weather_ground_sun | 24 | soil_temperature_key_conflict_resolved | boolean | true |
+| energy_gold | weather_ground_sun | 25 | soil_temperature_qn_missing | boolean | true |
+| energy_gold | weather_ground_sun | 26 | soil_temperature_stuck_reading | boolean | true |
+| energy_gold | weather_ground_sun | 27 | global_radiation_w_per_m2 | double | true |
+| energy_gold | weather_ground_sun | 28 | global_radiation_native_value | double | true |
+| energy_gold | weather_ground_sun | 29 | global_radiation_native_unit | string | true |
+| energy_gold | weather_ground_sun | 30 | diffuse_radiation_w_per_m2 | double | true |
+| energy_gold | weather_ground_sun | 31 | diffuse_radiation_native_value | double | true |
+| energy_gold | weather_ground_sun | 32 | diffuse_radiation_native_unit | string | true |
+| energy_gold | weather_ground_sun | 33 | solar_radiation_quality_code | string | true |
+| energy_gold | weather_ground_sun | 34 | solar_radiation_quality_label | string | true |
+| energy_gold | weather_ground_sun | 35 | solar_radiation_source_dataset | string | true |
+| energy_gold | weather_ground_sun | 36 | solar_radiation_key_conflict_resolved | boolean | true |
+| energy_gold | weather_ground_sun | 37 | solar_radiation_qn_missing | boolean | true |
+| energy_gold | weather_ground_sun | 38 | solar_radiation_stuck_reading | boolean | true |
+| energy_gold | weather_ground_sun | 39 | longwave_downward_radiation_w_per_m2 | double | true |
+| energy_gold | weather_ground_sun | 40 | longwave_downward_radiation_native_value | double | true |
+| energy_gold | weather_ground_sun | 41 | longwave_downward_radiation_native_unit | string | true |
+| energy_gold | weather_ground_sun | 42 | longwave_radiation_quality_code | string | true |
+| energy_gold | weather_ground_sun | 43 | longwave_radiation_quality_label | string | true |
+| energy_gold | weather_ground_sun | 44 | longwave_radiation_source_dataset | string | true |
+| energy_gold | weather_ground_sun | 45 | longwave_radiation_key_conflict_resolved | boolean | true |
+| energy_gold | weather_ground_sun | 46 | longwave_radiation_qn_missing | boolean | true |
+| energy_gold | weather_ground_sun | 47 | longwave_radiation_stuck_reading | boolean | true |
+| energy_gold | weather_ground_sun | 48 | sunshine_duration_minutes | double | true |
+| energy_gold | weather_ground_sun | 49 | sunshine_duration_quality_code | string | true |
+| energy_gold | weather_ground_sun | 50 | sunshine_duration_quality_label | string | true |
+| energy_gold | weather_ground_sun | 51 | sunshine_duration_source_dataset | string | true |
+| energy_gold | weather_ground_sun | 52 | sunshine_duration_key_conflict_resolved | boolean | true |
+| energy_gold | weather_ground_sun | 53 | sunshine_duration_qn_missing | boolean | true |
+| energy_gold | weather_ground_sun | 54 | sunshine_duration_stuck_reading | boolean | true |
+| energy_gold | weather_ground_sun | 55 | solar_zenith_angle_degrees | double | true |
+| energy_gold | weather_ground_sun | 56 | solar_geometry_quality_code | string | true |
+| energy_gold | weather_ground_sun | 57 | solar_geometry_quality_label | string | true |
+| energy_gold | weather_ground_sun | 58 | solar_geometry_source_dataset | string | true |
+| energy_gold | weather_ground_sun | 59 | solar_geometry_key_conflict_resolved | boolean | true |
+| energy_gold | weather_ground_sun | 60 | solar_geometry_qn_missing | boolean | true |
+| energy_gold | weather_ground_sun | 61 | solar_geometry_stuck_reading | boolean | true |
+| energy_gold | weather_ground_sun | 62 | uv_index | double | true |
+| energy_gold | weather_ground_sun | 63 | uv_index_quality_code | string | true |
+| energy_gold | weather_ground_sun | 64 | uv_index_quality_label | string | true |
+| energy_gold | weather_ground_sun | 65 | uv_index_source_dataset | string | true |
+| energy_gold | weather_ground_sun | 66 | uv_index_key_conflict_resolved | boolean | true |
+| energy_gold | weather_ground_sun | 67 | uv_index_qn_missing | boolean | true |
+| energy_gold | weather_ground_sun | 68 | uv_index_stuck_reading | boolean | true |
+| energy_gold | weather_ground_sun | 69 | source_record_id | string | true |
+| energy_gold | weather_ground_sun | 70 | ecosystem | string | true |
+| energy_gold | weather_ground_sun | 71 | _gold_loaded_at | timestamp | true |
+| energy_gold | weather_ground_sun | 72 | _gold_run_id | string | true |
+| energy_gold | weather_observation | 1 | observation_key | string | true |
+| energy_gold | weather_observation | 2 | location_key | string | true |
+| energy_gold | weather_observation | 3 | source_location_id | string | true |
+| energy_gold | weather_observation | 4 | observation_timestamp_native | string | true |
+| energy_gold | weather_observation | 5 | time_basis | string | true |
+| energy_gold | weather_observation | 6 | utc_offset_hours | double | true |
+| energy_gold | weather_observation | 7 | observation_timestamp_utc | timestamp | true |
+| energy_gold | weather_observation | 8 | observation_timestamp_project | timestamp | true |
+| energy_gold | weather_observation | 9 | local_date | date | true |
+| energy_gold | weather_observation | 10 | interval_seconds | int | true |
+| energy_gold | weather_observation | 11 | interval_reference | string | true |
+| energy_gold | weather_observation | 12 | true_solar_time_native | string | true |
+| energy_gold | weather_observation | 13 | measurement_basis | string | true |
+| energy_gold | weather_observation | 14 | source_system | string | true |
+| energy_gold | weather_observation | 15 | air_temperature_degc | double | true |
+| energy_gold | weather_observation | 16 | dew_point_temperature_degc | double | true |
+| energy_gold | weather_observation | 17 | wet_bulb_temperature_degc | double | true |
+| energy_gold | weather_observation | 18 | air_temperature_moisture_degc | double | true |
+| energy_gold | weather_observation | 19 | air_temperature_moisture_quality_code | string | true |
+| energy_gold | weather_observation | 20 | air_temperature_dew_point_degc | double | true |
+| energy_gold | weather_observation | 21 | air_temperature_dew_point_quality_code | string | true |
+| energy_gold | weather_observation | 22 | dew_point_temperature_moisture_degc | double | true |
+| energy_gold | weather_observation | 23 | dew_point_temperature_moisture_quality_code | string | true |
+| energy_gold | weather_observation | 24 | dew_point_above_air_temperature | boolean | true |
+| energy_gold | weather_observation | 25 | temperature_quality_code | string | true |
+| energy_gold | weather_observation | 26 | temperature_quality_label | string | true |
+| energy_gold | weather_observation | 27 | temperature_source_dataset | string | true |
+| energy_gold | weather_observation | 28 | temperature_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 29 | temperature_qn_missing | boolean | true |
+| energy_gold | weather_observation | 30 | temperature_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 31 | relative_humidity_percent | double | true |
+| energy_gold | weather_observation | 32 | absolute_humidity_g_per_m3 | double | true |
+| energy_gold | weather_observation | 33 | vapour_pressure_hpa | double | true |
+| energy_gold | weather_observation | 34 | relative_humidity_moisture_percent | double | true |
+| energy_gold | weather_observation | 35 | relative_humidity_moisture_quality_code | string | true |
+| energy_gold | weather_observation | 36 | relative_humidity_above_100 | boolean | true |
+| energy_gold | weather_observation | 37 | humidity_quality_code | string | true |
+| energy_gold | weather_observation | 38 | humidity_quality_label | string | true |
+| energy_gold | weather_observation | 39 | humidity_source_dataset | string | true |
+| energy_gold | weather_observation | 40 | humidity_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 41 | humidity_qn_missing | boolean | true |
+| energy_gold | weather_observation | 42 | humidity_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 43 | pressure_station_hpa | double | true |
+| energy_gold | weather_observation | 44 | pressure_station_native_value | double | true |
+| energy_gold | weather_observation | 45 | pressure_station_native_unit | string | true |
+| energy_gold | weather_observation | 46 | pressure_station_moisture_hpa | double | true |
+| energy_gold | weather_observation | 47 | pressure_station_moisture_quality_code | string | true |
+| energy_gold | weather_observation | 48 | pressure_sea_level_hpa | double | true |
+| energy_gold | weather_observation | 49 | pressure_sea_level_native_value | double | true |
+| energy_gold | weather_observation | 50 | pressure_sea_level_native_unit | string | true |
+| energy_gold | weather_observation | 51 | pressure_quality_code | string | true |
+| energy_gold | weather_observation | 52 | pressure_quality_label | string | true |
+| energy_gold | weather_observation | 53 | pressure_source_dataset | string | true |
+| energy_gold | weather_observation | 54 | pressure_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 55 | pressure_qn_missing | boolean | true |
+| energy_gold | weather_observation | 56 | pressure_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 57 | wind_mean_speed_m_per_s | double | true |
+| energy_gold | weather_observation | 58 | wind_mean_direction_degrees | double | true |
+| energy_gold | weather_observation | 59 | wind_mean_direction_variable | boolean | true |
+| energy_gold | weather_observation | 60 | wind_instant_speed_m_per_s | double | true |
+| energy_gold | weather_observation | 61 | wind_instant_direction_degrees | double | true |
+| energy_gold | weather_observation | 62 | wind_max_gust_m_per_s | double | true |
+| energy_gold | weather_observation | 63 | wind_unspecified_speed_m_per_s | double | true |
+| energy_gold | weather_observation | 64 | wind_unspecified_direction_degrees | double | true |
+| energy_gold | weather_observation | 65 | wind_unspecified_gust_m_per_s | double | true |
+| energy_gold | weather_observation | 66 | wind_quality_code | string | true |
+| energy_gold | weather_observation | 67 | wind_quality_label | string | true |
+| energy_gold | weather_observation | 68 | wind_source_dataset | string | true |
+| energy_gold | weather_observation | 69 | wind_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 70 | wind_qn_missing | boolean | true |
+| energy_gold | weather_observation | 71 | wind_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 72 | precipitation_mm | double | true |
+| energy_gold | weather_observation | 73 | precipitation_occurred | boolean | true |
+| energy_gold | weather_observation | 74 | precipitation_form_code | string | true |
+| energy_gold | weather_observation | 75 | precipitation_form_text | string | true |
+| energy_gold | weather_observation | 76 | precipitation_quality_code | string | true |
+| energy_gold | weather_observation | 77 | precipitation_quality_label | string | true |
+| energy_gold | weather_observation | 78 | precipitation_source_dataset | string | true |
+| energy_gold | weather_observation | 79 | precipitation_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 80 | precipitation_qn_missing | boolean | true |
+| energy_gold | weather_observation | 81 | precipitation_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 82 | cloud_cover_total_percent | double | true |
+| energy_gold | weather_observation | 83 | cloud_cover_total_native_value | double | true |
+| energy_gold | weather_observation | 84 | cloud_cover_total_native_unit | string | true |
+| energy_gold | weather_observation | 85 | cloud_cover_total_cloud_type_percent | double | true |
+| energy_gold | weather_observation | 86 | cloud_cover_total_cloud_type_native_value | double | true |
+| energy_gold | weather_observation | 87 | cloud_cover_total_cloud_type_native_unit | string | true |
+| energy_gold | weather_observation | 88 | cloud_cover_total_cloud_type_quality_code | string | true |
+| energy_gold | weather_observation | 89 | cloud_base_height_m | double | true |
+| energy_gold | weather_observation | 90 | cloud_observation_method | string | true |
+| energy_gold | weather_observation | 91 | cloud_layer_1_genus_code | string | true |
+| energy_gold | weather_observation | 92 | cloud_layer_1_genus_text | string | true |
+| energy_gold | weather_observation | 93 | cloud_layer_1_base_height_m | double | true |
+| energy_gold | weather_observation | 94 | cloud_layer_1_cover_percent | double | true |
+| energy_gold | weather_observation | 95 | cloud_layer_1_cover_native_value | double | true |
+| energy_gold | weather_observation | 96 | cloud_layer_1_cover_native_unit | string | true |
+| energy_gold | weather_observation | 97 | cloud_layer_2_genus_code | string | true |
+| energy_gold | weather_observation | 98 | cloud_layer_2_genus_text | string | true |
+| energy_gold | weather_observation | 99 | cloud_layer_2_base_height_m | double | true |
+| energy_gold | weather_observation | 100 | cloud_layer_2_cover_percent | double | true |
+| energy_gold | weather_observation | 101 | cloud_layer_2_cover_native_value | double | true |
+| energy_gold | weather_observation | 102 | cloud_layer_2_cover_native_unit | string | true |
+| energy_gold | weather_observation | 103 | cloud_layer_3_genus_code | string | true |
+| energy_gold | weather_observation | 104 | cloud_layer_3_genus_text | string | true |
+| energy_gold | weather_observation | 105 | cloud_layer_3_base_height_m | double | true |
+| energy_gold | weather_observation | 106 | cloud_layer_3_cover_percent | double | true |
+| energy_gold | weather_observation | 107 | cloud_layer_3_cover_native_value | double | true |
+| energy_gold | weather_observation | 108 | cloud_layer_3_cover_native_unit | string | true |
+| energy_gold | weather_observation | 109 | cloud_layer_4_genus_code | string | true |
+| energy_gold | weather_observation | 110 | cloud_layer_4_genus_text | string | true |
+| energy_gold | weather_observation | 111 | cloud_layer_4_base_height_m | double | true |
+| energy_gold | weather_observation | 112 | cloud_layer_4_cover_percent | double | true |
+| energy_gold | weather_observation | 113 | cloud_layer_4_cover_native_value | double | true |
+| energy_gold | weather_observation | 114 | cloud_layer_4_cover_native_unit | string | true |
+| energy_gold | weather_observation | 115 | cloud_quality_code | string | true |
+| energy_gold | weather_observation | 116 | cloud_quality_label | string | true |
+| energy_gold | weather_observation | 117 | cloud_source_dataset | string | true |
+| energy_gold | weather_observation | 118 | cloud_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 119 | cloud_qn_missing | boolean | true |
+| energy_gold | weather_observation | 120 | cloud_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 121 | visibility_m | double | true |
+| energy_gold | weather_observation | 122 | visibility_native_value | double | true |
+| energy_gold | weather_observation | 123 | visibility_native_unit | string | true |
+| energy_gold | weather_observation | 124 | visibility_observation_method | string | true |
+| energy_gold | weather_observation | 125 | visibility_quality_code | string | true |
+| energy_gold | weather_observation | 126 | visibility_quality_label | string | true |
+| energy_gold | weather_observation | 127 | visibility_source_dataset | string | true |
+| energy_gold | weather_observation | 128 | visibility_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 129 | visibility_qn_missing | boolean | true |
+| energy_gold | weather_observation | 130 | visibility_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 131 | present_weather_code | string | true |
+| energy_gold | weather_observation | 132 | present_weather_text | string | true |
+| energy_gold | weather_observation | 133 | present_weather_quality_code | string | true |
+| energy_gold | weather_observation | 134 | present_weather_quality_label | string | true |
+| energy_gold | weather_observation | 135 | present_weather_source_dataset | string | true |
+| energy_gold | weather_observation | 136 | present_weather_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 137 | present_weather_qn_missing | boolean | true |
+| energy_gold | weather_observation | 138 | present_weather_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 139 | soil_temperature_2cm_degc | double | true |
+| energy_gold | weather_observation | 140 | soil_temperature_5cm_degc | double | true |
+| energy_gold | weather_observation | 141 | soil_temperature_10cm_degc | double | true |
+| energy_gold | weather_observation | 142 | soil_temperature_20cm_degc | double | true |
+| energy_gold | weather_observation | 143 | soil_temperature_50cm_degc | double | true |
+| energy_gold | weather_observation | 144 | soil_temperature_100cm_degc | double | true |
+| energy_gold | weather_observation | 145 | soil_temperature_quality_code | string | true |
+| energy_gold | weather_observation | 146 | soil_temperature_quality_label | string | true |
+| energy_gold | weather_observation | 147 | soil_temperature_source_dataset | string | true |
+| energy_gold | weather_observation | 148 | soil_temperature_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 149 | soil_temperature_qn_missing | boolean | true |
+| energy_gold | weather_observation | 150 | soil_temperature_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 151 | global_radiation_w_per_m2 | double | true |
+| energy_gold | weather_observation | 152 | global_radiation_native_value | double | true |
+| energy_gold | weather_observation | 153 | global_radiation_native_unit | string | true |
+| energy_gold | weather_observation | 154 | diffuse_radiation_w_per_m2 | double | true |
+| energy_gold | weather_observation | 155 | diffuse_radiation_native_value | double | true |
+| energy_gold | weather_observation | 156 | diffuse_radiation_native_unit | string | true |
+| energy_gold | weather_observation | 157 | solar_radiation_quality_code | string | true |
+| energy_gold | weather_observation | 158 | solar_radiation_quality_label | string | true |
+| energy_gold | weather_observation | 159 | solar_radiation_source_dataset | string | true |
+| energy_gold | weather_observation | 160 | solar_radiation_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 161 | solar_radiation_qn_missing | boolean | true |
+| energy_gold | weather_observation | 162 | solar_radiation_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 163 | longwave_downward_radiation_w_per_m2 | double | true |
+| energy_gold | weather_observation | 164 | longwave_downward_radiation_native_value | double | true |
+| energy_gold | weather_observation | 165 | longwave_downward_radiation_native_unit | string | true |
+| energy_gold | weather_observation | 166 | longwave_radiation_quality_code | string | true |
+| energy_gold | weather_observation | 167 | longwave_radiation_quality_label | string | true |
+| energy_gold | weather_observation | 168 | longwave_radiation_source_dataset | string | true |
+| energy_gold | weather_observation | 169 | longwave_radiation_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 170 | longwave_radiation_qn_missing | boolean | true |
+| energy_gold | weather_observation | 171 | longwave_radiation_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 172 | sunshine_duration_minutes | double | true |
+| energy_gold | weather_observation | 173 | sunshine_duration_quality_code | string | true |
+| energy_gold | weather_observation | 174 | sunshine_duration_quality_label | string | true |
+| energy_gold | weather_observation | 175 | sunshine_duration_source_dataset | string | true |
+| energy_gold | weather_observation | 176 | sunshine_duration_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 177 | sunshine_duration_qn_missing | boolean | true |
+| energy_gold | weather_observation | 178 | sunshine_duration_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 179 | solar_zenith_angle_degrees | double | true |
+| energy_gold | weather_observation | 180 | solar_geometry_quality_code | string | true |
+| energy_gold | weather_observation | 181 | solar_geometry_quality_label | string | true |
+| energy_gold | weather_observation | 182 | solar_geometry_source_dataset | string | true |
+| energy_gold | weather_observation | 183 | solar_geometry_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 184 | solar_geometry_qn_missing | boolean | true |
+| energy_gold | weather_observation | 185 | solar_geometry_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 186 | uv_index | double | true |
+| energy_gold | weather_observation | 187 | uv_index_quality_code | string | true |
+| energy_gold | weather_observation | 188 | uv_index_quality_label | string | true |
+| energy_gold | weather_observation | 189 | uv_index_source_dataset | string | true |
+| energy_gold | weather_observation | 190 | uv_index_key_conflict_resolved | boolean | true |
+| energy_gold | weather_observation | 191 | uv_index_qn_missing | boolean | true |
+| energy_gold | weather_observation | 192 | uv_index_stuck_reading | boolean | true |
+| energy_gold | weather_observation | 193 | source_record_id | string | true |
+| energy_gold | weather_observation | 194 | place_source_location_id | string | true |
+| energy_gold | weather_observation | 195 | place_location_role | string | true |
+| energy_gold | weather_observation | 196 | place_name | string | true |
+| energy_gold | weather_observation | 197 | place_latitude | double | true |
+| energy_gold | weather_observation | 198 | place_longitude | double | true |
+| energy_gold | weather_observation | 199 | place_elevation_m | double | true |
+| energy_gold | weather_observation | 200 | place_continent | string | true |
+| energy_gold | weather_observation | 201 | place_country_code | string | true |
+| energy_gold | weather_observation | 202 | place_region | string | true |
+| energy_gold | weather_observation | 203 | place_city | string | true |
+| energy_gold | weather_observation | 204 | place_official_municipality_key | string | true |
+| energy_gold | weather_observation | 205 | place_geography_basis | string | true |
+| energy_gold | weather_observation | 206 | ecosystem | string | true |
+| energy_gold | weather_observation | 207 | _gold_loaded_at | timestamp | true |
+| energy_gold | weather_observation | 208 | _gold_run_id | string | true |
+| energy_gold | weather_sky | 1 | observation_key | string | true |
+| energy_gold | weather_sky | 2 | location_key | string | true |
+| energy_gold | weather_sky | 3 | source_location_id | string | true |
+| energy_gold | weather_sky | 4 | observation_timestamp_native | string | true |
+| energy_gold | weather_sky | 5 | time_basis | string | true |
+| energy_gold | weather_sky | 6 | utc_offset_hours | double | true |
+| energy_gold | weather_sky | 7 | observation_timestamp_utc | timestamp | true |
+| energy_gold | weather_sky | 8 | observation_timestamp_project | timestamp | true |
+| energy_gold | weather_sky | 9 | local_date | date | true |
+| energy_gold | weather_sky | 10 | interval_seconds | int | true |
+| energy_gold | weather_sky | 11 | interval_reference | string | true |
+| energy_gold | weather_sky | 12 | true_solar_time_native | string | true |
+| energy_gold | weather_sky | 13 | measurement_basis | string | true |
+| energy_gold | weather_sky | 14 | source_system | string | true |
+| energy_gold | weather_sky | 15 | cloud_cover_total_percent | double | true |
+| energy_gold | weather_sky | 16 | cloud_cover_total_native_value | double | true |
+| energy_gold | weather_sky | 17 | cloud_cover_total_native_unit | string | true |
+| energy_gold | weather_sky | 18 | cloud_cover_total_cloud_type_percent | double | true |
+| energy_gold | weather_sky | 19 | cloud_cover_total_cloud_type_native_value | double | true |
+| energy_gold | weather_sky | 20 | cloud_cover_total_cloud_type_native_unit | string | true |
+| energy_gold | weather_sky | 21 | cloud_cover_total_cloud_type_quality_code | string | true |
+| energy_gold | weather_sky | 22 | cloud_base_height_m | double | true |
+| energy_gold | weather_sky | 23 | cloud_observation_method | string | true |
+| energy_gold | weather_sky | 24 | cloud_layer_1_genus_code | string | true |
+| energy_gold | weather_sky | 25 | cloud_layer_1_genus_text | string | true |
+| energy_gold | weather_sky | 26 | cloud_layer_1_base_height_m | double | true |
+| energy_gold | weather_sky | 27 | cloud_layer_1_cover_percent | double | true |
+| energy_gold | weather_sky | 28 | cloud_layer_1_cover_native_value | double | true |
+| energy_gold | weather_sky | 29 | cloud_layer_1_cover_native_unit | string | true |
+| energy_gold | weather_sky | 30 | cloud_layer_2_genus_code | string | true |
+| energy_gold | weather_sky | 31 | cloud_layer_2_genus_text | string | true |
+| energy_gold | weather_sky | 32 | cloud_layer_2_base_height_m | double | true |
+| energy_gold | weather_sky | 33 | cloud_layer_2_cover_percent | double | true |
+| energy_gold | weather_sky | 34 | cloud_layer_2_cover_native_value | double | true |
+| energy_gold | weather_sky | 35 | cloud_layer_2_cover_native_unit | string | true |
+| energy_gold | weather_sky | 36 | cloud_layer_3_genus_code | string | true |
+| energy_gold | weather_sky | 37 | cloud_layer_3_genus_text | string | true |
+| energy_gold | weather_sky | 38 | cloud_layer_3_base_height_m | double | true |
+| energy_gold | weather_sky | 39 | cloud_layer_3_cover_percent | double | true |
+| energy_gold | weather_sky | 40 | cloud_layer_3_cover_native_value | double | true |
+| energy_gold | weather_sky | 41 | cloud_layer_3_cover_native_unit | string | true |
+| energy_gold | weather_sky | 42 | cloud_layer_4_genus_code | string | true |
+| energy_gold | weather_sky | 43 | cloud_layer_4_genus_text | string | true |
+| energy_gold | weather_sky | 44 | cloud_layer_4_base_height_m | double | true |
+| energy_gold | weather_sky | 45 | cloud_layer_4_cover_percent | double | true |
+| energy_gold | weather_sky | 46 | cloud_layer_4_cover_native_value | double | true |
+| energy_gold | weather_sky | 47 | cloud_layer_4_cover_native_unit | string | true |
+| energy_gold | weather_sky | 48 | cloud_quality_code | string | true |
+| energy_gold | weather_sky | 49 | cloud_quality_label | string | true |
+| energy_gold | weather_sky | 50 | cloud_source_dataset | string | true |
+| energy_gold | weather_sky | 51 | cloud_key_conflict_resolved | boolean | true |
+| energy_gold | weather_sky | 52 | cloud_qn_missing | boolean | true |
+| energy_gold | weather_sky | 53 | cloud_stuck_reading | boolean | true |
+| energy_gold | weather_sky | 54 | visibility_m | double | true |
+| energy_gold | weather_sky | 55 | visibility_native_value | double | true |
+| energy_gold | weather_sky | 56 | visibility_native_unit | string | true |
+| energy_gold | weather_sky | 57 | visibility_observation_method | string | true |
+| energy_gold | weather_sky | 58 | visibility_quality_code | string | true |
+| energy_gold | weather_sky | 59 | visibility_quality_label | string | true |
+| energy_gold | weather_sky | 60 | visibility_source_dataset | string | true |
+| energy_gold | weather_sky | 61 | visibility_key_conflict_resolved | boolean | true |
+| energy_gold | weather_sky | 62 | visibility_qn_missing | boolean | true |
+| energy_gold | weather_sky | 63 | visibility_stuck_reading | boolean | true |
+| energy_gold | weather_sky | 64 | present_weather_code | string | true |
+| energy_gold | weather_sky | 65 | present_weather_text | string | true |
+| energy_gold | weather_sky | 66 | present_weather_quality_code | string | true |
+| energy_gold | weather_sky | 67 | present_weather_quality_label | string | true |
+| energy_gold | weather_sky | 68 | present_weather_source_dataset | string | true |
+| energy_gold | weather_sky | 69 | present_weather_key_conflict_resolved | boolean | true |
+| energy_gold | weather_sky | 70 | present_weather_qn_missing | boolean | true |
+| energy_gold | weather_sky | 71 | present_weather_stuck_reading | boolean | true |
+| energy_gold | weather_sky | 72 | source_record_id | string | true |
+| energy_gold | weather_sky | 73 | ecosystem | string | true |
+| energy_gold | weather_sky | 74 | _gold_loaded_at | timestamp | true |
+| energy_gold | weather_sky | 75 | _gold_run_id | string | true |
+| energy_gold | weather_wind_precipitation | 1 | observation_key | string | true |
+| energy_gold | weather_wind_precipitation | 2 | location_key | string | true |
+| energy_gold | weather_wind_precipitation | 3 | source_location_id | string | true |
+| energy_gold | weather_wind_precipitation | 4 | observation_timestamp_native | string | true |
+| energy_gold | weather_wind_precipitation | 5 | time_basis | string | true |
+| energy_gold | weather_wind_precipitation | 6 | utc_offset_hours | double | true |
+| energy_gold | weather_wind_precipitation | 7 | observation_timestamp_utc | timestamp | true |
+| energy_gold | weather_wind_precipitation | 8 | observation_timestamp_project | timestamp | true |
+| energy_gold | weather_wind_precipitation | 9 | local_date | date | true |
+| energy_gold | weather_wind_precipitation | 10 | interval_seconds | int | true |
+| energy_gold | weather_wind_precipitation | 11 | interval_reference | string | true |
+| energy_gold | weather_wind_precipitation | 12 | true_solar_time_native | string | true |
+| energy_gold | weather_wind_precipitation | 13 | measurement_basis | string | true |
+| energy_gold | weather_wind_precipitation | 14 | source_system | string | true |
+| energy_gold | weather_wind_precipitation | 15 | wind_mean_speed_m_per_s | double | true |
+| energy_gold | weather_wind_precipitation | 16 | wind_mean_direction_degrees | double | true |
+| energy_gold | weather_wind_precipitation | 17 | wind_mean_direction_variable | boolean | true |
+| energy_gold | weather_wind_precipitation | 18 | wind_instant_speed_m_per_s | double | true |
+| energy_gold | weather_wind_precipitation | 19 | wind_instant_direction_degrees | double | true |
+| energy_gold | weather_wind_precipitation | 20 | wind_max_gust_m_per_s | double | true |
+| energy_gold | weather_wind_precipitation | 21 | wind_unspecified_speed_m_per_s | double | true |
+| energy_gold | weather_wind_precipitation | 22 | wind_unspecified_direction_degrees | double | true |
+| energy_gold | weather_wind_precipitation | 23 | wind_unspecified_gust_m_per_s | double | true |
+| energy_gold | weather_wind_precipitation | 24 | wind_quality_code | string | true |
+| energy_gold | weather_wind_precipitation | 25 | wind_quality_label | string | true |
+| energy_gold | weather_wind_precipitation | 26 | wind_source_dataset | string | true |
+| energy_gold | weather_wind_precipitation | 27 | wind_key_conflict_resolved | boolean | true |
+| energy_gold | weather_wind_precipitation | 28 | wind_qn_missing | boolean | true |
+| energy_gold | weather_wind_precipitation | 29 | wind_stuck_reading | boolean | true |
+| energy_gold | weather_wind_precipitation | 30 | precipitation_mm | double | true |
+| energy_gold | weather_wind_precipitation | 31 | precipitation_occurred | boolean | true |
+| energy_gold | weather_wind_precipitation | 32 | precipitation_form_code | string | true |
+| energy_gold | weather_wind_precipitation | 33 | precipitation_form_text | string | true |
+| energy_gold | weather_wind_precipitation | 34 | precipitation_quality_code | string | true |
+| energy_gold | weather_wind_precipitation | 35 | precipitation_quality_label | string | true |
+| energy_gold | weather_wind_precipitation | 36 | precipitation_source_dataset | string | true |
+| energy_gold | weather_wind_precipitation | 37 | precipitation_key_conflict_resolved | boolean | true |
+| energy_gold | weather_wind_precipitation | 38 | precipitation_qn_missing | boolean | true |
+| energy_gold | weather_wind_precipitation | 39 | precipitation_stuck_reading | boolean | true |
+| energy_gold | weather_wind_precipitation | 40 | source_record_id | string | true |
+| energy_gold | weather_wind_precipitation | 41 | ecosystem | string | true |
+| energy_gold | weather_wind_precipitation | 42 | _gold_loaded_at | timestamp | true |
+| energy_gold | weather_wind_precipitation | 43 | _gold_run_id | string | true |
+| genomics_gold | benchmark_coding_variant | 1 | benchmark_set | string | true |
+| genomics_gold | benchmark_coding_variant | 2 | variant_key | string | true |
+| genomics_gold | benchmark_coding_variant | 3 | assembly_basis | string | true |
+| genomics_gold | benchmark_coding_variant | 4 | contig | string | true |
+| genomics_gold | benchmark_coding_variant | 5 | position | bigint | true |
+| genomics_gold | benchmark_coding_variant | 6 | reference_allele | string | true |
+| genomics_gold | benchmark_coding_variant | 7 | alternate_allele | string | true |
+| genomics_gold | benchmark_coding_variant | 8 | label | string | true |
+| genomics_gold | benchmark_coding_variant | 9 | label_integer | int | true |
+| genomics_gold | benchmark_coding_variant | 10 | split | string | true |
+| genomics_gold | benchmark_coding_variant | 11 | source_label | string | true |
+| genomics_gold | benchmark_coding_variant | 12 | consequence | string | true |
+| genomics_gold | benchmark_coding_variant | 13 | review_status | string | true |
+| genomics_gold | benchmark_coding_variant | 14 | record_id | string | true |
+| genomics_gold | benchmark_coding_variant | 15 | gene | string | true |
+| genomics_gold | benchmark_coding_variant | 16 | allele_count | double | true |
+| genomics_gold | benchmark_coding_variant | 17 | allele_number | double | true |
+| genomics_gold | benchmark_coding_variant | 18 | allele_frequency | double | true |
+| genomics_gold | benchmark_coding_variant | 19 | minor_allele_frequency | double | true |
+| genomics_gold | benchmark_coding_variant | 20 | minor_allele_count | double | true |
+| genomics_gold | benchmark_coding_variant | 21 | gpn_star_v100 | double | true |
+| genomics_gold | benchmark_coding_variant | 22 | gpn_star_p243 | double | true |
+| genomics_gold | benchmark_coding_variant | 23 | gpn_star_m447 | double | true |
+| genomics_gold | benchmark_coding_variant | 24 | protein_id | string | true |
+| genomics_gold | benchmark_coding_variant | 25 | mutant | string | true |
+| genomics_gold | benchmark_coding_variant | 26 | protein_position | int | true |
+| genomics_gold | benchmark_coding_variant | 27 | wild_type_aa | string | true |
+| genomics_gold | benchmark_coding_variant | 28 | mutant_aa | string | true |
+| genomics_gold | benchmark_coding_variant | 29 | source_dataset | string | true |
+| genomics_gold | benchmark_coding_variant | 30 | source_system | string | true |
+| genomics_gold | benchmark_coding_variant | 31 | source_record_id | string | true |
+| genomics_gold | benchmark_coding_variant | 32 | ecosystem | string | true |
+| genomics_gold | benchmark_coding_variant | 33 | _gold_loaded_at | timestamp | true |
+| genomics_gold | benchmark_coding_variant | 34 | _gold_run_id | string | true |
+| genomics_gold | benchmark_population_variant | 1 | benchmark_set | string | true |
+| genomics_gold | benchmark_population_variant | 2 | variant_key | string | true |
+| genomics_gold | benchmark_population_variant | 3 | assembly_basis | string | true |
+| genomics_gold | benchmark_population_variant | 4 | contig | string | true |
+| genomics_gold | benchmark_population_variant | 5 | position | bigint | true |
+| genomics_gold | benchmark_population_variant | 6 | reference_allele | string | true |
+| genomics_gold | benchmark_population_variant | 7 | alternate_allele | string | true |
+| genomics_gold | benchmark_population_variant | 8 | label | string | true |
+| genomics_gold | benchmark_population_variant | 9 | split | string | true |
+| genomics_gold | benchmark_population_variant | 10 | source_label | string | true |
+| genomics_gold | benchmark_population_variant | 11 | consequence | string | true |
+| genomics_gold | benchmark_population_variant | 12 | record_id | string | true |
+| genomics_gold | benchmark_population_variant | 13 | protein_id | string | true |
+| genomics_gold | benchmark_population_variant | 14 | protein_position | int | true |
+| genomics_gold | benchmark_population_variant | 15 | wild_type_aa | string | true |
+| genomics_gold | benchmark_population_variant | 16 | mutant_aa | string | true |
+| genomics_gold | benchmark_population_variant | 17 | sequence_length | int | true |
+| genomics_gold | benchmark_population_variant | 18 | stars | int | true |
+| genomics_gold | benchmark_population_variant | 19 | cluster | string | true |
+| genomics_gold | benchmark_population_variant | 20 | shuffle_rank | string | true |
+| genomics_gold | benchmark_population_variant | 21 | split_file | string | true |
+| genomics_gold | benchmark_population_variant | 22 | source_dataset | string | true |
+| genomics_gold | benchmark_population_variant | 23 | source_system | string | true |
+| genomics_gold | benchmark_population_variant | 24 | source_record_id | string | true |
+| genomics_gold | benchmark_population_variant | 25 | ecosystem | string | true |
+| genomics_gold | benchmark_population_variant | 26 | _gold_loaded_at | timestamp | true |
+| genomics_gold | benchmark_population_variant | 27 | _gold_run_id | string | true |
+| genomics_gold | benchmark_regulatory_variant | 1 | benchmark_set | string | true |
+| genomics_gold | benchmark_regulatory_variant | 2 | variant_key | string | true |
+| genomics_gold | benchmark_regulatory_variant | 3 | assembly_basis | string | true |
+| genomics_gold | benchmark_regulatory_variant | 4 | contig | string | true |
+| genomics_gold | benchmark_regulatory_variant | 5 | position | bigint | true |
+| genomics_gold | benchmark_regulatory_variant | 6 | reference_allele | string | true |
+| genomics_gold | benchmark_regulatory_variant | 7 | alternate_allele | string | true |
+| genomics_gold | benchmark_regulatory_variant | 8 | label | string | true |
+| genomics_gold | benchmark_regulatory_variant | 9 | label_integer | int | true |
+| genomics_gold | benchmark_regulatory_variant | 10 | split | string | true |
+| genomics_gold | benchmark_regulatory_variant | 11 | source_label | string | true |
+| genomics_gold | benchmark_regulatory_variant | 12 | consequence | string | true |
+| genomics_gold | benchmark_regulatory_variant | 13 | record_id | string | true |
+| genomics_gold | benchmark_regulatory_variant | 14 | gene | string | true |
+| genomics_gold | benchmark_regulatory_variant | 15 | omim | string | true |
+| genomics_gold | benchmark_regulatory_variant | 16 | pubmed_id | string | true |
+| genomics_gold | benchmark_regulatory_variant | 17 | allele_count | double | true |
+| genomics_gold | benchmark_regulatory_variant | 18 | allele_number | double | true |
+| genomics_gold | benchmark_regulatory_variant | 19 | allele_frequency | double | true |
+| genomics_gold | benchmark_regulatory_variant | 20 | minor_allele_frequency | double | true |
+| genomics_gold | benchmark_regulatory_variant | 21 | minor_allele_count | double | true |
+| genomics_gold | benchmark_regulatory_variant | 22 | tissue | string | true |
+| genomics_gold | benchmark_regulatory_variant | 23 | distance_to_nearest_transcription_start_site | double | true |
+| genomics_gold | benchmark_regulatory_variant | 24 | source_dataset | string | true |
+| genomics_gold | benchmark_regulatory_variant | 25 | source_system | string | true |
+| genomics_gold | benchmark_regulatory_variant | 26 | source_record_id | string | true |
+| genomics_gold | benchmark_regulatory_variant | 27 | ecosystem | string | true |
+| genomics_gold | benchmark_regulatory_variant | 28 | _gold_loaded_at | timestamp | true |
+| genomics_gold | benchmark_regulatory_variant | 29 | _gold_run_id | string | true |
+| genomics_gold | benchmark_variant | 1 | benchmark_set | string | true |
+| genomics_gold | benchmark_variant | 2 | variant_key | string | true |
+| genomics_gold | benchmark_variant | 3 | assembly_basis | string | true |
+| genomics_gold | benchmark_variant | 4 | contig | string | true |
+| genomics_gold | benchmark_variant | 5 | position | bigint | true |
+| genomics_gold | benchmark_variant | 6 | reference_allele | string | true |
+| genomics_gold | benchmark_variant | 7 | alternate_allele | string | true |
+| genomics_gold | benchmark_variant | 8 | label | string | true |
+| genomics_gold | benchmark_variant | 9 | label_integer | int | true |
+| genomics_gold | benchmark_variant | 10 | split | string | true |
+| genomics_gold | benchmark_variant | 11 | source_label | string | true |
+| genomics_gold | benchmark_variant | 12 | consequence | string | true |
+| genomics_gold | benchmark_variant | 13 | review_status | string | true |
+| genomics_gold | benchmark_variant | 14 | record_id | string | true |
+| genomics_gold | benchmark_variant | 15 | gene | string | true |
+| genomics_gold | benchmark_variant | 16 | omim | string | true |
+| genomics_gold | benchmark_variant | 17 | pubmed_id | string | true |
+| genomics_gold | benchmark_variant | 18 | allele_count | double | true |
+| genomics_gold | benchmark_variant | 19 | allele_number | double | true |
+| genomics_gold | benchmark_variant | 20 | allele_frequency | double | true |
+| genomics_gold | benchmark_variant | 21 | minor_allele_frequency | double | true |
+| genomics_gold | benchmark_variant | 22 | minor_allele_count | double | true |
+| genomics_gold | benchmark_variant | 23 | tissue | string | true |
+| genomics_gold | benchmark_variant | 24 | distance_to_nearest_transcription_start_site | double | true |
+| genomics_gold | benchmark_variant | 25 | gpn_star_v100 | double | true |
+| genomics_gold | benchmark_variant | 26 | gpn_star_p243 | double | true |
+| genomics_gold | benchmark_variant | 27 | gpn_star_m447 | double | true |
+| genomics_gold | benchmark_variant | 28 | protein_id | string | true |
+| genomics_gold | benchmark_variant | 29 | mutant | string | true |
+| genomics_gold | benchmark_variant | 30 | protein_position | int | true |
+| genomics_gold | benchmark_variant | 31 | wild_type_aa | string | true |
+| genomics_gold | benchmark_variant | 32 | mutant_aa | string | true |
+| genomics_gold | benchmark_variant | 33 | sequence_length | int | true |
+| genomics_gold | benchmark_variant | 34 | stars | int | true |
+| genomics_gold | benchmark_variant | 35 | cluster | string | true |
+| genomics_gold | benchmark_variant | 36 | shuffle_rank | string | true |
+| genomics_gold | benchmark_variant | 37 | split_file | string | true |
+| genomics_gold | benchmark_variant | 38 | source_dataset | string | true |
+| genomics_gold | benchmark_variant | 39 | source_system | string | true |
+| genomics_gold | benchmark_variant | 40 | source_record_id | string | true |
+| genomics_gold | benchmark_variant | 41 | ecosystem | string | true |
+| genomics_gold | benchmark_variant | 42 | _gold_loaded_at | timestamp | true |
+| genomics_gold | benchmark_variant | 43 | _gold_run_id | string | true |
+| genomics_gold | case_assay_record | 1 | record_kind | string | true |
+| genomics_gold | case_assay_record | 2 | record_key | string | true |
+| genomics_gold | case_assay_record | 3 | quarter | string | true |
+| genomics_gold | case_assay_record | 4 | primary_id | string | true |
+| genomics_gold | case_assay_record | 5 | case_id | string | true |
+| genomics_gold | case_assay_record | 6 | case_version | string | true |
+| genomics_gold | case_assay_record | 7 | initial_or_followup | string | true |
+| genomics_gold | case_assay_record | 8 | event_date_raw | string | true |
+| genomics_gold | case_assay_record | 9 | manufacturer_date_raw | string | true |
+| genomics_gold | case_assay_record | 10 | initial_fda_date_raw | string | true |
+| genomics_gold | case_assay_record | 11 | fda_date_raw | string | true |
+| genomics_gold | case_assay_record | 12 | report_date_raw | string | true |
+| genomics_gold | case_assay_record | 13 | event_date | date | true |
+| genomics_gold | case_assay_record | 14 | manufacturer_date | date | true |
+| genomics_gold | case_assay_record | 15 | initial_fda_date | date | true |
+| genomics_gold | case_assay_record | 16 | fda_date | date | true |
+| genomics_gold | case_assay_record | 17 | report_date | date | true |
+| genomics_gold | case_assay_record | 18 | report_code | string | true |
+| genomics_gold | case_assay_record | 19 | manufacturer_number | string | true |
+| genomics_gold | case_assay_record | 20 | manufacturer_sender | string | true |
+| genomics_gold | case_assay_record | 21 | age | double | true |
+| genomics_gold | case_assay_record | 22 | age_unit | string | true |
+| genomics_gold | case_assay_record | 23 | age_group | string | true |
+| genomics_gold | case_assay_record | 24 | sex | string | true |
+| genomics_gold | case_assay_record | 25 | electronic_submission | string | true |
+| genomics_gold | case_assay_record | 26 | weight | double | true |
+| genomics_gold | case_assay_record | 27 | weight_unit | string | true |
+| genomics_gold | case_assay_record | 28 | occupation_code | string | true |
+| genomics_gold | case_assay_record | 29 | reporter_country | string | true |
+| genomics_gold | case_assay_record | 30 | occurrence_country | string | true |
+| genomics_gold | case_assay_record | 31 | authority_number | string | true |
+| genomics_gold | case_assay_record | 32 | literature_reference | string | true |
+| genomics_gold | case_assay_record | 33 | sent_to_manufacturer | string | true |
+| genomics_gold | case_assay_record | 34 | source_system | string | true |
+| genomics_gold | case_assay_record | 35 | source_record_id | string | true |
+| genomics_gold | case_assay_record | 36 | ecosystem | string | true |
+| genomics_gold | case_assay_record | 37 | drug_sequence | string | true |
+| genomics_gold | case_assay_record | 38 | role_code | string | true |
+| genomics_gold | case_assay_record | 39 | drug_name | string | true |
+| genomics_gold | case_assay_record | 40 | dose_record_number | int | true |
+| genomics_gold | case_assay_record | 41 | active_ingredient | string | true |
+| genomics_gold | case_assay_record | 42 | drug_name_validation_code | string | true |
+| genomics_gold | case_assay_record | 43 | route | string | true |
+| genomics_gold | case_assay_record | 44 | dose_verbatim_text | string | true |
+| genomics_gold | case_assay_record | 45 | cumulative_dose | double | true |
+| genomics_gold | case_assay_record | 46 | cumulative_dose_unit | string | true |
+| genomics_gold | case_assay_record | 47 | dechallenge | string | true |
+| genomics_gold | case_assay_record | 48 | rechallenge | string | true |
+| genomics_gold | case_assay_record | 49 | lot_number | string | true |
+| genomics_gold | case_assay_record | 50 | expiry_date_raw | string | true |
+| genomics_gold | case_assay_record | 51 | new_drug_application_number | string | true |
+| genomics_gold | case_assay_record | 52 | dose_amount | double | true |
+| genomics_gold | case_assay_record | 53 | dose_unit | string | true |
+| genomics_gold | case_assay_record | 54 | dose_form | string | true |
+| genomics_gold | case_assay_record | 55 | dose_frequency | string | true |
+| genomics_gold | case_assay_record | 56 | drug_key | string | true |
+| genomics_gold | case_assay_record | 57 | drug_link_method | string | true |
+| genomics_gold | case_assay_record | 58 | item_kind | string | true |
+| genomics_gold | case_assay_record | 59 | item_value | string | true |
+| genomics_gold | case_assay_record | 60 | drug_recurrence_action | string | true |
+| genomics_gold | case_assay_record | 61 | therapy_start_date_raw | string | true |
+| genomics_gold | case_assay_record | 62 | therapy_end_date_raw | string | true |
+| genomics_gold | case_assay_record | 63 | therapy_duration | string | true |
+| genomics_gold | case_assay_record | 64 | therapy_duration_unit | string | true |
+| genomics_gold | case_assay_record | 65 | assay_id | string | true |
+| genomics_gold | case_assay_record | 66 | epitope_id | string | true |
+| genomics_gold | case_assay_record | 67 | reference_pubmed_id | string | true |
+| genomics_gold | case_assay_record | 68 | reference_date | string | true |
+| genomics_gold | case_assay_record | 69 | epitope_object_type | string | true |
+| genomics_gold | case_assay_record | 70 | epitope_name | string | true |
+| genomics_gold | case_assay_record | 71 | epitope_reference_name | string | true |
+| genomics_gold | case_assay_record | 72 | epitope_modified_residues | string | true |
+| genomics_gold | case_assay_record | 73 | epitope_modifications | string | true |
+| genomics_gold | case_assay_record | 74 | epitope_starting_position | string | true |
+| genomics_gold | case_assay_record | 75 | epitope_ending_position | string | true |
+| genomics_gold | case_assay_record | 76 | source_molecule | string | true |
+| genomics_gold | case_assay_record | 77 | source_molecule_iri | string | true |
+| genomics_gold | case_assay_record | 78 | molecule_parent | string | true |
+| genomics_gold | case_assay_record | 79 | molecule_parent_iri | string | true |
+| genomics_gold | case_assay_record | 80 | source_organism | string | true |
+| genomics_gold | case_assay_record | 81 | species | string | true |
+| genomics_gold | case_assay_record | 82 | species_iri | string | true |
+| genomics_gold | case_assay_record | 83 | related_object_epitope_relation | string | true |
+| genomics_gold | case_assay_record | 84 | related_object_name | string | true |
+| genomics_gold | case_assay_record | 85 | host_name | string | true |
+| genomics_gold | case_assay_record | 86 | host_iri | string | true |
+| genomics_gold | case_assay_record | 87 | in_vivo_process_type | string | true |
+| genomics_gold | case_assay_record | 88 | in_vivo_process_disease | string | true |
+| genomics_gold | case_assay_record | 89 | in_vivo_process_disease_iri | string | true |
+| genomics_gold | case_assay_record | 90 | assay_method | string | true |
+| genomics_gold | case_assay_record | 91 | assay_response_measured | string | true |
+| genomics_gold | case_assay_record | 92 | assay_qualitative_measurement | string | true |
+| genomics_gold | case_assay_record | 93 | assay_measurement_inequality | string | true |
+| genomics_gold | case_assay_record | 94 | assay_quantitative_measurement | string | true |
+| genomics_gold | case_assay_record | 95 | assay_units | string | true |
+| genomics_gold | case_assay_record | 96 | antigen_presenting_cell_name | string | true |
+| genomics_gold | case_assay_record | 97 | mhc_restriction_name | string | true |
+| genomics_gold | case_assay_record | 98 | mhc_restriction_class | string | true |
+| genomics_gold | case_assay_record | 99 | mhc_restriction_evidence_code | string | true |
+| genomics_gold | case_assay_record | 100 | protein_key | string | true |
+| genomics_gold | case_assay_record | 101 | protein_link_method | string | true |
+| genomics_gold | case_assay_record | 102 | source_dataset | string | true |
+| genomics_gold | case_assay_record | 103 | _gold_loaded_at | timestamp | true |
+| genomics_gold | case_assay_record | 104 | _gold_run_id | string | true |
+| genomics_gold | cell_line_profile | 1 | cell_line_key | string | true |
+| genomics_gold | cell_line_profile | 2 | cell_name | string | true |
+| genomics_gold | cell_line_profile | 3 | cellosaur_id | string | true |
+| genomics_gold | cell_line_profile | 4 | organ | string | true |
+| genomics_gold | cell_line_profile | 5 | driver_gene_symbol | string | true |
+| genomics_gold | cell_line_profile | 6 | driver_variant_zygosity | string | true |
+| genomics_gold | cell_line_profile | 7 | driver_variant_type | string | true |
+| genomics_gold | cell_line_profile | 8 | driver_effect | string | true |
+| genomics_gold | cell_line_profile | 9 | driver_mechanism | string | true |
+| genomics_gold | cell_line_profile | 10 | driver_gene_type | string | true |
+| genomics_gold | cell_line_profile | 11 | in_tahoe | boolean | true |
+| genomics_gold | cell_line_profile | 12 | in_depmap | boolean | true |
+| genomics_gold | cell_line_profile | 13 | patient_id | string | true |
+| genomics_gold | cell_line_profile | 14 | stripped_cell_line_name | string | true |
+| genomics_gold | cell_line_profile | 15 | ccle_name | string | true |
+| genomics_gold | cell_line_profile | 16 | depmap_model_type | string | true |
+| genomics_gold | cell_line_profile | 17 | model_type | string | true |
+| genomics_gold | cell_line_profile | 18 | pediatric_model_type | string | true |
+| genomics_gold | cell_line_profile | 19 | oncotree_lineage | string | true |
+| genomics_gold | cell_line_profile | 20 | oncotree_primary_disease | string | true |
+| genomics_gold | cell_line_profile | 21 | oncotree_subtype | string | true |
+| genomics_gold | cell_line_profile | 22 | oncotree_code | string | true |
+| genomics_gold | cell_line_profile | 23 | age | string | true |
+| genomics_gold | cell_line_profile | 24 | age_category | string | true |
+| genomics_gold | cell_line_profile | 25 | sex | string | true |
+| genomics_gold | cell_line_profile | 26 | patient_race | string | true |
+| genomics_gold | cell_line_profile | 27 | primary_or_metastasis | string | true |
+| genomics_gold | cell_line_profile | 28 | source_type | string | true |
+| genomics_gold | cell_line_profile | 29 | source_detail | string | true |
+| genomics_gold | cell_line_profile | 30 | catalog_number | string | true |
+| genomics_gold | cell_line_profile | 31 | sample_collection_site | string | true |
+| genomics_gold | cell_line_profile | 32 | model_subtype_features | string | true |
+| genomics_gold | cell_line_profile | 33 | patient_subtype_features | string | true |
+| genomics_gold | cell_line_profile | 34 | tissue_origin | string | true |
+| genomics_gold | cell_line_profile | 35 | model_derivation_material | string | true |
+| genomics_gold | cell_line_profile | 36 | model_treatment | string | true |
+| genomics_gold | cell_line_profile | 37 | patient_treatment_status | string | true |
+| genomics_gold | cell_line_profile | 38 | patient_treatment_type | string | true |
+| genomics_gold | cell_line_profile | 39 | patient_treatment_details | string | true |
+| genomics_gold | cell_line_profile | 40 | stage | string | true |
+| genomics_gold | cell_line_profile | 41 | staging_system | string | true |
+| genomics_gold | cell_line_profile | 42 | patient_tumor_grade | string | true |
+| genomics_gold | cell_line_profile | 43 | patient_treatment_response | string | true |
+| genomics_gold | cell_line_profile | 44 | growth_pattern | string | true |
+| genomics_gold | cell_line_profile | 45 | onboarded_media | string | true |
+| genomics_gold | cell_line_profile | 46 | formulation_id | string | true |
+| genomics_gold | cell_line_profile | 47 | serum_free_media | string | true |
+| genomics_gold | cell_line_profile | 48 | plate_coating | string | true |
+| genomics_gold | cell_line_profile | 49 | engineered_model | string | true |
+| genomics_gold | cell_line_profile | 50 | engineered_model_details | string | true |
+| genomics_gold | cell_line_profile | 51 | cultured_resistance_drug | string | true |
+| genomics_gold | cell_line_profile | 52 | public_comments | string | true |
+| genomics_gold | cell_line_profile | 53 | model_id_alias | string | true |
+| genomics_gold | cell_line_profile | 54 | hcmi_id | string | true |
+| genomics_gold | cell_line_profile | 55 | sanger_model_id | string | true |
+| genomics_gold | cell_line_profile | 56 | wtsi_master_cell_id | string | true |
+| genomics_gold | cell_line_profile | 57 | cosmic_id | string | true |
+| genomics_gold | cell_line_profile | 58 | source_system | string | true |
+| genomics_gold | cell_line_profile | 59 | source_record_id | string | true |
+| genomics_gold | cell_line_profile | 60 | ecosystem | string | true |
+| genomics_gold | cell_line_profile | 61 | dependent_gene_count | double | true |
+| genomics_gold | cell_line_profile | 62 | perturbation_drug_count | double | true |
+| genomics_gold | cell_line_profile | 63 | strongly_dependent_gene_count | double | true |
+| genomics_gold | cell_line_profile | 64 | tested_gene_count | double | true |
+| genomics_gold | cell_line_profile | 65 | _gold_loaded_at | timestamp | true |
+| genomics_gold | cell_line_profile | 66 | _gold_run_id | string | true |
+| genomics_gold | clinical_trial_profile | 1 | nct_id | string | true |
+| genomics_gold | clinical_trial_profile | 2 | nlm_download_date_description | string | true |
+| genomics_gold | clinical_trial_profile | 3 | study_first_submitted_date | string | true |
+| genomics_gold | clinical_trial_profile | 4 | results_first_submitted_date | string | true |
+| genomics_gold | clinical_trial_profile | 5 | disposition_first_submitted_date | string | true |
+| genomics_gold | clinical_trial_profile | 6 | last_update_submitted_date | string | true |
+| genomics_gold | clinical_trial_profile | 7 | study_first_submitted_quality_check_date | string | true |
+| genomics_gold | clinical_trial_profile | 8 | study_first_posted_date | string | true |
+| genomics_gold | clinical_trial_profile | 9 | study_first_posted_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 10 | results_first_submitted_quality_check_date | string | true |
+| genomics_gold | clinical_trial_profile | 11 | results_first_posted_date | string | true |
+| genomics_gold | clinical_trial_profile | 12 | results_first_posted_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 13 | disposition_first_submitted_quality_check_date | string | true |
+| genomics_gold | clinical_trial_profile | 14 | disposition_first_posted_date | string | true |
+| genomics_gold | clinical_trial_profile | 15 | disposition_first_posted_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 16 | last_update_submitted_quality_check_date | string | true |
+| genomics_gold | clinical_trial_profile | 17 | last_update_posted_date | string | true |
+| genomics_gold | clinical_trial_profile | 18 | last_update_posted_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 19 | start_month_year | string | true |
+| genomics_gold | clinical_trial_profile | 20 | start_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 21 | start_date | string | true |
+| genomics_gold | clinical_trial_profile | 22 | verification_month_year | string | true |
+| genomics_gold | clinical_trial_profile | 23 | verification_date | string | true |
+| genomics_gold | clinical_trial_profile | 24 | completion_month_year | string | true |
+| genomics_gold | clinical_trial_profile | 25 | completion_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 26 | completion_date | string | true |
+| genomics_gold | clinical_trial_profile | 27 | primary_completion_month_year | string | true |
+| genomics_gold | clinical_trial_profile | 28 | primary_completion_date_type | string | true |
+| genomics_gold | clinical_trial_profile | 29 | primary_completion_date | string | true |
+| genomics_gold | clinical_trial_profile | 30 | target_duration | string | true |
+| genomics_gold | clinical_trial_profile | 31 | study_type | string | true |
+| genomics_gold | clinical_trial_profile | 32 | acronym | string | true |
+| genomics_gold | clinical_trial_profile | 33 | baseline_population | string | true |
+| genomics_gold | clinical_trial_profile | 34 | brief_title | string | true |
+| genomics_gold | clinical_trial_profile | 35 | official_title | string | true |
+| genomics_gold | clinical_trial_profile | 36 | overall_status | string | true |
+| genomics_gold | clinical_trial_profile | 37 | last_known_status | string | true |
+| genomics_gold | clinical_trial_profile | 38 | phase | string | true |
+| genomics_gold | clinical_trial_profile | 39 | enrollment | string | true |
+| genomics_gold | clinical_trial_profile | 40 | enrollment_type | string | true |
+| genomics_gold | clinical_trial_profile | 41 | sponsor_source | string | true |
+| genomics_gold | clinical_trial_profile | 42 | limitations_and_caveats | string | true |
+| genomics_gold | clinical_trial_profile | 43 | number_of_arms | string | true |
+| genomics_gold | clinical_trial_profile | 44 | number_of_groups | string | true |
+| genomics_gold | clinical_trial_profile | 45 | why_stopped | string | true |
+| genomics_gold | clinical_trial_profile | 46 | has_expanded_access | string | true |
+| genomics_gold | clinical_trial_profile | 47 | expanded_access_type_individual | string | true |
+| genomics_gold | clinical_trial_profile | 48 | expanded_access_type_intermediate | string | true |
+| genomics_gold | clinical_trial_profile | 49 | expanded_access_type_treatment | string | true |
+| genomics_gold | clinical_trial_profile | 50 | has_data_monitoring_committee | string | true |
+| genomics_gold | clinical_trial_profile | 51 | is_fda_regulated_drug | string | true |
+| genomics_gold | clinical_trial_profile | 52 | is_fda_regulated_device | string | true |
+| genomics_gold | clinical_trial_profile | 53 | is_unapproved_device | string | true |
+| genomics_gold | clinical_trial_profile | 54 | is_pediatric_postmarket_surveillance_device | string | true |
+| genomics_gold | clinical_trial_profile | 55 | is_us_export | string | true |
+| genomics_gold | clinical_trial_profile | 56 | biospecimen_retention | string | true |
+| genomics_gold | clinical_trial_profile | 57 | biospecimen_description | string | true |
+| genomics_gold | clinical_trial_profile | 58 | individual_participant_data_time_frame | string | true |
+| genomics_gold | clinical_trial_profile | 59 | individual_participant_data_access_criteria | string | true |
+| genomics_gold | clinical_trial_profile | 60 | individual_participant_data_url | string | true |
+| genomics_gold | clinical_trial_profile | 61 | plan_to_share_individual_participant_data | string | true |
+| genomics_gold | clinical_trial_profile | 62 | plan_to_share_individual_participant_data_description | string | true |
+| genomics_gold | clinical_trial_profile | 63 | registry_created_at | string | true |
+| genomics_gold | clinical_trial_profile | 64 | registry_updated_at | string | true |
+| genomics_gold | clinical_trial_profile | 65 | sponsor_source_class | string | true |
+| genomics_gold | clinical_trial_profile | 66 | delayed_posting | string | true |
+| genomics_gold | clinical_trial_profile | 67 | expanded_access_nct_id | string | true |
+| genomics_gold | clinical_trial_profile | 68 | expanded_access_status_for_nct_id | string | true |
+| genomics_gold | clinical_trial_profile | 69 | fda_amendments_act_801_violation | string | true |
+| genomics_gold | clinical_trial_profile | 70 | baseline_type_units_analyzed | string | true |
+| genomics_gold | clinical_trial_profile | 71 | patient_registry | string | true |
+| genomics_gold | clinical_trial_profile | 72 | sampling_method | string | true |
+| genomics_gold | clinical_trial_profile | 73 | eligible_gender | string | true |
+| genomics_gold | clinical_trial_profile | 74 | minimum_age | string | true |
+| genomics_gold | clinical_trial_profile | 75 | maximum_age | string | true |
+| genomics_gold | clinical_trial_profile | 76 | healthy_volunteers | string | true |
+| genomics_gold | clinical_trial_profile | 77 | eligible_population | string | true |
+| genomics_gold | clinical_trial_profile | 78 | eligibility_criteria | string | true |
+| genomics_gold | clinical_trial_profile | 79 | gender_description | string | true |
+| genomics_gold | clinical_trial_profile | 80 | gender_based | string | true |
+| genomics_gold | clinical_trial_profile | 81 | accepts_adults | string | true |
+| genomics_gold | clinical_trial_profile | 82 | accepts_children | string | true |
+| genomics_gold | clinical_trial_profile | 83 | accepts_older_adults | string | true |
+| genomics_gold | clinical_trial_profile | 84 | source_dataset | string | true |
+| genomics_gold | clinical_trial_profile | 85 | source_system | string | true |
+| genomics_gold | clinical_trial_profile | 86 | source_record_id | string | true |
+| genomics_gold | clinical_trial_profile | 87 | ecosystem | string | true |
+| genomics_gold | clinical_trial_profile | 88 | condition_count | double | true |
+| genomics_gold | clinical_trial_profile | 89 | intervention_count | double | true |
+| genomics_gold | clinical_trial_profile | 90 | keyword_count | double | true |
+| genomics_gold | clinical_trial_profile | 91 | linked_disease_count | double | true |
+| genomics_gold | clinical_trial_profile | 92 | linked_drug_count | double | true |
+| genomics_gold | clinical_trial_profile | 93 | _gold_loaded_at | timestamp | true |
+| genomics_gold | clinical_trial_profile | 94 | _gold_run_id | string | true |
+| genomics_gold | clinvar_classification_change | 1 | variant_key | string | true |
+| genomics_gold | clinvar_classification_change | 2 | classification_type | string | true |
+| genomics_gold | clinvar_classification_change | 3 | term | string | true |
+| genomics_gold | clinvar_classification_change | 4 | clinical_significance_simple | string | true |
+| genomics_gold | clinvar_classification_change | 5 | first_source_snapshot | string | true |
+| genomics_gold | clinvar_classification_change | 6 | last_source_snapshot | string | true |
+| genomics_gold | clinvar_classification_change | 7 | previous_term | string | true |
+| genomics_gold | clinvar_classification_change | 8 | previous_clinical_significance_simple | string | true |
+| genomics_gold | clinvar_classification_change | 9 | previous_first_source_snapshot | string | true |
+| genomics_gold | clinvar_classification_change | 10 | previous_last_source_snapshot | string | true |
+| genomics_gold | clinvar_classification_change | 11 | source_system | string | true |
+| genomics_gold | clinvar_classification_change | 12 | ecosystem | string | true |
+| genomics_gold | clinvar_classification_change | 13 | _gold_loaded_at | timestamp | true |
+| genomics_gold | clinvar_classification_change | 14 | _gold_run_id | string | true |
+| genomics_gold | disease_profile | 1 | disease_key | string | true |
+| genomics_gold | disease_profile | 2 | entity_type | string | true |
+| genomics_gold | disease_profile | 3 | key_source | string | true |
+| genomics_gold | disease_profile | 4 | description | string | true |
+| genomics_gold | disease_profile | 5 | description_source | string | true |
+| genomics_gold | disease_profile | 6 | description_method | string | true |
+| genomics_gold | disease_profile | 7 | name | string | true |
+| genomics_gold | disease_profile | 8 | name_source | string | true |
+| genomics_gold | disease_profile | 9 | name_method | string | true |
+| genomics_gold | disease_profile | 10 | ontology_prefix | string | true |
+| genomics_gold | disease_profile | 11 | ontology_prefix_source | string | true |
+| genomics_gold | disease_profile | 12 | ontology_prefix_method | string | true |
+| genomics_gold | disease_profile | 13 | therapeutic_areas | string | true |
+| genomics_gold | disease_profile | 14 | therapeutic_areas_source | string | true |
+| genomics_gold | disease_profile | 15 | therapeutic_areas_method | string | true |
+| genomics_gold | disease_profile | 16 | source_system | string | true |
+| genomics_gold | disease_profile | 17 | source_record_id | string | true |
+| genomics_gold | disease_profile | 18 | ecosystem | string | true |
+| genomics_gold | disease_profile | 19 | disease_complexity | string | true |
+| genomics_gold | disease_profile | 20 | associated_gene_count | double | true |
+| genomics_gold | disease_profile | 21 | child_count | double | true |
+| genomics_gold | disease_profile | 22 | clinical_trial_count | double | true |
+| genomics_gold | disease_profile | 23 | clinical_trial_count_via_ancestor_terms | double | true |
+| genomics_gold | disease_profile | 24 | clinical_trials_active_not_recruiting | double | true |
+| genomics_gold | disease_profile | 25 | clinical_trials_approved_for_marketing | double | true |
+| genomics_gold | disease_profile | 26 | clinical_trials_available | double | true |
+| genomics_gold | disease_profile | 27 | clinical_trials_completed | double | true |
+| genomics_gold | disease_profile | 28 | clinical_trials_enrolling_by_invitation | double | true |
+| genomics_gold | disease_profile | 29 | clinical_trials_in_early_phase1 | double | true |
+| genomics_gold | disease_profile | 30 | clinical_trials_in_phase1 | double | true |
+| genomics_gold | disease_profile | 31 | clinical_trials_in_phase1_phase2 | double | true |
+| genomics_gold | disease_profile | 32 | clinical_trials_in_phase2 | double | true |
+| genomics_gold | disease_profile | 33 | clinical_trials_in_phase2_phase3 | double | true |
+| genomics_gold | disease_profile | 34 | clinical_trials_in_phase3 | double | true |
+| genomics_gold | disease_profile | 35 | clinical_trials_in_phase4 | double | true |
+| genomics_gold | disease_profile | 36 | clinical_trials_no_longer_available | double | true |
+| genomics_gold | disease_profile | 37 | clinical_trials_not_yet_recruiting | double | true |
+| genomics_gold | disease_profile | 38 | clinical_trials_recruiting | double | true |
+| genomics_gold | disease_profile | 39 | clinical_trials_suspended | double | true |
+| genomics_gold | disease_profile | 40 | clinical_trials_temporarily_not_available | double | true |
+| genomics_gold | disease_profile | 41 | clinical_trials_terminated | double | true |
+| genomics_gold | disease_profile | 42 | clinical_trials_unknown | double | true |
+| genomics_gold | disease_profile | 43 | clinical_trials_withdrawn | double | true |
+| genomics_gold | disease_profile | 44 | disease_benign_variants | double | true |
+| genomics_gold | disease_profile | 45 | disease_complexity_score | double | true |
+| genomics_gold | disease_profile | 46 | disease_gene_count | double | true |
+| genomics_gold | disease_profile | 47 | disease_pathogenic_ratio | double | true |
+| genomics_gold | disease_profile | 48 | disease_pathogenic_variants | double | true |
+| genomics_gold | disease_profile | 49 | disease_total_variants | double | true |
+| genomics_gold | disease_profile | 50 | disease_vus_variants | double | true |
+| genomics_gold | disease_profile | 51 | genetic_test_count | double | true |
+| genomics_gold | disease_profile | 52 | parent_count | double | true |
+| genomics_gold | disease_profile | 53 | phenotype_count | double | true |
+| genomics_gold | disease_profile | 54 | cancer | boolean | true |
+| genomics_gold | disease_profile | 55 | cardiovascular | boolean | true |
+| genomics_gold | disease_profile | 56 | developmental | boolean | true |
+| genomics_gold | disease_profile | 57 | disease_has_high_pathogenic_burden | boolean | true |
+| genomics_gold | disease_profile | 58 | disease_name_is_generic | boolean | true |
+| genomics_gold | disease_profile | 59 | hereditary | boolean | true |
+| genomics_gold | disease_profile | 60 | immune | boolean | true |
+| genomics_gold | disease_profile | 61 | is_polygenic_disease | boolean | true |
+| genomics_gold | disease_profile | 62 | metabolic | boolean | true |
+| genomics_gold | disease_profile | 63 | muscular | boolean | true |
+| genomics_gold | disease_profile | 64 | neurological | boolean | true |
+| genomics_gold | disease_profile | 65 | cancer__matched_text | string | true |
+| genomics_gold | disease_profile | 66 | cardiovascular__matched_text | string | true |
+| genomics_gold | disease_profile | 67 | developmental__matched_text | string | true |
+| genomics_gold | disease_profile | 68 | hereditary__matched_text | string | true |
+| genomics_gold | disease_profile | 69 | immune__matched_text | string | true |
+| genomics_gold | disease_profile | 70 | metabolic__matched_text | string | true |
+| genomics_gold | disease_profile | 71 | muscular__matched_text | string | true |
+| genomics_gold | disease_profile | 72 | neurological__matched_text | string | true |
+| genomics_gold | disease_profile | 73 | _gold_loaded_at | timestamp | true |
+| genomics_gold | disease_profile | 74 | _gold_run_id | string | true |
+| genomics_gold | dms_assay | 1 | assay_set | string | true |
+| genomics_gold | dms_assay | 2 | assay_id | string | true |
+| genomics_gold | dms_assay | 3 | assay_index | string | true |
+| genomics_gold | dms_assay | 4 | assay_filename | string | true |
+| genomics_gold | dms_assay | 5 | uniprot_id | string | true |
+| genomics_gold | dms_assay | 6 | protein_key | string | true |
+| genomics_gold | dms_assay | 7 | taxon | string | true |
+| genomics_gold | dms_assay | 8 | source_organism | string | true |
+| genomics_gold | dms_assay | 9 | target_sequence | string | true |
+| genomics_gold | dms_assay | 10 | sequence_length | int | true |
+| genomics_gold | dms_assay | 11 | includes_multiple_mutants | boolean | true |
+| genomics_gold | dms_assay | 12 | total_mutants | int | true |
+| genomics_gold | dms_assay | 13 | single_mutants | int | true |
+| genomics_gold | dms_assay | 14 | multiple_mutants | int | true |
+| genomics_gold | dms_assay | 15 | binarization_cutoff | double | true |
+| genomics_gold | dms_assay | 16 | binarization_method | string | true |
+| genomics_gold | dms_assay | 17 | first_author | string | true |
+| genomics_gold | dms_assay | 18 | title | string | true |
+| genomics_gold | dms_assay | 19 | publication_year | int | true |
+| genomics_gold | dms_assay | 20 | journal | string | true |
+| genomics_gold | dms_assay | 21 | region_mutated | string | true |
+| genomics_gold | dms_assay | 22 | molecule_name | string | true |
+| genomics_gold | dms_assay | 23 | selection_assay | string | true |
+| genomics_gold | dms_assay | 24 | selection_type | string | true |
+| genomics_gold | dms_assay | 25 | coarse_selection_type | string | true |
+| genomics_gold | dms_assay | 26 | alignment_filename | string | true |
+| genomics_gold | dms_assay | 27 | alignment_start | int | true |
+| genomics_gold | dms_assay | 28 | alignment_end | int | true |
+| genomics_gold | dms_assay | 29 | alignment_length | int | true |
+| genomics_gold | dms_assay | 30 | alignment_bit_score | double | true |
+| genomics_gold | dms_assay | 31 | alignment_theta | double | true |
+| genomics_gold | dms_assay | 32 | alignment_sequence_count | int | true |
+| genomics_gold | dms_assay | 33 | alignment_percent_coverage | double | true |
+| genomics_gold | dms_assay | 34 | alignment_coverage_count | int | true |
+| genomics_gold | dms_assay | 35 | alignment_effective_sequences | double | true |
+| genomics_gold | dms_assay | 36 | alignment_effective_sequences_per_length | double | true |
+| genomics_gold | dms_assay | 37 | alignment_effective_sequences_per_length_category | string | true |
+| genomics_gold | dms_assay | 38 | alignment_significant_count | int | true |
+| genomics_gold | dms_assay | 39 | alignment_significant_per_length | double | true |
+| genomics_gold | dms_assay | 40 | raw_scan_filename | string | true |
+| genomics_gold | dms_assay | 41 | raw_scan_phenotype_name | string | true |
+| genomics_gold | dms_assay | 42 | raw_scan_directionality | string | true |
+| genomics_gold | dms_assay | 43 | raw_scan_mutant_column | string | true |
+| genomics_gold | dms_assay | 44 | weight_file_name | string | true |
+| genomics_gold | dms_assay | 45 | protein_structure_file | string | true |
+| genomics_gold | dms_assay | 46 | protein_structure_range | string | true |
+| genomics_gold | dms_assay | 47 | proteingym_version | string | true |
+| genomics_gold | dms_assay | 48 | raw_mutation_offset | int | true |
+| genomics_gold | dms_assay | 49 | eve_model_path | string | true |
+| genomics_gold | dms_assay | 50 | file_length | int | true |
+| genomics_gold | dms_assay | 51 | alignment_source | string | true |
+| genomics_gold | dms_assay | 52 | source_dataset | string | true |
+| genomics_gold | dms_assay | 53 | source_system | string | true |
+| genomics_gold | dms_assay | 54 | source_record_id | string | true |
+| genomics_gold | dms_assay | 55 | ecosystem | string | true |
+| genomics_gold | dms_assay | 56 | _gold_loaded_at | timestamp | true |
+| genomics_gold | dms_assay | 57 | _gold_run_id | string | true |
+| genomics_gold | dms_assay_mutant | 1 | assay_set | string | true |
+| genomics_gold | dms_assay_mutant | 2 | assay_id | string | true |
+| genomics_gold | dms_assay_mutant | 3 | mutant | string | true |
+| genomics_gold | dms_assay_mutant | 4 | mutation_count | int | true |
+| genomics_gold | dms_assay_mutant | 5 | wild_type_aa | string | true |
+| genomics_gold | dms_assay_mutant | 6 | position | int | true |
+| genomics_gold | dms_assay_mutant | 7 | mutant_aa | string | true |
+| genomics_gold | dms_assay_mutant | 8 | scan_score | double | true |
+| genomics_gold | dms_assay_mutant | 9 | scan_score_binarized | int | true |
+| genomics_gold | dms_assay_mutant | 10 | source_dataset | string | true |
+| genomics_gold | dms_assay_mutant | 11 | source_system | string | true |
+| genomics_gold | dms_assay_mutant | 12 | source_record_id | string | true |
+| genomics_gold | dms_assay_mutant | 13 | ecosystem | string | true |
+| genomics_gold | dms_assay_mutant | 14 | _gold_loaded_at | timestamp | true |
+| genomics_gold | dms_assay_mutant | 15 | _gold_run_id | string | true |
+| genomics_gold | drug_profile | 1 | drug_key | string | true |
+| genomics_gold | drug_profile | 2 | entity_type | string | true |
+| genomics_gold | drug_profile | 3 | key_source | string | true |
+| genomics_gold | drug_profile | 4 | description | string | true |
+| genomics_gold | drug_profile | 5 | description_source | string | true |
+| genomics_gold | drug_profile | 6 | description_method | string | true |
+| genomics_gold | drug_profile | 7 | name | string | true |
+| genomics_gold | drug_profile | 8 | name_source | string | true |
+| genomics_gold | drug_profile | 9 | name_method | string | true |
+| genomics_gold | drug_profile | 10 | type | string | true |
+| genomics_gold | drug_profile | 11 | type_source | string | true |
+| genomics_gold | drug_profile | 12 | type_method | string | true |
+| genomics_gold | drug_profile | 13 | smiles | string | true |
+| genomics_gold | drug_profile | 14 | smiles_source | string | true |
+| genomics_gold | drug_profile | 15 | smiles_method | string | true |
+| genomics_gold | drug_profile | 16 | inchi | string | true |
+| genomics_gold | drug_profile | 17 | inchi_source | string | true |
+| genomics_gold | drug_profile | 18 | inchi_method | string | true |
+| genomics_gold | drug_profile | 19 | inchi_key | string | true |
+| genomics_gold | drug_profile | 20 | inchi_key_source | string | true |
+| genomics_gold | drug_profile | 21 | inchi_key_method | string | true |
+| genomics_gold | drug_profile | 22 | max_clinical_stage | string | true |
+| genomics_gold | drug_profile | 23 | max_clinical_stage_source | string | true |
+| genomics_gold | drug_profile | 24 | max_clinical_stage_method | string | true |
+| genomics_gold | drug_profile | 25 | parent_chembl_id | string | true |
+| genomics_gold | drug_profile | 26 | parent_chembl_id_source | string | true |
+| genomics_gold | drug_profile | 27 | parent_chembl_id_method | string | true |
+| genomics_gold | drug_profile | 28 | source_system | string | true |
+| genomics_gold | drug_profile | 29 | source_record_id | string | true |
+| genomics_gold | drug_profile | 30 | ecosystem | string | true |
+| genomics_gold | drug_profile | 31 | clinical_trial_count | double | true |
+| genomics_gold | drug_profile | 32 | clinical_trial_count_via_ancestor_terms | double | true |
+| genomics_gold | drug_profile | 33 | clinical_trials_in_early_phase1 | double | true |
+| genomics_gold | drug_profile | 34 | clinical_trials_in_phase1 | double | true |
+| genomics_gold | drug_profile | 35 | clinical_trials_in_phase1_phase2 | double | true |
+| genomics_gold | drug_profile | 36 | clinical_trials_in_phase2 | double | true |
+| genomics_gold | drug_profile | 37 | clinical_trials_in_phase2_phase3 | double | true |
+| genomics_gold | drug_profile | 38 | clinical_trials_in_phase3 | double | true |
+| genomics_gold | drug_profile | 39 | clinical_trials_in_phase4 | double | true |
+| genomics_gold | drug_profile | 40 | faers_case_count | double | true |
+| genomics_gold | drug_profile | 41 | faers_cases_with_an_outcome | double | true |
+| genomics_gold | drug_profile | 42 | faers_cases_with_outcome_ca | double | true |
+| genomics_gold | drug_profile | 43 | faers_cases_with_outcome_de | double | true |
+| genomics_gold | drug_profile | 44 | faers_cases_with_outcome_ds | double | true |
+| genomics_gold | drug_profile | 45 | faers_cases_with_outcome_ho | double | true |
+| genomics_gold | drug_profile | 46 | faers_cases_with_outcome_lt | double | true |
+| genomics_gold | drug_profile | 47 | faers_cases_with_outcome_ot | double | true |
+| genomics_gold | drug_profile | 48 | faers_cases_with_outcome_ri | double | true |
+| genomics_gold | drug_profile | 49 | faers_cases_with_role_c | double | true |
+| genomics_gold | drug_profile | 50 | faers_cases_with_role_dn | double | true |
+| genomics_gold | drug_profile | 51 | faers_cases_with_role_i | double | true |
+| genomics_gold | drug_profile | 52 | faers_cases_with_role_ps | double | true |
+| genomics_gold | drug_profile | 53 | faers_cases_with_role_ss | double | true |
+| genomics_gold | drug_profile | 54 | faers_reaction_count | double | true |
+| genomics_gold | drug_profile | 55 | gene_target_count | double | true |
+| genomics_gold | drug_profile | 56 | interacting_drug_count | double | true |
+| genomics_gold | drug_profile | 57 | interacting_drug_count_major | double | true |
+| genomics_gold | drug_profile | 58 | interacting_drug_count_minor | double | true |
+| genomics_gold | drug_profile | 59 | interacting_drug_count_moderate | double | true |
+| genomics_gold | drug_profile | 60 | interacting_drug_count_unknown | double | true |
+| genomics_gold | drug_profile | 61 | perturbation_gene_count | double | true |
+| genomics_gold | drug_profile | 62 | perturbation_sample_count | double | true |
+| genomics_gold | drug_profile | 63 | pharmgkb_relationship_count | double | true |
+| genomics_gold | drug_profile | 64 | _gold_loaded_at | timestamp | true |
+| genomics_gold | drug_profile | 65 | _gold_run_id | string | true |
+| genomics_gold | embedding_split | 1 | split_file | string | true |
+| genomics_gold | embedding_split | 2 | matrix_rows | int | true |
+| genomics_gold | embedding_split | 3 | matrix_columns | int | true |
+| genomics_gold | embedding_split | 4 | index_values | string | true |
+| genomics_gold | embedding_split | 5 | mean_embedding | string | true |
+| genomics_gold | embedding_split | 6 | variant_rows | bigint | true |
+| genomics_gold | embedding_split | 7 | distinct_index_values | bigint | true |
+| genomics_gold | embedding_split | 8 | distinct_mean_embedding_values | bigint | true |
+| genomics_gold | embedding_split | 9 | source_system | string | true |
+| genomics_gold | embedding_split | 10 | source_record_id | string | true |
+| genomics_gold | embedding_split | 11 | ecosystem | string | true |
+| genomics_gold | embedding_split | 12 | _gold_loaded_at | timestamp | true |
+| genomics_gold | embedding_split | 13 | _gold_run_id | string | true |
+| genomics_gold | entity_identity_record | 1 | record_kind | string | true |
+| genomics_gold | entity_identity_record | 2 | record_key | string | true |
+| genomics_gold | entity_identity_record | 3 | entity_type | string | true |
+| genomics_gold | entity_identity_record | 4 | entity_key | string | true |
+| genomics_gold | entity_identity_record | 5 | id_type | string | true |
+| genomics_gold | entity_identity_record | 6 | id_value | string | true |
+| genomics_gold | entity_identity_record | 7 | source_dataset | string | true |
+| genomics_gold | entity_identity_record | 8 | source_field | string | true |
+| genomics_gold | entity_identity_record | 9 | match_method | string | true |
+| genomics_gold | entity_identity_record | 10 | entities_sharing_id | int | true |
+| genomics_gold | entity_identity_record | 11 | source_system | string | true |
+| genomics_gold | entity_identity_record | 12 | source_record_id | string | true |
+| genomics_gold | entity_identity_record | 13 | ecosystem | string | true |
+| genomics_gold | entity_identity_record | 14 | term | string | true |
+| genomics_gold | entity_identity_record | 15 | term_type | string | true |
+| genomics_gold | entity_identity_record | 16 | entities_sharing_term | int | true |
+| genomics_gold | entity_identity_record | 17 | field | string | true |
+| genomics_gold | entity_identity_record | 18 | value_text | string | true |
+| genomics_gold | entity_identity_record | 19 | value_number | double | true |
+| genomics_gold | entity_identity_record | 20 | value_date | date | true |
+| genomics_gold | entity_identity_record | 21 | value_type | string | true |
+| genomics_gold | entity_identity_record | 22 | source_rank | int | true |
+| genomics_gold | entity_identity_record | 23 | source_type | string | true |
+| genomics_gold | entity_identity_record | 24 | first_source_snapshot | string | true |
+| genomics_gold | entity_identity_record | 25 | last_source_snapshot | string | true |
+| genomics_gold | entity_identity_record | 26 | feature_level | string | true |
+| genomics_gold | entity_identity_record | 27 | assembly | string | true |
+| genomics_gold | entity_identity_record | 28 | contig | string | true |
+| genomics_gold | entity_identity_record | 29 | start_position | bigint | true |
+| genomics_gold | entity_identity_record | 30 | end_position | bigint | true |
+| genomics_gold | entity_identity_record | 31 | interval_length | bigint | true |
+| genomics_gold | entity_identity_record | 32 | strand | string | true |
+| genomics_gold | entity_identity_record | 33 | coordinate_system | string | true |
+| genomics_gold | entity_identity_record | 34 | coordinate_conversion | string | true |
+| genomics_gold | entity_identity_record | 35 | is_primary | boolean | true |
+| genomics_gold | entity_identity_record | 36 | contig_genbank_gi | string | true |
+| genomics_gold | entity_identity_record | 37 | ontology | string | true |
+| genomics_gold | entity_identity_record | 38 | parent_key | string | true |
+| genomics_gold | entity_identity_record | 39 | child_key | string | true |
+| genomics_gold | entity_identity_record | 40 | relation | string | true |
+| genomics_gold | entity_identity_record | 41 | direction | string | true |
+| genomics_gold | entity_identity_record | 42 | relation_id | string | true |
+| genomics_gold | entity_identity_record | 43 | parent_atom_id | string | true |
+| genomics_gold | entity_identity_record | 44 | child_atom_id | string | true |
+| genomics_gold | entity_identity_record | 45 | parent_source_type | string | true |
+| genomics_gold | entity_identity_record | 46 | _gold_loaded_at | timestamp | true |
+| genomics_gold | entity_identity_record | 47 | _gold_run_id | string | true |
+| genomics_gold | epitope_profile | 1 | epitope_id | string | true |
+| genomics_gold | epitope_profile | 2 | epitope_object_type | string | true |
+| genomics_gold | epitope_profile | 3 | epitope_name | string | true |
+| genomics_gold | epitope_profile | 4 | epitope_modified_residues | string | true |
+| genomics_gold | epitope_profile | 5 | epitope_modifications | string | true |
+| genomics_gold | epitope_profile | 6 | epitope_starting_position | string | true |
+| genomics_gold | epitope_profile | 7 | epitope_ending_position | string | true |
+| genomics_gold | epitope_profile | 8 | epitope_iri | string | true |
+| genomics_gold | epitope_profile | 9 | epitope_synonyms | string | true |
+| genomics_gold | epitope_profile | 10 | source_molecule | string | true |
+| genomics_gold | epitope_profile | 11 | source_molecule_iri | string | true |
+| genomics_gold | epitope_profile | 12 | molecule_parent | string | true |
+| genomics_gold | epitope_profile | 13 | molecule_parent_iri | string | true |
+| genomics_gold | epitope_profile | 14 | source_organism | string | true |
+| genomics_gold | epitope_profile | 15 | source_organism_iri | string | true |
+| genomics_gold | epitope_profile | 16 | species | string | true |
+| genomics_gold | epitope_profile | 17 | species_iri | string | true |
+| genomics_gold | epitope_profile | 18 | related_object_epitope_relation | string | true |
+| genomics_gold | epitope_profile | 19 | related_object_type | string | true |
+| genomics_gold | epitope_profile | 20 | related_object_name | string | true |
+| genomics_gold | epitope_profile | 21 | related_object_starting_position | string | true |
+| genomics_gold | epitope_profile | 22 | related_object_ending_position | string | true |
+| genomics_gold | epitope_profile | 23 | related_object_iri | string | true |
+| genomics_gold | epitope_profile | 24 | related_object_synonyms | string | true |
+| genomics_gold | epitope_profile | 25 | related_object_source_molecule | string | true |
+| genomics_gold | epitope_profile | 26 | related_object_source_molecule_iri | string | true |
+| genomics_gold | epitope_profile | 27 | related_object_molecule_parent | string | true |
+| genomics_gold | epitope_profile | 28 | related_object_molecule_parent_iri | string | true |
+| genomics_gold | epitope_profile | 29 | related_object_source_organism | string | true |
+| genomics_gold | epitope_profile | 30 | related_object_source_organism_iri | string | true |
+| genomics_gold | epitope_profile | 31 | related_object_species | string | true |
+| genomics_gold | epitope_profile | 32 | related_object_species_iri | string | true |
+| genomics_gold | epitope_profile | 33 | protein_key | string | true |
+| genomics_gold | epitope_profile | 34 | protein_link_method | string | true |
+| genomics_gold | epitope_profile | 35 | source_dataset | string | true |
+| genomics_gold | epitope_profile | 36 | source_system | string | true |
+| genomics_gold | epitope_profile | 37 | source_record_id | string | true |
+| genomics_gold | epitope_profile | 38 | ecosystem | string | true |
+| genomics_gold | epitope_profile | 39 | assay_count | double | true |
+| genomics_gold | epitope_profile | 40 | host_count | double | true |
+| genomics_gold | epitope_profile | 41 | mhc_allele_count | double | true |
+| genomics_gold | epitope_profile | 42 | positive_assay_count | double | true |
+| genomics_gold | epitope_profile | 43 | _gold_loaded_at | timestamp | true |
+| genomics_gold | epitope_profile | 44 | _gold_run_id | string | true |
+| genomics_gold | gene_cancer_profile | 1 | gene_key | string | true |
+| genomics_gold | gene_cancer_profile | 2 | symbol | string | true |
+| genomics_gold | gene_cancer_profile | 3 | gene_cancer_role | string | true |
+| genomics_gold | gene_cancer_profile | 4 | cancer_mutation_burden_score | double | true |
+| genomics_gold | gene_cancer_profile | 5 | cancer_priority_score | double | true |
+| genomics_gold | gene_cancer_profile | 6 | functional_impact_score | double | true |
+| genomics_gold | gene_cancer_profile | 7 | missense_mutations | double | true |
+| genomics_gold | gene_cancer_profile | 8 | silent_mutations | double | true |
+| genomics_gold | gene_cancer_profile | 9 | total_samples_affected | double | true |
+| genomics_gold | gene_cancer_profile | 10 | truncating_mutations | double | true |
+| genomics_gold | gene_cancer_profile | 11 | unique_mutation_sites | double | true |
+| genomics_gold | gene_cancer_profile | 12 | unique_samples_affected | double | true |
+| genomics_gold | gene_cancer_profile | 13 | cancer_features__is_cancer_gene | boolean | true |
+| genomics_gold | gene_cancer_profile | 14 | is_frequently_mutated_gene | boolean | true |
+| genomics_gold | gene_cancer_profile | 15 | is_oncogene_candidate | boolean | true |
+| genomics_gold | gene_cancer_profile | 16 | is_tumor_suppressor_candidate | boolean | true |
+| genomics_gold | gene_cancer_profile | 17 | source_system | string | true |
+| genomics_gold | gene_cancer_profile | 18 | ecosystem | string | true |
+| genomics_gold | gene_cancer_profile | 19 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_cancer_profile | 20 | _gold_run_id | string | true |
+| genomics_gold | gene_clinical_profile | 1 | gene_key | string | true |
+| genomics_gold | gene_clinical_profile | 2 | symbol | string | true |
+| genomics_gold | gene_clinical_profile | 3 | annotation_priority_level | string | true |
+| genomics_gold | gene_clinical_profile | 4 | disease_count_category | string | true |
+| genomics_gold | gene_clinical_profile | 5 | disease_impact_category | string | true |
+| genomics_gold | gene_clinical_profile | 6 | expression_context | string | true |
+| genomics_gold | gene_clinical_profile | 7 | gene_impact_burden | string | true |
+| genomics_gold | gene_clinical_profile | 8 | gene_loss_of_function_tolerance | string | true |
+| genomics_gold | gene_clinical_profile | 9 | gene_mutation_burden | string | true |
+| genomics_gold | gene_clinical_profile | 10 | gene_priority_tier | string | true |
+| genomics_gold | gene_clinical_profile | 11 | gene_variant_profile | string | true |
+| genomics_gold | gene_clinical_profile | 12 | clinical_features__average_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_clinical_profile | 13 | clinical_features__max_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_clinical_profile | 14 | disease_association_strength | double | true |
+| genomics_gold | gene_clinical_profile | 15 | gene_annotation_score | double | true |
+| genomics_gold | gene_clinical_profile | 16 | gene_average_impact_score | double | true |
+| genomics_gold | gene_clinical_profile | 17 | gene_average_review_quality | double | true |
+| genomics_gold | gene_clinical_profile | 18 | gene_benign_count | double | true |
+| genomics_gold | gene_clinical_profile | 19 | gene_benign_ratio | double | true |
+| genomics_gold | gene_clinical_profile | 20 | gene_clinical_utility_score | double | true |
+| genomics_gold | gene_clinical_profile | 21 | gene_description_length | double | true |
+| genomics_gold | gene_clinical_profile | 22 | gene_disease_diversity | double | true |
+| genomics_gold | gene_clinical_profile | 23 | gene_domain_affecting_count | double | true |
+| genomics_gold | gene_clinical_profile | 24 | gene_domain_count | double | true |
+| genomics_gold | gene_clinical_profile | 25 | gene_frameshift_count | double | true |
+| genomics_gold | gene_clinical_profile | 26 | gene_high_impact_count | double | true |
+| genomics_gold | gene_clinical_profile | 27 | gene_high_quality_count | double | true |
+| genomics_gold | gene_clinical_profile | 28 | gene_loss_of_function_count | double | true |
+| genomics_gold | gene_clinical_profile | 29 | gene_loss_of_function_variant_ratio | double | true |
+| genomics_gold | gene_clinical_profile | 30 | gene_max_impact_score | double | true |
+| genomics_gold | gene_clinical_profile | 31 | gene_missense_count | double | true |
+| genomics_gold | gene_clinical_profile | 32 | gene_mondo_variants | double | true |
+| genomics_gold | gene_clinical_profile | 33 | gene_nonsense_count | double | true |
+| genomics_gold | gene_clinical_profile | 34 | gene_omim_variants | double | true |
+| genomics_gold | gene_clinical_profile | 35 | gene_pathogenic_count | double | true |
+| genomics_gold | gene_clinical_profile | 36 | gene_pathogenic_ratio | double | true |
+| genomics_gold | gene_clinical_profile | 37 | gene_splice_count | double | true |
+| genomics_gold | gene_clinical_profile | 38 | gene_splice_variant_count | double | true |
+| genomics_gold | gene_clinical_profile | 39 | gene_total_variants | double | true |
+| genomics_gold | gene_clinical_profile | 40 | gene_very_high_impact_count | double | true |
+| genomics_gold | gene_clinical_profile | 41 | gene_vus_count | double | true |
+| genomics_gold | gene_clinical_profile | 42 | gene_vus_ratio | double | true |
+| genomics_gold | gene_clinical_profile | 43 | gene_well_annotated_variants | double | true |
+| genomics_gold | gene_clinical_profile | 44 | omim_disease_count | double | true |
+| genomics_gold | gene_clinical_profile | 45 | tissues_expressed_count | double | true |
+| genomics_gold | gene_clinical_profile | 46 | clinical_features__is_cancer_gene | boolean | true |
+| genomics_gold | gene_clinical_profile | 47 | clinical_features__is_highly_expressed | boolean | true |
+| genomics_gold | gene_clinical_profile | 48 | gene_has_ensembl | boolean | true |
+| genomics_gold | gene_clinical_profile | 49 | gene_has_high_loss_of_function_burden | boolean | true |
+| genomics_gold | gene_clinical_profile | 50 | gene_has_omim | boolean | true |
+| genomics_gold | gene_clinical_profile | 51 | gene_has_quality_annotations | boolean | true |
+| genomics_gold | gene_clinical_profile | 52 | gene_is_benign_enriched | boolean | true |
+| genomics_gold | gene_clinical_profile | 53 | gene_is_pathogenic_enriched | boolean | true |
+| genomics_gold | gene_clinical_profile | 54 | gene_is_validated | boolean | true |
+| genomics_gold | gene_clinical_profile | 55 | gene_is_vus_enriched | boolean | true |
+| genomics_gold | gene_clinical_profile | 56 | gene_is_well_characterized | boolean | true |
+| genomics_gold | gene_clinical_profile | 57 | has_cancer_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 58 | has_cardiovascular_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 59 | has_developmental_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 60 | has_excellent_annotation | boolean | true |
+| genomics_gold | gene_clinical_profile | 61 | has_hereditary_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 62 | has_immune_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 63 | has_kinase_domain | boolean | true |
+| genomics_gold | gene_clinical_profile | 64 | has_metabolic_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 65 | has_muscular_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 66 | has_neurological_disease | boolean | true |
+| genomics_gold | gene_clinical_profile | 67 | is_broadly_expressed | boolean | true |
+| genomics_gold | gene_clinical_profile | 68 | is_cancer_hotspot_gene | boolean | true |
+| genomics_gold | gene_clinical_profile | 69 | is_clinically_actionable | boolean | true |
+| genomics_gold | gene_clinical_profile | 70 | is_disease_associated_gene | boolean | true |
+| genomics_gold | gene_clinical_profile | 71 | is_disease_gene | boolean | true |
+| genomics_gold | gene_clinical_profile | 72 | is_multi_disease_gene | boolean | true |
+| genomics_gold | gene_clinical_profile | 73 | is_omim_gene | boolean | true |
+| genomics_gold | gene_clinical_profile | 74 | is_research_candidate | boolean | true |
+| genomics_gold | gene_clinical_profile | 75 | has_cancer_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 76 | has_cardiovascular_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 77 | has_developmental_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 78 | has_hereditary_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 79 | has_immune_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 80 | has_metabolic_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 81 | has_muscular_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 82 | has_neurological_disease__matched_text | string | true |
+| genomics_gold | gene_clinical_profile | 83 | source_system | string | true |
+| genomics_gold | gene_clinical_profile | 84 | ecosystem | string | true |
+| genomics_gold | gene_clinical_profile | 85 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_clinical_profile | 86 | _gold_run_id | string | true |
+| genomics_gold | gene_disease_profile | 1 | disease_key | string | true |
+| genomics_gold | gene_disease_profile | 2 | gene_key | string | true |
+| genomics_gold | gene_disease_profile | 3 | relation_kind | string | true |
+| genomics_gold | gene_disease_profile | 4 | relation_subkind | string | true |
+| genomics_gold | gene_disease_profile | 5 | source_dataset | string | true |
+| genomics_gold | gene_disease_profile | 6 | source_gene_id | string | true |
+| genomics_gold | gene_disease_profile | 7 | source_disease_id | string | true |
+| genomics_gold | gene_disease_profile | 8 | gene_link_method | string | true |
+| genomics_gold | gene_disease_profile | 9 | disease_link_method | string | true |
+| genomics_gold | gene_disease_profile | 10 | gene_disease_score | double | true |
+| genomics_gold | gene_disease_profile | 11 | evidence_count | bigint | true |
+| genomics_gold | gene_disease_profile | 12 | supporting_count | bigint | true |
+| genomics_gold | gene_disease_profile | 13 | gene_disease_relation_type | string | true |
+| genomics_gold | gene_disease_profile | 14 | classification | string | true |
+| genomics_gold | gene_disease_profile | 15 | mode_of_inheritance | string | true |
+| genomics_gold | gene_disease_profile | 16 | evaluation_date | string | true |
+| genomics_gold | gene_disease_profile | 17 | study_id | string | true |
+| genomics_gold | gene_disease_profile | 18 | aggregation_value | string | true |
+| genomics_gold | gene_disease_profile | 19 | report_url | string | true |
+| genomics_gold | gene_disease_profile | 20 | comment | string | true |
+| genomics_gold | gene_disease_profile | 21 | relation_detail | string | true |
+| genomics_gold | gene_disease_profile | 22 | pubmed_id | string | true |
+| genomics_gold | gene_disease_profile | 23 | source_gene_symbol | string | true |
+| genomics_gold | gene_disease_profile | 24 | source_disease_name | string | true |
+| genomics_gold | gene_disease_profile | 25 | standard_operating_procedure | string | true |
+| genomics_gold | gene_disease_profile | 26 | cytogenetic_band | string | true |
+| genomics_gold | gene_disease_profile | 27 | genomic_location | string | true |
+| genomics_gold | gene_disease_profile | 28 | novelty_score | double | true |
+| genomics_gold | gene_disease_profile | 29 | target_from_source_id | string | true |
+| genomics_gold | gene_disease_profile | 30 | disease_from_source_mapped_id | string | true |
+| genomics_gold | gene_disease_profile | 31 | datatype_id | string | true |
+| genomics_gold | gene_disease_profile | 32 | curation_date | string | true |
+| genomics_gold | gene_disease_profile | 33 | publication_date | string | true |
+| genomics_gold | gene_disease_profile | 34 | resource_score | double | true |
+| genomics_gold | gene_disease_profile | 35 | source_system | string | true |
+| genomics_gold | gene_disease_profile | 36 | source_record_id | string | true |
+| genomics_gold | gene_disease_profile | 37 | ecosystem | string | true |
+| genomics_gold | gene_disease_profile | 38 | gene_symbol | string | true |
+| genomics_gold | gene_disease_profile | 39 | disease_name | string | true |
+| genomics_gold | gene_disease_profile | 40 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_disease_profile | 41 | _gold_run_id | string | true |
+| genomics_gold | gene_drug_profile | 1 | gene_key | string | true |
+| genomics_gold | gene_drug_profile | 2 | symbol | string | true |
+| genomics_gold | gene_drug_profile | 3 | cancer_mutation_burden | string | true |
+| genomics_gold | gene_drug_profile | 4 | clinical_actionability_tier | string | true |
+| genomics_gold | gene_drug_profile | 5 | disease_test_correlation | string | true |
+| genomics_gold | gene_drug_profile | 6 | drug_metabolism_context | string | true |
+| genomics_gold | gene_drug_profile | 7 | drug_metabolism_tissue_expression | string | true |
+| genomics_gold | gene_drug_profile | 8 | drug_target_category | string | true |
+| genomics_gold | gene_drug_profile | 9 | expression_breadth | string | true |
+| genomics_gold | gene_drug_profile | 10 | gene_pharmacogene_burden | string | true |
+| genomics_gold | gene_drug_profile | 11 | gene_pharmacogene_priority | string | true |
+| genomics_gold | gene_drug_profile | 12 | metabolizing_enzyme_type | string | true |
+| genomics_gold | gene_drug_profile | 13 | pharmacogene_category | string | true |
+| genomics_gold | gene_drug_profile | 14 | pharmacogene_category_enhanced | string | true |
+| genomics_gold | gene_drug_profile | 15 | pharmacogene_evidence_level | string | true |
+| genomics_gold | gene_drug_profile | 16 | pharmacogene_features__primary_indication_category | string | true |
+| genomics_gold | gene_drug_profile | 17 | pharmacogene_gene_features__primary_indication_category | string | true |
+| genomics_gold | gene_drug_profile | 18 | pharmacogene_priority | string | true |
+| genomics_gold | gene_drug_profile | 19 | population_test_priority | string | true |
+| genomics_gold | gene_drug_profile | 20 | primary_test_type | string | true |
+| genomics_gold | gene_drug_profile | 21 | test_availability_category | string | true |
+| genomics_gold | gene_drug_profile | 22 | test_priority | string | true |
+| genomics_gold | gene_drug_profile | 23 | test_recommendation_tier | string | true |
+| genomics_gold | gene_drug_profile | 24 | variant_impact_burden | string | true |
+| genomics_gold | gene_drug_profile | 25 | variant_test_coverage_level | string | true |
+| genomics_gold | gene_drug_profile | 26 | average_pathogenicity_score | double | true |
+| genomics_gold | gene_drug_profile | 27 | clinical_test_utility_score | double | true |
+| genomics_gold | gene_drug_profile | 28 | complete_test_count | double | true |
+| genomics_gold | gene_drug_profile | 29 | disease_relationships | double | true |
+| genomics_gold | gene_drug_profile | 30 | drug_interaction_score | double | true |
+| genomics_gold | gene_drug_profile | 31 | drug_relationships | double | true |
+| genomics_gold | gene_drug_profile | 32 | druggability_score | double | true |
+| genomics_gold | gene_drug_profile | 33 | enhanced_druggability_score | double | true |
+| genomics_gold | gene_drug_profile | 34 | entity_type_count | double | true |
+| genomics_gold | gene_drug_profile | 35 | evidence_count | double | true |
+| genomics_gold | gene_drug_profile | 36 | frequent_test_count | double | true |
+| genomics_gold | gene_drug_profile | 37 | gene_average_druggability | double | true |
+| genomics_gold | gene_drug_profile | 38 | gene_drug_interaction_variants | double | true |
+| genomics_gold | gene_drug_profile | 39 | gene_metabolizer_variants | double | true |
+| genomics_gold | gene_drug_profile | 40 | gene_pharmacogene_pathogenic | double | true |
+| genomics_gold | gene_drug_profile | 41 | gene_pharmacogene_variants | double | true |
+| genomics_gold | gene_drug_profile | 42 | gene_transporter_variants | double | true |
+| genomics_gold | gene_drug_profile | 43 | genetic_test_features__clinical_utility_score | double | true |
+| genomics_gold | gene_drug_profile | 44 | metabolism_context_score | double | true |
+| genomics_gold | gene_drug_profile | 45 | pathogenic_variants_in_tested_gene | double | true |
+| genomics_gold | gene_drug_profile | 46 | pharmacogene_evidence_score | double | true |
+| genomics_gold | gene_drug_profile | 47 | pharmacogene_gene_features__clinical_utility_score | double | true |
+| genomics_gold | gene_drug_profile | 48 | pharmacogene_source_count | double | true |
+| genomics_gold | gene_drug_profile | 49 | pharmacogene_variant_impact_score | double | true |
+| genomics_gold | gene_drug_profile | 50 | population_test_relevance_score | double | true |
+| genomics_gold | gene_drug_profile | 51 | rare_pathogenic_variants | double | true |
+| genomics_gold | gene_drug_profile | 52 | test_accessibility_score | double | true |
+| genomics_gold | gene_drug_profile | 53 | test_covered_variants | double | true |
+| genomics_gold | gene_drug_profile | 54 | test_disease_count | double | true |
+| genomics_gold | gene_drug_profile | 55 | test_quality_score | double | true |
+| genomics_gold | gene_drug_profile | 56 | tests_with_disease_info | double | true |
+| genomics_gold | gene_drug_profile | 57 | tests_with_gene_info | double | true |
+| genomics_gold | gene_drug_profile | 58 | total_relationships | double | true |
+| genomics_gold | gene_drug_profile | 59 | total_test_count | double | true |
+| genomics_gold | gene_drug_profile | 60 | unique_test_count | double | true |
+| genomics_gold | gene_drug_profile | 61 | variant_relationships | double | true |
+| genomics_gold | gene_drug_profile | 62 | variant_test_coverage_score | double | true |
+| genomics_gold | gene_drug_profile | 63 | carrier_screening_relevant | boolean | true |
+| genomics_gold | gene_drug_profile | 64 | gene_description_mentions_drug | boolean | true |
+| genomics_gold | gene_drug_profile | 65 | gene_has_multiple_drug_variants | boolean | true |
+| genomics_gold | gene_drug_profile | 66 | has_clinical_test | boolean | true |
+| genomics_gold | gene_drug_profile | 67 | has_comprehensive_testing | boolean | true |
+| genomics_gold | gene_drug_profile | 68 | has_high_druggability | boolean | true |
+| genomics_gold | gene_drug_profile | 69 | has_multiple_tests | boolean | true |
+| genomics_gold | gene_drug_profile | 70 | has_pharmacogene_variants | boolean | true |
+| genomics_gold | gene_drug_profile | 71 | has_pharmgkb_annotation | boolean | true |
+| genomics_gold | gene_drug_profile | 72 | hereditary_cancer_testing | boolean | true |
+| genomics_gold | gene_drug_profile | 73 | is_cancer_drug_target | boolean | true |
+| genomics_gold | gene_drug_profile | 74 | is_cancer_panel_gene | boolean | true |
+| genomics_gold | gene_drug_profile | 75 | is_drug_metabolizer | boolean | true |
+| genomics_gold | gene_drug_profile | 76 | is_drug_target | boolean | true |
+| genomics_gold | gene_drug_profile | 77 | is_drug_target_gene | boolean | true |
+| genomics_gold | gene_drug_profile | 78 | is_drug_transporter | boolean | true |
+| genomics_gold | gene_drug_profile | 79 | is_drug_transporter_gene | boolean | true |
+| genomics_gold | gene_drug_profile | 80 | is_hepatic_metabolizer | boolean | true |
+| genomics_gold | gene_drug_profile | 81 | is_kidney_expressed | boolean | true |
+| genomics_gold | gene_drug_profile | 82 | is_kinase_inhibitor_target | boolean | true |
+| genomics_gold | gene_drug_profile | 83 | is_liver_expressed | boolean | true |
+| genomics_gold | gene_drug_profile | 84 | is_metabolizing_enzyme | boolean | true |
+| genomics_gold | gene_drug_profile | 85 | is_oncology_drug_target | boolean | true |
+| genomics_gold | gene_drug_profile | 86 | is_oncology_target | boolean | true |
+| genomics_gold | gene_drug_profile | 87 | is_pharmacogene | boolean | true |
+| genomics_gold | gene_drug_profile | 88 | is_renal_transporter | boolean | true |
+| genomics_gold | gene_drug_profile | 89 | is_validated_cancer_target | boolean | true |
+| genomics_gold | gene_drug_profile | 90 | is_well_tested_gene | boolean | true |
+| genomics_gold | gene_drug_profile | 91 | multi_disease_testing | boolean | true |
+| genomics_gold | gene_drug_profile | 92 | source_system | string | true |
+| genomics_gold | gene_drug_profile | 93 | ecosystem | string | true |
+| genomics_gold | gene_drug_profile | 94 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_drug_profile | 95 | _gold_run_id | string | true |
+| genomics_gold | gene_expression_profile | 1 | gene_key | string | true |
+| genomics_gold | gene_expression_profile | 2 | symbol | string | true |
+| genomics_gold | gene_expression_profile | 3 | cancer_expression_relevance | string | true |
+| genomics_gold | gene_expression_profile | 4 | disease_specific_expression_pattern | string | true |
+| genomics_gold | gene_expression_profile | 5 | domain_expression_correlation | string | true |
+| genomics_gold | gene_expression_profile | 6 | expression_breadth_category | string | true |
+| genomics_gold | gene_expression_profile | 7 | expression_function_correlation | string | true |
+| genomics_gold | gene_expression_profile | 8 | expression_level_category | string | true |
+| genomics_gold | gene_expression_profile | 9 | expression_priority | string | true |
+| genomics_gold | gene_expression_profile | 10 | primary_tissue | string | true |
+| genomics_gold | gene_expression_profile | 11 | tissue_specificity_category | string | true |
+| genomics_gold | gene_expression_profile | 12 | cancer_expression_score | double | true |
+| genomics_gold | gene_expression_profile | 13 | clinical_relevance_score | double | true |
+| genomics_gold | gene_expression_profile | 14 | disease_category_count | double | true |
+| genomics_gold | gene_expression_profile | 15 | disease_expression_score | double | true |
+| genomics_gold | gene_expression_profile | 16 | expression_features__average_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_expression_profile | 17 | expression_features__max_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_expression_profile | 18 | expression_significance_score | double | true |
+| genomics_gold | gene_expression_profile | 19 | functional_expression_score | double | true |
+| genomics_gold | gene_expression_profile | 20 | max_median_transcripts_per_million | double | true |
+| genomics_gold | gene_expression_profile | 21 | primary_tissue_count | double | true |
+| genomics_gold | gene_expression_profile | 22 | tissue_specificity_score | double | true |
+| genomics_gold | gene_expression_profile | 23 | tissues_expressed | double | true |
+| genomics_gold | gene_expression_profile | 24 | total_tissues_expressed | double | true |
+| genomics_gold | gene_expression_profile | 25 | expression_features__is_highly_expressed | boolean | true |
+| genomics_gold | gene_expression_profile | 26 | has_expression_variants | boolean | true |
+| genomics_gold | gene_expression_profile | 27 | is_lowly_expressed | boolean | true |
+| genomics_gold | gene_expression_profile | 28 | is_tissue_specific | boolean | true |
+| genomics_gold | gene_expression_profile | 29 | is_ubiquitously_expressed | boolean | true |
+| genomics_gold | gene_expression_profile | 30 | source_system | string | true |
+| genomics_gold | gene_expression_profile | 31 | ecosystem | string | true |
+| genomics_gold | gene_expression_profile | 32 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_expression_profile | 33 | _gold_run_id | string | true |
+| genomics_gold | gene_measurement | 1 | record_kind | string | true |
+| genomics_gold | gene_measurement | 2 | record_key | string | true |
+| genomics_gold | gene_measurement | 3 | cell_line_key | string | true |
+| genomics_gold | gene_measurement | 4 | gene_key | string | true |
+| genomics_gold | gene_measurement | 5 | gene_symbol | string | true |
+| genomics_gold | gene_measurement | 6 | ncbi_gene_id | string | true |
+| genomics_gold | gene_measurement | 7 | gene_link_method | string | true |
+| genomics_gold | gene_measurement | 8 | gene_effect | double | true |
+| genomics_gold | gene_measurement | 9 | source_dataset | string | true |
+| genomics_gold | gene_measurement | 10 | source_system | string | true |
+| genomics_gold | gene_measurement | 11 | source_record_id | string | true |
+| genomics_gold | gene_measurement | 12 | ecosystem | string | true |
+| genomics_gold | gene_measurement | 13 | gene_ensembl_id | string | true |
+| genomics_gold | gene_measurement | 14 | tissue_key | string | true |
+| genomics_gold | gene_measurement | 15 | median_transcripts_per_million | double | true |
+| genomics_gold | gene_measurement | 16 | base_mean | double | true |
+| genomics_gold | gene_measurement | 17 | log2_fold_change | double | true |
+| genomics_gold | gene_measurement | 18 | log2_fold_change_standard_error | double | true |
+| genomics_gold | gene_measurement | 19 | statistic | double | true |
+| genomics_gold | gene_measurement | 20 | p_value | double | true |
+| genomics_gold | gene_measurement | 21 | adjusted_p_value | double | true |
+| genomics_gold | gene_measurement | 22 | plate | string | true |
+| genomics_gold | gene_measurement | 23 | n_cells_treated | int | true |
+| genomics_gold | gene_measurement | 24 | n_cells_control | int | true |
+| genomics_gold | gene_measurement | 25 | cellosaur_id | string | true |
+| genomics_gold | gene_measurement | 26 | cell_name_vevo | string | true |
+| genomics_gold | gene_measurement | 27 | drug_name | string | true |
+| genomics_gold | gene_measurement | 28 | drug_key | string | true |
+| genomics_gold | gene_measurement | 29 | drug_link_method | string | true |
+| genomics_gold | gene_measurement | 30 | concentration | double | true |
+| genomics_gold | gene_measurement | 31 | concentration_unit | string | true |
+| genomics_gold | gene_measurement | 32 | sample_id | string | true |
+| genomics_gold | gene_measurement | 33 | mean_gene_count | double | true |
+| genomics_gold | gene_measurement | 34 | mean_tscp_count | double | true |
+| genomics_gold | gene_measurement | 35 | mean_mread_count | double | true |
+| genomics_gold | gene_measurement | 36 | mean_pcnt_mito | double | true |
+| genomics_gold | gene_measurement | 37 | drugname_drugconc | string | true |
+| genomics_gold | gene_measurement | 38 | source_gene_id | string | true |
+| genomics_gold | gene_measurement | 39 | source_disease_id | string | true |
+| genomics_gold | gene_measurement | 40 | association_level | string | true |
+| genomics_gold | gene_measurement | 41 | datasource_id | string | true |
+| genomics_gold | gene_measurement | 42 | year | int | true |
+| genomics_gold | gene_measurement | 43 | association_score | double | true |
+| genomics_gold | gene_measurement | 44 | novelty | double | true |
+| genomics_gold | gene_measurement | 45 | yearly_evidence_count | double | true |
+| genomics_gold | gene_measurement | 46 | element_key | string | true |
+| genomics_gold | gene_measurement | 47 | contig | string | true |
+| genomics_gold | gene_measurement | 48 | start_position | bigint | true |
+| genomics_gold | gene_measurement | 49 | end_position | bigint | true |
+| genomics_gold | gene_measurement | 50 | element_class | string | true |
+| genomics_gold | gene_measurement | 51 | target_gene_symbol | string | true |
+| genomics_gold | gene_measurement | 52 | target_gene_ensembl_id | string | true |
+| genomics_gold | gene_measurement | 53 | target_gene_transcription_start_site | bigint | true |
+| genomics_gold | gene_measurement | 54 | is_self_promoter | boolean | true |
+| genomics_gold | gene_measurement | 55 | biosample | string | true |
+| genomics_gold | gene_measurement | 56 | cell_type | string | true |
+| genomics_gold | gene_measurement | 57 | score | double | true |
+| genomics_gold | gene_measurement | 58 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_measurement | 59 | _gold_run_id | string | true |
+| genomics_gold | gene_profile | 1 | gene_key | string | true |
+| genomics_gold | gene_profile | 2 | entity_type | string | true |
+| genomics_gold | gene_profile | 3 | key_source | string | true |
+| genomics_gold | gene_profile | 4 | symbol | string | true |
+| genomics_gold | gene_profile | 5 | symbol_source | string | true |
+| genomics_gold | gene_profile | 6 | symbol_method | string | true |
+| genomics_gold | gene_profile | 7 | full_name | string | true |
+| genomics_gold | gene_profile | 8 | full_name_source | string | true |
+| genomics_gold | gene_profile | 9 | full_name_method | string | true |
+| genomics_gold | gene_profile | 10 | gene_type | string | true |
+| genomics_gold | gene_profile | 11 | gene_type_source | string | true |
+| genomics_gold | gene_profile | 12 | gene_type_method | string | true |
+| genomics_gold | gene_profile | 13 | ensembl_id | string | true |
+| genomics_gold | gene_profile | 14 | ensembl_id_source | string | true |
+| genomics_gold | gene_profile | 15 | ensembl_id_method | string | true |
+| genomics_gold | gene_profile | 16 | hgnc_id | string | true |
+| genomics_gold | gene_profile | 17 | hgnc_id_source | string | true |
+| genomics_gold | gene_profile | 18 | hgnc_id_method | string | true |
+| genomics_gold | gene_profile | 19 | description | string | true |
+| genomics_gold | gene_profile | 20 | description_source | string | true |
+| genomics_gold | gene_profile | 21 | description_method | string | true |
+| genomics_gold | gene_profile | 22 | chromosome | string | true |
+| genomics_gold | gene_profile | 23 | chromosome_source | string | true |
+| genomics_gold | gene_profile | 24 | chromosome_method | string | true |
+| genomics_gold | gene_profile | 25 | map_location | string | true |
+| genomics_gold | gene_profile | 26 | map_location_source | string | true |
+| genomics_gold | gene_profile | 27 | map_location_method | string | true |
+| genomics_gold | gene_profile | 28 | cytoband_arm | string | true |
+| genomics_gold | gene_profile | 29 | cytoband_band | string | true |
+| genomics_gold | gene_profile | 30 | cytoband_sub_band | string | true |
+| genomics_gold | gene_profile | 31 | grch38_contig | string | true |
+| genomics_gold | gene_profile | 32 | grch38_start_position | bigint | true |
+| genomics_gold | gene_profile | 33 | grch38_end_position | bigint | true |
+| genomics_gold | gene_profile | 34 | grch38_strand | string | true |
+| genomics_gold | gene_profile | 35 | grch38_source | string | true |
+| genomics_gold | gene_profile | 36 | source_system | string | true |
+| genomics_gold | gene_profile | 37 | source_record_id | string | true |
+| genomics_gold | gene_profile | 38 | ecosystem | string | true |
+| genomics_gold | gene_profile | 39 | annotation_priority_level | string | true |
+| genomics_gold | gene_profile | 40 | cancer_expression_relevance | string | true |
+| genomics_gold | gene_profile | 41 | cancer_mutation_burden | string | true |
+| genomics_gold | gene_profile | 42 | cancer_protein_classification | string | true |
+| genomics_gold | gene_profile | 43 | chain_type | string | true |
+| genomics_gold | gene_profile | 44 | clinical_actionability_tier | string | true |
+| genomics_gold | gene_profile | 45 | cytoband_last_band_digit | string | true |
+| genomics_gold | gene_profile | 46 | disease_count_category | string | true |
+| genomics_gold | gene_profile | 47 | disease_impact_category | string | true |
+| genomics_gold | gene_profile | 48 | disease_specific_domains | string | true |
+| genomics_gold | gene_profile | 49 | disease_specific_expression_pattern | string | true |
+| genomics_gold | gene_profile | 50 | disease_test_correlation | string | true |
+| genomics_gold | gene_profile | 51 | domain_expression_correlation | string | true |
+| genomics_gold | gene_profile | 52 | drug_metabolism_context | string | true |
+| genomics_gold | gene_profile | 53 | drug_metabolism_tissue_expression | string | true |
+| genomics_gold | gene_profile | 54 | drug_target_category | string | true |
+| genomics_gold | gene_profile | 55 | essentiality_class | string | true |
+| genomics_gold | gene_profile | 56 | expression_breadth | string | true |
+| genomics_gold | gene_profile | 57 | expression_breadth_category | string | true |
+| genomics_gold | gene_profile | 58 | expression_context | string | true |
+| genomics_gold | gene_profile | 59 | expression_function_correlation | string | true |
+| genomics_gold | gene_profile | 60 | expression_level_category | string | true |
+| genomics_gold | gene_profile | 61 | expression_priority | string | true |
+| genomics_gold | gene_profile | 62 | gene_age_consensus | string | true |
+| genomics_gold | gene_profile | 63 | gene_annotation_quality | string | true |
+| genomics_gold | gene_profile | 64 | gene_cancer_role | string | true |
+| genomics_gold | gene_profile | 65 | gene_impact_burden | string | true |
+| genomics_gold | gene_profile | 66 | gene_loss_of_function_tolerance | string | true |
+| genomics_gold | gene_profile | 67 | gene_mutation_burden | string | true |
+| genomics_gold | gene_profile | 68 | gene_pharmacogene_burden | string | true |
+| genomics_gold | gene_profile | 69 | gene_pharmacogene_priority | string | true |
+| genomics_gold | gene_profile | 70 | gene_priority_tier | string | true |
+| genomics_gold | gene_profile | 71 | gene_variant_profile | string | true |
+| genomics_gold | gene_profile | 72 | metabolizing_enzyme_type | string | true |
+| genomics_gold | gene_profile | 73 | oncogenic_domain_alterations | string | true |
+| genomics_gold | gene_profile | 74 | orthologue_depth | string | true |
+| genomics_gold | gene_profile | 75 | pharmacogene_category | string | true |
+| genomics_gold | gene_profile | 76 | pharmacogene_category_enhanced | string | true |
+| genomics_gold | gene_profile | 77 | pharmacogene_evidence_level | string | true |
+| genomics_gold | gene_profile | 78 | pharmacogene_features__primary_indication_category | string | true |
+| genomics_gold | gene_profile | 79 | pharmacogene_gene_features__primary_indication_category | string | true |
+| genomics_gold | gene_profile | 80 | pharmacogene_priority | string | true |
+| genomics_gold | gene_profile | 81 | population_test_priority | string | true |
+| genomics_gold | gene_profile | 82 | primary_function | string | true |
+| genomics_gold | gene_profile | 83 | primary_gene_category | string | true |
+| genomics_gold | gene_profile | 84 | primary_test_type | string | true |
+| genomics_gold | gene_profile | 85 | primary_tissue | string | true |
+| genomics_gold | gene_profile | 86 | protein_family | string | true |
+| genomics_gold | gene_profile | 87 | protein_family_priority | string | true |
+| genomics_gold | gene_profile | 88 | protein_functional_category | string | true |
+| genomics_gold | gene_profile | 89 | test_availability_category | string | true |
+| genomics_gold | gene_profile | 90 | test_priority | string | true |
+| genomics_gold | gene_profile | 91 | test_recommendation_tier | string | true |
+| genomics_gold | gene_profile | 92 | tissue_specificity_category | string | true |
+| genomics_gold | gene_profile | 93 | variant_disease_domain_correlation | string | true |
+| genomics_gold | gene_profile | 94 | variant_impact_burden | string | true |
+| genomics_gold | gene_profile | 95 | variant_test_coverage_level | string | true |
+| genomics_gold | gene_profile | 96 | associated_disease_count | double | true |
+| genomics_gold | gene_profile | 97 | average_pathogenicity_score | double | true |
+| genomics_gold | gene_profile | 98 | biogrid_partner_count | double | true |
+| genomics_gold | gene_profile | 99 | cancer_expression_score | double | true |
+| genomics_gold | gene_profile | 100 | cancer_missense_mutations | double | true |
+| genomics_gold | gene_profile | 101 | cancer_mutation_burden_score | double | true |
+| genomics_gold | gene_profile | 102 | cancer_priority_score | double | true |
+| genomics_gold | gene_profile | 103 | cancer_protein_family_score | double | true |
+| genomics_gold | gene_profile | 104 | cancer_samples_affected | double | true |
+| genomics_gold | gene_profile | 105 | cancer_truncating_mutations | double | true |
+| genomics_gold | gene_profile | 106 | clinical_features__average_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_profile | 107 | clinical_features__max_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_profile | 108 | clinical_relevance_score | double | true |
+| genomics_gold | gene_profile | 109 | clinical_test_utility_score | double | true |
+| genomics_gold | gene_profile | 110 | complete_test_count | double | true |
+| genomics_gold | gene_profile | 111 | critical_domain_variants | double | true |
+| genomics_gold | gene_profile | 112 | database_count | double | true |
+| genomics_gold | gene_profile | 113 | dependent_cell_line_share | double | true |
+| genomics_gold | gene_profile | 114 | description_word_count | double | true |
+| genomics_gold | gene_profile | 115 | disease_association_strength | double | true |
+| genomics_gold | gene_profile | 116 | disease_category_count | double | true |
+| genomics_gold | gene_profile | 117 | disease_expression_score | double | true |
+| genomics_gold | gene_profile | 118 | disease_protein_family_score | double | true |
+| genomics_gold | gene_profile | 119 | disease_relationships | double | true |
+| genomics_gold | gene_profile | 120 | domain_affecting_variants | double | true |
+| genomics_gold | gene_profile | 121 | domain_diversity_score | double | true |
+| genomics_gold | gene_profile | 122 | domain_pathogenic_variants | double | true |
+| genomics_gold | gene_profile | 123 | drug_interaction_score | double | true |
+| genomics_gold | gene_profile | 124 | drug_relationships | double | true |
+| genomics_gold | gene_profile | 125 | druggability_potential_score | double | true |
+| genomics_gold | gene_profile | 126 | druggability_score | double | true |
+| genomics_gold | gene_profile | 127 | enhanced_druggability_score | double | true |
+| genomics_gold | gene_profile | 128 | entity_type_count | double | true |
+| genomics_gold | gene_profile | 129 | evidence_count | double | true |
+| genomics_gold | gene_profile | 130 | expression_features__average_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_profile | 131 | expression_features__max_expression_transcripts_per_million | double | true |
+| genomics_gold | gene_profile | 132 | expression_significance_score | double | true |
+| genomics_gold | gene_profile | 133 | frequent_test_count | double | true |
+| genomics_gold | gene_profile | 134 | function_keyword_count | double | true |
+| genomics_gold | gene_profile | 135 | functional_complexity_score | double | true |
+| genomics_gold | gene_profile | 136 | functional_expression_score | double | true |
+| genomics_gold | gene_profile | 137 | functional_impact_score | double | true |
+| genomics_gold | gene_profile | 138 | gene_age_bimodality | double | true |
+| genomics_gold | gene_profile | 139 | gene_age_contributing_databases | double | true |
+| genomics_gold | gene_profile | 140 | gene_age_entropy | double | true |
+| genomics_gold | gene_profile | 141 | gene_age_node_error | double | true |
+| genomics_gold | gene_profile | 142 | gene_age_share_cellular_organisms | double | true |
+| genomics_gold | gene_profile | 143 | gene_age_share_euk_archaea | double | true |
+| genomics_gold | gene_profile | 144 | gene_age_share_euk_bac | double | true |
+| genomics_gold | gene_profile | 145 | gene_age_share_eukaryota | double | true |
+| genomics_gold | gene_profile | 146 | gene_age_share_eumetazoa | double | true |
+| genomics_gold | gene_profile | 147 | gene_age_share_mammalia | double | true |
+| genomics_gold | gene_profile | 148 | gene_age_share_opisthokonta | double | true |
+| genomics_gold | gene_profile | 149 | gene_age_share_vertebrata | double | true |
+| genomics_gold | gene_profile | 150 | gene_annotation_score | double | true |
+| genomics_gold | gene_profile | 151 | gene_average_druggability | double | true |
+| genomics_gold | gene_profile | 152 | gene_average_impact_score | double | true |
+| genomics_gold | gene_profile | 153 | gene_average_review_quality | double | true |
+| genomics_gold | gene_profile | 154 | gene_benign_count | double | true |
+| genomics_gold | gene_profile | 155 | gene_benign_ratio | double | true |
+| genomics_gold | gene_profile | 156 | gene_clinical_utility_score | double | true |
+| genomics_gold | gene_profile | 157 | gene_description_length | double | true |
+| genomics_gold | gene_profile | 158 | gene_disease_diversity | double | true |
+| genomics_gold | gene_profile | 159 | gene_domain_affecting_count | double | true |
+| genomics_gold | gene_profile | 160 | gene_domain_count | double | true |
+| genomics_gold | gene_profile | 161 | gene_drug_interaction_variants | double | true |
+| genomics_gold | gene_profile | 162 | gene_frameshift_count | double | true |
+| genomics_gold | gene_profile | 163 | gene_high_impact_count | double | true |
+| genomics_gold | gene_profile | 164 | gene_high_quality_count | double | true |
+| genomics_gold | gene_profile | 165 | gene_importance_score | double | true |
+| genomics_gold | gene_profile | 166 | gene_length | double | true |
+| genomics_gold | gene_profile | 167 | gene_loss_of_function_count | double | true |
+| genomics_gold | gene_profile | 168 | gene_loss_of_function_variant_ratio | double | true |
+| genomics_gold | gene_profile | 169 | gene_max_impact_score | double | true |
+| genomics_gold | gene_profile | 170 | gene_metabolizer_variants | double | true |
+| genomics_gold | gene_profile | 171 | gene_missense_count | double | true |
+| genomics_gold | gene_profile | 172 | gene_mondo_variants | double | true |
+| genomics_gold | gene_profile | 173 | gene_nonsense_count | double | true |
+| genomics_gold | gene_profile | 174 | gene_omim_variants | double | true |
+| genomics_gold | gene_profile | 175 | gene_pathogenic_count | double | true |
+| genomics_gold | gene_profile | 176 | gene_pathogenic_ratio | double | true |
+| genomics_gold | gene_profile | 177 | gene_pharmacogene_pathogenic | double | true |
+| genomics_gold | gene_profile | 178 | gene_pharmacogene_variants | double | true |
+| genomics_gold | gene_profile | 179 | gene_splice_count | double | true |
+| genomics_gold | gene_profile | 180 | gene_splice_variant_count | double | true |
+| genomics_gold | gene_profile | 181 | gene_test_count | double | true |
+| genomics_gold | gene_profile | 182 | gene_total_variants | double | true |
+| genomics_gold | gene_profile | 183 | gene_transporter_variants | double | true |
+| genomics_gold | gene_profile | 184 | gene_very_high_impact_count | double | true |
+| genomics_gold | gene_profile | 185 | gene_vus_count | double | true |
+| genomics_gold | gene_profile | 186 | gene_vus_ratio | double | true |
+| genomics_gold | gene_profile | 187 | gene_well_annotated_variants | double | true |
+| genomics_gold | gene_profile | 188 | genetic_test_features__clinical_utility_score | double | true |
+| genomics_gold | gene_profile | 189 | max_domain_count | double | true |
+| genomics_gold | gene_profile | 190 | max_median_transcripts_per_million | double | true |
+| genomics_gold | gene_profile | 191 | mean_gene_effect | double | true |
+| genomics_gold | gene_profile | 192 | member_number | double | true |
+| genomics_gold | gene_profile | 193 | metabolism_context_score | double | true |
+| genomics_gold | gene_profile | 194 | minimum_gene_effect | double | true |
+| genomics_gold | gene_profile | 195 | missense_mutations | double | true |
+| genomics_gold | gene_profile | 196 | omim_disease_count | double | true |
+| genomics_gold | gene_profile | 197 | orthologue_depth_rank | double | true |
+| genomics_gold | gene_profile | 198 | paralogue_count | double | true |
+| genomics_gold | gene_profile | 199 | pathogenic_variant_count | double | true |
+| genomics_gold | gene_profile | 200 | pathogenic_variants_in_tested_gene | double | true |
+| genomics_gold | gene_profile | 201 | pathway_count | double | true |
+| genomics_gold | gene_profile | 202 | perturbation_drug_count | double | true |
+| genomics_gold | gene_profile | 203 | pharmacogene_evidence_score | double | true |
+| genomics_gold | gene_profile | 204 | pharmacogene_gene_features__clinical_utility_score | double | true |
+| genomics_gold | gene_profile | 205 | pharmacogene_source_count | double | true |
+| genomics_gold | gene_profile | 206 | pharmacogene_variant_impact_score | double | true |
+| genomics_gold | gene_profile | 207 | phenotype_count | double | true |
+| genomics_gold | gene_profile | 208 | population_test_relevance_score | double | true |
+| genomics_gold | gene_profile | 209 | primary_tissue_count | double | true |
+| genomics_gold | gene_profile | 210 | protein_count | double | true |
+| genomics_gold | gene_profile | 211 | proteins_with_death_domain | double | true |
+| genomics_gold | gene_profile | 212 | proteins_with_functional_domain | double | true |
+| genomics_gold | gene_profile | 213 | proteins_with_helix_loop_helix | double | true |
+| genomics_gold | gene_profile | 214 | proteins_with_immunoglobulin | double | true |
+| genomics_gold | gene_profile | 215 | proteins_with_kinase_in_name | double | true |
+| genomics_gold | gene_profile | 216 | proteins_with_leucine_zipper | double | true |
+| genomics_gold | gene_profile | 217 | proteins_with_ph_domain | double | true |
+| genomics_gold | gene_profile | 218 | proteins_with_receptor_in_name | double | true |
+| genomics_gold | gene_profile | 219 | proteins_with_sh2_domain | double | true |
+| genomics_gold | gene_profile | 220 | proteins_with_sh3_domain | double | true |
+| genomics_gold | gene_profile | 221 | proteins_with_zinc_finger | double | true |
+| genomics_gold | gene_profile | 222 | rare_pathogenic_variants | double | true |
+| genomics_gold | gene_profile | 223 | regulated_gene_count | double | true |
+| genomics_gold | gene_profile | 224 | regulator_count | double | true |
+| genomics_gold | gene_profile | 225 | regulatory_element_biosample_count | double | true |
+| genomics_gold | gene_profile | 226 | regulatory_element_count | double | true |
+| genomics_gold | gene_profile | 227 | related_drug_count | double | true |
+| genomics_gold | gene_profile | 228 | silent_mutations | double | true |
+| genomics_gold | gene_profile | 229 | somatic_mutation_count | double | true |
+| genomics_gold | gene_profile | 230 | string_partner_count | double | true |
+| genomics_gold | gene_profile | 231 | strongly_essential_cell_lines | double | true |
+| genomics_gold | gene_profile | 232 | test_accessibility_score | double | true |
+| genomics_gold | gene_profile | 233 | test_covered_variants | double | true |
+| genomics_gold | gene_profile | 234 | test_disease_count | double | true |
+| genomics_gold | gene_profile | 235 | test_quality_score | double | true |
+| genomics_gold | gene_profile | 236 | tests_with_disease_info | double | true |
+| genomics_gold | gene_profile | 237 | tests_with_gene_info | double | true |
+| genomics_gold | gene_profile | 238 | tissue_specificity_score | double | true |
+| genomics_gold | gene_profile | 239 | tissues_expressed | double | true |
+| genomics_gold | gene_profile | 240 | tissues_expressed_count | double | true |
+| genomics_gold | gene_profile | 241 | total_aliases | double | true |
+| genomics_gold | gene_profile | 242 | total_designations | double | true |
+| genomics_gold | gene_profile | 243 | total_disease_count | double | true |
+| genomics_gold | gene_profile | 244 | total_relationships | double | true |
+| genomics_gold | gene_profile | 245 | total_samples_affected | double | true |
+| genomics_gold | gene_profile | 246 | total_test_count | double | true |
+| genomics_gold | gene_profile | 247 | total_tissues_expressed | double | true |
+| genomics_gold | gene_profile | 248 | truncating_mutations | double | true |
+| genomics_gold | gene_profile | 249 | tumor_sample_count | double | true |
+| genomics_gold | gene_profile | 250 | type_number | double | true |
+| genomics_gold | gene_profile | 251 | unique_mutation_sites | double | true |
+| genomics_gold | gene_profile | 252 | unique_samples_affected | double | true |
+| genomics_gold | gene_profile | 253 | unique_test_count | double | true |
+| genomics_gold | gene_profile | 254 | variant_domain_impact_score | double | true |
+| genomics_gold | gene_profile | 255 | variant_relationships | double | true |
+| genomics_gold | gene_profile | 256 | variant_test_coverage_score | double | true |
+| genomics_gold | gene_profile | 257 | apoptosis | boolean | true |
+| genomics_gold | gene_profile | 258 | cancer_features__is_cancer_gene | boolean | true |
+| genomics_gold | gene_profile | 259 | cancer_relevant_protein_family | boolean | true |
+| genomics_gold | gene_profile | 260 | carrier_screening_relevant | boolean | true |
+| genomics_gold | gene_profile | 261 | cell_cycle | boolean | true |
+| genomics_gold | gene_profile | 262 | cell_growth | boolean | true |
+| genomics_gold | gene_profile | 263 | cell_signaling | boolean | true |
+| genomics_gold | gene_profile | 264 | clinical_features__is_cancer_gene | boolean | true |
+| genomics_gold | gene_profile | 265 | clinical_features__is_highly_expressed | boolean | true |
+| genomics_gold | gene_profile | 266 | cytoplasmic | boolean | true |
+| genomics_gold | gene_profile | 267 | disease_associated_protein_family | boolean | true |
+| genomics_gold | gene_profile | 268 | dna_repair_replication | boolean | true |
+| genomics_gold | gene_profile | 269 | endoplasmic_reticulum | boolean | true |
+| genomics_gold | gene_profile | 270 | expression_features__is_highly_expressed | boolean | true |
+| genomics_gold | gene_profile | 271 | extracellular | boolean | true |
+| genomics_gold | gene_profile | 272 | gene_age_horizontal_transfer_flag | boolean | true |
+| genomics_gold | gene_profile | 273 | gene_description_mentions_drug | boolean | true |
+| genomics_gold | gene_profile | 274 | gene_designation__has_binding_keyword | boolean | true |
+| genomics_gold | gene_profile | 275 | gene_designation__has_glycoprotein | boolean | true |
+| genomics_gold | gene_profile | 276 | gene_function__has_binding_keyword | boolean | true |
+| genomics_gold | gene_profile | 277 | gene_function__has_glycoprotein | boolean | true |
+| genomics_gold | gene_profile | 278 | gene_has_ensembl | boolean | true |
+| genomics_gold | gene_profile | 279 | gene_has_high_loss_of_function_burden | boolean | true |
+| genomics_gold | gene_profile | 280 | gene_has_multiple_drug_variants | boolean | true |
+| genomics_gold | gene_profile | 281 | gene_has_omim | boolean | true |
+| genomics_gold | gene_profile | 282 | gene_has_quality_annotations | boolean | true |
+| genomics_gold | gene_profile | 283 | gene_is_benign_enriched | boolean | true |
+| genomics_gold | gene_profile | 284 | gene_is_pathogenic_enriched | boolean | true |
+| genomics_gold | gene_profile | 285 | gene_is_validated | boolean | true |
+| genomics_gold | gene_profile | 286 | gene_is_vus_enriched | boolean | true |
+| genomics_gold | gene_profile | 287 | gene_is_well_characterized | boolean | true |
+| genomics_gold | gene_profile | 288 | golgi | boolean | true |
+| genomics_gold | gene_profile | 289 | has_apoptosis_domain | boolean | true |
+| genomics_gold | gene_profile | 290 | has_cancer_disease | boolean | true |
+| genomics_gold | gene_profile | 291 | has_cancer_keyword | boolean | true |
+| genomics_gold | gene_profile | 292 | has_cardiovascular_disease | boolean | true |
+| genomics_gold | gene_profile | 293 | has_clinical_test | boolean | true |
+| genomics_gold | gene_profile | 294 | has_comprehensive_testing | boolean | true |
+| genomics_gold | gene_profile | 295 | has_deficiency_keyword | boolean | true |
+| genomics_gold | gene_profile | 296 | has_detailed_description | boolean | true |
+| genomics_gold | gene_profile | 297 | has_developmental_disease | boolean | true |
+| genomics_gold | gene_profile | 298 | has_dna_binding_domain | boolean | true |
+| genomics_gold | gene_profile | 299 | has_domain_in_description | boolean | true |
+| genomics_gold | gene_profile | 300 | has_domain_variants | boolean | true |
+| genomics_gold | gene_profile | 301 | has_enzyme_in_description | boolean | true |
+| genomics_gold | gene_profile | 302 | has_enzyme_keyword | boolean | true |
+| genomics_gold | gene_profile | 303 | has_excellent_annotation | boolean | true |
+| genomics_gold | gene_profile | 304 | has_expression_variants | boolean | true |
+| genomics_gold | gene_profile | 305 | has_hereditary_disease | boolean | true |
+| genomics_gold | gene_profile | 306 | has_high_druggability | boolean | true |
+| genomics_gold | gene_profile | 307 | has_immune_disease | boolean | true |
+| genomics_gold | gene_profile | 308 | has_immune_domain | boolean | true |
+| genomics_gold | gene_profile | 309 | has_kinase_domain | boolean | true |
+| genomics_gold | gene_profile | 310 | has_kinase_in_description | boolean | true |
+| genomics_gold | gene_profile | 311 | has_kinase_keyword | boolean | true |
+| genomics_gold | gene_profile | 312 | has_membrane_domain | boolean | true |
+| genomics_gold | gene_profile | 313 | has_membrane_in_description | boolean | true |
+| genomics_gold | gene_profile | 314 | has_metabolic_disease | boolean | true |
+| genomics_gold | gene_profile | 315 | has_mitochondrial_in_description | boolean | true |
+| genomics_gold | gene_profile | 316 | has_multiple_tests | boolean | true |
+| genomics_gold | gene_profile | 317 | has_muscular_disease | boolean | true |
+| genomics_gold | gene_profile | 318 | has_neurological_disease | boolean | true |
+| genomics_gold | gene_profile | 319 | has_nuclear_in_description | boolean | true |
+| genomics_gold | gene_profile | 320 | has_pharmacogene_variants | boolean | true |
+| genomics_gold | gene_profile | 321 | has_pharmgkb_annotation | boolean | true |
+| genomics_gold | gene_profile | 322 | has_receptor_in_description | boolean | true |
+| genomics_gold | gene_profile | 323 | has_receptor_keyword | boolean | true |
+| genomics_gold | gene_profile | 324 | has_signaling_domain | boolean | true |
+| genomics_gold | gene_profile | 325 | has_signaling_in_description | boolean | true |
+| genomics_gold | gene_profile | 326 | has_structural_in_description | boolean | true |
+| genomics_gold | gene_profile | 327 | has_subunit_info | boolean | true |
+| genomics_gold | gene_profile | 328 | has_syndrome_keyword | boolean | true |
+| genomics_gold | gene_profile | 329 | has_transcription_in_description | boolean | true |
+| genomics_gold | gene_profile | 330 | has_transporter_in_description | boolean | true |
+| genomics_gold | gene_profile | 331 | hereditary_cancer_testing | boolean | true |
+| genomics_gold | gene_profile | 332 | immune_response | boolean | true |
+| genomics_gold | gene_profile | 333 | is_acmg_secondary_finding_gene | boolean | true |
+| genomics_gold | gene_profile | 334 | is_broadly_expressed | boolean | true |
+| genomics_gold | gene_profile | 335 | is_cancer_drug_target | boolean | true |
+| genomics_gold | gene_profile | 336 | is_cancer_hotspot_gene | boolean | true |
+| genomics_gold | gene_profile | 337 | is_cancer_panel_gene | boolean | true |
+| genomics_gold | gene_profile | 338 | is_centromeric | boolean | true |
+| genomics_gold | gene_profile | 339 | is_channel | boolean | true |
+| genomics_gold | gene_profile | 340 | is_clinically_actionable | boolean | true |
+| genomics_gold | gene_profile | 341 | is_disease_associated_gene | boolean | true |
+| genomics_gold | gene_profile | 342 | is_disease_gene | boolean | true |
+| genomics_gold | gene_profile | 343 | is_dna_binding | boolean | true |
+| genomics_gold | gene_profile | 344 | is_drug_metabolizer | boolean | true |
+| genomics_gold | gene_profile | 345 | is_drug_target | boolean | true |
+| genomics_gold | gene_profile | 346 | is_drug_target_gene | boolean | true |
+| genomics_gold | gene_profile | 347 | is_drug_transporter | boolean | true |
+| genomics_gold | gene_profile | 348 | is_drug_transporter_gene | boolean | true |
+| genomics_gold | gene_profile | 349 | is_enzyme | boolean | true |
+| genomics_gold | gene_profile | 350 | is_frequently_mutated | boolean | true |
+| genomics_gold | gene_profile | 351 | is_frequently_mutated_gene | boolean | true |
+| genomics_gold | gene_profile | 352 | is_frequently_tested | boolean | true |
+| genomics_gold | gene_profile | 353 | is_gpcr | boolean | true |
+| genomics_gold | gene_profile | 354 | is_growth_factor | boolean | true |
+| genomics_gold | gene_profile | 355 | is_hepatic_metabolizer | boolean | true |
+| genomics_gold | gene_profile | 356 | is_kidney_expressed | boolean | true |
+| genomics_gold | gene_profile | 357 | is_kinase | boolean | true |
+| genomics_gold | gene_profile | 358 | is_kinase_inhibitor_target | boolean | true |
+| genomics_gold | gene_profile | 359 | is_liver_expressed | boolean | true |
+| genomics_gold | gene_profile | 360 | is_lowly_expressed | boolean | true |
+| genomics_gold | gene_profile | 361 | is_membrane_protein | boolean | true |
+| genomics_gold | gene_profile | 362 | is_metabolic | boolean | true |
+| genomics_gold | gene_profile | 363 | is_metabolizing_enzyme | boolean | true |
+| genomics_gold | gene_profile | 364 | is_multi_disease_gene | boolean | true |
+| genomics_gold | gene_profile | 365 | is_omim_gene | boolean | true |
+| genomics_gold | gene_profile | 366 | is_oncogene_candidate | boolean | true |
+| genomics_gold | gene_profile | 367 | is_oncology_drug_target | boolean | true |
+| genomics_gold | gene_profile | 368 | is_oncology_target | boolean | true |
+| genomics_gold | gene_profile | 369 | is_pericentromeric | boolean | true |
+| genomics_gold | gene_profile | 370 | is_pharmacogene | boolean | true |
+| genomics_gold | gene_profile | 371 | is_phosphatase | boolean | true |
+| genomics_gold | gene_profile | 372 | is_protease | boolean | true |
+| genomics_gold | gene_profile | 373 | is_receptor | boolean | true |
+| genomics_gold | gene_profile | 374 | is_regulatory | boolean | true |
+| genomics_gold | gene_profile | 375 | is_renal_transporter | boolean | true |
+| genomics_gold | gene_profile | 376 | is_research_candidate | boolean | true |
+| genomics_gold | gene_profile | 377 | is_rna_binding | boolean | true |
+| genomics_gold | gene_profile | 378 | is_structural | boolean | true |
+| genomics_gold | gene_profile | 379 | is_telomeric | boolean | true |
+| genomics_gold | gene_profile | 380 | is_tissue_specific | boolean | true |
+| genomics_gold | gene_profile | 381 | is_transcription_factor | boolean | true |
+| genomics_gold | gene_profile | 382 | is_transporter | boolean | true |
+| genomics_gold | gene_profile | 383 | is_tumor_suppressor_candidate | boolean | true |
+| genomics_gold | gene_profile | 384 | is_ubiquitin_related | boolean | true |
+| genomics_gold | gene_profile | 385 | is_ubiquitously_expressed | boolean | true |
+| genomics_gold | gene_profile | 386 | is_validated_cancer_target | boolean | true |
+| genomics_gold | gene_profile | 387 | is_well_annotated | boolean | true |
+| genomics_gold | gene_profile | 388 | is_well_characterized | boolean | true |
+| genomics_gold | gene_profile | 389 | is_well_tested_gene | boolean | true |
+| genomics_gold | gene_profile | 390 | lysosomal | boolean | true |
+| genomics_gold | gene_profile | 391 | membrane | boolean | true |
+| genomics_gold | gene_profile | 392 | metabolism | boolean | true |
+| genomics_gold | gene_profile | 393 | mitochondrial | boolean | true |
+| genomics_gold | gene_profile | 394 | multi_disease_testing | boolean | true |
+| genomics_gold | gene_profile | 395 | nuclear | boolean | true |
+| genomics_gold | gene_profile | 396 | peroxisomal | boolean | true |
+| genomics_gold | gene_profile | 397 | pseudogene | boolean | true |
+| genomics_gold | gene_profile | 398 | regulatory | boolean | true |
+| genomics_gold | gene_profile | 399 | tissue_specific_protein_expression | boolean | true |
+| genomics_gold | gene_profile | 400 | transcription_regulation | boolean | true |
+| genomics_gold | gene_profile | 401 | transport | boolean | true |
+| genomics_gold | gene_profile | 402 | uncharacterized | boolean | true |
+| genomics_gold | gene_profile | 403 | apoptosis__matched_text | string | true |
+| genomics_gold | gene_profile | 404 | cell_cycle__matched_text | string | true |
+| genomics_gold | gene_profile | 405 | cell_growth__matched_text | string | true |
+| genomics_gold | gene_profile | 406 | cell_signaling__matched_text | string | true |
+| genomics_gold | gene_profile | 407 | chain_type__matched_text | string | true |
+| genomics_gold | gene_profile | 408 | cytoband_last_band_digit__matched_text | string | true |
+| genomics_gold | gene_profile | 409 | cytoplasmic__matched_text | string | true |
+| genomics_gold | gene_profile | 410 | dna_repair_replication__matched_text | string | true |
+| genomics_gold | gene_profile | 411 | endoplasmic_reticulum__matched_text | string | true |
+| genomics_gold | gene_profile | 412 | extracellular__matched_text | string | true |
+| genomics_gold | gene_profile | 413 | gene_designation__has_binding_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 414 | gene_designation__has_glycoprotein__matched_text | string | true |
+| genomics_gold | gene_profile | 415 | gene_function__has_binding_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 416 | gene_function__has_glycoprotein__matched_text | string | true |
+| genomics_gold | gene_profile | 417 | golgi__matched_text | string | true |
+| genomics_gold | gene_profile | 418 | has_cancer_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 419 | has_cancer_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 420 | has_cardiovascular_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 421 | has_deficiency_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 422 | has_developmental_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 423 | has_domain_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 424 | has_enzyme_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 425 | has_enzyme_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 426 | has_hereditary_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 427 | has_immune_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 428 | has_kinase_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 429 | has_kinase_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 430 | has_membrane_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 431 | has_metabolic_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 432 | has_mitochondrial_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 433 | has_muscular_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 434 | has_neurological_disease__matched_text | string | true |
+| genomics_gold | gene_profile | 435 | has_nuclear_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 436 | has_receptor_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 437 | has_receptor_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 438 | has_signaling_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 439 | has_structural_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 440 | has_subunit_info__matched_text | string | true |
+| genomics_gold | gene_profile | 441 | has_syndrome_keyword__matched_text | string | true |
+| genomics_gold | gene_profile | 442 | has_transcription_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 443 | has_transporter_in_description__matched_text | string | true |
+| genomics_gold | gene_profile | 444 | immune_response__matched_text | string | true |
+| genomics_gold | gene_profile | 445 | is_centromeric__matched_text | string | true |
+| genomics_gold | gene_profile | 446 | is_channel__matched_text | string | true |
+| genomics_gold | gene_profile | 447 | is_dna_binding__matched_text | string | true |
+| genomics_gold | gene_profile | 448 | is_enzyme__matched_text | string | true |
+| genomics_gold | gene_profile | 449 | is_gpcr__matched_text | string | true |
+| genomics_gold | gene_profile | 450 | is_growth_factor__matched_text | string | true |
+| genomics_gold | gene_profile | 451 | is_kinase__matched_text | string | true |
+| genomics_gold | gene_profile | 452 | is_membrane_protein__matched_text | string | true |
+| genomics_gold | gene_profile | 453 | is_metabolic__matched_text | string | true |
+| genomics_gold | gene_profile | 454 | is_pericentromeric__matched_text | string | true |
+| genomics_gold | gene_profile | 455 | is_phosphatase__matched_text | string | true |
+| genomics_gold | gene_profile | 456 | is_protease__matched_text | string | true |
+| genomics_gold | gene_profile | 457 | is_receptor__matched_text | string | true |
+| genomics_gold | gene_profile | 458 | is_regulatory__matched_text | string | true |
+| genomics_gold | gene_profile | 459 | is_rna_binding__matched_text | string | true |
+| genomics_gold | gene_profile | 460 | is_structural__matched_text | string | true |
+| genomics_gold | gene_profile | 461 | is_telomeric__matched_text | string | true |
+| genomics_gold | gene_profile | 462 | is_transcription_factor__matched_text | string | true |
+| genomics_gold | gene_profile | 463 | is_transporter__matched_text | string | true |
+| genomics_gold | gene_profile | 464 | is_ubiquitin_related__matched_text | string | true |
+| genomics_gold | gene_profile | 465 | lysosomal__matched_text | string | true |
+| genomics_gold | gene_profile | 466 | member_number__matched_text | string | true |
+| genomics_gold | gene_profile | 467 | membrane__matched_text | string | true |
+| genomics_gold | gene_profile | 468 | metabolism__matched_text | string | true |
+| genomics_gold | gene_profile | 469 | mitochondrial__matched_text | string | true |
+| genomics_gold | gene_profile | 470 | nuclear__matched_text | string | true |
+| genomics_gold | gene_profile | 471 | peroxisomal__matched_text | string | true |
+| genomics_gold | gene_profile | 472 | protein_family__matched_text | string | true |
+| genomics_gold | gene_profile | 473 | pseudogene__matched_text | string | true |
+| genomics_gold | gene_profile | 474 | regulatory__matched_text | string | true |
+| genomics_gold | gene_profile | 475 | transcription_regulation__matched_text | string | true |
+| genomics_gold | gene_profile | 476 | transport__matched_text | string | true |
+| genomics_gold | gene_profile | 477 | type_number__matched_text | string | true |
+| genomics_gold | gene_profile | 478 | uncharacterized__matched_text | string | true |
+| genomics_gold | gene_profile | 479 | _gold_loaded_at | timestamp | true |
+| genomics_gold | gene_profile | 480 | _gold_run_id | string | true |
+| genomics_gold | genetic_test_profile | 1 | test_key | string | true |
+| genomics_gold | genetic_test_profile | 2 | latest_version | string | true |
+| genomics_gold | genetic_test_profile | 3 | versions | bigint | true |
+| genomics_gold | genetic_test_profile | 4 | test_type | string | true |
+| genomics_gold | genetic_test_profile | 5 | link_kind | string | true |
+| genomics_gold | genetic_test_profile | 6 | gene_key | string | true |
+| genomics_gold | genetic_test_profile | 7 | gene_symbol | string | true |
+| genomics_gold | genetic_test_profile | 8 | disease_key | string | true |
+| genomics_gold | genetic_test_profile | 9 | condition_name | string | true |
+| genomics_gold | genetic_test_profile | 10 | mim_number | string | true |
+| genomics_gold | genetic_test_profile | 11 | snomed_ct_id | string | true |
+| genomics_gold | genetic_test_profile | 12 | source_system | string | true |
+| genomics_gold | genetic_test_profile | 13 | source_record_id | string | true |
+| genomics_gold | genetic_test_profile | 14 | ecosystem | string | true |
+| genomics_gold | genetic_test_profile | 15 | disease_count | double | true |
+| genomics_gold | genetic_test_profile | 16 | gene_count | double | true |
+| genomics_gold | genetic_test_profile | 17 | has_disease_info | boolean | true |
+| genomics_gold | genetic_test_profile | 18 | has_gene_info | boolean | true |
+| genomics_gold | genetic_test_profile | 19 | is_complete_record | boolean | true |
+| genomics_gold | genetic_test_profile | 20 | _gold_loaded_at | timestamp | true |
+| genomics_gold | genetic_test_profile | 21 | _gold_run_id | string | true |
+| genomics_gold | multi_value_attribute | 1 | entity_type | string | true |
+| genomics_gold | multi_value_attribute | 2 | entity_key | string | true |
+| genomics_gold | multi_value_attribute | 3 | rule_name | string | true |
+| genomics_gold | multi_value_attribute | 4 | attribute | string | true |
+| genomics_gold | multi_value_attribute | 5 | value_type | string | true |
+| genomics_gold | multi_value_attribute | 6 | value_text | string | true |
+| genomics_gold | multi_value_attribute | 7 | value_number | double | true |
+| genomics_gold | multi_value_attribute | 8 | value_boolean | boolean | true |
+| genomics_gold | multi_value_attribute | 9 | method | string | true |
+| genomics_gold | multi_value_attribute | 10 | matched_text | string | true |
+| genomics_gold | multi_value_attribute | 11 | text_source | string | true |
+| genomics_gold | multi_value_attribute | 12 | source_record_id | string | true |
+| genomics_gold | multi_value_attribute | 13 | source_system | string | true |
+| genomics_gold | multi_value_attribute | 14 | ecosystem | string | true |
+| genomics_gold | multi_value_attribute | 15 | _gold_loaded_at | timestamp | true |
+| genomics_gold | multi_value_attribute | 16 | _gold_run_id | string | true |
+| genomics_gold | multi_value_score | 1 | variant_key | string | true |
+| genomics_gold | multi_value_score | 2 | assembly | string | true |
+| genomics_gold | multi_value_score | 3 | contig | string | true |
+| genomics_gold | multi_value_score | 4 | position | bigint | true |
+| genomics_gold | multi_value_score | 5 | score_name | string | true |
+| genomics_gold | multi_value_score | 6 | score_value | double | true |
+| genomics_gold | multi_value_score | 7 | score_label | string | true |
+| genomics_gold | multi_value_score | 8 | context | string | true |
+| genomics_gold | multi_value_score | 9 | source_dataset | string | true |
+| genomics_gold | multi_value_score | 10 | source_field | string | true |
+| genomics_gold | multi_value_score | 11 | source_system | string | true |
+| genomics_gold | multi_value_score | 12 | source_record_id | string | true |
+| genomics_gold | multi_value_score | 13 | ecosystem | string | true |
+| genomics_gold | multi_value_score | 14 | _gold_loaded_at | timestamp | true |
+| genomics_gold | multi_value_score | 15 | _gold_run_id | string | true |
+| genomics_gold | protein_profile | 1 | protein_key | string | true |
+| genomics_gold | protein_profile | 2 | entity_type | string | true |
+| genomics_gold | protein_profile | 3 | key_source | string | true |
+| genomics_gold | protein_profile | 4 | description | string | true |
+| genomics_gold | protein_profile | 5 | description_source | string | true |
+| genomics_gold | protein_profile | 6 | description_method | string | true |
+| genomics_gold | protein_profile | 7 | name | string | true |
+| genomics_gold | protein_profile | 8 | name_source | string | true |
+| genomics_gold | protein_profile | 9 | name_method | string | true |
+| genomics_gold | protein_profile | 10 | length | string | true |
+| genomics_gold | protein_profile | 11 | length_source | string | true |
+| genomics_gold | protein_profile | 12 | length_method | string | true |
+| genomics_gold | protein_profile | 13 | gene_symbol | string | true |
+| genomics_gold | protein_profile | 14 | gene_symbol_source | string | true |
+| genomics_gold | protein_profile | 15 | gene_symbol_method | string | true |
+| genomics_gold | protein_profile | 16 | entry_name | string | true |
+| genomics_gold | protein_profile | 17 | entry_name_source | string | true |
+| genomics_gold | protein_profile | 18 | entry_name_method | string | true |
+| genomics_gold | protein_profile | 19 | target_type | string | true |
+| genomics_gold | protein_profile | 20 | target_type_source | string | true |
+| genomics_gold | protein_profile | 21 | target_type_method | string | true |
+| genomics_gold | protein_profile | 22 | tax_id | string | true |
+| genomics_gold | protein_profile | 23 | tax_id_source | string | true |
+| genomics_gold | protein_profile | 24 | tax_id_method | string | true |
+| genomics_gold | protein_profile | 25 | source_system | string | true |
+| genomics_gold | protein_profile | 26 | source_record_id | string | true |
+| genomics_gold | protein_profile | 27 | ecosystem | string | true |
+| genomics_gold | protein_profile | 28 | dms_assay_count | double | true |
+| genomics_gold | protein_profile | 29 | domain_count | double | true |
+| genomics_gold | protein_profile | 30 | epitope_assay_count | double | true |
+| genomics_gold | protein_profile | 31 | epitope_count | double | true |
+| genomics_gold | protein_profile | 32 | mean_plddt | double | true |
+| genomics_gold | protein_profile | 33 | pathway_count | double | true |
+| genomics_gold | protein_profile | 34 | string_partner_count | double | true |
+| genomics_gold | protein_profile | 35 | very_low_confidence_residue_share | double | true |
+| genomics_gold | protein_profile | 36 | has_death_domain | boolean | true |
+| genomics_gold | protein_profile | 37 | has_functional_domain | boolean | true |
+| genomics_gold | protein_profile | 38 | has_helix_loop_helix | boolean | true |
+| genomics_gold | protein_profile | 39 | has_immunoglobulin | boolean | true |
+| genomics_gold | protein_profile | 40 | has_kinase_in_name | boolean | true |
+| genomics_gold | protein_profile | 41 | has_leucine_zipper | boolean | true |
+| genomics_gold | protein_profile | 42 | has_ph_domain | boolean | true |
+| genomics_gold | protein_profile | 43 | has_receptor_in_name | boolean | true |
+| genomics_gold | protein_profile | 44 | has_sh2_domain | boolean | true |
+| genomics_gold | protein_profile | 45 | has_sh3_domain | boolean | true |
+| genomics_gold | protein_profile | 46 | has_zinc_finger | boolean | true |
+| genomics_gold | protein_profile | 47 | has_death_domain__matched_text | string | true |
+| genomics_gold | protein_profile | 48 | has_helix_loop_helix__matched_text | string | true |
+| genomics_gold | protein_profile | 49 | has_immunoglobulin__matched_text | string | true |
+| genomics_gold | protein_profile | 50 | has_kinase_in_name__matched_text | string | true |
+| genomics_gold | protein_profile | 51 | has_leucine_zipper__matched_text | string | true |
+| genomics_gold | protein_profile | 52 | has_ph_domain__matched_text | string | true |
+| genomics_gold | protein_profile | 53 | has_receptor_in_name__matched_text | string | true |
+| genomics_gold | protein_profile | 54 | has_sh2_domain__matched_text | string | true |
+| genomics_gold | protein_profile | 55 | has_sh3_domain__matched_text | string | true |
+| genomics_gold | protein_profile | 56 | has_zinc_finger__matched_text | string | true |
+| genomics_gold | protein_profile | 57 | _gold_loaded_at | timestamp | true |
+| genomics_gold | protein_profile | 58 | _gold_run_id | string | true |
+| genomics_gold | protein_variant_record | 1 | record_kind | string | true |
+| genomics_gold | protein_variant_record | 2 | record_key | string | true |
+| genomics_gold | protein_variant_record | 3 | protein_key | string | true |
+| genomics_gold | protein_variant_record | 4 | uniprot_accession | string | true |
+| genomics_gold | protein_variant_record | 5 | protein_link_method | string | true |
+| genomics_gold | protein_variant_record | 6 | fragment | string | true |
+| genomics_gold | protein_variant_record | 7 | residue_number | int | true |
+| genomics_gold | protein_variant_record | 8 | residue | string | true |
+| genomics_gold | protein_variant_record | 9 | score_name | string | true |
+| genomics_gold | protein_variant_record | 10 | score_value | double | true |
+| genomics_gold | protein_variant_record | 11 | score_band | string | true |
+| genomics_gold | protein_variant_record | 12 | source_dataset | string | true |
+| genomics_gold | protein_variant_record | 13 | source_system | string | true |
+| genomics_gold | protein_variant_record | 14 | source_record_id | string | true |
+| genomics_gold | protein_variant_record | 15 | ecosystem | string | true |
+| genomics_gold | protein_variant_record | 16 | feature_id | string | true |
+| genomics_gold | protein_variant_record | 17 | feature_type | string | true |
+| genomics_gold | protein_variant_record | 18 | location_raw | string | true |
+| genomics_gold | protein_variant_record | 19 | start_position | int | true |
+| genomics_gold | protein_variant_record | 20 | end_position | int | true |
+| genomics_gold | protein_variant_record | 21 | note | string | true |
+| genomics_gold | protein_variant_record | 22 | qualifiers | string | true |
+| genomics_gold | protein_variant_record | 23 | reference_kind | string | true |
+| genomics_gold | protein_variant_record | 24 | reference_value | string | true |
+| genomics_gold | protein_variant_record | 25 | gene_key | string | true |
+| genomics_gold | protein_variant_record | 26 | link_method | string | true |
+| genomics_gold | protein_variant_record | 27 | genes_sharing_symbol | bigint | true |
+| genomics_gold | protein_variant_record | 28 | source_field | string | true |
+| genomics_gold | protein_variant_record | 29 | variant_key | string | true |
+| genomics_gold | protein_variant_record | 30 | transcript_accession | string | true |
+| genomics_gold | protein_variant_record | 31 | transcript_version | int | true |
+| genomics_gold | protein_variant_record | 32 | transcript_key | string | true |
+| genomics_gold | protein_variant_record | 33 | gene_symbol | string | true |
+| genomics_gold | protein_variant_record | 34 | coding_notation | string | true |
+| genomics_gold | protein_variant_record | 35 | coding_region | string | true |
+| genomics_gold | protein_variant_record | 36 | coding_start | int | true |
+| genomics_gold | protein_variant_record | 37 | coding_start_offset | int | true |
+| genomics_gold | protein_variant_record | 38 | coding_end | int | true |
+| genomics_gold | protein_variant_record | 39 | coding_end_offset | int | true |
+| genomics_gold | protein_variant_record | 40 | coding_edit_type | string | true |
+| genomics_gold | protein_variant_record | 41 | coding_reference_base | string | true |
+| genomics_gold | protein_variant_record | 42 | coding_alternate_base | string | true |
+| genomics_gold | protein_variant_record | 43 | coding_inserted_bases | string | true |
+| genomics_gold | protein_variant_record | 44 | protein_notation | string | true |
+| genomics_gold | protein_variant_record | 45 | protein_reference_amino_acid | string | true |
+| genomics_gold | protein_variant_record | 46 | protein_position | int | true |
+| genomics_gold | protein_variant_record | 47 | protein_end_reference_amino_acid | string | true |
+| genomics_gold | protein_variant_record | 48 | protein_end_position | int | true |
+| genomics_gold | protein_variant_record | 49 | protein_edit_type | string | true |
+| genomics_gold | protein_variant_record | 50 | protein_alternate_amino_acid | string | true |
+| genomics_gold | protein_variant_record | 51 | protein_inserted_amino_acids | string | true |
+| genomics_gold | protein_variant_record | 52 | parse_status | string | true |
+| genomics_gold | protein_variant_record | 53 | first_source_snapshot | string | true |
+| genomics_gold | protein_variant_record | 54 | last_source_snapshot | string | true |
+| genomics_gold | protein_variant_record | 55 | condition_position | int | true |
+| genomics_gold | protein_variant_record | 56 | condition_name | string | true |
+| genomics_gold | protein_variant_record | 57 | clinvar_condition_accession | string | true |
+| genomics_gold | protein_variant_record | 58 | condition_id | string | true |
+| genomics_gold | protein_variant_record | 59 | disease_key | string | true |
+| genomics_gold | protein_variant_record | 60 | disease_link_method | string | true |
+| genomics_gold | protein_variant_record | 61 | is_generic_label | boolean | true |
+| genomics_gold | protein_variant_record | 62 | pairing_status | string | true |
+| genomics_gold | protein_variant_record | 63 | feature_kind | string | true |
+| genomics_gold | protein_variant_record | 64 | feature_key | string | true |
+| genomics_gold | protein_variant_record | 65 | overlap_method | string | true |
+| genomics_gold | protein_variant_record | 66 | _gold_loaded_at | timestamp | true |
+| genomics_gold | protein_variant_record | 67 | _gold_run_id | string | true |
+| genomics_gold | somatic_mutation_profile | 1 | source_record_id | string | true |
+| genomics_gold | somatic_mutation_profile | 2 | sample_barcode | string | true |
+| genomics_gold | somatic_mutation_profile | 3 | gene_symbol | string | true |
+| genomics_gold | somatic_mutation_profile | 4 | gene_key | string | true |
+| genomics_gold | somatic_mutation_profile | 5 | gene_link_method | string | true |
+| genomics_gold | somatic_mutation_profile | 6 | ensembl_gene_id | string | true |
+| genomics_gold | somatic_mutation_profile | 7 | assembly | string | true |
+| genomics_gold | somatic_mutation_profile | 8 | contig | string | true |
+| genomics_gold | somatic_mutation_profile | 9 | start_position | bigint | true |
+| genomics_gold | somatic_mutation_profile | 10 | end_position | bigint | true |
+| genomics_gold | somatic_mutation_profile | 11 | strand | string | true |
+| genomics_gold | somatic_mutation_profile | 12 | variant_classification | string | true |
+| genomics_gold | somatic_mutation_profile | 13 | variant_type | string | true |
+| genomics_gold | somatic_mutation_profile | 14 | reference_allele | string | true |
+| genomics_gold | somatic_mutation_profile | 15 | tumor_allele1 | string | true |
+| genomics_gold | somatic_mutation_profile | 16 | tumor_allele2 | string | true |
+| genomics_gold | somatic_mutation_profile | 17 | rsid | string | true |
+| genomics_gold | somatic_mutation_profile | 18 | coding_change_notation | string | true |
+| genomics_gold | somatic_mutation_profile | 19 | protein_change_short_notation | string | true |
+| genomics_gold | somatic_mutation_profile | 20 | protein_reference_amino_acid | string | true |
+| genomics_gold | somatic_mutation_profile | 21 | protein_position | int | true |
+| genomics_gold | somatic_mutation_profile | 22 | protein_alternate_amino_acid | string | true |
+| genomics_gold | somatic_mutation_profile | 23 | protein_edit_type | string | true |
+| genomics_gold | somatic_mutation_profile | 24 | transcript_key | string | true |
+| genomics_gold | somatic_mutation_profile | 25 | transcript_source_id | string | true |
+| genomics_gold | somatic_mutation_profile | 26 | exon_number | string | true |
+| genomics_gold | somatic_mutation_profile | 27 | exon_index | int | true |
+| genomics_gold | somatic_mutation_profile | 28 | exon_count | int | true |
+| genomics_gold | somatic_mutation_profile | 29 | tumor_depth | int | true |
+| genomics_gold | somatic_mutation_profile | 30 | tumor_ref_count | int | true |
+| genomics_gold | somatic_mutation_profile | 31 | tumor_alt_count | int | true |
+| genomics_gold | somatic_mutation_profile | 32 | impact | string | true |
+| genomics_gold | somatic_mutation_profile | 33 | filter_status | string | true |
+| genomics_gold | somatic_mutation_profile | 34 | variant_key | string | true |
+| genomics_gold | somatic_mutation_profile | 35 | variant_link_method | string | true |
+| genomics_gold | somatic_mutation_profile | 36 | source_dataset | string | true |
+| genomics_gold | somatic_mutation_profile | 37 | source_system | string | true |
+| genomics_gold | somatic_mutation_profile | 38 | ecosystem | string | true |
+| genomics_gold | somatic_mutation_profile | 39 | impact_category | string | true |
+| genomics_gold | somatic_mutation_profile | 40 | is_indel | boolean | true |
+| genomics_gold | somatic_mutation_profile | 41 | is_missense | boolean | true |
+| genomics_gold | somatic_mutation_profile | 42 | is_silent | boolean | true |
+| genomics_gold | somatic_mutation_profile | 43 | is_snv | boolean | true |
+| genomics_gold | somatic_mutation_profile | 44 | is_truncating | boolean | true |
+| genomics_gold | somatic_mutation_profile | 45 | _gold_loaded_at | timestamp | true |
+| genomics_gold | somatic_mutation_profile | 46 | _gold_run_id | string | true |
+| genomics_gold | somatic_site_profile | 1 | site_key | string | true |
+| genomics_gold | somatic_site_profile | 2 | assembly | string | true |
+| genomics_gold | somatic_site_profile | 3 | contig | string | true |
+| genomics_gold | somatic_site_profile | 4 | start_position | bigint | true |
+| genomics_gold | somatic_site_profile | 5 | reference_allele | string | true |
+| genomics_gold | somatic_site_profile | 6 | tumor_allele | string | true |
+| genomics_gold | somatic_site_profile | 7 | expression_change_relevance | string | true |
+| genomics_gold | somatic_site_profile | 8 | mutation_frequency_category | string | true |
+| genomics_gold | somatic_site_profile | 9 | somatic_versus_germline_classification | string | true |
+| genomics_gold | somatic_site_profile | 10 | conservation_score | double | true |
+| genomics_gold | somatic_site_profile | 11 | driver_likelihood_score | double | true |
+| genomics_gold | somatic_site_profile | 12 | germline_variant_frequency | double | true |
+| genomics_gold | somatic_site_profile | 13 | indel_sample_count | double | true |
+| genomics_gold | somatic_site_profile | 14 | missense_sample_count | double | true |
+| genomics_gold | somatic_site_profile | 15 | prognostic_value_score | double | true |
+| genomics_gold | somatic_site_profile | 16 | sample_count | double | true |
+| genomics_gold | somatic_site_profile | 17 | silent_sample_count | double | true |
+| genomics_gold | somatic_site_profile | 18 | snv_sample_count | double | true |
+| genomics_gold | somatic_site_profile | 19 | therapeutic_target_score | double | true |
+| genomics_gold | somatic_site_profile | 20 | total_mutation_count | double | true |
+| genomics_gold | somatic_site_profile | 21 | truncating_sample_count | double | true |
+| genomics_gold | somatic_site_profile | 22 | variant_class_count | double | true |
+| genomics_gold | somatic_site_profile | 23 | variant_type_count | double | true |
+| genomics_gold | somatic_site_profile | 24 | affected_oncogenic_domains | boolean | true |
+| genomics_gold | somatic_site_profile | 25 | clinvar_is_pathogenic | boolean | true |
+| genomics_gold | somatic_site_profile | 26 | hereditary_cancer_syndrome | boolean | true |
+| genomics_gold | somatic_site_profile | 27 | is_high_impact_cancer_variant | boolean | true |
+| genomics_gold | somatic_site_profile | 28 | is_hotspot_mutation | boolean | true |
+| genomics_gold | somatic_site_profile | 29 | is_recurrent_mutation | boolean | true |
+| genomics_gold | somatic_site_profile | 30 | source_system | string | true |
+| genomics_gold | somatic_site_profile | 31 | ecosystem | string | true |
+| genomics_gold | somatic_site_profile | 32 | _gold_loaded_at | timestamp | true |
+| genomics_gold | somatic_site_profile | 33 | _gold_run_id | string | true |
+| genomics_gold | structural_variant_profile | 1 | variant_key | string | true |
+| genomics_gold | structural_variant_profile | 2 | assembly | string | true |
+| genomics_gold | structural_variant_profile | 3 | contig | string | true |
+| genomics_gold | structural_variant_profile | 4 | position | bigint | true |
+| genomics_gold | structural_variant_profile | 5 | end_position | bigint | true |
+| genomics_gold | structural_variant_profile | 6 | variant_type | string | true |
+| genomics_gold | structural_variant_profile | 7 | disease_structural_variant_priority | string | true |
+| genomics_gold | structural_variant_profile | 8 | gene_count_category | string | true |
+| genomics_gold | structural_variant_profile | 9 | structural_variant_classification | string | true |
+| genomics_gold | structural_variant_profile | 10 | structural_variant_clinical_priority | string | true |
+| genomics_gold | structural_variant_profile | 11 | structural_variant_impact_tier | string | true |
+| genomics_gold | structural_variant_profile | 12 | structural_variant_pathogenicity_risk | string | true |
+| genomics_gold | structural_variant_profile | 13 | structural_variant_size_category | string | true |
+| genomics_gold | structural_variant_profile | 14 | structural_variant_type_class | string | true |
+| genomics_gold | structural_variant_profile | 15 | average_druggability_affected_genes | double | true |
+| genomics_gold | structural_variant_profile | 16 | broadly_expressed_genes_affected | double | true |
+| genomics_gold | structural_variant_profile | 17 | cancer_genes_affected | double | true |
+| genomics_gold | structural_variant_profile | 18 | genes_overlapped | double | true |
+| genomics_gold | structural_variant_profile | 19 | kinase_genes_affected | double | true |
+| genomics_gold | structural_variant_profile | 20 | max_gene_disruption_fraction | double | true |
+| genomics_gold | structural_variant_profile | 21 | neurological_genes_affected | double | true |
+| genomics_gold | structural_variant_profile | 22 | omim_genes_affected | double | true |
+| genomics_gold | structural_variant_profile | 23 | pharmacogenes_affected | double | true |
+| genomics_gold | structural_variant_profile | 24 | receptor_genes_affected | double | true |
+| genomics_gold | structural_variant_profile | 25 | structural_variant_combined_impact_score | double | true |
+| genomics_gold | structural_variant_profile | 26 | structural_variant_size | double | true |
+| genomics_gold | structural_variant_profile | 27 | total_disease_associations | double | true |
+| genomics_gold | structural_variant_profile | 28 | affects_essential_genes | boolean | true |
+| genomics_gold | structural_variant_profile | 29 | has_critical_gene_disruption | boolean | true |
+| genomics_gold | structural_variant_profile | 30 | has_disease_associated_genes | boolean | true |
+| genomics_gold | structural_variant_profile | 31 | source_system | string | true |
+| genomics_gold | structural_variant_profile | 32 | ecosystem | string | true |
+| genomics_gold | structural_variant_profile | 33 | _gold_loaded_at | timestamp | true |
+| genomics_gold | structural_variant_profile | 34 | _gold_run_id | string | true |
+| genomics_gold | structural_variant_profile | 35 | record_kind | string | true |
+| genomics_gold | structural_variant_profile | 36 | overlapping_gene_key | string | true |
+| genomics_gold | structural_variant_profile | 37 | gene_disruption_level | string | true |
+| genomics_gold | structural_variant_profile | 38 | gene_coverage_fraction | double | true |
+| genomics_gold | structural_variant_profile | 39 | overlap_length | double | true |
+| genomics_gold | structural_variant_profile | 40 | structural_variant_coverage_fraction | double | true |
+| genomics_gold | transcript_profile | 1 | transcript_key | string | true |
+| genomics_gold | transcript_profile | 2 | entity_type | string | true |
+| genomics_gold | transcript_profile | 3 | key_source | string | true |
+| genomics_gold | transcript_profile | 4 | gene_key | string | true |
+| genomics_gold | transcript_profile | 5 | gene_key_source | string | true |
+| genomics_gold | transcript_profile | 6 | gene_key_method | string | true |
+| genomics_gold | transcript_profile | 7 | protein_key | string | true |
+| genomics_gold | transcript_profile | 8 | protein_key_source | string | true |
+| genomics_gold | transcript_profile | 9 | protein_key_method | string | true |
+| genomics_gold | transcript_profile | 10 | transcript_type | string | true |
+| genomics_gold | transcript_profile | 11 | transcript_type_source | string | true |
+| genomics_gold | transcript_profile | 12 | transcript_type_method | string | true |
+| genomics_gold | transcript_profile | 13 | transcript_name | string | true |
+| genomics_gold | transcript_profile | 14 | transcript_name_source | string | true |
+| genomics_gold | transcript_profile | 15 | transcript_name_method | string | true |
+| genomics_gold | transcript_profile | 16 | version | string | true |
+| genomics_gold | transcript_profile | 17 | version_source | string | true |
+| genomics_gold | transcript_profile | 18 | version_method | string | true |
+| genomics_gold | transcript_profile | 19 | level | string | true |
+| genomics_gold | transcript_profile | 20 | level_source | string | true |
+| genomics_gold | transcript_profile | 21 | level_method | string | true |
+| genomics_gold | transcript_profile | 22 | grch38_contig | string | true |
+| genomics_gold | transcript_profile | 23 | grch38_start_position | bigint | true |
+| genomics_gold | transcript_profile | 24 | grch38_end_position | bigint | true |
+| genomics_gold | transcript_profile | 25 | grch38_strand | string | true |
+| genomics_gold | transcript_profile | 26 | grch38_source | string | true |
+| genomics_gold | transcript_profile | 27 | source_system | string | true |
+| genomics_gold | transcript_profile | 28 | source_record_id | string | true |
+| genomics_gold | transcript_profile | 29 | ecosystem | string | true |
+| genomics_gold | transcript_profile | 30 | somatic_mutation_count | double | true |
+| genomics_gold | transcript_profile | 31 | variant_count | double | true |
+| genomics_gold | transcript_profile | 32 | variants_with_deletion | double | true |
+| genomics_gold | transcript_profile | 33 | variants_with_delins | double | true |
+| genomics_gold | transcript_profile | 34 | variants_with_duplication | double | true |
+| genomics_gold | transcript_profile | 35 | variants_with_extension | double | true |
+| genomics_gold | transcript_profile | 36 | variants_with_frameshift | double | true |
+| genomics_gold | transcript_profile | 37 | variants_with_insertion | double | true |
+| genomics_gold | transcript_profile | 38 | variants_with_missense | double | true |
+| genomics_gold | transcript_profile | 39 | variants_with_nonsense | double | true |
+| genomics_gold | transcript_profile | 40 | variants_with_other | double | true |
+| genomics_gold | transcript_profile | 41 | variants_with_synonymous | double | true |
+| genomics_gold | transcript_profile | 42 | _gold_loaded_at | timestamp | true |
+| genomics_gold | transcript_profile | 43 | _gold_run_id | string | true |
+| genomics_gold | tumor_sample_profile | 1 | sample_barcode | string | true |
+| genomics_gold | tumor_sample_profile | 2 | participant_barcode | string | true |
+| genomics_gold | tumor_sample_profile | 3 | project | string | true |
+| genomics_gold | tumor_sample_profile | 4 | tissue_source_site | string | true |
+| genomics_gold | tumor_sample_profile | 5 | sample_type_code | string | true |
+| genomics_gold | tumor_sample_profile | 6 | vial | string | true |
+| genomics_gold | tumor_sample_profile | 7 | portion | string | true |
+| genomics_gold | tumor_sample_profile | 8 | analyte | string | true |
+| genomics_gold | tumor_sample_profile | 9 | plate | string | true |
+| genomics_gold | tumor_sample_profile | 10 | center | string | true |
+| genomics_gold | tumor_sample_profile | 11 | parse_status | string | true |
+| genomics_gold | tumor_sample_profile | 12 | mutation_records | bigint | true |
+| genomics_gold | tumor_sample_profile | 13 | source_dataset | string | true |
+| genomics_gold | tumor_sample_profile | 14 | source_system | string | true |
+| genomics_gold | tumor_sample_profile | 15 | source_record_id | string | true |
+| genomics_gold | tumor_sample_profile | 16 | ecosystem | string | true |
+| genomics_gold | tumor_sample_profile | 17 | missense_mutation_count | double | true |
+| genomics_gold | tumor_sample_profile | 18 | mutation_count | double | true |
+| genomics_gold | tumor_sample_profile | 19 | silent_mutation_count | double | true |
+| genomics_gold | tumor_sample_profile | 20 | truncating_mutation_count | double | true |
+| genomics_gold | tumor_sample_profile | 21 | _gold_loaded_at | timestamp | true |
+| genomics_gold | tumor_sample_profile | 22 | _gold_run_id | string | true |
+| genomics_gold | variant_clinical_profile | 1 | variant_key | string | true |
+| genomics_gold | variant_clinical_profile | 2 | assembly | string | true |
+| genomics_gold | variant_clinical_profile | 3 | contig | string | true |
+| genomics_gold | variant_clinical_profile | 4 | position | bigint | true |
+| genomics_gold | variant_clinical_profile | 5 | reference_allele | string | true |
+| genomics_gold | variant_clinical_profile | 6 | alternate_allele | string | true |
+| genomics_gold | variant_clinical_profile | 7 | gene_key | string | true |
+| genomics_gold | variant_clinical_profile | 8 | rsid | string | true |
+| genomics_gold | variant_clinical_profile | 9 | carrier_frequency_by_disease | string | true |
+| genomics_gold | variant_clinical_profile | 10 | clinical_actionability | string | true |
+| genomics_gold | variant_clinical_profile | 11 | clinical_significance_label | string | true |
+| genomics_gold | variant_clinical_profile | 12 | clinvar_first_snapshot | string | true |
+| genomics_gold | variant_clinical_profile | 13 | clinvar_last_snapshot | string | true |
+| genomics_gold | variant_clinical_profile | 14 | disease_allele_frequency | string | true |
+| genomics_gold | variant_clinical_profile | 15 | drug_response_category | string | true |
+| genomics_gold | variant_clinical_profile | 16 | drug_response_features__drug_response_frequency_context | string | true |
+| genomics_gold | variant_clinical_profile | 17 | drug_response_impact | string | true |
+| genomics_gold | variant_clinical_profile | 18 | drug_response_priority | string | true |
+| genomics_gold | variant_clinical_profile | 19 | expression_frequency_correlation | string | true |
+| genomics_gold | variant_clinical_profile | 20 | frequency_tier | string | true |
+| genomics_gold | variant_clinical_profile | 21 | gene_mutation_tolerance | string | true |
+| genomics_gold | variant_clinical_profile | 22 | inheritance_pathogenicity_modifier | string | true |
+| genomics_gold | variant_clinical_profile | 23 | inheritance_pattern | string | true |
+| genomics_gold | variant_clinical_profile | 24 | kinase_variant_therapeutic_relevance | string | true |
+| genomics_gold | variant_clinical_profile | 25 | metabolizer_phenotype_risk | string | true |
+| genomics_gold | variant_clinical_profile | 26 | pharmacogene_features__drug_response_frequency_context | string | true |
+| genomics_gold | variant_clinical_profile | 27 | polygenic_risk_contribution | string | true |
+| genomics_gold | variant_clinical_profile | 28 | population_priority | string | true |
+| genomics_gold | variant_clinical_profile | 29 | primary_indication_category | string | true |
+| genomics_gold | variant_clinical_profile | 30 | quality_tier | string | true |
+| genomics_gold | variant_clinical_profile | 31 | screening_recommendation | string | true |
+| genomics_gold | variant_clinical_profile | 32 | transporter_impact_level | string | true |
+| genomics_gold | variant_clinical_profile | 33 | variant_disease_link_quality | string | true |
+| genomics_gold | variant_clinical_profile | 34 | x_linked_risk_modifier | string | true |
+| genomics_gold | variant_clinical_profile | 35 | carrier_risk_score | double | true |
+| genomics_gold | variant_clinical_profile | 36 | carrier_risk_score_adjusted | double | true |
+| genomics_gold | variant_clinical_profile | 37 | clinical_significance_frequency_score | double | true |
+| genomics_gold | variant_clinical_profile | 38 | clinvar_snapshot_count | double | true |
+| genomics_gold | variant_clinical_profile | 39 | combined_pathogenicity_risk | double | true |
+| genomics_gold | variant_clinical_profile | 40 | disease_database_coverage | double | true |
+| genomics_gold | variant_clinical_profile | 41 | disease_interaction_count | double | true |
+| genomics_gold | variant_clinical_profile | 42 | drug_interaction_count | double | true |
+| genomics_gold | variant_clinical_profile | 43 | drug_response_priority_score | double | true |
+| genomics_gold | variant_clinical_profile | 44 | drug_response_significance_points | double | true |
+| genomics_gold | variant_clinical_profile | 45 | evidence_count | double | true |
+| genomics_gold | variant_clinical_profile | 46 | functional_impact_score | double | true |
+| genomics_gold | variant_clinical_profile | 47 | gene_constraint_score | double | true |
+| genomics_gold | variant_clinical_profile | 48 | interaction_type_count | double | true |
+| genomics_gold | variant_clinical_profile | 49 | pathogenicity_likelihood_refined | double | true |
+| genomics_gold | variant_clinical_profile | 50 | pathogenicity_likelihood_score | double | true |
+| genomics_gold | variant_clinical_profile | 51 | pharmacogene_annotation_score | double | true |
+| genomics_gold | variant_clinical_profile | 52 | population_adjusted_score | double | true |
+| genomics_gold | variant_clinical_profile | 53 | rarity_score | double | true |
+| genomics_gold | variant_clinical_profile | 54 | review_quality_score | double | true |
+| genomics_gold | variant_clinical_profile | 55 | somatic_frequency | double | true |
+| genomics_gold | variant_clinical_profile | 56 | tissue_specific_response_score | double | true |
+| genomics_gold | variant_clinical_profile | 57 | total_interactions | double | true |
+| genomics_gold | variant_clinical_profile | 58 | affects_drug_efficacy | boolean | true |
+| genomics_gold | variant_clinical_profile | 59 | affects_drug_metabolism | boolean | true |
+| genomics_gold | variant_clinical_profile | 60 | clinical_significance_is_uncertain | boolean | true |
+| genomics_gold | variant_clinical_profile | 61 | common_benign_validation | boolean | true |
+| genomics_gold | variant_clinical_profile | 62 | disease_features__has_high_conservation | boolean | true |
+| genomics_gold | variant_clinical_profile | 63 | disease_is_well_annotated | boolean | true |
+| genomics_gold | variant_clinical_profile | 64 | drug_response_features__has_high_conservation | boolean | true |
+| genomics_gold | variant_clinical_profile | 65 | frequency_pathogenicity_conflict | boolean | true |
+| genomics_gold | variant_clinical_profile | 66 | germline_cancer_predisposition | boolean | true |
+| genomics_gold | variant_clinical_profile | 67 | has_complete_annotation | boolean | true |
+| genomics_gold | variant_clinical_profile | 68 | has_conservation_data | boolean | true |
+| genomics_gold | variant_clinical_profile | 69 | has_drug_interaction_potential | boolean | true |
+| genomics_gold | variant_clinical_profile | 70 | has_mondo_disease | boolean | true |
+| genomics_gold | variant_clinical_profile | 71 | has_omim_disease | boolean | true |
+| genomics_gold | variant_clinical_profile | 72 | has_orphanet_disease | boolean | true |
+| genomics_gold | variant_clinical_profile | 73 | has_strong_evidence | boolean | true |
+| genomics_gold | variant_clinical_profile | 74 | in_current_clinvar | boolean | true |
+| genomics_gold | variant_clinical_profile | 75 | indication_specific_actionability | boolean | true |
+| genomics_gold | variant_clinical_profile | 76 | is_autosomal_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 77 | is_benign | boolean | true |
+| genomics_gold | variant_clinical_profile | 78 | is_carrier_screening_candidate | boolean | true |
+| genomics_gold | variant_clinical_profile | 79 | is_clinically_actionable_rare_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 80 | is_coding_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 81 | is_common_pharmacogene_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 82 | is_frameshift_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 83 | is_hepatic_drug_metabolism_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 84 | is_high_impact_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 85 | is_low_frequency_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 86 | is_metabolizer_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 87 | is_missense_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 88 | is_mitochondrial_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 89 | is_nonsense_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 90 | is_pathogenic | boolean | true |
+| genomics_gold | variant_clinical_profile | 91 | is_pharmgkb_annotated_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 92 | is_potential_resistance_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 93 | is_rare_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 94 | is_regulatory_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 95 | is_transporter_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 96 | is_ultra_rare_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 97 | is_very_rare_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 98 | is_vus | boolean | true |
+| genomics_gold | variant_clinical_profile | 99 | is_x_linked_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 100 | is_y_linked_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 101 | pathogenicity_frequency_conflict | boolean | true |
+| genomics_gold | variant_clinical_profile | 102 | population_features__is_common_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 103 | rare_pathogenic_variant | boolean | true |
+| genomics_gold | variant_clinical_profile | 104 | tissue_specific_allele_effects | boolean | true |
+| genomics_gold | variant_clinical_profile | 105 | clinical_significance_label__matched_text | string | true |
+| genomics_gold | variant_clinical_profile | 106 | source_system | string | true |
+| genomics_gold | variant_clinical_profile | 107 | ecosystem | string | true |
+| genomics_gold | variant_clinical_profile | 108 | _gold_loaded_at | timestamp | true |
+| genomics_gold | variant_clinical_profile | 109 | _gold_run_id | string | true |
+| genomics_gold | variant_frequency_profile | 1 | variant_key | string | true |
+| genomics_gold | variant_frequency_profile | 2 | assembly | string | true |
+| genomics_gold | variant_frequency_profile | 3 | contig | string | true |
+| genomics_gold | variant_frequency_profile | 4 | position | bigint | true |
+| genomics_gold | variant_frequency_profile | 5 | reference_allele | string | true |
+| genomics_gold | variant_frequency_profile | 6 | alternate_allele | string | true |
+| genomics_gold | variant_frequency_profile | 7 | gene_key | string | true |
+| genomics_gold | variant_frequency_profile | 8 | afr_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 9 | afr_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 10 | afr_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 11 | afr_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 12 | afr_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 13 | afr_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 14 | afr_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 15 | afr_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 16 | afr_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 17 | afr_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 18 | all_heteroplasmic_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 19 | all_heteroplasmic_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 20 | all_heteroplasmic_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 21 | all_heteroplasmic_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 22 | all_heteroplasmic_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 23 | all_homoplasmic_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 24 | all_homoplasmic_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 25 | all_homoplasmic_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 26 | all_homoplasmic_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 27 | all_homoplasmic_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 28 | all_maximum_observed_heteroplasmy_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 29 | all_maximum_observed_heteroplasmy_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 30 | all_maximum_observed_heteroplasmy_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 31 | all_maximum_observed_heteroplasmy_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 32 | all_maximum_observed_heteroplasmy_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 33 | ami_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 34 | ami_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 35 | ami_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 36 | ami_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 37 | ami_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 38 | amr_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 39 | amr_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 40 | amr_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 41 | amr_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 42 | amr_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 43 | amr_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 44 | amr_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 45 | amr_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 46 | amr_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 47 | amr_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 48 | asj_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 49 | asj_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 50 | asj_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 51 | asj_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 52 | asj_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 53 | eas_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 54 | eas_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 55 | eas_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 56 | eas_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 57 | eas_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 58 | eas_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 59 | eas_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 60 | eas_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 61 | eas_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 62 | eas_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 63 | eur_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 64 | eur_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 65 | eur_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 66 | eur_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 67 | eur_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 68 | fin_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 69 | fin_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 70 | fin_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 71 | fin_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 72 | fin_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 73 | gnomad_variants_afr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 74 | gnomad_variants_afr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 75 | gnomad_variants_afr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 76 | gnomad_variants_afr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 77 | gnomad_variants_afr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 78 | gnomad_variants_all_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 79 | gnomad_variants_all_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 80 | gnomad_variants_all_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 81 | gnomad_variants_all_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 82 | gnomad_variants_all_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 83 | gnomad_variants_amr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 84 | gnomad_variants_amr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 85 | gnomad_variants_amr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 86 | gnomad_variants_amr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 87 | gnomad_variants_amr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 88 | gnomad_variants_eas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 89 | gnomad_variants_eas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 90 | gnomad_variants_eas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 91 | gnomad_variants_eas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 92 | gnomad_variants_eas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 93 | gnomad_variants_sas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 94 | gnomad_variants_sas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 95 | gnomad_variants_sas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 96 | gnomad_variants_sas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 97 | gnomad_variants_sas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 98 | max_ancestry_highest_ancestry_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 99 | max_ancestry_highest_ancestry_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 100 | max_ancestry_highest_ancestry_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 101 | max_ancestry_highest_ancestry_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 102 | max_ancestry_highest_ancestry_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 103 | mid_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 104 | mid_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 105 | mid_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 106 | mid_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 107 | mid_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 108 | nfe_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 109 | nfe_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 110 | nfe_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 111 | nfe_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 112 | nfe_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 113 | nfe_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 114 | nfe_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 115 | nfe_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 116 | nfe_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 117 | nfe_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 118 | nfe_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 119 | nfe_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 120 | nfe_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 121 | nfe_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 122 | nfe_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 123 | remaining_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 124 | remaining_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 125 | remaining_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 126 | remaining_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 127 | remaining_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 128 | sas_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 129 | sas_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 130 | sas_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 131 | sas_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 132 | sas_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 133 | sas_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 134 | sas_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 135 | sas_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 136 | sas_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 137 | sas_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 138 | thousand_genomes_variants_afr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 139 | thousand_genomes_variants_afr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 140 | thousand_genomes_variants_afr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 141 | thousand_genomes_variants_afr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 142 | thousand_genomes_variants_afr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 143 | thousand_genomes_variants_all_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 144 | thousand_genomes_variants_all_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 145 | thousand_genomes_variants_all_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 146 | thousand_genomes_variants_all_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 147 | thousand_genomes_variants_all_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 148 | thousand_genomes_variants_amr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 149 | thousand_genomes_variants_amr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 150 | thousand_genomes_variants_amr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 151 | thousand_genomes_variants_amr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 152 | thousand_genomes_variants_amr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 153 | thousand_genomes_variants_eas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 154 | thousand_genomes_variants_eas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 155 | thousand_genomes_variants_eas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 156 | thousand_genomes_variants_eas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 157 | thousand_genomes_variants_eas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 158 | thousand_genomes_variants_sas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 159 | thousand_genomes_variants_sas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 160 | thousand_genomes_variants_sas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_frequency_profile | 161 | thousand_genomes_variants_sas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_frequency_profile | 162 | thousand_genomes_variants_sas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_frequency_profile | 163 | frequency_band | string | true |
+| genomics_gold | variant_frequency_profile | 164 | max_population_frequency | double | true |
+| genomics_gold | variant_frequency_profile | 165 | frequency_flags__is_common_variant | boolean | true |
+| genomics_gold | variant_frequency_profile | 166 | is_common | boolean | true |
+| genomics_gold | variant_frequency_profile | 167 | is_rare | boolean | true |
+| genomics_gold | variant_frequency_profile | 168 | is_ultra_rare | boolean | true |
+| genomics_gold | variant_frequency_profile | 169 | frequency_band__matched_text | string | true |
+| genomics_gold | variant_frequency_profile | 170 | source_system | string | true |
+| genomics_gold | variant_frequency_profile | 171 | ecosystem | string | true |
+| genomics_gold | variant_frequency_profile | 172 | _gold_loaded_at | timestamp | true |
+| genomics_gold | variant_frequency_profile | 173 | _gold_run_id | string | true |
+| genomics_gold | variant_impact_profile | 1 | variant_key | string | true |
+| genomics_gold | variant_impact_profile | 2 | assembly | string | true |
+| genomics_gold | variant_impact_profile | 3 | contig | string | true |
+| genomics_gold | variant_impact_profile | 4 | position | bigint | true |
+| genomics_gold | variant_impact_profile | 5 | reference_allele | string | true |
+| genomics_gold | variant_impact_profile | 6 | alternate_allele | string | true |
+| genomics_gold | variant_impact_profile | 7 | gene_key | string | true |
+| genomics_gold | variant_impact_profile | 8 | rsid | string | true |
+| genomics_gold | variant_impact_profile | 9 | cancer_variant_priority | string | true |
+| genomics_gold | variant_impact_profile | 10 | clinical_impact_priority | string | true |
+| genomics_gold | variant_impact_profile | 11 | conservation_impact_class | string | true |
+| genomics_gold | variant_impact_profile | 12 | disease_specific_priority | string | true |
+| genomics_gold | variant_impact_profile | 13 | domain_impact_severity | string | true |
+| genomics_gold | variant_impact_profile | 14 | expression_impact_context | string | true |
+| genomics_gold | variant_impact_profile | 15 | gene_variant_impact_priority | string | true |
+| genomics_gold | variant_impact_profile | 16 | loss_of_function_category | string | true |
+| genomics_gold | variant_impact_profile | 17 | predicted_pathogenicity | string | true |
+| genomics_gold | variant_impact_profile | 18 | protein_impact_category | string | true |
+| genomics_gold | variant_impact_profile | 19 | splice_impact_severity | string | true |
+| genomics_gold | variant_impact_profile | 20 | variant_impact_tier | string | true |
+| genomics_gold | variant_impact_profile | 21 | combined_impact_score | double | true |
+| genomics_gold | variant_impact_profile | 22 | conservation_level | double | true |
+| genomics_gold | variant_impact_profile | 23 | domain_type_count | double | true |
+| genomics_gold | variant_impact_profile | 24 | mutation_severity_score | double | true |
+| genomics_gold | variant_impact_profile | 25 | pathogenicity_score | double | true |
+| genomics_gold | variant_impact_profile | 26 | affects_functional_domain | boolean | true |
+| genomics_gold | variant_impact_profile | 27 | has_cadd_score | boolean | true |
+| genomics_gold | variant_impact_profile | 28 | has_multiple_domain_types | boolean | true |
+| genomics_gold | variant_impact_profile | 29 | is_cancer_relevant_variant | boolean | true |
+| genomics_gold | variant_impact_profile | 30 | is_conservation_constrained | boolean | true |
+| genomics_gold | variant_impact_profile | 31 | is_deleterious_by_cadd | boolean | true |
+| genomics_gold | variant_impact_profile | 32 | is_druggable_gene | boolean | true |
+| genomics_gold | variant_impact_profile | 33 | is_high_impact | boolean | true |
+| genomics_gold | variant_impact_profile | 34 | is_highly_conserved_region | boolean | true |
+| genomics_gold | variant_impact_profile | 35 | is_key_protein_type | boolean | true |
+| genomics_gold | variant_impact_profile | 36 | is_loss_of_function | boolean | true |
+| genomics_gold | variant_impact_profile | 37 | is_splice_affecting | boolean | true |
+| genomics_gold | variant_impact_profile | 38 | is_splice_site_variant | boolean | true |
+| genomics_gold | variant_impact_profile | 39 | is_very_high_impact | boolean | true |
+| genomics_gold | variant_impact_profile | 40 | source_system | string | true |
+| genomics_gold | variant_impact_profile | 41 | ecosystem | string | true |
+| genomics_gold | variant_impact_profile | 42 | _gold_loaded_at | timestamp | true |
+| genomics_gold | variant_impact_profile | 43 | _gold_run_id | string | true |
+| genomics_gold | variant_profile | 1 | variant_key | string | true |
+| genomics_gold | variant_profile | 2 | key_source | string | true |
+| genomics_gold | variant_profile | 3 | assembly | string | true |
+| genomics_gold | variant_profile | 4 | contig | string | true |
+| genomics_gold | variant_profile | 5 | position | bigint | true |
+| genomics_gold | variant_profile | 6 | reference_allele | string | true |
+| genomics_gold | variant_profile | 7 | alternate_allele | string | true |
+| genomics_gold | variant_profile | 8 | end_position | bigint | true |
+| genomics_gold | variant_profile | 9 | in_clinvar | boolean | true |
+| genomics_gold | variant_profile | 10 | in_gnomad | boolean | true |
+| genomics_gold | variant_profile | 11 | in_alphamissense | boolean | true |
+| genomics_gold | variant_profile | 12 | in_cadd | boolean | true |
+| genomics_gold | variant_profile | 13 | in_dbvar | boolean | true |
+| genomics_gold | variant_profile | 14 | in_pharmgkb | boolean | true |
+| genomics_gold | variant_profile | 15 | in_long_range_pathogenic_coding | boolean | true |
+| genomics_gold | variant_profile | 16 | in_long_range_pathogenic_non_coding | boolean | true |
+| genomics_gold | variant_profile | 17 | in_long_range_causal_eqtl | boolean | true |
+| genomics_gold | variant_profile | 18 | in_clinvar_vs_benign | boolean | true |
+| genomics_gold | variant_profile | 19 | in_gnomad_balanced | boolean | true |
+| genomics_gold | variant_profile | 20 | in_gnomad_mtdna | boolean | true |
+| genomics_gold | variant_profile | 21 | in_thousand_genomes | boolean | true |
+| genomics_gold | variant_profile | 22 | variant_type | string | true |
+| genomics_gold | variant_profile | 23 | variant_type_source | string | true |
+| genomics_gold | variant_profile | 24 | variant_type_method | string | true |
+| genomics_gold | variant_profile | 25 | rsid | string | true |
+| genomics_gold | variant_profile | 26 | rsid_source | string | true |
+| genomics_gold | variant_profile | 27 | rsid_method | string | true |
+| genomics_gold | variant_profile | 28 | gene_key | string | true |
+| genomics_gold | variant_profile | 29 | gene_key_source | string | true |
+| genomics_gold | variant_profile | 30 | gene_key_method | string | true |
+| genomics_gold | variant_profile | 31 | origin | string | true |
+| genomics_gold | variant_profile | 32 | origin_source | string | true |
+| genomics_gold | variant_profile | 33 | origin_method | string | true |
+| genomics_gold | variant_profile | 34 | name | string | true |
+| genomics_gold | variant_profile | 35 | name_source | string | true |
+| genomics_gold | variant_profile | 36 | name_method | string | true |
+| genomics_gold | variant_profile | 37 | source_system | string | true |
+| genomics_gold | variant_profile | 38 | source_record_id | string | true |
+| genomics_gold | variant_profile | 39 | ecosystem | string | true |
+| genomics_gold | variant_profile | 40 | allele_class | string | true |
+| genomics_gold | variant_profile | 41 | cancer_variant_priority | string | true |
+| genomics_gold | variant_profile | 42 | carrier_frequency_by_disease | string | true |
+| genomics_gold | variant_profile | 43 | clinical_actionability | string | true |
+| genomics_gold | variant_profile | 44 | clinical_impact_priority | string | true |
+| genomics_gold | variant_profile | 45 | clinical_significance_label | string | true |
+| genomics_gold | variant_profile | 46 | clinvar_first_snapshot | string | true |
+| genomics_gold | variant_profile | 47 | clinvar_last_snapshot | string | true |
+| genomics_gold | variant_profile | 48 | conservation_impact_class | string | true |
+| genomics_gold | variant_profile | 49 | disease_allele_frequency | string | true |
+| genomics_gold | variant_profile | 50 | disease_specific_priority | string | true |
+| genomics_gold | variant_profile | 51 | domain_impact_severity | string | true |
+| genomics_gold | variant_profile | 52 | drug_response_category | string | true |
+| genomics_gold | variant_profile | 53 | drug_response_features__drug_response_frequency_context | string | true |
+| genomics_gold | variant_profile | 54 | drug_response_impact | string | true |
+| genomics_gold | variant_profile | 55 | drug_response_priority | string | true |
+| genomics_gold | variant_profile | 56 | expression_frequency_correlation | string | true |
+| genomics_gold | variant_profile | 57 | expression_impact_context | string | true |
+| genomics_gold | variant_profile | 58 | frequency_band | string | true |
+| genomics_gold | variant_profile | 59 | frequency_tier | string | true |
+| genomics_gold | variant_profile | 60 | gene_mutation_tolerance | string | true |
+| genomics_gold | variant_profile | 61 | gene_variant_impact_priority | string | true |
+| genomics_gold | variant_profile | 62 | inheritance_pathogenicity_modifier | string | true |
+| genomics_gold | variant_profile | 63 | inheritance_pattern | string | true |
+| genomics_gold | variant_profile | 64 | kinase_variant_therapeutic_relevance | string | true |
+| genomics_gold | variant_profile | 65 | loss_of_function_category | string | true |
+| genomics_gold | variant_profile | 66 | metabolizer_phenotype_risk | string | true |
+| genomics_gold | variant_profile | 67 | pharmacogene_features__drug_response_frequency_context | string | true |
+| genomics_gold | variant_profile | 68 | plddt_band_at_variant | string | true |
+| genomics_gold | variant_profile | 69 | polygenic_risk_contribution | string | true |
+| genomics_gold | variant_profile | 70 | population_priority | string | true |
+| genomics_gold | variant_profile | 71 | predicted_pathogenicity | string | true |
+| genomics_gold | variant_profile | 72 | primary_indication_category | string | true |
+| genomics_gold | variant_profile | 73 | protein_impact_category | string | true |
+| genomics_gold | variant_profile | 74 | quality_tier | string | true |
+| genomics_gold | variant_profile | 75 | screening_recommendation | string | true |
+| genomics_gold | variant_profile | 76 | splice_impact_severity | string | true |
+| genomics_gold | variant_profile | 77 | transporter_impact_level | string | true |
+| genomics_gold | variant_profile | 78 | variant_disease_link_quality | string | true |
+| genomics_gold | variant_profile | 79 | variant_impact_tier | string | true |
+| genomics_gold | variant_profile | 80 | x_linked_risk_modifier | string | true |
+| genomics_gold | variant_profile | 81 | carrier_risk_score | double | true |
+| genomics_gold | variant_profile | 82 | carrier_risk_score_adjusted | double | true |
+| genomics_gold | variant_profile | 83 | clinical_significance_frequency_score | double | true |
+| genomics_gold | variant_profile | 84 | clinvar_snapshot_count | double | true |
+| genomics_gold | variant_profile | 85 | combined_impact_score | double | true |
+| genomics_gold | variant_profile | 86 | combined_pathogenicity_risk | double | true |
+| genomics_gold | variant_profile | 87 | condition_count | double | true |
+| genomics_gold | variant_profile | 88 | conservation_level | double | true |
+| genomics_gold | variant_profile | 89 | days_since_evaluation | double | true |
+| genomics_gold | variant_profile | 90 | disease_database_coverage | double | true |
+| genomics_gold | variant_profile | 91 | disease_interaction_count | double | true |
+| genomics_gold | variant_profile | 92 | domain_type_count | double | true |
+| genomics_gold | variant_profile | 93 | drug_interaction_count | double | true |
+| genomics_gold | variant_profile | 94 | drug_response_priority_score | double | true |
+| genomics_gold | variant_profile | 95 | drug_response_significance_points | double | true |
+| genomics_gold | variant_profile | 96 | evidence_count | double | true |
+| genomics_gold | variant_profile | 97 | functional_impact_score | double | true |
+| genomics_gold | variant_profile | 98 | gene_constraint_score | double | true |
+| genomics_gold | variant_profile | 99 | interaction_type_count | double | true |
+| genomics_gold | variant_profile | 100 | linked_disease_count | double | true |
+| genomics_gold | variant_profile | 101 | max_population_frequency | double | true |
+| genomics_gold | variant_profile | 102 | mutation_severity_score | double | true |
+| genomics_gold | variant_profile | 103 | overlapping_coding_sequence_count | double | true |
+| genomics_gold | variant_profile | 104 | overlapping_enhancer_element_count | double | true |
+| genomics_gold | variant_profile | 105 | overlapping_exon_count | double | true |
+| genomics_gold | variant_profile | 106 | overlapping_regulatory_element_count | double | true |
+| genomics_gold | variant_profile | 107 | overlapping_transcript_count | double | true |
+| genomics_gold | variant_profile | 108 | overlapping_untranslated_region_count | double | true |
+| genomics_gold | variant_profile | 109 | pathogenicity_likelihood_refined | double | true |
+| genomics_gold | variant_profile | 110 | pathogenicity_likelihood_score | double | true |
+| genomics_gold | variant_profile | 111 | pathogenicity_score | double | true |
+| genomics_gold | variant_profile | 112 | pharmacogene_annotation_score | double | true |
+| genomics_gold | variant_profile | 113 | phenotype_database_count | double | true |
+| genomics_gold | variant_profile | 114 | plddt_at_variant | double | true |
+| genomics_gold | variant_profile | 115 | population_adjusted_score | double | true |
+| genomics_gold | variant_profile | 116 | rarity_score | double | true |
+| genomics_gold | variant_profile | 117 | review_quality_score | double | true |
+| genomics_gold | variant_profile | 118 | somatic_frequency | double | true |
+| genomics_gold | variant_profile | 119 | tissue_specific_response_score | double | true |
+| genomics_gold | variant_profile | 120 | total_interactions | double | true |
+| genomics_gold | variant_profile | 121 | tumor_sample_count | double | true |
+| genomics_gold | variant_profile | 122 | variation_membership_count | double | true |
+| genomics_gold | variant_profile | 123 | affects_drug_efficacy | boolean | true |
+| genomics_gold | variant_profile | 124 | affects_drug_metabolism | boolean | true |
+| genomics_gold | variant_profile | 125 | affects_functional_domain | boolean | true |
+| genomics_gold | variant_profile | 126 | common_benign_validation | boolean | true |
+| genomics_gold | variant_profile | 127 | disease_features__has_high_conservation | boolean | true |
+| genomics_gold | variant_profile | 128 | disease_is_well_annotated | boolean | true |
+| genomics_gold | variant_profile | 129 | drug_response_features__has_high_conservation | boolean | true |
+| genomics_gold | variant_profile | 130 | frequency_flags__is_common_variant | boolean | true |
+| genomics_gold | variant_profile | 131 | frequency_pathogenicity_conflict | boolean | true |
+| genomics_gold | variant_profile | 132 | germline_cancer_predisposition | boolean | true |
+| genomics_gold | variant_profile | 133 | has_cadd_score | boolean | true |
+| genomics_gold | variant_profile | 134 | has_complete_annotation | boolean | true |
+| genomics_gold | variant_profile | 135 | has_conservation_data | boolean | true |
+| genomics_gold | variant_profile | 136 | has_drug_interaction_potential | boolean | true |
+| genomics_gold | variant_profile | 137 | has_mondo_disease | boolean | true |
+| genomics_gold | variant_profile | 138 | has_multiple_domain_types | boolean | true |
+| genomics_gold | variant_profile | 139 | has_no_review_stars | boolean | true |
+| genomics_gold | variant_profile | 140 | has_omim_disease | boolean | true |
+| genomics_gold | variant_profile | 141 | has_orphanet_disease | boolean | true |
+| genomics_gold | variant_profile | 142 | has_strong_evidence | boolean | true |
+| genomics_gold | variant_profile | 143 | in_current_clinvar | boolean | true |
+| genomics_gold | variant_profile | 144 | indication_specific_actionability | boolean | true |
+| genomics_gold | variant_profile | 145 | is_autosomal_variant | boolean | true |
+| genomics_gold | variant_profile | 146 | is_benign | boolean | true |
+| genomics_gold | variant_profile | 147 | is_cancer_relevant_variant | boolean | true |
+| genomics_gold | variant_profile | 148 | is_carrier_screening_candidate | boolean | true |
+| genomics_gold | variant_profile | 149 | is_clinically_actionable_rare_variant | boolean | true |
+| genomics_gold | variant_profile | 150 | is_cnv | boolean | true |
+| genomics_gold | variant_profile | 151 | is_coding_variant | boolean | true |
+| genomics_gold | variant_profile | 152 | is_common | boolean | true |
+| genomics_gold | variant_profile | 153 | is_common_pharmacogene_variant | boolean | true |
+| genomics_gold | variant_profile | 154 | is_conservation_constrained | boolean | true |
+| genomics_gold | variant_profile | 155 | is_deleterious_by_cadd | boolean | true |
+| genomics_gold | variant_profile | 156 | is_deletion | boolean | true |
+| genomics_gold | variant_profile | 157 | is_druggable_gene | boolean | true |
+| genomics_gold | variant_profile | 158 | is_duplication | boolean | true |
+| genomics_gold | variant_profile | 159 | is_frameshift_variant | boolean | true |
+| genomics_gold | variant_profile | 160 | is_germline | boolean | true |
+| genomics_gold | variant_profile | 161 | is_hepatic_drug_metabolism_variant | boolean | true |
+| genomics_gold | variant_profile | 162 | is_high_impact | boolean | true |
+| genomics_gold | variant_profile | 163 | is_high_impact_variant | boolean | true |
+| genomics_gold | variant_profile | 164 | is_highly_conserved_region | boolean | true |
+| genomics_gold | variant_profile | 165 | is_indel | boolean | true |
+| genomics_gold | variant_profile | 166 | is_insertion | boolean | true |
+| genomics_gold | variant_profile | 167 | is_key_protein_type | boolean | true |
+| genomics_gold | variant_profile | 168 | is_loss_of_function | boolean | true |
+| genomics_gold | variant_profile | 169 | is_low_frequency_variant | boolean | true |
+| genomics_gold | variant_profile | 170 | is_metabolizer_variant | boolean | true |
+| genomics_gold | variant_profile | 171 | is_microsatellite | boolean | true |
+| genomics_gold | variant_profile | 172 | is_missense_variant | boolean | true |
+| genomics_gold | variant_profile | 173 | is_mitochondrial_variant | boolean | true |
+| genomics_gold | variant_profile | 174 | is_nonsense_variant | boolean | true |
+| genomics_gold | variant_profile | 175 | is_pathogenic | boolean | true |
+| genomics_gold | variant_profile | 176 | is_pharmgkb_annotated_variant | boolean | true |
+| genomics_gold | variant_profile | 177 | is_potential_resistance_variant | boolean | true |
+| genomics_gold | variant_profile | 178 | is_rare | boolean | true |
+| genomics_gold | variant_profile | 179 | is_rare_variant | boolean | true |
+| genomics_gold | variant_profile | 180 | is_recently_evaluated | boolean | true |
+| genomics_gold | variant_profile | 181 | is_regulatory_variant | boolean | true |
+| genomics_gold | variant_profile | 182 | is_snv | boolean | true |
+| genomics_gold | variant_profile | 183 | is_somatic | boolean | true |
+| genomics_gold | variant_profile | 184 | is_splice_affecting | boolean | true |
+| genomics_gold | variant_profile | 185 | is_splice_site_variant | boolean | true |
+| genomics_gold | variant_profile | 186 | is_transporter_variant | boolean | true |
+| genomics_gold | variant_profile | 187 | is_ultra_rare | boolean | true |
+| genomics_gold | variant_profile | 188 | is_ultra_rare_variant | boolean | true |
+| genomics_gold | variant_profile | 189 | is_very_high_impact | boolean | true |
+| genomics_gold | variant_profile | 190 | is_very_rare_variant | boolean | true |
+| genomics_gold | variant_profile | 191 | is_vus | boolean | true |
+| genomics_gold | variant_profile | 192 | is_well_annotated | boolean | true |
+| genomics_gold | variant_profile | 193 | is_x_linked_variant | boolean | true |
+| genomics_gold | variant_profile | 194 | is_y_linked_variant | boolean | true |
+| genomics_gold | variant_profile | 195 | pathogenicity_frequency_conflict | boolean | true |
+| genomics_gold | variant_profile | 196 | population_features__is_common_variant | boolean | true |
+| genomics_gold | variant_profile | 197 | rare_pathogenic_variant | boolean | true |
+| genomics_gold | variant_profile | 198 | tissue_specific_allele_effects | boolean | true |
+| genomics_gold | variant_profile | 199 | clinical_significance_label__matched_text | string | true |
+| genomics_gold | variant_profile | 200 | frequency_band__matched_text | string | true |
+| genomics_gold | variant_profile | 201 | is_cnv__matched_text | string | true |
+| genomics_gold | variant_profile | 202 | is_deletion__matched_text | string | true |
+| genomics_gold | variant_profile | 203 | is_duplication__matched_text | string | true |
+| genomics_gold | variant_profile | 204 | is_germline__matched_text | string | true |
+| genomics_gold | variant_profile | 205 | is_indel__matched_text | string | true |
+| genomics_gold | variant_profile | 206 | is_insertion__matched_text | string | true |
+| genomics_gold | variant_profile | 207 | is_microsatellite__matched_text | string | true |
+| genomics_gold | variant_profile | 208 | is_snv__matched_text | string | true |
+| genomics_gold | variant_profile | 209 | is_somatic__matched_text | string | true |
+| genomics_gold | variant_profile | 210 | _gold_loaded_at | timestamp | true |
+| genomics_gold | variant_profile | 211 | _gold_run_id | string | true |
+| genomics_gold | variant_profile | 212 | alphamissense_pathogenicity_value | double | true |
+| genomics_gold | variant_profile | 213 | alphamissense_pathogenicity_label | string | true |
+| genomics_gold | variant_profile | 214 | alphamissense_pathogenicity_context | string | true |
+| genomics_gold | variant_profile | 215 | cadd_phred_value | double | true |
+| genomics_gold | variant_profile | 216 | cadd_phred_label | string | true |
+| genomics_gold | variant_profile | 217 | cadd_phred_context | string | true |
+| genomics_gold | variant_profile | 218 | gpn_star_m447_value | double | true |
+| genomics_gold | variant_profile | 219 | gpn_star_m447_label | string | true |
+| genomics_gold | variant_profile | 220 | gpn_star_m447_context | string | true |
+| genomics_gold | variant_profile | 221 | gpn_star_p243_value | double | true |
+| genomics_gold | variant_profile | 222 | gpn_star_p243_label | string | true |
+| genomics_gold | variant_profile | 223 | gpn_star_p243_context | string | true |
+| genomics_gold | variant_profile | 224 | gpn_star_v100_value | double | true |
+| genomics_gold | variant_profile | 225 | gpn_star_v100_label | string | true |
+| genomics_gold | variant_profile | 226 | gpn_star_v100_context | string | true |
+| genomics_gold | variant_profile | 227 | phastcons_100way | double | true |
+| genomics_gold | variant_profile | 228 | phylop_100way | double | true |
+| genomics_gold | variant_profile | 229 | afr_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_profile | 230 | afr_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_profile | 231 | afr_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_profile | 232 | afr_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 233 | afr_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_profile | 234 | afr_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 235 | afr_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 236 | afr_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 237 | afr_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 238 | afr_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 239 | all_heteroplasmic_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 240 | all_heteroplasmic_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 241 | all_heteroplasmic_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 242 | all_heteroplasmic_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 243 | all_heteroplasmic_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 244 | all_homoplasmic_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 245 | all_homoplasmic_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 246 | all_homoplasmic_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 247 | all_homoplasmic_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 248 | all_homoplasmic_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 249 | all_maximum_observed_heteroplasmy_allele_frequency | double | true |
+| genomics_gold | variant_profile | 250 | all_maximum_observed_heteroplasmy_allele_count | bigint | true |
+| genomics_gold | variant_profile | 251 | all_maximum_observed_heteroplasmy_allele_number | bigint | true |
+| genomics_gold | variant_profile | 252 | all_maximum_observed_heteroplasmy_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 253 | all_maximum_observed_heteroplasmy_filter_status | string | true |
+| genomics_gold | variant_profile | 254 | ami_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 255 | ami_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 256 | ami_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 257 | ami_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 258 | ami_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 259 | amr_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_profile | 260 | amr_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_profile | 261 | amr_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_profile | 262 | amr_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 263 | amr_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_profile | 264 | amr_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 265 | amr_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 266 | amr_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 267 | amr_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 268 | amr_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 269 | asj_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 270 | asj_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 271 | asj_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 272 | asj_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 273 | asj_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 274 | eas_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_profile | 275 | eas_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_profile | 276 | eas_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_profile | 277 | eas_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 278 | eas_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_profile | 279 | eas_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 280 | eas_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 281 | eas_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 282 | eas_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 283 | eas_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 284 | eur_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 285 | eur_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 286 | eur_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 287 | eur_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 288 | eur_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 289 | fin_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 290 | fin_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 291 | fin_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 292 | fin_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 293 | fin_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 294 | gnomad_variants_afr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 295 | gnomad_variants_afr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 296 | gnomad_variants_afr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 297 | gnomad_variants_afr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 298 | gnomad_variants_afr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 299 | gnomad_variants_all_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 300 | gnomad_variants_all_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 301 | gnomad_variants_all_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 302 | gnomad_variants_all_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 303 | gnomad_variants_all_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 304 | gnomad_variants_amr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 305 | gnomad_variants_amr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 306 | gnomad_variants_amr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 307 | gnomad_variants_amr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 308 | gnomad_variants_amr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 309 | gnomad_variants_eas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 310 | gnomad_variants_eas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 311 | gnomad_variants_eas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 312 | gnomad_variants_eas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 313 | gnomad_variants_eas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 314 | gnomad_variants_sas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 315 | gnomad_variants_sas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 316 | gnomad_variants_sas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 317 | gnomad_variants_sas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 318 | gnomad_variants_sas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 319 | max_ancestry_highest_ancestry_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 320 | max_ancestry_highest_ancestry_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 321 | max_ancestry_highest_ancestry_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 322 | max_ancestry_highest_ancestry_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 323 | max_ancestry_highest_ancestry_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 324 | mid_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 325 | mid_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 326 | mid_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 327 | mid_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 328 | mid_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 329 | nfe_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 330 | nfe_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 331 | nfe_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 332 | nfe_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 333 | nfe_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 334 | nfe_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_profile | 335 | nfe_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_profile | 336 | nfe_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_profile | 337 | nfe_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 338 | nfe_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_profile | 339 | nfe_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 340 | nfe_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 341 | nfe_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 342 | nfe_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 343 | nfe_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 344 | remaining_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 345 | remaining_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 346 | remaining_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 347 | remaining_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 348 | remaining_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 349 | sas_filtering_allele_frequency_95_allele_frequency | double | true |
+| genomics_gold | variant_profile | 350 | sas_filtering_allele_frequency_95_allele_count | bigint | true |
+| genomics_gold | variant_profile | 351 | sas_filtering_allele_frequency_95_allele_number | bigint | true |
+| genomics_gold | variant_profile | 352 | sas_filtering_allele_frequency_95_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 353 | sas_filtering_allele_frequency_95_filter_status | string | true |
+| genomics_gold | variant_profile | 354 | sas_highest_group_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 355 | sas_highest_group_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 356 | sas_highest_group_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 357 | sas_highest_group_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 358 | sas_highest_group_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 359 | thousand_genomes_variants_afr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 360 | thousand_genomes_variants_afr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 361 | thousand_genomes_variants_afr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 362 | thousand_genomes_variants_afr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 363 | thousand_genomes_variants_afr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 364 | thousand_genomes_variants_all_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 365 | thousand_genomes_variants_all_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 366 | thousand_genomes_variants_all_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 367 | thousand_genomes_variants_all_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 368 | thousand_genomes_variants_all_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 369 | thousand_genomes_variants_amr_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 370 | thousand_genomes_variants_amr_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 371 | thousand_genomes_variants_amr_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 372 | thousand_genomes_variants_amr_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 373 | thousand_genomes_variants_amr_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 374 | thousand_genomes_variants_eas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 375 | thousand_genomes_variants_eas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 376 | thousand_genomes_variants_eas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 377 | thousand_genomes_variants_eas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 378 | thousand_genomes_variants_eas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_profile | 379 | thousand_genomes_variants_sas_allele_frequency_allele_frequency | double | true |
+| genomics_gold | variant_profile | 380 | thousand_genomes_variants_sas_allele_frequency_allele_count | bigint | true |
+| genomics_gold | variant_profile | 381 | thousand_genomes_variants_sas_allele_frequency_allele_number | bigint | true |
+| genomics_gold | variant_profile | 382 | thousand_genomes_variants_sas_allele_frequency_homozygote_count | bigint | true |
+| genomics_gold | variant_profile | 383 | thousand_genomes_variants_sas_allele_frequency_filter_status | string | true |
+| genomics_gold | variant_score_profile | 1 | variant_key | string | true |
+| genomics_gold | variant_score_profile | 2 | assembly | string | true |
+| genomics_gold | variant_score_profile | 3 | contig | string | true |
+| genomics_gold | variant_score_profile | 4 | position | bigint | true |
+| genomics_gold | variant_score_profile | 5 | reference_allele | string | true |
+| genomics_gold | variant_score_profile | 6 | alternate_allele | string | true |
+| genomics_gold | variant_score_profile | 7 | gene_key | string | true |
+| genomics_gold | variant_score_profile | 8 | alphamissense_pathogenicity_value | double | true |
+| genomics_gold | variant_score_profile | 9 | alphamissense_pathogenicity_label | string | true |
+| genomics_gold | variant_score_profile | 10 | alphamissense_pathogenicity_context | string | true |
+| genomics_gold | variant_score_profile | 11 | cadd_phred_value | double | true |
+| genomics_gold | variant_score_profile | 12 | cadd_phred_label | string | true |
+| genomics_gold | variant_score_profile | 13 | cadd_phred_context | string | true |
+| genomics_gold | variant_score_profile | 14 | gpn_star_m447_value | double | true |
+| genomics_gold | variant_score_profile | 15 | gpn_star_m447_label | string | true |
+| genomics_gold | variant_score_profile | 16 | gpn_star_m447_context | string | true |
+| genomics_gold | variant_score_profile | 17 | gpn_star_p243_value | double | true |
+| genomics_gold | variant_score_profile | 18 | gpn_star_p243_label | string | true |
+| genomics_gold | variant_score_profile | 19 | gpn_star_p243_context | string | true |
+| genomics_gold | variant_score_profile | 20 | gpn_star_v100_value | double | true |
+| genomics_gold | variant_score_profile | 21 | gpn_star_v100_label | string | true |
+| genomics_gold | variant_score_profile | 22 | gpn_star_v100_context | string | true |
+| genomics_gold | variant_score_profile | 23 | phastcons_100way | double | true |
+| genomics_gold | variant_score_profile | 24 | phylop_100way | double | true |
+| genomics_gold | variant_score_profile | 25 | source_system | string | true |
+| genomics_gold | variant_score_profile | 26 | ecosystem | string | true |
+| genomics_gold | variant_score_profile | 27 | _gold_loaded_at | timestamp | true |
+| genomics_gold | variant_score_profile | 28 | _gold_run_id | string | true |
+| shared_conformed | dim_date | 1 | date_key | int | true |
+| shared_conformed | dim_date | 2 | calendar_date | date | true |
+| shared_conformed | dim_date | 3 | year | smallint | true |
+| shared_conformed | dim_date | 4 | quarter | smallint | true |
+| shared_conformed | dim_date | 5 | month | smallint | true |
+| shared_conformed | dim_date | 6 | month_name | string | true |
+| shared_conformed | dim_date | 7 | day_of_month | smallint | true |
+| shared_conformed | dim_date | 8 | day_of_year | smallint | true |
+| shared_conformed | dim_date | 9 | iso_week | smallint | true |
+| shared_conformed | dim_date | 10 | day_of_week | smallint | true |
+| shared_conformed | dim_date | 11 | day_name | string | true |
+| shared_conformed | dim_date | 12 | is_weekend | boolean | true |
+| shared_conformed | dim_geography | 1 | ags_code | string | true |
+| shared_conformed | dim_geography | 2 | ars_code | string | true |
+| shared_conformed | dim_geography | 3 | level | string | true |
+| shared_conformed | dim_geography | 4 | name | string | true |
+| shared_conformed | dim_geography | 5 | parent_ags_code | string | true |
+| shared_conformed | dim_geography | 6 | nuts_code | string | true |
+| shared_conformed | dim_geography | 7 | valid_from | date | true |
+| shared_conformed | dim_geography | 8 | valid_to | date | true |
+| shared_conformed | dim_geography | 9 | source_system | string | true |
+| shared_conformed | dim_geography | 10 | created_at | timestamp | true |
+| shared_conformed | dim_place | 1 | location_key | string | true |
+| shared_conformed | dim_place | 2 | source_location_id | string | true |
+| shared_conformed | dim_place | 3 | location_role | string | true |
+| shared_conformed | dim_place | 4 | name | string | true |
+| shared_conformed | dim_place | 5 | latitude | double | true |
+| shared_conformed | dim_place | 6 | longitude | double | true |
+| shared_conformed | dim_place | 7 | elevation_m | double | true |
+| shared_conformed | dim_place | 8 | continent | string | true |
+| shared_conformed | dim_place | 9 | country_code | string | true |
+| shared_conformed | dim_place | 10 | region | string | true |
+| shared_conformed | dim_place | 11 | city | string | true |
+| shared_conformed | dim_place | 12 | official_municipality_key | string | true |
+| shared_conformed | dim_place | 13 | geography_basis | string | true |
+| shared_conformed | dim_place | 14 | source_system | string | true |
+| shared_conformed | dim_place | 15 | source_dataset | string | true |
+| shared_conformed | dim_place | 16 | source_record_id | string | true |
+| shared_conformed | dim_place | 17 | is_current | boolean | true |
+| shared_conformed | dim_place | 18 | ecosystem | string | true |
+| shared_conformed | dim_place | 19 | _gold_loaded_at | timestamp | true |
+| shared_conformed | dim_place | 20 | _gold_run_id | string | true |
+| shared_conformed | dim_time | 1 | time_key | smallint | true |
+| shared_conformed | dim_time | 2 | hour_24 | smallint | true |
+| shared_conformed | dim_time | 3 | minute | smallint | true |
+| shared_conformed | dim_time | 4 | hour_12 | smallint | true |
+| shared_conformed | dim_time | 5 | am_pm | string | true |
+| shared_conformed | dim_time | 6 | quarter_hour | smallint | true |
+| shared_conformed | dim_time | 7 | daypart | string | true |
+| shared_conformed | dim_weather_context | 1 | weather_context_key | string | false |
+| shared_conformed | dim_weather_context | 2 | ags_code | string | false |
+| shared_conformed | dim_weather_context | 3 | date_key | int | false |
+| shared_conformed | dim_weather_context | 4 | weather_regime | string | true |
+| shared_conformed | dim_weather_context | 5 | avg_temperature_c | decimal(5,2) | true |
+| shared_conformed | dim_weather_context | 6 | total_precipitation_mm | decimal(6,2) | true |
+| shared_conformed | dim_weather_context | 7 | source_system | string | false |
+| shared_conformed | dim_weather_context | 8 | published_from | string | false |
+| shared_conformed | dim_weather_context | 9 | created_at | timestamp | false |
+| shared_conformed | geo_plz_gemeinde_xref | 1 | plz | string | false |
+| shared_conformed | geo_plz_gemeinde_xref | 2 | ags_code | string | false |
+| shared_conformed | geo_plz_gemeinde_xref | 3 | coverage_share | decimal(5,4) | true |
+| shared_conformed | geo_plz_gemeinde_xref | 4 | source_system | string | false |
+| shared_conformed | geo_plz_gemeinde_xref | 5 | valid_from | date | true |
+| shared_conformed | geo_plz_gemeinde_xref | 6 | valid_to | date | true |
+| shared_conformed | geo_plz_gemeinde_xref | 7 | created_at | timestamp | false |
+| shared_conformed | metric_definition | 1 | ecosystem | string | true |
+| shared_conformed | metric_definition | 2 | metric_key | string | true |
+| shared_conformed | metric_definition | 3 | definition | string | true |
+| shared_conformed | metric_definition | 4 | formula | string | true |
+| shared_conformed | metric_definition | 5 | source_mart | string | true |
+| shared_conformed | metric_definition | 6 | grain | string | true |
+| shared_conformed | metric_definition | 7 | source_system | string | true |
+| shared_conformed | metric_definition | 8 | _gold_loaded_at | timestamp | true |
+| shared_conformed | metric_definition | 9 | _gold_run_id | string | true |
+| shared_conformed | ref_energy_carrier | 1 | carrier_key | string | true |
+| shared_conformed | ref_energy_carrier | 2 | display_label | string | true |
+| shared_conformed | ref_energy_carrier | 3 | source_system | string | true |
+| shared_conformed | ref_energy_carrier | 4 | ecosystem | string | true |
+| shared_conformed | ref_energy_carrier | 5 | _gold_loaded_at | timestamp | true |
+| shared_conformed | ref_energy_carrier | 6 | _gold_run_id | string | true |
+| shared_conformed | ref_energy_carrier_map | 1 | source_vocabulary | string | true |
+| shared_conformed | ref_energy_carrier_map | 2 | source_value | string | true |
+| shared_conformed | ref_energy_carrier_map | 3 | carrier_key | string | true |
+| shared_conformed | ref_energy_carrier_map | 4 | match_basis | string | true |
+| shared_conformed | ref_energy_carrier_map | 5 | row_count | bigint | true |
+| shared_conformed | ref_energy_carrier_map | 6 | source_system | string | true |
+| shared_conformed | ref_energy_carrier_map | 7 | source_dataset | string | true |
+| shared_conformed | ref_energy_carrier_map | 8 | source_record_id | string | true |
+| shared_conformed | ref_energy_carrier_map | 9 | ecosystem | string | true |
+| shared_conformed | ref_energy_carrier_map | 10 | _gold_loaded_at | timestamp | true |
+| shared_conformed | ref_energy_carrier_map | 11 | _gold_run_id | string | true |
+| shared_conformed | ref_measure | 1 | catalog_kind | string | true |
+| shared_conformed | ref_measure | 2 | code_id | string | true |
+| shared_conformed | ref_measure | 3 | parent_id | string | true |
+| shared_conformed | ref_measure | 4 | label | string | true |
+| shared_conformed | ref_measure | 5 | unit | string | true |
+| shared_conformed | ref_measure | 6 | description_de | string | true |
+| shared_conformed | ref_measure | 7 | catalog_vintage | string | true |
+| shared_conformed | ref_measure | 8 | source_system | string | true |
+| shared_conformed | ref_measure | 9 | source_dataset | string | true |
+| shared_conformed | ref_measure | 10 | source_record_id | string | true |
+| shared_conformed | ref_measure | 11 | ecosystem | string | true |
+| shared_conformed | ref_measure | 12 | _gold_loaded_at | timestamp | true |
+| shared_conformed | ref_measure | 13 | _gold_run_id | string | true |
+| shared_conformed | series_coverage | 1 | location_key | string | true |
+| shared_conformed | series_coverage | 2 | source_location_id | string | true |
+| shared_conformed | series_coverage | 3 | parameter_source_code | string | true |
+| shared_conformed | series_coverage | 4 | reconciliation_status | string | true |
+| shared_conformed | series_coverage | 5 | observed_count | bigint | true |
+| shared_conformed | series_coverage | 6 | time_span_start_utc | timestamp | true |
+| shared_conformed | series_coverage | 7 | time_span_end_utc | timestamp | true |
+| shared_conformed | series_coverage | 8 | source_system | string | true |
+| shared_conformed | series_coverage | 9 | source_dataset | string | true |
+| shared_conformed | series_coverage | 10 | source_record_id | string | true |
+| shared_conformed | series_coverage | 11 | record_kind | string | true |
+| shared_conformed | series_coverage | 12 | name | string | true |
+| shared_conformed | series_coverage | 13 | gap_start_timestamp | timestamp | true |
+| shared_conformed | series_coverage | 14 | gap_end_timestamp | timestamp | true |
+| shared_conformed | series_coverage | 15 | record_ordinal | int | true |
+| shared_conformed | series_coverage | 16 | missing_value_count | bigint | true |
+| shared_conformed | series_coverage | 17 | gap_description | string | true |
+| shared_conformed | series_coverage | 18 | period_kind | string | true |
+| shared_conformed | series_coverage | 19 | valid_from | date | true |
+| shared_conformed | series_coverage | 20 | valid_to | date | true |
+| shared_conformed | series_coverage | 21 | latitude | double | true |
+| shared_conformed | series_coverage | 22 | longitude | double | true |
+| shared_conformed | series_coverage | 23 | elevation_m | double | true |
+| shared_conformed | series_coverage | 24 | coordinate_outside_germany_bounding_box | boolean | true |
+| shared_conformed | series_coverage | 25 | parameter_category | string | true |
+| shared_conformed | series_coverage | 26 | sensor_height_m | double | true |
+| shared_conformed | series_coverage | 27 | device_type | string | true |
+| shared_conformed | series_coverage | 28 | measurement_method | string | true |
+| shared_conformed | series_coverage | 29 | parameter_description_de | string | true |
+| shared_conformed | series_coverage | 30 | parameter_unit | string | true |
+| shared_conformed | series_coverage | 31 | parameter_data_source | string | true |
+| shared_conformed | series_coverage | 32 | parameter_extra_info | string | true |
+| shared_conformed | series_coverage | 33 | parameter_special_notes | string | true |
+| shared_conformed | series_coverage | 34 | parameter_reference | string | true |
+| shared_conformed | series_coverage | 35 | ecosystem | string | true |
+| shared_conformed | series_coverage | 36 | _gold_loaded_at | timestamp | true |
+| shared_conformed | series_coverage | 37 | _gold_run_id | string | true |
