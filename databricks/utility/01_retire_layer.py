@@ -25,6 +25,8 @@
 # MAGIC or `fresh_gold` (the same for the Gold schemas before a rebuild from Silver).
 # MAGIC `merged_parts` drops each Bronze table of `bronze_merges.yml` that a merge
 # MAGIC built from it, only when the merged table holds the same rows for its value.
+# MAGIC `stale_tables` drops, in the Gold and analytics schemas, only the tables that
+# MAGIC carry a provenance column and were last written before `CUTOFF`.
 # MAGIC
 # MAGIC The default is a dry run: the notebook lists what it would drop and writes the
 # MAGIC findings file. The three drop switches stay off until you have read the plan.
@@ -37,6 +39,7 @@ import os
 from datetime import UTC, datetime
 
 import yaml
+from pyspark.sql import functions as F
 
 # COMMAND ----------
 
@@ -49,8 +52,16 @@ FINDINGS_SUBDIR = "src/inventory"
 # rebuild from Bronze; the Bronze schemas must hold tables first.
 # "fresh_gold": drop the tables of the Gold schemas before a rebuild from Silver.
 # "merged_parts": drop the Bronze tables that a merge of bronze_merges.yml holds.
-MODE = "fresh"  # "retire", "fresh_gold", "merged_parts"
+# "stale_tables": drop the Gold and analytics tables written before CUTOFF.
+MODE = "stale_tables"  # "retire", "fresh", "fresh_gold", "merged_parts"
 MERGES_FILE = "src/schemas/mappings/bronze_merges.yml"
+
+# stale_tables: start of the run to keep (UTC). A table is old when its last write
+# is before it and it has a provenance column; other tables stay.
+CUTOFF = "2026-11-19T21:00:00Z"
+PROVENANCE_COLUMNS = ("_gold_loaded_at", "_analytics_loaded_at")
+# Table history operations that write data (OPTIMIZE, COMPUTE STATS are not writes).
+WRITE_OPERATIONS = "^(CREATE|REPLACE|WRITE|MERGE|COPY INTO|UPDATE|DELETE)"
 
 # name -> schemas to drop, and the schemas that must hold the data before the drop
 RETIREMENTS_BY_MODE = {
@@ -103,6 +114,28 @@ RETIREMENTS_BY_MODE = {
         },
     },
     "merged_parts": {},  # no whole layer is dropped in this mode
+    # tables only; the cell "Pick the old tables" keeps what is written after CUTOFF
+    "stale_tables": {
+        "gold and analytics (old tables)": {
+            "drop": [
+                "energy_gold",
+                "commerce_gold",
+                "genomics_gold",
+                "shared_conformed",
+                "energy_analytics",
+                "commerce_analytics",
+                "genomics_analytics",
+            ],
+            "successor": [
+                "energy_silver",
+                "energy_silver_reference",
+                "commerce_silver",
+                "genomics_silver",
+                "genomics_silver_reference",
+            ],
+            "keep_schema": True,
+        },
+    },
 }
 RETIREMENTS = RETIREMENTS_BY_MODE[MODE]
 
@@ -170,6 +203,45 @@ for name, spec in RETIREMENTS.items():
             f"{name}: {schema} holds {len(held['tables'])} tables, "
             f"{len(held['views'])} views, {len(held['volumes'])} Volumes"
         )
+
+# COMMAND ----------
+
+# DBTITLE 1,Pick the old tables (MODE stale_tables)
+stale_rows = []  # (schema, table, last write, provenance column, decision)
+if MODE == "stale_tables":
+    for schema, held in inventory.items():
+        with_column = {
+            r["table_name"]
+            for r in spark.sql(
+                f"SELECT DISTINCT table_name FROM {CATALOG}.information_schema.columns "
+                f"WHERE table_schema = '{schema}' "
+                f"AND column_name IN {PROVENANCE_COLUMNS}"
+            ).collect()
+        }
+        old = []
+        for table in held["tables"]:
+            if table not in with_column:
+                stale_rows.append((schema, table, None, "no", "keep (no column)"))
+                continue
+            last = (
+                spark.sql(f"DESCRIBE HISTORY {CATALOG}.{schema}.{table}")
+                .where(F.col("operation").rlike(WRITE_OPERATIONS))
+                .agg(
+                    F.date_format(F.max("timestamp"), "yyyy-MM-dd HH:mm").alias("at"),
+                    (F.max("timestamp") < F.lit(CUTOFF).cast("timestamp")).alias("old"),
+                )
+                .first()
+            )
+            if last["old"]:
+                old.append(table)
+                decision = "old"
+            else:
+                decision = "keep (written after the cutoff or never)"
+            stale_rows.append((schema, table, last["at"], "yes", decision))
+            print(f"{decision.upper()}  {schema}.{table}  last write {last['at']}")
+        if held["tables"] and len(old) == len(held["tables"]):
+            raise ValueError(f"{schema}: CUTOFF {CUTOFF} would drop every table")
+        inventory[schema] = {"tables": old, "views": [], "volumes": []}
 
 # COMMAND ----------
 
@@ -252,6 +324,18 @@ findings_path = os.path.join(
 with open(findings_path, "w", encoding="utf-8") as fh:
     fh.write(findings_text)
 print(f"Written: {findings_path}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Add the table list to the findings file (MODE stale_tables)
+if MODE == "stale_tables":
+    columns = ["schema", "table", "last write", "provenance column", "decision"]
+    with open(findings_path, "a", encoding="utf-8") as fh:
+        fh.write(
+            f"\n## Tables by last write (cutoff {CUTOFF})\n\n"
+            + markdown_table(columns, stale_rows)
+            + "\n"
+        )
 
 # COMMAND ----------
 
