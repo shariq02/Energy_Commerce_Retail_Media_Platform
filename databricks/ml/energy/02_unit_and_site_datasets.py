@@ -462,9 +462,10 @@ _label_functions = [
         F.lit("declared_gap_present").alias("lf_name"),
         F.when(F.col("_g"), "gap").otherwise("no_gap").alias("lf_label"),
     ),
+    # a unit id repeats across unit types: the Gold grain is (unit_type, unit_id)
     units_all.filter(F.col("registration_date").isNotNull()).select(
         F.lit("unit").alias("entity_type"),
-        F.col("unit_id").alias("entity_id"),
+        F.concat_ws("|", "unit_type", "unit_id").alias("entity_id"),
         F.lit("registration_era").alias("lf_name"),
         F.when(
             F.col("registration_date") >= F.lit(MIGRATION_DATE).cast("date"),
