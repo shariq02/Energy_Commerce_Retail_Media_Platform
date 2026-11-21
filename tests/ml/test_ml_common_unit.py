@@ -2,7 +2,7 @@
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
-Date: September 2026
+Date: November 2026
 
 Loaded through `tests/_notebook_loader.py`, which reproduces the notebooks' own
 `%run` chain. Only functions that do not call a live Spark API are exercised.
@@ -165,33 +165,94 @@ def test_derive_contract_skips_provenance_columns(ml):
     assert [c[0] for c in contract] == ["x"]
 
 
-def test_assembled_select_drops_provenance_and_label_inputs(ml):
-    sql = ml["assembled_select"](
-        "demo",
-        "target_demo",
-        "energy",
-        [{"table": "features_demo", "keys": ["a", "b"], "drop": ["extra"]}],
-        target_drop=["realised_mwh"],
+def test_derive_contract_marks_a_declared_label_derived_column(ml):
+    contract, classes, _ = ml["derive_contract"](
+        ["variant_key", "target_flag", "leaky_score", "plain_score"],
+        keys=["variant_key"],
+        time_col=None,
+        label_derived=("leaky_score",),
+        default_clock="static_annotation",
     )
-    assert "realised_mwh" in sql.split("FROM")[0]
-    assert "EXCEPT" in sql
-    assert "t.a = f0.a AND t.b = f0.b" in sql
-    assert "energy_ml_datasets.target_demo" in sql
+    by = {c[0]: c for c in contract}
+    assert by["leaky_score"][1] == "label_derived"
+    assert by["plain_score"][1:3] == ("feature", "static_annotation")
+    assert "leaky_score" not in {c[0] for c in classes}
 
 
-def test_shared_registry_tables_live_once_in_the_shared_schema(ml):
+def test_the_registry_tables_that_every_ecosystem_shares_live_once(ml):
     for name in ml["ML_SHARED_TABLES"]:
         energy, commerce = ml["ml_fqn"](name, "energy"), ml["ml_fqn"](name, "commerce")
         assert energy == commerce
         assert energy.endswith(f".ml_datasets_shared.{name}")
-    assert ".energy_ml_datasets." in ml["ml_fqn"]("target_demo", "energy")
-    assert ".commerce_ml_datasets." in ml["ml_fqn"]("dataset_demo", "commerce")
-    assert ".energy_ml_datasets." in ml["ml_fqn"]("gap_limits", "energy")
+    assert ".energy_ml_datasets." in ml["ml_fqn"]("dataset_unit", "energy")
+    assert ".commerce_ml_datasets." in ml["ml_fqn"]("dataset_lapse", "commerce")
+    assert ".genomics_ml_datasets." in ml["ml_fqn"]("dataset_variant", "genomics")
 
 
-def test_only_registry_tables_are_shared_and_gap_limits_stays_per_ecosystem(ml):
+def test_only_registry_tables_are_shared_and_there_are_seven(ml):
     assert set(ml["ML_SHARED_TABLES"]) <= set(ml["REGISTRY_DDL"])
-    assert "gap_limits" not in ml["ML_SHARED_TABLES"]
+    assert len(ml["ML_SHARED_TABLES"]) == len(ml["REGISTRY_DDL"]) == 7
+    for merged in ("split_specification", "null_rate_profile", "gap_limits"):
+        assert merged not in ml["REGISTRY_DDL"]
+
+
+def test_the_merged_registry_tables_carry_the_columns_they_took_over(ml):
+    manifest = ml["REGISTRY_DDL"]["dataset_manifest"]
+    for column in ("family string", "split_rule string", "embargo_days int"):
+        assert column in manifest
+    classes = ml["REGISTRY_DDL"]["null_class_registry"]
+    assert "null_rate_train double" in classes
+    assert "decision string" in classes
+
+
+def test_every_dataset_belongs_to_a_family_of_its_ecosystem(ml):
+    spec = ml["ML_SPEC"]
+    for name, dataset in spec["datasets"].items():
+        if dataset.get("registered_only"):
+            continue
+        family = spec["families"][dataset["family"]]
+        assert family["ecosystem"] == dataset["ecosystem"], name
+        assert ml["dataset_table"](name) == f"dataset_{dataset['family']}"
+        assert ml["dataset_table"](name) in ml["family_tables"](dataset["ecosystem"])
+
+
+def test_every_built_dataset_declares_a_split_a_fit_and_a_known_calendar(ml):
+    spec = ml["ML_SPEC"]
+    for ecosystem in ("energy", "commerce", "genomics"):
+        for name in ml["built_datasets"](ecosystem):
+            dataset = spec["datasets"][name]
+            assert {"grain", "split", "fit", "target_name"} <= set(dataset), name
+            split = dataset["split"]
+            for key in ("calendar", "default_calendar", "honda_calendar"):
+                if key in split:
+                    assert split[key] in ml["SPLIT_CALENDARS"], name
+            assert dataset["fit"]["fold_mode"] in ("rolling", "grouped", "none")
+
+
+def test_a_label_derived_column_is_never_the_target_or_a_key(ml):
+    for name, dataset in ml["ML_SPEC"]["datasets"].items():
+        derived = set(dataset.get("label_derived", []))
+        assert not derived & set(dataset.get("grain", [])), name
+        assert dataset.get("target_name") not in derived, name
+
+
+def test_the_manifest_row_carries_the_split_specification(ml):
+    columns = ml["split_columns"]("price_daily")
+    assert columns[0] == ml["SPLIT_VERSION"]
+    assert columns[1] == "calendar"
+    assert columns[2] == "calendar:energy_daily"
+    assert columns[3:9] == (
+        *ml["SPLIT_CALENDARS"]["energy_daily"]["train"],
+        *ml["SPLIT_CALENDARS"]["energy_daily"]["validation"],
+        *ml["SPLIT_CALENDARS"]["energy_daily"]["test"],
+    )
+    assert columns[9] == ml["EMBARGO_DAYS"]["energy_daily"]
+    assert len(ml["split_columns"]("survival")) == 13
+
+
+def test_zone_codes_in_the_spec_are_four_distinct_market_areas(ml):
+    rows = ml["ML_SPEC"]["zone_code_map"]
+    assert len({r[0] for r in rows}) == len({r[1] for r in rows}) == 4
 
 
 def test_ecosystem_helpers_scope_a_shared_table(ml):

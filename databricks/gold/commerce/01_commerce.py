@@ -12,10 +12,12 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 3 `commerce_gold` tables: sessions (with the columns of their
-# MAGIC user), products and `commerce_event` (REES46 view, cart and purchase events
-# MAGIC and GA4 web events), all with the conformed session, user and product keys.
-# MAGIC The last cell checks that every Silver event is in the Gold table.
+# MAGIC **Purpose:** the 4 `commerce_gold` tables: sessions (with the columns of their
+# MAGIC user), products, `commerce_event` (REES46 view, cart and purchase events
+# MAGIC and GA4 web events) and `commerce_event_item` (one row per item of a GA4
+# MAGIC event), all with the conformed session, user and product keys. The last cells
+# MAGIC check that every Silver event and item is in a Gold table and that every
+# MAGIC Silver commerce table feeds a Gold table.
 
 # COMMAND ----------
 
@@ -33,6 +35,13 @@ COMMON = {**GATE, "schema": gold_schema_for(SOURCE)}
 ENTITY_KEYS = {"commerce_session": "session_key", "commerce_product": "product_key"}
 # table -> (parent table, join column, column prefix): the parent columns are joined in
 PARENTS = {"commerce_session": ("commerce_user", "user_key", "user_")}
+# Gold table -> the Silver tables it is built from
+GOLD_FEEDS = {
+    "commerce_session": ("commerce_session", "commerce_user"),
+    "commerce_product": ("commerce_product",),
+    "commerce_event": ("commerce_event",),
+    "commerce_event_item": ("ga4_event_item",),
+}
 TABLES = {}
 
 # COMMAND ----------
@@ -43,6 +52,7 @@ entities = {
     for table in (*ENTITY_KEYS, *(p[0] for p in PARENTS.values()))
 }
 commerce_event = from_silver(read_silver("commerce_event"))
+event_item = from_silver(read_silver("ga4_event_item"))
 
 # COMMAND ----------
 
@@ -73,6 +83,24 @@ TABLES["commerce_event"] = (add_provenance(events, SOURCE, RID), ["event_key"])
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- commerce_event_item (the keys of its event, the product key)
+# item_id is a campaign id on promotions: only a product item has a product key
+items = event_item.join(
+    events.select("event_key", "session_key", "user_key"), "event_key", "left"
+).withColumn(
+    "product_key",
+    F.when(
+        (F.col("item_context") == "product") & F.col("item_id").isNotNull(),
+        sha_key("source_system", "item_id"),
+    ),
+)
+TABLES["commerce_event_item"] = (
+    add_provenance(items, SOURCE, RID),
+    ["event_key", "item_ordinal"],
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Grain gate -- every table
 gate_tables(TABLES, **GATE)
 
@@ -88,16 +116,34 @@ inspect_tables(TABLES, findings="commerce", **COMMON)
 
 # COMMAND ----------
 
-# DBTITLE 1,Validation -- tables have rows and the Gold table holds every Silver event
+# DBTITLE 1,Validation -- tables have rows and the Gold tables hold every Silver event and item
 validate_tables(TABLES, **COMMON)
-gold_rows = read_gold("commerce_event", source=SOURCE).count()
-silver_rows = commerce_event.count()
+for gold_table, silver_frame, name in (
+    ("commerce_event", commerce_event, "every_commerce_event_in_the_gold_table"),
+    ("commerce_event_item", event_item, "every_ga4_event_item_in_the_gold_table"),
+):
+    gold_rows = read_gold(gold_table, source=SOURCE).count()
+    silver_rows = silver_frame.count()
+    check(
+        COMPONENT,
+        SOURCE,
+        name,
+        gold_rows == silver_rows,
+        detail=f"gold={gold_rows} silver={silver_rows}",
+        metric_value=float(gold_rows - silver_rows),
+        rid=RID,
+    )
+
+# COMMAND ----------
+
+# DBTITLE 1,Validation -- every Silver commerce table feeds a Gold table
+unfed = unfed_tables(GOLD_FEEDS, silver_tables(COMMERCE_SILVER_SCHEMAS))
 check(
     COMPONENT,
     SOURCE,
-    "every_commerce_event_in_the_gold_table",
-    gold_rows == silver_rows,
-    detail=f"gold={gold_rows} silver={silver_rows}",
-    metric_value=float(gold_rows - silver_rows),
+    "every_silver_table_feeds_a_gold_table",
+    not unfed,
+    detail=", ".join(unfed),
+    metric_value=float(len(unfed)),
     rid=RID,
 )

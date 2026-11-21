@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # ML ZONE WEATHER LIBRARY
@@ -14,8 +14,9 @@
 # MAGIC
 # MAGIC **Purpose:** the station, unit-weight and zone-day computations shared by
 # MAGIC the zone-weather parameter fit, the zone-weather build and its acceptance
-# MAGIC test. Pulled in with `%run ../../_ml_zone_weather` after `_ml_common`.
-# MAGIC Definitions only.
+# MAGIC test. Pulled in with `%run ../_ml_zone_weather` after `_ml_common`.
+# MAGIC Definitions only. Stations are `dim_place` rows; the sensor heights are the
+# MAGIC `instrument` station periods of `series_coverage`.
 
 # COMMAND ----------
 
@@ -31,8 +32,8 @@ MOUNTAIN_STATION_PATTERN = "(?i)zugspitze|feldberg|hohenpei"
 COASTAL_STATION_PATTERN = "(?i)list|norderney|kiel|warnem"
 WIND_CATEGORY_PATTERN = "(?i)windgeschwindigkeit|wind_?speed"
 WIND_SPEED_EXPR = (
-    "coalesce(try_element_at(filter(wind__readings, r -> r.statistic = 'mean'), 1), "
-    "try_element_at(wind__readings, 1)).wind_speed_m_per_s"
+    "coalesce(wind_mean_speed_m_per_s, wind_instant_speed_m_per_s, "
+    "wind_unspecified_speed_m_per_s)"
 )
 MIN_STATION_HOURS = 18
 EARTH_RADIUS_KM = 6371.0
@@ -59,9 +60,11 @@ def station_table(dim_place: DataFrame, place_periods: DataFrame, *, names_like=
     """One row per weather station with coordinates and name."""
     st = (
         dim_place.filter(F.col("latitude").isNotNull() & F.col("longitude").isNotNull())
-        .select("place_key", "name", "latitude", "longitude")
+        .select(
+            F.col("location_key").alias("place_key"), "name", "latitude", "longitude"
+        )
         .join(
-            place_periods.select("place_key").distinct(),
+            place_periods.select(F.col("location_key").alias("place_key")).distinct(),
             "place_key",
             "inner",
         )
@@ -77,7 +80,7 @@ def wind_height_periods(place_periods: DataFrame) -> DataFrame:
         F.col("parameter_category").rlike(WIND_CATEGORY_PATTERN)
         & F.col("sensor_height_m").isNotNull()
     ).select(
-        "place_key",
+        F.col("location_key").alias("place_key"),
         "valid_from",
         F.coalesce(F.col("valid_to"), F.lit("9999-12-31").cast("date")).alias(
             "valid_to"
@@ -92,7 +95,7 @@ def station_day_wind(
     """Mean wind speed and mean speed cubed per station and local date, with the
     sensor height valid on that date."""
     hourly = weather.filter(
-        (F.col("origin_source_system") == "dwd")
+        (F.col("source_system") == "dwd")
         & (F.col("interval_seconds") == 3600)
         & (F.col("interval_reference") == "clock")
         & F.col("local_date").between(date_from, date_to)
@@ -261,12 +264,12 @@ def zone_wind_daily(
 
 def station_day_radiation(radiation: DataFrame, date_from: str, date_to: str):
     hourly = radiation.filter(
-        (F.col("origin_source_system") == "dwd")
+        (F.col("source_system") == "dwd")
         & F.col("local_date").between(date_from, date_to)
     ).select(
         F.col("location_key").alias("place_key"),
         "local_date",
-        F.col("solar_radiation__global_radiation_w_per_m2").alias("radiation"),
+        F.col("global_radiation_w_per_m2").alias("radiation"),
     )
     return (
         hourly.filter(F.col("radiation").isNotNull())

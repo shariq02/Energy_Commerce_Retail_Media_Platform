@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # ML FIT AND TRANSFORM LIBRARY
@@ -12,12 +12,13 @@
 # MAGIC
 # MAGIC **Date:** September 2026
 # MAGIC
-# MAGIC **Purpose:** the split, fit, transform step shared by every fit notebook,
-# MAGIC pulled in with `%run ../../_ml_fit` after `_ml_common`. Definitions only.
+# MAGIC **Purpose:** the build of a dataset, shared by every build notebook, pulled in
+# MAGIC with `%run ../_ml_fit` after `_ml_common`. Definitions only.
 # MAGIC
-# MAGIC Order is fixed: read the assembled view, attach the stored partition,
-# MAGIC drop columns by the null rule, fit imputers on the training partition
-# MAGIC only, apply them to every partition, record the fitted parameters.
+# MAGIC Order is fixed: write the assembled rows once, declare the contract, split
+# MAGIC by the spec rule, attach the stored partition, drop columns by the null
+# MAGIC rule, fit imputers on the training partition only, apply them to every
+# MAGIC partition, record the fitted parameters, write the final rows.
 
 # COMMAND ----------
 
@@ -33,11 +34,13 @@ NUMERIC_TYPES = ("double", "float", "int", "bigint", "smallint", "tinyint")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load an assembled dataset with its stored partition
+# DBTITLE 1,Attach the stored partition to the assembled rows
 
 
-def load_partitioned(dataset_id: str, ecosystem: str) -> DataFrame:
-    """Assembled view joined to the partition manifest; embargo and excluded
+def load_partitioned(
+    assembled: DataFrame, dataset_id: str, ecosystem: str
+) -> DataFrame:
+    """The assembled rows joined to the partition manifest; embargo and excluded
     rows are dropped."""
     m = (
         read_ml("dataset_manifest", ecosystem=ecosystem)
@@ -46,12 +49,7 @@ def load_partitioned(dataset_id: str, ecosystem: str) -> DataFrame:
     )
     if m is None:
         raise RuntimeError(f"{dataset_id} is not registered")
-    df = attach_partition(
-        read_ml(f"assembled_{dataset_id}", ecosystem=ecosystem),
-        dataset_id,
-        ecosystem,
-        list(m["grain_key"]),
-    )
+    df = attach_partition(assembled, dataset_id, ecosystem, list(m["grain_key"]))
     return df.filter(F.col("partition").isin(*USED_PARTITIONS))
 
 
@@ -181,6 +179,7 @@ def fold_train_frames(
 
 
 def fit_transform(
+    assembled: DataFrame,
     dataset_id: str,
     ecosystem: str,
     *,
@@ -195,7 +194,7 @@ def fit_transform(
 ) -> DataFrame:
     """Apply the null rule, fit imputers on the training partition only, apply
     them to every partition and record final and per-fold parameters."""
-    df = load_partitioned(dataset_id, ecosystem)
+    df = load_partitioned(assembled, dataset_id, ecosystem)
     if not impute:
         merge_null_classes(
             dataset_id,
@@ -259,4 +258,197 @@ def fit_transform(
             if c not in numeric and c not in categorical
         ],
     )
+    record_null_rates(
+        dataset_id,
+        ecosystem,
+        [
+            (
+                c,
+                float(r),
+                "exempt_missingness_is_signal"
+                if c in classed
+                else "drop"
+                if c in drop
+                else "keep_indicator_impute_if_beats_baseline"
+                if r >= 0.5
+                else "keep",
+            )
+            for c, r in rates.items()
+        ],
+    )
     return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Declare, build and finish datasets
+
+
+def declare_dataset(dataset_id: str, columns: list[str]) -> list[str]:
+    """Register the manifest row, the feature contract and the null classes of a
+    dataset from the spec file and the columns of its frame; the columns that got
+    the default clock are returned."""
+    spec = dataset_spec(dataset_id)
+    eco = spec["ecosystem"]
+    rules = spec.get("contract", {})
+    label_inputs = rules.get("label_inputs", [])
+    contract, classes, defaulted = derive_contract(
+        [c for c in columns if c not in label_inputs],
+        keys=spec["grain"],
+        time_col=spec.get("time_col"),
+        static=tuple(rules.get("static", ())),
+        registry=tuple(rules.get("registry", ())),
+        perfect_prognosis=tuple(rules.get("perfect_prognosis", ())),
+        context=tuple(rules.get("context", ())),
+        group_col=spec.get("group_col"),
+        overrides={k: tuple(v) for k, v in rules.get("overrides", {}).items()},
+        label_derived=tuple(spec.get("label_derived", ())),
+        default_clock=DEFAULT_CLOCK[eco],
+    )
+    contract += [
+        (
+            c,
+            "label_input",
+            "observation_realised",
+            0,
+            None,
+            "defines the target; excluded from the dataset",
+        )
+        for c in label_inputs
+    ]
+    register_feature_contract(dataset_id, eco, contract)
+    register_null_classes(dataset_id, eco, classes)
+    register_dataset(dataset_id, status="assembled")
+    return defaulted
+
+
+def build_dataset(
+    dataset_id: str,
+    frame: DataFrame,
+    *,
+    rid: str,
+    source: str,
+    blocks: list | None = None,
+) -> None:
+    """The whole build of one dataset from its assembled frame: the heavy frame is
+    computed and written once (stage 1), the contract, the split and the fit read
+    those rows, and the final rows replace them in the family table."""
+    spec = dataset_spec(dataset_id)
+    eco = spec["ecosystem"]
+    component = f"ml/{eco}/{dataset_id}"
+    label_inputs = spec.get("contract", {}).get("label_inputs", [])
+    grain = list(spec["grain"])
+    columns = frame.columns
+    write_dataset_rows(
+        add_ml_provenance(frame, dataset_id, eco, rid),
+        dataset_id,
+        source=source,
+        component=component + "/assembled",
+        rid=rid,
+    )
+    assembled = read_dataset(dataset_id).select(*columns)
+    assert_unique_grain(assembled, grain, component=component, source=source, rid=rid)
+    assert_no_forbidden_columns(
+        assembled.drop(*label_inputs), component=component, source=source, rid=rid
+    )
+    defaulted = declare_dataset(dataset_id, columns)
+    if defaulted:
+        print(f"WARN {dataset_id}: columns given the default clock:", defaulted)
+    write_dataset_partitions(partition_frame(assembled, dataset_id), dataset_id)
+    write_diagnostic_partitions(assembled, dataset_id)
+    fit = spec["fit"]
+    out = fit_transform(
+        assembled.drop(*label_inputs),
+        dataset_id,
+        eco,
+        group_cols=fit["group_cols"],
+        fold_mode=fit["fold_mode"],
+        calendar_key=fit["calendar_key"],
+        date_col=fit["date_col"],
+        impute=fit["impute"],
+        rid=rid,
+        source=source,
+    )
+    out = add_ml_provenance(out, dataset_id, eco, rid)
+    assert_unique_grain(out, grain, component=component, source=source, rid=rid)
+    assert_no_forbidden_columns(out, component=component, source=source, rid=rid)
+    write_dataset_rows(
+        out, dataset_id, source=source, component=component + "/fit", rid=rid
+    )
+    set_dataset_status(dataset_id, eco, "fitted")
+    final = read_dataset(dataset_id).select(*out.columns)
+    targets = contract_columns(dataset_id, eco, "target")
+    inspected = inspect_ml_table(
+        final,
+        dataset_table(dataset_id),
+        ecosystem=eco,
+        key_cols=grain,
+        partition_col="partition",
+        target_col=targets[0] if targets else None,
+    )
+    write_ml_findings(
+        eco, "build__" + dataset_id, dataset_id, [*inspected, *(blocks or [])]
+    )
+
+
+def build_datasets(frames: dict, *, rid: str, source: str, blocks: dict | None = None):
+    """Build every dataset of `frames` (dataset id -> assembled frame) in order;
+    `blocks` holds extra findings blocks per dataset (the dropped target rows)."""
+    for dataset_id, frame in frames.items():
+        print(f"=== {dataset_id}")
+        build_dataset(
+            dataset_id,
+            frame,
+            rid=rid,
+            source=source,
+            blocks=(blocks or {}).get(dataset_id),
+        )
+
+
+def register_waiting_datasets(ecosystem: str) -> None:
+    """Register the datasets that are declared but not built (a status in the spec)."""
+    for name, spec in ML_SPEC["datasets"].items():
+        if spec["ecosystem"] == ecosystem and spec.get("registered_only"):
+            register_dataset(name)
+            print(f"registered {name}: {spec['status']}")
+
+
+def write_stored_table(
+    df: DataFrame,
+    table: str,
+    ecosystem: str,
+    *,
+    key_cols: list[str],
+    source: str,
+    component: str,
+    rid: str,
+    section: str = "stored",
+    target_col: str | None = None,
+    blocks: list | None = None,
+) -> None:
+    """One table that is kept (a shared target, a shared feature, a helper): the
+    provenance, the grain and forbidden-column gates, the write, the findings."""
+    out = add_ml_provenance(df, table, ecosystem, rid)
+    assert_unique_grain(out, key_cols, component=component, source=source, rid=rid)
+    assert_no_forbidden_columns(out, component=component, source=source, rid=rid)
+    check(
+        component,
+        source,
+        "non_empty",
+        out.limit(1).count() > 0,
+        detail="no rows produced; check the input filters",
+        rid=rid,
+    )
+    write_ml(
+        out, table, ecosystem=ecosystem, source=source, component=component, rid=rid
+    )
+    inspected = inspect_ml_table(
+        read_ml(table, ecosystem=ecosystem),
+        table,
+        ecosystem=ecosystem,
+        key_cols=key_cols,
+        target_col=target_col,
+    )
+    write_ml_findings(
+        ecosystem, f"{section}__{table}", table, [*inspected, *(blocks or [])]
+    )

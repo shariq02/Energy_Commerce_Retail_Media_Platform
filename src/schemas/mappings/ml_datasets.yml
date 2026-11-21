@@ -1,0 +1,921 @@
+# ML datasets -- split calendars, cutoffs, dataset families and the declaration of
+# every dataset (grain, contract, split rule, fit parameters, label-derived columns).
+# Read by databricks/ml/_ml_common.py; one file for energy, commerce and genomics.
+version: s1
+
+calendars:
+  energy_daily:
+    train: ["2018-10-01", "2023-12-31"]
+    validation: ["2024-01-01", "2024-12-31"]
+    test: ["2025-01-01", null]
+    embargo_days: 2
+    blocks:
+      - ["2021-01-01", "2021-12-31"]
+      - ["2022-01-01", "2022-12-31"]
+      - ["2023-01-01", "2023-12-31"]
+  quarter_hour:
+    train: ["2024-09-08", "2025-06-30"]
+    validation: ["2025-07-01", "2025-12-31"]
+    test: ["2026-01-01", null]
+    embargo_days: 2
+    blocks:
+      - ["2025-01-01", "2025-03-31"]
+      - ["2025-04-01", "2025-06-30"]
+  redispatch:
+    train: ["2013-04-02", "2018-12-31"]
+    validation: ["2019-01-01", "2019-12-31"]
+    test: ["2020-01-01", "2020-12-31"]
+    embargo_days: 2
+    blocks:
+      - ["2016-01-01", "2016-12-31"]
+      - ["2017-01-01", "2017-12-31"]
+      - ["2018-01-01", "2018-12-31"]
+  honda:
+    train: ["2018-01-01", "2021-12-31"]
+    validation: ["2022-01-01", "2022-12-31"]
+    test: ["2023-01-01", "2023-12-31"]
+    embargo_days: 1
+    blocks:
+      - ["2019-01-01", "2019-12-31"]
+      - ["2020-01-01", "2020-12-31"]
+      - ["2021-01-01", "2021-12-31"]
+
+cutoffs:
+  user_split_percent: [70, 15, 15]
+  user_hash_seed: ecrmap-ml-s1
+  grouped_folds: 5
+  rees46_evaluation_start: "2019-11-01"
+  ga4_lapse_train_cutoff: "2020-11-20"
+  ga4_lapse_evaluation_cutoff: "2020-12-01"
+  ga4_diagnostic_date: "2020-12-15"
+  survival_window_start: "2021-01-01"
+  survival_censor_date: "2026-09-03"
+  survival_check_fit_through: "2024-12-31"
+  survival_diagnostic_date: "2025-01-01"
+
+# Column clocks a feature may declare. A load clock is never a feature; a realised
+# observation needs lag_days of at least 2.
+feature_clocks:
+  - observation_realised
+  - publication_before_day
+  - calendar
+  - static_registry
+  - registry_effective
+  - session_prefix
+  - user_history_before_session
+  - derived_from_earlier
+  - perfect_prognosis
+  - context_window
+  - state_at_step
+  - static_annotation
+
+# Control zone key (MaStR) -> market area code and name. The zone chain of the wind
+# units reads it; every control zone value of the connection points must be here.
+zone_code_map:
+  - ["1000001", fifty_hertz, 50Hertz]
+  - ["1000010", amprion, Amprion]
+  - ["1001564", tennet_de, TenneT]
+  - ["1001572", transnetbw, TransnetBW]
+
+# Dataset family -> dataset table (one table per family, rows told apart by dataset_id).
+families:
+  market_daily: {ecosystem: energy}
+  market_quarter_hour: {ecosystem: energy}
+  redispatch: {ecosystem: energy}
+  honda: {ecosystem: energy}
+  unit: {ecosystem: energy}
+  self_supervised_rl: {ecosystem: energy}
+  session_purchase: {ecosystem: commerce}
+  lapse: {ecosystem: commerce}
+  next_item_sequence: {ecosystem: commerce}
+  variant: {ecosystem: genomics}
+  gene: {ecosystem: genomics}
+  benchmark: {ecosystem: genomics}
+
+# Split rules (functions in _ml_common.partition_frame):
+#   calendar               train/validation/test by date, rolling folds; optional group_col
+#   calendar_per_series    calendar by series family
+#   hash_unit_stratified   hash of unit_id inside strata, grouped folds, calendar diagnostic
+#   hash_group             hash of group_cols, grouped folds; optional temporal rule:
+#                          user_cutoff (date_col, cutoff), user_cutoffs (train, evaluation),
+#                          and an optional diagnostic split on a date
+#   all_train_grouped      one partition (train), grouped folds on group_col
+#   source_defined         the split the source gives (column split)
+datasets:
+  # ---------------------------------------------------------------- energy
+  price_daily:
+    ecosystem: energy
+    family: market_daily
+    grain: [market_area_code, local_date]
+    time_col: local_date
+    capability: day-ahead price, daily
+    dependency_group: 1
+    target_name: target_price_eur_per_mwh
+    provenance_tier: sourced
+    notes: ""
+    contract:
+      overrides:
+        interval_seconds: [flag, null, null]
+        regime_year: [flag, null, null]
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: energy_daily, date_col: local_date, impute: true}
+  price_quarter_hour:
+    ecosystem: energy
+    family: market_quarter_hour
+    grain: [market_area_code, interval_start_utc]
+    time_col: local_date
+    capability: day-ahead price, quarter-hour and negative flag
+    dependency_group: 1
+    target_name: target_price_eur_per_mwh
+    provenance_tier: sourced
+    notes: ""
+    contract: {}
+    split: {rule: calendar, rule_id: "calendar:quarter_hour", calendar: quarter_hour, date_col: local_date}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: quarter_hour, date_col: local_date, impute: true}
+  bias:
+    ecosystem: energy
+    family: market_daily
+    grain: [market_area_code, local_date, forecast_scope]
+    time_col: local_date
+    capability: wind and PV forecast bias
+    dependency_group: 1
+    target_name: target_bias_mwh
+    provenance_tier: constructed
+    notes: the PV scope uses the derived PV forecast
+    contract:
+      overrides:
+        scope_mapping_status: [flag, null, null]
+      label_inputs: [realised_mwh]
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date}
+    fit: {group_cols: [market_area_code, forecast_scope], fold_mode: rolling, calendar_key: energy_daily, date_col: local_date, impute: true}
+  load:
+    ecosystem: energy
+    family: market_daily
+    grain: [market_area_code, local_date, load_kind]
+    time_col: local_date
+    capability: residual and zone load
+    dependency_group: 1
+    target_name: target_value_mwh
+    provenance_tier: sourced
+    notes: ""
+    contract:
+      overrides:
+        load_kind: [key, null, null]
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date}
+    fit: {group_cols: [market_area_code, load_kind], fold_mode: rolling, calendar_key: energy_daily, date_col: local_date, impute: true}
+    diagnostics:
+      - {id: load__zone_held_out, keys: [market_area_code, local_date, load_kind], where: "market_area_code != 'de_lu'", group_col: market_area_code}
+  zone_generation:
+    ecosystem: energy
+    family: unit
+    grain: [market_area_code, local_date, carrier]
+    time_col: local_date
+    capability: zone wind and PV generation from weather
+    dependency_group: 2
+    target_name: target_generation_mwh
+    provenance_tier: sourced
+    notes: observed zone weather stands in for a forecast (perfect prognosis)
+    contract:
+      registry: [capacity_net_mw]
+      perfect_prognosis:
+        - onshore_wind_speed_adjusted_mean
+        - onshore_wind_speed_cubed_adjusted_mean
+        - offshore_wind_speed_adjusted_mean
+        - offshore_wind_speed_cubed_adjusted_mean
+        - global_radiation_mean_w_per_m2
+        - covered_weight_share
+      overrides:
+        carrier: [key, null, null]
+        trend_years: [feature, calendar, null]
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date}
+    fit: {group_cols: [market_area_code, carrier], fold_mode: rolling, calendar_key: energy_daily, date_col: local_date, impute: true}
+    diagnostics:
+      - {id: zone_generation__zone_held_out, keys: [market_area_code, local_date, carrier], where: null, group_col: market_area_code}
+  redispatch:
+    ecosystem: energy
+    family: redispatch
+    grain: [market_area_code, local_date]
+    time_col: local_date
+    capability: old-regime redispatch, two-part
+    dependency_group: 1
+    target_name: target_any_event
+    provenance_tier: sourced
+    notes: market forecast features exist only from 2018-10-01; earlier rows carry nulls
+    contract:
+      label_inputs: [event_count]
+    split: {rule: calendar, rule_id: "calendar:redispatch", calendar: redispatch, date_col: local_date}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: redispatch, date_col: local_date, impute: true}
+  rl_redispatch:
+    ecosystem: energy
+    family: redispatch
+    grain: [episode_id, step]
+    time_col: local_date
+    capability: redispatch event trajectories
+    dependency_group: 1
+    target_name: reward
+    provenance_tier: rule_derived
+    notes: old regime only; reward is minus the energy volume, a proxy that ignores cost and reason
+    contract:
+      overrides:
+        event_key: [flag, null, null]
+        event_start_utc: [flag, null, null]
+        market_area_code: [flag, null, null]
+        action_direction: [target, null, null]
+        action_reason: [target, null, null]
+        action_energy_mwh: [target, null, null]
+        reward: [target, null, null]
+    split: {rule: calendar, rule_id: "calendar:redispatch", calendar: redispatch, date_col: local_date, group_col: episode_id}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: redispatch, date_col: local_date, impute: true}
+  honda_forecast:
+    ecosystem: energy
+    family: honda
+    grain: [location_key, channel, interval_seconds, interval_start_utc]
+    time_col: local_date
+    capability: Honda site energy forecast
+    dependency_group: 1
+    target_name: target_increment
+    provenance_tier: sourced
+    notes: ""
+    contract:
+      overrides:
+        unit: [flag, null, null]
+        sign_convention: [flag, null, null]
+        interval_seconds: [key, null, null]
+    split: {rule: calendar, rule_id: "calendar:honda", calendar: honda, date_col: local_date}
+    fit: {group_cols: [location_key, channel], fold_mode: rolling, calendar_key: honda, date_col: local_date, impute: true}
+  honda_anomaly:
+    ecosystem: energy
+    family: honda
+    grain: [location_key, channel, interval_seconds, interval_start_utc]
+    time_col: local_date
+    capability: Honda anomaly detection (hourly)
+    dependency_group: 1
+    target_name: target_increment
+    provenance_tier: simulated
+    notes: anomaly labels are injected at evaluation from the stored specification; no sourced labels exist
+    contract:
+      overrides:
+        unit: [flag, null, null]
+        sign_convention: [flag, null, null]
+        interval_seconds: [key, null, null]
+    split: {rule: calendar, rule_id: "calendar:honda", calendar: honda, date_col: local_date}
+    fit: {group_cols: [location_key, channel], fold_mode: rolling, calendar_key: honda, date_col: local_date, impute: true}
+  survival:
+    ecosystem: energy
+    family: unit
+    grain: [unit_id]
+    time_col: null
+    capability: wind unit survival
+    dependency_group: 1
+    target_name: target_duration_years
+    provenance_tier: rule_derived
+    notes: fully deregistered units are absent from the registry (survivorship declared)
+    contract:
+      static:
+        - capacity_net_kw
+        - capacity_gross_kw
+        - rotor_diameter_m
+        - manufacturer
+        - model_designation
+        - latitude
+        - longitude
+        - federal_state
+        - operator_id
+        - is_offshore
+        - commissioning_year
+        - control_zone_code
+        - zone_status
+        - hub_height_m_filled
+        - hub_height_was_imputed
+      overrides:
+        commissioning_date: [flag, null, null]
+        entry_date: [flag, null, null]
+        entry_years: [flag, null, null]
+        left_truncated: [flag, null, null]
+        target_event: [target, null, null]
+      label_inputs: [stop_date]
+    split: {rule: hash_unit_stratified, rule_id: "hash:unit_stratified", group_col: unit_id}
+    fit: {group_cols: [is_offshore], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  capacity_additions:
+    ecosystem: energy
+    family: unit
+    grain: [carrier_key, commissioning_month]
+    time_col: commissioning_month
+    capability: monthly capacity additions
+    dependency_group: 1
+    target_name: target_capacity_added_mw
+    provenance_tier: constructed
+    notes: early months are understated because deregistered units are absent
+    contract:
+      label_inputs: [units_commissioned]
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: commissioning_month}
+    fit: {group_cols: [carrier_key], fold_mode: rolling, calendar_key: energy_daily, date_col: commissioning_month, impute: true}
+  redispatch_matching:
+    ecosystem: energy
+    family: unit
+    grain: [affected_asset_text]
+    time_col: null
+    capability: redispatch asset matching tier
+    dependency_group: 1
+    target_name: target_match_tier
+    provenance_tier: rule_derived
+    notes: ""
+    contract:
+      static:
+        - event_count
+        - first_event_date
+        - last_event_date
+        - max_power_mw
+        - primary_energy_type
+        - direction_count
+        - text_length
+        - token_count
+        - has_digit
+      label_inputs: [matched_unit_name, match_confidence]
+    split: {rule: all_train_grouped, rule_id: "hash:affected_asset_text", group_col: affected_asset_text}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  ccpp:
+    ecosystem: energy
+    family: unit
+    grain: [sample_key]
+    time_col: null
+    capability: combined-cycle plant output
+    dependency_group: 1
+    target_name: target_net_output_mw
+    provenance_tier: sourced
+    notes: no time column; random split grouped by repeat key; citation requirement applies
+    contract:
+      context:
+        - ambient_temperature_degc
+        - exhaust_vacuum_cm_of_mercury
+        - ambient_pressure_mbar
+        - relative_humidity_percent
+      overrides:
+        humidity_above_100_flag: [flag, null, null]
+      label_inputs: [net_electrical_output_mw]
+    split: {rule: hash_group, rule_id: "hash:sample_key", group_cols: [sample_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  weak_supervision:
+    ecosystem: energy
+    family: unit
+    grain: [entity_type, entity_id, lf_name]
+    time_col: null
+    capability: weak supervision labels
+    dependency_group: 1
+    target_name: lf_label
+    provenance_tier: weak
+    notes: ""
+    contract:
+      overrides:
+        lf_label: [target, null, null]
+        entity_type: [key, null, null]
+        entity_id: [key, null, null]
+        lf_name: [key, null, null]
+    split: {rule: all_train_grouped, rule_id: "hash:entity_id", group_col: entity_id}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  weather_imputation:
+    ecosystem: energy
+    family: self_supervised_rl
+    grain: [location_key, observation_timestamp_utc]
+    time_col: local_date
+    capability: weather quality and imputation (self-supervised)
+    dependency_group: 1
+    target_name: masked_value
+    provenance_tier: constructed
+    notes: masks come from the stored mask specification; evaluation is on held-out real values
+    contract:
+      context:
+        - air_temperature
+        - dew_point_temperature
+        - relative_humidity
+        - pressure_station
+        - pressure_sea_level
+        - wind_speed
+        - wind_direction
+        - cloud_cover
+        - visibility
+        - soil_temperature
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date, group_col: location_key}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  self_supervised_other:
+    ecosystem: energy
+    family: self_supervised_rl
+    grain: [series_family, series_id, ts]
+    time_col: local_date
+    capability: masked and shifted series windows
+    dependency_group: 1
+    target_name: masked_or_shifted_value
+    provenance_tier: constructed
+    notes: ""
+    contract:
+      context: [series_value]
+      overrides:
+        series_family: [key, null, null]
+        series_id: [key, null, null]
+        ts: [key, null, null]
+    split: {rule: calendar_per_series, rule_id: "calendar:per_series_family", family_column: series_family, honda_family: honda_hourly, honda_calendar: honda, default_calendar: energy_daily, date_col: local_date}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  rl_pumped_storage:
+    ecosystem: energy
+    family: self_supervised_rl
+    grain: [episode_id, step]
+    time_col: local_date
+    capability: pumped-storage arbitrage trajectories
+    dependency_group: 1
+    target_name: reward_eur
+    provenance_tier: constructed
+    notes: the action is the net output of many plants; only off-policy evaluation is supported
+    contract:
+      overrides:
+        state_price_eur_per_mwh: [feature, state_at_step, null]
+        state_residual_load_mwh: [feature, state_at_step, null]
+        action_generation_mwh: [target, null, null]
+        action_consumption_mwh: [target, null, null]
+        action_net_mwh: [target, null, null]
+        reward_eur: [target, null, null]
+        interval_start_utc: [flag, null, null]
+    split: {rule: calendar, rule_id: "calendar:quarter_hour", calendar: quarter_hour, date_col: local_date, group_col: episode_id}
+    fit: {group_cols: [], fold_mode: rolling, calendar_key: quarter_hour, date_col: local_date, impute: true}
+  rl_site_control:
+    ecosystem: energy
+    registered_only: true
+    status: waits_for_site_forecast_model
+    grain: [episode_id, step]
+    capability: site control (simulated tier)
+    dependency_group: 1
+    target_name: reward
+    provenance_tier: simulated
+    notes: the simulator is the trained site forecast model; validity is capped by its error
+  rl_plant_dispatch:
+    ecosystem: energy
+    registered_only: true
+    status: blocked_entsoe_probe
+    grain: [episode_id, step]
+    capability: plant-level dispatch
+    dependency_group: 1
+    target_name: reward
+    provenance_tier: constructed
+    notes: needs per-unit output for units of 100 MW or more; reward can only be market revenue
+
+  # -------------------------------------------------------------- commerce
+  session_purchase_rees46:
+    ecosystem: commerce
+    family: session_purchase
+    grain: [session_key]
+    time_col: session_date
+    group_col: user_id
+    capability: REES46 session to purchase at the two-event prefix
+    dependency_group: 1
+    target_name: target_purchase_after_prefix
+    provenance_tier: constructed
+    notes: prefix k = 2; sessions below k or with a purchase inside the prefix are excluded
+    contract:
+      overrides:
+        session_start_utc: [flag, null, null]
+        user_id: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], temporal: {kind: user_cutoff, date_col: session_date, cutoff: rees46_evaluation_start}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  session_purchase_ga4:
+    ecosystem: commerce
+    family: session_purchase
+    grain: [session_key]
+    time_col: session_date
+    group_col: user_id
+    capability: GA4 session to purchase at the ten-event prefix (thin)
+    dependency_group: 1
+    target_name: target_purchase_after_prefix
+    provenance_tier: constructed
+    notes: prefix k = 10; sessions below k or with a purchase inside the prefix are excluded
+    contract:
+      overrides:
+        session_start_utc: [flag, null, null]
+        user_id: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], diagnostic: {date_col: session_date, date: ga4_diagnostic_date}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  lapse_rees46:
+    ecosystem: commerce
+    family: lapse
+    grain: [user_id, cutoff_date]
+    time_col: cutoff_date
+    group_col: user_id
+    capability: REES46 lapse (return in the 30 days after the cutoff)
+    dependency_group: 1
+    target_name: target_returned
+    provenance_tier: constructed
+    notes: single cutoff, user-disjoint split with no temporal partition
+    contract:
+      overrides:
+        user_id: [group, null, null]
+        cutoff_date: [key, null, null]
+        label_window_days: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id", group_cols: [user_id]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  lapse_ga4:
+    ecosystem: commerce
+    family: lapse
+    grain: [user_id, cutoff_date]
+    time_col: cutoff_date
+    group_col: user_id
+    capability: GA4 lapse (return after the cutoff, thin)
+    dependency_group: 1
+    target_name: target_returned
+    provenance_tier: constructed
+    notes: training users at the first cutoff, evaluation users at the second; a user belongs to one partition
+    contract:
+      overrides:
+        user_id: [group, null, null]
+        cutoff_date: [key, null, null]
+        label_window_days: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_cutoffs", group_cols: [user_id], temporal: {kind: user_cutoffs, date_col: cutoff_date, train: ga4_lapse_train_cutoff, evaluation: ga4_lapse_evaluation_cutoff}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  next_item_rees46:
+    ecosystem: commerce
+    family: next_item_sequence
+    grain: [session_key, step]
+    time_col: local_date
+    group_col: user_id
+    capability: REES46 next distinct item
+    dependency_group: 1
+    target_name: target_next_product_id
+    provenance_tier: constructed
+    notes: ties in the event timestamp are ordered by event key and flagged
+    contract:
+      overrides:
+        user_id: [group, null, null]
+        event_key: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], temporal: {kind: user_cutoff, date_col: local_date, cutoff: rees46_evaluation_start}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  next_item_ga4:
+    ecosystem: commerce
+    family: next_item_sequence
+    grain: [session_key, step]
+    time_col: local_date
+    group_col: user_id
+    capability: GA4 next distinct item
+    dependency_group: 1
+    target_name: target_next_product_id
+    provenance_tier: constructed
+    notes: ties in the event timestamp are ordered by event key and flagged
+    contract:
+      overrides:
+        user_id: [group, null, null]
+        event_key: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], diagnostic: {date_col: local_date, date: ga4_diagnostic_date}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  rl_session_sequences:
+    ecosystem: commerce
+    family: next_item_sequence
+    grain: [episode_id, step]
+    time_col: local_date
+    group_col: user_id
+    capability: session sequences with reward-weighted targets
+    dependency_group: 1
+    target_name: reward
+    provenance_tier: simulated
+    notes: sequence modelling with reward-weighted targets; the action is the user's choice, not a policy
+    contract:
+      overrides:
+        user_id: [group, null, null]
+        event_key: [flag, null, null]
+        session_key: [flag, null, null]
+        target_action_event_type: [target, null, null]
+        target_action_product_id: [target, null, null]
+        reward: [target, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], temporal: {kind: user_cutoff, date_col: local_date, cutoff: rees46_evaluation_start}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+
+  # ------------------------------------------------------------- genomics
+  # Label-derived columns are declared per target (Silver rules read on 2026-11-21:
+  # drug_response_* points use is_pathogenic and is_benign; the rare, conflict and
+  # actionable flags use is_pathogenic; sequence scores are not label-derived).
+  variant_pathogenicity:
+    ecosystem: genomics
+    family: variant
+    grain: [variant_key]
+    time_col: null
+    capability: ClinVar variant pathogenic against benign
+    dependency_group: 1
+    target_name: target_is_pathogenic
+    provenance_tier: sourced
+    notes: rows with a pathogenic or benign class; the clinical significance text and class flags are the label
+    contract:
+      overrides:
+        key_source: [flag, null, null]
+        gene_key: [group, null, null]
+    group_col: gene_key
+    label_derived:
+      - is_pathogenic
+      - is_benign
+      - is_vus
+      - clinical_significance_label
+      - clinical_significance_label__matched_text
+      - review_quality_score
+      - has_no_review_stars
+      - drug_response_significance_points
+      - drug_response_priority_score
+      - drug_response_priority
+      - drug_response_impact
+      - drug_response_category
+      - is_high_impact_variant
+      - clinical_significance_frequency_score
+      - pathogenicity_likelihood_refined
+      - pathogenicity_frequency_conflict
+      - frequency_pathogenicity_conflict
+      - rare_pathogenic_variant
+      - is_clinically_actionable_rare_variant
+      - common_benign_validation
+      - carrier_frequency_by_disease
+      - population_priority
+      - screening_recommendation
+      - clinical_actionability
+      - clinical_impact_priority
+      - clinvar_first_snapshot
+      - clinvar_last_snapshot
+      - clinvar_snapshot_count
+      - condition_count
+      - days_since_evaluation
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  variant_high_impact:
+    ecosystem: genomics
+    family: variant
+    grain: [variant_key]
+    time_col: null
+    capability: ClinVar variant high sequence impact
+    dependency_group: 1
+    target_name: target_is_high_impact
+    provenance_tier: rule_derived
+    notes: the label is the impact rule of Silver (pathogenicity score at or above a band); its inputs are label-derived here
+    contract:
+      overrides:
+        key_source: [flag, null, null]
+        gene_key: [group, null, null]
+    group_col: gene_key
+    label_derived:
+      - is_high_impact
+      - is_very_high_impact
+      - pathogenicity_score
+      - mutation_severity_score
+      - combined_pathogenicity_risk
+      - combined_impact_score
+      - predicted_pathogenicity
+      - protein_impact_category
+      - variant_impact_tier
+      - conservation_impact_class
+      - domain_impact_severity
+      - splice_impact_severity
+      - clinical_significance_label
+      - is_pathogenic
+      - is_benign
+      - is_vus
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  variant_carrier_screening:
+    ecosystem: genomics
+    family: variant
+    grain: [variant_key]
+    time_col: null
+    capability: variant carrier-screening candidate (rare germline variant)
+    dependency_group: 1
+    target_name: target_is_carrier_screening_candidate
+    provenance_tier: rule_derived
+    notes: rows with a population frequency; the label is a rare tier and a germline origin
+    contract:
+      overrides:
+        key_source: [flag, null, null]
+        gene_key: [group, null, null]
+    group_col: gene_key
+    label_derived:
+      - is_carrier_screening_candidate
+      - frequency_tier
+      - frequency_band
+      - origin
+      - origin_source
+      - origin_method
+      - rarity_score
+      - carrier_risk_score
+      - carrier_risk_score_adjusted
+      - screening_recommendation
+      - population_priority
+      - is_pathogenic
+      - is_benign
+      - is_vus
+      - clinical_significance_label
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  variant_actionable_rare:
+    ecosystem: genomics
+    family: variant
+    grain: [variant_key]
+    time_col: null
+    capability: variant clinically actionable rare variant
+    dependency_group: 1
+    target_name: target_is_clinically_actionable_rare_variant
+    provenance_tier: rule_derived
+    notes: rows with a population frequency; the label is a rare tier and a pathogenic class
+    contract:
+      overrides:
+        key_source: [flag, null, null]
+        gene_key: [group, null, null]
+    group_col: gene_key
+    label_derived:
+      - is_clinically_actionable_rare_variant
+      - rare_pathogenic_variant
+      - is_pathogenic
+      - is_benign
+      - is_vus
+      - clinical_significance_label
+      - clinical_significance_frequency_score
+      - pathogenicity_likelihood_refined
+      - pathogenicity_frequency_conflict
+      - carrier_frequency_by_disease
+      - screening_recommendation
+      - population_priority
+      - frequency_tier
+      - frequency_band
+      - rarity_score
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  gene_pharmacogene:
+    ecosystem: genomics
+    family: gene
+    grain: [gene_key]
+    time_col: null
+    capability: gene is a pharmacogene
+    dependency_group: 1
+    target_name: target_is_pharmacogene
+    provenance_tier: sourced
+    notes: the label is the PharmGKB gene annotation; columns that count or score pharmacogene evidence are label-derived
+    contract:
+      overrides:
+        entity_type: [flag, null, null]
+        key_source: [flag, null, null]
+    label_derived:
+      - is_pharmacogene
+      - gene_pharmacogene_burden
+      - gene_pharmacogene_priority
+      - gene_pharmacogene_pathogenic
+      - has_pharmgkb_annotation
+      - drug_target_category
+      - drug_metabolism_context
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  gene_cancer_role:
+    ecosystem: genomics
+    family: gene
+    grain: [gene_key]
+    time_col: null
+    capability: gene cancer role (multiclass)
+    dependency_group: 1
+    target_name: target_gene_cancer_role
+    provenance_tier: sourced
+    notes: the old project found 97.95 percent in one class; the class balance is reported by the gates
+    contract:
+      overrides:
+        entity_type: [flag, null, null]
+        key_source: [flag, null, null]
+    label_derived:
+      - gene_cancer_role
+      - cancer_protein_classification
+      - cancer_expression_relevance
+      - cancer_mutation_burden
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  structural_variant_disruption:
+    ecosystem: genomics
+    family: variant
+    grain: [variant_key]
+    time_col: null
+    capability: structural variant critical gene disruption
+    dependency_group: 1
+    target_name: target_has_critical_gene_disruption
+    provenance_tier: rule_derived
+    notes: the variant rows of structural_variant_profile (the gene overlap rows are left out); the label is derived from the gene overlap columns
+    group_col: variant_key
+    label_derived:
+      - has_critical_gene_disruption
+      - max_gene_disruption_fraction
+      - gene_disruption_level
+      - gene_coverage_fraction
+      - structural_variant_classification
+      - structural_variant_clinical_priority
+      - structural_variant_impact_tier
+      - structural_variant_pathogenicity_risk
+      - structural_variant_combined_impact_score
+    split: {rule: hash_group, rule_id: "hash:variant_key", group_cols: [variant_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  benchmark_causal_eqtl:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark causal eQTL (source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the split is the source split; label and split columns come from the benchmark
+    benchmark_set: causal_eqtl
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  benchmark_maps:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark MAPS (source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: 1,682 proteins occur in train and test in the source split; the leakage gate reports it
+    benchmark_set: maps
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  benchmark_pathogenic_coding:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark long-range pathogenic coding (source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the split is the source split
+    benchmark_set: pathogenic_coding
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  benchmark_pathogenic_non_coding:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark long-range pathogenic non-coding (source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the source test split has 406 pathogenic rows against 2,321,067 common rows
+    benchmark_set: pathogenic_non_coding
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, impute: false}
+  benchmark_spectralbio:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark SpectraLBIO (source subsets)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the three subsets are the source split
+    benchmark_set: spectralbio
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  benchmark_clinvar_vs_benign:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark ClinVar against benign (no source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the source gives no split; split by hash of the gene
+    benchmark_set: clinvar_vs_benign
+    group_col: gene
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: hash_group, rule_id: "hash:gene", group_cols: [gene]}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  benchmark_gnomad_balanced:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark gnomAD balanced (no source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the source gives no split; split by hash of the protein
+    benchmark_set: gnomad_balanced
+    group_col: protein_id
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: hash_group, rule_id: "hash:protein_id", group_cols: [protein_id]}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  benchmark_proteingym_clinical:
+    ecosystem: genomics
+    family: benchmark
+    grain: [source_record_id]
+    time_col: null
+    capability: benchmark ProteinGym clinical (no source split)
+    dependency_group: 1
+    target_name: target_label_integer
+    provenance_tier: sourced
+    notes: the source gives no split; split by hash of the protein
+    benchmark_set: proteingym_clinical
+    group_col: protein_id
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    split: {rule: hash_group, rule_id: "hash:protein_id", group_cols: [protein_id]}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}

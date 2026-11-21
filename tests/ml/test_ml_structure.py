@@ -2,7 +2,7 @@
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
-Date: September 2026
+Date: November 2026
 
 Every notebook must parse, carry the standard header, stay within the cell
 limit, keep to the allowed set of driver-side conversions, reference only
@@ -34,13 +34,20 @@ _GATE_CALLS = {
     "record_check",
     "assert_values_present",
     "assert_no_forbidden_columns",
+    # these library functions call the gates themselves
+    "build_datasets",
+    "write_stored_table",
 }
-_WRITE_CALLS = {"write_ml", "write_ml_view"}
+_WRITE_CALLS = {
+    "write_ml",
+    "write_dataset_rows",
+    "write_stored_table",
+    "build_datasets",
+}
 # Small entity tables only (guarded by a size assertion) or tiny aggregates.
 _TO_PANDAS_ALLOWED = {
-    "utility/01_gap_limit_evaluation.py",
-    "energy/features/05_hub_height_fill.py",
-    "energy/features/09_zone_weather_acceptance.py",
+    "energy/02_unit_and_site_datasets.py",
+    "energy/03_zone_and_weather_datasets.py",
 }
 _DOC_REFERENCES = re.compile(r"docs/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
 
@@ -96,37 +103,35 @@ def test_to_pandas_is_limited_to_the_small_table_notebooks(path):
         assert _rel(path) in _TO_PANDAS_ALLOWED, f"{_rel(path)} calls toPandas"
 
 
-def test_split_notebooks_reference_only_defined_calendars():
+def test_the_spec_references_only_defined_calendars():
     calendars = set(load_ml_common()["SPLIT_CALENDARS"])
     pat = re.compile(r"(?:calendar_partition|rolling_fold)\([^,]+,\s*\"(\w+)\"")
-    for p in (_ML / "energy" / "split").glob("*.py"):
+    for p in _FILES:
         for key in pat.findall(p.read_text(encoding="utf-8")):
             assert key in calendars, f"{_rel(p)} uses unknown calendar {key}"
 
 
-def test_fit_notebooks_never_read_the_test_partition():
+def test_build_code_never_reads_the_test_partition():
     pat = re.compile(r"""(==|!=)\s*['"]test['"]|isin\([^)]*['"]test['"]""")
-    for sub in ("energy/fit", "commerce/fit"):
-        for p in (_ML / sub).glob("*.py"):
-            assert not pat.search(p.read_text(encoding="utf-8")), _rel(p)
+    for p in (*_ML.glob("*/0*.py"), _ML / "_ml_fit.py"):
+        if p.parent.name == "gate":
+            continue
+        assert not pat.search(p.read_text(encoding="utf-8")), _rel(p)
 
 
 def test_registry_tables_are_defined_and_used():
     ddl = set(load_ml_common()["REGISTRY_DDL"])
     used = set()
-    for p in _NOTEBOOKS:
+    for p in _FILES:
         used |= set(
             re.findall(r"read_ml\(\"([a-z_]+)\"", p.read_text(encoding="utf-8"))
         )
     registry = {
         "dataset_manifest",
-        "split_specification",
         "partition_manifest",
         "null_class_registry",
         "imputer_parameters",
         "mask_specification",
-        "gap_limits",
-        "null_rate_profile",
         "feature_contract",
         "gate_results",
     }
@@ -134,7 +139,14 @@ def test_registry_tables_are_defined_and_used():
     assert used & registry
 
 
-_SHARED_NAME_ALLOWED = {"_ml_common.py", "00_ml_setup.py", "03_freeze_gate.py"}
+def test_the_ml_folder_stays_under_the_file_target():
+    """Fewer than 15 files: the notebooks, the libraries and the spec file."""
+    spec = _ROOT / "src" / "schemas" / "mappings" / "ml_datasets.yml"
+    assert spec.exists()
+    assert len(_FILES) + 1 < 15, f"{len(_FILES)} files in databricks/ml"
+
+
+_SHARED_NAME_ALLOWED = {"_ml_common.py", "00_ml_setup.py", "01_ml_gates.py"}
 
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)
@@ -150,25 +162,29 @@ def test_shared_registry_tables_are_reached_through_the_helpers(path):
         assert f"ml_fqn('{name}'" not in text, f"{_rel(path)}: {name}"
 
 
-def test_gate_notebooks_and_freeze_gate_exist():
-    for name in (
-        "01_leakage_audit.py",
-        "02_null_handling_audit.py",
-        "03_freeze_gate.py",
-    ):
-        assert (_ML / "gate" / name).exists()
+def test_the_gate_notebook_exists():
+    assert (_ML / "gate" / "01_ml_gates.py").exists()
 
 
 def test_write_ml_refuses_a_frozen_dataset_before_any_write():
     text = (_ML / "_ml_common.py").read_text()
-    body = text[text.index("def write_ml(") :]
-    assert body.index("_frozen_guard(table, ecosystem)") < body.index(".saveAsTable(")
+    for name in ("def write_ml(", "def write_dataset_rows("):
+        body = text[text.index(name) :]
+        assert body.index("_frozen_guard(") < body.index(".saveAsTable(")
 
 
 def test_freeze_gate_protects_and_reads_the_version_before_freezing():
-    text = (_ML / "gate" / "03_freeze_gate.py").read_text()
+    text = (_ML / "gate" / "01_ml_gates.py").read_text()
     assert "delta.deletedFileRetentionDuration" in text
     assert "delta.logRetentionDuration" in text
     assert 'format("noop")' in text
-    call = text.index("read_error = protect_and_read(full")
+    call = text.index("error = protect_and_read(full, version)")
     assert call < text.index("SET status = 'frozen'")
+
+
+def test_the_freeze_pins_a_family_only_when_every_dataset_of_it_passed():
+    text = (_ML / "gate" / "01_ml_gates.py").read_text()
+    assert "waiting = [d for d in built" in text
+    assert "if waiting or failed:" in text
+    call = text.index("error = protect_and_read(full, version)")
+    assert text.index("if waiting or failed:") < call

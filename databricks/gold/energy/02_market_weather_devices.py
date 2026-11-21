@@ -150,6 +150,45 @@ PROVENANCE = [
 ]
 NO_TEXT = F.lit(None).cast("string")
 NO_FLAG = F.lit(None).cast("boolean")
+# Gold table -> the Silver tables it is built from (gold/energy/01 and 02,
+# gold/shared/01)
+GOLD_FEEDS = {
+    "storage_plant": ("storage_plant",),
+    "market_actor": ("market_actor",),
+    "grid_location": ("grid_location",),
+    "grid_network": ("grid_network",),
+    "balancing_area": ("balancing_area",),
+    "generation_unit": ("generation_unit", "support_registration"),
+    "power_plant": ("power_plant_register", "generation_unit"),
+    "unit_event": ("register_change_event", "unit_authorisation", "unit_repowering"),
+    "capacity_plan": ("power_plant_capacity_plan",),
+    "market_actor_role": ("market_actor_role", "market_actor"),
+    "grid_connection_point": (
+        "grid_connection_point",
+        "grid_network",
+        "grid_location",
+        "balancing_area",
+        "market_actor",
+    ),
+    "weather_daily": ("weather_daily",),
+    "iot_device": ("device_telemetry_snapshot",),
+    "plant_sensor_observation": ("plant_operating_sample",),
+    "grid_intervention_event": ("grid_intervention_event",),
+    "market_price": ("energy_observation",),
+    "channel_reading": ("energy_observation",),
+    "energy_component": ("energy_component",),
+    "forecast_actual": ("energy_component",),
+    "weather_observation": ("weather_observation", "weather_location"),
+    "entity_link": ("register_link",),
+    "ref_energy_carrier_map": ("energy_carrier_map",),
+    "ref_measure": ("reference_code_list",),
+    "dim_place": ("weather_location", "weather_station_period"),
+    "series_coverage": (
+        "weather_missingness_reconciliation",
+        "weather_missing_value_period",
+        "weather_station_period",
+    ),
+}
 TABLES = {}
 
 # COMMAND ----------
@@ -434,3 +473,17 @@ inspect_tables(TABLES, findings="energy", **COMMON)
 
 # DBTITLE 1,Validation -- every table exists and has rows
 validate_tables(TABLES, **COMMON)
+
+# COMMAND ----------
+
+# DBTITLE 1,Validation -- every Silver energy table feeds a Gold table
+unfed = unfed_tables(GOLD_FEEDS, silver_tables(ENERGY_SILVER_SCHEMAS))
+check(
+    COMPONENT,
+    SOURCE,
+    "every_silver_table_feeds_a_gold_table",
+    not unfed,
+    detail=", ".join(unfed),
+    metric_value=float(len(unfed)),
+    rid=RID,
+)

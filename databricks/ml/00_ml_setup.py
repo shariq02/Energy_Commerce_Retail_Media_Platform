@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # ML SETUP
@@ -10,10 +10,11 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** September 2026
+# MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** create the two ML schemas and the registry tables, and assert every Gold
-# MAGIC table the ML notebooks read exists. Idempotent.
+# MAGIC **Purpose:** create the ML schemas and the registry tables, check that
+# MAGIC every Gold table the ML notebooks read exists, and count the objects per
+# MAGIC schema against the quota. Run once before any build notebook.
 
 # COMMAND ----------
 
@@ -23,48 +24,41 @@
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-ML_ECOSYSTEMS = ("energy", "commerce")
-ENERGY_ONLY_REGISTRY = ("gap_limits",)
-
+ML_ECOSYSTEMS = tuple(ML_SCHEMAS)
 # Every Gold table the ML notebooks read -- (schema, table).
 _REQUIRED_GOLD = (
-    ("energy_gold", "energy_balance_component"),
+    ("energy_gold", "energy_component"),
     ("energy_gold", "market_price"),
-    ("energy_gold", "generation_forecast"),
     ("energy_gold", "generation_unit"),
     ("energy_gold", "grid_connection_point"),
     ("energy_gold", "grid_intervention_event"),
     ("energy_gold", "channel_reading"),
     ("energy_gold", "weather_observation"),
-    ("energy_gold", "weather_observation_radiation"),
-    ("energy_gold", "place_instrument_period"),
     ("energy_gold", "plant_sensor_observation"),
     ("shared_conformed", "series_coverage"),
-    ("shared_conformed", "data_gap_period"),
     ("shared_conformed", "dim_place"),
-    ("commerce_gold", "ga4_event"),
-    ("commerce_gold", "ga4_session"),
-    ("commerce_gold", "ga4_product"),
-    ("commerce_gold", "rees46_event"),
-    ("commerce_gold", "rees46_session"),
-    ("commerce_gold", "rees46_product"),
+    ("commerce_gold", "commerce_event"),
+    ("commerce_gold", "commerce_event_item"),
+    ("commerce_gold", "commerce_session"),
+    ("commerce_gold", "commerce_product"),
+    ("genomics_gold", "variant_profile"),
+    ("genomics_gold", "gene_profile"),
+    ("genomics_gold", "structural_variant_profile"),
+    ("genomics_gold", "benchmark_variant"),
 )
 
 # COMMAND ----------
 
 # DBTITLE 1,Create the ML schemas
-for schema in (*(ml_schema_for(eco) for eco in ML_ECOSYSTEMS), ML_SHARED_SCHEMA):
+for schema in (*ML_SCHEMAS.values(), ML_SHARED_SCHEMA):
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{schema}")
     print(f"OK  schema ready: {CATALOG}.{schema}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Create the registry tables
-for eco in ML_ECOSYSTEMS:
-    for name, ddl in REGISTRY_DDL.items():
-        if name in ENERGY_ONLY_REGISTRY and eco != "energy":
-            continue
-        print(f"OK  registry table ready: {create_ml_registry_table(name, ddl, eco)}")
+for name, ddl in REGISTRY_DDL.items():
+    print(f"OK  registry table ready: {create_ml_registry_table(name, ddl, 'energy')}")
 
 # COMMAND ----------
 
@@ -94,5 +88,6 @@ print("ML SETUP SUMMARY")
 print("=" * 70)
 for eco in ML_ECOSYSTEMS:
     print(f"Schema : {CATALOG}.{ml_schema_for(eco)}")
+print(f"Schema : {CATALOG}.{ML_SHARED_SCHEMA}")
 print("RESULT: PASS")
 print("=" * 70)

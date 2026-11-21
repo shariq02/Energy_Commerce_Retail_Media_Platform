@@ -340,6 +340,8 @@ STRUCTURAL_RULES = ("structural_variant_features",)
 # The widest typed table (owner, 2026-11): record kinds that would pass it stay apart.
 MAX_TYPED_COLUMNS = 140
 GENOMICS_SILVER_SCHEMAS = ("genomics_silver", "genomics_silver_reference")
+ENERGY_SILVER_SCHEMAS = ("energy_silver", "energy_silver_reference")
+COMMERCE_SILVER_SCHEMAS = ("commerce_silver",)
 
 
 def mixed_columns(dtypes: list) -> set:

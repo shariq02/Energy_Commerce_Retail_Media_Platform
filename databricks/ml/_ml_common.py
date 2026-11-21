@@ -13,12 +13,12 @@
 # MAGIC **Date:** September 2026
 # MAGIC
 # MAGIC **Purpose:** the reusable ML-dataset plumbing pulled into every ML
-# MAGIC notebook with `%run ../../_ml_common`. Definitions only -- no side
-# MAGIC effects at import; the caller owns `spark`.
+# MAGIC notebook with `%run ../_ml_common`. Definitions only; the one read at import
+# MAGIC is the dataset spec file. The caller owns `spark`.
 # MAGIC
-# MAGIC Covers as-of joins, causal gap fill, fitted imputers, split calendars and
-# MAGIC partition helpers, registry tables and the hard-fail gate. Gold is read,
-# MAGIC never changed.
+# MAGIC Covers the spec file, family dataset tables, as-of joins, causal gap fill,
+# MAGIC fitted imputers, split rules, registry tables and the hard-fail gate. Gold is
+# MAGIC read, never changed.
 
 # COMMAND ----------
 
@@ -39,19 +39,22 @@ from pyspark.sql.window import Window
 
 # DBTITLE 1,Configuration constants
 ML_STAGE = "ml"
-ML_SCHEMAS = {"energy": "energy_ml_datasets", "commerce": "commerce_ml_datasets"}
+ML_SCHEMAS = {
+    "energy": "energy_ml_datasets",
+    "commerce": "commerce_ml_datasets",
+    "genomics": "genomics_ml_datasets",
+}
 ML_SHARED_SCHEMA = "ml_datasets_shared"
 ML_SHARED_TABLES = (
     "dataset_manifest",
-    "split_specification",
     "partition_manifest",
     "null_class_registry",
     "imputer_parameters",
     "mask_specification",
-    "null_rate_profile",
     "feature_contract",
     "gate_results",
 )
+ML_SPEC = load_yaml("src/schemas/mappings/ml_datasets.yml")
 ECOSYSTEM_COLUMN = "ecosystem"
 SCHEMA_OBJECT_QUOTA = 100
 SCHEMA_OBJECT_WARN = 80
@@ -73,8 +76,8 @@ CLASS_E_COLUMNS = (
     "forecast_issue_timestamp",
 )
 
-# Upper bound in hours for a causal gap fill; the final limits come from
-# utility/01_gap_limit_evaluation and are stored in the gap_limits table.
+# Upper bound in hours for a causal gap fill; the final limits come from the gap
+# limit evaluation and are stored as rows of imputer_parameters (dataset gap_limits).
 GAP_LIMIT_CAPS_HOURS = {
     "air_temperature": 3,
     "dew_point_temperature": 3,
@@ -101,64 +104,31 @@ NEVER_FILLED = (
     "honda_increment",
 )
 
-# Split calendars: (start, end) per partition; end None means open.
+# Split calendars: (start, end) per partition; end None means open. All values come
+# from the spec file.
 SPLIT_CALENDARS = {
-    "energy_daily": {
-        "train": ("2018-10-01", "2023-12-31"),
-        "validation": ("2024-01-01", "2024-12-31"),
-        "test": ("2025-01-01", None),
-    },
-    "quarter_hour": {
-        "train": ("2024-09-08", "2025-06-30"),
-        "validation": ("2025-07-01", "2025-12-31"),
-        "test": ("2026-01-01", None),
-    },
-    "redispatch": {
-        "train": ("2013-04-02", "2018-12-31"),
-        "validation": ("2019-01-01", "2019-12-31"),
-        "test": ("2020-01-01", "2020-12-31"),
-    },
-    "honda": {
-        "train": ("2018-01-01", "2021-12-31"),
-        "validation": ("2022-01-01", "2022-12-31"),
-        "test": ("2023-01-01", "2023-12-31"),
-    },
+    key: {part: tuple(cal[part]) for part in ("train", "validation", "test")}
+    for key, cal in ML_SPEC["calendars"].items()
 }
 # Embargo in days between partitions: label horizon plus the realised lag.
-EMBARGO_DAYS = {
-    "energy_daily": 2,
-    "quarter_hour": 2,
-    "redispatch": 2,
-    "honda": 1,
-}
+EMBARGO_DAYS = {key: cal["embargo_days"] for key, cal in ML_SPEC["calendars"].items()}
 # Rolling-origin validation blocks inside the training partition.
 ROLLING_BLOCKS = {
-    "energy_daily": [
-        ("2021-01-01", "2021-12-31"),
-        ("2022-01-01", "2022-12-31"),
-        ("2023-01-01", "2023-12-31"),
-    ],
-    "quarter_hour": [("2025-01-01", "2025-03-31"), ("2025-04-01", "2025-06-30")],
-    "redispatch": [
-        ("2016-01-01", "2016-12-31"),
-        ("2017-01-01", "2017-12-31"),
-        ("2018-01-01", "2018-12-31"),
-    ],
-    "honda": [
-        ("2019-01-01", "2019-12-31"),
-        ("2020-01-01", "2020-12-31"),
-        ("2021-01-01", "2021-12-31"),
-    ],
+    key: [tuple(block) for block in cal["blocks"]]
+    for key, cal in ML_SPEC["calendars"].items()
 }
-USER_SPLIT_PERCENT = (70, 15, 15)
-USER_HASH_SEED = "ecrmap-ml-s1"
-GROUPED_FOLDS = 5
-REES46_EVALUATION_START = "2019-11-01"
-GA4_LAPSE_TRAIN_CUTOFF = "2020-11-20"
-GA4_LAPSE_EVALUATION_CUTOFF = "2020-12-01"
-SURVIVAL_WINDOW_START = "2021-01-01"
-SURVIVAL_CENSOR_DATE = "2026-09-03"
-SURVIVAL_CHECK_FIT_THROUGH = "2024-12-31"
+_CUTOFFS = ML_SPEC["cutoffs"]
+USER_SPLIT_PERCENT = tuple(_CUTOFFS["user_split_percent"])
+USER_HASH_SEED = _CUTOFFS["user_hash_seed"]
+GROUPED_FOLDS = _CUTOFFS["grouped_folds"]
+REES46_EVALUATION_START = _CUTOFFS["rees46_evaluation_start"]
+GA4_LAPSE_TRAIN_CUTOFF = _CUTOFFS["ga4_lapse_train_cutoff"]
+GA4_LAPSE_EVALUATION_CUTOFF = _CUTOFFS["ga4_lapse_evaluation_cutoff"]
+GA4_DIAGNOSTIC_DATE = _CUTOFFS["ga4_diagnostic_date"]
+SURVIVAL_WINDOW_START = _CUTOFFS["survival_window_start"]
+SURVIVAL_CENSOR_DATE = _CUTOFFS["survival_censor_date"]
+SURVIVAL_CHECK_FIT_THROUGH = _CUTOFFS["survival_check_fit_through"]
+SURVIVAL_DIAGNOSTIC_DATE = _CUTOFFS["survival_diagnostic_date"]
 
 # COMMAND ----------
 
@@ -173,6 +143,38 @@ def ml_fqn(table: str, ecosystem: str) -> str:
     """A registry table that both ecosystems share lives once in the shared schema."""
     schema = ML_SHARED_SCHEMA if table in ML_SHARED_TABLES else ml_schema_for(ecosystem)
     return f"{CATALOG}.{schema}.{table}"
+
+
+def dataset_spec(dataset_id: str) -> dict:
+    """The declaration of one dataset in the spec file."""
+    return ML_SPEC["datasets"][dataset_id]
+
+
+def dataset_family(dataset_id: str) -> str:
+    return dataset_spec(dataset_id)["family"]
+
+
+def dataset_table(dataset_id: str) -> str:
+    """The family table that holds the rows of a dataset."""
+    return f"dataset_{dataset_family(dataset_id)}"
+
+
+def family_tables(ecosystem: str) -> list[str]:
+    """The family dataset tables of one ecosystem."""
+    return [
+        f"dataset_{name}"
+        for name, family in ML_SPEC["families"].items()
+        if family["ecosystem"] == ecosystem
+    ]
+
+
+def built_datasets(ecosystem: str) -> list[str]:
+    """The datasets of one ecosystem that are built (not only registered)."""
+    return [
+        name
+        for name, spec in ML_SPEC["datasets"].items()
+        if spec["ecosystem"] == ecosystem and not spec.get("registered_only")
+    ]
 
 
 def ddl_with_ecosystem(ddl: str) -> str:
@@ -211,27 +213,29 @@ def ml_run_id() -> str:
 
 # DBTITLE 1,Registry table definitions (created by 00_ml_setup)
 REGISTRY_DDL = {
+    # one row per dataset: the identity, the family table, the freeze and the split
+    # specification (split_family, split_rule, the calendar and the fold scheme)
     "dataset_manifest": (
         "dataset_id string, dataset_version string, ecosystem string, "
-        "capability string, grain_key array<string>, dependency_group int, "
-        "target_name string, provenance_tier string, status string, "
-        "freeze_status string, frozen_delta_version bigint, notes string, "
-        "updated_at timestamp"
-    ),
-    "split_specification": (
-        "dataset_id string, split_version string, family string, rule string, "
-        "train_start string, train_end string, validation_start string, "
-        "validation_end string, test_start string, test_end string, "
-        "embargo_days int, hash_seed string, fold_scheme string, notes string"
+        "family string, capability string, grain_key array<string>, "
+        "dependency_group int, target_name string, provenance_tier string, "
+        "status string, freeze_status string, frozen_delta_version bigint, "
+        "notes string, updated_at timestamp, split_version string, "
+        "split_family string, split_rule string, train_start string, "
+        "train_end string, validation_start string, validation_end string, "
+        "test_start string, test_end string, embargo_days int, "
+        "hash_seed string, fold_scheme string, split_notes string"
     ),
     "partition_manifest": (
         "dataset_id string, split_version string, grain_key string, "
         "partition string, fold_id int, group_key string, rule_id string, "
         "diagnostic_group string"
     ),
+    # one row per dataset column: the null class and the null rate of the training rows
     "null_class_registry": (
         "dataset_id string, column_name string, null_class string, "
-        "method string, parameters string, decided_at timestamp"
+        "method string, parameters string, decided_at timestamp, "
+        "null_rate_train double, decision string, evaluated_at timestamp"
     ),
     "imputer_parameters": (
         "dataset_id string, split_version string, fold_id int, "
@@ -242,14 +246,6 @@ REGISTRY_DDL = {
         "dataset_id string, split_version string, seed int, "
         "mask_length_hours int, weight double, block_start string, "
         "block_end string, held_out_units string"
-    ),
-    "gap_limits": (
-        "variable string, cap_hours int, final_limit_hours int, method string, "
-        "score double, baseline_score double, evaluated_at timestamp"
-    ),
-    "null_rate_profile": (
-        "dataset_id string, column_name string, null_rate_train double, "
-        "decision string, evaluated_at timestamp"
     ),
     "feature_contract": (
         "dataset_id string, column_name string, role string, clock string, "
@@ -262,21 +258,23 @@ REGISTRY_DDL = {
 }
 # Column roles and the clocks a feature may declare. A load clock is never a
 # feature; realised observations need lag_days >= MIN_REALISED_LAG_DAYS.
-CONTRACT_ROLES = ("key", "time", "target", "label_input", "feature", "flag", "group")
-FEATURE_CLOCKS = (
-    "observation_realised",
-    "publication_before_day",
-    "calendar",
-    "static_registry",
-    "registry_effective",
-    "session_prefix",
-    "user_history_before_session",
-    "derived_from_earlier",
-    "perfect_prognosis",
-    "context_window",
-    "state_at_step",
+CONTRACT_ROLES = (
+    "key",
+    "time",
+    "target",
+    "label_input",
+    "label_derived",
+    "feature",
+    "flag",
+    "group",
 )
-REGISTRY_ECOSYSTEM_ONLY = {"gap_limits": "energy"}
+FEATURE_CLOCKS = tuple(ML_SPEC["feature_clocks"])
+# The clock a column gets when no rule names one, by ecosystem.
+DEFAULT_CLOCK = {
+    "energy": "derived_from_earlier",
+    "commerce": "derived_from_earlier",
+    "genomics": "static_annotation",
+}
 
 # COMMAND ----------
 
@@ -444,24 +442,24 @@ def _quota_guard(full: str, ecosystem: str) -> None:
 
 
 def _frozen_guard(table: str, ecosystem: str) -> None:
-    """A frozen dataset table is never overwritten; reopen it first."""
+    """A frozen family table is never overwritten; reopen its datasets first."""
     manifest = ml_fqn("dataset_manifest", ecosystem)
     if table == "dataset_manifest" or not spark.catalog.tableExists(manifest):
         return
-    if not table.startswith("dataset_"):
+    if table not in family_tables(ecosystem):
         return
     frozen = (
         read_ml("dataset_manifest", ecosystem=ecosystem)
         .filter(
-            (F.col("dataset_id") == table.removeprefix("dataset_"))
+            (F.col("family") == table.removeprefix("dataset_"))
             & (F.col("freeze_status") == "frozen")
         )
         .count()
     )
     if frozen:
         raise RuntimeError(
-            f"{ml_fqn(table, ecosystem)} is frozen; run its assembled notebook "
-            "to reopen it"
+            f"{ml_fqn(table, ecosystem)} holds a frozen dataset; reopen it before "
+            "a write"
         )
 
 
@@ -525,12 +523,67 @@ def write_ml(
     return n
 
 
-def write_ml_view(select_sql: str, table: str, *, ecosystem: str) -> None:
-    """CREATE OR REPLACE VIEW; select_sql uses fully-qualified table names."""
+def write_dataset_rows(
+    df: DataFrame,
+    dataset_id: str,
+    *,
+    source: str,
+    component: str,
+    rid: str,
+) -> int | None:
+    """Replace the rows of one dataset in its family table; the other datasets of
+    the family are untouched. The first write creates the table; a later write may
+    add columns (mergeSchema). The caller adds the provenance columns."""
+    ecosystem = dataset_spec(dataset_id)["ecosystem"]
+    table = dataset_table(dataset_id)
     full = ml_fqn(table, ecosystem)
+    _frozen_guard(table, ecosystem)
     _quota_guard(full, ecosystem)
-    spark.sql(f"CREATE OR REPLACE VIEW {full} AS\n{select_sql}")
-    print(f"OK  {full}: view created")
+    started = now_utc()
+    if spark.catalog.tableExists(full):
+        v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
+        print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
+        (
+            df.write.format("delta")
+            .mode("overwrite")
+            .option("replaceWhere", f"dataset_id = '{dataset_id}'")
+            .option("mergeSchema", "true")
+            .saveAsTable(full)
+        )
+    else:
+        df.write.format("delta").mode("overwrite").saveAsTable(full)
+    n = spark.table(full).filter(F.col("dataset_id") == dataset_id).count()
+    row = spark.createDataFrame(
+        [
+            (
+                rid,
+                source,
+                ML_STAGE,
+                component,
+                None,
+                None,
+                int(n),
+                "COMPLETE",
+                started,
+                _dt.datetime.now(_dt.UTC),
+            )
+        ],
+        "run_id string, source string, stage string, component string, "
+        "last_processed_ts timestamp, last_processed_row bigint, rows_written bigint, "
+        "status string, started_at timestamp, completed_at timestamp",
+    )
+    row.write.format("delta").mode("append").saveAsTable(WATERMARK_TABLE)
+    print(f"OK  {full}: {n} rows of {dataset_id}")
+    return n
+
+
+def read_dataset(dataset_id: str) -> DataFrame:
+    """The rows of one dataset from its family table (the other datasets of the
+    family are filtered out)."""
+    spec = dataset_spec(dataset_id)
+    return spark.table(ml_fqn(dataset_table(dataset_id), spec["ecosystem"])).filter(
+        F.col("dataset_id") == dataset_id
+    )
 
 
 def read_ml(table: str, *, ecosystem: str) -> DataFrame:
@@ -565,34 +618,52 @@ def replace_rows(df: DataFrame, table: str, *, ecosystem: str, predicate: str) -
 # DBTITLE 1,Dataset, split and null-class registration
 
 
-def register_dataset(
-    dataset_id: str,
-    ecosystem: str,
-    *,
-    capability: str,
-    grain: list[str],
-    dependency_group: int,
-    target_name: str | None,
-    provenance_tier: str | None,
-    status: str,
-    notes: str = "",
-) -> None:
+def split_columns(dataset_id: str) -> tuple:
+    """The split part of a manifest row, from the spec file: split family, rule,
+    the six calendar dates, embargo days, hash seed, fold scheme and notes."""
+    spec = dataset_spec(dataset_id)
+    split = spec.get("split")
+    if not split:
+        return (None,) * 13
+    key = split.get("calendar") or split.get("default_calendar")
+    cal = SPLIT_CALENDARS.get(key) if key else None
+    dates = (*cal["train"], *cal["validation"], *cal["test"]) if cal else (None,) * 6
+    mode = spec["fit"]["fold_mode"] if "fit" in spec else "none"
+    scheme = {"rolling": "rolling_origin", "grouped": "grouped_kfold"}.get(mode)
+    return (
+        SPLIT_VERSION,
+        split["rule"],
+        split["rule_id"],
+        *dates,
+        EMBARGO_DAYS.get(key, 0) if key else 0,
+        None if cal else USER_HASH_SEED,
+        scheme,
+        spec["notes"] or None,
+    )
+
+
+def register_dataset(dataset_id: str, status: str | None = None) -> None:
+    """The manifest row of a dataset from the spec file: identity, family, grain,
+    declared status, split specification. The freeze columns start unfrozen."""
+    spec = dataset_spec(dataset_id)
     row = spark.createDataFrame(
         [
             (
                 dataset_id,
                 DATASET_VERSION,
-                ecosystem,
-                capability,
-                grain,
-                dependency_group,
-                target_name,
-                provenance_tier,
-                status,
+                spec["ecosystem"],
+                spec.get("family"),
+                spec["capability"],
+                list(spec["grain"]),
+                spec["dependency_group"],
+                spec["target_name"],
+                spec["provenance_tier"],
+                status or spec.get("status") or "assembled",
                 "not_frozen",
                 None,
-                notes or None,
+                spec["notes"] or None,
                 now_utc(),
+                *split_columns(dataset_id),
             )
         ],
         REGISTRY_DDL["dataset_manifest"],
@@ -600,7 +671,7 @@ def register_dataset(
     replace_rows(
         row,
         "dataset_manifest",
-        ecosystem=ecosystem,
+        ecosystem=spec["ecosystem"],
         predicate=f"dataset_id = '{dataset_id}'",
     )
 
@@ -628,12 +699,41 @@ def register_null_classes(dataset_id: str, ecosystem: str, rows: list[tuple]) ->
                 p if isinstance(p, str) else _json.dumps(p, sort_keys=True, default=str)
             ),
             now_utc(),
+            None,
+            None,
+            None,
         )
         for c, k, m, p in rows
     ]
     df = spark.createDataFrame(data, REGISTRY_DDL["null_class_registry"])
     replace_rows(
         df,
+        "null_class_registry",
+        ecosystem=ecosystem,
+        predicate=f"dataset_id = '{dataset_id}'",
+    )
+
+
+def record_null_rates(dataset_id: str, ecosystem: str, rows: list[tuple]) -> None:
+    """rows: (column_name, null_rate_train, decision). Adds the rate and the decision
+    to the null class rows of the dataset; a column without a class row is skipped."""
+    rates = spark.createDataFrame(
+        rows, "column_name string, _rate double, _decision string"
+    )
+    registry = read_ml("null_class_registry", ecosystem=ecosystem).filter(
+        F.col("dataset_id") == dataset_id
+    )
+    columns = registry.columns
+    out = (
+        registry.drop("null_rate_train", "decision", "evaluated_at")
+        .join(rates, "column_name", "left")
+        .withColumn("null_rate_train", F.col("_rate"))
+        .withColumn("decision", F.col("_decision"))
+        .withColumn("evaluated_at", F.current_timestamp())
+        .select(*[c for c in columns if c != ECOSYSTEM_COLUMN], ECOSYSTEM_COLUMN)
+    )
+    replace_rows(
+        out,
         "null_class_registry",
         ecosystem=ecosystem,
         predicate=f"dataset_id = '{dataset_id}'",
@@ -702,18 +802,6 @@ def record_imputer(
             f"dataset_id = '{dataset_id}' AND split_version = '{split_version}' "
             f"AND fold_id = {fold_id}"
         ),
-    )
-
-
-def write_split_specification(rows: list[tuple], ecosystem: str) -> None:
-    """rows follow the split_specification column order."""
-    df = spark.createDataFrame(rows, REGISTRY_DDL["split_specification"])
-    ids = ", ".join(f"'{r[0]}'" for r in rows)
-    replace_rows(
-        df,
-        "split_specification",
-        ecosystem=ecosystem,
-        predicate=f"split_version = '{SPLIT_VERSION}' AND dataset_id IN ({ids})",
     )
 
 
@@ -876,6 +964,182 @@ def fold_frames(df: DataFrame, calendar_key: str, k: int, date_col: str):
     )
     valid = df.filter((F.col("partition") == "train") & (F.col("fold_id") == k))
     return train, valid
+
+
+def _calendar_columns(df: DataFrame, split: dict, date_col: str, calendar_key: str):
+    keyed = df.withColumn(
+        "partition", calendar_partition(date_col, calendar_key)
+    ).withColumn(
+        "fold_id",
+        F.when(F.col("partition") == "train", rolling_fold(date_col, calendar_key)),
+    )
+    group_col = split.get("group_col")
+    if group_col:
+        keyed = keyed.withColumn("group_key", F.col(group_col).cast("string"))
+    return keyed
+
+
+def _user_cutoff_partition(base, split: dict):
+    """Train users before the evaluation start, other users from it; the rest is
+    excluded. A cutoff name refers to the spec cutoffs."""
+    temporal = split.get("temporal") or {}
+    group_cols = split["group_cols"]
+    p = user_partition(group_cols)
+    kind = temporal.get("kind")
+    if kind == "user_cutoff":
+        d = F.col(temporal["date_col"])
+        cut = F.lit(_CUTOFFS[temporal["cutoff"]]).cast("date")
+        return (
+            F.when((p == "train") & (d >= cut), "excluded")
+            .when((p != "train") & (d < cut), "excluded")
+            .otherwise(p)
+        )
+    if kind == "user_cutoffs":
+        d = F.col(temporal["date_col"])
+        first = F.lit(_CUTOFFS[temporal["train"]]).cast("date")
+        second = F.lit(_CUTOFFS[temporal["evaluation"]]).cast("date")
+        return (
+            F.when((p == "train") & (d != first), "excluded")
+            .when((p != "train") & (d != second), "excluded")
+            .otherwise(p)
+        )
+    return p
+
+
+def partition_frame(df: DataFrame, dataset_id: str) -> DataFrame:
+    """The frame with `partition`, `fold_id`, `group_key` and `diagnostic_group`,
+    from the split rule of the dataset in the spec file. The frame holds the grain
+    columns and every column the rule names."""
+    split = dataset_spec(dataset_id)["split"]
+    rule = split["rule"]
+    if rule == "calendar":
+        keyed = _calendar_columns(df, split, split["date_col"], split["calendar"])
+    elif rule == "calendar_per_series":
+        honda = F.col(split["family_column"]) == split["honda_family"]
+        date_col = split["date_col"]
+        keyed = df.withColumn(
+            "partition",
+            F.when(
+                honda, calendar_partition(date_col, split["honda_calendar"])
+            ).otherwise(calendar_partition(date_col, split["default_calendar"])),
+        ).withColumn(
+            "fold_id",
+            F.when(
+                F.col("partition") == "train",
+                F.when(
+                    honda, rolling_fold(date_col, split["honda_calendar"])
+                ).otherwise(rolling_fold(date_col, split["default_calendar"])),
+            ),
+        )
+    elif rule == "hash_unit_stratified":
+        group = split["group_col"]
+        stratum = F.concat_ws(
+            "|",
+            F.col("target_event").cast("string"),
+            F.col("is_offshore").cast("string"),
+        )
+        w = Window.partitionBy(stratum).orderBy(user_hash_bucket([group]), group)
+        rank = F.percent_rank().over(w)
+        tr, va, _ = USER_SPLIT_PERCENT
+        diag = F.lit(SURVIVAL_DIAGNOSTIC_DATE).cast("date")
+        keyed = (
+            df.withColumn("_r", rank)
+            .withColumn(
+                "partition",
+                F.when(F.col("_r") < tr / 100, "train")
+                .when(F.col("_r") < (tr + va) / 100, "validation")
+                .otherwise("test"),
+            )
+            .withColumn(
+                "fold_id",
+                F.when(F.col("partition") == "train", grouped_fold([group])),
+            )
+            .withColumn("group_key", F.col(group).cast("string"))
+            .withColumn(
+                "diagnostic_group",
+                F.when(
+                    (F.col("entry_date") <= diag) & (F.col("stop_date") >= diag),
+                    "calendar_score",
+                ).otherwise("calendar_fit_only"),
+            )
+            .drop("_r")
+        )
+    elif rule == "hash_group":
+        group_cols = split["group_cols"]
+        keyed = (
+            df.withColumn("partition", _user_cutoff_partition(df, split))
+            .withColumn(
+                "fold_id",
+                F.when(F.col("partition") == "train", grouped_fold(group_cols)),
+            )
+            .withColumn("group_key", F.col(group_cols[0]).cast("string"))
+        )
+        diag = split.get("diagnostic")
+        if diag:
+            cut = F.lit(_CUTOFFS[diag["date"]]).cast("date")
+            keyed = keyed.withColumn(
+                "diagnostic_group",
+                F.when(F.col(diag["date_col"]) <= cut, "early").otherwise("late"),
+            )
+    elif rule == "all_train_grouped":
+        group = split["group_col"]
+        keyed = (
+            df.withColumn("partition", F.lit("train"))
+            .withColumn("fold_id", grouped_fold([group]))
+            .withColumn("group_key", F.col(group).cast("string"))
+        )
+    elif rule == "source_defined":
+        column = F.col(split["split_column"])
+        keyed = df.withColumn(
+            "partition",
+            F.when(column.startswith("train"), "train").otherwise("test"),
+        ).withColumn("diagnostic_group", column.cast("string"))
+    else:
+        raise ValueError(f"{dataset_id}: unknown split rule {rule}")
+    for name in ("fold_id", "group_key", "diagnostic_group"):
+        if name not in keyed.columns:
+            keyed = keyed.withColumn(
+                name, F.lit(None).cast("int" if name == "fold_id" else "string")
+            )
+    return keyed
+
+
+def write_dataset_partitions(keyed: DataFrame, dataset_id: str) -> None:
+    """Store the partition manifest of a dataset from a partitioned frame."""
+    spec = dataset_spec(dataset_id)
+    write_partition_manifest(
+        keyed,
+        dataset_id,
+        spec["ecosystem"],
+        key_cols=list(spec["grain"]),
+        fold_col="fold_id",
+        group_col="group_key",
+        rule_id=spec["split"]["rule_id"],
+        diagnostic_col="diagnostic_group",
+    )
+
+
+def write_diagnostic_partitions(assembled: DataFrame, dataset_id: str) -> None:
+    """The diagnostic manifests of a dataset (held-out zone runs), by calendar."""
+    spec = dataset_spec(dataset_id)
+    split = spec["split"]
+    for diag in spec.get("diagnostics", []):
+        base = assembled.select(*diag["keys"], split["date_col"])
+        if diag.get("where"):
+            base = base.filter(F.expr(diag["where"]))
+        keyed = _calendar_columns(
+            base, {"group_col": diag["group_col"]}, split["date_col"], split["calendar"]
+        ).withColumn("diagnostic_group", F.col(diag["group_col"]).cast("string"))
+        write_partition_manifest(
+            keyed,
+            diag["id"],
+            spec["ecosystem"],
+            key_cols=list(diag["keys"]),
+            fold_col="fold_id",
+            group_col="group_key",
+            rule_id="diagnostic:zone_held_out",
+            diagnostic_col="diagnostic_group",
+        )
 
 
 # COMMAND ----------
@@ -1081,16 +1345,25 @@ def causal_fill(
     return out.drop(*drop)
 
 
+GAP_LIMIT_DATASET = "gap_limits"
+
+
 def load_gap_limits(ecosystem: str = "energy") -> dict:
-    """Final limits from the evaluation table when present, else the caps."""
+    """Final limits from the evaluation rows of imputer_parameters when present,
+    else the caps. A row holds the cap, the final limit and the scores as JSON."""
     limits = dict(GAP_LIMIT_CAPS_HOURS)
-    full = ml_fqn("gap_limits", ecosystem)
+    full = ml_fqn("imputer_parameters", ecosystem)
     if spark.catalog.tableExists(full):
-        for r in spark.table(full).collect():
-            if r["final_limit_hours"] is not None:
-                limits[r["variable"]] = min(
-                    int(r["final_limit_hours"]),
-                    GAP_LIMIT_CAPS_HOURS.get(r["variable"], 0),
+        rows = (
+            read_ml("imputer_parameters", ecosystem=ecosystem)
+            .filter(F.col("dataset_id") == GAP_LIMIT_DATASET)
+            .collect()
+        )
+        for r in rows:
+            final = _json.loads(r["parameters"]).get("final_limit_hours")
+            if final is not None:
+                limits[r["column_name"]] = min(
+                    int(final), GAP_LIMIT_CAPS_HOURS.get(r["column_name"], 0)
                 )
     return limits
 
@@ -1398,6 +1671,14 @@ def normalise_zone_key(col):
     return F.regexp_replace(F.lower(F.trim(col)), r"[^a-z0-9]", "")
 
 
+def zone_code_frame() -> DataFrame:
+    """The control zone to market area map of the spec file as a frame."""
+    return spark.createDataFrame(
+        [tuple(row) for row in ML_SPEC["zone_code_map"]],
+        "control_zone_key string, market_area_code string, control_zone_name string",
+    )
+
+
 def unit_zone_map(units: DataFrame, connection_points: DataFrame, zone_map: DataFrame):
     """unit_id -> market_area_code through location -> connection point ->
     control zone. Multi-zone locations and units without a location or zone are
@@ -1481,38 +1762,27 @@ CALENDAR_COLUMNS = (
 DERIVED_SUFFIXES_ML = ("_is_missing", "_filled", "_gap_hours", "_raw", "_imputed")
 
 
-def assembled_select(
-    dataset_id: str,
-    target_table: str,
-    ecosystem: str,
-    joins: list[dict],
+def assembled_frame(
+    target: DataFrame,
+    joins: list[tuple],
     *,
-    where: str | None = None,
-    target_drop: list[str] | None = None,
-    extra_select: list[str] | None = None,
-) -> str:
-    """SQL for an assembled view: the target table plus feature tables joined at
-    the dataset grain. Each join: table, keys, drop (extra columns to exclude),
-    how (default left). Provenance columns of every side are dropped."""
-    t_drop = ", ".join([*PROVENANCE_COLUMNS, *(target_drop or [])])
-    sel = [
-        f"'{dataset_id}' AS dataset_id",
-        f"t.* EXCEPT ({t_drop})",
-        *(extra_select or []),
-    ]
-    frm = [f"{ml_fqn(target_table, ecosystem)} t"]
-    for i, j in enumerate(joins):
-        alias = f"f{i}"
-        drop = ", ".join([*j["keys"], *j.get("drop", []), *PROVENANCE_COLUMNS])
-        sel.append(f"{alias}.* EXCEPT ({drop})")
-        on = " AND ".join(f"t.{k} = {alias}.{k}" for k in j["keys"])
-        frm.append(
-            f"{j.get('how', 'left').upper()} JOIN {ml_fqn(j['table'], ecosystem)} {alias} ON {on}"
+    drop: list[str] | None = None,
+    extra: dict | None = None,
+) -> DataFrame:
+    """The target rows plus feature frames joined at the dataset grain, in memory
+    (no view is stored). joins: (frame, keys) or (frame, keys, columns_to_drop);
+    provenance columns of every side are dropped; `extra` adds derived columns
+    (name -> expression); `drop` removes columns of the target frame."""
+    out = target.drop(*PROVENANCE_COLUMNS, *(drop or []))
+    for join in joins:
+        frame, keys, *rest = join
+        skip = [*PROVENANCE_COLUMNS, *(rest[0] if rest else [])]
+        out = out.join(
+            frame.drop(*[c for c in skip if c in frame.columns]), keys, "left"
         )
-    sql = "SELECT " + ",\n       ".join(sel) + "\nFROM " + "\n".join(frm)
-    if where:
-        sql += f"\nWHERE {where}"
-    return sql
+    for name, expression in (extra or {}).items():
+        out = out.withColumn(name, expression)
+    return out
 
 
 def derive_contract(
@@ -1526,10 +1796,13 @@ def derive_contract(
     context: tuple = (),
     group_col: str | None = None,
     overrides: dict | None = None,
+    label_derived: tuple = (),
+    default_clock: str = "derived_from_earlier",
 ) -> tuple[list, list, list]:
     """(contract rows, null-class rows, defaulted columns) from column names.
     contract row: (column, role, clock, lag_days, source_table, notes);
-    null-class row: (column, class, method, parameters)."""
+    null-class row: (column, class, method, parameters). A declared label-derived
+    column gets the role label_derived and is no feature."""
     overrides = overrides or {}
     contract, classes, defaulted = [], [], []
     for c in columns:
@@ -1543,6 +1816,8 @@ def derive_contract(
             role, clock, lag = "time", None, None
         elif group_col and c == group_col:
             role, clock, lag = "group", None, None
+        elif c in label_derived:
+            role, clock, lag = "label_derived", None, None
         elif c.startswith("target_"):
             role, clock, lag = "target", None, None
         elif (
@@ -1571,7 +1846,7 @@ def derive_contract(
         elif c in context:
             role, clock, lag = "feature", "context_window", None
         else:
-            role, clock, lag = "feature", "derived_from_earlier", None
+            role, clock, lag = "feature", default_clock, None
             defaulted.append(c)
         contract.append((c, role, clock, lag, None, None))
         if role == "target":
