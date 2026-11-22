@@ -1090,7 +1090,8 @@ def partition_frame(df: DataFrame, dataset_id: str) -> DataFrame:
             keyed = keyed.withColumn(
                 name, F.lit(None).cast("int" if name == "fold_id" else "string")
             )
-    return keyed
+    # the grouped fold is a bigint hash, the table and the manifest keep an int
+    return keyed.withColumn("fold_id", F.col("fold_id").cast("int"))
 
 
 SPLIT_RULE_KEYS = {

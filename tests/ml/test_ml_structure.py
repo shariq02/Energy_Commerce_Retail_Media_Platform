@@ -173,6 +173,15 @@ def test_write_ml_refuses_a_frozen_dataset_before_any_write():
         assert body.index("_frozen_guard(") < body.index(".saveAsTable(")
 
 
+def test_the_partition_frame_returns_the_fold_as_an_int():
+    """The family table and the manifest keep `fold_id` as int; a grouped fold is
+    a bigint hash, and Delta refuses to merge the two types."""
+    text = (_ML / "_ml_common.py").read_text()
+    body = text[text.index("def partition_frame(") :]
+    body = body[: body.index("\ndef ")]
+    assert 'F.col("fold_id").cast("int")' in body.rsplit("return", 1)[1]
+
+
 def test_freeze_gate_protects_and_reads_the_version_before_freezing():
     text = (_ML / "gate" / "01_ml_gates.py").read_text()
     assert "delta.deletedFileRetentionDuration" in text
