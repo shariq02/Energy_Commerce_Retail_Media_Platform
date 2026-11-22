@@ -32,6 +32,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import gc as _gc
+import hashlib as _hashlib
 import importlib as _importlib
 import importlib.metadata as _importlib_metadata
 import json as _json
@@ -447,6 +448,10 @@ class TaskContext:
         self.component = f"models/train/{task_id}"
         if record:
             record_task_context(self, "started")
+
+    def fingerprint(self) -> str:
+        """Changes when the task file entry of this task changes."""
+        return settings_fingerprint(TASK_BY_ID[self.task_id])
 
 
 def assert_no_test_partition(partitions) -> None:
@@ -1429,6 +1434,90 @@ def record_task_context(
 
 # COMMAND ----------
 
+# DBTITLE 1,Skip a task that already finished with the same data and settings
+
+
+def settings_fingerprint(*parts) -> str:
+    """Twelve characters that change when any of the settings a result depends on
+    change."""
+    text = _json.dumps(parts, sort_keys=True, default=str)
+    return _hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
+def finished_detail(baseline_ok: bool, fingerprint: str) -> str:
+    """The detail of a finished context row: the baseline state and the settings."""
+    return f"baseline_ok={baseline_ok}; fingerprint={fingerprint}"
+
+
+def run_is_current(rows, frozen_version: int, fingerprint: str) -> bool:
+    """True when the latest context row of a task (one ecosystem, one run kind) is a
+    finished run with a working baseline, at this frozen version and with these
+    settings. A later started or data_ready row means a run that did not finish."""
+    if not rows:
+        return False
+    last = max(rows, key=lambda r: r["recorded_at"])
+    detail = last["detail"] or ""
+    return (
+        last["status"] == "finished"
+        and int(last["frozen_delta_version"]) == int(frozen_version)
+        and "baseline_ok=True" in detail
+        and f"fingerprint={fingerprint}" in detail
+    )
+
+
+def context_rows(
+    ecosystem: str, task_id: str, smoke: bool, table: str = "task_run_context"
+) -> list:
+    """The context rows of one task and one run kind; empty before the first run."""
+    if not spark.catalog.tableExists(model_fqn(table, ecosystem)):
+        return []
+    frame = read_model(table, ecosystem=ecosystem).filter(
+        (F.col("task_id") == task_id) & (F.col("smoke") == smoke)
+    )
+    cols = ["status", "frozen_delta_version", "detail", "recorded_at"]
+    return [r.asDict() for r in frame.select(*cols).collect()]
+
+
+def has_ok_baseline(table: str, ecosystem: str, task_id: str, smoke: bool) -> bool:
+    """True when the result table still holds a working baseline row of the task."""
+    if not spark.catalog.tableExists(model_fqn(table, ecosystem)):
+        return False
+    rows = read_model(table, ecosystem=ecosystem).filter(
+        (F.col("task_id") == task_id)
+        & (F.col("smoke") == smoke)
+        & (F.col("stage") == "baseline")
+        & (F.col("status") == "ok")
+    )
+    return rows.limit(1).count() > 0
+
+
+def train_is_current(task_id: str, rid: str, smoke: bool) -> bool:
+    """True when the training of the task finished earlier with the same frozen data
+    and the same task file entry, and its baseline row is still stored."""
+    ctx = TaskContext(task_id, rid, smoke, record=False)
+    return run_is_current(
+        context_rows(ctx.ecosystem, task_id, smoke),
+        ctx.frozen_version,
+        ctx.fingerprint(),
+    ) and has_ok_baseline("candidate_results", ctx.ecosystem, task_id, smoke)
+
+
+def skip_notes(skipped, what: str) -> dict:
+    """A findings note per ecosystem for the tasks a run skipped. Each entry starts
+    with a task id; a label may follow after a space."""
+    eco_of = {t["task_id"]: t["ecosystem"] for t in (*TASKS, *CHECK_TASKS)}
+    by_eco: dict = {}
+    for entry in skipped:
+        by_eco.setdefault(eco_of[entry.split(" ")[0]], []).append(entry)
+    tail = "Their rows stay in the tables under the run that wrote them."
+    return {
+        eco: [f"Skipped, {what}: {', '.join(names)}. {tail}"]
+        for eco, names in by_eco.items()
+    }
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Result recording
 
 
@@ -1771,7 +1860,9 @@ def finish_task(ctx: TaskContext) -> None:
         .count()
         > 0
     )
-    record_task_context(ctx, "finished", detail=f"baseline_ok={baseline_ok}")
+    record_task_context(
+        ctx, "finished", detail=finished_detail(baseline_ok, ctx.fingerprint())
+    )
     check(
         ctx.component,
         "models",

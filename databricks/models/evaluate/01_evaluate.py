@@ -16,7 +16,8 @@
 # MAGIC held-out partition, exactly as stored, one cell per paradigm, and score the
 # MAGIC check-only datasets (no train rows) with the model of the task that scores them.
 # MAGIC A task that fails does not stop the others; the last cell fails the run when
-# MAGIC any task failed.
+# MAGIC any task failed. A task evaluated earlier with the same frozen data, forwarded
+# MAGIC models and settings is skipped (REEVALUATE = True scores every task again).
 
 # COMMAND ----------
 
@@ -35,8 +36,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Smoke setting (True = short test on a small sample of every dataset)
+# DBTITLE 1,Run settings (SMOKE = short test on a small sample; REEVALUATE = ignore earlier runs)
 SMOKE = False
+# False: a task that was evaluated earlier with the same frozen data, the same forwarded
+# models and the same settings is skipped. True: every task is evaluated again (the
+# held-out partition is read again).
+REEVALUATE = False
 
 # COMMAND ----------
 
@@ -44,16 +49,23 @@ SMOKE = False
 COMPONENT = "models/evaluate/01_evaluate"
 rid = model_run_id()
 failed = []
+skipped = []
 
 
 def evaluate_tasks(tasks):
-    """Evaluate each task; a failure is recorded and the next task still runs."""
+    """Evaluate each task; a failure is recorded and the next task still runs. A task
+    that was evaluated earlier with the same inputs is skipped."""
     for t in tasks:
+        task_id = t["task_id"]
         try:
-            evaluate_by_id(t["task_id"], rid, SMOKE)
+            if not REEVALUATE and evaluation_is_current(task_id, rid, SMOKE):
+                skipped.append(task_id)
+                print(f"SKIP {task_id}: evaluated earlier, same inputs")
+                continue
+            evaluate_by_id(task_id, rid, SMOKE)
         except Exception as exc:
-            failed.append((t["task_id"], f"{type(exc).__name__}: {str(exc)[:300]}"))
-            print(f"FAIL {t['task_id']}: {failed[-1][1]}")
+            failed.append((task_id, f"{type(exc).__name__}: {str(exc)[:300]}"))
+            print(f"FAIL {task_id}: {failed[-1][1]}")
 
 
 # COMMAND ----------
@@ -66,6 +78,10 @@ evaluate_tasks(tasks_of(("regression", "classification", "multiclass")))
 # DBTITLE 1,Check-only datasets, scored by the model of another task
 for _name, _entry in CHECK_ONLY.items():
     try:
+        if not REEVALUATE and check_only_is_current(_name, rid, SMOKE):
+            skipped.append(_entry["task_id"])
+            print(f"SKIP {_entry['task_id']}: evaluated earlier, same inputs")
+            continue
         evaluate_check_only(_name, rid, SMOKE)
     except Exception as exc:
         failed.append((_entry["task_id"], f"{type(exc).__name__}: {str(exc)[:300]}"))
@@ -111,6 +127,7 @@ for eco in ECOSYSTEMS:
             *(c["task_id"] for c in CHECK_ONLY.values() if c["ecosystem"] == eco),
         ],
         smoke=SMOKE,
+        notes=skip_notes(skipped, "evaluated earlier with the same inputs"),
     )
 
 # COMMAND ----------

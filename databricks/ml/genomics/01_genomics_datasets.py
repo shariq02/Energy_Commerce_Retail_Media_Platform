@@ -17,7 +17,8 @@
 # MAGIC or target table is stored. The label-derived columns of each target are declared
 # MAGIC in the spec file; they stay in the dataset with the role `label_derived` and are
 # MAGIC never features. Class flags of Gold are true or null, so a target is the flag
-# MAGIC with null read as false on the rows where its rule was evaluated.
+# MAGIC with null read as false on the rows where its rule was evaluated. REBUILD names
+# MAGIC the datasets to build again after a change; their frozen families are reopened.
 
 # COMMAND ----------
 
@@ -40,6 +41,9 @@
 ECO = "genomics"
 SOURCE = "genomics"
 COMPONENT = "ml/genomics"
+# Empty: build every genomics dataset (a frozen family stops the build). Dataset ids:
+# build only these and reopen their families first; the gate freezes them again.
+REBUILD = ()
 # columns that carry provenance or identify a row, never a feature
 TECHNICAL = {
     "source_system",
@@ -116,6 +120,8 @@ _target = F.coalesce(
 ).cast("int")
 for _name, _spec in ML_SPEC["datasets"].items():
     if _spec["ecosystem"] != ECO or _spec.get("benchmark_set") is None:
+        continue
+    if REBUILD and _name not in REBUILD:
         continue
     _rows = benchmarks.filter(F.col("benchmark_set") == _spec["benchmark_set"])
     _framed = _rows
@@ -196,7 +202,19 @@ FRAMES["variant_actionable_rare"] = features_only(
 # COMMAND ----------
 
 # DBTITLE 1,Build the datasets -- contract, split, fit and the family rows
-build_datasets(FRAMES, rid=rid, source=SOURCE, blocks=BLOCKS)
+_unknown = [d for d in REBUILD if d not in FRAMES]
+if _unknown:
+    raise RuntimeError(
+        f"REBUILD names datasets this notebook does not build: {_unknown}"
+    )
+for _dataset in REBUILD:
+    reopen_family(_dataset)
+build_datasets(
+    {k: v for k, v in FRAMES.items() if not REBUILD or k in REBUILD},
+    rid=rid,
+    source=SOURCE,
+    blocks=BLOCKS,
+)
 
 # COMMAND ----------
 

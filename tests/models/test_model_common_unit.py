@@ -406,3 +406,57 @@ def test_the_front_library_folder_goes_first_and_the_main_folder_last(c, tmp_pat
     finally:
         c["library_folder"] = original
         sys.path[:] = saved
+
+
+def _context_row(status, minute, version=7, detail=None):
+    return {
+        "status": status,
+        "frozen_delta_version": version,
+        "detail": detail,
+        "recorded_at": dt.datetime(2026, 11, 22, 10, minute, tzinfo=dt.UTC),
+    }
+
+
+def test_the_fingerprint_follows_the_settings_and_ignores_key_order(c):
+    one = c["settings_fingerprint"]({"a": 1, "b": [2, 3]}, "x")
+    assert one == c["settings_fingerprint"]({"b": [2, 3], "a": 1}, "x")
+    assert one != c["settings_fingerprint"]({"a": 1, "b": [2, 4]}, "x")
+    assert len(one) == 12
+
+
+def test_a_finished_run_at_the_same_version_and_settings_is_skipped(c):
+    detail = c["finished_detail"](True, "abc")
+    rows = [_context_row("started", 1), _context_row("finished", 5, detail=detail)]
+    assert c["run_is_current"](rows, 7, "abc")
+
+
+@pytest.mark.parametrize(
+    "version, fingerprint",
+    [(8, "abc"), (7, "other")],
+)
+def test_other_data_or_other_settings_train_again(c, version, fingerprint):
+    detail = c["finished_detail"](True, "abc")
+    rows = [_context_row("finished", 5, detail=detail)]
+    assert not c["run_is_current"](rows, version, fingerprint)
+
+
+def test_a_later_unfinished_run_or_a_failed_baseline_trains_again(c):
+    detail = c["finished_detail"](True, "abc")
+    later = [
+        _context_row("finished", 5, detail=detail),
+        _context_row("data_ready", 9),
+    ]
+    assert not c["run_is_current"](later, 7, "abc")
+    no_baseline = [
+        _context_row("finished", 5, detail=c["finished_detail"](False, "abc"))
+    ]
+    assert not c["run_is_current"](no_baseline, 7, "abc")
+    assert not c["run_is_current"]([], 7, "abc")
+
+
+def test_skip_notes_group_the_skipped_tasks_by_ecosystem(c):
+    first = c["TASKS"][0]
+    notes = c["skip_notes"]([first["task_id"], f"{first['task_id']} (profile)"], "kept")
+    assert list(notes) == [first["ecosystem"]]
+    assert "Skipped, kept:" in notes[first["ecosystem"]][0]
+    assert c["skip_notes"]([], "kept") == {}

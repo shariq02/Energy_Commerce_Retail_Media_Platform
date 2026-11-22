@@ -98,6 +98,23 @@ class EvalContext(TaskContext):
         self.component = f"models/evaluate/{task_id}"
         self.thresholds = read_thresholds(self.ecosystem)
 
+    def fingerprint(self) -> str:
+        """Changes when the task file entry, the check entry, the forwarded models
+        (name, rank, stored run, version) or the evaluation settings change."""
+        selected = sorted(
+            (
+                s["model_name"],
+                int(s["rank"]),
+                s["mlflow_run_id"],
+                int(s["frozen_delta_version"]),
+            )
+            for s in table_rows("candidate_selection", self)
+        )
+        spec_task = TASK_BY_ID[getattr(self, "spec_task_id", self.task_id)]
+        return settings_fingerprint(
+            spec_task, getattr(self, "check_entry", None), selected, self.thresholds
+        )
+
 
 def read_partitions(ctx: EvalContext, partitions) -> DataFrame:
     """The dataset at its frozen Delta version, restricted to the given partitions
@@ -716,7 +733,10 @@ def evaluate_task(ctx: EvalContext, evaluator: Evaluator) -> None:
     scored.clear()
     bundles.clear()
     record_task_context(
-        ctx, "finished", detail=f"baseline_ok={ok}", table=EVAL_CONTEXT_TABLE
+        ctx,
+        "finished",
+        detail=finished_detail(ok, ctx.fingerprint()),
+        table=EVAL_CONTEXT_TABLE,
     )
     check(
         ctx.component,
@@ -1701,6 +1721,7 @@ class CheckContext(EvalContext):
         self.spec_task_id = entry["scored_by"]
         self.selection_task_id = entry["scored_by"]
         self.rows_dataset_id = entry["dataset_id"]
+        self.check_entry = entry
         self.task_id = entry["task_id"]
         self.component = f"models/evaluate/{self.task_id}"
 
@@ -1716,6 +1737,25 @@ def evaluate_check_only(name: str, rid: str, smoke: bool) -> None:
         "key_cols": CHECK_ONLY[name]["key_cols"],
     }
     run_evaluator(ctx)
+
+
+def _evaluation_is_current(ctx) -> bool:
+    return run_is_current(
+        context_rows(ctx.ecosystem, ctx.task_id, ctx.smoke, EVAL_CONTEXT_TABLE),
+        ctx.frozen_version,
+        ctx.fingerprint(),
+    ) and has_ok_baseline("evaluation_results", ctx.ecosystem, ctx.task_id, ctx.smoke)
+
+
+def evaluation_is_current(task_id: str, rid: str, smoke: bool) -> bool:
+    """True when the task was evaluated earlier on the same partition with the same
+    frozen data, forwarded models and settings, and its baseline row is still stored."""
+    return _evaluation_is_current(EvalContext(task_id, rid, smoke))
+
+
+def check_only_is_current(name: str, rid: str, smoke: bool) -> bool:
+    """The same test for a check-only dataset."""
+    return _evaluation_is_current(CheckContext(name, rid, smoke))
 
 
 def run_evaluator(ctx) -> None:

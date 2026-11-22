@@ -15,7 +15,8 @@
 # MAGIC **Purpose:** audit every fitted dataset of every ecosystem (the list comes from
 # MAGIC the dataset manifest): the leakage checks, the null-handling checks and, when a
 # MAGIC whole family passes both, the freeze of its family table at one Delta version.
-# MAGIC Run after the build notebooks.
+# MAGIC Run after the build notebooks. ONLY names the datasets to audit again; the stored
+# MAGIC results of the others stay, and the freeze still covers every family.
 
 # COMMAND ----------
 
@@ -50,6 +51,8 @@ NULLS = "02_null_handling_audit"
 TWO_SIDED_ALLOWED = {"weather_imputation", "honda_anomaly"}
 RETENTION = "interval 3650 days"
 BUILD_DIRS = ("energy", "commerce", "genomics")
+# Empty: audit every fitted dataset. Dataset ids: audit only these.
+ONLY = ()
 
 # COMMAND ----------
 
@@ -78,6 +81,17 @@ def fitted_datasets(eco):
         .filter(F.col("status").isin(*FIT_STATES))
         .collect()
     )
+
+
+def audited(eco):
+    """The fitted datasets this run audits: all of them, or those named in ONLY."""
+    return [d for d in fitted_datasets(eco) if not ONLY or d["dataset_id"] in ONLY]
+
+
+_known = {d["dataset_id"] for eco in ECOSYSTEMS for d in fitted_datasets(eco)}
+_unknown = [d for d in ONLY if d not in _known]
+if _unknown:
+    raise RuntimeError(f"ONLY names datasets that are not fitted: {_unknown}")
 
 
 def base_column(name):
@@ -111,7 +125,7 @@ def contract_rows(eco, ds):
 
 # DBTITLE 1,Leakage -- contract clocks, lags, label inputs and label-derived columns
 for eco in ECOSYSTEMS:
-    for d in fitted_datasets(eco):
+    for d in audited(eco):
         ds = d["dataset_id"]
         contract = contract_rows(eco, ds)
         by_col = {r["column_name"]: r for r in contract}
@@ -188,7 +202,7 @@ for eco in ECOSYSTEMS:
 
 # DBTITLE 1,Leakage -- partitions are disjoint, complete and keep their embargo
 for eco in ECOSYSTEMS:
-    for d in fitted_datasets(eco):
+    for d in audited(eco):
         ds = d["dataset_id"]
         m = read_partition_manifest(ds, eco)
         dup = m.groupBy("grain_key").count().filter(F.col("count") > 1).count()
@@ -256,7 +270,7 @@ for eco in ECOSYSTEMS:
 
 # DBTITLE 1,Leakage -- groups stay in one partition, fits use training rows only
 for eco in ECOSYSTEMS:
-    for d in fitted_datasets(eco):
+    for d in audited(eco):
         ds = d["dataset_id"]
         manifest = read_partition_manifest(ds, eco)
         if not manifest.filter(F.col("rule_id").startswith("hash:")).limit(1).count():
@@ -333,7 +347,7 @@ audit(
 
 # DBTITLE 1,Leakage -- label coverage and balance per partition
 for eco in ECOSYSTEMS:
-    for d in fitted_datasets(eco):
+    for d in audited(eco):
         ds = d["dataset_id"]
         targets = [
             r["column_name"] for r in contract_rows(eco, ds) if r["role"] == "target"
@@ -382,7 +396,7 @@ for eco in ECOSYSTEMS:
 
 # DBTITLE 1,Null handling -- classes, empty columns and missing indicators
 for eco in ECOSYSTEMS:
-    for d in fitted_datasets(eco):
+    for d in audited(eco):
         ds = d["dataset_id"]
         feats = {
             r["column_name"] for r in contract_rows(eco, ds) if r["role"] == "feature"
@@ -448,7 +462,7 @@ for eco in ECOSYSTEMS:
 
 # DBTITLE 1,Null handling -- causal fills stay within the final gap limits
 _limits = load_gap_limits("energy")
-for d in fitted_datasets("energy"):
+for d in audited("energy"):
     ds = d["dataset_id"]
     df = read_dataset(ds)
     bad = []
@@ -493,6 +507,14 @@ for eco in ECOSYSTEMS:
             ecosystem=eco,
             predicate=f"gate = '{gate}' AND dataset_id IN ({ids})",
         )
+_shown = results
+if ONLY:
+    # a partial run keeps the findings of the datasets it did not audit
+    _shown = [
+        (eco, r["dataset_id"], r["gate"], r["check_name"], r["status"], r["detail"])
+        for eco in ECOSYSTEMS
+        for r in read_ml("gate_results", ecosystem=eco).collect()
+    ]
 _blocks = [
     (
         "results",
@@ -503,7 +525,7 @@ _blocks = [
             ]
             + [
                 f"| {e} | {d} | {g} | {c} | {s} | {det} |"
-                for (e, d, g, c, s, det) in results
+                for (e, d, g, c, s, det) in _shown
             ]
         ),
     )

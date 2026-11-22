@@ -15,7 +15,9 @@
 # MAGIC **Purpose:** baseline and candidates of every task of the task file on the frozen
 # MAGIC datasets (train and validation partitions only), one cell per paradigm. A task
 # MAGIC that fails does not stop the others; the last cell fails the run when any task
-# MAGIC failed. The findings of each ecosystem are written at the end.
+# MAGIC failed. A task that finished earlier with the same frozen data and the same task
+# MAGIC file entry is skipped (RETRAIN = True trains every task again). The findings of
+# MAGIC each ecosystem are written at the end.
 
 # COMMAND ----------
 
@@ -29,8 +31,11 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Smoke setting (True = short test on a small sample of every dataset)
+# DBTITLE 1,Run settings (SMOKE = short test on a small sample; RETRAIN = ignore earlier runs)
 SMOKE = False
+# False: a task that finished earlier with the same frozen data and the same task file
+# entry is skipped. True: every task trains again.
+RETRAIN = False
 
 # COMMAND ----------
 
@@ -38,16 +43,23 @@ SMOKE = False
 COMPONENT = "models/train/01_train"
 rid = model_run_id()
 failed = []
+skipped = []
 
 
 def run_tasks(tasks):
-    """Run each task; a failure is recorded and the next task still runs."""
+    """Run each task; a failure is recorded and the next task still runs. A task
+    that finished earlier with the same data and settings is skipped."""
     for t in tasks:
+        task_id = t["task_id"]
         try:
-            run_task(t["task_id"], rid, SMOKE)
+            if not RETRAIN and train_is_current(task_id, rid, SMOKE):
+                skipped.append(task_id)
+                print(f"SKIP {task_id}: finished earlier, same data and settings")
+                continue
+            run_task(task_id, rid, SMOKE)
         except Exception as exc:
-            failed.append((t["task_id"], f"{type(exc).__name__}: {str(exc)[:300]}"))
-            print(f"FAIL {t['task_id']}: {failed[-1][1]}")
+            failed.append((task_id, f"{type(exc).__name__}: {str(exc)[:300]}"))
+            print(f"FAIL {task_id}: {failed[-1][1]}")
 
 
 # COMMAND ----------
@@ -92,6 +104,7 @@ for eco in ECOSYSTEMS:
         rid,
         task_ids=[t["task_id"] for t in TASKS if t["ecosystem"] == eco],
         smoke=SMOKE,
+        notes=skip_notes(skipped, "finished earlier with the same data and settings"),
     )
 
 # COMMAND ----------

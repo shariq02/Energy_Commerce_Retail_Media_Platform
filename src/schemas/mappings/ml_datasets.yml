@@ -100,7 +100,9 @@ families:
 #                          user_cutoff (date_col, cutoff), user_cutoffs (train, evaluation),
 #                          and an optional diagnostic split on a date
 #   all_train_grouped      one partition (train), grouped folds on group_col
-#   source_defined         the split the source gives (column split)
+#   source_defined         the split the source gives (column split); with validation_percent
+#                          and group_cols, that share of its train rows (hash of group_cols)
+#                          is the validation partition, the source gives none
 datasets:
   # ---------------------------------------------------------------- energy
   price_daily:
@@ -813,10 +815,10 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: the split is the source split; label and split columns come from the benchmark
+    notes: the test partition is the source test split; validation is 15 percent of the source train rows by hash of source_record_id, so it shares genes with train; label and split columns come from the benchmark
     benchmark_set: causal_eqtl
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
-    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_maps:
     ecosystem: genomics
@@ -827,10 +829,10 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: 1,682 proteins occur in train and test in the source split; the leakage gate reports it
+    notes: 1,682 proteins occur in train and test in the source split; the leakage gate reports it; validation is 15 percent of the source train rows by hash of source_record_id, so it shares proteins with train
     benchmark_set: maps
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
-    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_pathogenic_coding:
     ecosystem: genomics
@@ -841,10 +843,10 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: the split is the source split
+    notes: the test partition is the source test split; validation is 15 percent of the source train rows by hash of source_record_id, so it shares genes with train
     benchmark_set: pathogenic_coding
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
-    split: {rule: source_defined, rule_id: "source:split", split_column: split}
+    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_pathogenic_non_coding:
     ecosystem: genomics

@@ -445,6 +445,21 @@ def _quota_guard(full: str, ecosystem: str) -> None:
         print(f"WARN {ml_schema_for(ecosystem)} holds {n} of {SCHEMA_OBJECT_QUOTA}")
 
 
+def reopen_family(dataset_id: str) -> None:
+    """Make the family table of a dataset writable again: every manifest row of the
+    family leaves the frozen state. The gate freezes the family again at its next
+    Delta version."""
+    spec = dataset_spec(dataset_id)
+    eco = spec["ecosystem"]
+    where = ecosystem_predicate(eco, f"family = '{spec['family']}'")
+    spark.sql(
+        f"UPDATE {ml_fqn('dataset_manifest', eco)} SET status = 'fitted', "
+        "freeze_status = 'not_frozen', frozen_delta_version = NULL, "
+        f"updated_at = current_timestamp() WHERE {where}"
+    )
+    print(f"OK  family {spec['family']} of {eco} reopened for {dataset_id}")
+
+
 def _frozen_guard(table: str, ecosystem: str) -> None:
     """A frozen family table is never overwritten; reopen its datasets first."""
     manifest = ml_fqn("dataset_manifest", ecosystem)
@@ -1079,10 +1094,20 @@ def partition_frame(df: DataFrame, dataset_id: str) -> DataFrame:
         )
     elif rule == "source_defined":
         column = F.col(split["split_column"])
-        keyed = df.withColumn(
-            "partition",
-            F.when(column.startswith("train"), "train").otherwise("test"),
-        ).withColumn("diagnostic_group", column.cast("string"))
+        source_train = column.startswith("train")
+        partition = F.when(source_train, "train").otherwise("test")
+        share = split.get("validation_percent")
+        if share:
+            # the source gives no validation rows: a hash share of its train rows
+            bucket = user_hash_bucket(split["group_cols"])
+            partition = (
+                F.when(source_train & (bucket < share), "validation")
+                .when(source_train, "train")
+                .otherwise("test")
+            )
+        keyed = df.withColumn("partition", partition).withColumn(
+            "diagnostic_group", column.cast("string")
+        )
     else:
         raise ValueError(f"{dataset_id}: unknown split rule {rule}")
     for name in ("fold_id", "group_key", "diagnostic_group"):
@@ -1114,7 +1139,7 @@ SPLIT_RULE_FRAME_COLUMNS = {
     "hash_unit_stratified": ("group_col",),
     "hash_group": ("group_cols",),
     "all_train_grouped": ("group_col",),
-    "source_defined": ("split_column",),
+    "source_defined": ("split_column", "group_cols"),
 }
 SPLIT_KEYS = ("rule", "rule_id")
 STRATIFIED_COLUMNS = ("target_event", "is_offshore", "entry_date", "stop_date")

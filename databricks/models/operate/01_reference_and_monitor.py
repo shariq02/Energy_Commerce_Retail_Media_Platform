@@ -19,7 +19,8 @@
 # MAGIC the comparison of each window with the recorded reference (feature drift, input
 # MAGIC quality, prediction drift). The references of all ecosystems are recorded before
 # MAGIC any other window is read. No target value is scored. A breach is a record,
-# MAGIC never a status change.
+# MAGIC never a status change. A profile or a window already stored at the registered and
+# MAGIC frozen version is kept (RERUN = True does all of it again).
 
 # COMMAND ----------
 
@@ -50,6 +51,9 @@
 
 # DBTITLE 1,Configuration
 COMPONENT = "models/operate/01_reference_and_monitor"
+# False: a profile or a window stored at the registered and frozen version is kept.
+# True: every model is profiled and monitored again.
+RERUN = False
 
 # COMMAND ----------
 
@@ -64,7 +68,9 @@ print(environment_record())
 # COMMAND ----------
 
 # DBTITLE 1,Profile every registered model (reference windows)
-profile_failed = {eco: operate_ecosystem(eco, rid, "profile") for eco in ECOSYSTEMS}
+profile_failed = {
+    eco: operate_ecosystem(eco, rid, "profile", RERUN) for eco in ECOSYSTEMS
+}
 
 # COMMAND ----------
 
@@ -81,7 +87,9 @@ for eco, failed in profile_failed.items():
 # COMMAND ----------
 
 # DBTITLE 1,Monitor every registered model (validation and held-out windows)
-monitor_failed = {eco: operate_ecosystem(eco, rid, "monitor") for eco in ECOSYSTEMS}
+monitor_failed = {
+    eco: operate_ecosystem(eco, rid, "monitor", RERUN) for eco in ECOSYSTEMS
+}
 
 # COMMAND ----------
 
@@ -109,4 +117,5 @@ write_model_findings(
         "model_predictions",
     ],
     rid,
+    notes=skip_notes(OPERATE_SKIPPED, "stored at the registered and frozen version"),
 )

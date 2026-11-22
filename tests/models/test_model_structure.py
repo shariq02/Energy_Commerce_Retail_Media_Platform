@@ -119,6 +119,7 @@ def test_training_and_evaluation_run_every_task_through_the_task_file():
         assert entry in text, name
         assert "spark.table(" not in text and "spark.read" not in text, name
         assert "SMOKE = False" in text, name
+        assert re.search(r"^(RETRAIN|REEVALUATE) = False$", text, re.MULTILINE), name
 
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)

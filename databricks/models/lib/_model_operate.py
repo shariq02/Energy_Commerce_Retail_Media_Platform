@@ -1412,10 +1412,84 @@ def write_predictions(entry: dict, data: dict, rid: str, now) -> None:
 # DBTITLE 1,Reference profile and monitoring of one registered model
 
 
-def profile_entry(entry: dict, rid: str, spec: dict) -> dict:
-    """Profile the train window of one registered model and store its predictions
-    and its reference profile."""
+OPERATE_SKIPPED: list = []
+
+
+def _rows_exist(table: str, eco: str, condition) -> bool:
+    if not spark.catalog.tableExists(model_fqn(table, eco)):
+        return False
+    return read_model(table, ecosystem=eco).filter(condition).limit(1).count() > 0
+
+
+def _entry_condition(entry: dict):
+    return (
+        (F.col("task_id") == entry["task_id"])
+        & (F.col("model_name") == entry["model_name"])
+        & (F.col("registry_version") == int(entry["version"]))
+    )
+
+
+def _at_frozen_version(entry: dict) -> bool:
+    """True when the dataset is still at the version the entry was registered at."""
+    task = TASK_BY_ID[entry["task_id"]]
+    version = frozen_version(task["dataset_id"], task["ecosystem"])
+    return version == int(entry["frozen_delta_version"])
+
+
+def predictions_exist(entry: dict, window_id: str) -> bool:
+    """Stored predictions of this entry and window at its frozen version."""
     eco = TASK_BY_ID[entry["task_id"]]["ecosystem"]
+    return _rows_exist(
+        "model_predictions",
+        eco,
+        _entry_condition(entry)
+        & (F.col("window_id") == window_id)
+        & (F.col("frozen_delta_version") == int(entry["frozen_delta_version"])),
+    )
+
+
+def profile_is_current(entry: dict) -> bool:
+    """True when the reference profile of the registered version is stored at the
+    frozen version, with the predictions of the train window."""
+    eco = TASK_BY_ID[entry["task_id"]]["ecosystem"]
+    if not spark.catalog.tableExists(model_fqn("reference_profile", eco)):
+        return False
+    reference = reference_by_subject(eco, entry)
+    return (
+        PREDICTION_SUBJECT in reference
+        and all(
+            int(r["frozen_delta_version"]) == int(entry["frozen_delta_version"])
+            for r in reference.values()
+        )
+        and predictions_exist(entry, REFERENCE_WINDOW)
+        and _at_frozen_version(entry)
+    )
+
+
+def window_is_current(entry: dict, window_id: str) -> bool:
+    """True when the window has monitoring results of the registered version and its
+    predictions. The results are written last, so they show a finished window."""
+    eco = TASK_BY_ID[entry["task_id"]]["ecosystem"]
+    return (
+        _rows_exist(
+            "monitoring_results",
+            eco,
+            _entry_condition(entry)
+            & (F.col("window_id") == window_id)
+            & (F.col("check_kind") != "performance"),
+        )
+        and predictions_exist(entry, window_id)
+        and _at_frozen_version(entry)
+    )
+
+
+def profile_entry(entry: dict, rid: str, spec: dict, redo: bool = False) -> dict:
+    """Profile the train window of one registered model and store its predictions
+    and its reference profile. A stored profile of the same version is kept."""
+    eco = TASK_BY_ID[entry["task_id"]]["ecosystem"]
+    if not redo and profile_is_current(entry):
+        OPERATE_SKIPPED.append(f"{entry['task_id']} (profile)")
+        return {"skipped": "profile stored at the registered and frozen version"}
     bundle = load_bundle({"mlflow_run_id": entry["mlflow_run_id"]})
     data = collect_window(entry, REFERENCE_WINDOW, bundle, rid, spec)
     now = now_utc()
@@ -1440,16 +1514,25 @@ def reference_by_subject(ecosystem: str, entry: dict) -> dict:
     return {r["subject"]: r.asDict() for r in rows}
 
 
-def monitor_entry(entry: dict, rid: str, spec: dict) -> dict:
+def monitor_entry(entry: dict, rid: str, spec: dict, redo: bool = False) -> dict:
     """Score the validation and held-out windows of one registered model, store the
-    predictions and compare each window with the recorded reference profile."""
+    predictions and compare each window with the recorded reference profile. A window
+    already monitored at the same version is kept."""
     eco = TASK_BY_ID[entry["task_id"]]["ecosystem"]
     reference = reference_by_subject(eco, entry)
     if not reference:
         raise RuntimeError(f"{entry['task_id']}: no reference profile recorded")
+    todo = []
+    for window_id in MONITOR_WINDOWS:
+        if not redo and window_is_current(entry, window_id):
+            OPERATE_SKIPPED.append(f"{entry['task_id']} ({window_id})")
+        else:
+            todo.append(window_id)
+    if not todo:
+        return {"skipped": "every window stored at the registered and frozen version"}
     bundle = load_bundle({"mlflow_run_id": entry["mlflow_run_id"]})
     counts = {}
-    for window_id in MONITOR_WINDOWS:
+    for window_id in todo:
         data = collect_window(entry, window_id, bundle, rid, spec)
         now = now_utc()
         write_predictions(entry, data, rid, now)
@@ -1458,12 +1541,11 @@ def monitor_entry(entry: dict, rid: str, spec: dict) -> dict:
         )
         results = result_rows(found, entry, window_id, rid, now)
         window = f" AND window_id = '{window_id}' AND check_kind <> 'performance'"
-        result_where = entry_predicate(entry, window)
-        replace_table_rows(results, "monitoring_results", eco, result_where)
+        # the flags first, the results last: the results show a finished window
         flags = flag_rows(results, rid, now)
-        flag_window = f" AND window_id = '{window_id}' AND check_kind <> 'performance'"
-        flag_where = entry_predicate(entry, flag_window)
-        replace_table_rows(flags, "monitoring_flags", eco, flag_where)
+        where = entry_predicate(entry, window)
+        replace_table_rows(flags, "monitoring_flags", eco, where)
+        replace_table_rows(results, "monitoring_results", eco, where)
         counts[window_id] = {
             lv: sum(1 for r in results if r["level"] == lv) for lv in LEVELS
         }
@@ -1475,17 +1557,19 @@ def monitor_entry(entry: dict, rid: str, spec: dict) -> dict:
 # DBTITLE 1,One ecosystem
 
 
-def operate_ecosystem(ecosystem: str, rid: str, step: str) -> list:
+def operate_ecosystem(ecosystem: str, rid: str, step: str, redo: bool = False) -> list:
     """Run `profile_entry` or `monitor_entry` for every registered selected model of
-    the ecosystem. A model that fails is listed; the others still run."""
+    the ecosystem. A model that fails is listed; the others still run. Work stored
+    at the same registered and frozen version is kept unless `redo` is True."""
     rows = read_model("monitoring_spec", ecosystem=ecosystem).collect()
     spec = operate_spec_from_rows([r.asDict() for r in rows])
     run = profile_entry if step == "profile" else monitor_entry
     failed = []
     for entry in sorted(operate_entries(ecosystem), key=lambda e: e["task_id"]):
         try:
-            out = run(entry, rid, spec)
-            print(f"OK   {entry['task_id']} {entry['model_name']}: {out}")
+            out = run(entry, rid, spec, redo)
+            label = "SKIP" if "skipped" in out else "OK  "
+            print(f"{label} {entry['task_id']} {entry['model_name']}: {out}")
         except Exception as exc:
             failed.append((entry["task_id"], f"{type(exc).__name__}: {str(exc)[:300]}"))
             print(f"FAIL {entry['task_id']} {entry['model_name']}: {failed[-1][1]}")

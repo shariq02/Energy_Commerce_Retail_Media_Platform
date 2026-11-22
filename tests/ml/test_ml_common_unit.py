@@ -11,8 +11,10 @@ Loaded through `tests/_notebook_loader.py`, which reproduces the notebooks' own
 from __future__ import annotations
 
 import datetime as dt
+import pathlib
 
 import pytest
+import yaml
 
 from tests._notebook_loader import load_ml_common
 
@@ -326,3 +328,32 @@ def test_static_imputation_scores_three_methods_on_masked_values(ml):
         ["year"],
     )
     assert len(pred) == 100
+
+
+def test_a_source_split_with_train_rows_also_gives_a_validation_partition(ml):
+    """Training and evaluation need train and validation rows; a source split gives
+    only train and test, so every trained source-split dataset declares a share."""
+    root = pathlib.Path(__file__).resolve().parents[2] / "src" / "schemas" / "mappings"
+    tasks = yaml.safe_load((root / "model_tasks.yml").read_text(encoding="utf-8"))
+    trained = {t["dataset_id"] for t in tasks["tasks"].values()}
+    for name in trained:
+        split = ml["ML_SPEC"]["datasets"][name]["split"]
+        if split["rule"] == "source_defined":
+            assert split.get("validation_percent"), name
+            assert split.get("group_cols"), name
+
+
+def test_spec_problems_names_a_validation_group_column_the_frame_lacks(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    name = "benchmark_maps"
+    columns = {*datasets[name]["grain"], "split"}
+    assert ml["spec_problems"](name, columns) == []
+    datasets["_probe"] = {
+        **datasets[name],
+        "split": {**datasets[name]["split"], "group_cols": ["missing_column"]},
+    }
+    try:
+        problems = ml["spec_problems"]("_probe", columns)
+    finally:
+        del datasets["_probe"]
+    assert "_probe: split column missing_column is not in the frame" in problems
