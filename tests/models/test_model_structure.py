@@ -118,14 +118,11 @@ def test_training_and_evaluation_run_every_task_through_the_task_file():
         text = (_MODELS / name).read_text(encoding="utf-8")
         assert entry in text, name
         assert "spark.table(" not in text and "spark.read" not in text, name
-        assert "SMOKE = smoke_setting()" in text, name
+        assert "SMOKE = False" in text, name
 
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)
-def test_only_the_shared_library_and_the_score_request_read_widgets(path):
-    # the smoke widget is read once, in `smoke_setting`; the notebooks use no other
-    if path.name == "_model_common.py":
-        return
+def test_no_model_file_reads_a_widget(path):
     assert "dbutils.widgets" not in path.read_text(encoding="utf-8"), _rel(path)
 
 

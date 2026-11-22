@@ -35,8 +35,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Smoke parameter
-SMOKE = smoke_setting()
+# DBTITLE 1,Smoke setting (True = short test on a small sample of every dataset)
+SMOKE = False
 
 # COMMAND ----------
 

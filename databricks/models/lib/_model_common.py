@@ -1385,14 +1385,6 @@ def _notebook_identity():
     return path, job, str(run) if run is not None else None
 
 
-def smoke_setting() -> bool:
-    """The `smoke` widget of the notebook (default false): true runs a short test on a
-    small sample of every dataset. Train and evaluation read it here, so a pipeline
-    passes one parameter."""
-    dbutils.widgets.text("smoke", "false")
-    return dbutils.widgets.get("smoke").strip().lower() == "true"
-
-
 def train_side(fn) -> dict:
     """Run a train-side metric computation; a failure is printed and never fails
     the candidate."""
