@@ -96,6 +96,8 @@ _Generated: 2026-09-30T19:36Z_
 <!-- BEGIN commerce:assembled__assembled_next_item_ga4 -->
 ## assembled_next_item_ga4
 
+> STALE: not rewritten in the last 24h
+
 _Generated: 2026-10-23T12:08Z_
 
 ### completeness
@@ -142,6 +144,8 @@ _Generated: 2026-10-23T12:08Z_
 
 <!-- BEGIN commerce:assembled__assembled_next_item_rees46 -->
 ## assembled_next_item_rees46
+
+> STALE: not rewritten in the last 24h
 
 _Generated: 2026-10-23T12:06Z_
 
@@ -190,6 +194,8 @@ _Generated: 2026-10-23T12:06Z_
 
 <!-- BEGIN commerce:assembled__assembled_rl_session_sequences -->
 ## assembled_rl_session_sequences
+
+> STALE: not rewritten in the last 24h
 
 _Generated: 2026-10-23T12:16Z_
 
@@ -357,6 +363,516 @@ _Generated: 2026-09-30T19:37Z_
 | row_count | rows | 14543421.0 |  | INFO | INFO |  |
 
 <!-- END commerce:assembled__assembled_session_purchase_rees46 -->
+
+<!-- BEGIN commerce:build__lapse_ga4 -->
+## lapse_ga4
+
+_Generated: 2026-11-22T12:34Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:cutoff_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_returned | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:label_window_days | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_session_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_event_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_transaction_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_active_days | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_days_since_last_session | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.39877355401422915 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['user_id', 'cutoff_date'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:train | rows | 20197.0 |  | INFO | INFO | target_n=20197 target_mean=0.09887607070356984 |
+| partition:validation | rows | 6524.0 |  | INFO | INFO | target_n=6524 target_mean=0.07863274064990804 |
+| partition:test | rows | 6872.0 |  | INFO | INFO | target_n=6872 target_mean=0.07814318975552968 |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 18.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 33593.0 |  | INFO | INFO |  |
+
+<!-- END commerce:build__lapse_ga4 -->
+
+<!-- BEGIN commerce:build__lapse_rees46 -->
+## lapse_rees46
+
+_Generated: 2026-11-22T12:33Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:cutoff_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_returned | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:label_window_days | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_session_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_event_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_purchase_sessions | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_product_views | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_active_days | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_days_since_last_session | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:lapse_days_since_first_session | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.30024329241842856 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['user_id', 'cutoff_date'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:train | rows | 2114867.0 |  | INFO | INFO | target_n=2114867 target_mean=0.4631090276598954 |
+| partition:test | rows | 453593.0 |  | INFO | INFO | target_n=453593 target_mean=0.4629502659873499 |
+| partition:validation | rows | 453829.0 |  | INFO | INFO | target_n=453829 target_mean=0.4633507334260261 |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 20.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 3022289.0 |  | INFO | INFO |  |
+
+### cohort
+
+| users_seen | users_in_cohort |
+|---|---|
+| 5316648 | 3022289 |
+
+<!-- END commerce:build__lapse_rees46 -->
+
+<!-- BEGIN commerce:build__next_item_ga4 -->
+## next_item_ga4
+
+_Generated: 2026-11-22T12:45Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:step | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:local_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_next_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:event_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_category | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_price | null_rate | 0.001607522568980226 |  | INFO | INFO |  |
+| null_rate:seq_previous_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_previous_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_seconds_since_session_start | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_timestamp_tie | null_rate | 0.01563779916896919 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.30943483114116066 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_price_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_price_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['session_key', 'step'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:test | rows | 578611.0 |  | INFO | INFO | target_n=578611 target_mean=9194216.19741905 |
+| partition:train | rows | 2603276.0 |  | INFO | INFO | target_n=2603276 target_mean=9194039.84913012 |
+| partition:validation | rows | 587889.0 |  | INFO | INFO | target_n=587889 target_mean=9194211.977231806 |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 25.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 3769776.0 |  | INFO | INFO |  |
+
+### steps
+
+| steps_total | steps_with_next_item |
+|---|---|
+| 3852091 | 3769776 |
+
+<!-- END commerce:build__next_item_ga4 -->
+
+<!-- BEGIN commerce:build__next_item_rees46 -->
+## next_item_rees46
+
+_Generated: 2026-11-22T12:44Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:step | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:local_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_next_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:event_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_category | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_brand | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_price | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_previous_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_previous_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_seconds_since_session_start | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_timestamp_tie | null_rate | 0.15593403459822824 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.40814640658617735 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['session_key', 'step'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:validation | rows | 6846474.0 |  | INFO | INFO | target_n=6846474 target_mean=13644846.114129696 |
+| partition:test | rows | 6859737.0 |  | INFO | INFO | target_n=6859737 target_mean=13643182.535848532 |
+| partition:train | rows | 19875393.0 |  | INFO | INFO | target_n=19875393 target_mean=11450693.374528091 |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 24.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 33581604.0 |  | INFO | INFO |  |
+
+### steps
+
+| steps_total | steps_with_next_item |
+|---|---|
+| 109819980 | 73916894 |
+
+<!-- END commerce:build__next_item_rees46 -->
+
+<!-- BEGIN commerce:build__rl_session_sequences -->
+## rl_session_sequences
+
+_Generated: 2026-11-22T12:53Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:step | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:episode_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:event_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:local_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_action_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_action_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:reward | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_category | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_brand | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_price | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_previous_product_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_previous_event_type | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_seconds_since_session_start | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:seq_timestamp_tie | null_rate | 0.21288160947902737 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.4065375058300215 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['episode_id', 'step'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:validation | rows | 10143799.0 |  | INFO | INFO | target_n=10143799 target_mean=None |
+| partition:test | rows | 10178643.0 |  | INFO | INFO | target_n=10178643 target_mean=None |
+| partition:train | rows | 29666653.0 |  | INFO | INFO | target_n=29666653 target_mean=None |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 27.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 49989095.0 |  | INFO | INFO |  |
+
+<!-- END commerce:build__rl_session_sequences -->
+
+<!-- BEGIN commerce:build__session_purchase_ga4 -->
+## session_purchase_ga4
+
+_Generated: 2026-11-22T12:32Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:session_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_purchase_after_prefix | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:session_start_utc | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:as_of_ts | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_event_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_page_view_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_view_item_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_add_to_cart_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_search_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_distinct_pages | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_session_number | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_geo_country | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_span_seconds | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_hour_of_day | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_day_of_week | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_session_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_transaction_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_revenue | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_event_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_last_session | null_rate | 0.6132535718434197 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.30973399930305495 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_last_session_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_last_session_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['session_key'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:train | rows | 11885.0 |  | INFO | INFO | target_n=11885 target_mean=0.24392090870845604 |
+| partition:validation | rows | 2609.0 |  | INFO | INFO | target_n=2609 target_mean=0.23763894212341893 |
+| partition:test | rows | 2724.0 |  | INFO | INFO | target_n=2724 target_mean=0.2551395007342144 |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 33.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 17218.0 |  | INFO | INFO |  |
+
+### excluded_sessions
+
+| reason | sessions |
+|---|---|
+| fewer_events_than_k | 151511 |
+| purchase_inside_prefix | 234 |
+
+### sessions_below_prefix_length
+
+| k | sessions_excluded | sessions_total |
+|---|---|---|
+| 10 | 151511 | 168963 |
+
+<!-- END commerce:build__session_purchase_ga4 -->
+
+<!-- BEGIN commerce:build__session_purchase_rees46 -->
+## session_purchase_rees46
+
+_Generated: 2026-11-22T12:30Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:session_date | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:target_purchase_after_prefix | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:session_start_utc | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:as_of_ts | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_event_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_view_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_cart_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_distinct_products | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_first_category | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_first_brand | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_first_price | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_mean_price | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_span_seconds | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_hour_of_day | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:prefix_day_of_week | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_views | null_rate | 0.0370094213370517 |  | INFO | INFO |  |
+| null_rate:product_pop_carts | null_rate | 0.0370094213370517 |  | INFO | INFO |  |
+| null_rate:product_pop_purchases | null_rate | 0.0370094213370517 |  | INFO | INFO |  |
+| null_rate:product_pop_last_price | null_rate | 0.0370094213370517 |  | INFO | INFO |  |
+| null_rate:user_hist_session_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_purchase_sessions | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_event_count | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_product_views | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_last_session | null_rate | 0.24436196548012076 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_first_session | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:partition | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:fold_id | null_rate | 0.3914847840339775 |  | INFO | INFO |  |
+| null_rate:group_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_views_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_carts_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_purchases_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_last_price_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_last_session_is_missing | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_views_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_carts_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_purchases_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_pop_last_price_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_hist_days_since_last_session_imputed | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['session_key'] |
+
+### partitions
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| partition:test | rows | 1313711.0 |  | INFO | INFO | target_n=1313711 target_mean=0.08170899079021185 |
+| partition:train | rows | 4077313.0 |  | INFO | INFO | target_n=4077313 target_mean=0.08321534304577549 |
+| partition:validation | rows | 1309405.0 |  | INFO | INFO | target_n=1309405 target_mean=0.08127966519144192 |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 46.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 6700429.0 |  | INFO | INFO |  |
+
+### excluded_sessions
+
+| reason | sessions |
+|---|---|
+| fewer_events_than_k | 8270080 |
+| purchase_inside_prefix | 204098 |
+
+### sessions_below_prefix_length
+
+| k | sessions_excluded |
+|---|---|
+| 2 | 8270080 |
+
+<!-- END commerce:build__session_purchase_rees46 -->
 
 <!-- BEGIN commerce:features__features_item_sequence_ga4 -->
 ## features_item_sequence_ga4
@@ -557,9 +1073,7 @@ _Generated: 2026-09-30T19:22Z_
 <!-- BEGIN commerce:features__features_product_asof_ga4 -->
 ## features_product_asof_ga4
 
-> STALE: not rewritten in the last 24h
-
-_Generated: 2026-09-30T19:22Z_
+_Generated: 2026-11-22T12:25Z_
 
 ### completeness
 
@@ -601,9 +1115,7 @@ _Generated: 2026-09-30T19:22Z_
 <!-- BEGIN commerce:features__features_product_asof_rees46 -->
 ## features_product_asof_rees46
 
-> STALE: not rewritten in the last 24h
-
-_Generated: 2026-09-30T19:22Z_
+_Generated: 2026-11-22T12:25Z_
 
 ### completeness
 
@@ -998,6 +1510,8 @@ _Generated: 2026-09-30T19:48Z_
 <!-- BEGIN commerce:fit__dataset_next_item_ga4 -->
 ## dataset_next_item_ga4
 
+> STALE: not rewritten in the last 24h
+
 _Generated: 2026-10-23T12:45Z_
 
 ### completeness
@@ -1062,6 +1576,8 @@ _Generated: 2026-10-23T12:45Z_
 <!-- BEGIN commerce:fit__dataset_next_item_rees46 -->
 ## dataset_next_item_rees46
 
+> STALE: not rewritten in the last 24h
+
 _Generated: 2026-10-23T12:42Z_
 
 ### completeness
@@ -1124,6 +1640,8 @@ _Generated: 2026-10-23T12:42Z_
 
 <!-- BEGIN commerce:fit__dataset_rl_session_sequences -->
 ## dataset_rl_session_sequences
+
+> STALE: not rewritten in the last 24h
 
 _Generated: 2026-10-23T13:09Z_
 
@@ -1348,6 +1866,88 @@ _Generated: 2026-09-30T19:58Z_
 | row_count | rows | 6700427.0 |  | INFO | INFO |  |
 
 <!-- END commerce:fit__dataset_session_purchase_rees46 -->
+
+<!-- BEGIN commerce:targets__target_basket_ga4 -->
+## target_basket_ga4
+
+_Generated: 2026-11-22T12:37Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:purchased_products | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:basket_size | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['session_key'] |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 10.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 4446.0 |  | INFO | INFO |  |
+
+<!-- END commerce:targets__target_basket_ga4 -->
+
+<!-- BEGIN commerce:targets__target_basket_rees46 -->
+## target_basket_rees46
+
+_Generated: 2026-11-22T12:36Z_
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:purchased_products | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:basket_size | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:provenance_tier | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:dataset_version | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_ml_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['session_key'] |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| column_count | count | 10.0 |  | INFO | INFO |  |
+| class_e_columns | count | 0.0 | 0.0 | PASS | INFO | columns=[] |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 1402758.0 |  | INFO | INFO |  |
+
+<!-- END commerce:targets__target_basket_rees46 -->
 
 <!-- BEGIN commerce:targets__target_lapse_ga4 -->
 ## target_lapse_ga4

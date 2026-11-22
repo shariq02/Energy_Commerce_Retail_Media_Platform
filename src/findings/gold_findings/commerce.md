@@ -149,7 +149,7 @@ _Generated: 2026-11-18T19:44Z_
 <!-- BEGIN commerce:01_commerce__commerce_event -->
 ## commerce_event
 
-_Generated: 2026-11-19T21:23Z_
+_Generated: 2026-11-21T22:04Z_
 
 ### cardinality
 
@@ -288,10 +288,100 @@ _Generated: 2026-11-19T21:23Z_
 
 <!-- END commerce:01_commerce__commerce_event -->
 
+<!-- BEGIN commerce:01_commerce__commerce_event_item -->
+## commerce_event_item
+
+_Generated: 2026-11-21T22:04Z_
+
+### cardinality
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| distinct:event_key | approx_distinct | 468023.0 |  | INFO | INFO |  |
+| distinct:item_ordinal | approx_distinct | 32.0 |  | INFO | INFO |  |
+| distinct:event_name | approx_distinct | 8.0 |  | INFO | INFO |  |
+| distinct:event_timestamp_utc | approx_distinct | 433608.0 |  | INFO | INFO |  |
+| distinct:user_pseudo_id | approx_distinct | 105316.0 |  | INFO | INFO |  |
+| distinct:item_context | approx_distinct | 2.0 |  | INFO | INFO |  |
+| distinct:item_id | approx_distinct | 1338.0 |  | INFO | INFO |  |
+| distinct:item_name | approx_distinct | 414.0 |  | INFO | INFO |  |
+| distinct:item_category | approx_distinct | 81.0 |  | INFO | INFO |  |
+| distinct:price | approx_distinct | 70.0 |  | INFO | INFO |  |
+| distinct:quantity | approx_distinct | 88.0 |  | INFO | INFO |  |
+| distinct:item_revenue | approx_distinct | 158.0 |  | INFO | INFO |  |
+| distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:session_key | approx_distinct | 131716.0 |  | INFO | INFO |  |
+| distinct:user_key | approx_distinct | 111202.0 |  | INFO | INFO |  |
+| distinct:product_key | approx_distinct | 1404.0 |  | INFO | INFO |  |
+| distinct:ecosystem | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_gold_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
+| distinct:_gold_run_id | approx_distinct | 1.0 |  | INFO | INFO |  |
+
+### completeness
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| null_rate:event_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:item_ordinal | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:event_name | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:event_timestamp_utc | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_pseudo_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:item_context | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:item_id | null_rate | 0.03280185561067127 |  | INFO | INFO |  |
+| null_rate:item_name | null_rate | 0.03727541797941714 |  | INFO | INFO |  |
+| null_rate:item_category | null_rate | 0.041392692252453844 |  | INFO | INFO |  |
+| null_rate:price | null_rate | 0.037275669063346464 |  | INFO | INFO |  |
+| null_rate:quantity | null_rate | 0.9622610810870528 |  | INFO | INFO |  |
+| null_rate:item_revenue | null_rate | 0.9960943894793824 |  | INFO | INFO |  |
+| null_rate:source_system | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_dataset | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:source_record_id | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:session_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:user_key | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:product_key | null_rate | 0.037275669063346464 |  | INFO | INFO |  |
+| null_rate:ecosystem | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_gold_loaded_at | null_rate | 0.0 |  | INFO | INFO |  |
+| null_rate:_gold_run_id | null_rate | 0.0 |  | INFO | INFO |  |
+
+### grain
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| duplicate_keys | count | 0.0 | 0.0 | PASS | INFO | key_cols=['event_key', 'item_ordinal'] |
+
+### numeric
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| zero_count:item_ordinal | count | 512346.0 |  | INFO | INFO |  |
+| negative_count:item_ordinal | count | 0.0 |  | INFO | INFO |  |
+| zero_count:price | count | 0.0 |  | INFO | INFO |  |
+| negative_count:price | count | 0.0 |  | INFO | INFO |  |
+| zero_count:quantity | count | 2.0 |  | INFO | INFO |  |
+| negative_count:quantity | count | 1.0 |  | INFO | INFO |  |
+| zero_count:item_revenue | count | 0.0 |  | INFO | INFO |  |
+| negative_count:item_revenue | count | 0.0 |  | INFO | INFO |  |
+
+### schema
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| table_exists | exists | 1.0 | 1.0 | PASS | INFO |  |
+| column_count | count | 21.0 |  | INFO | INFO |  |
+
+### volume
+
+| check | metric | observed | expected | status | severity | details |
+|---|---|---|---|---|---|---|
+| row_count | rows | 3982732.0 |  | INFO | INFO |  |
+
+<!-- END commerce:01_commerce__commerce_event_item -->
+
 <!-- BEGIN commerce:01_commerce__commerce_product -->
 ## commerce_product
 
-_Generated: 2026-11-19T21:23Z_
+_Generated: 2026-11-21T22:02Z_
 
 ### cardinality
 
@@ -601,7 +691,7 @@ _Generated: 2026-11-18T19:44Z_
 <!-- BEGIN commerce:01_commerce__commerce_session -->
 ## commerce_session
 
-_Generated: 2026-11-19T21:23Z_
+_Generated: 2026-11-21T22:02Z_
 
 ### cardinality
 
