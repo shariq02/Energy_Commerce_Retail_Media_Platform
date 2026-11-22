@@ -119,7 +119,7 @@ for _name, _spec in ML_SPEC["datasets"].items():
         continue
     _rows = benchmarks.filter(F.col("benchmark_set") == _spec["benchmark_set"])
     _framed = _rows
-    if "split_group" in _spec["split"]["group_cols"]:
+    if "split_group" in _spec["split"].get("group_cols", []):
         # split by the gene of the variant; a variant without a gene is its own group
         _framed = (
             _rows.join(variant_genes, "variant_key", "left")
