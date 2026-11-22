@@ -62,6 +62,10 @@ SCHEMA_OBJECT_STOP = 95
 DATASET_VERSION = "v1"
 SPLIT_VERSION = "s1"
 NULL_DROP_THRESHOLD = 0.95
+CATEGORY_MIN_COUNT = 20
+CATEGORY_MAX_LEVELS = 2000
+PARTITION_COLUMNS = ("partition", "fold_id", "group_key", "diagnostic_group")
+FIT_KEYS = ("group_cols", "fold_mode", "calendar_key", "date_col", "impute")
 MIN_REALISED_LAG_DAYS = 2
 PROJECT_TIMEZONE = "Europe/Berlin"
 
@@ -850,20 +854,6 @@ def read_partition_manifest(dataset_id: str, ecosystem: str) -> DataFrame:
     )
 
 
-def attach_partition(
-    df: DataFrame, dataset_id: str, ecosystem: str, key_cols: list[str]
-) -> DataFrame:
-    """Join the stored partition, fold and group onto a dataset by grain key."""
-    m = read_partition_manifest(dataset_id, ecosystem).select(
-        "grain_key", "partition", "fold_id", "group_key"
-    )
-    return (
-        df.withColumn("_grain_key", grain_key(*key_cols))
-        .join(m, F.col("_grain_key") == m["grain_key"], "inner")
-        .drop("grain_key", "_grain_key")
-    )
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Split rules -- date partitions, entity hashes, rolling folds
@@ -954,16 +944,15 @@ def partition_for_date_py(date_iso: str, calendar_key: str) -> str:
     return "test"
 
 
-def fold_frames(df: DataFrame, calendar_key: str, k: int, date_col: str):
-    """(train, validation) rows for rolling fold k from a manifest-joined frame."""
+def rolling_train_condition(date_col: str, calendar_key: str, k: int):
+    """The training rows of rolling fold k: the train partition before the block
+    start, less the embargo."""
     a, _b = ROLLING_BLOCKS[calendar_key][k]
     emb = EMBARGO_DAYS[calendar_key]
     d = F.col(date_col).cast("date")
-    train = df.filter(
-        (F.col("partition") == "train") & (d < F.date_sub(F.lit(a).cast("date"), emb))
+    return (F.col("partition") == "train") & (
+        d < F.date_sub(F.lit(a).cast("date"), emb)
     )
-    valid = df.filter((F.col("partition") == "train") & (F.col("fold_id") == k))
-    return train, valid
 
 
 def _calendar_columns(df: DataFrame, split: dict, date_col: str, calendar_key: str):
@@ -1102,6 +1091,112 @@ def partition_frame(df: DataFrame, dataset_id: str) -> DataFrame:
                 name, F.lit(None).cast("int" if name == "fold_id" else "string")
             )
     return keyed
+
+
+SPLIT_RULE_KEYS = {
+    "calendar": ("calendar", "date_col"),
+    "calendar_per_series": (
+        "family_column",
+        "honda_family",
+        "honda_calendar",
+        "default_calendar",
+        "date_col",
+    ),
+    "hash_unit_stratified": ("group_col",),
+    "hash_group": ("group_cols",),
+    "all_train_grouped": ("group_col",),
+    "source_defined": ("split_column",),
+}
+SPLIT_RULE_FRAME_COLUMNS = {
+    "calendar": ("date_col", "group_col"),
+    "calendar_per_series": ("family_column", "date_col"),
+    "hash_unit_stratified": ("group_col",),
+    "hash_group": ("group_cols",),
+    "all_train_grouped": ("group_col",),
+    "source_defined": ("split_column",),
+}
+SPLIT_KEYS = ("rule", "rule_id")
+STRATIFIED_COLUMNS = ("target_event", "is_offshore", "entry_date", "stop_date")
+REQUIRED_SPEC_KEYS = (
+    "ecosystem",
+    "family",
+    "capability",
+    "grain",
+    "dependency_group",
+    "target_name",
+    "provenance_tier",
+    "notes",
+    "split",
+    "fit",
+)
+
+
+def spec_problems(dataset_id: str, columns) -> list[str]:
+    """What the spec file declares for a dataset that its frame cannot serve: a
+    missing key, an unknown rule or calendar, a column that a rule reads and the
+    frame lacks. Nothing is read from Spark."""
+    spec = ML_SPEC["datasets"].get(dataset_id)
+    if spec is None:
+        return [f"{dataset_id}: not in the spec file"]
+    missing = [k for k in REQUIRED_SPEC_KEYS if k not in spec]
+    if missing:
+        return [f"{dataset_id}: no spec key {k}" for k in missing]
+    have = set(columns)
+    split, fit = spec["split"], spec["fit"]
+    found = []
+
+    def absent(kind, names):
+        flat = []
+        for name in names:
+            flat += name if isinstance(name, list) else [name]
+        return [
+            f"{dataset_id}: {kind} column {c} is not in the frame"
+            for c in flat
+            if c and c not in have
+        ]
+
+    found += [f"{dataset_id}: no fit key {k}" for k in FIT_KEYS if k not in fit]
+    found += [f"{dataset_id}: no split key {k}" for k in SPLIT_KEYS if k not in split]
+    rule = split.get("rule")
+    if rule not in SPLIT_RULE_KEYS:
+        found.append(f"{dataset_id}: unknown split rule {rule}")
+    else:
+        wanted = SPLIT_RULE_KEYS[rule]
+        found += [f"{dataset_id}: no split key {k}" for k in wanted if k not in split]
+        found += absent("split", [split.get(k) for k in SPLIT_RULE_FRAME_COLUMNS[rule]])
+        if rule == "hash_unit_stratified":
+            found += absent("split", STRATIFIED_COLUMNS)
+        temporal = split.get("temporal") or {}
+        diagnostic = split.get("diagnostic") or {}
+        found += absent("temporal", [temporal.get("date_col")])
+        found += absent("diagnostic", [diagnostic.get("date_col")])
+        calendars = [split.get(k) for k in ("calendar", "honda_calendar")]
+        calendars.append(split.get("default_calendar"))
+        found += [
+            f"{dataset_id}: unknown calendar {c}"
+            for c in calendars
+            if c and c not in SPLIT_CALENDARS
+        ]
+        cutoffs = [temporal.get(k) for k in ("cutoff", "train", "evaluation")]
+        cutoffs.append(diagnostic.get("date"))
+        found += [
+            f"{dataset_id}: unknown cutoff {c}"
+            for c in cutoffs
+            if c and c not in _CUTOFFS
+        ]
+    found += absent("grain", [spec["grain"]])
+    found += absent("fit group", [fit.get("group_cols") or []])
+    mode = fit.get("fold_mode")
+    if mode not in ("rolling", "grouped", "none"):
+        found.append(f"{dataset_id}: unknown fold mode {mode}")
+    if mode == "rolling":
+        found += absent("fit date", [fit.get("date_col")])
+        key = fit.get("calendar_key")
+        if key not in ROLLING_BLOCKS:
+            found.append(f"{dataset_id}: no rolling blocks for {key}")
+    for diag in spec.get("diagnostics", []):
+        found += absent("diagnostic", [diag["keys"], diag["group_col"]])
+    return found
 
 
 def write_dataset_partitions(keyed: DataFrame, dataset_id: str) -> None:
@@ -1438,23 +1533,6 @@ def apply_group_median(
         out_col or value_col,
         F.coalesce(F.col(value_col), F.col("_gm"), F.lit(params["overall"])),
     ).drop("_gm")
-
-
-def fit_category_levels(
-    train: DataFrame, col: str, min_count: int = 20, max_levels: int = 2000
-) -> list:
-    """Most frequent levels of a categorical (at least min_count rows, at most
-    max_levels); everything else becomes the rare level when applied."""
-    rows = (
-        train.filter(F.col(col).isNotNull())
-        .groupBy(col)
-        .count()
-        .filter(F.col("count") >= min_count)
-        .orderBy(F.col("count").desc())
-        .limit(max_levels)
-        .collect()
-    )
-    return sorted(str(r[col]) for r in rows)
 
 
 def apply_category_levels(

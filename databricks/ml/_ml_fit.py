@@ -15,42 +15,39 @@
 # MAGIC **Purpose:** the build of a dataset, shared by every build notebook, pulled in
 # MAGIC with `%run ../_ml_fit` after `_ml_common`. Definitions only.
 # MAGIC
-# MAGIC Order is fixed: write the assembled rows once, declare the contract, split
-# MAGIC by the spec rule, attach the stored partition, drop columns by the null
-# MAGIC rule, fit imputers on the training partition only, apply them to every
-# MAGIC partition, record the fitted parameters, write the final rows.
+# MAGIC Order is fixed: check the spec against the frames, write the assembled rows
+# MAGIC with their partition columns once, declare the contract, store the partition
+# MAGIC manifest, drop columns by the null rule, fit the imputers of the final fit
+# MAGIC and of every fold on the training rows only (one pass per kind of
+# MAGIC parameter), apply the final fit to every partition, record the fitted
+# MAGIC parameters, write the final rows.
 
 # COMMAND ----------
 
 # DBTITLE 1,Imports
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 # COMMAND ----------
 
 # DBTITLE 1,Configuration constants
 USED_PARTITIONS = ("train", "validation", "test")
 NUMERIC_TYPES = ("double", "float", "int", "bigint", "smallint", "tinyint")
+FIT_BATCH_AGGREGATES = 400
+FIT_BATCH_TEXT_COLUMNS = 25
 
 # COMMAND ----------
 
-# DBTITLE 1,Attach the stored partition to the assembled rows
+# DBTITLE 1,The partitioned rows of a dataset
 
 
-def load_partitioned(
-    assembled: DataFrame, dataset_id: str, ecosystem: str
-) -> DataFrame:
-    """The assembled rows joined to the partition manifest; embargo and excluded
-    rows are dropped."""
-    m = (
-        read_ml("dataset_manifest", ecosystem=ecosystem)
-        .filter(F.col("dataset_id") == dataset_id)
-        .first()
+def load_partitioned(assembled: DataFrame) -> DataFrame:
+    """The assembled rows of the used partitions; embargo and excluded rows are
+    dropped. The partition, fold and group columns are stored with the rows."""
+    return assembled.drop("diagnostic_group").filter(
+        F.col("partition").isin(*USED_PARTITIONS)
     )
-    if m is None:
-        raise RuntimeError(f"{dataset_id} is not registered")
-    df = attach_partition(assembled, dataset_id, ecosystem, list(m["grain_key"]))
-    return df.filter(F.col("partition").isin(*USED_PARTITIONS))
 
 
 def contract_columns(dataset_id: str, ecosystem: str, role: str) -> list[str]:
@@ -64,20 +61,107 @@ def contract_columns(dataset_id: str, ecosystem: str, role: str) -> list[str]:
 
 # COMMAND ----------
 
-# DBTITLE 1,Group medians for many columns in one pass
+# DBTITLE 1,The fits of a dataset -- the final fit and every fold in one pass
 
 
-def fit_group_medians(train: DataFrame, cols: list[str], group_cols: list[str]) -> dict:
-    """Median per group (and overall) for every column, from the training rows."""
-    if not cols:
-        return {}
-    aggs = [F.percentile_approx(c, 0.5).alias(c) for c in cols]
-    overall = train.agg(*aggs).first().asDict()
-    groups = []
-    if group_cols:
-        for r in train.groupBy(*group_cols).agg(*aggs).collect():
-            groups.append({**{g: r[g] for g in group_cols}, **{c: r[c] for c in cols}})
-    return {"group_cols": group_cols, "overall": overall, "groups": groups}
+def fit_memberships(mode: str, calendar_key: str | None, date_col: str | None) -> dict:
+    """Fit id -> the condition that selects its training rows; -1 is the final fit
+    (the whole train partition), 0 and up are the folds of the scheme."""
+    train = F.col("partition") == "train"
+    fits = {-1: train}
+    if mode == "rolling":
+        for k in range(len(ROLLING_BLOCKS[calendar_key])):
+            fits[k] = rolling_train_condition(date_col, calendar_key, k)
+    elif mode == "grouped":
+        for k in range(GROUPED_FOLDS):
+            fits[k] = train & (F.col("fold_id") != k)
+    return fits
+
+
+def _member(condition):
+    return F.when(condition, F.lit(1)).otherwise(F.lit(0))
+
+
+def fit_medians(
+    df: DataFrame, cols: list[str], group_cols: list[str], fits: dict
+) -> tuple[dict, dict]:
+    """Median per column, overall and per group, for every fit, in one pass per
+    batch of columns. A fit reads only its own training rows. Returns the
+    parameters and the number of training rows per fit id."""
+    ids = list(fits)
+    df = df.filter(fits[-1])
+    counts = [F.sum(_member(fits[j])).alias(f"n{i}") for i, j in enumerate(ids)]
+    first = df.agg(*counts).first()
+    params = {j: {"group_cols": group_cols, "overall": {}, "groups": {}} for j in ids}
+    size = max(1, FIT_BATCH_AGGREGATES // len(ids))
+    for start in range(0, len(cols), size):
+        batch = cols[start : start + size]
+        aggs = [
+            F.percentile_approx(F.when(fits[j], F.col(c)), 0.5).alias(f"m{i}_{b}")
+            for i, j in enumerate(ids)
+            for b, c in enumerate(batch)
+        ]
+        row = df.agg(*aggs).first()
+        for i, j in enumerate(ids):
+            for b, c in enumerate(batch):
+                params[j]["overall"][c] = row[f"m{i}_{b}"]
+        if not group_cols:
+            continue
+        for r in df.groupBy(*group_cols).agg(*aggs, *counts).collect():
+            key = tuple(r[g] for g in group_cols)
+            for i, j in enumerate(ids):
+                if r[f"n{i}"]:
+                    entry = params[j]["groups"].setdefault(
+                        key, dict(zip(group_cols, key))
+                    )
+                    for b, c in enumerate(batch):
+                        entry[c] = r[f"m{i}_{b}"]
+    for j in ids:
+        params[j]["groups"] = list(params[j]["groups"].values())
+    return params, {j: int(first[f"n{i}"] or 0) for i, j in enumerate(ids)}
+
+
+def fit_levels(df: DataFrame, cols: list[str], fits: dict) -> dict:
+    """Most frequent levels of every text column for every fit (at least
+    CATEGORY_MIN_COUNT training rows, at most CATEGORY_MAX_LEVELS); everything else
+    becomes the rare level when applied. One pass per batch of columns."""
+    ids = list(fits)
+    levels = {j: {c: [] for c in cols} for j in ids}
+    members = [_member(fits[j]).alias(f"m{i}") for i, j in enumerate(ids)]
+    rows = df.filter(fits[-1])
+    for start in range(0, len(cols), FIT_BATCH_TEXT_COLUMNS):
+        batch = cols[start : start + FIT_BATCH_TEXT_COLUMNS]
+        pairs = []
+        for c in batch:
+            name, ident = c.replace("'", "''"), c.replace("`", "``")
+            pairs.append(f"'{name}', cast(`{ident}` as string)")
+        stack = f"stack({len(batch)}, {', '.join(pairs)}) as (column_name, value)"
+        stacked = rows.select(F.expr(stack), *members).filter(
+            F.col("value").isNotNull()
+        )
+        counted = stacked.groupBy("column_name", "value").agg(
+            *[F.sum(F.col(f"m{i}")).alias(f"n{i}") for i in range(len(ids))]
+        )
+        top = F.col("n0")
+        for i in range(1, len(ids)):
+            top = F.greatest(top, F.col(f"n{i}"))
+        counted = counted.filter(top >= CATEGORY_MIN_COUNT)
+        keep = F.lit(False)
+        for i in range(len(ids)):
+            order = Window.partitionBy("column_name").orderBy(
+                F.col(f"n{i}").desc(), F.col("value")
+            )
+            counted = counted.withColumn(f"r{i}", F.row_number().over(order))
+            keep = keep | (
+                (F.col(f"n{i}") >= CATEGORY_MIN_COUNT)
+                & (F.col(f"r{i}") <= CATEGORY_MAX_LEVELS)
+            )
+        for r in counted.filter(keep).collect():
+            for i, j in enumerate(ids):
+                n, rank = r[f"n{i}"], r[f"r{i}"]
+                if n >= CATEGORY_MIN_COUNT and rank <= CATEGORY_MAX_LEVELS:
+                    levels[j][r["column_name"]].append(r["value"])
+    return {j: {c: sorted(v) for c, v in by.items()} for j, by in levels.items()}
 
 
 def apply_group_medians(df: DataFrame, cols: list[str], params: dict) -> DataFrame:
@@ -104,16 +188,7 @@ def apply_group_medians(df: DataFrame, cols: list[str], params: dict) -> DataFra
 
 # COMMAND ----------
 
-# DBTITLE 1,Fit on one training frame and record the parameters
-
-
-def _fit_params(
-    train: DataFrame, numeric: list[str], categorical: list[str], group_cols
-):
-    return {
-        "numeric": fit_group_medians(train, numeric, group_cols),
-        "categorical": {c: fit_category_levels(train, c) for c in categorical},
-    }
+# DBTITLE 1,Record the fitted parameters and the null classes
 
 
 def _record(dataset_id, ecosystem, fold_id, params, numeric, categorical, n_rows):
@@ -159,20 +234,6 @@ def merge_null_classes(dataset_id: str, ecosystem: str, updates: list[tuple]) ->
     register_null_classes(dataset_id, ecosystem, list(prev.values()))
 
 
-def fold_train_frames(
-    df: DataFrame, mode: str, calendar_key: str | None, date_col: str | None
-):
-    """(fold_id, training rows of that fold) for every fold of the scheme."""
-    if mode == "rolling":
-        for k in range(len(ROLLING_BLOCKS[calendar_key])):
-            tr, _ = fold_frames(df, calendar_key, k, date_col)
-            yield k, tr
-    elif mode == "grouped":
-        base = df.filter(F.col("partition") == "train")
-        for k in range(GROUPED_FOLDS):
-            yield k, base.filter(F.col("fold_id") != k)
-
-
 # COMMAND ----------
 
 # DBTITLE 1,Split, fit, transform
@@ -194,7 +255,7 @@ def fit_transform(
 ) -> DataFrame:
     """Apply the null rule, fit imputers on the training partition only, apply
     them to every partition and record final and per-fold parameters."""
-    df = load_partitioned(assembled, dataset_id, ecosystem)
+    df = load_partitioned(assembled)
     if not impute:
         merge_null_classes(
             dataset_id,
@@ -228,13 +289,13 @@ def fit_transform(
         f"{dataset_id}: dropped {len(drop)} column(s) {drop[:10]}; imputing {len(numeric)} numeric, {len(categorical)} categorical"
     )
 
-    train = df.filter(F.col("partition") == "train")
-    final = _fit_params(train, numeric, categorical, group_cols)
-    _record(dataset_id, ecosystem, -1, final, numeric, categorical, train.count())
-    if fold_mode != "none":
-        for k, tr in fold_train_frames(df, fold_mode, calendar_key, date_col):
-            p = _fit_params(tr, numeric, categorical, group_cols)
-            _record(dataset_id, ecosystem, k, p, numeric, categorical, tr.count())
+    fits = fit_memberships(fold_mode, calendar_key, date_col)
+    medians, n_rows = fit_medians(df, numeric, group_cols, fits)
+    levels = fit_levels(df, categorical, fits)
+    for j in fits:
+        params = {"numeric": medians[j], "categorical": levels[j]}
+        _record(dataset_id, ecosystem, j, params, numeric, categorical, n_rows[j])
+    final = {"numeric": medians[-1], "categorical": levels[-1]}
 
     out = df
     for c in numeric:
@@ -331,8 +392,9 @@ def build_dataset(
     blocks: list | None = None,
 ) -> None:
     """The whole build of one dataset from its assembled frame: the heavy frame is
-    computed and written once (stage 1), the contract, the split and the fit read
-    those rows, and the final rows replace them in the family table."""
+    computed once and written with its partition, fold and group columns (stage 1),
+    the contract, the split manifest and the fit read those rows, and the final rows
+    replace them in the family table."""
     spec = dataset_spec(dataset_id)
     eco = spec["ecosystem"]
     component = f"ml/{eco}/{dataset_id}"
@@ -340,13 +402,13 @@ def build_dataset(
     grain = list(spec["grain"])
     columns = frame.columns
     write_dataset_rows(
-        add_ml_provenance(frame, dataset_id, eco, rid),
+        add_ml_provenance(partition_frame(frame, dataset_id), dataset_id, eco, rid),
         dataset_id,
         source=source,
         component=component + "/assembled",
         rid=rid,
     )
-    assembled = read_dataset(dataset_id).select(*columns)
+    assembled = read_dataset(dataset_id).select(*columns, *PARTITION_COLUMNS)
     assert_unique_grain(assembled, grain, component=component, source=source, rid=rid)
     assert_no_forbidden_columns(
         assembled.drop(*label_inputs), component=component, source=source, rid=rid
@@ -354,7 +416,7 @@ def build_dataset(
     defaulted = declare_dataset(dataset_id, columns)
     if defaulted:
         print(f"WARN {dataset_id}: columns given the default clock:", defaulted)
-    write_dataset_partitions(partition_frame(assembled, dataset_id), dataset_id)
+    write_dataset_partitions(assembled, dataset_id)
     write_diagnostic_partitions(assembled, dataset_id)
     fit = spec["fit"]
     out = fit_transform(
@@ -393,7 +455,15 @@ def build_dataset(
 
 def build_datasets(frames: dict, *, rid: str, source: str, blocks: dict | None = None):
     """Build every dataset of `frames` (dataset id -> assembled frame) in order;
-    `blocks` holds extra findings blocks per dataset (the dropped target rows)."""
+    `blocks` holds extra findings blocks per dataset (the dropped target rows). The
+    spec is checked against every frame first; one problem stops the run before any
+    write."""
+    problems = [
+        p for name, frame in frames.items() for p in spec_problems(name, frame.columns)
+    ]
+    if problems:
+        detail = "; ".join(problems)
+        raise RuntimeError(f"spec and frames disagree, nothing written: {detail}")
     for dataset_id, frame in frames.items():
         print(f"=== {dataset_id}")
         build_dataset(

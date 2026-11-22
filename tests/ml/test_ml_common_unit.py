@@ -229,6 +229,37 @@ def test_every_built_dataset_declares_a_split_a_fit_and_a_known_calendar(ml):
             assert dataset["fit"]["fold_mode"] in ("rolling", "grouped", "none")
 
 
+def test_every_built_dataset_declares_every_fit_key(ml):
+    for ecosystem in ("energy", "commerce", "genomics"):
+        for name in ml["built_datasets"](ecosystem):
+            fit = ml["ML_SPEC"]["datasets"][name]["fit"]
+            assert set(ml["FIT_KEYS"]) <= set(fit), name
+
+
+def test_spec_problems_is_empty_for_a_dataset_whose_frame_has_its_columns(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    columns = {*datasets["price_daily"]["grain"], "local_date", "market_area_code"}
+    assert ml["spec_problems"]("price_daily", columns) == []
+
+
+def test_spec_problems_names_a_missing_fit_key_and_a_missing_column(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    base = datasets["price_daily"]
+    fit = {k: v for k, v in base["fit"].items() if k != "date_col"}
+    datasets["_probe"] = {**base, "fit": fit}
+    try:
+        problems = ml["spec_problems"]("_probe", {"market_area_code"})
+    finally:
+        del datasets["_probe"]
+    assert "_probe: no fit key date_col" in problems
+    assert "_probe: split column local_date is not in the frame" in problems
+    assert "_probe: grain column local_date is not in the frame" in problems
+
+
+def test_spec_problems_reports_a_dataset_that_is_not_in_the_spec(ml):
+    assert ml["spec_problems"]("_unknown", set()) == ["_unknown: not in the spec file"]
+
+
 def test_a_label_derived_column_is_never_the_target_or_a_key(ml):
     for name, dataset in ml["ML_SPEC"]["datasets"].items():
         derived = set(dataset.get("label_derived", []))

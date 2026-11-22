@@ -859,7 +859,7 @@ datasets:
     benchmark_set: pathogenic_non_coding
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
     split: {rule: source_defined, rule_id: "source:split", split_column: split}
-    fit: {group_cols: [], fold_mode: none, calendar_key: null, impute: false}
+    fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_spectralbio:
     ecosystem: genomics
     family: benchmark
@@ -883,11 +883,11 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: the source gives no split; split by hash of the gene
+    notes: the source gives no split; split by hash of the gene key of variant_profile, the variant key where the variant has no gene
     benchmark_set: clinvar_vs_benign
-    group_col: gene
+    group_col: split_group
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
-    split: {rule: hash_group, rule_id: "hash:gene", group_cols: [gene]}
+    split: {rule: hash_group, rule_id: "hash:gene_key_else_variant_key", group_cols: [split_group]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_gnomad_balanced:
     ecosystem: genomics
@@ -898,11 +898,11 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: the source gives no split; split by hash of the protein
+    notes: the source gives no split; split by hash of the gene key of variant_profile, the variant key where the variant has no gene
     benchmark_set: gnomad_balanced
-    group_col: protein_id
+    group_col: split_group
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
-    split: {rule: hash_group, rule_id: "hash:protein_id", group_cols: [protein_id]}
+    split: {rule: hash_group, rule_id: "hash:gene_key_else_variant_key", group_cols: [split_group]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_proteingym_clinical:
     ecosystem: genomics

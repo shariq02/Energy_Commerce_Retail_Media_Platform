@@ -103,12 +103,77 @@ structural = table("structural_variant_profile").filter(
     F.col("record_kind") == "variant"
 )
 benchmarks = table("benchmark_variant")
+variant_genes = table("variant_profile").select("variant_key", "gene_key")
+
+# COMMAND ----------
+
+# DBTITLE 1,Benchmark datasets -- one dataset per benchmark set, the source split kept
+# the datasets are built in the order of FRAMES: the quick ones first
+_label = F.col("label")
+_target = F.coalesce(
+    F.col("label_integer"),
+    F.when(_label.isin(*POSITIVE_LABELS), 1).when(_label.isin(*NEGATIVE_LABELS), 0),
+).cast("int")
+for _name, _spec in ML_SPEC["datasets"].items():
+    if _spec["ecosystem"] != ECO or _spec.get("benchmark_set") is None:
+        continue
+    _rows = benchmarks.filter(F.col("benchmark_set") == _spec["benchmark_set"])
+    _framed = _rows
+    if "split_group" in _spec["split"]["group_cols"]:
+        # split by the gene of the variant; a variant without a gene is its own group
+        _framed = (
+            _rows.join(variant_genes, "variant_key", "left")
+            .withColumn(
+                "split_group", F.coalesce(F.col("gene_key"), F.col("variant_key"))
+            )
+            .drop("gene_key")
+        )
+    FRAMES[_name] = features_only(
+        _framed, keep=("source_record_id", "gene", "protein_id", "split")
+    ).withColumn("target_label_integer", _target)
+    BLOCKS[_name] = [
+        (
+            "label_balance_per_split",
+            markdown_table(
+                ["split", "label", "rows"],
+                [
+                    (r["split"], r["label"], r["n"])
+                    for r in _rows.groupBy("split", "label")
+                    .agg(F.count("*").alias("n"))
+                    .orderBy("split", "label")
+                    .collect()
+                ],
+            ),
+        )
+    ]
+
+# COMMAND ----------
+
+# DBTITLE 1,Gene datasets -- pharmacogene and cancer role
+FRAMES["gene_pharmacogene"] = features_only(genes).withColumn(
+    "target_is_pharmacogene", flag("is_pharmacogene")
+)
+FRAMES["gene_cancer_role"] = features_only(
+    genes.filter(F.col("gene_cancer_role").isNotNull())
+).withColumn("target_gene_cancer_role", F.col("gene_cancer_role"))
 
 # COMMAND ----------
 
 # DBTITLE 1,Variant datasets -- pathogenic against benign, impact, carrier, actionable
 _pathogenic = flag("is_pathogenic")
 _labelled = _pathogenic | flag("is_benign")
+FRAMES["structural_variant_disruption"] = features_only(
+    structural.drop(
+        "overlapping_gene_key",
+        "gene_disruption_level",
+        "gene_coverage_fraction",
+        "overlap_length",
+        "structural_variant_coverage_fraction",
+        "record_kind",
+    )
+).withColumn(
+    "target_has_critical_gene_disruption", flag("has_critical_gene_disruption")
+)
 FRAMES["variant_pathogenicity"] = features_only(
     variants.filter(_labelled), keep=("gene_key",)
 ).withColumn("target_is_pathogenic", _pathogenic)
@@ -127,59 +192,6 @@ FRAMES["variant_actionable_rare"] = features_only(
     "target_is_clinically_actionable_rare_variant",
     flag("is_clinically_actionable_rare_variant"),
 )
-FRAMES["structural_variant_disruption"] = features_only(
-    structural.drop(
-        "overlapping_gene_key",
-        "gene_disruption_level",
-        "gene_coverage_fraction",
-        "overlap_length",
-        "structural_variant_coverage_fraction",
-        "record_kind",
-    )
-).withColumn(
-    "target_has_critical_gene_disruption", flag("has_critical_gene_disruption")
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Gene datasets -- pharmacogene and cancer role
-FRAMES["gene_pharmacogene"] = features_only(genes).withColumn(
-    "target_is_pharmacogene", flag("is_pharmacogene")
-)
-FRAMES["gene_cancer_role"] = features_only(
-    genes.filter(F.col("gene_cancer_role").isNotNull())
-).withColumn("target_gene_cancer_role", F.col("gene_cancer_role"))
-
-# COMMAND ----------
-
-# DBTITLE 1,Benchmark datasets -- one dataset per benchmark set, the source split kept
-_label = F.col("label")
-_target = F.coalesce(
-    F.col("label_integer"),
-    F.when(_label.isin(*POSITIVE_LABELS), 1).when(_label.isin(*NEGATIVE_LABELS), 0),
-).cast("int")
-for _name, _spec in ML_SPEC["datasets"].items():
-    if _spec["ecosystem"] != ECO or _spec.get("benchmark_set") is None:
-        continue
-    _rows = benchmarks.filter(F.col("benchmark_set") == _spec["benchmark_set"])
-    FRAMES[_name] = features_only(
-        _rows, keep=("source_record_id", "gene", "protein_id", "split")
-    ).withColumn("target_label_integer", _target)
-    BLOCKS[_name] = [
-        (
-            "label_balance_per_split",
-            markdown_table(
-                ["split", "label", "rows"],
-                [
-                    (r["split"], r["label"], r["n"])
-                    for r in _rows.groupBy("split", "label")
-                    .agg(F.count("*").alias("n"))
-                    .orderBy("split", "label")
-                    .collect()
-                ],
-            ),
-        )
-    ]
 
 # COMMAND ----------
 
