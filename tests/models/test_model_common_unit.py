@@ -11,17 +11,14 @@ session are exercised.
 from __future__ import annotations
 
 import datetime as dt
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from tests._notebook_loader import load_model_common
+from tests._notebook_loader import load_model_common, load_model_libs
 
 pytestmark = [pytest.mark.unit]
-
-_MODELS = Path(__file__).resolve().parents[2] / "databricks" / "models"
 
 
 @pytest.fixture(scope="module")
@@ -40,33 +37,6 @@ def test_select_features_prefers_the_fitted_replacement(c):
 
 def test_select_features_ignores_contract_columns_the_frame_lacks(c):
     assert c["select_features"]({"x": "feature"}, ["y"]) == []
-
-
-def test_group_assignment_puts_every_group_in_one_partition(c):
-    groups = [(f"g{i}", "A") for i in range(100)] + [("h0", "B"), ("h1", "B")]
-    out = c["assign_group_partitions"](groups, (70, 15, 15))
-    assert set(out) == {g for g, _ in groups}
-    a = [p for g, p in out.items() if g.startswith("g")]
-    assert (a.count("train"), a.count("validation"), a.count("test")) == (70, 15, 15)
-
-
-def test_small_strata_stay_in_train(c):
-    out = c["assign_group_partitions"]([("h0", "B"), ("h1", "B")], (70, 15, 15))
-    assert set(out.values()) == {"train"}
-
-
-def test_group_assignment_is_deterministic_and_seeded(c):
-    groups = [(f"g{i}", "A") for i in range(50)]
-    first = c["assign_group_partitions"](groups, (60, 20, 20))
-    assert first == c["assign_group_partitions"](groups, (60, 20, 20))
-    assert first != c["assign_group_partitions"](groups, (60, 20, 20), seed="other")
-
-
-def test_asset_text_normalisation(c):
-    assert (
-        c["normalise_asset_text"]("  kraftwerk   neurath a ") == "KRAFTWERK NEURATH A"
-    )
-    assert c["normalise_asset_text"](None) is None
 
 
 def test_feature_encoder_handles_numbers_bools_text_and_dates(c):
@@ -139,19 +109,35 @@ def test_only_train_and_validation_may_be_read(c):
         c["assert_no_test_partition"](("train", "test"))
 
 
-def test_task_registry_is_complete_and_points_at_real_notebooks(c):
+def test_task_file_is_complete(c):
     tasks = c["TASKS"]
-    assert len(tasks) == 26
-    assert len({t["task_id"] for t in tasks}) == 26
-    assert len({(t["ecosystem"], t["dataset_id"]) for t in tasks}) == 24
+    assert len(tasks) == 36
+    assert len({t["task_id"] for t in tasks}) == 36
+    by_ecosystem = {e: sum(t["ecosystem"] == e for t in tasks) for e in c["ECOSYSTEMS"]}
+    assert by_ecosystem == {"energy": 16, "commerce": 7, "genomics": 13}
+    runners = load_model_libs()["RUNNERS"]
     for t in tasks:
-        assert (_MODELS / t["notebook"]).exists(), t["task_id"]
         assert t["ecosystem"] in c["MODEL_SCHEMAS"]
-        assert t["notebook"].startswith(t["ecosystem"] + "/")
+        assert t["runner"] in runners, t["task_id"]
+
+
+def test_check_only_sets_are_scored_by_a_trained_task(c):
+    assert set(c["CHECK_ONLY"]) == {
+        "benchmark_pathogenic_non_coding",
+        "benchmark_spectralbio",
+    }
+    for entry in c["CHECK_ONLY"].values():
+        assert entry["scored_by"] in c["TASK_BY_ID"]
+
+
+def test_the_evaluation_spec_is_the_fit_spec_without_the_fit_only_keys(c):
+    for t in c["TASKS"]:
+        wanted = {k: v for k, v in t["fit"].items() if k not in c["FIT_ONLY_KEYS"]}
+        assert set(wanted) <= set(c["eval_spec"](t["task_id"])), t["task_id"]
 
 
 def test_both_ecosystems_share_one_model_schema(c):
-    assert c["MODEL_SCHEMAS"] == {"energy": "ml_models", "commerce": "ml_models"}
+    assert c["MODEL_SCHEMAS"] == dict.fromkeys(c["ECOSYSTEMS"], "ml_models")
     assert c["MODEL_SCHEMA"] == "ml_models"
     assert c["VOLUME_SCHEMA"] == "energy_ml_models"
     assert c["model_schema_for"]("commerce") == "ml_models"
@@ -162,7 +148,7 @@ def test_ddl_with_ecosystem_adds_the_column_once(c):
     for name, text in ddl.items():
         names = [n for n, _ in c["ddl_columns"](c["ddl_with_ecosystem"](text))]
         assert names.count("ecosystem") == 1, name
-        assert names[-1] == "ecosystem" or name == "task_registry", name
+        assert names[-1] == "ecosystem", name
     plain = c["ddl_with_ecosystem"]("a string, b int")
     assert plain == "a string, b int, ecosystem string"
 
@@ -177,8 +163,6 @@ def test_ecosystem_predicate_scopes_every_row_predicate(c):
 
 def test_model_ddl_holds_the_agreed_tables(c):
     assert set(c["MODEL_DDL"]) == {
-        "task_registry",
-        "evaluation_split_manifest",
         "evaluation_spec",
         "candidate_results",
         "candidate_selection",
@@ -197,6 +181,7 @@ def test_model_ddl_holds_the_agreed_tables(c):
         "monitoring_results",
         "monitoring_flags",
         "monitoring_triggers",
+        "scoring_requests",
     }
 
 

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # APPROVAL RECOMMENDATION
@@ -10,7 +10,7 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** October 2026
+# MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** read the recorded evaluation results and write one recommendation
 # MAGIC per forwarded model of every task, with the rules behind it. Reads recorded
@@ -23,19 +23,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Approval rules library
-# MAGIC %run ../lib/_approval_rules
-
-# COMMAND ----------
-
-# DBTITLE 1,Imports
-import ast as _ast
+# DBTITLE 1,Model governance library
+# MAGIC %run ../lib/_model_govern
 
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
 COMPONENT = "models/approve/01_recommend"
-SOURCE = "models"
 RESULT_FIELDS = (
     "task_id",
     "model_name",
@@ -68,7 +62,7 @@ rid = model_run_id()
 
 # DBTITLE 1,Read the evidence of each ecosystem
 evidence = {}
-for eco in ("energy", "commerce"):
+for eco in ECOSYSTEMS:
     spec = spec_from_rows(read_model("approval_spec", ecosystem=eco).collect())
     results = [
         r.asDict()
@@ -83,42 +77,6 @@ for eco in ("energy", "commerce"):
         .select(*SELECTION_FIELDS)
         .collect()
     ]
-    facts = {}
-    if spark.catalog.tableExists(model_fqn("foundation_selection", eco)):
-        foundation_selected = [
-            r.asDict()
-            for r in read_model("foundation_selection", ecosystem=eco)
-            .select(*SELECTION_FIELDS)
-            .collect()
-        ]
-        selection += foundation_selected
-        params = {
-            (r["task_id"], r["model_name"]): _ast.literal_eval(r["params"] or "{}")
-            for r in read_model("foundation_results", ecosystem=eco)
-            .filter(~F.col("smoke") & (F.col("status") == "ok"))
-            .select("task_id", "model_name", "params")
-            .distinct()
-            .collect()
-        }
-        register = {
-            r["model_key"]: r.asDict()
-            for r in read_model("foundation_model_register", ecosystem=eco).collect()
-        }
-        flags = {}
-        if spark.catalog.tableExists(model_fqn("foundation_contamination", eco)):
-            flags = {
-                (r["model_key"], r["task_id"]): r.asDict()
-                for r in read_model("foundation_contamination", ecosystem=eco).collect()
-            }
-        for task in (t for t in TASKS if t["ecosystem"] == eco):
-            tid = task["task_id"]
-            mine = [s for s in foundation_selected if s["task_id"] == tid]
-            facts[tid] = foundation_facts(
-                mine,
-                {m: p for (t, m), p in params.items() if t == tid},
-                register,
-                {k: v for (k, t), v in flags.items() if t == tid},
-            )
     context = (
         read_model(APPROVAL_CONTEXT_TABLE, ecosystem=eco)
         .filter(~F.col("smoke"))
@@ -129,7 +87,7 @@ for eco in ("energy", "commerce"):
     reads = {}
     for c in context:
         reads[c["task_id"]] = reads.get(c["task_id"], 0) + 1
-    evidence[eco] = (spec, results, selection, reads, facts)
+    evidence[eco] = (spec, results, selection, reads)
     print(f"{eco}: {len(results)} result row(s), {len(selection)} selection row(s)")
 
 # COMMAND ----------
@@ -138,7 +96,7 @@ for eco in ("energy", "commerce"):
 recommended = {eco: [] for eco in evidence}
 for task in TASKS:
     eco = task["ecosystem"]
-    spec, results, selection, reads, facts = evidence[eco]
+    spec, results, selection, reads = evidence[eco]
     tid = task["task_id"]
     recommended[eco] += recommend_task(
         task,
@@ -146,7 +104,6 @@ for task in TASKS:
         [r for r in results if r["task_id"] == tid],
         spec,
         reads.get(tid, 0),
-        facts.get(tid),
     )
 print({eco: len(rows) for eco, rows in recommended.items()})
 
@@ -183,21 +140,13 @@ for eco, rows in recommended.items():
         roles = {r["role"] for r in rows if r["task_id"] == t["task_id"]}
         if not {"selected", "baseline_fallback"} <= roles:
             _missing.append(t["task_id"])
-check(
-    COMPONENT,
-    SOURCE,
-    "every_task_recommended",
-    not _missing,
-    detail=f"no recommendation: {_missing}",
-    metric_value=float(len(_missing)),
-    rid=rid,
-)
+guard(COMPONENT, rid, "every_task_recommended", _missing, "no recommendation")
 
 # COMMAND ----------
 
 # DBTITLE 1,Write the findings of this notebook
 write_model_findings(
-    ("energy", "commerce"),
+    ECOSYSTEMS,
     "approve__01_recommend",
     "Approval Recommendation",
     ["model_approval"],

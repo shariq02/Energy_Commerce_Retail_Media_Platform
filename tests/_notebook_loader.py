@@ -116,105 +116,11 @@ def load_model_common() -> dict:
     )
 
 
-def load_model_metrics() -> dict:
-    """`_model_metrics.py` alone: numpy only, no Spark names."""
-    namespace: dict = {"__name__": "_model_metrics_under_test"}
-    return _exec_notebook(
-        REPO_ROOT / "databricks" / "models" / "lib" / "_model_metrics.py", namespace
-    )
-
-
 def load_model_libs() -> dict:
-    """The model libraries in the order the notebooks `%run` them."""
+    """The model libraries in the order the notebooks `%run` them: common (with the
+    metrics), fit, evaluate, govern, operate."""
     namespace = load_model_common()
-    for name in (
-        "_model_metrics",
-        "_fit_tabular",
-        "_fit_survival",
-        "_fit_ranking",
-        "_fit_anomaly",
-        "_fit_reconstruction",
-        "_fit_weak",
-        "_fit_rl",
-    ):
-        _exec_notebook(
-            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
-        )
-    return namespace
-
-
-def load_eval_libs() -> dict:
-    """The model libraries, then the evaluation libraries in the order the
-    evaluation notebooks `%run` them."""
-    namespace = load_model_libs()
-    for name in (
-        "_eval_common",
-        "_eval_tabular",
-        "_eval_survival",
-        "_eval_ranking",
-        "_eval_anomaly",
-        "_eval_reconstruction",
-        "_eval_weak",
-        "_eval_rl",
-        "_eval_specs",
-    ):
-        _exec_notebook(
-            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
-        )
-    return namespace
-
-
-def load_foundation_libs() -> dict:
-    """The model libraries, then the foundation libraries in the order the foundation
-    notebooks `%run` them."""
-    namespace = load_model_libs()
-    for name in (
-        "_fit_foundation_ts",
-        "_fit_foundation_tab",
-        "_fit_foundation_anomaly",
-        "_fit_foundation_survival",
-        "_fit_foundation_rank",
-        "_fit_foundation_rl",
-        "_fit_foundation_stack",
-    ):
-        _exec_notebook(
-            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
-        )
-    return namespace
-
-
-def load_approval_libs() -> dict:
-    """The model shared library, then the approval libraries in the order the
-    approval notebooks `%run` them."""
-    namespace = load_model_common()
-    for name in ("_approval_rules", "_approval_render"):
-        _exec_notebook(
-            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
-        )
-    return namespace
-
-
-def load_registry_libs() -> dict:
-    """The evaluation libraries, then the approval rules and the registry
-    libraries in the order the registry notebooks `%run` them."""
-    namespace = load_eval_libs()
-    for name in ("_approval_rules", "_registry_rules", "_registry_check"):
-        _exec_notebook(
-            REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
-        )
-    return namespace
-
-
-def load_operate_libs() -> dict:
-    """The evaluation libraries, then the registry, operate-rules, operate-windows
-    and operate-requests libraries in the order the operate notebooks `%run` them."""
-    namespace = load_eval_libs()
-    for name in (
-        "_registry_rules",
-        "_operate_rules",
-        "_operate_windows",
-        "_operate_requests",
-    ):
+    for name in ("_model_fit", "_model_evaluate", "_model_govern", "_model_operate"):
         _exec_notebook(
             REPO_ROOT / "databricks" / "models" / "lib" / f"{name}.py", namespace
         )

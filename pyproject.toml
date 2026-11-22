@@ -99,7 +99,6 @@ extend-ignore = ["E402", "BLE001"]
 "databricks/utility/01_retire_layer.py" = ["F821"]
 "databricks/utility/02_catalog_inventory.py" = ["F821"]
 "databricks/utility/03_update_model_card_paths.py" = ["F821"]
-"databricks/utility/04_cpu_speed_probe.py" = ["F821"]
 # Analytics notebooks pull `%run ../../gold/_gold_common` (Databricks runtime
 # magic), which loads `_silver_common`; they use the names of both libraries.
 "databricks/analytics/energy/**/*.py" = ["F821"]

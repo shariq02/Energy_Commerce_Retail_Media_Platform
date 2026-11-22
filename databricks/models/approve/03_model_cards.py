@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # MODEL CARDS
@@ -10,7 +10,7 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** October 2026
+# MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** write one model card per approved task to the repository
 # MAGIC (`src/model_cards/`), from the recorded decisions, evaluation results,
@@ -24,13 +24,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Approval rules library
-# MAGIC %run ../lib/_approval_rules
-
-# COMMAND ----------
-
-# DBTITLE 1,Approval text library
-# MAGIC %run ../lib/_approval_render
+# DBTITLE 1,Model governance library
+# MAGIC %run ../lib/_model_govern
 
 # COMMAND ----------
 
@@ -40,7 +35,11 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-CARDS_SUBDIR = "src/model_cards"
+# the cards sit next to the findings: src/model_cards beside src/findings
+CARDS_DIR = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_findings_dir())), "model_cards"
+)
+print(f"OK  cards directory: {CARDS_DIR}")
 RESULT_FIELDS = (
     "task_id",
     "model_name",
@@ -60,46 +59,6 @@ CONTEXT_FIELDS = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Repo-root discovery
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    try:
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-    except Exception as exc:
-        raise RuntimeError(
-            "repo root not found -- run from inside the repo's Databricks Git folder"
-        ) from exc
-    i = wp.rfind("/databricks/")
-    if i > 0:
-        for cand in (wp[:i], "/Workspace" + wp[:i]):
-            if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                return cand
-    raise RuntimeError(
-        "repo root not found -- run from inside the repo's Databricks Git folder"
-    )
-
-
-CARDS_DIR = _os.path.join(_repo_root(), CARDS_SUBDIR)
-print(f"OK  cards directory: {CARDS_DIR}")
-
-# COMMAND ----------
-
 # DBTITLE 1,Run identity
 rid = model_run_id()
 
@@ -108,8 +67,8 @@ rid = model_run_id()
 # DBTITLE 1,Event counts of the survival dataset, train and validation only
 
 
-def survival_event_lines() -> list:
-    ctx = TaskContext("survival.unit_lifetime", rid, record=False)
+def survival_event_lines(task_id: str) -> list:
+    ctx = TaskContext(task_id, rid, record=False)
     counts = (
         read_frozen(ctx, apply_smoke=False)
         .groupBy("partition")
@@ -127,13 +86,13 @@ def survival_event_lines() -> list:
     return [*lines, "- events in the held-out partition: not recorded"]
 
 
-EXTRA_FACTS = {"survival.unit_lifetime": survival_event_lines}
+EXTRA_FACTS = {t["task_id"]: survival_event_lines for t in tasks_of("survival")}
 
 # COMMAND ----------
 
 # DBTITLE 1,Read the decisions and the evidence
 evidence = {}
-for eco in ("energy", "commerce"):
+for eco in ECOSYSTEMS:
     spec = spec_from_rows(read_model("approval_spec", ecosystem=eco).collect())
     approvals = [
         r.asDict() for r in read_model("model_approval", ecosystem=eco).collect()
@@ -162,28 +121,14 @@ for eco in ("energy", "commerce"):
         .select(*CONTEXT_FIELDS)
         .collect()
     ]
-    params = {}
-    for table in ("candidate_results", "foundation_results"):
-        if not spark.catalog.tableExists(model_fqn(table, eco)):
-            continue
-        params.update(
-            {
-                (r["task_id"], r["model_name"]): r["params"]
-                for r in read_model(table, ecosystem=eco)
-                .filter(~F.col("smoke") & (F.col("status") == "ok"))
-                .select("task_id", "model_name", "params")
-                .distinct()
-                .collect()
-            }
-        )
-    if spark.catalog.tableExists(model_fqn("foundation_run_context", eco)):
-        fit_context += [
-            r.asDict()
-            for r in read_model("foundation_run_context", ecosystem=eco)
-            .filter(~F.col("smoke") & (F.col("status") == "finished"))
-            .select(*CONTEXT_FIELDS)
-            .collect()
-        ]
+    params = {
+        (r["task_id"], r["model_name"]): r["params"]
+        for r in read_model("candidate_results", ecosystem=eco)
+        .filter(~F.col("smoke") & (F.col("status") == "ok"))
+        .select("task_id", "model_name", "params")
+        .distinct()
+        .collect()
+    }
     evidence[eco] = (spec, approvals, results, flags, eval_context, fit_context, params)
     print(f"{eco}: {len(approvals)} decision row(s)")
 
@@ -221,7 +166,7 @@ for eco, (
             "eval_context": [c for c in eval_ctx if c["task_id"] == tid],
             "fit_context": [c for c in fit_ctx if c["task_id"] == tid],
             "params": params.get((tid, sel["model_name"])),
-            "extra": EXTRA_FACTS[tid]() if tid in EXTRA_FACTS else [],
+            "extra": EXTRA_FACTS[tid](tid) if tid in EXTRA_FACTS else [],
         }
         cards[eco][tid] = render_model_card(
             TASK_BY_ID[tid], sel, base, facts, spec, stamp
@@ -247,7 +192,7 @@ for eco, items in cards.items():
 
 # DBTITLE 1,Write the findings of this notebook
 write_model_findings(
-    ("energy", "commerce"),
+    ECOSYSTEMS,
     "approve__03_model_cards",
     "Model Cards",
     [],

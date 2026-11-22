@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tests._notebook_loader import load_operate_libs
+from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
@@ -29,7 +29,7 @@ SPEC = {
 
 @pytest.fixture(scope="module")
 def lib():
-    return load_operate_libs()
+    return load_model_libs()
 
 
 def _columns(ddl: str) -> list:

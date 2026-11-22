@@ -2,12 +2,13 @@
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
-Date: October 2026
+Date: November 2026
 
 Every file must parse, carry the standard header, stay within the cell limit and cite
-no planning documents. Dataset notebooks must pin a registered task, read through
-`read_frozen`, and never name the test partition; only the evaluation code and the
-split code may. Only the shared library may convert Spark frames to pandas.
+no planning documents. Only the shared library may convert Spark frames to pandas, and
+only the evaluation code may name the test partition. The task file holds every task,
+and the notebooks hold no task of their own: the notebooks of a stage run the tasks of
+all ecosystems from that file.
 """
 
 from __future__ import annotations
@@ -26,10 +27,13 @@ _ROOT = Path(__file__).resolve().parents[2]
 _MODELS = _ROOT / "databricks" / "models"
 _FILES = sorted(_MODELS.rglob("*.py"))
 _NOTEBOOKS = [p for p in _FILES if not p.name.startswith("_")]
-_DATASET_NOTEBOOKS = [p for p in _NOTEBOOKS if p.parent.name in ("energy", "commerce")]
-_MAX_CELLS = 30
-_EVALUATION = [p for p in _NOTEBOOKS if p.parent.name == "evaluate"]
+_MAX_CELLS = 45
 _DOC_REFERENCES = re.compile(r"docs/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
+_RETIRED_NAMES = re.compile(
+    r"foundation_(?:ts|tab|anomaly|survival|rank|rl|stack)|weak_supervision|"
+    r"redispatch_matching|self_supervised_other|chronos|tabpfn|tabicl|momentfm|"
+    r"timesfm|granite_tsfm|task_registry|evaluation_split_manifest"
+)
 
 
 def _rel(p: Path) -> str:
@@ -56,70 +60,63 @@ def test_file_carries_no_document_references(path):
 
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)
+def test_no_code_of_a_removed_model_family_remains(path):
+    hits = _RETIRED_NAMES.findall(path.read_text(encoding="utf-8"))
+    assert not hits, f"{_rel(path)} names removed code: {hits}"
+
+
+@pytest.mark.parametrize("path", _FILES, ids=_rel)
 def test_only_the_shared_library_converts_frames_to_pandas(path):
     if path.name == "_model_common.py":
         return
     assert ".toPandas(" not in path.read_text(encoding="utf-8"), _rel(path)
 
 
+_MAY_NAME_THE_TEST_PARTITION = {
+    "lib/_model_common.py",
+    "lib/_model_evaluate.py",
+    "03_evaluate.py",
+    "04_evaluation_gate.py",
+}
+
+
 @pytest.mark.parametrize("path", _FILES, ids=_rel)
 def test_model_code_never_names_the_test_partition(path):
-    # Splitting code assigns the partition and the evaluation code reads it; the
-    # other libraries and the model notebooks only ever read train and validation.
-    if path.name == "_model_common.py" or path.parent.name == "split":
-        return
-    if _rel(path).startswith("evaluate/") or path.name.startswith("_eval_"):
+    # The shared library assigns the partition and the evaluation code reads it; the
+    # other libraries and the notebooks only ever read train and validation.
+    if _rel(path) in _MAY_NAME_THE_TEST_PARTITION:
         return
     text = path.read_text(encoding="utf-8")
     assert not re.search(r"""['"]test['"]""", text), _rel(path)
 
 
-def test_every_registered_task_has_a_notebook_that_pins_it():
-    tasks = load_model_common()["TASKS"]
-    pinned = set()
-    for p in _DATASET_NOTEBOOKS:
-        pinned |= set(
-            re.findall(r'TaskContext\("([^"]+)"', p.read_text(encoding="utf-8"))
-        )
-    assert pinned == {t["task_id"] for t in tasks}
+def test_every_notebook_has_a_numbered_name_in_its_folder():
+    for p in _NOTEBOOKS:
+        assert re.match(r"\d\d_", p.name), _rel(p)
+    assert {p.parent.name for p in _NOTEBOOKS} <= {
+        "models",
+        "approve",
+        "register",
+        "operate",
+    }
 
 
-def test_every_dataset_notebook_belongs_to_a_registered_task():
-    tasks = load_model_common()["TASKS"]
-    registered = {t["notebook"] for t in tasks}
-    assert {_rel(p) for p in _DATASET_NOTEBOOKS} == registered
+def test_the_task_notebooks_hold_no_task_id_of_their_own():
+    task_ids = set(load_model_common()["TASK_BY_ID"])
+    for p in _NOTEBOOKS:
+        text = p.read_text(encoding="utf-8")
+        assert not [t for t in task_ids if f'"{t}"' in text], _rel(p)
 
 
-@pytest.mark.parametrize("path", _DATASET_NOTEBOOKS, ids=_rel)
-def test_dataset_notebooks_read_through_the_frozen_reader(path):
-    text = path.read_text(encoding="utf-8")
-    assert "read_frozen(" in text
-    assert "spark.table(" not in text and "spark.read" not in text
-    assert 'dbutils.widgets.text("smoke"' in text
-
-
-@pytest.mark.parametrize("path", _DATASET_NOTEBOOKS, ids=_rel)
-def test_dataset_notebooks_call_a_paradigm_runner(path):
-    text = path.read_text(encoding="utf-8")
-    assert re.search(r"\brun_[a-z_]+\(ctx", text), _rel(path)
-
-
-def test_every_registered_task_is_evaluated_by_exactly_one_notebook():
-    tasks = load_model_common()["TASKS"]
-    named = []
-    for p in _EVALUATION:
-        named += re.findall(r'evaluate_by_id\("([^"]+)"', p.read_text(encoding="utf-8"))
-    assert sorted(named) == sorted(t["task_id"] for t in tasks)
-
-
-@pytest.mark.parametrize("path", _EVALUATION, ids=_rel)
-def test_evaluation_notebooks_use_the_evaluation_entry_point(path):
-    text = path.read_text(encoding="utf-8")
-    if path.name == "00_evaluation_setup.py":
-        return
-    assert "spark.table(" not in text and "spark.read" not in text
-    assert 'dbutils.widgets.text("smoke"' in text
-    assert "%run ../lib/_eval_common" in text and "%run ../lib/_eval_specs" in text
+def test_training_and_evaluation_run_every_task_through_the_task_file():
+    for name, entry in (
+        ("01_train.py", "run_task("),
+        ("03_evaluate.py", "evaluate_by_id("),
+    ):
+        text = (_MODELS / name).read_text(encoding="utf-8")
+        assert entry in text, name
+        assert "spark.table(" not in text and "spark.read" not in text, name
+        assert 'dbutils.widgets.text("smoke"' in text, name
 
 
 def test_only_the_volume_schema_keeps_an_ecosystem_name():
@@ -137,7 +134,7 @@ _MODEL_TABLE_ACCESS = [
 
 @pytest.mark.parametrize("path", _FILES, ids=_rel)
 def test_model_tables_are_reached_only_through_the_shared_helpers(path):
-    """Both ecosystems share each model table, so every read, create and append goes
+    """The ecosystems share each model table, so every read, create and append goes
     through `read_model`, `create_model_table` and `append_model_rows`."""
     if path.name == "_model_common.py":
         return
@@ -153,59 +150,62 @@ def test_a_delete_on_a_model_table_names_the_ecosystem(path):
         assert "ecosystem_predicate(" in text, _rel(path)
 
 
-def test_setup_preflight_splits_and_gates_exist():
+def test_the_expected_files_exist():
     for rel in (
-        "00_model_setup.py",
         "00_model_libraries.py",
-        "00_model_preflight.py",
-        "split/01_weak_supervision_split.py",
-        "split/02_redispatch_matching_split.py",
-        "split/03_evaluation_spec.py",
-        "gate/01_candidate_guards.py",
-        "gate/02_candidate_selection.py",
-        "gate/03_export_findings.py",
-        "evaluate/00_evaluation_setup.py",
-        "evaluate/gate/01_evaluation_guards.py",
-        "evaluate/gate/02_evaluation_flags.py",
-        "evaluate/gate/03_export_findings.py",
-        "lib/_eval_common.py",
-        "lib/_eval_specs.py",
-        "approve/00_approval_setup.py",
+        "00_model_setup.py",
+        "01_train.py",
+        "02_candidate_gate.py",
+        "03_evaluate.py",
+        "04_evaluation_gate.py",
         "approve/01_recommend.py",
         "approve/02_record_decisions.py",
         "approve/03_model_cards.py",
-        "approve/gate/01_approval_guards.py",
-        "approve/gate/02_approval_cards.py",
-        "approve/gate/03_export_findings.py",
-        "lib/_approval_rules.py",
-        "lib/_approval_render.py",
-        "register/00_registry_setup.py",
+        "approve/04_approval_gate.py",
         "register/01_register_models.py",
-        "register/02_reproducibility_energy.py",
-        "register/02_reproducibility_commerce.py",
-        "register/gate/01_registry_guards.py",
-        "register/gate/02_reproducibility_guards.py",
-        "register/gate/03_export_findings.py",
-        "lib/_registry_rules.py",
-        "lib/_registry_check.py",
-        "operate/00_operate_setup.py",
-        "operate/01_reference_profiles_energy.py",
-        "operate/01_reference_profiles_commerce.py",
-        "operate/02_monitor_energy.py",
-        "operate/02_monitor_commerce.py",
-        "operate/03_performance_and_triggers.py",
-        "operate/gate/01_operate_guards.py",
-        "operate/gate/02_monitoring_guards.py",
-        "operate/gate/03_export_findings.py",
-        "lib/_operate_rules.py",
-        "lib/_operate_windows.py",
-        "lib/_operate_requests.py",
+        "register/02_reproducibility.py",
+        "register/03_registry_gate.py",
+        "operate/01_reference_and_monitor.py",
+        "operate/02_performance_and_triggers.py",
+        "operate/03_score_request.py",
+        "operate/04_operate_gate.py",
+        "lib/_model_common.py",
+        "lib/_model_fit.py",
+        "lib/_model_evaluate.py",
+        "lib/_model_govern.py",
+        "lib/_model_operate.py",
     ):
         assert (_MODELS / rel).exists(), rel
+    assert {_rel(p) for p in _FILES} == {
+        "00_model_libraries.py",
+        "00_model_setup.py",
+        "01_train.py",
+        "02_candidate_gate.py",
+        "03_evaluate.py",
+        "04_evaluation_gate.py",
+        "approve/01_recommend.py",
+        "approve/02_record_decisions.py",
+        "approve/03_model_cards.py",
+        "approve/04_approval_gate.py",
+        "register/01_register_models.py",
+        "register/02_reproducibility.py",
+        "register/03_registry_gate.py",
+        "operate/01_reference_and_monitor.py",
+        "operate/02_performance_and_triggers.py",
+        "operate/03_score_request.py",
+        "operate/04_operate_gate.py",
+        "lib/_model_common.py",
+        "lib/_model_fit.py",
+        "lib/_model_evaluate.py",
+        "lib/_model_govern.py",
+        "lib/_model_operate.py",
+    }
     assert (_ROOT / "databricks" / "schema_registry" / "01_snapshot_schema.py").exists()
 
 
 _APPROVAL = [p for p in _NOTEBOOKS if _rel(p).startswith("approve/")]
+_REGISTER = [p for p in _NOTEBOOKS if _rel(p).startswith("register/")]
+_OPERATE = [p for p in _NOTEBOOKS if _rel(p).startswith("operate/")]
 
 
 @pytest.mark.parametrize("path", _APPROVAL, ids=_rel)
@@ -213,56 +213,33 @@ def test_approval_notebooks_read_recorded_results_only(path):
     text = path.read_text(encoding="utf-8")
     assert ".toPandas(" not in text
     assert "evaluate_by_id(" not in text and "load_bundle(" not in text
+    assert "%run ../lib/_model_common" in text
+    assert "%run ../lib/_model_govern" in text
 
 
-def test_approval_notebooks_load_the_approval_libraries():
-    for p in _APPROVAL:
-        text = p.read_text(encoding="utf-8")
-        assert "lib/_model_common" in text, _rel(p)
-        assert "lib/_approval_rules" in text, _rel(p)
+_REPRODUCIBILITY = _MODELS / "register" / "02_reproducibility.py"
+_RECORD_ONLY = [p for p in _REGISTER if p != _REPRODUCIBILITY]
 
 
-_REGISTER = [p for p in _NOTEBOOKS if _rel(p).startswith("register/")]
-_REGISTER_CHECKS = [
-    p for p in _REGISTER if p.parent.name == "register" and p.name.startswith("02_")
-]
-_REGISTER_RECORD_ONLY = [p for p in _REGISTER if p not in _REGISTER_CHECKS]
-
-
-@pytest.mark.parametrize("path", _REGISTER_RECORD_ONLY, ids=_rel)
+@pytest.mark.parametrize("path", _RECORD_ONLY, ids=_rel)
 def test_registry_record_notebooks_read_recorded_results_only(path):
     text = path.read_text(encoding="utf-8")
     assert "evaluate_by_id(" not in text and "load_bundle(" not in text
-    needs = ["lib/_model_common"]
-    if path.name != "00_registry_setup.py":
-        needs.append("lib/_registry_rules")
-    for lib in needs:
-        assert lib in text, _rel(path)
+    assert "%run ../lib/_model_common" in text
+    assert "%run ../lib/_model_govern" in text
 
 
-@pytest.mark.parametrize("path", _REGISTER_CHECKS, ids=_rel)
-def test_reproducibility_notebooks_use_the_check_library(path):
-    text = path.read_text(encoding="utf-8")
-    for lib in ("_registry_rules", "_registry_check", "_eval_common", "_eval_specs"):
-        assert f"%run ../lib/{lib}" in text, _rel(path)
+def test_reproducibility_notebook_uses_the_check_functions_and_scores_no_test_data():
+    text = _REPRODUCIBILITY.read_text(encoding="utf-8")
+    for lib in ("_model_common", "_model_fit", "_model_evaluate", "_model_govern"):
+        assert f"%run ../lib/{lib}" in text
     assert "reproduce_ecosystem(" in text and "record_checks(" in text
     assert "evaluate_by_id(" not in text
-
-
-def test_registry_check_library_scores_the_earlier_partitions_only():
-    text = (_MODELS / "lib" / "_registry_check.py").read_text(encoding="utf-8")
-    assert "ALLOWED_PARTITIONS" in text and 'partition = "validation"' in text
-    assert "evaluate_task(" not in text and "run_candidate(" not in text
-
-
-_OPERATE = [p for p in _NOTEBOOKS if _rel(p).startswith("operate/")]
-_OPERATE_WINDOW_RUNS = [
-    p for p in _OPERATE if p.name[:2] in ("01", "02") and p.parent.name == "operate"
-]
-_OPERATE_SCORING = [p for p in _OPERATE if p.name.startswith("04_")]
-_OPERATE_RECORD_ONLY = [
-    p for p in _OPERATE if p not in _OPERATE_WINDOW_RUNS and p not in _OPERATE_SCORING
-]
+    library = (_MODELS / "lib" / "_model_govern.py").read_text(encoding="utf-8")
+    assert (
+        "ALLOWED_PARTITIONS" in library and 'self.partition = "validation"' in library
+    )
+    assert "evaluate_task(" not in library and "run_candidate(" not in library
 
 
 @pytest.mark.parametrize("path", _OPERATE, ids=_rel)
@@ -276,40 +253,25 @@ def test_operate_notebooks_never_change_a_decision_or_a_registry_row(path):
     assert 'saveAsTable(model_fqn("model_approval"' not in text, _rel(path)
 
 
-@pytest.mark.parametrize("path", _OPERATE_RECORD_ONLY, ids=_rel)
-def test_operate_record_notebooks_read_recorded_results_only(path):
-    text = path.read_text(encoding="utf-8")
-    assert "load_bundle(" not in text and "evaluate_by_id(" not in text
-    assert "operate_ecosystem(" not in text and ".toPandas(" not in text
-
-
-@pytest.mark.parametrize("path", _OPERATE_SCORING, ids=_rel)
-def test_score_request_notebooks_take_keys_and_a_window_and_no_feature_values(path):
-    text = path.read_text(encoding="utf-8")
-    for lib in (
-        "_eval_common",
-        "_eval_specs",
-        "_operate_rules",
-        "_operate_windows",
-        "_operate_requests",
-    ):
-        assert f"%run ../lib/{lib}" in text, _rel(path)
+def test_the_score_request_takes_keys_and_a_window_and_no_feature_values():
+    text = (_MODELS / "operate" / "03_score_request.py").read_text(encoding="utf-8")
     for widget in ('"task_id"', '"keys"', '"window_start"', '"window_end"'):
-        assert widget in text, _rel(path)
-    library = (_MODELS / "lib" / "_operate_requests.py").read_text(encoding="utf-8")
-    assert "key_columns(cfg)" in library and "evaluate_by_id(" not in text
-
-
-@pytest.mark.parametrize("path", _OPERATE_WINDOW_RUNS, ids=_rel)
-def test_operate_window_notebooks_use_the_window_library(path):
-    text = path.read_text(encoding="utf-8")
-    for lib in ("_eval_common", "_eval_specs", "_operate_rules", "_operate_windows"):
-        assert f"%run ../lib/{lib}" in text, _rel(path)
-    assert "operate_ecosystem(" in text and "evaluate_by_id(" not in text
+        assert widget in text
+    assert "evaluate_by_id(" not in text
+    library = (_MODELS / "lib" / "_model_operate.py").read_text(encoding="utf-8")
+    assert "key_columns(cfg)" in library
 
 
 def test_operate_window_library_scores_no_target():
-    text = (_MODELS / "lib" / "_operate_windows.py").read_text(encoding="utf-8")
+    text = (_MODELS / "lib" / "_model_operate.py").read_text(encoding="utf-8")
     assert ".score(" not in text.replace("bundle.score(", "")
     assert "evaluate_task(" not in text and "record_evaluation(" not in text
     assert "window_partition(" in text and "TEST_PARTITION" in text
+
+
+def test_genomics_texts_hold_no_identifier():
+    """Findings and cards of the genomics ecosystem go to the repository as counts,
+    rates and metrics only: no variant, gene, rsID or genomic position."""
+    gate = (_MODELS / "approve" / "04_approval_gate.py").read_text(encoding="utf-8")
+    assert "genomics_texts_hold_no_identifier" in gate
+    assert "GENOMICS_IDENTIFIER.search(" in gate

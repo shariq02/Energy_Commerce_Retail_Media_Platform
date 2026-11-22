@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # MODEL SHARED LIBRARY
@@ -10,15 +10,16 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** October 2026
+# MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** plumbing shared by every model notebook, pulled in with
 # MAGIC `%run ../lib/_model_common`. Definitions only; the one side effect is adding the
 # MAGIC model library folder to the import path.
 # MAGIC
-# MAGIC Covers the task registry, frozen-dataset reads (test partition never read),
-# MAGIC feature resolution, the feature encoder, the isolated candidate runner, result
-# MAGIC recording and MLflow logging. No model logic lives here.
+# MAGIC Covers the tasks of the task file, frozen-dataset reads (test partition never
+# MAGIC read), feature resolution, the feature encoder, the isolated candidate runner,
+# MAGIC result recording, MLflow logging, the metrics and the gate `guard`. No model
+# MAGIC logic lives here.
 
 # COMMAND ----------
 
@@ -31,7 +32,6 @@
 import contextlib as _contextlib
 import datetime as _dt
 import gc as _gc
-import hashlib as _hashlib
 import importlib as _importlib
 import importlib.metadata as _importlib_metadata
 import json as _json
@@ -57,7 +57,14 @@ from pyspark.sql import functions as F
 # DBTITLE 1,Configuration constants
 MODEL_STAGE = "models"
 MODEL_SCHEMA = "ml_models"
-MODEL_SCHEMAS = {"energy": MODEL_SCHEMA, "commerce": MODEL_SCHEMA}
+ECOSYSTEMS = tuple(ML_SCHEMAS)
+MODEL_SCHEMAS = dict.fromkeys(ECOSYSTEMS, MODEL_SCHEMA)
+# a check recorded per ecosystem carries the ecosystem after a colon
+OTHER_ECOSYSTEM_SUFFIXES = {
+    eco: tuple(f":{other}" for other in ECOSYSTEMS if other != eco)
+    for eco in ECOSYSTEMS
+}
+TASK_SPEC = load_yaml("src/schemas/mappings/model_tasks.yml")
 VOLUME_SCHEMA = "energy_ml_models"
 MODEL_SEED = 42
 LIBRARY_VOLUME = "model_libraries"
@@ -69,10 +76,8 @@ TUNE_MAX_ROWS = 500_000
 TUNE_MAX_FOLDS = 3
 USER_SAMPLE_PERCENT = 10
 USER_SAMPLE_SEED = "ecrmap-model-sample-s1"
-WEAK_SPLIT_PERCENT = (70, 15, 15)
-MATCHING_SPLIT_PERCENT = (60, 20, 20)
-MIN_TIER_ROWS = 10
-MIN_SERIES_ENTITIES = 10
+MIN_CLASS_ROWS = 10
+TUNE_HASH_FOLDS = 5
 SURVIVAL_HORIZONS_YEARS = (1, 3, 5)
 QUANTILES = (0.1, 0.5, 0.9)
 RANK_KS = (5, 10, 20)
@@ -92,16 +97,6 @@ RUN_CONTEXT_COLUMNS = (
     "library_versions string, detail string, recorded_at timestamp"
 )
 MODEL_DDL = {
-    "task_registry": (
-        "task_id string, dataset_id string, ecosystem string, paradigm string, "
-        "task_type string, target string, baseline string, primary_metric string, "
-        "higher_is_better boolean, notebook string, registered_at timestamp"
-    ),
-    "evaluation_split_manifest": (
-        "dataset_id string, frozen_delta_version bigint, grain_key string, "
-        "partition string, fold_id int, group_key string, stratum string, "
-        "rule_id string, split_version string"
-    ),
     "evaluation_spec": (
         "dataset_id string, spec_key string, spec_value string, run_id string, "
         "recorded_at timestamp"
@@ -197,15 +192,14 @@ MODEL_DDL = {
         "trigger_kind string, source string, condition string, detail string, "
         "value double, threshold double, run_id string, raised_at timestamp"
     ),
+    "scoring_requests": (
+        "request_id string, task_id string, model_name string, "
+        "registry_version int, key_filter string, window_start string, "
+        "window_end string, row_key string, prediction double, "
+        "prediction_q10 double, prediction_q90 double, "
+        "frozen_delta_version bigint, run_id string, scored_at timestamp"
+    ),
 }
-# a foundation candidate is named after its model and how it ran
-FOUNDATION_NAME_SUFFIXES = ("_zero_shot", "_lora", "_in_context")
-
-
-def is_foundation_model(name: str) -> bool:
-    return str(name).endswith(FOUNDATION_NAME_SUFFIXES)
-
-
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
 LIBRARIES = {
@@ -218,357 +212,65 @@ LIBRARIES = {
     "mlflow": "mlflow",
     "cloudpickle": "cloudpickle",
     "psutil": "psutil",
-    "chronos": "chronos-forecasting",
-    "timesfm": "timesfm",
-    "tsfm_public": "granite-tsfm",
-    "tabpfn": "tabpfn",
-    "tabicl": "tabicl",
-    "momentfm": "momentfm",
-    "toto2": "toto-2",
 }
 
+# COMMAND ----------
 
-def _task(
-    task_id,
-    dataset_id,
-    ecosystem,
-    paradigm,
-    task_type,
-    target,
-    baseline,
-    primary,
-    higher,
-    notebook,
-):
-    return {
-        "task_id": task_id,
-        "dataset_id": dataset_id,
-        "ecosystem": ecosystem,
-        "paradigm": paradigm,
-        "task_type": task_type,
-        "target": target,
-        "baseline": baseline,
-        "primary_metric": primary,
-        "higher_is_better": higher,
-        "notebook": notebook,
-    }
-
-
+# DBTITLE 1,Tasks from the task file
+TASK_FIELDS = (
+    "dataset_id",
+    "ecosystem",
+    "paradigm",
+    "task_type",
+    "target",
+    "baseline",
+    "primary_metric",
+    "higher_is_better",
+    "runner",
+    "fit",
+    "eval",
+)
 TASKS = [
-    _task(
-        "price_daily.price",
-        "price_daily",
-        "energy",
-        "supervised",
-        "regression_price",
-        "target_price_eur_per_mwh",
-        "seasonal_naive",
-        "mae",
-        False,
-        "energy/01_price_daily.py",
-    ),
-    _task(
-        "price_quarter_hour.price",
-        "price_quarter_hour",
-        "energy",
-        "supervised",
-        "regression_price",
-        "target_price_eur_per_mwh",
-        "persistence",
-        "mae",
-        False,
-        "energy/02_price_quarter_hour.py",
-    ),
-    _task(
-        "price_quarter_hour.negative_price",
-        "price_quarter_hour",
-        "energy",
-        "supervised",
-        "classification",
-        "target_is_negative_price",
-        "base_rate",
-        "pr_auc",
-        True,
-        "energy/02_price_quarter_hour.py",
-    ),
-    _task(
-        "load.load",
-        "load",
-        "energy",
-        "supervised",
-        "regression",
-        "target_value_mwh",
-        "seasonal_mean",
-        "mae",
-        False,
-        "energy/03_load.py",
-    ),
-    _task(
-        "bias.bias",
-        "bias",
-        "energy",
-        "supervised",
-        "regression",
-        "target_bias_mwh",
-        "zero_correction",
-        "mae",
-        False,
-        "energy/04_bias.py",
-    ),
-    _task(
-        "zone_generation.generation",
-        "zone_generation",
-        "energy",
-        "supervised",
-        "regression",
-        "target_generation_mwh",
-        "capacity_factor",
-        "mae",
-        False,
-        "energy/05_zone_generation.py",
-    ),
-    _task(
-        "honda_forecast.increment",
-        "honda_forecast",
-        "energy",
-        "supervised",
-        "regression",
-        "target_increment",
-        "persistence",
-        "mae",
-        False,
-        "energy/06_honda_forecast.py",
-    ),
-    _task(
-        "honda_anomaly.anomaly",
-        "honda_anomaly",
-        "energy",
-        "unsupervised",
-        "anomaly",
-        "injected_anomaly",
-        "seasonal_zscore",
-        "pr_auc",
-        True,
-        "energy/07_honda_anomaly.py",
-    ),
-    _task(
-        "ccpp.output",
-        "ccpp",
-        "energy",
-        "supervised",
-        "regression",
-        "target_net_output_mw",
-        "train_mean",
-        "mae",
-        False,
-        "energy/08_ccpp.py",
-    ),
-    _task(
-        "capacity_additions.additions",
-        "capacity_additions",
-        "energy",
-        "supervised",
-        "regression_count",
-        "target_capacity_added_mw",
-        "seasonal_mean",
-        "mae",
-        False,
-        "energy/09_capacity_additions.py",
-    ),
-    _task(
-        "redispatch.any_event",
-        "redispatch",
-        "energy",
-        "supervised",
-        "classification",
-        "target_any_event",
-        "base_rate",
-        "pr_auc",
-        True,
-        "energy/10_redispatch.py",
-    ),
-    _task(
-        "redispatch.event_energy",
-        "redispatch",
-        "energy",
-        "supervised",
-        "regression",
-        "target_log_event_energy_mwh",
-        "zone_mean",
-        "mae",
-        False,
-        "energy/10_redispatch.py",
-    ),
-    _task(
-        "survival.unit_lifetime",
-        "survival",
-        "energy",
-        "survival",
-        "survival",
-        "target_duration_years",
-        "kaplan_meier",
-        "concordance",
-        True,
-        "energy/11_survival.py",
-    ),
-    _task(
-        "redispatch_matching.tier",
-        "redispatch_matching",
-        "energy",
-        "matching",
-        "multiclass",
-        "target_match_tier",
-        "majority_tier",
-        "balanced_accuracy",
-        True,
-        "energy/12_redispatch_matching.py",
-    ),
-    _task(
-        "weak_supervision.labels",
-        "weak_supervision",
-        "energy",
-        "weak_supervision",
-        "label_model",
-        "lf_label",
-        "majority_vote",
-        "coverage",
-        True,
-        "energy/13_weak_supervision.py",
-    ),
-    _task(
-        "weather_imputation.reconstruction",
-        "weather_imputation",
-        "energy",
-        "self_supervised",
-        "reconstruction",
-        "masked_value",
-        "carry_forward",
-        "skill_mae_mean",
-        True,
-        "energy/14_weather_imputation.py",
-    ),
-    _task(
-        "self_supervised_other.reconstruction",
-        "self_supervised_other",
-        "energy",
-        "self_supervised",
-        "reconstruction",
-        "masked_or_shifted_value",
-        "seasonal_carry",
-        "skill_mae_mean",
-        True,
-        "energy/15_self_supervised_other.py",
-    ),
-    _task(
-        "rl_pumped_storage.policy",
-        "rl_pumped_storage",
-        "energy",
-        "offline_rl",
-        "policy",
-        "action_net_mwh",
-        "rule_policy",
-        "reward_timing",
-        True,
-        "energy/16_rl_pumped_storage.py",
-    ),
-    _task(
-        "rl_redispatch.policy",
-        "rl_redispatch",
-        "energy",
-        "offline_rl",
-        "policy",
-        "action_direction",
-        "majority_action",
-        "action_agreement",
-        True,
-        "energy/17_rl_redispatch.py",
-    ),
-    _task(
-        "session_purchase_ga4.purchase",
-        "session_purchase_ga4",
-        "commerce",
-        "supervised",
-        "classification",
-        "target_purchase_after_prefix",
-        "base_rate",
-        "pr_auc",
-        True,
-        "commerce/01_session_purchase_ga4.py",
-    ),
-    _task(
-        "session_purchase_rees46.purchase",
-        "session_purchase_rees46",
-        "commerce",
-        "supervised",
-        "classification",
-        "target_purchase_after_prefix",
-        "base_rate",
-        "pr_auc",
-        True,
-        "commerce/02_session_purchase_rees46.py",
-    ),
-    _task(
-        "lapse_ga4.return",
-        "lapse_ga4",
-        "commerce",
-        "supervised",
-        "classification",
-        "target_returned",
-        "base_rate",
-        "pr_auc",
-        True,
-        "commerce/03_lapse_ga4.py",
-    ),
-    _task(
-        "lapse_rees46.return",
-        "lapse_rees46",
-        "commerce",
-        "supervised",
-        "classification",
-        "target_returned",
-        "base_rate",
-        "pr_auc",
-        True,
-        "commerce/04_lapse_rees46.py",
-    ),
-    _task(
-        "next_item_ga4.next_item",
-        "next_item_ga4",
-        "commerce",
-        "ranking",
-        "ranking",
-        "target_next_product_id",
-        "popularity",
-        "ndcg_at_10",
-        True,
-        "commerce/05_next_item_ga4.py",
-    ),
-    _task(
-        "next_item_rees46.next_item",
-        "next_item_rees46",
-        "commerce",
-        "ranking",
-        "ranking",
-        "target_next_product_id",
-        "popularity",
-        "ndcg_at_10",
-        True,
-        "commerce/06_next_item_rees46.py",
-    ),
-    _task(
-        "rl_session_sequences.policy",
-        "rl_session_sequences",
-        "commerce",
-        "offline_rl",
-        "policy",
-        "target_action_event_type",
-        "most_frequent_event",
-        "action_agreement",
-        True,
-        "commerce/07_rl_session_sequences.py",
-    ),
+    {"task_id": task_id, **{k: v for k, v in entry.items()}}
+    for task_id, entry in TASK_SPEC["tasks"].items()
 ]
 TASK_BY_ID = {t["task_id"]: t for t in TASKS}
+CHECK_ONLY = {
+    name: {"task_id": f"{name}.check", **entry}
+    for name, entry in TASK_SPEC["check_only"].items()
+}
+# a check-only dataset is reported like a task: the identity of the task that scores it
+CHECK_TASKS = [
+    {
+        **TASK_BY_ID[entry["scored_by"]],
+        "task_id": entry["task_id"],
+        "dataset_id": entry["dataset_id"],
+    }
+    for entry in CHECK_ONLY.values()
+]
+FIT_ONLY_KEYS = tuple(TASK_SPEC["fit_only_keys"])
+BLOCK_RULES = TASK_SPEC["blocks"]
+
+
+def tasks_of(runner: str | tuple) -> list[dict]:
+    """The tasks of one runner (or several), in the order of the task file."""
+    names = (runner,) if isinstance(runner, str) else tuple(runner)
+    return [t for t in TASKS if t["runner"] in names]
+
+
+def eval_spec(task_id: str) -> dict:
+    """The evaluation specification: the fit specification without the keys that
+    only the training reads (the baseline name included)."""
+    fit = TASK_BY_ID[task_id]["fit"]
+    spec = {k: v for k, v in fit.items() if k not in FIT_ONLY_KEYS}
+    if isinstance(spec.get("baseline"), dict):
+        spec["baseline"] = {k: v for k, v in spec["baseline"].items() if k != "name"}
+    return spec
+
+
+def findings_title(task_id: str) -> str:
+    return task_id.replace("_", " ").replace(".", " ").title()
+
 
 # COMMAND ----------
 
@@ -742,7 +444,7 @@ class TaskContext:
         self.rid = rid
         self.smoke = bool(smoke)
         self.frozen_version = frozen_version(self.dataset_id, self.ecosystem)
-        self.component = f"models/{t['notebook'].removesuffix('.py')}"
+        self.component = f"models/train/{task_id}"
         if record:
             record_task_context(self, "started")
 
@@ -761,40 +463,115 @@ def smoke_subset(df: DataFrame, rows: int = SMOKE_ROWS) -> DataFrame:
     return parts[0].unionByName(parts[1])
 
 
+def _spec_strings(value) -> set:
+    """Every string of a specification (names of columns among them)."""
+    if isinstance(value, str):
+        return {value}
+    if isinstance(value, dict):
+        return set().union(*(_spec_strings(v) for v in value.values()), set())
+    if isinstance(value, (list, tuple)):
+        return set().union(*(_spec_strings(v) for v in value), set())
+    return set()
+
+
+def own_columns(ctx: TaskContext, columns, spec=None) -> list[str]:
+    """The columns of the dataset of a task inside its family table: the declared
+    contract and null-class columns, the partition columns, the columns the
+    specification names and their fitted replacements. The other datasets of the
+    family add columns that hold no value for this dataset."""
+    declared = {
+        r["column_name"]
+        for table in ("feature_contract", "null_class_registry")
+        for r in read_ml(table, ecosystem=ctx.ecosystem)
+        .filter(F.col("dataset_id") == ctx.dataset_id)
+        .select("column_name")
+        .collect()
+    }
+    wanted = declared | set(PARTITION_COLUMNS) | _spec_strings(spec or {})
+    wanted |= {f"{c}{s}" for c in wanted for s in ("_imputed", "_is_missing")}
+    return [c for c in columns if c in wanted]
+
+
+def dataset_at_version(ctx: TaskContext, spec=None) -> DataFrame:
+    """The rows of the task's dataset at its frozen Delta version, with the columns
+    of that dataset only."""
+    full = ml_fqn(dataset_table(ctx.dataset_id), ctx.ecosystem)
+    rows_of = getattr(ctx, "rows_dataset_id", ctx.dataset_id)
+    df = spark.sql(f"SELECT * FROM {full} VERSION AS OF {ctx.frozen_version}").filter(
+        F.col("dataset_id") == rows_of
+    )
+    return df.select(*own_columns(ctx, df.columns, spec))
+
+
+def with_tuning_folds(df: DataFrame, key_cols) -> DataFrame:
+    """Folds for tuning where the source gives none: a hash of the key columns, for
+    the train rows only (a dataset without a validation partition)."""
+    fold = F.pmod(
+        F.xxhash64(*[F.col(c).cast("string") for c in key_cols]),
+        F.lit(TUNE_HASH_FOLDS),
+    ).cast("int")
+    return df.withColumn(
+        "fold_id",
+        F.when(F.col("partition") == "train", F.coalesce(F.col("fold_id"), fold)),
+    )
+
+
 def read_frozen(
     ctx: TaskContext, partitions=ALLOWED_PARTITIONS, apply_smoke: bool = True
 ) -> DataFrame:
     """The dataset at its frozen Delta version, train and validation rows only."""
     assert_no_test_partition(partitions)
-    full = ml_fqn(f"dataset_{ctx.dataset_id}", ctx.ecosystem)
-    df = spark.sql(f"SELECT * FROM {full} VERSION AS OF {ctx.frozen_version}")
-    df = df.filter(F.col("partition").isin(*partitions))
+    task = TASK_BY_ID[ctx.task_id]
+    df = dataset_at_version(ctx, task["fit"]).filter(
+        F.col("partition").isin(*partitions)
+    )
+    if task["fit"].get("tuning_hash"):
+        df = with_tuning_folds(df, task["fit"]["tuning_hash"])
+    if task.get("read_apply_smoke") is False:
+        apply_smoke = False
     return smoke_subset(df) if ctx.smoke and apply_smoke else df
-
-
-def attach_evaluation_partition(
-    df: DataFrame, ctx: TaskContext, key_cols: list[str]
-) -> DataFrame:
-    """Replace partition, fold and group by the evaluation split manifest."""
-    m = (
-        read_model("evaluation_split_manifest", ecosystem=ctx.ecosystem)
-        .filter(F.col("dataset_id") == ctx.dataset_id)
-        .select("grain_key", "partition", "fold_id", "group_key")
-    )
-    base = df.drop("partition", "fold_id", "group_key").withColumn(
-        "_grain_key", grain_key(*key_cols)
-    )
-    out = base.join(m, base["_grain_key"] == m["grain_key"], "inner").drop(
-        "grain_key", "_grain_key"
-    )
-    out = out.filter(F.col("partition").isin(*ALLOWED_PARTITIONS))
-    return smoke_subset(out) if ctx.smoke else out
 
 
 def sample_users(df: DataFrame, user_col: str = "user_id") -> DataFrame:
     """Stable user-level sample; the same users fall in every partition."""
     bucket = user_hash_bucket([user_col], seed=USER_SAMPLE_SEED)
     return df.filter(bucket < USER_SAMPLE_PERCENT)
+
+
+LOAD_KEYS = ["market_area_code", "load_kind"]
+CALENDAR_COLUMNS = [
+    "day_of_week",
+    "is_weekend",
+    "month",
+    "day_of_year",
+    "iso_week",
+    "year",
+    "is_holiday",
+    "is_bridge_day",
+    "local_day_hours",
+]
+REALISED_LAGS = [2, 7, 14]
+
+
+def complete_load_features(frame, ctx):
+    """The frozen features exist for one market area only. Calendar columns come
+    from the calendar table for every area; realised load at least two days back
+    comes from the frame itself (earlier partitions included)."""
+    keys = ["market_area_code", "local_date"]
+    have = [c for c in CALENDAR_COLUMNS if c in frame.columns]
+    calendar = read_ml("features_calendar_market_area", ecosystem=ctx.ecosystem)
+    out = frame.drop(*have).join(calendar.select(*keys, *have), keys, "left")
+    realised = frame.select(
+        *LOAD_KEYS, "local_date", F.col("target_value_mwh").alias("_realised")
+    )
+    for n in REALISED_LAGS:
+        shifted = realised.select(
+            *LOAD_KEYS,
+            F.date_add("local_date", n).alias("local_date"),
+            F.col("_realised").alias(f"realised_lag{n}"),
+        )
+        out = out.join(shifted, [*LOAD_KEYS, "local_date"], "left")
+    return out
 
 
 # COMMAND ----------
@@ -981,53 +758,6 @@ def pick_params(grid, folds, fit_score, lower_is_better: bool = True) -> dict:
         if better:
             best, best_score = params, mean
     return best
-
-
-# COMMAND ----------
-
-# DBTITLE 1,Group-stratified split assignment and text normalisation
-
-
-def assign_group_partitions(groups, fractions, seed: str = "ecrmap-model-split-s1"):
-    """groups: [(group_key, stratum)] -> {group_key: partition}.
-
-    Inside each stratum the groups are ordered by a seeded hash and cut by the
-    fractions, so every group lands in exactly one partition. A stratum with
-    fewer than three groups stays entirely in train."""
-    _, va_f, te_f = (f / 100.0 for f in fractions)
-    by_stratum: dict = {}
-    for g, s in groups:
-        by_stratum.setdefault(s, []).append(g)
-    out: dict = {}
-    for members in by_stratum.values():
-        members = sorted(
-            set(members),
-            key=lambda g: _hashlib.md5(
-                f"{seed}|{g}".encode(), usedforsecurity=False
-            ).hexdigest(),
-        )
-        n = len(members)
-        if n < 3:
-            n_va = n_te = 0
-        else:
-            n_va = max(1, round(n * va_f))
-            n_te = max(1, round(n * te_f))
-            if n - n_va - n_te < 1:
-                n_va, n_te = 1, 1
-        n_tr = n - n_va - n_te
-        for i, g in enumerate(members):
-            out[g] = (
-                "train" if i < n_tr else ("validation" if i < n_tr + n_va else "test")
-            )
-    return out
-
-
-def normalise_asset_text(text) -> str | None:
-    """Collapse whitespace, trim and upper-case -- the same normalisation the
-    redispatch name match applies."""
-    if text is None:
-        return None
-    return " ".join(str(text).split()).upper()
 
 
 # COMMAND ----------
@@ -1818,15 +1548,12 @@ def log_candidate_to_mlflow(ctx, name, family, params, metrics, bundle):
 
 # DBTITLE 1,Candidate guard -- time limit, stack print, stage times
 CANDIDATE_LIMIT_SECONDS = 1200
-FOUNDATION_LIMIT_SECONDS = 1800
 STACK_PRINT_SECONDS = 300
 STACK_PRINT_ROWS = 12
 
 
 def candidate_limit(family: str) -> int:
-    """Seconds one candidate may run: foundation families get the longer limit."""
-    if str(family).startswith("foundation"):
-        return FOUNDATION_LIMIT_SECONDS
+    """Seconds one candidate may run."""
     return CANDIDATE_LIMIT_SECONDS
 
 
@@ -2065,6 +1792,26 @@ def finish_task(ctx: TaskContext) -> None:
 
 # COMMAND ----------
 
+# DBTITLE 1,Guard -- one check of a gate notebook
+
+
+def guard(component, rid, name, offenders, detail) -> None:
+    """A gate check that passes when `offenders` is empty; the detail shows the first
+    ten and the metric value is their count."""
+    shown = list(offenders)[:10]
+    check(
+        component,
+        MODEL_STAGE,
+        name,
+        not offenders,
+        detail=f"{detail}: {shown}",
+        metric_value=float(len(offenders)),
+        rid=rid,
+    )
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Findings section of one notebook (src/findings/model_findings)
 
 NOTEBOOK_FINDINGS_SUBDIR = "src/findings/model_findings"
@@ -2208,7 +1955,7 @@ FINDINGS_COLUMNS = {
     ],
 }
 # tables without a run id are summarised by these columns
-FINDINGS_GROUPED = {"evaluation_split_manifest": ["dataset_id", "partition"]}
+FINDINGS_GROUPED: dict = {}
 
 
 def _findings_dir() -> str:
@@ -2408,3 +2155,336 @@ def write_model_findings(
             bool(smoke),
             now,
         )
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Imports
+import numpy as np
+
+# COMMAND ----------
+
+# DBTITLE 1,Regression
+
+
+def _pair(y, p):
+    y = np.asarray(y, dtype="float64")
+    p = np.asarray(p, dtype="float64")
+    ok = np.isfinite(y) & np.isfinite(p)
+    return y[ok], p[ok]
+
+
+def mae(y, p) -> float:
+    y, p = _pair(y, p)
+    return float(np.mean(np.abs(y - p))) if len(y) else float("nan")
+
+
+def rmse(y, p) -> float:
+    y, p = _pair(y, p)
+    return float(np.sqrt(np.mean((y - p) ** 2))) if len(y) else float("nan")
+
+
+def skill(model_error: float, baseline_error: float) -> float:
+    """1 - model / baseline; positive means better than the baseline."""
+    if not np.isfinite(baseline_error) or baseline_error <= 0:
+        return float("nan")
+    return float(1.0 - model_error / baseline_error)
+
+
+def pinball(y, q_pred, tau: float) -> float:
+    y, q = _pair(y, q_pred)
+    if not len(y):
+        return float("nan")
+    d = y - q
+    return float(np.mean(np.maximum(tau * d, (tau - 1.0) * d)))
+
+
+def bias_metrics(y, pred) -> dict:
+    """Signed mean error, that error relative to the mean absolute target, and the
+    spread of the predictions relative to the spread of the target."""
+    y_, p = _pair(y, pred)
+    if not len(y_):
+        return {}
+    out = {"mean_error": float(np.mean(p - y_))}
+    scale = float(np.mean(np.abs(y_)))
+    if scale > 0:
+        out["mean_error_relative"] = out["mean_error"] / scale
+    spread = float(np.std(y_))
+    if spread > 0:
+        out["pred_std_ratio"] = float(np.std(p)) / spread
+    return out
+
+
+def regression_metrics(y, pred, baseline_pred=None) -> dict:
+    out = {"mae": mae(y, pred), "rmse": rmse(y, pred)}
+    out.update(bias_metrics(y, pred))
+    if baseline_pred is not None:
+        out["skill_mae"] = skill(out["mae"], mae(y, baseline_pred))
+        out["skill_rmse"] = skill(out["rmse"], rmse(y, baseline_pred))
+    return out
+
+
+def quantile_metrics(y, preds: dict, baseline_preds: dict | None = None) -> dict:
+    """preds: {tau: predictions}; pinball per quantile plus coverage of the
+    central interval when tau 0.1 and 0.9 are both present."""
+    out = {}
+    for tau, q in preds.items():
+        out[f"pinball_q{round(tau * 100):02d}"] = pinball(y, q, tau)
+        if baseline_preds is not None and tau in baseline_preds:
+            out[f"skill_pinball_q{round(tau * 100):02d}"] = skill(
+                out[f"pinball_q{round(tau * 100):02d}"],
+                pinball(y, baseline_preds[tau], tau),
+            )
+    if 0.1 in preds and 0.9 in preds:
+        y_, lo = _pair(y, preds[0.1])
+        _, hi = _pair(y, preds[0.9])
+        if len(y_) and len(lo) == len(hi) == len(y_):
+            out["interval_coverage_80"] = float(np.mean((y_ >= lo) & (y_ <= hi)))
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Classification
+
+
+def average_precision(y_true, score) -> float:
+    """Area under the precision-recall curve as average precision."""
+    y, s = _pair(y_true, score)
+    n_pos = float(np.sum(y > 0))
+    if not len(y) or n_pos == 0:
+        return float("nan")
+    if np.ptp(s) == 0:
+        return n_pos / len(y)
+    order = np.argsort(-s, kind="mergesort")
+    hit = (y[order] > 0).astype("float64")
+    tp = np.cumsum(hit)
+    precision = tp / np.arange(1, len(hit) + 1)
+    return float(np.sum(precision * hit) / n_pos)
+
+
+def log_loss(y_true, p, eps: float = 1e-15) -> float:
+    y, q = _pair(y_true, p)
+    if not len(y):
+        return float("nan")
+    q = np.clip(q, eps, 1 - eps)
+    return float(-np.mean(y * np.log(q) + (1 - y) * np.log(1 - q)))
+
+
+def calibration_error(y_true, p, bins: int = 10) -> float:
+    """Expected calibration error over equal-width probability bins."""
+    y, q = _pair(y_true, p)
+    if not len(y):
+        return float("nan")
+    idx = np.minimum((np.clip(q, 0, 1) * bins).astype(int), bins - 1)
+    err = 0.0
+    for b in range(bins):
+        m = idx == b
+        if m.any():
+            err += m.sum() / len(y) * abs(float(y[m].mean()) - float(q[m].mean()))
+    return float(err)
+
+
+def classification_metrics(y_true, p) -> dict:
+    y, q = _pair(y_true, p)
+    return {
+        "pr_auc": average_precision(y, q),
+        "log_loss": log_loss(y, q),
+        "calibration_error": calibration_error(y, q),
+        "base_rate": float(np.mean(y)) if len(y) else float("nan"),
+        "pred_mean": float(np.mean(q)) if len(q) else float("nan"),
+        "pred_positive_share": float(np.mean(q >= 0.5)) if len(q) else float("nan"),
+    }
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Survival
+
+
+def concordance_index(duration, event, risk) -> float:
+    """Harrell's C: among comparable pairs, the share where the higher risk
+    failed first; risk ties count one half."""
+    d = np.asarray(duration, dtype="float64")
+    e = np.asarray(event, dtype="float64") > 0
+    r = np.asarray(risk, dtype="float64")
+    ok = np.isfinite(d) & np.isfinite(r)
+    d, e, r = d[ok], e[ok], r[ok]
+    conc = 0.0
+    comparable = 0.0
+    for i in np.flatnonzero(e):
+        later = d > d[i]
+        n = float(later.sum())
+        if n == 0:
+            continue
+        comparable += n
+        conc += float(np.sum(r[i] > r[later])) + 0.5 * float(np.sum(r[i] == r[later]))
+    return float(conc / comparable) if comparable else float("nan")
+
+
+def kaplan_meier(duration, event):
+    """(sorted unique event times, survival after each) for right-censored data."""
+    d = np.asarray(duration, dtype="float64")
+    e = np.asarray(event, dtype="float64") > 0
+    ok = np.isfinite(d)
+    d, e = d[ok], e[ok]
+    times = np.unique(d[e])
+    surv = np.ones(len(times))
+    s = 1.0
+    for k, t in enumerate(times):
+        at_risk = float(np.sum(d >= t))
+        deaths = float(np.sum((d == t) & e))
+        if at_risk > 0:
+            s *= 1.0 - deaths / at_risk
+        surv[k] = s
+    return times, surv
+
+
+def km_at(times, surv, t) -> np.ndarray:
+    """Step-function value of a Kaplan-Meier curve at t (1 before the first event)."""
+    t = np.atleast_1d(np.asarray(t, dtype="float64"))
+    if len(times) == 0:
+        return np.ones(len(t))
+    idx = np.searchsorted(times, t, side="right") - 1
+    return np.where(idx >= 0, np.asarray(surv)[np.maximum(idx, 0)], 1.0)
+
+
+def brier_at(duration, event, surv_at_t, horizon: float) -> float:
+    """Inverse-probability-of-censoring weighted Brier score at one horizon."""
+    d = np.asarray(duration, dtype="float64")
+    e = np.asarray(event, dtype="float64") > 0
+    s = np.asarray(surv_at_t, dtype="float64")
+    ok = np.isfinite(d) & np.isfinite(s)
+    d, e, s = d[ok], e[ok], s[ok]
+    if not len(d):
+        return float("nan")
+    ct, cs = kaplan_meier(d, ~e)
+    g_d = np.maximum(km_at(ct, cs, d), 1e-6)
+    g_h = float(np.maximum(km_at(ct, cs, horizon)[0], 1e-6))
+    score = np.zeros(len(d))
+    failed = (d <= horizon) & e
+    alive = d > horizon
+    score[failed] = (s[failed] ** 2) / g_d[failed]
+    score[alive] = ((1.0 - s[alive]) ** 2) / g_h
+    return float(np.mean(score))
+
+
+def survival_calibration_gap(duration, event, surv_at_t, horizon: float) -> float:
+    """Absolute gap between the mean predicted survival and the Kaplan-Meier
+    observed survival at the horizon."""
+    times, surv = kaplan_meier(duration, event)
+    observed = float(km_at(times, surv, horizon)[0])
+    s = np.asarray(surv_at_t, dtype="float64")
+    s = s[np.isfinite(s)]
+    return float(abs(np.mean(s) - observed)) if len(s) else float("nan")
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Ranking
+
+
+def ranking_metrics(ranks, ks=(5, 10, 20)) -> dict:
+    """ranks: 1-based rank of the true item per case; inf when it is not ranked."""
+    r = np.asarray(ranks, dtype="float64")
+    if not len(r):
+        return {}
+    out = {}
+    for k in ks:
+        hit = r <= k
+        out[f"recall_at_{k}"] = float(np.mean(hit))
+        out[f"ndcg_at_{k}"] = float(np.mean(np.where(hit, 1.0 / np.log2(r + 1.0), 0.0)))
+    out["mrr"] = float(np.mean(np.where(np.isfinite(r), 1.0 / r, 0.0)))
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Reconstruction, anomaly and agreement
+
+
+def masked_mae(y_true, y_pred, mask) -> float:
+    m = np.asarray(mask, dtype=bool)
+    return mae(np.asarray(y_true)[m], np.asarray(y_pred)[m])
+
+
+def detection_metrics(injected, flagged, flagged_uninjected_rate: float) -> dict:
+    """Precision and recall of flags against injected anomalies, plus the flag
+    rate on the same series before injection."""
+    inj = np.asarray(injected, dtype=bool)
+    fl = np.asarray(flagged, dtype=bool)
+    tp = float(np.sum(inj & fl))
+    precision = tp / float(fl.sum()) if fl.sum() else float("nan")
+    recall = tp / float(inj.sum()) if inj.sum() else float("nan")
+    return {
+        "precision": float(precision),
+        "recall": float(recall),
+        "flag_rate": float(flagged_uninjected_rate),
+    }
+
+
+def agreement_metrics(logged, predicted, reward) -> dict:
+    """Top-1 action agreement and the logged reward where the policy agrees
+    and disagrees with the logged action."""
+    lg = np.asarray(logged)
+    pr = np.asarray(predicted)
+    rw = np.asarray(reward, dtype="float64")
+    agree = lg == pr
+    out = {"action_agreement": float(np.mean(agree)) if len(agree) else float("nan")}
+    out["reward_when_agree"] = (
+        float(np.mean(rw[agree])) if agree.any() else float("nan")
+    )
+    out["reward_when_disagree"] = (
+        float(np.mean(rw[~agree])) if (~agree).any() else float("nan")
+    )
+    total = float(np.sum(rw))
+    out["reward_weighted_agreement"] = (
+        float(np.sum(rw[agree]) / total) if total != 0 else float("nan")
+    )
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Multi-class metrics
+
+
+def per_class_precision_recall(y_true, y_pred, labels, min_rows: int = 10) -> dict:
+    """{label: (precision, recall, n_true, estimable)}; a class with fewer than
+    min_rows true rows is marked not estimable and its scores are nan."""
+    yt = np.asarray(y_true)
+    yp = np.asarray(y_pred)
+    out = {}
+    for lab in labels:
+        n_true = int(np.sum(yt == lab))
+        tp = float(np.sum((yt == lab) & (yp == lab)))
+        n_pred = float(np.sum(yp == lab))
+        ok = n_true >= min_rows
+        precision = tp / n_pred if n_pred else float("nan")
+        recall = tp / n_true if n_true else float("nan")
+        out[lab] = (
+            precision if ok else float("nan"),
+            recall if ok else float("nan"),
+            n_true,
+            ok,
+        )
+    return out
+
+
+def multiclass_metrics(y_true, y_pred, labels) -> dict:
+    """Accuracy, balanced accuracy and, per class, precision, recall and the true
+    row count; a class below the minimum rows is marked not estimable."""
+    per = per_class_precision_recall(y_true, y_pred, labels, MIN_CLASS_ROWS)
+    yt, yp = np.asarray(y_true), np.asarray(y_pred)
+    out = {"accuracy": float(np.mean(yt == yp))}
+    recalls = []
+    for lab, (p, r, n, ok) in per.items():
+        out[f"precision__{lab}"] = p
+        out[f"recall__{lab}"] = r
+        out[f"n_true__{lab}"] = float(n)
+        out[f"estimable__{lab}"] = 1.0 if ok else 0.0
+        if n:
+            recalls.append(float(np.sum((yt == lab) & (yp == lab))) / n)
+    out["estimable_classes"] = float(sum(v[3] for v in per.values()))
+    out["balanced_accuracy"] = float(np.mean(recalls)) if recalls else float("nan")
+    return out

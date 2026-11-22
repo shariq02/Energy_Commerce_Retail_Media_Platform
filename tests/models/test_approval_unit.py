@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-from tests._notebook_loader import load_approval_libs
+from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
@@ -30,7 +30,7 @@ GOOD = {
 
 @pytest.fixture(scope="module")
 def lib():
-    return load_approval_libs()
+    return load_model_libs()
 
 
 def _rows(task, model, stage="candidate", n_rows=1000, status="ok", **metrics):
@@ -134,7 +134,7 @@ def test_evidence_below_the_floor_is_deferred(lib, cand, metrics):
 def test_a_thin_metric_tier_defers_the_task(lib):
     out = _decide(
         lib,
-        "redispatch_matching.tier",
+        "gene_cancer_role.cancer_role",
         n_true__exact_normalised=4.0,
         n_true__unmatched=139.0,
     )
@@ -145,7 +145,7 @@ def test_a_thin_metric_tier_defers_the_task(lib):
 def test_a_task_whose_tiers_all_pass_is_not_deferred(lib):
     out = _decide(
         lib,
-        "redispatch_matching.tier",
+        "gene_cancer_role.cancer_role",
         n_true__exact_normalised=60.0,
         n_true__unmatched=139.0,
     )
@@ -165,12 +165,6 @@ def test_a_model_that_was_not_evaluated_is_deferred(lib):
     assert out["decision"] == "deferred"
     out = lib["decide_selected"](task, [], [], SPEC, 1)
     assert out["decision"] == "deferred"
-
-
-def test_no_ground_truth_gives_diagnostic_use_only(lib):
-    out = _decide(lib, "weak_supervision.labels")
-    assert out["decision"] == "approved_with_conditions"
-    assert out["restriction"] == "diagnostic_only" and "R06" in _rule_ids(out)
 
 
 def test_offline_reinforcement_learning_is_offline_only_with_the_energy_figures(lib):
@@ -366,10 +360,9 @@ def test_the_approval_settings_are_typed_and_must_be_recorded(lib):
 
 def test_the_rule_table_has_every_rule_once_with_its_class(lib):
     ids = {r[0] for r in lib["APPROVAL_RULES"]}
-    assert ids == {f"R{i:02d}" for i in range(1, 15)}
+    assert ids == {f"R{i:02d}" for i in range(1, 13)}
     classes = {r[0]: r[1] for r in lib["APPROVAL_RULES"]}
-    assert classes["R03"] == classes["R05"] == classes["R14"] == "blocking"
-    assert classes["R13"] == "conditional"
+    assert classes["R03"] == classes["R05"] == "blocking"
 
 
 def _table_rows(lib, recommended):

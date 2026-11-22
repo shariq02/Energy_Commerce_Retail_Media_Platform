@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # APPROVAL DECISIONS
@@ -10,7 +10,7 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** October 2026
+# MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** record the owner's decision for every model. A row keeps the rule
 # MAGIC recommendation unless an override is listed; an override needs a reason. Running
@@ -23,14 +23,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Approval rules library
-# MAGIC %run ../lib/_approval_rules
+# DBTITLE 1,Model governance library
+# MAGIC %run ../lib/_model_govern
 
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
 COMPONENT = "models/approve/02_record_decisions"
-SOURCE = "models"
 # (task_id, model_name): {"decision": ..., "restriction": ..., "reason": ...}
 OWNER_DECISIONS = {}
 
@@ -44,7 +43,7 @@ rid = model_run_id()
 # DBTITLE 1,Read the recommendations
 rows = {
     eco: [r.asDict() for r in read_model("model_approval", ecosystem=eco).collect()]
-    for eco in ("energy", "commerce")
+    for eco in ECOSYSTEMS
 }
 print({eco: len(v) for eco, v in rows.items()})
 
@@ -112,21 +111,19 @@ _open = [
     for r in items
     if r["decided_by"] != DECIDER_OWNER
 ]
-check(
+guard(
     COMPONENT,
-    SOURCE,
+    rid,
     "every_model_decided_by_the_owner",
-    not _open,
-    detail=f"not decided by the owner: {_open[:10]}",
-    metric_value=float(len(_open)),
-    rid=rid,
+    _open,
+    "not decided by the owner",
 )
 
 # COMMAND ----------
 
 # DBTITLE 1,Write the findings of this notebook
 write_model_findings(
-    ("energy", "commerce"),
+    ECOSYSTEMS,
     "approve__02_record_decisions",
     "Approval Decisions",
     ["model_approval"],

@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tests._notebook_loader import load_eval_libs
+from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.unit]
 
@@ -29,7 +29,7 @@ _MODELS = Path(__file__).resolve().parents[2] / "databricks" / "models"
 
 @pytest.fixture(scope="module")
 def lib():
-    return load_eval_libs()
+    return load_model_libs()
 
 
 def _ctx(task_id="price_daily.price", higher=False, primary="mae"):
@@ -230,42 +230,7 @@ def test_ranking_scores_the_rank_of_the_true_item(lib):
     assert sc.row_stat(np.arange(4)) == pytest.approx(gain)
 
 
-def test_matching_marks_thin_tiers_not_estimable(lib):
-    ev = _evaluator(
-        lib, "MatchingEvaluator", _ctx("redispatch_matching.tier"), {"target": "t"}
-    )
-    ev.frames["eval"] = pd.DataFrame({"t": ["a"] * 12 + ["b"] * 2})
-    major = lib["MajorityTier"]("a")
-    ev.attach({"majority": major}, "majority")
-    sc = ev.score(major, "eval", {"majority": major})
-    assert sc.metrics["balanced_accuracy"] == pytest.approx(0.5)
-    assert sc.metrics["estimable__a"] == 1.0 and sc.metrics["estimable__b"] == 0.0
-    assert sc.row_stat(np.arange(14)) == pytest.approx(0.5)
-
-
 # --- weak supervision, anomaly, reconstruction ---------------------------------
-
-
-def test_weak_supervision_scores_coverage_and_conflict_on_the_heldout_entities(lib):
-    rows = [
-        ("series", "s1", "f1", "x", "train"),
-        ("series", "s1", "f2", "x", "train"),
-        ("series", "s2", "f1", "x", "test"),
-        ("series", "s2", "f2", "y", "test"),
-        ("series", "s3", "f1", "y", "test"),
-    ]
-    pdf = pd.DataFrame(
-        rows, columns=["entity_type", "entity_id", "lf_name", "lf_label", "partition"]
-    )
-    pdf["group_key"] = pdf["entity_id"]
-    ev = _evaluator(lib, "WeakEvaluator", _ctx("weak_supervision.labels"))
-    ev.mats = lib["label_data"](pdf)
-    sc = ev.score({"rule": "majority"}, "eval", {})
-    assert sc.metrics["coverage"] == pytest.approx(1.0)
-    assert sc.metrics["resolved_rate__series"] == pytest.approx(0.5)
-    assert sc.metrics["conflict_rate__series"] == pytest.approx(1.0)
-    assert list(ev.entity_groups) == ["s2", "s3"]
-    assert sc.row_stat(np.array([0, 1])) == pytest.approx(1.0)
 
 
 def test_anomaly_scores_flags_at_the_recorded_threshold(lib):
@@ -537,14 +502,6 @@ def test_every_task_has_a_specification_and_an_evaluator(lib):
     for cfg in lib["EVAL_TASKS"].values():
         assert lib["EVALUATOR_NAMES"][cfg["kind"]] in lib
         assert cfg["blocks"]["by"] in ("month", "group", "row")
-
-
-def test_specifications_use_only_values_the_candidate_notebooks_use(lib):
-    for task in lib["TASKS"]:
-        text = (_MODELS / task["notebook"]).read_text(encoding="utf-8")
-        spec = lib["EVAL_TASKS"][task["task_id"]]["spec"]
-        missing = [s for s in _strings(spec) if f'"{s}"' not in text]
-        assert not missing, (task["task_id"], missing)
 
 
 def test_row_fraction_is_read_from_the_recorded_parameters(lib):

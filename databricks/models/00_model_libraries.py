@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # MODEL LIBRARIES
@@ -10,7 +10,7 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** October 2026
+# MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** install the model libraries once into a Unity Catalog volume folder;
 # MAGIC every model notebook adds that folder to its import path through the shared
@@ -47,22 +47,11 @@ PACKAGES = {
     "lifelines": "lifelines",
     "scikit-survival": "sksurv.ensemble",
     "torch": "torch.nn",
-    "chronos-forecasting": "chronos",
-    "timesfm": "timesfm",
-    "granite-tsfm": "tsfm_public",
-    "tabpfn": "tabpfn",
-    "tabicl": "tabicl",
-    "momentfm": "momentfm",
-    "toto-2": "toto2",
-    "peft": "peft",
 }
 # packages whose pinned dependencies cannot be built here: installed without them
-NO_DEPENDENCIES = {"momentfm"}
+NO_DEPENDENCIES: set = set()
 # release that matches the environment's scikit-learn 1.6
-PIP_SPECS = {
-    "scikit-survival": "scikit-survival>=0.24,<0.26",
-    "chronos-forecasting": "chronos-forecasting>=2.0,<3",
-}
+PIP_SPECS = {"scikit-survival": "scikit-survival>=0.24,<0.26"}
 FOLDER = library_folder()
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 # a package that pulls its own torch must not overwrite the CPU build

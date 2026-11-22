@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # REGISTER MODELS
@@ -10,7 +10,7 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** October 2026
+# MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** register the approved model of each task and the baseline fallback
 # MAGIC of that task, linked to the approval row, the run, the frozen dataset version
@@ -24,13 +24,8 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Approval rules library
-# MAGIC %run ../lib/_approval_rules
-
-# COMMAND ----------
-
-# DBTITLE 1,Registry library
-# MAGIC %run ../lib/_registry_rules
+# DBTITLE 1,Model governance library
+# MAGIC %run ../lib/_model_govern
 
 # COMMAND ----------
 
@@ -41,48 +36,10 @@ import os as _os
 
 # DBTITLE 1,Configuration
 COMPONENT = "models/register/01_register_models"
-SOURCE = "models"
 # {(task_id, model_name, role): {"status": "deprecated" | "retired", "reason": "..."}}
 LIFECYCLE_CHANGES = {}
-
-# COMMAND ----------
-
-# DBTITLE 1,Repo-root discovery
-
-
-def _repo_root():
-    p = _os.path.abspath(_os.getcwd())
-    for _ in range(12):
-        if _os.path.isdir(_os.path.join(p, "src", "schemas")) and _os.path.isdir(
-            _os.path.join(p, "databricks")
-        ):
-            return p
-        if _os.path.dirname(p) == p:
-            break
-        p = _os.path.dirname(p)
-    try:
-        wp = (
-            dbutils.notebook.entry_point.getDbutils()
-            .notebook()
-            .getContext()
-            .notebookPath()
-            .get()
-        )
-    except Exception as exc:
-        raise RuntimeError(
-            "repo root not found -- run from inside the repo's Databricks Git folder"
-        ) from exc
-    i = wp.rfind("/databricks/")
-    if i > 0:
-        for cand in (wp[:i], "/Workspace" + wp[:i]):
-            if _os.path.isdir(_os.path.join(cand, "src", "schemas")):
-                return cand
-    raise RuntimeError(
-        "repo root not found -- run from inside the repo's Databricks Git folder"
-    )
-
-
-REPO_ROOT = _repo_root()
+# the findings folder is src/findings/model_findings: three levels below the root
+REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.dirname(_findings_dir())))
 print(f"OK  repository root: {REPO_ROOT}")
 
 # COMMAND ----------
@@ -94,7 +51,7 @@ rid = model_run_id()
 
 # DBTITLE 1,Read the decisions, the fit environment and the registry so far
 evidence = {}
-for eco in ("energy", "commerce"):
+for eco in ECOSYSTEMS:
     approvals = [
         r.asDict() for r in read_model("model_approval", ecosystem=eco).collect()
     ]
@@ -117,9 +74,7 @@ for eco in ("energy", "commerce"):
 now = now_utc()
 planned = {}
 for eco, (approvals, fit_versions, existing) in evidence.items():
-    wanted = annotate_replacements(
-        registry_entries(approvals, fit_versions), existing, is_foundation_model
-    )
+    wanted = registry_entries(approvals, fit_versions)
     changes = {
         k: v
         for k, v in LIFECYCLE_CHANGES.items()
@@ -161,14 +116,12 @@ _problems = [
     for eco, (approvals, _fit, existing) in evidence.items()
     for problem in planned_registry_problems(existing, planned[eco], approvals)
 ]
-check(
+guard(
     COMPONENT,
-    SOURCE,
+    rid,
     "planned_registry_is_consistent",
-    not _problems,
-    detail=f"ecosystem, task, problem, model: {_problems}",
-    metric_value=float(len(_problems)),
-    rid=rid,
+    _problems,
+    "ecosystem, task, problem, model",
 )
 
 # COMMAND ----------
@@ -196,21 +149,19 @@ for eco in evidence:
         card = _os.path.join(REPO_ROOT, r["card_path"])
         if not r["mlflow_run_id"] or not _os.path.isfile(card):
             _unlinked.append(key)
-check(
+guard(
     COMPONENT,
-    SOURCE,
+    rid,
     "every_entry_has_a_run_and_a_card",
-    not _unlinked,
-    detail=f"entries without a run or a card: {_unlinked}",
-    metric_value=float(len(_unlinked)),
-    rid=rid,
+    _unlinked,
+    "entries without a run or a card",
 )
 
 # COMMAND ----------
 
 # DBTITLE 1,Write the findings of this notebook
 write_model_findings(
-    ("energy", "commerce"),
+    ECOSYSTEMS,
     "register__01_register_models",
     "Register Models",
     ["model_registry"],

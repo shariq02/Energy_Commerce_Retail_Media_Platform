@@ -15,53 +15,50 @@ from pathlib import Path
 
 import pytest
 
-from tests._notebook_loader import load_foundation_libs
+from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
 
 _MODELS = Path(__file__).resolve().parents[2] / "databricks" / "models"
-_SKIPPED_FOLDERS = {"lib", "gate"}
-_NOTEBOOKS = sorted(
-    p
-    for p in _MODELS.rglob("[0-9]*.py")
-    if p.parent.name not in _SKIPPED_FOLDERS
-    and p.parent != _MODELS
-    and p.name != "00_foundation_setup.py"
-)
-_CALLS = ("write_model_findings", "write_foundation_findings")
+_ALL = sorted(p for p in _MODELS.rglob("[0-9]*.py") if p.parent.name != "lib")
+# a gate writes the findings files itself and ends with the merge
+_GATES = [p for p in _ALL if "FINDINGS_DIR" in p.read_text(encoding="utf-8")]
+_NOTEBOOKS = [p for p in _ALL if p not in _GATES and p.name != "00_model_libraries.py"]
 _NAMES = [p.relative_to(_MODELS).as_posix() for p in _NOTEBOOKS]
 
 
-def _last_call(path):
-    last = path.read_text(encoding="utf-8").split("# COMMAND ----------")[-1]
-    for node in ast.parse(last).body:
-        call = getattr(node, "value", None)
-        if isinstance(call, ast.Call) and getattr(call.func, "id", "") in _CALLS:
-            return call
+def _findings_call(path):
+    """The call of `write_model_findings` in a notebook, in any cell."""
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == (
+            "write_model_findings"
+        ):
+            return node
     return None
 
 
 @pytest.fixture(scope="module")
 def lib():
-    return load_foundation_libs()
+    return load_model_libs()
 
 
 @pytest.mark.parametrize("path", _NOTEBOOKS, ids=_NAMES)
-def test_notebook_ends_with_its_findings_call(path):
-    assert _last_call(path) is not None
+def test_notebook_writes_its_findings(path):
+    assert _findings_call(path) is not None
 
 
 @pytest.mark.parametrize("path", _NOTEBOOKS, ids=_NAMES)
 def test_findings_call_names_known_tables_and_tasks(path, lib):
-    call = _last_call(path)
-    if call.func.id == "write_foundation_findings":
+    call = _findings_call(path)
+    tables = call.args[3]
+    if not isinstance(tables, ast.List):
         return
-    tables = ast.literal_eval(call.args[3])
-    known = set(lib["MODEL_DDL"]) | {"foundation_registry_entry", "scoring_requests"}
-    assert set(tables) <= known
+    known = set(lib["MODEL_DDL"])
+    named = {e.value for e in tables.elts if isinstance(e, ast.Constant)}
+    assert named <= known, named - known
     keywords = {k.arg: k.value for k in call.keywords}
     if "task_ids" in keywords:
-        wanted = {t["task_id"] for t in lib["TASKS"]}
+        wanted = {t["task_id"] for t in lib["TASKS"]} | set(lib["CHECK_ONLY"])
         listed = getattr(keywords["task_ids"], "elts", [])  # a computed list is skipped
         named = {e.value for e in listed if isinstance(e, ast.Constant)}
         assert named <= wanted
@@ -70,46 +67,36 @@ def test_findings_call_names_known_tables_and_tasks(path, lib):
 def test_the_findings_key_is_the_notebook_path():
     keys = set()
     for path in _NOTEBOOKS:
-        call = _last_call(path)
-        key = ast.literal_eval(call.args[1])
-        if call.func.id == "write_model_findings":
-            assert key == path.relative_to(_MODELS).as_posix()[:-3].replace("/", "__")
+        key = ast.literal_eval(_findings_call(path).args[1])
+        assert key == path.relative_to(_MODELS).as_posix()[:-3].replace("/", "__")
         keys.add(key)
     assert len(keys) == len(_NOTEBOOKS)
 
 
-_GATES = (
-    "gate/03_export_findings.py",
-    "gate/06_foundation_findings.py",
-    "evaluate/gate/03_export_findings.py",
-    "approve/gate/03_export_findings.py",
-    "register/gate/03_export_findings.py",
-    "operate/gate/03_export_findings.py",
-)
-
-
 def test_every_gate_that_writes_findings_is_listed():
-    writers = {
-        p.relative_to(_MODELS).as_posix()
-        for p in _MODELS.rglob("*.py")
-        if "gate" in p.parts and "FINDINGS_DIR" in p.read_text(encoding="utf-8")
+    names = {p.relative_to(_MODELS).as_posix() for p in _GATES}
+    assert names == {
+        "02_candidate_gate.py",
+        "04_evaluation_gate.py",
+        "approve/04_approval_gate.py",
+        "register/03_registry_gate.py",
+        "operate/04_operate_gate.py",
     }
-    assert writers == set(_GATES)
 
 
-@pytest.mark.parametrize("gate", _GATES)
+@pytest.mark.parametrize("gate", _GATES, ids=lambda p: p.name)
 def test_findings_gates_end_with_the_merge(gate):
-    last = (_MODELS / gate).read_text(encoding="utf-8").split("# COMMAND ----------")
+    last = gate.read_text(encoding="utf-8").split("# COMMAND ----------")
     assert last[-1].strip().endswith("merge_notebook_findings()")
 
 
 def test_notebook_findings_group_splits_prefix_smoke_and_key(lib):
     group = lib["notebook_findings_group"]
     assert group("energy__split__01_x.md") == ("energy", False, "energy__split__01_x")
-    assert group("foundation_commerce__foundation__03_a_smoke.md") == (
-        "foundation_commerce",
+    assert group("commerce__03_evaluate_smoke.md") == (
+        "commerce",
         True,
-        "foundation_commerce__foundation__03_a",
+        "commerce__03_evaluate",
     )
 
 

@@ -223,51 +223,6 @@ def test_causal_baseline_picks_the_seasonal_value_when_asked(lib):
 # --- weak supervision and matching ------------------------------------------
 
 
-def test_majority_vote_leaves_ties_and_empty_rows_unresolved(lib):
-    matrix = np.array([[0, 0], [0, 1], [-1, 1], [-1, -1]])
-    assert lib["majority_vote"](matrix).tolist() == [0, -1, 1, -1]
-
-
-def test_label_model_recovers_function_accuracies(lib):
-    rng = np.random.default_rng(3)
-    truth = rng.integers(0, 2, 6000)
-    accuracy = [0.9, 0.8, 0.7]
-    cols = [np.where(rng.random(6000) < a, truth, 1 - truth) for a in accuracy]
-    model = lib["fit_label_model"](np.column_stack(cols))
-    assert list(model.accuracy) == pytest.approx(accuracy, abs=0.06)
-
-
-def test_label_matrices_split_by_entity_type(lib):
-    frame = pd.DataFrame(
-        {
-            "entity_type": ["series", "series", "unit"],
-            "entity_id": ["p|m", "p|m", "u1"],
-            "lf_name": ["a", "b", "era"],
-            "lf_label": ["gap", "no_gap", "pre"],
-            "partition": ["train", "train", "validation"],
-        }
-    )
-    mats = lib["label_matrices"](frame)
-    votes, lfs, _labels, part = mats["series"]
-    assert votes.shape == (1, 2) and lfs == ["a", "b"] and part.tolist() == ["train"]
-    assert mats["unit"][0].shape == (1, 1)
-
-
-def test_tier_metrics_keep_thin_tiers_in_the_balanced_score(lib):
-    y_true = np.array(["a"] * 12 + ["b"] * 2)
-    y_pred = np.array(["a"] * 12 + ["a", "b"])
-    out = lib["tier_metrics"](y_true, y_pred, ["a", "b"])
-    assert out["estimable__b"] == 0.0
-    assert out["estimable_tiers"] == 1.0
-    assert out["balanced_accuracy"] == pytest.approx(0.75)
-
-
-def test_majority_tier_does_not_score_perfectly_when_a_thin_tier_exists(lib):
-    y_true = np.array(["a"] * 12 + ["b"] * 2)
-    out = lib["tier_metrics"](y_true, np.array(["a"] * 14), ["a", "b"])
-    assert out["balanced_accuracy"] == pytest.approx(0.5)
-
-
 # --- policies ---------------------------------------------------------------
 
 

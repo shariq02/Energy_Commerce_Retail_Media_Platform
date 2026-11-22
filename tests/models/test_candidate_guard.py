@@ -18,14 +18,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests._notebook_loader import load_foundation_libs
+from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(scope="module")
 def lib():
-    return load_foundation_libs()
+    return load_model_libs()
 
 
 @pytest.fixture
@@ -42,11 +42,6 @@ def _ctx():
 
 
 # --- limit by family --------------------------------------------------------------
-
-
-def test_foundation_families_get_the_longer_limit(lib):
-    assert lib["candidate_limit"]("foundation_tab") == 1800
-    assert lib["candidate_limit"]("foundation_surv") == 1800
 
 
 def test_other_families_get_the_default_limit(lib):
@@ -118,7 +113,7 @@ def test_a_candidate_over_the_limit_is_recorded_as_failed_with_the_timeout(
         time.sleep(10)
 
     result = lib["run_candidate"](
-        _ctx(), "slow_model", "foundation_tab", slow, limit_seconds=1
+        _ctx(), "slow_model", "tabular", slow, limit_seconds=1
     )
     assert result is None
     assert len(recorded) == 1
@@ -126,7 +121,7 @@ def test_a_candidate_over_the_limit_is_recorded_as_failed_with_the_timeout(
     assert row[1] == "slow_model" and row[4] == "failed"
     assert "TimeoutError" in row[7] and "timeout after 1 s" in row[7]
     out = capsys.readouterr().out
-    assert "START slow_model [foundation_tab] task=task.one limit=1 s" in out
+    assert "START slow_model [tabular] task=task.one limit=1 s" in out
     assert "FAIL slow_model" in out
 
 
@@ -135,35 +130,7 @@ def test_a_candidate_inside_the_limit_is_recorded_as_ok(lib, recorded):
         return object(), {"pr_auc": 0.5}, 7
 
     metrics = lib["run_candidate"](
-        _ctx(), "fast_model", "foundation_tab", fast, limit_seconds=5
+        _ctx(), "fast_model", "tabular", fast, limit_seconds=5
     )
     assert metrics == {"pr_auc": 0.5}
     assert [row[4] for row in recorded] == ["ok"]
-
-
-def test_the_default_limit_comes_from_the_family(lib, recorded, capsys):
-    lib["run_candidate"](
-        _ctx(), "m", "foundation_ts", lambda: (object(), {"x": 1.0}, 1)
-    )
-    assert "limit=1800 s" in capsys.readouterr().out
-
-
-# --- prediction batch size ----------------------------------------------------------
-
-
-def test_a_small_context_keeps_the_full_batch(lib):
-    assert lib["predict_batch"](500) == 10_000
-    assert lib["predict_batch"](10_000) == 10_000
-
-
-def test_a_larger_context_gets_a_smaller_batch(lib):
-    assert lib["predict_batch"](20_000) == 5_000
-    assert lib["predict_batch"](50_000) == 2_000
-
-
-def test_the_batch_never_falls_under_the_minimum(lib):
-    assert lib["predict_batch"](10_000_000) == lib["MIN_PREDICT_BATCH"]
-
-
-def test_the_context_of_tabpfn_25_is_capped_under_the_library_maximum(lib):
-    assert lib["TAB_LIMITS"]["tabpfn_25"]["max_rows"] == 20_000

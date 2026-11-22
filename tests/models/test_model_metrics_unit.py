@@ -15,14 +15,14 @@ import math
 import numpy as np
 import pytest
 
-from tests._notebook_loader import load_model_metrics
+from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(scope="module")
 def m():
-    return load_model_metrics()
+    return load_model_libs()
 
 
 def test_regression_errors_and_skill(m):
@@ -127,14 +127,6 @@ def test_agreement_metrics(m):
     assert out["reward_when_agree"] == pytest.approx(2.0)
     assert out["reward_when_disagree"] == pytest.approx(2.0)
     assert out["reward_weighted_agreement"] == pytest.approx(4 / 6)
-
-
-def test_label_matrix_metrics(m):
-    matrix = [[0, 0], [0, 1], [-1, 1], [-1, -1]]
-    out = m["label_matrix_metrics"](matrix)
-    assert out["coverage"] == pytest.approx(0.75)
-    assert out["conflict_rate"] == pytest.approx(0.5)
-    assert out["agreement_rate"] == pytest.approx(0.5)
 
 
 def test_per_class_precision_recall_marks_thin_classes(m):
