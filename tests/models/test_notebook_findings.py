@@ -23,7 +23,7 @@ _MODELS = Path(__file__).resolve().parents[2] / "databricks" / "models"
 _ALL = sorted(p for p in _MODELS.rglob("[0-9]*.py") if p.parent.name != "lib")
 # a gate writes the findings files itself and ends with the merge
 _GATES = [p for p in _ALL if "FINDINGS_DIR" in p.read_text(encoding="utf-8")]
-_NOTEBOOKS = [p for p in _ALL if p not in _GATES and p.name != "00_model_libraries.py"]
+_NOTEBOOKS = [p for p in _ALL if p not in _GATES and p.name != "01_model_libraries.py"]
 _NAMES = [p.relative_to(_MODELS).as_posix() for p in _NOTEBOOKS]
 
 
@@ -76,8 +76,8 @@ def test_the_findings_key_is_the_notebook_path():
 def test_every_gate_that_writes_findings_is_listed():
     names = {p.relative_to(_MODELS).as_posix() for p in _GATES}
     assert names == {
-        "02_candidate_gate.py",
-        "04_evaluation_gate.py",
+        "train/02_candidate_gate.py",
+        "evaluate/02_evaluation_gate.py",
         "approve/04_approval_gate.py",
         "register/03_registry_gate.py",
         "operate/04_operate_gate.py",
@@ -93,10 +93,10 @@ def test_findings_gates_end_with_the_merge(gate):
 def test_notebook_findings_group_splits_prefix_smoke_and_key(lib):
     group = lib["notebook_findings_group"]
     assert group("energy__split__01_x.md") == ("energy", False, "energy__split__01_x")
-    assert group("commerce__03_evaluate_smoke.md") == (
+    assert group("commerce__evaluate__01_evaluate_smoke.md") == (
         "commerce",
         True,
-        "commerce__03_evaluate",
+        "commerce__evaluate__01_evaluate",
     )
 
 

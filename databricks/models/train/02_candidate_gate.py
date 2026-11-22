@@ -24,7 +24,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ./lib/_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
@@ -34,7 +34,7 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-COMPONENT = "models/02_candidate_gate"
+COMPONENT = "models/train/02_candidate_gate"
 SKILL_TASK_TYPES = ("regression", "regression_price", "regression_count")
 RESULT_FIELDS = (
     "task_id",
@@ -255,8 +255,10 @@ checks = [
     for r in spark.table(AUDIT_TABLE)
     .filter(
         (F.col("stage") == ML_STAGE)
-        & F.col("component").like("models/%")
-        & ~F.col("component").like("models/evaluate/%")
+        & (
+            F.col("component").like("models/setup/%")
+            | F.col("component").like("models/train/%")
+        )
     )
     .select("component", "metric_name", "status", "error_detail", "recorded_at")
     .collect()

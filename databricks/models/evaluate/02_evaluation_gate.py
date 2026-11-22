@@ -23,12 +23,12 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ./lib/_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model evaluation library
-# MAGIC %run ./lib/_model_evaluate
+# MAGIC %run ../lib/_model_evaluate
 
 # COMMAND ----------
 
@@ -38,7 +38,7 @@ import os as _os
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-COMPONENT = "models/evaluate/04_evaluation_gate"
+COMPONENT = "models/evaluate/02_evaluation_gate"
 RESULT_FIELDS = (
     "task_id",
     "model_name",

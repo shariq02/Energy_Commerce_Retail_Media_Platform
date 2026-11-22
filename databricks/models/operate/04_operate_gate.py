@@ -92,6 +92,7 @@ for eco in ECOSYSTEMS:
             r.asDict() for r in read_model("reference_profile", ecosystem=eco).collect()
         ],
         "predictions": predictions,
+        "spec_rows": [r.asDict() for r in spec_rows],
         "spec": operate_spec_from_rows([r.asDict() for r in spec_rows]),
         "spec_at": min((r["recorded_at"] for r in spec_rows), default=None),
         "results": [
@@ -324,6 +325,20 @@ for eco, rec in record.items():
 # COMMAND ----------
 
 # DBTITLE 1,Write the monitoring findings
+
+
+def _rows_per_window(predictions: list) -> list:
+    """Stored rows per task, model and window, from the counts read once above."""
+    total: dict = {}
+    for p in predictions:
+        key = (p["task_id"], p["model_name"], p["window_id"])
+        total[key] = total.get(key, 0) + p["rows"]
+    return [
+        {"task_id": t, "model_name": m, "window_id": w, "rows": n}
+        for (t, m, w), n in total.items()
+    ]
+
+
 checks = [
     r.asDict()
     for r in spark.table(AUDIT_TABLE)
@@ -334,9 +349,7 @@ checks = [
 stamp = now_utc().strftime("%Y-%m-%dT%H:%MZ")
 for eco, rec in record.items():
     data = {
-        "spec": [
-            r.asDict() for r in read_model("monitoring_spec", ecosystem=eco).collect()
-        ],
+        "spec": rec["spec_rows"],
         "reference": [
             {
                 k: r[k]
@@ -351,13 +364,7 @@ for eco, rec in record.items():
             }
             for r in rec["reference"]
         ],
-        "predictions": [
-            r.asDict()
-            for r in read_model("model_predictions", ecosystem=eco)
-            .groupBy("task_id", "model_name", "window_id")
-            .agg(F.count("*").alias("rows"))
-            .collect()
-        ],
+        "predictions": _rows_per_window(rec["predictions"]),
         "results": rec["results"],
         "triggers": rec["triggers"],
         "checks": checks,

@@ -269,9 +269,8 @@ results = [
 ]
 stamp = now_utc().strftime("%Y-%m-%dT%H:%MZ")
 for eco in ECOSYSTEMS:
-    text = render_registry_findings(
-        eco, registry_rows(eco), check_rows(eco), results, stamp
-    )
+    registry, _approvals, checks = record[eco]
+    text = render_registry_findings(eco, registry, checks, results, stamp)
     with open(
         _os.path.join(FINDINGS_DIR, f"{eco}_registry.md"), "w", encoding="utf-8"
     ) as fh:

@@ -75,8 +75,8 @@ def test_only_the_shared_library_converts_frames_to_pandas(path):
 _MAY_NAME_THE_TEST_PARTITION = {
     "lib/_model_common.py",
     "lib/_model_evaluate.py",
-    "03_evaluate.py",
-    "04_evaluation_gate.py",
+    "evaluate/01_evaluate.py",
+    "evaluate/02_evaluation_gate.py",
 }
 
 
@@ -93,8 +93,10 @@ def test_model_code_never_names_the_test_partition(path):
 def test_every_notebook_has_a_numbered_name_in_its_folder():
     for p in _NOTEBOOKS:
         assert re.match(r"\d\d_", p.name), _rel(p)
-    assert {p.parent.name for p in _NOTEBOOKS} <= {
-        "models",
+    assert {p.parent.name for p in _NOTEBOOKS} == {
+        "setup",
+        "train",
+        "evaluate",
         "approve",
         "register",
         "operate",
@@ -110,13 +112,21 @@ def test_the_task_notebooks_hold_no_task_id_of_their_own():
 
 def test_training_and_evaluation_run_every_task_through_the_task_file():
     for name, entry in (
-        ("01_train.py", "run_task("),
-        ("03_evaluate.py", "evaluate_by_id("),
+        ("train/01_train.py", "run_task("),
+        ("evaluate/01_evaluate.py", "evaluate_by_id("),
     ):
         text = (_MODELS / name).read_text(encoding="utf-8")
         assert entry in text, name
         assert "spark.table(" not in text and "spark.read" not in text, name
-        assert 'dbutils.widgets.text("smoke"' in text, name
+        assert "SMOKE = smoke_setting()" in text, name
+
+
+@pytest.mark.parametrize("path", _FILES, ids=_rel)
+def test_only_the_shared_library_and_the_score_request_read_widgets(path):
+    # the smoke widget is read once, in `smoke_setting`; the notebooks use no other
+    if path.name == "_model_common.py":
+        return
+    assert "dbutils.widgets" not in path.read_text(encoding="utf-8"), _rel(path)
 
 
 def test_only_the_volume_schema_keeps_an_ecosystem_name():
@@ -152,12 +162,12 @@ def test_a_delete_on_a_model_table_names_the_ecosystem(path):
 
 def test_the_expected_files_exist():
     for rel in (
-        "00_model_libraries.py",
-        "00_model_setup.py",
-        "01_train.py",
-        "02_candidate_gate.py",
-        "03_evaluate.py",
-        "04_evaluation_gate.py",
+        "setup/01_model_libraries.py",
+        "setup/02_model_setup.py",
+        "train/01_train.py",
+        "train/02_candidate_gate.py",
+        "evaluate/01_evaluate.py",
+        "evaluate/02_evaluation_gate.py",
         "approve/01_recommend.py",
         "approve/02_record_decisions.py",
         "approve/03_model_cards.py",
@@ -177,12 +187,12 @@ def test_the_expected_files_exist():
     ):
         assert (_MODELS / rel).exists(), rel
     assert {_rel(p) for p in _FILES} == {
-        "00_model_libraries.py",
-        "00_model_setup.py",
-        "01_train.py",
-        "02_candidate_gate.py",
-        "03_evaluate.py",
-        "04_evaluation_gate.py",
+        "setup/01_model_libraries.py",
+        "setup/02_model_setup.py",
+        "train/01_train.py",
+        "train/02_candidate_gate.py",
+        "evaluate/01_evaluate.py",
+        "evaluate/02_evaluation_gate.py",
         "approve/01_recommend.py",
         "approve/02_record_decisions.py",
         "approve/03_model_cards.py",
@@ -245,9 +255,7 @@ def test_reproducibility_notebook_uses_the_check_functions_and_scores_no_test_da
 @pytest.mark.parametrize("path", _OPERATE, ids=_rel)
 def test_operate_notebooks_never_change_a_decision_or_a_registry_row(path):
     text = path.read_text(encoding="utf-8")
-    pattern = (
-        r"""(?:replace_rows|replace_model_rows)\([^)]*['"]model_(?:registry|approval)"""
-    )
+    pattern = r"""(?:replace_table_rows|replace_model_rows)\([^)]*['"]model_(?:registry|approval)"""
     assert not re.search(pattern, text), _rel(path)
     assert 'saveAsTable(model_fqn("model_registry"' not in text, _rel(path)
     assert 'saveAsTable(model_fqn("model_approval"' not in text, _rel(path)
@@ -255,9 +263,9 @@ def test_operate_notebooks_never_change_a_decision_or_a_registry_row(path):
 
 def test_the_score_request_takes_keys_and_a_window_and_no_feature_values():
     text = (_MODELS / "operate" / "03_score_request.py").read_text(encoding="utf-8")
-    for widget in ('"task_id"', '"keys"', '"window_start"', '"window_end"'):
-        assert widget in text
-    assert "evaluate_by_id(" not in text
+    for setting in ("TASK_ID", "KEYS", "WINDOW_START", "WINDOW_END"):
+        assert f"{setting} = " in text
+    assert "evaluate_by_id(" not in text and "widgets" not in text
     library = (_MODELS / "lib" / "_model_operate.py").read_text(encoding="utf-8")
     assert "key_columns(cfg)" in library
 

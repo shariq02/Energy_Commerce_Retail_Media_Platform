@@ -19,9 +19,9 @@
 # MAGIC data in batch; no endpoint is involved. Without keys and a window, the default
 # MAGIC request scores the newest day (at most 100 rows) of the task in `task_id`, or of
 # MAGIC every tabular task of the energy and commerce ecosystems when `task_id` is empty.
-# MAGIC Widgets, all optional: `task_id`, `keys` (a JSON object of key columns and
-# MAGIC values), `window_start` and `window_end` (dates, only for a task with a time
-# MAGIC column), `request_id` (empty gives a new one). Run on the compute type of the
+# MAGIC Settings, all optional, in the settings cell: `TASK_ID`, `KEYS` (key columns and
+# MAGIC values), `WINDOW_START` and `WINDOW_END` (dates, only for a task with a time
+# MAGIC column), `REQUEST_ID` (empty gives a new one). Run on the compute type of the
 # MAGIC registered model.
 
 # COMMAND ----------
@@ -56,16 +56,13 @@ COMPONENT = "models/operate/03_score_request"
 
 # COMMAND ----------
 
-# DBTITLE 1,Widgets
-import json
-
-for _name in ("task_id", "keys", "window_start", "window_end", "request_id"):
-    dbutils.widgets.text(_name, "")
-TASK_ID = dbutils.widgets.get("task_id").strip()
-KEYS = json.loads(dbutils.widgets.get("keys").strip() or "{}")
-WINDOW_START = dbutils.widgets.get("window_start").strip()
-WINDOW_END = dbutils.widgets.get("window_end").strip()
-REQUEST_ID = dbutils.widgets.get("request_id").strip()
+# DBTITLE 1,Request settings
+# All settings are optional. Empty values give the default request.
+TASK_ID = ""  # a task id; empty scores every tabular task
+KEYS = {}  # key columns and values, for example {"unit_id": "A1"}
+WINDOW_START = ""  # a date, only for a task with a time column
+WINDOW_END = ""  # a date, only for a task with a time column
+REQUEST_ID = ""  # empty gives a new request id
 
 # COMMAND ----------
 

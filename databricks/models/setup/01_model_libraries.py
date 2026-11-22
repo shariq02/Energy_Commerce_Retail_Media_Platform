@@ -14,13 +14,14 @@
 # MAGIC
 # MAGIC **Purpose:** install the model libraries once into a Unity Catalog volume folder;
 # MAGIC every model notebook adds that folder to its import path through the shared
-# MAGIC library. Libraries that already import are skipped; set `refresh` to `true` to
-# MAGIC reinstall everything.
+# MAGIC library. Libraries that already import are skipped, and the notebook stops when
+# MAGIC nothing changed since the last passing check. To reinstall everything, delete the
+# MAGIC library folder in the volume.
 
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ./lib/_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
@@ -38,8 +39,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-dbutils.widgets.text("refresh", "false")
-REFRESH = dbutils.widgets.get("refresh").lower() == "true"
 # import probe per package: a half-copied folder passes `import torch`, not `torch.nn`
 PACKAGES = {
     "lightgbm": "lightgbm",
@@ -78,9 +77,6 @@ MARKER = os.path.join(FOLDER, "libraries_ok.json")
 # DBTITLE 1,Create the volume
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{VOLUME_SCHEMA}.{LIBRARY_VOLUME}")
-if REFRESH:
-    dbutils.fs.rm(FOLDER, True)
-    dbutils.fs.rm(FRONT_FOLDER, True)
 os.makedirs(FOLDER, exist_ok=True)
 os.makedirs(FRONT_FOLDER, exist_ok=True)
 print(f"OK  volume ready: {FOLDER} and {FRONT_FOLDER}")
@@ -117,7 +113,7 @@ def write_marker() -> None:
 
 # DBTITLE 1,Stop when nothing changed since the last passing check
 _marker, _now = read_marker(), fingerprint()
-if not REFRESH and _marker == _now:
+if _marker == _now:
     dbutils.notebook.exit("libraries unchanged since the last passing import check")
 if _marker is None:
     print(f"no marker at {MARKER}; the import check runs")
@@ -331,9 +327,9 @@ if _run.returncode != 0:
 # DBTITLE 1,Which libraries are missing
 missing = {}
 errors = {}
-results = {} if REFRESH else check_imports(list(PACKAGES.values()))
+results = check_imports(list(PACKAGES.values()))
 for _pkg, _mod in PACKAGES.items():
-    _error = "refresh" if REFRESH else results[_mod]
+    _error = results[_mod]
     _line = f"MISS {_pkg}: {_error}" if _error else f"OK   {_pkg}"
     print(_line, flush=True)
     for _row in ERROR_TEXT.get(_mod, "").splitlines()[-ERROR_ROWS:]:
@@ -400,12 +396,7 @@ def needs_install(pkg: str, error: str | None) -> bool:
     if error is None:
         return False
     missing_module = "No module named" in error
-    return (
-        pkg == "torch"
-        or error == "refresh"
-        or missing_module
-        or TRANSFORMERS_HINT in error
-    )
+    return pkg == "torch" or missing_module or TRANSFORMERS_HINT in error
 
 
 def install_target(pkg: str, error: str | None) -> str:

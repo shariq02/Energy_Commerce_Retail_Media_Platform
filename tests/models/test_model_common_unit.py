@@ -328,7 +328,6 @@ def test_findings_show_run_context_flags_and_the_other_mode(c):
         {
             "task_id": "load.load",
             "smoke": True,
-            "smoke_widget": "true",
             "run_id": "r1",
             "status": s,
             "notebook_path": "/x/03_load",
@@ -361,7 +360,6 @@ def test_findings_keep_user_folders_and_emails_out(c):
         {
             "task_id": "load.load",
             "smoke": True,
-            "smoke_widget": "true",
             "run_id": "r1",
             "status": "finished",
             "notebook_path": "/Users/someone@example.com/Repo/databricks/models/energy/03_load",

@@ -21,28 +21,27 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ./lib/_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model fit library
-# MAGIC %run ./lib/_model_fit
+# MAGIC %run ../lib/_model_fit
 
 # COMMAND ----------
 
 # DBTITLE 1,Model evaluation library
-# MAGIC %run ./lib/_model_evaluate
+# MAGIC %run ../lib/_model_evaluate
 
 # COMMAND ----------
 
 # DBTITLE 1,Smoke parameter
-dbutils.widgets.text("smoke", "false")
-SMOKE = dbutils.widgets.get("smoke").lower() == "true"
+SMOKE = smoke_setting()
 
 # COMMAND ----------
 
 # DBTITLE 1,Run identity
-COMPONENT = "models/evaluate/03_evaluate"
+COMPONENT = "models/evaluate/01_evaluate"
 rid = model_run_id()
 failed = []
 
@@ -103,7 +102,7 @@ evaluate_tasks(tasks_of("ranking"))
 for eco in ECOSYSTEMS:
     write_model_findings(
         (eco,),
-        "03_evaluate",
+        "evaluate__01_evaluate",
         "Model Evaluation",
         ["evaluation_results", "evaluation_flags", EVAL_CONTEXT_TABLE],
         rid,

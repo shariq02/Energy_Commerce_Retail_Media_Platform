@@ -20,27 +20,27 @@
 # COMMAND ----------
 
 # DBTITLE 1,Model shared library
-# MAGIC %run ./lib/_model_common
+# MAGIC %run ../lib/_model_common
 
 # COMMAND ----------
 
 # DBTITLE 1,Model evaluation library
-# MAGIC %run ./lib/_model_evaluate
+# MAGIC %run ../lib/_model_evaluate
 
 # COMMAND ----------
 
 # DBTITLE 1,Model governance library
-# MAGIC %run ./lib/_model_govern
+# MAGIC %run ../lib/_model_govern
 
 # COMMAND ----------
 
 # DBTITLE 1,Model operate library
-# MAGIC %run ./lib/_model_operate
+# MAGIC %run ../lib/_model_operate
 
 # COMMAND ----------
 
 # DBTITLE 1,Configuration
-COMPONENT = "models/00_model_setup"
+COMPONENT = "models/setup/02_model_setup"
 # Datasets whose tasks name their columns explicitly instead of the feature contract.
 EXPLICIT_COLUMNS = {"rl_pumped_storage", "weather_imputation"}
 # Runners whose target is built at run time (no column in the dataset).
@@ -342,7 +342,7 @@ for eco, have in _monitor_recorded.items():
         }
         for p, v, d in OPERATE_DEFAULTS
     ]
-    replace_rows(rows, "monitoring_spec", eco, "parameter IS NOT NULL")
+    replace_table_rows(rows, "monitoring_spec", eco, "parameter IS NOT NULL")
     print(f"OK  {len(rows)} monitoring setting row(s) recorded for {eco}")
 
 # COMMAND ----------
@@ -370,7 +370,7 @@ for eco in ECOSYSTEMS:
 # DBTITLE 1,Write the findings of this notebook
 write_model_findings(
     ECOSYSTEMS,
-    "00_model_setup",
+    "setup__02_model_setup",
     "Model Setup",
     ["evaluation_spec", "approval_spec", "monitoring_spec"],
     rid,

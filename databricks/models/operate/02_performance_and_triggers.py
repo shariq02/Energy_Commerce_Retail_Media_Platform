@@ -114,15 +114,15 @@ for eco, (entries, approvals, limit, results) in evidence.items():
 for eco, (performance, triggers, flags) in checked.items():
     for entry, rows in performance:
         where = entry_predicate(entry, " AND check_kind = 'performance'")
-        replace_rows(rows, "monitoring_results", eco, where)
-        replace_rows(
+        replace_table_rows(rows, "monitoring_results", eco, where)
+        replace_table_rows(
             [f for f in flags if f["task_id"] == entry["task_id"]],
             "monitoring_flags",
             eco,
             where,
         )
     for entry, rows in triggers:
-        replace_rows(rows, "monitoring_triggers", eco, entry_predicate(entry))
+        replace_table_rows(rows, "monitoring_triggers", eco, entry_predicate(entry))
 
 # COMMAND ----------
 
