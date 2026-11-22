@@ -860,12 +860,15 @@ def stored_models(ecosystem: str) -> set:
 def remove_rows_without_entry(ecosystem: str) -> list:
     """Delete the rows of every model that is not a current operate entry (a model
     that the registry retired). Returns the (task, model) pairs removed."""
+    stored = stored_models(ecosystem)
+    if not stored:
+        return []
     entries = operate_entries(ecosystem)
     if not entries:
         raise RuntimeError(
             f"{ecosystem}: no registered selected model, nothing removed"
         )
-    stale = models_without_entry(stored_models(ecosystem), entries)
+    stale = models_without_entry(stored, entries)
     for task_id, model_name in stale:
         for table in RECORD_TABLES:
             where = ecosystem_predicate(
