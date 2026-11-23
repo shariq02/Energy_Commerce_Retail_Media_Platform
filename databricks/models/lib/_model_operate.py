@@ -213,7 +213,7 @@ def score_request(
             task_id,
             entry["model_name"],
             int(entry["version"]),
-            json.dumps(keys, sort_keys=True),
+            _json.dumps(keys, sort_keys=True),
             start.isoformat() if start else "",
             end.isoformat() if end else "",
             row_key_list[i],

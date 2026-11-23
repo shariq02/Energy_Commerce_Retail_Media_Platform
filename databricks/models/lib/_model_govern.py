@@ -1643,26 +1643,6 @@ def tolerance_for(model_name: str, thresholds: dict) -> float:
 
 # COMMAND ----------
 
-# DBTITLE 1,Check context and the validation frame
-
-
-class ReproContext(EvalContext):
-    """One task scored on the validation partition."""
-
-    def __init__(self, task_id: str, rid: str):
-        super().__init__(task_id, rid, smoke=False)
-        self.partition = "validation"
-        self.component = f"models/register/{task_id}"
-
-
-def validation_frame(ctx: ReproContext) -> DataFrame:
-    """The validation rows of the task; only the earlier partitions are kept."""
-    frame = task_frame(ctx, ctx.partition)
-    return frame.filter(F.col("partition").isin(*ALLOWED_PARTITIONS))
-
-
-# COMMAND ----------
-
 # DBTITLE 1,One check row
 
 

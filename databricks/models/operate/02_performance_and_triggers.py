@@ -25,6 +25,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Model evaluation library
+# MAGIC %run ../lib/_model_evaluate
+
+# COMMAND ----------
+
 # DBTITLE 1,Model governance library
 # MAGIC %run ../lib/_model_govern
 

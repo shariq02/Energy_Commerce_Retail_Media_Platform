@@ -244,9 +244,13 @@ def test_reproducibility_notebook_uses_the_check_functions_and_scores_no_test_da
     assert "reproduce_ecosystem(" in text and "record_checks(" in text
     assert "evaluate_by_id(" not in text
     library = (_MODELS / "lib" / "_model_govern.py").read_text(encoding="utf-8")
+    evaluation = (_MODELS / "lib" / "_model_evaluate.py").read_text(encoding="utf-8")
+    assert "class ReproContext(EvalContext)" in evaluation
     assert (
-        "ALLOWED_PARTITIONS" in library and 'self.partition = "validation"' in library
+        "ALLOWED_PARTITIONS" in evaluation
+        and 'self.partition = "validation"' in evaluation
     )
+    assert "class ReproContext" not in library
     assert "evaluate_task(" not in library and "run_candidate(" not in library
 
 
