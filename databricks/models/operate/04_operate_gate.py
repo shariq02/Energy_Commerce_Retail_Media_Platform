@@ -346,6 +346,7 @@ checks = [
     .select("component", "metric_name", "status", "error_detail", "recorded_at")
     .collect()
 ]
+checks = current_check_rows(checks, notebook_stems(("operate",)))
 stamp = now_utc().strftime("%Y-%m-%dT%H:%MZ")
 for eco, rec in record.items():
     data = {

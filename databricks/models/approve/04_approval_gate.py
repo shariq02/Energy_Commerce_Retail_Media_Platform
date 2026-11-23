@@ -265,6 +265,7 @@ checks = [
     .select("component", "metric_name", "status", "error_detail", "recorded_at")
     .collect()
 ]
+checks = current_check_rows(checks, notebook_stems(("approve",)))
 stamp = now_utc().strftime("%Y-%m-%dT%H:%MZ")
 for eco in ECOSYSTEMS:
     rows = [r.asDict() for r in read_model("model_approval", ecosystem=eco).collect()]

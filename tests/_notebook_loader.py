@@ -108,6 +108,12 @@ def load_ml_common() -> dict:
     return _exec_notebook(REPO_ROOT / "databricks" / "ml" / "_ml_common.py", namespace)
 
 
+def load_ml_inspect() -> dict:
+    """The ML shared library, then `_ml_inspect.py` (the pure label-proxy check)."""
+    namespace = load_ml_common()
+    return _exec_notebook(REPO_ROOT / "databricks" / "ml" / "_ml_inspect.py", namespace)
+
+
 def load_model_common() -> dict:
     """The ML shared library chain, then `databricks/models/lib/_model_common.py`."""
     namespace = load_ml_common()

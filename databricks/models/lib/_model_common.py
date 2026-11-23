@@ -203,6 +203,7 @@ MODEL_DDL = {
 }
 # imported instead of the bare name so a partial install counts as missing
 LIBRARY_PROBES = {"torch": "torch.nn", "sksurv": "sksurv.ensemble"}
+LIBRARY_OTHER_DISTRIBUTIONS = {"mlflow": ("mlflow-skinny",)}
 LIBRARIES = {
     "sklearn": "scikit-learn",
     "lightgbm": "lightgbm",
@@ -401,10 +402,14 @@ def library_available(name: str) -> bool:
 
 
 def library_version(name: str) -> str | None:
-    try:
-        return _importlib_metadata.version(LIBRARIES.get(name, name))
-    except _importlib_metadata.PackageNotFoundError:
-        return None
+    """The installed version; a library that serverless installs under another
+    distribution name (mlflow as mlflow-skinny) is found under that name."""
+    for dist in (LIBRARIES.get(name, name), *LIBRARY_OTHER_DISTRIBUTIONS.get(name, ())):
+        try:
+            return _importlib_metadata.version(dist)
+        except _importlib_metadata.PackageNotFoundError:
+            continue
+    return None
 
 
 def missing_libraries(requires) -> list[str]:
@@ -879,6 +884,17 @@ BOUNDED_PRIMARY_METRICS = (
     "ndcg_at_10",
     "skill_mae_mean",
 )
+# a primary metric at or above this (bounded, higher is better), or an error of zero,
+# is a score a model does not reach on honest inputs
+NEAR_PERFECT = 0.995
+
+
+def is_near_perfect(metric: str, higher_is_better: bool, value) -> bool:
+    if value is None:
+        return False
+    if higher_is_better:
+        return metric in BOUNDED_PRIMARY_METRICS and value >= NEAR_PERFECT
+    return abs(value) < 1e-9
 
 
 def _sampled_frames(rows) -> list:
@@ -918,10 +934,7 @@ def findings_flags(tasks, results, context=None) -> list:
             is_baseline = by[m][0]["stage"] == "baseline"
             is_candidate = by[m][0]["stage"] == "candidate"
             p = v.get(primary)
-            if p is not None and (
-                (higher and primary in BOUNDED_PRIMARY_METRICS and p >= 0.995)
-                or (not higher and abs(p) < 1e-9)
-            ):
+            if is_near_perfect(primary, higher, p):
                 flags.append((tid, m, "near-perfect score", f"{primary} = {p:.4g}"))
             for tr_key, va_key in TRAIN_PAIRS_LOWER:
                 tr, va = v.get(tr_key), v.get(va_key)
@@ -2172,6 +2185,35 @@ def merge_notebook_findings() -> list[str]:
         _os.remove(_os.path.join(folder, name))
     print(f"{len(names)} notebook file(s) merged and removed")
     return written
+
+
+def notebook_stems(stages) -> set:
+    """File names (without .py) of the notebooks in the stage folders of this
+    checkout; a check row of a notebook that is gone is no current check."""
+    root = _os.path.dirname(_os.path.dirname(_os.path.dirname(_findings_dir())))
+    names = set()
+    for stage in stages:
+        folder = _os.path.join(root, "databricks", "models", stage)
+        if _os.path.isdir(folder):
+            names |= {n[:-3] for n in _os.listdir(folder) if n.endswith(".py")}
+    return names
+
+
+def current_check_rows(rows, stems) -> list:
+    """The latest row of every (component, check) whose component is `models/<stage>/
+    <name>` with a name that is a notebook of `stems`, a task or a check-only task.
+    Rows of earlier layouts and earlier runs stay in the audit table, not in the
+    findings."""
+    names = set(stems) | set(TASK_BY_ID) | {e["task_id"] for e in CHECK_ONLY.values()}
+    latest: dict = {}
+    for r in rows:
+        parts = r["component"].split("/")
+        if len(parts) != 3 or parts[2] not in names:
+            continue
+        key = (r["component"], r["metric_name"])
+        if key not in latest or r["recorded_at"] > latest[key]["recorded_at"]:
+            latest[key] = r
+    return sorted(latest.values(), key=lambda r: r["recorded_at"])
 
 
 def table_findings(table, ecosystem, run_id, task_ids=None, smoke=None) -> str:

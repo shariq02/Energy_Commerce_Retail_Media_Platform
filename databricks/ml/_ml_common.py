@@ -1889,6 +1889,13 @@ def assembled_frame(
     return out
 
 
+def is_label_derived(column: str, declared=(), like=()) -> bool:
+    """A column the spec declares label-derived: listed by name, or named by a part
+    of its name (`label_derived_like`, for families of columns such as the
+    population frequency columns of one source)."""
+    return column in declared or any(part in column for part in like)
+
+
 def derive_contract(
     columns: list[str],
     *,
@@ -1901,6 +1908,7 @@ def derive_contract(
     group_col: str | None = None,
     overrides: dict | None = None,
     label_derived: tuple = (),
+    label_derived_like: tuple = (),
     default_clock: str = "derived_from_earlier",
 ) -> tuple[list, list, list]:
     """(contract rows, null-class rows, defaulted columns) from column names.
@@ -1920,7 +1928,9 @@ def derive_contract(
             role, clock, lag = "time", None, None
         elif group_col and c == group_col:
             role, clock, lag = "group", None, None
-        elif c in label_derived:
+        elif not c.startswith("target_") and is_label_derived(
+            c, label_derived, label_derived_like
+        ):
             role, clock, lag = "label_derived", None, None
         elif c.startswith("target_"):
             role, clock, lag = "target", None, None

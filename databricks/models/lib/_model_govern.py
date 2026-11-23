@@ -29,7 +29,7 @@ DECISIONS = ("approved", "approved_with_conditions", "not_approved", "deferred")
 RESTRICTIONS = ("diagnostic_only", "offline_only")
 ROLES = ("selected", "runner_up", "baseline_fallback")
 APPROVED = ("approved", "approved_with_conditions")
-BLOCKING_RULES = ("R03", "R05", "R07")
+BLOCKING_RULES = ("R03", "R05", "R07", "R15")
 DECIDER_ENGINE = "rule_engine"
 DECIDER_OWNER = "owner"
 # (rule id, class, description, parameter, default value)
@@ -113,6 +113,17 @@ APPROVAL_RULES = (
         (
             "task-specific limits: survival calibration gap, unrecorded held-out "
             "event count and revalidation"
+        ),
+        "",
+        "",
+    ),
+    (
+        "R15",
+        "blocking",
+        (
+            "near-perfect primary metric on validation or held-out: the score points "
+            "to a label proxy among the inputs; not approved until the inputs are "
+            "checked"
         ),
         "",
         "",
@@ -210,6 +221,25 @@ def evidence_floor(task: dict, rows, metrics: dict, spec: dict) -> list:
         if positives < spec["min_rows"]:
             fails.append(f"{positives:.0f} positive rows")
     return fails
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Near-perfect score
+
+
+def near_perfect_text(task: dict, metrics: dict) -> str:
+    """R15 text when the primary metric is near-perfect on validation or held-out."""
+    primary = task["primary_metric"]
+    held_out, validation = metrics.get(primary, (None, None))
+    shown = [
+        f"{where} {value:.4g}"
+        for where, value in (("held-out", held_out), ("validation", validation))
+        if is_near_perfect(primary, task["higher_is_better"], value)
+    ]
+    if not shown:
+        return ""
+    return f"{primary} is near-perfect ({', '.join(shown)}); a label proxy is likely"
 
 
 # COMMAND ----------
@@ -379,6 +409,11 @@ def decide_selected(task, rows, base_rows, spec, reads) -> dict:
     fails = evidence_floor(task, rows, metrics, spec)
     if fails:
         out["rules"].insert(0, _rule("R05", "blocking", "; ".join(fails)))
+        return out
+    perfect = near_perfect_text(task, metrics)
+    if perfect:
+        out["rules"].append(_rule("R15", "blocking", perfect))
+        out["decision"] = "not_approved"
         return out
     skill_rules, skill_conditions = _skill_rules(metrics)
     out["rules"] += skill_rules

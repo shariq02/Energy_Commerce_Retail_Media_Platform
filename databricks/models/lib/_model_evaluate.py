@@ -781,6 +781,12 @@ def evaluation_flag_rows(results, thresholds: dict) -> list:
             detail = f"primary metric {change:+.1%} worse than on validation"
             name = "validation-to-test degradation above the threshold"
             _flag(flags, key, name, detail, change, cut)
+        if stage == "candidate":
+            for metric in BOUNDED_PRIMARY_METRICS:
+                if is_near_perfect(metric, True, v.get(metric)):
+                    detail = f"{metric} = {v[metric]:.4g}"
+                    name = "near-perfect score"
+                    _flag(flags, key, name, detail, v[metric], NEAR_PERFECT)
         if stage == "candidate" and "skill_primary" in v:
             low, high = v.get("skill_primary_ci_low"), v.get("skill_primary_ci_high")
             if low is None:

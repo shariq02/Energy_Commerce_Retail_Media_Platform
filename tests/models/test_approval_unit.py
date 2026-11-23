@@ -111,6 +111,43 @@ def test_degradation_above_the_limit_is_conditional_and_the_limit_itself_is_not(
     assert at["decision"] == "approved"
 
 
+def _perfect(lib, held_out, validation):
+    task_id = "variant_pathogenicity.pathogenic"
+    task = lib["TASK_BY_ID"][task_id]
+    rows = _rows(task_id, "cand", pr_auc=held_out, **GOOD)
+    for r in rows:
+        if r["metric"] == "pr_auc":
+            r["validation_value"] = validation
+    base = _rows(task_id, task["baseline"], "baseline", pr_auc=0.2)
+    return lib["decide_selected"](task, rows, base, SPEC, 1)
+
+
+def test_a_near_perfect_held_out_score_is_not_approved(lib):
+    out = _perfect(lib, held_out=0.9991, validation=0.9)
+    assert out["decision"] == "not_approved"
+    assert "R15" in _rule_ids(out)
+    assert "held-out 0.9991" in out["rules"][-1]["detail"]
+
+
+def test_a_near_perfect_validation_score_is_not_approved(lib):
+    out = _perfect(lib, held_out=0.9, validation=1.0)
+    assert out["decision"] == "not_approved"
+    assert "validation 1" in out["rules"][-1]["detail"]
+
+
+def test_a_high_but_honest_score_is_not_blocked_by_r15(lib):
+    out = _perfect(lib, held_out=0.99, validation=0.98)
+    assert "R15" not in _rule_ids(out)
+    assert out["decision"] == "approved"
+
+
+def test_is_near_perfect_reads_a_bounded_metric_and_a_zero_error(lib):
+    near = lib["is_near_perfect"]
+    assert near("pr_auc", True, 0.995) and not near("pr_auc", True, 0.994)
+    assert not near("mae", True, 1.0) and near("mae", False, 0.0)
+    assert not near("pr_auc", True, None) and not near("mae", False, 0.5)
+
+
 def test_interval_coverage_outside_the_tolerance_is_conditional(lib):
     low = _decide(lib, "price_daily.price", interval_coverage_80=0.57)
     inside = _decide(lib, "price_daily.price", interval_coverage_80=0.72)
@@ -360,9 +397,10 @@ def test_the_approval_settings_are_typed_and_must_be_recorded(lib):
 
 def test_the_rule_table_has_every_rule_once_with_its_class(lib):
     ids = {r[0] for r in lib["APPROVAL_RULES"]}
-    assert ids == {f"R{i:02d}" for i in range(1, 13)}
+    assert ids == {f"R{i:02d}" for i in range(1, 13)} | {"R15"}
     classes = {r[0]: r[1] for r in lib["APPROVAL_RULES"]}
-    assert classes["R03"] == classes["R05"] == "blocking"
+    assert classes["R03"] == classes["R05"] == classes["R15"] == "blocking"
+    assert set(lib["BLOCKING_RULES"]) == {"R03", "R05", "R07", "R15"}
 
 
 def _table_rows(lib, recommended):

@@ -180,10 +180,12 @@ for eco in ECOSYSTEMS:
             f"columns={leaked}",
         )
         declared = set(dataset_spec(ds).get("label_derived", []))
+        like = tuple(dataset_spec(ds).get("label_derived_like", ()))
         used = [
             r["column_name"]
             for r in contract
-            if r["role"] == "feature" and base_column(r["column_name"]) in declared
+            if r["role"] == "feature"
+            and is_label_derived(base_column(r["column_name"]), declared, like)
         ]
         audit(
             LEAKAGE,
@@ -196,6 +198,82 @@ for eco in ECOSYSTEMS:
         forbidden = [c for c in cols if c in CLASS_E_COLUMNS]
         audit(
             LEAKAGE, eco, ds, "no_class_e_column", not forbidden, f"columns={forbidden}"
+        )
+
+# COMMAND ----------
+
+# DBTITLE 1,Leakage -- no few columns reproduce the label, and the null gap by partition
+PROXY_SAMPLE_ROWS = 60_000
+NULL_GAP_SHOWN = 0.2
+
+
+def feature_columns(eco, ds, cols):
+    """The raw feature columns of a dataset that hold a value (the null pattern of a
+    column is part of what a model sees)."""
+    roles = {r["column_name"]: r["role"] for r in contract_rows(eco, ds)}
+    return [c for c, role in roles.items() if role == "feature" and c in cols]
+
+
+for eco in ECOSYSTEMS:
+    for d in audited(eco):
+        ds = d["dataset_id"]
+        target = dataset_spec(ds).get("target_name")
+        cols = dataset_columns(ds)
+        features = feature_columns(eco, ds, cols)
+        frame = read_dataset(ds)
+        train = frame.filter(F.col("partition") == "train")
+        values = (
+            {r[0] for r in train.select(target).distinct().limit(3).collect()}
+            if target and target in cols
+            else set()
+        )
+        if features and values and values <= {0, 1}:
+            total = train.count()
+            share = min(1.0, PROXY_SAMPLE_ROWS * 1.2 / max(total, 1))
+            sample = (
+                train.select(target, *[f"`{c}`" for c in features])
+                .sample(False, share, seed=43)
+                .limit(PROXY_SAMPLE_ROWS)
+                .toPandas()
+            )
+            found = label_proxy_columns(sample, target, features)
+            audit(
+                LEAKAGE,
+                eco,
+                ds,
+                "no_few_columns_reproduce_the_label",
+                not found,
+                f"columns={[f'{c} ({how})' for c, how in found[:12]]}",
+            )
+        rates = (
+            frame.groupBy("partition")
+            .agg(
+                *[
+                    F.avg(F.col(f"`{c}`").isNull().cast("double")).alias(c)
+                    for c in features
+                ]
+            )
+            .collect()
+            if features
+            else []
+        )
+        by_part = {r["partition"]: r.asDict() for r in rates}
+        gaps = sorted(
+            (
+                (abs(by_part["test"][c] - by_part["train"][c]), c)
+                for c in features
+                if "test" in by_part and "train" in by_part
+            ),
+            reverse=True,
+        )
+        shown = [f"{c} {g:.2f}" for g, c in gaps if g >= NULL_GAP_SHOWN][:10]
+        audit(
+            LEAKAGE,
+            eco,
+            ds,
+            "null_rate_gap_train_to_test_listed",
+            True,
+            f"gap of at least {NULL_GAP_SHOWN}: {shown}",
         )
 
 # COMMAND ----------

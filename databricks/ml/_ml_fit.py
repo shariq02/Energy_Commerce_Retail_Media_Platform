@@ -364,6 +364,7 @@ def declare_dataset(dataset_id: str, columns: list[str]) -> list[str]:
         group_col=spec.get("group_col"),
         overrides={k: tuple(v) for k, v in rules.get("overrides", {}).items()},
         label_derived=tuple(spec.get("label_derived", ())),
+        label_derived_like=tuple(spec.get("label_derived_like", ())),
         default_clock=DEFAULT_CLOCK[eco],
     )
     contract += [

@@ -598,6 +598,8 @@ datasets:
     capability: ClinVar variant pathogenic against benign
     dependency_group: 1
     target_name: target_is_pathogenic
+    # families of columns the label is read from (a part of the column name)
+    label_derived_like: [clinical_significance, clinvar, review_stars]
     provenance_tier: sourced
     notes: rows with a pathogenic or benign class; the clinical significance text and class flags are the label
     contract:
@@ -646,6 +648,8 @@ datasets:
     capability: ClinVar variant high sequence impact
     dependency_group: 1
     target_name: target_is_high_impact
+    # the label is a band of severity plus conservation; the raw conservation scores feed it
+    label_derived_like: [severity, conservation, phylop, cadd]
     provenance_tier: rule_derived
     notes: the label is the impact rule of Silver (pathogenicity score at or above a band); its inputs are label-derived here
     contract:
@@ -680,6 +684,8 @@ datasets:
     capability: variant carrier-screening candidate (rare germline variant)
     dependency_group: 1
     target_name: target_is_carrier_screening_candidate
+    # the label is the rare tier of the population frequency and a germline origin
+    label_derived_like: [allele_frequency, population_frequency, allele_count, allele_number, homozygote_count, is_rare, is_common, is_ultra_rare, is_very_rare, is_low_frequency, origin, germline, pathogenicity_likelihood]
     provenance_tier: rule_derived
     notes: rows with a population frequency; the label is a rare tier and a germline origin
     contract:
@@ -713,6 +719,8 @@ datasets:
     capability: variant clinically actionable rare variant
     dependency_group: 1
     target_name: target_is_clinically_actionable_rare_variant
+    # the label is the rare tier of the population frequency and a pathogenic class
+    label_derived_like: [allele_frequency, population_frequency, allele_count, allele_number, homozygote_count, is_rare, is_common, is_ultra_rare, is_very_rare, is_low_frequency, pathogenicity_likelihood]
     provenance_tier: rule_derived
     notes: rows with a population frequency; the label is a rare tier and a pathogenic class
     contract:
@@ -746,6 +754,7 @@ datasets:
     capability: gene is a pharmacogene
     dependency_group: 1
     target_name: target_is_pharmacogene
+    label_derived_like: [pharmgkb, pharmacogene]
     provenance_tier: sourced
     notes: the label is the PharmGKB gene annotation; columns that count or score pharmacogene evidence are label-derived
     contract:
@@ -791,6 +800,8 @@ datasets:
     capability: structural variant critical gene disruption
     dependency_group: 1
     target_name: target_has_critical_gene_disruption
+    # the label is a pharmacogene or an OMIM gene among the genes the variant overlaps
+    label_derived_like: [pharmacogenes, omim_genes]
     provenance_tier: rule_derived
     notes: the variant rows of structural_variant_profile (the gene overlap rows are left out); the label is derived from the gene overlap columns
     group_col: variant_key
@@ -817,7 +828,16 @@ datasets:
     provenance_tier: sourced
     notes: the test partition is the source test split; validation is 15 percent of the source train rows by hash of source_record_id, so it shares genes with train; label and split columns come from the benchmark
     benchmark_set: causal_eqtl
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_maps:
@@ -831,7 +851,16 @@ datasets:
     provenance_tier: sourced
     notes: 1,682 proteins occur in train and test in the source split; the leakage gate reports it; validation is 15 percent of the source train rows by hash of source_record_id, so it shares proteins with train
     benchmark_set: maps
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_pathogenic_coding:
@@ -845,7 +874,16 @@ datasets:
     provenance_tier: sourced
     notes: the test partition is the source test split; validation is 15 percent of the source train rows by hash of source_record_id, so it shares genes with train
     benchmark_set: pathogenic_coding
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_pathogenic_non_coding:
@@ -859,7 +897,16 @@ datasets:
     provenance_tier: sourced
     notes: the source test split has 406 pathogenic rows against 2,321,067 common rows
     benchmark_set: pathogenic_non_coding
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: source_defined, rule_id: "source:split", split_column: split}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_spectralbio:
@@ -873,7 +920,16 @@ datasets:
     provenance_tier: sourced
     notes: the three subsets are the source split
     benchmark_set: spectralbio
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: source_defined, rule_id: "source:split", split_column: split}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_clinvar_vs_benign:
@@ -887,8 +943,17 @@ datasets:
     provenance_tier: sourced
     notes: the source gives no split; split by hash of the gene key of variant_profile, the variant key where the variant has no gene
     benchmark_set: clinvar_vs_benign
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
     group_col: split_group
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: hash_group, rule_id: "hash:gene_key_else_variant_key", group_cols: [split_group]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_gnomad_balanced:
@@ -902,8 +967,17 @@ datasets:
     provenance_tier: sourced
     notes: the source gives no split; split by hash of the gene key of variant_profile, the variant key where the variant has no gene
     benchmark_set: gnomad_balanced
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
+        protein_id: [key, null, null]
     group_col: split_group
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: hash_group, rule_id: "hash:gene_key_else_variant_key", group_cols: [split_group]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_proteingym_clinical:
@@ -917,7 +991,15 @@ datasets:
     provenance_tier: sourced
     notes: the source gives no split; split by hash of the protein
     benchmark_set: proteingym_clinical
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        assembly_basis: [flag, null, null]
+        contig: [key, null, null]
+        position: [key, null, null]
+        reference_allele: [key, null, null]
+        alternate_allele: [key, null, null]
     group_col: protein_id
-    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank]
+    label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: hash_group, rule_id: "hash:protein_id", group_cols: [protein_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}

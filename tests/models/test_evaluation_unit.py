@@ -516,3 +516,13 @@ def test_recorded_settings_are_numbers_where_they_are_used_as_numbers(lib):
     assert float(d["degradation_flag_relative"]) == pytest.approx(0.2)
     assert int(d["min_bootstrap_blocks"]) >= 2
     assert re.fullmatch(r"\d+", d["bootstrap_seed"])
+
+
+def test_a_near_perfect_candidate_is_flagged_and_a_baseline_is_not(lib):
+    rows = [
+        _result("m", "candidate", "pr_auc", 1.0),
+        _result("b", "baseline", "pr_auc", 0.999),
+    ]
+    flags = lib["evaluation_flag_rows"](rows, _THRESHOLDS)
+    assert [(f[1], f[3]) for f in flags] == [("m", "near-perfect score")]
+    assert flags[0][4] == "pr_auc = 1"

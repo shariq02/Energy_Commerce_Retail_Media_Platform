@@ -460,3 +460,82 @@ def test_skip_notes_group_the_skipped_tasks_by_ecosystem(c):
     assert list(notes) == [first["ecosystem"]]
     assert "Skipped, kept:" in notes[first["ecosystem"]][0]
     assert c["skip_notes"]([], "kept") == {}
+
+
+def test_a_library_installed_under_another_distribution_name_has_a_version(
+    c, monkeypatch
+):
+    from importlib import metadata
+
+    def fake(name):
+        if name == "mlflow-skinny":
+            return "3.1.0"
+        raise metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(c["_importlib_metadata"], "version", fake)
+    assert c["library_version"]("mlflow") == "3.1.0"
+    assert c["library_version"]("lifelines") is None
+
+
+def _check(component, name, stamp, status="PASS"):
+    return {
+        "component": component,
+        "metric_name": name,
+        "status": status,
+        "error_detail": "",
+        "recorded_at": stamp,
+    }
+
+
+def test_current_check_rows_keep_the_latest_row_of_a_current_component(c):
+    task = next(iter(c["TASK_BY_ID"]))
+    rows = [
+        _check("models/approve/04_approval_gate", "x", 1, "FAIL"),
+        _check("models/approve/04_approval_gate", "x", 2, "PASS"),
+        _check(f"models/evaluate/{task}", "baseline_evaluated", 3),
+        _check("models/approve/gate/01_approval_guards", "x", 4),
+        _check("models/evaluate/weak_supervision.labels", "x", 5),
+        _check("models/approve/00_approval_setup", "x", 6),
+    ]
+    out = c["current_check_rows"](rows, {"04_approval_gate"})
+    assert [(r["component"], r["status"]) for r in out] == [
+        ("models/approve/04_approval_gate", "PASS"),
+        (f"models/evaluate/{task}", "PASS"),
+    ]
+
+
+def test_a_check_only_task_is_a_current_component(c):
+    entry = next(iter(c["CHECK_ONLY"].values()))
+    rows = [_check(f"models/evaluate/{entry['task_id']}", "baseline_evaluated", 1)]
+    assert len(c["current_check_rows"](rows, set())) == 1
+
+
+def test_notebook_stems_name_the_notebooks_of_the_stage_folders(c):
+    stems = c["notebook_stems"](("approve",))
+    assert {"01_recommend", "04_approval_gate"} <= stems
+    assert "01_train" not in stems
+
+
+def test_near_perfect_is_one_rule_for_the_train_flag_and_the_approval(c):
+    assert c["NEAR_PERFECT"] == 0.995
+    flags = c["findings_flags"](
+        [
+            {
+                "task_id": "t",
+                "primary_metric": "pr_auc",
+                "higher_is_better": True,
+            }
+        ],
+        [
+            {
+                "task_id": "t",
+                "model_name": "m",
+                "stage": "candidate",
+                "status": "ok",
+                "detail": None,
+                "metric": "pr_auc",
+                "value": 1.0,
+            }
+        ],
+    )
+    assert ("t", "m", "near-perfect score", "pr_auc = 1") in flags

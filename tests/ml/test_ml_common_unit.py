@@ -181,6 +181,58 @@ def test_derive_contract_marks_a_declared_label_derived_column(ml):
     assert "leaky_score" not in {c[0] for c in classes}
 
 
+def test_derive_contract_marks_the_columns_named_by_a_part_of_their_name(ml):
+    contract, _, _ = ml["derive_contract"](
+        [
+            "variant_key",
+            "target_is_rare",
+            "gnomad_eur_allele_frequency",
+            "is_rare_variant",
+            "plain_score",
+        ],
+        keys=["variant_key"],
+        time_col=None,
+        label_derived_like=("allele_frequency", "is_rare"),
+        default_clock="static_annotation",
+    )
+    by = {c[0]: c[1] for c in contract}
+    assert by["gnomad_eur_allele_frequency"] == "label_derived"
+    assert by["is_rare_variant"] == "label_derived"
+    assert by["plain_score"] == "feature"
+    # a target is a target even when a part of its name is declared
+    assert by["target_is_rare"] == "target"
+
+
+def test_is_label_derived_reads_names_and_parts_of_names(ml):
+    f = ml["is_label_derived"]
+    assert f("a", ("a",), ())
+    assert f("x_allele_count", (), ("allele_count",))
+    assert not f("x_score", ("a",), ("allele_count",))
+
+
+def test_the_benchmark_datasets_do_not_read_the_frequency_or_the_coordinates(ml):
+    frequency = {
+        "allele_count",
+        "allele_number",
+        "allele_frequency",
+        "minor_allele_frequency",
+        "minor_allele_count",
+    }
+    for name, dataset in ml["ML_SPEC"]["datasets"].items():
+        if dataset.get("benchmark_set") is None:
+            continue
+        assert frequency <= set(dataset["label_derived"]), name
+        overrides = dataset["contract"]["overrides"]
+        for column in ("variant_key", "contig", "position", "reference_allele"):
+            assert overrides[column][0] == "key", name
+
+
+def test_every_label_derived_like_entry_is_a_non_empty_text(ml):
+    for name, dataset in ml["ML_SPEC"]["datasets"].items():
+        for part in dataset.get("label_derived_like", []):
+            assert isinstance(part, str) and part, name
+
+
 def test_the_registry_tables_that_every_ecosystem_shares_live_once(ml):
     for name in ml["ML_SHARED_TABLES"]:
         energy, commerce = ml["ml_fqn"](name, "energy"), ml["ml_fqn"](name, "commerce")

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # ML INSPECTION LIBRARY
@@ -238,3 +238,108 @@ def markdown_table(headers: list[str], rows: list[tuple]) -> str:
         "| " + " | ".join("" if v is None else str(v) for v in r) + " |" for r in rows
     ]
     return "\n".join(lines)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Columns that give the label away
+# a group of fewer rows than this counts at the base error: a key is pure by size
+PROXY_MIN_GROUP = 50
+PROXY_BUCKETS = 50
+# a column, or a tree of this depth, that makes at most this share of the errors of
+# the best constant guess gives the label away
+PROXY_ERROR_SHARE = 0.02
+PROXY_TREE_DEPTH = 3
+
+
+def _group_codes(series):
+    """Group number of every row: quantile bucket of a number, level of a text; the
+    null rows form their own group (-1)."""
+    import pandas as pd
+
+    if pd.api.types.is_bool_dtype(series):
+        series = series.astype("float64")
+    if pd.api.types.is_numeric_dtype(series):
+        try:
+            codes = pd.qcut(series, q=PROXY_BUCKETS, duplicates="drop").cat.codes
+        except ValueError:
+            codes = series.rank(method="dense").fillna(-1)
+        return codes.to_numpy()
+    return series.astype("category").cat.codes.to_numpy()
+
+
+def _tree_column(series):
+    """The column as floats for a tree; a null row is the lowest value."""
+    import numpy as np
+    import pandas as pd
+
+    if pd.api.types.is_bool_dtype(series):
+        series = series.astype("float64")
+    if pd.api.types.is_numeric_dtype(series):
+        values = series.astype("float64").to_numpy()
+    else:
+        values = series.astype("category").cat.codes.to_numpy().astype("float64")
+        return np.where(values < 0, -1e9, values)
+    return np.where(np.isnan(values), -1e9, values)
+
+
+def _group_error_share(codes, y) -> float:
+    """Share of the rows a guess by group gets wrong, relative to the best constant
+    guess. A group of fewer than PROXY_MIN_GROUP rows is counted at the base error."""
+    import pandas as pd
+
+    n = len(y)
+    base = min(y.mean(), 1.0 - y.mean())
+    if n == 0 or base == 0:
+        return 1.0
+    grouped = pd.DataFrame({"g": codes, "y": y}).groupby("g")["y"].agg(["size", "sum"])
+    big = grouped[grouped["size"] >= PROXY_MIN_GROUP]
+    if len(big) < 2:
+        return 1.0
+    wrong = (
+        big[["sum", "size"]].assign(other=big["size"] - big["sum"]).min(axis=1).sum()
+    )
+    small = n - big["size"].sum()
+    return float((wrong + small * base) / n / base)
+
+
+def label_proxy_columns(frame, target: str, columns) -> list:
+    """(column, how) of the columns that give a binary label away: one column whose
+    groups (null rows included) predict it almost exactly, or the columns used by a
+    shallow tree that does. `frame` is a pandas frame of train rows. A label that is
+    not binary, or that has one class only, returns an empty list."""
+    import numpy as np
+
+    y = frame[target]
+    if y.isna().any() or set(y.unique()) - {0, 1}:
+        return []
+    y = y.astype("int64")
+    if y.nunique() < 2:
+        return []
+    labels = y.to_numpy()
+    names = [c for c in columns if c in frame.columns and c != target]
+    found = []
+    for c in names:
+        if _group_error_share(_group_codes(frame[c]), labels) <= PROXY_ERROR_SHARE:
+            found.append((c, "one column"))
+    try:
+        from sklearn.model_selection import train_test_split
+        from sklearn.tree import DecisionTreeClassifier
+    except ImportError:
+        return found
+    # a number keeps its order, a text its level number; a null row is the lowest
+    matrix = np.column_stack([_tree_column(frame[c]) for c in names])
+    x_fit, x_test, y_fit, y_test = train_test_split(
+        matrix, labels, test_size=0.3, random_state=43, stratify=labels
+    )
+    tree = DecisionTreeClassifier(max_depth=PROXY_TREE_DEPTH, random_state=43)
+    tree.fit(x_fit, y_fit)
+    base = min(y_test.mean(), 1.0 - y_test.mean())
+    wrong = float((tree.predict(x_test) != y_test).mean())
+    if base > 0 and wrong <= PROXY_ERROR_SHARE * base:
+        weight = tree.feature_importances_
+        used = [names[i] for i in np.argsort(-weight) if weight[i] > 0]
+        seen = {c for c, _how in found}
+        how = f"tree of depth {PROXY_TREE_DEPTH}"
+        found += [(c, how) for c in used if c not in seen]
+    return found

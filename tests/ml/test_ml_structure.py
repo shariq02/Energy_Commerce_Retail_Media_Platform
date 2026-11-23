@@ -44,10 +44,13 @@ _WRITE_CALLS = {
     "write_stored_table",
     "build_datasets",
 }
-# Small entity tables only (guarded by a size assertion) or tiny aggregates.
+# Small entity tables only (guarded by a size assertion) or tiny aggregates. The
+# gate loads one train sample of at most PROXY_SAMPLE_ROWS rows per dataset for the
+# label-proxy check.
 _TO_PANDAS_ALLOWED = {
     "energy/02_unit_and_site_datasets.py",
     "energy/03_zone_and_weather_datasets.py",
+    "gate/01_ml_gates.py",
 }
 _DOC_REFERENCES = re.compile(r"docs/|ADR-\d|UC-\d|\bPhase \d|\bEntry \d{3}")
 

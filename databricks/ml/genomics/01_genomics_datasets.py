@@ -15,8 +15,9 @@
 # MAGIC **Purpose:** build the genomics datasets of the families `variant`, `gene` and
 # MAGIC `benchmark` from the Gold labels. The features are the Gold columns; no feature
 # MAGIC or target table is stored. The label-derived columns of each target are declared
-# MAGIC in the spec file; they stay in the dataset with the role `label_derived` and are
-# MAGIC never features. Class flags of Gold are true or null, so a target is the flag
+# MAGIC in the spec file, by name or by a part of the name; they stay in the dataset with
+# MAGIC the role `label_derived` and are never features. The identifier and coordinate
+# MAGIC columns of a benchmark keep the role `key`. Class flags of Gold are true or null, so a target is the flag
 # MAGIC with null read as false on the rows where its rule was evaluated. REBUILD names
 # MAGIC the datasets to build again after a change; their frozen families are reopened.
 

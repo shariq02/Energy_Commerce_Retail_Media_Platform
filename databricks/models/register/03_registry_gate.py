@@ -267,6 +267,7 @@ results = [
     .select("component", "metric_name", "status", "error_detail", "recorded_at")
     .collect()
 ]
+results = current_check_rows(results, notebook_stems(("register",)))
 stamp = now_utc().strftime("%Y-%m-%dT%H:%MZ")
 for eco in ECOSYSTEMS:
     registry, _approvals, checks = record[eco]
