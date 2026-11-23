@@ -144,6 +144,13 @@ merges:
       outcome: faers_outc
       report_source: faers_rpsr
   - schema: genomics_bronze
+    table: reference_small
+    discriminator: dataset
+    at_load: true
+    parts:
+      gnomad_constraint: gnomad_constraint_metrics
+      tcga_site_code: tcga_site_codes
+  - schema: genomics_bronze
     table: variant_benchmark_sets
     discriminator: benchmark
     parts:

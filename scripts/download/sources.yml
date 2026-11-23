@@ -56,6 +56,9 @@ vars:
   energy_charts: https://api.energy-charts.info/v2
   energy_charts_start: "2024-11-01"
   energy_charts_end: "2026-11-12"
+  gnomad_constraint: https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1/constraint
+  tcga_codes: https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables
+  eurostat: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data
 
 stages:
   # --- NCBI (ClinVar first: gnomAD, CADD, conservation and AlphaMissense read its positions)
@@ -209,6 +212,13 @@ stages:
         - Gene
         - IMPACT
         - FILTER
+  # Tissue source site code -> study (cancer cohort) of the GDC TCGA code table (open
+  # access). The mutations carry the site in the sample barcode; Silver reads both columns.
+  - source: tcga
+    datasets: [site_codes]
+    files:
+      - {tag: "", url: "{tcga_codes}/tissue-source-site-codes", file: tissue_source_site_codes.html}
+    parser: tcga_site_codes
 
   # --- curation
   - source: clingen
@@ -361,12 +371,14 @@ stages:
       read: {names: [chrom, start, end, dhs_accession, ccre_accession, ccre_class]}
   - source: faers
     datasets: [demo, drug, reac, outc, rpsr, ther, indi]
+    # Ten quarters (2024q1 to 2026q2): the severe-outcome model needs a time split.
     files:
-      - each: [2026q1, 2026q2]
+      - each: [2024q1, 2024q2, 2024q3, 2024q4, 2025q1, 2025q2, 2025q3, 2025q4, 2026q1, 2026q2]
         tag: "{item}"
         url: "{faers}/faers_ascii_{item}.zip"
         file: "faers_ascii_{item}.zip"
     parser: faers
+    refresh_when_files_added: true
   - source: long_range_benchmark
     datasets: [causal_eqtl]
     files: [{tag: "", url: "{long_range}/variant_effect_causal_eqtl/All_Tissues.csv", file: All_Tissues.csv}]
@@ -477,6 +489,18 @@ stages:
         file: "gnomad.genomes.v4.1.1.sites.{item}.parquet"
     parser: gnomad
     capped: [variants]
+  # Gene constraint of gnomAD v4.1 (CC0): one row per gene, the canonical or MANE Select
+  # transcript. Silver reads these columns only (pLI, LOEUF, loss-of-function counts,
+  # missense z-score); NA stays text.
+  - source: gnomad_constraint
+    datasets: [metrics]
+    files:
+      - {tag: v4.1, url: "{gnomad_constraint}/gnomad.v4.1.constraint_metrics.tsv", file: gnomad.v4.1.constraint_metrics.tsv}
+    parser:
+      name: table
+      dataset: metrics
+      keep: canonical_or_mane
+      usecols_in: [gene, gene_id, transcript, canonical, mane_select, lof.obs, lof.exp, lof.oe, lof.pLI, lof.oe_ci.upper, mis.z_score]
 
   # --- Tahoe-100M
   - source: tahoe
@@ -734,3 +758,18 @@ stages:
     parser: energy_charts
     # The public API answered 429 after 6 calls with a 2 s pause.
     pause_seconds: 10
+  # Eurostat sts_trtu_m (free re-use with source named): German retail trade except motor
+  # vehicles (G47), volume of sales (VOL_SLS), calendar adjusted, index 2021 = 100,
+  # monthly from 2018-01 (105 values at 2026-11-23). Silver reads these columns only.
+  - source: eurostat
+    ecosystem: commerce
+    datasets: [retail_trade]
+    files:
+      - tag: "2018-01"
+        url: "{eurostat}/sts_trtu_m/M.VOL_SLS.G47.CA.I21.DE?format=SDMX-CSV&startPeriod=2018-01"
+        file: sts_trtu_m_retail_trade.csv
+    parser:
+      name: table
+      dataset: retail_trade
+      read: {sep: ",", quoted: true}
+      usecols_in: [indic_bt, nace_r2, s_adj, unit, geo, TIME_PERIOD, OBS_VALUE, OBS_FLAG]

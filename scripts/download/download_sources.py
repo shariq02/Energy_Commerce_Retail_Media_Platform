@@ -138,6 +138,9 @@ FILTERS = {
         & f["child_pathway_id"].str.startswith("R-HSA")
     ),
     "clinvar_variants": keep_clinvar_variants,
+    "canonical_or_mane": lambda f: (
+        (f["canonical"] == "true") | (f["mane_select"] == "true")
+    ),
 }
 
 
@@ -450,13 +453,23 @@ def parse_energy_charts(path: Path, tag: str):
     yield {"physical_flows": frame}, len(records)
 
 
-def html_table_rows(path: Path) -> list[list[str]]:
-    """Rows of the first HTML table; a cell spanning rows is repeated below."""
+def html_table_rows(path: Path, first_header: str | None = None) -> list[list[str]]:
+    """Rows of the first HTML table, or of the first table whose first cell reads
+    `first_header`; a cell spanning rows is repeated below."""
     from bs4 import BeautifulSoup
 
-    table = BeautifulSoup(
+    tables = BeautifulSoup(
         path.read_text(encoding="utf-8", errors="replace"), "html.parser"
-    ).find("table")
+    ).find_all("table")
+    table = next(
+        (
+            t
+            for t in tables
+            if first_header is None
+            or (t.find(["th", "td"]) or t).get_text(" ", strip=True) == first_header
+        ),
+        None,
+    )
     if table is None:
         raise RuntimeError(f"{path.name}: no table found")
     rows: list[list[str]] = []
@@ -492,6 +505,15 @@ def parse_acmg(path: Path, tag: str):
     width = len(header)
     frame = pd.DataFrame([(r + [None] * width)[:width] for r in body], columns=header)
     yield {"secondary_findings_genes": frame}, len(body)
+
+
+def parse_tcga_site_codes(path: Path, tag: str):
+    """Tissue source site code and study name of the GDC TCGA code table."""
+    header, *body = html_table_rows(path, first_header="TSS Code")
+    width = len(header)
+    frame = pd.DataFrame([(r + [None] * width)[:width] for r in body], columns=header)
+    frame = frame.rename(columns={"TSS Code": "tss_code", "Study Name": "study_name"})
+    yield {"site_codes": frame[["tss_code", "study_name"]]}, len(body)
 
 
 def parse_depmap_effect(path: Path, tag: str):
@@ -758,6 +780,7 @@ PLAIN_PARSERS = {
     "alphafold": parse_alphafold,
     "energy_charts": parse_energy_charts,
     "acmg": parse_acmg,
+    "tcga_site_codes": parse_tcga_site_codes,
     "depmap_effect": parse_depmap_effect,
 }
 PARSER_FACTORIES = {

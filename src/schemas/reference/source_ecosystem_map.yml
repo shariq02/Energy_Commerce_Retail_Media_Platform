@@ -65,6 +65,9 @@ mappings:
   - source_system: ga4
     ecosystem: commerce
     first_mapped: "2026-09-15"
+  - source_system: eurostat
+    ecosystem: commerce
+    first_mapped: "2026-11-23"
   # genomics: one entry per source folder of genomics_bronze
   - source_system: aact
     ecosystem: genomics
@@ -87,6 +90,9 @@ mappings:
   - source_system: ensembl_compara
     ecosystem: genomics
     first_mapped: "2026-11-11"
+  - source_system: gnomad_constraint
+    ecosystem: genomics
+    first_mapped: "2026-11-23"
   - source_system: gnomad_mtdna
     ecosystem: genomics
     first_mapped: "2026-11-11"

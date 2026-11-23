@@ -345,27 +345,23 @@ def fit_transform(
 # DBTITLE 1,Declare, build and finish datasets
 
 
-CAP_BUCKETS = 1_000_000
+CAP_SEED = "row_cap"
 
 
 def cap_rows(frame: DataFrame, grain: list[str], max_rows: int | None) -> DataFrame:
-    """About `max_rows` rows of a frame that holds more: the rows whose grain hash
-    falls in the first share of the buckets. The same keys give the same rows on every
-    build. A frame with fewer rows, or a spec with no `max_rows`, is returned as it is."""
+    """About `max_rows` rows of a frame that holds more: the rows whose grain falls in
+    the first whole percent of the stable buckets (`user_hash_bucket`, its own seed, so
+    the sample does not follow the split hash). The same keys give the same rows on
+    every build. A frame with fewer rows, or a spec with no `max_rows`, is returned as
+    it is."""
     if not max_rows:
         return frame
     total = frame.count()
     if total <= max_rows:
         return frame
-    bucket = F.pmod(
-        F.xxhash64(*[F.col(c).cast("string") for c in grain]), F.lit(CAP_BUCKETS)
-    )
-    limit = max(1, int(max_rows / total * CAP_BUCKETS))
-    print(
-        f"capped {total} rows to about {max_rows} "
-        f"(stable hash, {limit} of {CAP_BUCKETS})"
-    )
-    return frame.filter(bucket < limit)
+    limit = max(1, int(max_rows / total * 100))
+    print(f"capped {total} rows to about {max_rows} (buckets 0 to {limit - 1} of 100)")
+    return frame.filter(user_hash_bucket(grain, CAP_SEED) < limit)
 
 
 def declare_dataset(dataset_id: str, columns: list[str]) -> list[str]:

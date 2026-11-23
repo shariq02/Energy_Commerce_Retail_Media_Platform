@@ -36,6 +36,11 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Zone weather library
+# MAGIC %run ../_ml_zone_weather
+
+# COMMAND ----------
+
 # DBTITLE 1,Configuration
 ECO = "energy"
 SOURCE = "smard"
@@ -79,9 +84,10 @@ QH_FROM = SPLIT_CALENDARS["quarter_hour"]["train"][0]
 REGIME_START = SPLIT_CALENDARS["redispatch"]["train"][0]
 REGIME_END = SPLIT_CALENDARS["redispatch"]["test"][1]
 TSOS = ["fifty_hertz", "amprion", "tennet_de", "transnetbw"]
-# national weather of the load dataset: a station-day needs 18 hourly values (radiation
-# 20), a day needs 10 stations; degree days against a heating and a cooling base
-WEATHER_MIN_HOURS, WEATHER_MIN_RADIATION_HOURS, WEATHER_MIN_STATIONS = 18, 20, 10
+# national weather of the load dataset: a station-day needs 18 hourly values (the zone
+# weather library sets 20 for radiation), a day needs 10 stations; degree days against
+# a heating and a cooling base
+WEATHER_MIN_HOURS, WEATHER_MIN_STATIONS = 18, 10
 HEATING_BASE_DEGC, COOLING_BASE_DEGC = 15.0, 22.0
 FRAMES, BLOCKS = {}, {}
 
@@ -316,11 +322,11 @@ _forecast_columns = [c for c in market_daily.columns if c.startswith("forecast_"
 # DBTITLE 1,National weather per day -- temperature, degree days and radiation (load)
 # The realised weather of the day is used as if it were a forecast (perfect prognosis,
 # named in the contract). The value is the mean of the DWD stations with enough hours.
-_weather = read_gold("weather_observation", source="dwd").filter(
-    F.col("source_system") == "dwd"
-)
+_weather = read_gold("weather_observation", source="dwd")
 _station_temperature = (
-    _weather.filter(F.col("air_temperature_degc").isNotNull())
+    _weather.filter(
+        (F.col("source_system") == "dwd") & F.col("air_temperature_degc").isNotNull()
+    )
     .groupBy("location_key", "local_date")
     .agg(
         F.count("*").alias("n_hours"),
@@ -328,18 +334,13 @@ _station_temperature = (
     )
     .filter(F.col("n_hours") >= WEATHER_MIN_HOURS)
 )
-_station_radiation = (
-    _weather.filter(F.col("global_radiation_w_per_m2").isNotNull())
-    .groupBy("location_key", "local_date")
+_national_radiation = (
+    station_day_radiation(_weather, DATE_FROM, CALENDAR_TO)
+    .groupBy("local_date")
     .agg(
-        F.count("*").alias("n_hours"),
-        F.avg("global_radiation_w_per_m2").alias("radiation"),
+        F.count("*").alias("n_stations"),
+        F.avg("radiation_mean").alias("weather_global_radiation_mean_w_per_m2"),
     )
-    .filter(F.col("n_hours") >= WEATHER_MIN_RADIATION_HOURS)
-)
-_national_radiation = _station_radiation.groupBy("local_date").agg(
-    F.count("*").alias("n_stations"),
-    F.avg("radiation").alias("weather_global_radiation_mean_w_per_m2"),
 )
 weather_national_daily = (
     _station_temperature.groupBy("local_date")

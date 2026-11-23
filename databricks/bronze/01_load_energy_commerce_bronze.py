@@ -144,6 +144,9 @@ SOURCES = {
     "energy_charts": {
         "datasets": [("physical_flows", "energy_charts_physical_flows", None)],
     },
+    "eurostat": {
+        "datasets": [("retail_trade", "eurostat_retail_trade", None)],
+    },
     "honda_iot": {
         "datasets": [
             (f"{kind}_{unit}", f"honda_iot_{kind}", unit.lower())

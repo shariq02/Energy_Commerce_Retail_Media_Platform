@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import io
 import re
 import sys
+import types
 import zipfile
 from pathlib import Path
 
@@ -303,6 +305,91 @@ def test_needs_staging_refreshes_only_marked_stages(genomics, monkeypatch):
     )
 
 
+def _entry(config, source, dataset):
+    return next(
+        e
+        for e in config["stages"]
+        if e["source"] == source and e["datasets"] == [dataset]
+    )
+
+
+def test_faers_lists_ten_quarters_and_refreshes_when_one_is_added(genomics, config):
+    entry = next(e for e in config["stages"] if e["source"] == "faers")
+    files = genomics.stage_files(entry, config["vars"])
+    assert [tag for tag, _, _ in files] == [
+        f"{year}q{q}" for year in (2024, 2025) for q in (1, 2, 3, 4)
+    ] + ["2026q1", "2026q2"]
+    assert entry["refresh_when_files_added"] is True
+
+
+def test_constraint_keeps_the_canonical_or_mane_transcript_and_its_columns(
+    genomics, config, tmp_path
+):
+    table = tmp_path / "c.tsv"
+    table.write_text(
+        "gene\tgene_id\ttranscript\tcanonical\tmane_select\tlof.pLI\textra\n"
+        "A\t1\tT1\ttrue\ttrue\t0.9\tx\n"
+        "A\t1\tT2\tfalse\tfalse\t0.1\tx\n"
+        "B\t2\tT3\tNA\ttrue\tNA\tx\n"
+        "B\t2\tT4\ttrue\tNA\t0.5\tx\n",
+        encoding="utf-8",
+    )
+    entry = _entry(config, "gnomad_constraint", "metrics")
+    parse = genomics.build_parser(entry["parser"])
+    batches, read = next(parse(table, "v4.1"))
+    frame = batches["metrics"]
+    assert list(frame["transcript"]) == ["T1", "T3", "T4"]
+    assert list(frame["lof.pLI"]) == ["0.9", "NA", "0.5"]
+    assert "extra" not in frame.columns
+    assert read == 4
+
+
+def test_tcga_site_codes_read_the_code_table_not_the_page_navigation(
+    genomics, tmp_path
+):
+    page = tmp_path / "t.html"
+    page.write_text(
+        "<table><tr><td>Data Portal</td><td>Website</td></tr></table>"
+        "<table><thead><tr><th>TSS Code</th><th>Source Site</th><th>Study Name</th>"
+        "<th>BCR</th></tr></thead><tbody>"
+        "<tr><td>01</td><td>IGC</td><td>Ovarian serous cystadenocarcinoma</td>"
+        "<td>IGC</td></tr></tbody></table>",
+        encoding="utf-8",
+    )
+    batches, read = next(genomics.parse_tcga_site_codes(page, ""))
+    frame = batches["site_codes"]
+    assert list(frame.columns) == ["tss_code", "study_name"]
+    assert frame.iloc[0].tolist() == ["01", "Ovarian serous cystadenocarcinoma"]
+    assert read == 1
+
+
+def test_eurostat_stage_is_a_commerce_csv_with_named_columns(
+    genomics, config, tmp_path
+):
+    entry = _entry(config, "eurostat", "retail_trade")
+    assert entry["ecosystem"] == "commerce"
+    table = tmp_path / "e.csv"
+    table.write_text(
+        "DATAFLOW,LAST UPDATE,freq,indic_bt,nace_r2,s_adj,unit,geo,TIME_PERIOD,"
+        "OBS_VALUE,OBS_FLAG,CONF_STATUS\n"
+        "ESTAT:STS_TRTU_M(1.0),21/11/26 11:00:00,M,VOL_SLS,G47,CA,I21,DE,2024-01,"
+        "103.4,p,\n",
+        encoding="utf-8",
+    )
+    batches, _ = next(genomics.build_parser(entry["parser"])(table, "2018-01"))
+    assert list(batches["retail_trade"].columns) == [
+        "indic_bt",
+        "nace_r2",
+        "s_adj",
+        "unit",
+        "geo",
+        "TIME_PERIOD",
+        "OBS_VALUE",
+        "OBS_FLAG",
+    ]
+    assert batches["retail_trade"].iloc[0]["OBS_VALUE"] == "103.4"
+
+
 def test_html_table_rows_repeat_a_spanned_cell(genomics, tmp_path):
     page = tmp_path / "t.html"
     page.write_text(
@@ -371,3 +458,53 @@ def test_a_zip_member_keeps_only_its_usecols_and_reads_quotes(genomics, tmp_path
 
     assert list(frame.columns) == ["nct_id", "name"]
     assert frame.loc[0, "name"] == "Heart | Disease"
+
+
+def _load_dwd():
+    spec = importlib.util.spec_from_file_location(
+        "download_dwd", DOWNLOAD_DIR / "download_dwd.py"
+    )
+    dwd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dwd)
+    return dwd
+
+
+def test_dwd_stage_option_runs_the_staging_after_the_download(monkeypatch, tmp_path):
+    dwd = _load_dwd()
+    calls = []
+    stub = types.ModuleType("stage_dwd")
+    stub.main = lambda: calls.append("stage")
+    monkeypatch.setitem(sys.modules, "stage_dwd", stub)
+    monkeypatch.setattr(dwd, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(dwd, "resolve_station_ids", dict)
+    dwd.main()
+    assert calls == []
+    dwd.main(stage=True)
+    assert calls == ["stage"]
+
+
+def test_dwd_refresh_replaces_the_old_recent_file_and_a_plain_run_keeps_it(
+    monkeypatch, tmp_path
+):
+    dwd = _load_dwd()
+    payload = io.BytesIO()
+    with zipfile.ZipFile(payload, "w") as archive:
+        archive.writestr("produkt_new.txt", "x")
+
+    class Reply:
+        status_code = 200
+        content = payload.getvalue()
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(dwd, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(dwd.requests, "get", lambda url, timeout: Reply())
+    recent = tmp_path / "berlin" / "wind" / "recent"
+    recent.mkdir(parents=True)
+    (recent / "produkt_old.txt").write_text("x", encoding="utf-8")
+
+    dwd.download_recent("berlin", "00001", "wind", "FF")
+    assert [p.name for p in recent.iterdir()] == ["produkt_old.txt"]
+    dwd.download_recent("berlin", "00001", "wind", "FF", refresh=True)
+    assert [p.name for p in recent.iterdir()] == ["produkt_new.txt"]

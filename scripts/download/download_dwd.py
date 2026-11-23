@@ -8,6 +8,7 @@
 
 import io
 import re
+import shutil
 import sys
 import unicodedata
 import zipfile
@@ -16,6 +17,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ingestion"))
 
 from config import DATA_RAW_DIR, get_logger
 
@@ -148,11 +150,22 @@ def _extract_zip(content: bytes, dest_dir: Path) -> None:
         archive.extractall(dest_dir)
 
 
+def _replace_dir(dest_dir: Path) -> None:
+    """Remove the files of an earlier download: the file name of a new `recent` or
+    `solar` zip holds its date range, so the old file would stay and be staged twice."""
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+
+
 def download_recent(
-    station_key: str, station_id: str, category: str, param: str
+    station_key: str,
+    station_id: str,
+    category: str,
+    param: str,
+    refresh: bool = False,
 ) -> None:
     dest_dir = OUTPUT_DIR / station_key / category / "recent"
-    if dest_dir.exists() and any(dest_dir.iterdir()):
+    if not refresh and dest_dir.exists() and any(dest_dir.iterdir()):
         logger.info(f"DWD {station_key}/{category}/recent already downloaded, skipping")
         return
 
@@ -164,6 +177,7 @@ def download_recent(
         )
         return
     response.raise_for_status()
+    _replace_dir(dest_dir)
     _extract_zip(response.content, dest_dir)
     logger.info(
         f"Downloaded DWD {category}/recent for {station_key} ({station_id}) -> {dest_dir}"
@@ -206,9 +220,9 @@ def download_historical(
     )
 
 
-def download_solar(station_key: str, station_id: str) -> None:
+def download_solar(station_key: str, station_id: str, refresh: bool = False) -> None:
     dest_dir = OUTPUT_DIR / station_key / "solar"
-    if dest_dir.exists() and any(dest_dir.iterdir()):
+    if not refresh and dest_dir.exists() and any(dest_dir.iterdir()):
         logger.info(f"DWD {station_key}/solar already downloaded, skipping")
         return
 
@@ -218,22 +232,30 @@ def download_solar(station_key: str, station_id: str) -> None:
         logger.warning(f"No solar data for station {station_key} ({station_id}): {url}")
         return
     response.raise_for_status()
+    _replace_dir(dest_dir)
     _extract_zip(response.content, dest_dir)
     logger.info(f"Downloaded DWD solar for {station_key} ({station_id}) -> {dest_dir}")
 
 
-def main() -> None:
+def main(refresh: bool = False, stage: bool = False) -> None:
+    """`refresh` downloads the `recent` and `solar` files again (the historical files
+    do not change). `stage` then runs `scripts/ingestion/stage_dwd.py`, so one command
+    downloads and stages."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     station_ids = resolve_station_ids()
     for station_key, station_id in station_ids.items():
         for category, param in CATEGORIES.items():
-            download_recent(station_key, station_id, category, param)
+            download_recent(station_key, station_id, category, param, refresh)
             download_historical(station_key, station_id, category, param)
-        download_solar(station_key, station_id)
+        download_solar(station_key, station_id, refresh)
 
     logger.info("DWD download complete.")
+    if stage:
+        import stage_dwd
+
+        stage_dwd.main()
 
 
 if __name__ == "__main__":
-    main()
+    main(refresh="--refresh" in sys.argv[1:], stage="--stage" in sys.argv[1:])
