@@ -1271,10 +1271,13 @@ def task_spec_hash(task_id: str) -> str:
 def data_fingerprint(task_id: str, version: int) -> str:
     """A fingerprint of the frozen dataset at its Delta version: the row count, the
     schema, and the sum of a hash of the partition and the target of every row. It
-    reads two columns. A changed or truncated dataset gives another value."""
+    reads two columns. A changed or truncated dataset gives another value. The rows
+    are those of the task's dataset in its family table."""
     task = TASK_BY_ID[task_id]
-    full = ml_fqn(f"dataset_{task['dataset_id']}", task["ecosystem"])
-    df = spark.sql(f"SELECT * FROM {full} VERSION AS OF {int(version)}")
+    full = ml_fqn(dataset_table(task["dataset_id"]), task["ecosystem"])
+    df = spark.sql(f"SELECT * FROM {full} VERSION AS OF {int(version)}").filter(
+        F.col("dataset_id") == task["dataset_id"]
+    )
     columns = [F.col("partition")]
     if task["target"] in df.columns:
         columns.append(F.col(task["target"]))
