@@ -925,7 +925,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--only",
         default="",
-        help="comma-separated sources; only their stages run (in list order)",
+        help=(
+            "comma-separated sources; only their stages run (in list order), "
+            "and the `before` scripts are skipped"
+        ),
     )
     return parser.parse_args()
 
@@ -936,7 +939,8 @@ def main() -> None:
     config = load_sources()
     failed: list[str] = []
     not_staged: list[str] = []
-    for name in [] if arguments.skip_before else config.get("before", []):
+    skip_before = arguments.skip_before or bool(only)
+    for name in [] if skip_before else config.get("before", []):
         try:
             importlib.import_module(name).main()
         except Exception:

@@ -390,6 +390,28 @@ def test_eurostat_stage_is_a_commerce_csv_with_named_columns(
     assert batches["retail_trade"].iloc[0]["OBS_VALUE"] == "103.4"
 
 
+@pytest.mark.parametrize(
+    ("arguments", "ran"),
+    [
+        ([], ["before_script"]),
+        (["--only", "faers"], []),
+        (["--skip-before"], []),
+    ],
+)
+def test_only_and_skip_before_leave_out_the_before_scripts(
+    genomics, config, monkeypatch, arguments, ran
+):
+    calls = []
+    stub = types.SimpleNamespace(main=lambda: calls.append("before_script"))
+    monkeypatch.setattr(
+        genomics, "load_sources", lambda: {**config, "before": ["x"], "stages": []}
+    )
+    monkeypatch.setattr(genomics.importlib, "import_module", lambda name: stub)
+    monkeypatch.setattr(sys, "argv", ["download_sources.py", *arguments])
+    genomics.main()
+    assert calls == ran
+
+
 def test_html_table_rows_repeat_a_spanned_cell(genomics, tmp_path):
     page = tmp_path / "t.html"
     page.write_text(
