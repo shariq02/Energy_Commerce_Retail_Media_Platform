@@ -1,6 +1,6 @@
 # Model card: next_item_ga4.next_item
 
-_model `sequence_transformer`, dataset `next_item_ga4`, frozen version 8, primary metric `ndcg_at_10` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `sequence_transformer`, dataset `next_item_ga4`, frozen version 28, primary metric `ndcg_at_10` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -30,31 +30,31 @@ _model `sequence_transformer`, dataset `next_item_ga4`, frozen version 8, primar
 
 ## Data
 
-- frame: 578604 rows, columns 6, rows by partition {'test': 578604}
-- held-out read: partition test, frozen_delta_version 8, rows 299434, groups 4082
-- frame: 587893 rows, columns 6, rows by partition {'validation': 587893}
+- frame: 578611 rows, columns 6, rows by partition {'test': 578611}
+- held-out read: partition test, frozen_delta_version 28, rows 299438, groups 4082
+- frame: 587889 rows, columns 6, rows by partition {'validation': 587889}
 
 ## Training
 
-- model family: sequence_transformer; MLflow run `a46ef3f4856548739b5ca8890c5c3f4a`
-- parameters: {'vocab': 1356, 'dim': 64, 'epochs': 2, 'history': 10, 'train_rows': 1000000, 'eval_rows': 297217, 'row_fraction': 1.0}
-- library versions: torch 2.9.0+cu129
+- model family: sequence_transformer; MLflow run `49a4b7e7675f4a0fa4c3924ef2798745`
+- parameters: {'vocab': 1356, 'dim': 64, 'epochs': 2, 'history': 10, 'train_rows': 1000000, 'eval_rows': 297216, 'row_fraction': 1.0}
+- library versions: torch 2.14.1+cpu
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | sequence_transformer held-out | sequence_transformer validation | popularity held-out |
 |---|---|---|---|
-| mrr | 0.3732 | 0.3749 | 0.07059 |
-| ndcg_at_10 | 0.4667 | 0.4684 | 0.0749 |
-| ndcg_at_20 | 0.4926 | 0.4943 | 0.1036 |
-| ndcg_at_5 | 0.3989 | 0.4005 | 0.05385 |
-| primary_change_relative | 0.003791 |  | 0.01144 |
-| recall_at_10 | 0.7997 | 0.8014 | 0.154 |
-| recall_at_20 | 0.9003 | 0.9015 | 0.2687 |
-| recall_at_5 | 0.5909 | 0.5921 | 0.08795 |
-| skill_primary | 0.3918 |  |  |
-| skill_primary_ci_high | 0.4038 |  |  |
+| mrr | 0.374 | 0.3749 | 0.07062 |
+| ndcg_at_10 | 0.4674 | 0.4689 | 0.0749 |
+| ndcg_at_20 | 0.4933 | 0.4943 | 0.1036 |
+| ndcg_at_5 | 0.3999 | 0.4008 | 0.05386 |
+| primary_change_relative | 0.003066 |  | 0.01128 |
+| recall_at_10 | 0.8002 | 0.803 | 0.1539 |
+| recall_at_20 | 0.9006 | 0.9017 | 0.2687 |
+| recall_at_5 | 0.592 | 0.5932 | 0.08793 |
+| skill_primary | 0.3925 |  |  |
+| skill_primary_ci_high | 0.4032 |  |  |
 | skill_primary_ci_low | 0.3899 |  |  |
 
 ## Flags
@@ -76,4 +76,4 @@ _model `sequence_transformer`, dataset `next_item_ga4`, frozen version 8, primar
 
 ## Baseline fallback
 
-- `popularity`: validation 0.07577, held-out 0.0749 on `ndcg_at_10`
+- `popularity`: validation 0.07576, held-out 0.0749 on `ndcg_at_10`

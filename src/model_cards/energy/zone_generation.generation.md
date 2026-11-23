@@ -1,6 +1,6 @@
 # Model card: zone_generation.generation
 
-_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
+_model `gbt_lightgbm`, dataset `zone_generation`, frozen version 34, primary metric `mae` (lower is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -30,43 +30,43 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 
 ## Data
 
-- frame: 6110 rows, columns 23, rows by partition {'test': 6110}
-- held-out read: partition test, frozen_delta_version 0, rows 6110, time_min 2025-01-01 00:00:00, time_max 2026-09-03 00:00:00, groups 611
+- frame: 6788 rows, columns 23, rows by partition {'test': 6788}
+- held-out read: partition test, frozen_delta_version 34, rows 6788, time_min 2025-01-01 00:00:00, time_max 2026-11-10 00:00:00, groups 679
 - frame: 3640 rows, columns 23, rows by partition {'validation': 3640}
 
 ## Training
 
-- model family: gbt_lightgbm; MLflow run `69c957537b174bae888a5bc912f45ebb`
+- model family: gbt_lightgbm; MLflow run `43aaeefeda404a56a0aa333bb6a176c6`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.6.0
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | gbt_lightgbm held-out | gbt_lightgbm validation | capacity_factor held-out |
 |---|---|---|---|
-| mae | 1.617e+04 | 1.093e+04 | 3.144e+04 |
-| mean_error | -7477 | -959.3 | -2594 |
-| mean_error_relative | -0.1258 | -0.01745 | -0.04364 |
-| primary_change_relative | 0.4796 |  | 0.2229 |
-| rmse | 2.412e+04 | 1.587e+04 | 4.644e+04 |
-| skill_mae | 0.4857 | 0.5749 |  |
-| skill_primary | 0.4857 |  |  |
-| skill_primary_ci_high | 0.5632 |  |  |
-| skill_primary_ci_low | 0.3815 |  |  |
-| skill_rmse | 0.4807 | 0.6171 |  |
+| mae | 1.981e+04 | 1.102e+04 | 3.187e+04 |
+| mean_error | -1.088e+04 | -37.66 | -2943 |
+| mean_error_relative | -0.1828 | -0.0006851 | -0.04943 |
+| primary_change_relative | 0.7978 |  | 0.2396 |
+| rmse | 3.429e+04 | 1.597e+04 | 4.721e+04 |
+| skill_mae | 0.3783 | 0.5714 |  |
+| skill_primary | 0.3783 |  |  |
+| skill_primary_ci_high | 0.5081 |  |  |
+| skill_primary_ci_low | 0.1989 |  |  |
+| skill_rmse | 0.2737 | 0.6148 |  |
 
 ## Flags
 
-- validation-to-test degradation above the threshold: primary metric +48.0% worse than on validation
+- validation-to-test degradation above the threshold: primary metric +79.8% worse than on validation
 
 ## Conditions and known limits
 
-- primary metric +48.0% worse than on validation; revalidate on newer data before relying on it
+- primary metric +79.8% worse than on validation; revalidate on newer data before relying on it
 
 ## Disclosures
 
-- the held-out partition was read in at least 4 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 
@@ -74,4 +74,4 @@ _model `gbt_lightgbm`, dataset `zone_generation`, frozen version 0, primary metr
 
 ## Baseline fallback
 
-- `capacity_factor`: validation 2.571e+04, held-out 3.144e+04 on `mae`
+- `capacity_factor`: validation 2.571e+04, held-out 3.187e+04 on `mae`

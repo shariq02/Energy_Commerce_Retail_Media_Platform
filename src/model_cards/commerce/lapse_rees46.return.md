@@ -1,6 +1,6 @@
 # Model card: lapse_rees46.return
 
-_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 8, primary metric `pr_auc` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -31,14 +31,14 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 ## Data
 
 - frame: 453593 rows, columns 12, rows by partition {'test': 453593}
-- held-out read: partition test, frozen_delta_version 0, rows 453593, groups 453593
+- held-out read: partition test, frozen_delta_version 8, rows 453593, groups 453593
 - frame: 453829 rows, columns 12, rows by partition {'validation': 453829}
 
 ## Training
 
-- model family: gbt_lightgbm; MLflow run `6bc0856f0b314ce5acfd4574961bb3a3`
+- model family: gbt_lightgbm; MLflow run `daf1393e038c44ce93e9838892204afc`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: lightgbm 4.6.0
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -46,14 +46,14 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 | metric | gbt_lightgbm held-out | gbt_lightgbm validation | base_rate held-out |
 |---|---|---|---|
 | base_rate | 0.463 | 0.4634 | 0.463 |
-| calibration_error | 0.002463 | 0.00216 | 0.0001588 |
+| calibration_error | 0.002309 | 0.00207 | 0.0001588 |
 | log_loss | 0.59 | 0.5906 | 0.6904 |
-| pr_auc | 0.7321 | 0.7318 | 0.463 |
-| pr_auc_lift | 1.581 | 1.579 | 1 |
-| primary_change_relative | -0.0004111 |  | 0.0008643 |
-| skill_primary | 0.2692 |  |  |
-| skill_primary_ci_high | 0.2717 |  |  |
-| skill_primary_ci_low | 0.2642 |  |  |
+| pr_auc | 0.7321 | 0.7319 | 0.463 |
+| pr_auc_lift | 1.581 | 1.58 | 1 |
+| primary_change_relative | -0.0002916 |  | 0.0008643 |
+| skill_primary | 0.2691 |  |  |
+| skill_primary_ci_high | 0.2711 |  |  |
+| skill_primary_ci_low | 0.2632 |  |  |
 
 ## Flags
 
@@ -65,7 +65,7 @@ _model `gbt_lightgbm`, dataset `lapse_rees46`, frozen version 0, primary metric 
 
 ## Disclosures
 
-- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

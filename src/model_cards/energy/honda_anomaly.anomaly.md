@@ -1,6 +1,6 @@
 # Model card: honda_anomaly.anomaly
 
-_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 15, primary metric `pr_auc` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -31,14 +31,14 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 
 ## Data
 
-- frame: 26277 rows, columns 20, rows by partition {'test': 26277}
-- held-out read: partition test, frozen_delta_version 0, rows 26277, time_min 2022-12-31 23:00:00, time_max 2023-12-31 21:00:00, groups 8759
+- frame: 26277 rows, columns 21, rows by partition {'test': 26277}
+- held-out read: partition test, frozen_delta_version 15, rows 26277, time_min 2022-12-31 23:00:00, time_max 2023-12-31 21:00:00, groups 8759
 
 ## Training
 
-- model family: forecast_residual_sklearn; MLflow run `eccc9fbf34ce4f998c5c715fc60a5535`
+- model family: forecast_residual_sklearn; MLflow run `f34ac44fc7b04e6ea269442cadd518cd`
 - parameters: {'inject_rate': 0.02, 'flag_quantile': 0.99, 'injected_rows': 537, 'row_fraction': 1.0}
-- library versions: sklearn 1.6.1
+- library versions: sklearn 1.7.2
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -66,7 +66,7 @@ _model `forecast_residual_sklearn`, dataset `honda_anomaly`, frozen version 0, p
 
 ## Disclosures
 
-- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

@@ -1,6 +1,6 @@
 # Model card: rl_session_sequences.policy
 
-_model `sequence_gru`, dataset `rl_session_sequences`, frozen version 9, primary metric `action_agreement` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `sequence_gru`, dataset `rl_session_sequences`, frozen version 28, primary metric `action_agreement` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -32,36 +32,36 @@ _model `sequence_gru`, dataset `rl_session_sequences`, frozen version 9, primary
 ## Data
 
 - frame: 1053871 rows, columns 12, rows by partition {'test': 1053871}
-- held-out read: partition test, frozen_delta_version 9, rows 1053871, groups 56030
+- held-out read: partition test, frozen_delta_version 28, rows 1053871, groups 56030
 - frame: 1014461 rows, columns 12, rows by partition {'validation': 1014461}
 
 ## Training
 
-- model family: sequence_gru; MLflow run `acbac24e0b264663a0762dca8fa8b91b`
+- model family: sequence_gru; MLflow run `3bea5eee2b04431ca1dde29b2afe48ac`
 - parameters: {'row_fraction': 1.0, 'history': 10, 'epochs': 2}
-- library versions: torch 2.9.0+cu129
+- library versions: torch 2.14.1+cpu
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
 | metric | sequence_gru held-out | sequence_gru validation | most_frequent_event held-out |
 |---|---|---|---|
-| action_agreement | 0.9439 | 0.9445 | 0.9433 |
-| primary_change_relative | 0.0006818 |  | 0.0009683 |
-| reward_weighted_agreement | 0.3527 | 0.3337 | 0 |
-| reward_when_agree | 2.019 | 1.764 | 0 |
-| reward_when_disagree | 62.3 | 59.97 | 95.22 |
-| skill_primary | 0.0006054 |  |  |
-| skill_primary_ci_high | 0.003587 |  |  |
-| skill_primary_ci_low | -0.0005137 |  |  |
+| action_agreement | 0.9439 | 0.9446 | 0.9433 |
+| primary_change_relative | 0.0006684 |  | 0.0009683 |
+| reward_weighted_agreement | 0.3528 | 0.3332 | 0 |
+| reward_when_agree | 2.019 | 1.761 | 0 |
+| reward_when_disagree | 62.35 | 60.06 | 95.22 |
+| skill_primary | 0.0006604 |  |  |
+| skill_primary_ci_high | 0.003618 |  |  |
+| skill_primary_ci_low | -0.0004193 |  |  |
 
 ## Flags
 
-- skill interval includes zero: interval -0.0005137 to 0.003587
+- skill interval includes zero: interval -0.0004193 to 0.003618
 
 ## Conditions and known limits
 
-- skill interval -0.0005137 to 0.003587 includes zero
+- skill interval -0.0004193 to 0.003618 includes zero
 - offline evidence only; operational feasibility is not shown
 
 ## Disclosures

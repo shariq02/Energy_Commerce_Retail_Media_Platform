@@ -1,6 +1,6 @@
 # ENERGY NOTEBOOK FINDINGS
 
-_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-10-27T19:49Z_
+_Merged by the findings gate from the files of the model notebooks; a section is replaced when its notebook runs again. Generated: 2026-11-23T14:42Z_
 
 <!-- section: energy__approve__00_approval_setup -->
 ## Approval Setup
@@ -33,85 +33,85 @@ _Merged by the findings gate from the files of the model notebooks; a section is
 
 ### model_approval
 
-73 row(s), first 30 shown
+48 row(s), first 30 shown
 
 | task_id | model_name | role | decision | restriction | overridden | primary_metric | validation_value | evaluated_value |
 |---|---|---|---|---|---|---|---|---|
-| price_daily.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 11.8123 | 15.947 |
-| price_daily.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 12.0123 | 15.5598 |
-| price_daily.price | toto2_zero_shot | runner_up | not_approved |  | False | mae | 19.9697 | 20.4462 |
-| price_daily.price | seasonal_naive | baseline_fallback | approved |  | False | mae | 28.0429 | 28.6236 |
-| price_quarter_hour.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 17.7397 | 29.4453 |
-| price_quarter_hour.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 17.8868 | 29.4854 |
-| price_quarter_hour.price | ttm_r2_zero_shot | runner_up | not_approved |  | False | mae | 28.3344 | 32.6938 |
-| price_quarter_hour.price | persistence | baseline_fallback | approved |  | False | mae | 33.1459 | 37.3036 |
-| price_quarter_hour.negative_price | logistic | selected | approved |  | False | pr_auc | 0.6168 | 0.7205 |
-| price_quarter_hour.negative_price | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6014 | 0.7098 |
-| price_quarter_hour.negative_price | tabpfn_v2_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
-| price_quarter_hour.negative_price | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0425 | 0.0738 |
-| load.load | gbt_sklearn | selected | approved |  | False | mae | 24860.3053 | 26838.3958 |
-| load.load | gbt_lightgbm | runner_up | not_approved |  | False | mae | 25128.0502 | 26943.748 |
-| load.load | chronos2_lora | runner_up | not_approved |  | False | mae | 39286.5963 | 40774.5511 |
-| load.load | seasonal_mean | baseline_fallback | approved |  | False | mae | 57004.7223 | 64187.8077 |
-| bias.bias | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 15334.1454 | 16247.296 |
-| bias.bias | gbt_sklearn | runner_up | not_approved |  | False | mae | 15426.0679 | 16532.2186 |
-| bias.bias | chronos2_lora | runner_up | not_approved |  | False | mae | 28836.0141 | 29572.7339 |
-| bias.bias | zero_correction | baseline_fallback | approved |  | False | mae | 93650.1115 | 102494.0979 |
-| zone_generation.generation | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 10930.1759 | 16172.1206 |
-| zone_generation.generation | gbt_sklearn | runner_up | not_approved |  | False | mae | 12541.1318 | 17187.8828 |
-| zone_generation.generation | timesfm25_zero_shot | runner_up | not_approved |  | False | mae |  |  |
-| zone_generation.generation | capacity_factor | baseline_fallback | approved |  | False | mae | 25712.8807 | 31443.7748 |
-| honda_forecast.increment | chronos2_lora | selected | approved_with_conditions |  | False | mae | 16.1482 | 18.1303 |
-| honda_forecast.increment | gbt_lightgbm | runner_up | not_approved |  | False | mae | 17.9655 | 20.4706 |
-| honda_forecast.increment | gbt_sklearn | runner_up | not_approved |  | False | mae | 18.0254 | 20.4469 |
+| price_daily.price | quantile_gbt_sklearn | selected | approved_with_conditions |  | False | mae | 12.3296 | 19.2973 |
+| price_daily.price | quantile_gbt_lightgbm | runner_up | not_approved |  | False | mae | 12.4472 | 20.2867 |
+| price_daily.price | seasonal_naive | baseline_fallback | approved |  | False | mae | 28.0429 | 32.7406 |
+| price_quarter_hour.price | quantile_gbt_sklearn | selected | approved_with_conditions |  | False | mae | 18.4332 | 38.8928 |
+| price_quarter_hour.price | gbt_sklearn | runner_up | not_approved |  | False | mae | 18.5928 | 37.9229 |
+| price_quarter_hour.price | persistence | baseline_fallback | approved |  | False | mae | 33.1459 | 42.9314 |
+| price_quarter_hour.negative_price | gbt_sklearn | selected | approved |  | False | pr_auc | 0.6071 | 0.699 |
+| price_quarter_hour.negative_price | logistic | runner_up | not_approved |  | False | pr_auc | 0.5941 | 0.7244 |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0425 | 0.0613 |
+| load.load | gbt_sklearn | selected | approved |  | False | mae | 24514.1739 | 26466.809 |
+| load.load | gbt_lightgbm | runner_up | not_approved |  | False | mae | 24728.663 | 26503.3639 |
+| load.load | seasonal_mean | baseline_fallback | approved |  | False | mae | 57004.7223 | 64905.5682 |
+| bias.bias | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 15338.4626 | 16570.2119 |
+| bias.bias | gbt_sklearn | runner_up | not_approved |  | False | mae | 16328.7275 | 17327.3634 |
+| bias.bias | zero_correction | baseline_fallback | approved |  | False | mae | 93650.1115 | 103336.4667 |
+| zone_generation.generation | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 11021.4218 | 19814.0279 |
+| zone_generation.generation | gbt_sklearn | runner_up | not_approved |  | False | mae | 13057.558 | 19566.1565 |
+| zone_generation.generation | capacity_factor | baseline_fallback | approved |  | False | mae | 25712.8807 | 31872.745 |
+| honda_forecast.increment | gbt_sklearn | selected | approved_with_conditions |  | False | mae | 17.9264 | 20.4132 |
+| honda_forecast.increment | gbt_lightgbm | runner_up | not_approved |  | False | mae | 17.944 | 20.4496 |
 | honda_forecast.increment | persistence | baseline_fallback | approved |  | False | mae | 20.3038 | 23.2843 |
 | honda_anomaly.anomaly | forecast_residual_sklearn | selected | approved_with_conditions | offline_only | False | pr_auc | 0.6517 | 0.5587 |
 | honda_anomaly.anomaly | forecast_residual_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6483 | 0.5568 |
+| honda_anomaly.anomaly | seasonal_zscore | baseline_fallback | approved |  | False | pr_auc | 0.442 | 0.357 |
+| ccpp.output | gbt_sklearn | selected | approved |  | False | mae | 2.4962 | 2.2872 |
+| ccpp.output | gbt_lightgbm | runner_up | not_approved |  | False | mae | 2.5034 | 2.2729 |
+| ccpp.output | train_mean | baseline_fallback | approved |  | False | mae | 14.7944 | 15.0301 |
+| capacity_additions.additions | poisson_gbt_sklearn | selected | approved_with_conditions |  | False | mae | 75.0231 | 94.9862 |
+| capacity_additions.additions | poisson_gbt_lightgbm | runner_up | not_approved |  | False | mae | 79.6022 | 95.8441 |
+| capacity_additions.additions | seasonal_mean | baseline_fallback | approved |  | False | mae | 151.9985 | 173.8152 |
 
 <!-- section: energy__approve__02_record_decisions -->
 ## Approval Decisions
 
 ### model_approval
 
-73 row(s), first 30 shown
+48 row(s), first 30 shown
 
 | task_id | model_name | role | decision | restriction | overridden | primary_metric | validation_value | evaluated_value |
 |---|---|---|---|---|---|---|---|---|
-| price_daily.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 11.8123 | 15.947 |
-| price_daily.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 12.0123 | 15.5598 |
-| price_daily.price | toto2_zero_shot | runner_up | not_approved |  | False | mae | 19.9697 | 20.4462 |
-| price_daily.price | seasonal_naive | baseline_fallback | approved |  | False | mae | 28.0429 | 28.6236 |
-| price_quarter_hour.price | quantile_gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 17.7397 | 29.4453 |
-| price_quarter_hour.price | quantile_gbt_sklearn | runner_up | not_approved |  | False | mae | 17.8868 | 29.4854 |
-| price_quarter_hour.price | ttm_r2_zero_shot | runner_up | not_approved |  | False | mae | 28.3344 | 32.6938 |
-| price_quarter_hour.price | persistence | baseline_fallback | approved |  | False | mae | 33.1459 | 37.3036 |
-| price_quarter_hour.negative_price | logistic | selected | approved |  | False | pr_auc | 0.6168 | 0.7205 |
-| price_quarter_hour.negative_price | gbt_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6014 | 0.7098 |
-| price_quarter_hour.negative_price | tabpfn_v2_in_context | runner_up | not_approved |  | False | pr_auc |  |  |
-| price_quarter_hour.negative_price | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0425 | 0.0738 |
-| load.load | gbt_sklearn | selected | approved |  | False | mae | 24860.3053 | 26838.3958 |
-| load.load | gbt_lightgbm | runner_up | not_approved |  | False | mae | 25128.0502 | 26943.748 |
-| load.load | chronos2_lora | runner_up | not_approved |  | False | mae | 39286.5963 | 40774.5511 |
-| load.load | seasonal_mean | baseline_fallback | approved |  | False | mae | 57004.7223 | 64187.8077 |
-| bias.bias | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 15334.1454 | 16247.296 |
-| bias.bias | gbt_sklearn | runner_up | not_approved |  | False | mae | 15426.0679 | 16532.2186 |
-| bias.bias | chronos2_lora | runner_up | not_approved |  | False | mae | 28836.0141 | 29572.7339 |
-| bias.bias | zero_correction | baseline_fallback | approved |  | False | mae | 93650.1115 | 102494.0979 |
-| zone_generation.generation | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 10930.1759 | 16172.1206 |
-| zone_generation.generation | gbt_sklearn | runner_up | not_approved |  | False | mae | 12541.1318 | 17187.8828 |
-| zone_generation.generation | timesfm25_zero_shot | runner_up | not_approved |  | False | mae |  |  |
-| zone_generation.generation | capacity_factor | baseline_fallback | approved |  | False | mae | 25712.8807 | 31443.7748 |
-| honda_forecast.increment | chronos2_lora | selected | approved_with_conditions |  | False | mae | 16.1482 | 18.1303 |
-| honda_forecast.increment | gbt_lightgbm | runner_up | not_approved |  | False | mae | 17.9655 | 20.4706 |
-| honda_forecast.increment | gbt_sklearn | runner_up | not_approved |  | False | mae | 18.0254 | 20.4469 |
+| price_daily.price | quantile_gbt_sklearn | selected | approved_with_conditions |  | False | mae | 12.3296 | 19.2973 |
+| price_daily.price | quantile_gbt_lightgbm | runner_up | not_approved |  | False | mae | 12.4472 | 20.2867 |
+| price_daily.price | seasonal_naive | baseline_fallback | approved |  | False | mae | 28.0429 | 32.7406 |
+| price_quarter_hour.price | quantile_gbt_sklearn | selected | approved_with_conditions |  | False | mae | 18.4332 | 38.8928 |
+| price_quarter_hour.price | gbt_sklearn | runner_up | not_approved |  | False | mae | 18.5928 | 37.9229 |
+| price_quarter_hour.price | persistence | baseline_fallback | approved |  | False | mae | 33.1459 | 42.9314 |
+| price_quarter_hour.negative_price | gbt_sklearn | selected | approved |  | False | pr_auc | 0.6071 | 0.699 |
+| price_quarter_hour.negative_price | logistic | runner_up | not_approved |  | False | pr_auc | 0.5941 | 0.7244 |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | approved |  | False | pr_auc | 0.0425 | 0.0613 |
+| load.load | gbt_sklearn | selected | approved |  | False | mae | 24514.1739 | 26466.809 |
+| load.load | gbt_lightgbm | runner_up | not_approved |  | False | mae | 24728.663 | 26503.3639 |
+| load.load | seasonal_mean | baseline_fallback | approved |  | False | mae | 57004.7223 | 64905.5682 |
+| bias.bias | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 15338.4626 | 16570.2119 |
+| bias.bias | gbt_sklearn | runner_up | not_approved |  | False | mae | 16328.7275 | 17327.3634 |
+| bias.bias | zero_correction | baseline_fallback | approved |  | False | mae | 93650.1115 | 103336.4667 |
+| zone_generation.generation | gbt_lightgbm | selected | approved_with_conditions |  | False | mae | 11021.4218 | 19814.0279 |
+| zone_generation.generation | gbt_sklearn | runner_up | not_approved |  | False | mae | 13057.558 | 19566.1565 |
+| zone_generation.generation | capacity_factor | baseline_fallback | approved |  | False | mae | 25712.8807 | 31872.745 |
+| honda_forecast.increment | gbt_sklearn | selected | approved_with_conditions |  | False | mae | 17.9264 | 20.4132 |
+| honda_forecast.increment | gbt_lightgbm | runner_up | not_approved |  | False | mae | 17.944 | 20.4496 |
 | honda_forecast.increment | persistence | baseline_fallback | approved |  | False | mae | 20.3038 | 23.2843 |
 | honda_anomaly.anomaly | forecast_residual_sklearn | selected | approved_with_conditions | offline_only | False | pr_auc | 0.6517 | 0.5587 |
 | honda_anomaly.anomaly | forecast_residual_lightgbm | runner_up | not_approved |  | False | pr_auc | 0.6483 | 0.5568 |
+| honda_anomaly.anomaly | seasonal_zscore | baseline_fallback | approved |  | False | pr_auc | 0.442 | 0.357 |
+| ccpp.output | gbt_sklearn | selected | approved |  | False | mae | 2.4962 | 2.2872 |
+| ccpp.output | gbt_lightgbm | runner_up | not_approved |  | False | mae | 2.5034 | 2.2729 |
+| ccpp.output | train_mean | baseline_fallback | approved |  | False | mae | 14.7944 | 15.0301 |
+| capacity_additions.additions | poisson_gbt_sklearn | selected | approved_with_conditions |  | False | mae | 75.0231 | 94.9862 |
+| capacity_additions.additions | poisson_gbt_lightgbm | runner_up | not_approved |  | False | mae | 79.6022 | 95.8441 |
+| capacity_additions.additions | seasonal_mean | baseline_fallback | approved |  | False | mae | 151.9985 | 173.8152 |
 
 <!-- section: energy__approve__03_model_cards -->
 ## Model Cards
 
-17 card(s) written to src/model_cards/energy
+16 card(s) written to src/model_cards/energy
 
 <!-- section: energy__energy__01_price_daily -->
 ## Model Price Daily
@@ -963,6 +963,87 @@ _Merged by the findings gate from the files of the model notebooks; a section is
 
 _no rows for this run_
 
+<!-- section: energy__evaluate__01_evaluate -->
+## Model Evaluation
+
+### evaluation_results
+
+1462 row(s), first 30 shown
+
+| task_id | model_name | stage | partition | metric | value | validation_value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| price_daily.price | seasonal_naive | baseline | test | mae | 32.7406 | 28.0429 | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | rmse | 45.6375 | 42.9023 | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mean_error | -1.8928 | -1.5877 | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mean_error_relative | -0.0183 | -0.0202 | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_std_ratio | 0.9137 | 1.0185 | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pinball_q50 | 16.3703 | 14.0215 | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | primary_change_relative | 0.1675 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__market_area_code__de_lu | 32.7406 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-01 | 51.8913 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-03 | 27.4197 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-04 | 18.0803 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-05 | 19.1765 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-06 | 21.5253 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-07 | 11.6842 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-08 | 15.3887 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-09 | 35.4757 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-10 | 38.3406 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-11 | 29.5123 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2025-12 | 23.8787 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-01 | 23.6926 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-03 | 38.681 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-04 | 42.6217 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-05 | 29.7623 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-06 | 31.2587 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-07 | 32.7994 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-08 | 27.3252 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-09 | 57.9493 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | mae__month__2026-10 | 72.5735 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_finite_share | 1.0 |  | 681 | ok | on test |
+| price_daily.price | seasonal_naive | baseline | test | pred_std | 42.8215 |  | 681 | ok | on test |
+
+### evaluation_flags
+
+_no rows for this run_
+
+### evaluation_run_context
+
+48 row(s), first 30 shown
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| price_daily.price | started | False | 14 |  | 2026-11-23 11:42:17.732028 |
+| price_daily.price | data_ready | False | 14 |  | 2026-11-23 11:43:13.602050 |
+| price_daily.price | finished | False | 14 | baseline_ok=True; fingerprint=b8a56bf1e1f8 | 2026-11-23 11:46:46.003243 |
+| price_quarter_hour.price | started | False | 4 |  | 2026-11-23 11:46:57.626772 |
+| price_quarter_hour.price | data_ready | False | 4 |  | 2026-11-23 11:47:04.954824 |
+| price_quarter_hour.price | finished | False | 4 | baseline_ok=True; fingerprint=b9715c638b1a | 2026-11-23 11:47:18.115865 |
+| price_quarter_hour.negative_price | started | False | 4 |  | 2026-11-23 11:47:28.445778 |
+| price_quarter_hour.negative_price | data_ready | False | 4 |  | 2026-11-23 11:47:35.002567 |
+| price_quarter_hour.negative_price | finished | False | 4 | baseline_ok=True; fingerprint=e6e720b6d59c | 2026-11-23 11:47:46.414599 |
+| load.load | started | False | 14 |  | 2026-11-23 11:48:02.545747 |
+| load.load | data_ready | False | 14 |  | 2026-11-23 11:48:09.132752 |
+| load.load | finished | False | 14 | baseline_ok=True; fingerprint=defcb45275b5 | 2026-11-23 11:48:30.602247 |
+| bias.bias | started | False | 14 |  | 2026-11-23 11:48:42.160138 |
+| bias.bias | data_ready | False | 14 |  | 2026-11-23 11:48:48.817654 |
+| bias.bias | finished | False | 14 | baseline_ok=True; fingerprint=7e12ac049d65 | 2026-11-23 11:48:59.365868 |
+| zone_generation.generation | started | False | 34 |  | 2026-11-23 11:49:10.864910 |
+| zone_generation.generation | data_ready | False | 34 |  | 2026-11-23 11:49:17.516076 |
+| zone_generation.generation | finished | False | 34 | baseline_ok=True; fingerprint=d74fd0ffb894 | 2026-11-23 11:49:27.891173 |
+| honda_forecast.increment | started | False | 15 |  | 2026-11-23 11:49:41.665830 |
+| honda_forecast.increment | data_ready | False | 15 |  | 2026-11-23 11:49:48.040416 |
+| honda_forecast.increment | finished | False | 15 | baseline_ok=True; fingerprint=5fba14c7ea1c | 2026-11-23 11:50:02.106937 |
+| ccpp.output | started | False | 34 |  | 2026-11-23 11:50:13.218751 |
+| ccpp.output | data_ready | False | 34 |  | 2026-11-23 11:50:19.704732 |
+| ccpp.output | finished | False | 34 | baseline_ok=True; fingerprint=581a560ea23f | 2026-11-23 11:50:29.170231 |
+| capacity_additions.additions | started | False | 34 |  | 2026-11-23 11:50:40.001112 |
+| capacity_additions.additions | data_ready | False | 34 |  | 2026-11-23 11:50:46.276063 |
+| capacity_additions.additions | finished | False | 34 | baseline_ok=True; fingerprint=2218ece9e100 | 2026-11-23 11:50:55.939209 |
+| redispatch.any_event | started | False | 8 |  | 2026-11-23 11:51:06.535864 |
+| redispatch.any_event | data_ready | False | 8 |  | 2026-11-23 11:51:12.801878 |
+| redispatch.any_event | finished | False | 8 | baseline_ok=True; fingerprint=7b337bfd9ff8 | 2026-11-23 11:51:25.540815 |
+
 <!-- section: energy__evaluate__01a_forecast_energy -->
 ## Evaluate Forecast Models Energy
 
@@ -1433,6 +1514,157 @@ _no rows for this run_
 
 _no rows for this run_
 
+<!-- section: energy__operate__01_reference_and_monitor -->
+## Reference Profiles And Monitoring
+
+### reference_profile
+
+152 row(s), first 30 shown
+
+| task_id | model_name | subject | value_kind | n_rows | null_rate |
+|---|---|---|---|---|---|
+| bias.bias | gbt_lightgbm | forecast_mwh | numeric | 11319 | 0.0 |
+| bias.bias | gbt_lightgbm | is_weekend | numeric | 11319 | 0.0 |
+| bias.bias | gbt_lightgbm | is_holiday | numeric | 11319 | 0.0 |
+| bias.bias | gbt_lightgbm | is_bridge_day | numeric | 11319 | 0.0 |
+| bias.bias | gbt_lightgbm | market_area_code | categorical | 11319 | 0.0 |
+| bias.bias | gbt_lightgbm | forecast_scope | categorical | 11319 | 0.0 |
+| bias.bias | gbt_lightgbm | __prediction__ | numeric | 11319 | 0.0 |
+| capacity_additions.additions | poisson_gbt_sklearn | year | numeric | 530 | 0.0 |
+| capacity_additions.additions | poisson_gbt_sklearn | month | numeric | 530 | 0.0 |
+| capacity_additions.additions | poisson_gbt_sklearn | carrier_key | categorical | 530 | 0.0 |
+| capacity_additions.additions | poisson_gbt_sklearn | __prediction__ | numeric | 530 | 0.0 |
+| ccpp.output | gbt_sklearn | ambient_temperature_degc | numeric | 6711 | 0.0 |
+| ccpp.output | gbt_sklearn | exhaust_vacuum_cm_of_mercury | numeric | 6711 | 0.0 |
+| ccpp.output | gbt_sklearn | ambient_pressure_mbar | numeric | 6711 | 0.0 |
+| ccpp.output | gbt_sklearn | relative_humidity_percent | numeric | 6711 | 0.0 |
+| ccpp.output | gbt_sklearn | __prediction__ | numeric | 6711 | 0.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | relative_humidity_percent_lag2d | numeric | 92062 | 1.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | hour_of_day | numeric | 92062 | 0.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | day_of_week | numeric | 92062 | 0.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | month | numeric | 92062 | 0.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | is_holiday | numeric | 92062 | 0.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | is_bridge_day | numeric | 92062 | 0.0 |
+| honda_anomaly.anomaly | forecast_residual_sklearn | __prediction__ | numeric | 92062 | 0.0 |
+| honda_forecast.increment | gbt_sklearn | increment_lag2d_imputed | numeric | 100000 | 0.0 |
+| honda_forecast.increment | gbt_sklearn | increment_lag2d_is_missing | numeric | 100000 | 0.0 |
+| honda_forecast.increment | gbt_sklearn | relative_humidity_percent_lag2d | numeric | 100000 | 1.0 |
+| honda_forecast.increment | gbt_sklearn | hour_of_day | numeric | 100000 | 0.0 |
+| honda_forecast.increment | gbt_sklearn | day_of_week | numeric | 100000 | 0.0 |
+| honda_forecast.increment | gbt_sklearn | month | numeric | 100000 | 0.0 |
+| honda_forecast.increment | gbt_sklearn | is_holiday | numeric | 100000 | 0.0 |
+
+### monitoring_results
+
+914 row(s), first 30 shown
+
+| task_id | model_name | window_id | check_kind | subject | value | level |
+|---|---|---|---|---|---|---|
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_mwh | 0.4007 | flag |
+| bias.bias | gbt_lightgbm | validation | null_rate | forecast_mwh | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | forecast_mwh | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | is_weekend | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | is_weekend | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | is_weekend | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | is_holiday | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | is_holiday | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | is_holiday | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | is_bridge_day | 0.0007 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | is_bridge_day | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | out_of_range | is_bridge_day | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | market_area_code | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | null_rate | market_area_code | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | unseen_category | market_area_code | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_scope | 0.3505 | flag |
+| bias.bias | gbt_lightgbm | validation | null_rate | forecast_scope | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | unseen_category | forecast_scope | 0.0 | info |
+| bias.bias | gbt_lightgbm | validation | prediction_drift | __prediction__ | 0.4985 | flag |
+| bias.bias | gbt_lightgbm | validation | prediction_null_rate | __prediction__ | 0.0 | ok |
+| bias.bias | gbt_lightgbm | validation | prediction_out_of_range | __prediction__ | 0.0 | info |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | forecast_mwh | 0.7421 | flag |
+| bias.bias | gbt_lightgbm | held_out | null_rate | forecast_mwh | 0.0 | ok |
+| bias.bias | gbt_lightgbm | held_out | out_of_range | forecast_mwh | 0.0 | info |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | is_weekend | 0.0 | ok |
+| bias.bias | gbt_lightgbm | held_out | null_rate | is_weekend | 0.0 | ok |
+| bias.bias | gbt_lightgbm | held_out | out_of_range | is_weekend | 0.0 | info |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | is_holiday | 0.0001 | ok |
+| bias.bias | gbt_lightgbm | held_out | null_rate | is_holiday | 0.0 | ok |
+| bias.bias | gbt_lightgbm | held_out | out_of_range | is_holiday | 0.0 | info |
+
+### monitoring_flags
+
+40 row(s), first 30 shown
+
+| task_id | model_name | window_id | check_kind | subject | level | value | threshold |
+|---|---|---|---|---|---|---|---|
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_mwh | flag | 0.4007 | 0.25 |
+| bias.bias | gbt_lightgbm | validation | feature_drift | forecast_scope | flag | 0.3505 | 0.25 |
+| bias.bias | gbt_lightgbm | validation | prediction_drift | __prediction__ | flag | 0.4985 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | forecast_mwh | flag | 0.7421 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | feature_drift | forecast_scope | flag | 1.1952 | 0.25 |
+| bias.bias | gbt_lightgbm | held_out | prediction_drift | __prediction__ | flag | 0.9527 | 0.25 |
+| capacity_additions.additions | poisson_gbt_sklearn | validation | prediction_drift | __prediction__ | warning | 0.2071 | 0.1 |
+| capacity_additions.additions | poisson_gbt_sklearn | held_out | prediction_drift | __prediction__ | warning | 0.1941 | 0.1 |
+| honda_forecast.increment | gbt_sklearn | held_out | feature_drift | increment_lag2d_imputed | warning | 0.1537 | 0.1 |
+| price_daily.price | quantile_gbt_sklearn | validation | feature_drift | price_eur_per_mwh_lag7_imputed | flag | 1.0104 | 0.25 |
+| price_daily.price | quantile_gbt_sklearn | validation | prediction_drift | __prediction__ | flag | 1.3893 | 0.25 |
+| price_daily.price | quantile_gbt_sklearn | held_out | feature_drift | price_eur_per_mwh_lag7_imputed | flag | 1.2836 | 0.25 |
+| price_daily.price | quantile_gbt_sklearn | held_out | prediction_drift | __prediction__ | flag | 1.0254 | 0.25 |
+| price_quarter_hour.negative_price | gbt_sklearn | validation | feature_drift | forecast_offshore_wind_mwh | warning | 0.1979 | 0.1 |
+| price_quarter_hour.negative_price | gbt_sklearn | held_out | feature_drift | forecast_onshore_wind_mwh | warning | 0.1147 | 0.1 |
+| price_quarter_hour.negative_price | gbt_sklearn | held_out | feature_drift | forecast_offshore_wind_mwh | warning | 0.1668 | 0.1 |
+| price_quarter_hour.negative_price | gbt_sklearn | held_out | feature_drift | forecast_wind_and_photovoltaic_mwh | warning | 0.1837 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_sklearn | validation | feature_drift | price_eur_per_mwh_lag2d_imputed | warning | 0.2026 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_sklearn | validation | feature_drift | forecast_offshore_wind_mwh | warning | 0.1979 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_sklearn | validation | prediction_drift | __prediction__ | warning | 0.1053 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_sklearn | held_out | feature_drift | price_eur_per_mwh_lag2d_imputed | flag | 0.2872 | 0.25 |
+| price_quarter_hour.price | quantile_gbt_sklearn | held_out | feature_drift | forecast_onshore_wind_mwh | warning | 0.1147 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_sklearn | held_out | feature_drift | forecast_offshore_wind_mwh | warning | 0.1668 | 0.1 |
+| price_quarter_hour.price | quantile_gbt_sklearn | held_out | feature_drift | forecast_wind_and_photovoltaic_mwh | warning | 0.1837 | 0.1 |
+| redispatch.any_event | logistic | validation | prediction_drift | __prediction__ | warning | 0.1396 | 0.1 |
+| redispatch.any_event | logistic | held_out | prediction_drift | __prediction__ | warning | 0.1422 | 0.1 |
+| redispatch.event_energy | gbt_sklearn | validation | prediction_drift | __prediction__ | warning | 0.1329 | 0.1 |
+| redispatch.event_energy | gbt_sklearn | held_out | prediction_drift | __prediction__ | warning | 0.1563 | 0.1 |
+| rl_pumped_storage.policy | conservative_q | validation | feature_drift | state_price_eur_per_mwh | warning | 0.2173 | 0.1 |
+| rl_pumped_storage.policy | conservative_q | validation | prediction_drift | __prediction__ | warning | 0.2173 | 0.1 |
+
+### model_predictions
+
+1122027 row(s), first 30 shown
+
+| task_id | model_name | window_id | row_key | prediction |
+|---|---|---|---|---|
+| bias.bias | gbt_lightgbm | train | de_lu/2019-10-02/total | 97364.0239 |
+| bias.bias | gbt_lightgbm | train | de_lu/2022-08-20/total | 19770.6398 |
+| bias.bias | gbt_lightgbm | train | de_lu/2023-05-03/total | 17964.9362 |
+| bias.bias | gbt_lightgbm | train | de_lu/2020-10-30/total | 178730.054 |
+| bias.bias | gbt_lightgbm | train | de_lu/2019-02-04/total | 74714.9998 |
+| bias.bias | gbt_lightgbm | train | de_lu/2020-07-04/total | 86989.161 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-07-20/total | 67694.5149 |
+| bias.bias | gbt_lightgbm | train | de_lu/2022-04-29/total | 40871.2408 |
+| bias.bias | gbt_lightgbm | train | de_lu/2023-07-11/total | 22473.8958 |
+| bias.bias | gbt_lightgbm | train | de_lu/2019-01-11/total | 54518.7598 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-01-10/total | 98955.3684 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-02-08/total | -13238.8484 |
+| bias.bias | gbt_lightgbm | train | de_lu/2022-08-18/total | -26197.6248 |
+| bias.bias | gbt_lightgbm | train | de_lu/2023-02-14/total | 87586.5402 |
+| bias.bias | gbt_lightgbm | train | de_lu/2019-07-20/total | 100596.5997 |
+| bias.bias | gbt_lightgbm | train | de_lu/2022-01-25/total | 56921.7467 |
+| bias.bias | gbt_lightgbm | train | de_lu/2023-07-16/total | -10851.1452 |
+| bias.bias | gbt_lightgbm | train | de_lu/2018-10-16/other | -1087604.6732 |
+| bias.bias | gbt_lightgbm | train | de_lu/2019-07-31/total | 111741.2257 |
+| bias.bias | gbt_lightgbm | train | de_lu/2019-10-25/total | 100802.8301 |
+| bias.bias | gbt_lightgbm | train | de_lu/2020-05-21/total | 37221.3257 |
+| bias.bias | gbt_lightgbm | train | de_lu/2020-01-02/total | 39907.8743 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-05-23/total | 31809.882 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-09-01/total | 149318.9681 |
+| bias.bias | gbt_lightgbm | train | de_lu/2022-05-11/total | 5466.194 |
+| bias.bias | gbt_lightgbm | train | de_lu/2023-08-26/total | 39185.0655 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-03-03/total | 23664.9299 |
+| bias.bias | gbt_lightgbm | train | de_lu/2023-10-18/photovoltaic | 3280.3591 |
+| bias.bias | gbt_lightgbm | train | de_lu/2021-03-27/total | 31766.7839 |
+| bias.bias | gbt_lightgbm | train | de_lu/2019-06-16/total | 69470.3654 |
+
 <!-- section: energy__operate__01_reference_profiles_energy -->
 ## Reference Profiles Energy
 
@@ -1587,6 +1819,59 @@ _no rows for this run_
 | bias.bias | gbt_lightgbm | validation | de_lu/2024-12-04/onshore_wind | 2851.0582 |
 | bias.bias | gbt_lightgbm | validation | de_lu/2024-05-10/onshore_wind | 3027.8908 |
 
+<!-- section: energy__operate__02_performance_and_triggers -->
+## Performance And Triggers
+
+### monitoring_results
+
+16 row(s)
+
+| task_id | model_name | window_id | check_kind | subject | value | level |
+|---|---|---|---|---|---|---|
+| price_daily.price | quantile_gbt_sklearn | held_out | performance | mae | 0.5651 | flag |
+| price_quarter_hour.price | quantile_gbt_sklearn | held_out | performance | mae | 1.1099 | flag |
+| price_quarter_hour.negative_price | gbt_sklearn | held_out | performance | pr_auc | -0.1515 | ok |
+| load.load | gbt_sklearn | held_out | performance | mae | 0.0797 | ok |
+| bias.bias | gbt_lightgbm | held_out | performance | mae | 0.0803 | ok |
+| zone_generation.generation | gbt_lightgbm | held_out | performance | mae | 0.7978 | flag |
+| honda_forecast.increment | gbt_sklearn | held_out | performance | mae | 0.1387 | ok |
+| honda_anomaly.anomaly | forecast_residual_sklearn | held_out | performance | pr_auc | 0.1428 | ok |
+| ccpp.output | gbt_sklearn | held_out | performance | mae | -0.0837 | ok |
+| capacity_additions.additions | poisson_gbt_sklearn | held_out | performance | mae | 0.2661 | flag |
+| redispatch.any_event | logistic | held_out | performance | pr_auc | -0.0167 | ok |
+| redispatch.event_energy | gbt_sklearn | held_out | performance | mae | 0.0429 | ok |
+| survival.unit_lifetime | boosted_cox_xgboost | held_out | performance | concordance | 0.0018 | ok |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | held_out | performance | skill_mae_mean | 0.0318 | ok |
+| rl_pumped_storage.policy | conservative_q | held_out | performance | reward_timing | -0.7263 | ok |
+| rl_redispatch.policy | reward_weighted_gbt_lightgbm | held_out | performance | action_agreement | 0.0949 | ok |
+
+### monitoring_flags
+
+4 row(s)
+
+| task_id | model_name | window_id | check_kind | subject | level | value | threshold |
+|---|---|---|---|---|---|---|---|
+| capacity_additions.additions | poisson_gbt_sklearn | held_out | performance | mae | flag | 0.2661 | 0.2 |
+| price_quarter_hour.price | quantile_gbt_sklearn | held_out | performance | mae | flag | 1.1099 | 0.2 |
+| zone_generation.generation | gbt_lightgbm | held_out | performance | mae | flag | 0.7978 | 0.2 |
+| price_daily.price | quantile_gbt_sklearn | held_out | performance | mae | flag | 0.5651 | 0.2 |
+
+### monitoring_triggers
+
+9 row(s)
+
+| task_id | model_name | trigger_kind | source | condition | value | threshold |
+|---|---|---|---|---|---|---|
+| price_quarter_hour.price | quantile_gbt_sklearn | performance_degradation | R04 | primary metric +111.0% worse than on validation; revalidate on newer data before relying on it | 1.1099 | 0.2 |
+| price_quarter_hour.price | quantile_gbt_sklearn | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.2872 | 0.25 |
+| zone_generation.generation | gbt_lightgbm | performance_degradation | R04 | primary metric +79.8% worse than on validation; revalidate on newer data before relying on it | 0.7978 | 0.2 |
+| zone_generation.generation | gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 14.9971 | 5.0 |
+| price_daily.price | quantile_gbt_sklearn | performance_degradation | R04 | primary metric +56.5% worse than on validation; revalidate on newer data before relying on it | 0.5651 | 0.2 |
+| price_daily.price | quantile_gbt_sklearn | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.3893 | 0.25 |
+| capacity_additions.additions | poisson_gbt_sklearn | performance_degradation | R04 | primary metric +26.6% worse than on validation; revalidate on newer data before relying on it | 0.2661 | 0.2 |
+| rl_pumped_storage.policy | conservative_q | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.2898 | 0.25 |
+| bias.bias | gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.1952 | 0.25 |
+
 <!-- section: energy__operate__03_performance_and_triggers -->
 ## Performance And Triggers
 
@@ -1642,6 +1927,46 @@ _no rows for this run_
 | price_quarter_hour.negative_price | logistic | drift_flag | monitoring | a drift or input-quality check reached the flag level | 0.9274 | 0.25 |
 | bias.bias | gbt_lightgbm | drift_flag | monitoring | a drift or input-quality check reached the flag level | 1.1953 | 0.25 |
 
+<!-- section: energy__operate__03_score_request -->
+## Score Request
+
+### scoring_requests
+
+417 row(s), first 30 shown
+
+| request_id | task_id | model_name | registry_version | key_filter | window_start | window_end | row_key | prediction | prediction_q10 | prediction_q90 | frozen_delta_version | run_id | scored_at |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | eb2fa5a873ab95087a2c3679c33cfc86928374a57c391304cdc5a007b8f51910 | 474.1482 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 13976d42a97f67ff380e158f4979c14aa084f0fabce04ff44793557ae714329d | 472.3464 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 530706043943c22805d51a53965488b8e4fb407ab8bb9157794e581d27667ab7 | 476.4016 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 5c830ad1c257eb04840f612e918b895b496eecc976bc2ca52e4ac50ae22f4f82 | 453.859 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 77792ea1c0d1d285dd0588bbe93b59ef342f620fca3849025dfc492066523348 | 443.5045 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | b39533ed5cc747c848650243692f33e08881ab6f10811990cbd6609f2c9d1ed4 | 442.8033 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 9695b5fa2ec1ebbfcd1954f8f23048bf712838ee920e3afe341bd0464ece5670 | 439.6516 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 4f84900f23c02bd3520eacf3536aa596d556dd310bd315d2c0ee32aab1d2219c | 480.3667 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 7ec82ab2b6dfae9d68807e98b4e851d3306542376a766901c76cb5889b13339e | 441.4431 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 0b5747ff66d5ca032e6e404b344ec63402730f00c695def589d3bec8e1af7ad0 | 441.4807 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 3e16eb9401035f60bce19c7b686f1b0ec763578f8f84facd05ea61d83b85f218 | 435.5598 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | d46f947ec8b9595f7b18491ae9b4407644a02db07fa08fb03adde7d8c1ad243c | 435.9218 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | a5a3be5b2fd20b6d0b87571430c3797ba9005f1a15752418a8e425eb157d17c8 | 429.0892 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | abd10c2fee435edb98b789e8e8c16570e1a36f0f24813d16b25bceb7dae8de70 | 475.8756 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | e42216541a00f7edac27b3644472d9b2594d27893128370451b6069171621a04 | 464.9333 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 450e96c9ca1bfccb44057b950c13260a1de31ec075b5a05a54424037041aaf43 | 438.2529 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | c115bf6799aad0f6df87f0d527e7cd10f1b44b88caf3246d8b9d46c40287e9ba | 484.4352 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 2e3708b71dde0d6c468c3a7156cbc4409528fd9301f51ac1267895f07bbd0973 | 472.1011 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 5792ada5420531ebe37027d309bf20026db562b7ddb6ca634b30839f8494140b | 452.5095 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 2d6859dd89691a310bb1e94da86c1efc8e7144b39f80d13dcbedb1e1e0002cc4 | 434.3552 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 15e7e264932b800846f4216927f083746af3596a05244c5db5ca187f36cb4216 | 474.6651 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 1cc60100a8144746c0f049c8b02eb3aa8b70f8420d6ca302ab19e93e4e6fbb25 | 482.6366 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 836e2e03e37be5274ffdb05fac23d22ac7fb13b6b1fb43e1472b68a0656d47a6 | 469.743 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 765dd96eecf75c6aba371d1da26a4ce2db9ab77c91e74da8458c06743573b19b | 448.2641 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | f680a138ccb79c84442e6b734596f08ac01e9eb324a4ade8ec4580f341c733b3 | 446.0739 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 002e6016ca606fd9b1b3157678bd2c17c03fe4ad417b695336a4239dd0dd6e6d | 441.7817 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 9506030f1f5227f8f211f18d9a7e26868051da1296949fd2aba30533ae4da4fb | 439.6779 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | c89d15f6714b2652b08597d4e3a2160b352110f9f9b367090bd206a86272cabf | 434.6357 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | fae48d6f348b833e52f61178b6921d373c2317782ded5df9a2283caf2280c571 | 478.9025 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+| 7ca189b61929 | ccpp.output | gbt_sklearn | 1 | {} |  |  | 36d4ad0519a118f4133d8cb7c4c828eb3fdb5d62f50934c4302be789e192618e | 470.5764 |  |  | 34 | model-20261123T143324Z | 2026-11-23 14:38:00.069773 |
+
 <!-- section: energy__operate__04_score_request -->
 ## Score Request
 
@@ -1692,7 +2017,80 @@ registry tables created if missing
 
 ### model_registry
 
-_no rows for this run_
+32 row(s), first 30 shown
+
+| task_id | model_name | role | version | lifecycle_status | decision | validation_value | reason |
+|---|---|---|---|---|---|---|---|
+| price_daily.price | quantile_gbt_sklearn | selected | 1 | registered | approved_with_conditions | 12.3296 | first registration |
+| price_daily.price | seasonal_naive | baseline_fallback | 1 | registered | approved | 28.0429 | first registration |
+| price_quarter_hour.price | quantile_gbt_sklearn | selected | 1 | registered | approved_with_conditions | 18.4332 | first registration |
+| price_quarter_hour.price | persistence | baseline_fallback | 1 | registered | approved | 33.1459 | first registration |
+| price_quarter_hour.negative_price | gbt_sklearn | selected | 1 | registered | approved | 0.6071 | first registration |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | 1 | registered | approved | 0.0425 | first registration |
+| load.load | gbt_sklearn | selected | 1 | registered | approved | 24514.1739 | first registration |
+| load.load | seasonal_mean | baseline_fallback | 1 | registered | approved | 57004.7223 | first registration |
+| bias.bias | gbt_lightgbm | selected | 1 | registered | approved_with_conditions | 15338.4626 | first registration |
+| bias.bias | zero_correction | baseline_fallback | 1 | registered | approved | 93650.1115 | first registration |
+| zone_generation.generation | gbt_lightgbm | selected | 1 | registered | approved_with_conditions | 11021.4218 | first registration |
+| zone_generation.generation | capacity_factor | baseline_fallback | 1 | registered | approved | 25712.8807 | first registration |
+| honda_forecast.increment | gbt_sklearn | selected | 1 | registered | approved_with_conditions | 17.9264 | first registration |
+| honda_forecast.increment | persistence | baseline_fallback | 1 | registered | approved | 20.3038 | first registration |
+| honda_anomaly.anomaly | forecast_residual_sklearn | selected | 1 | registered | approved_with_conditions | 0.6517 | first registration |
+| honda_anomaly.anomaly | seasonal_zscore | baseline_fallback | 1 | registered | approved | 0.442 | first registration |
+| ccpp.output | gbt_sklearn | selected | 1 | registered | approved | 2.4962 | first registration |
+| ccpp.output | train_mean | baseline_fallback | 1 | registered | approved | 14.7944 | first registration |
+| capacity_additions.additions | poisson_gbt_sklearn | selected | 1 | registered | approved_with_conditions | 75.0231 | first registration |
+| capacity_additions.additions | seasonal_mean | baseline_fallback | 1 | registered | approved | 151.9985 | first registration |
+| redispatch.any_event | logistic | selected | 1 | registered | approved | 0.8828 | first registration |
+| redispatch.any_event | base_rate | baseline_fallback | 1 | registered | approved | 0.6749 | first registration |
+| redispatch.event_energy | gbt_sklearn | selected | 1 | registered | approved | 1.033 | first registration |
+| redispatch.event_energy | zone_mean | baseline_fallback | 1 | registered | approved | 1.182 | first registration |
+| survival.unit_lifetime | boosted_cox_xgboost | selected | 1 | registered | approved_with_conditions | 0.9687 | first registration |
+| survival.unit_lifetime | kaplan_meier | baseline_fallback | 1 | registered | approved | 0.504 | first registration |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | selected | 1 | registered | approved_with_conditions | 0.438 | first registration |
+| weather_imputation.reconstruction | causal_baseline | baseline_fallback | 1 | registered | approved | 0.0 | first registration |
+| rl_pumped_storage.policy | conservative_q | selected | 1 | registered | approved_with_conditions | 30493.3417 | first registration |
+| rl_pumped_storage.policy | rule_policy | baseline_fallback | 1 | registered | approved | 11817.1204 | first registration |
+
+<!-- section: energy__register__02_reproducibility -->
+## Reproducibility Check
+
+### registry_check
+
+32 row(s), first 30 shown
+
+| task_id | model_name | role | registry_version | processor_type | reload_status | rescore_status | gap_relative | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| price_daily.price | quantile_gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_daily.price | seasonal_naive | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_quarter_hour.price | quantile_gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_quarter_hour.price | persistence | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| price_quarter_hour.negative_price | gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| price_quarter_hour.negative_price | base_rate | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| load.load | gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| load.load | seasonal_mean | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| bias.bias | gbt_lightgbm | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| bias.bias | zero_correction | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| zone_generation.generation | gbt_lightgbm | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| zone_generation.generation | capacity_factor | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| honda_forecast.increment | gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| honda_forecast.increment | persistence | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| honda_anomaly.anomaly | forecast_residual_sklearn | selected | 1 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| honda_anomaly.anomaly | seasonal_zscore | baseline_fallback | 1 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| ccpp.output | gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| ccpp.output | train_mean | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| capacity_additions.additions | poisson_gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| capacity_additions.additions | seasonal_mean | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| redispatch.any_event | logistic | selected | 1 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| redispatch.any_event | base_rate | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | pr_auc on validation |
+| redispatch.event_energy | gbt_sklearn | selected | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| redispatch.event_energy | zone_mean | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | mae on validation |
+| survival.unit_lifetime | boosted_cox_xgboost | selected | 1 | aarch64 | ok | matched | 0.0 | passed | concordance on validation |
+| survival.unit_lifetime | kaplan_meier | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | concordance on validation |
+| weather_imputation.reconstruction | gbt_cross_variable_lightgbm | selected | 1 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| weather_imputation.reconstruction | causal_baseline | baseline_fallback | 1 | aarch64 | ok | not_comparable |  | passed | events are drawn again, the validation value cannot be reproduced |
+| rl_pumped_storage.policy | conservative_q | selected | 1 | aarch64 | ok | matched | 0.0 | passed | reward_timing on validation |
+| rl_pumped_storage.policy | rule_policy | baseline_fallback | 1 | aarch64 | ok | matched | 0.0 | passed | reward_timing on validation |
 
 <!-- section: energy__register__02_reproducibility_energy -->
 ## Reproducibility Check Energy
@@ -1738,6 +2136,30 @@ _no rows for this run_
 ## Foundation References
 
 ### foundation_registry_entry
+
+_no rows for this run_
+
+<!-- section: energy__setup__02_model_setup -->
+## Model Setup
+
+### evaluation_spec
+
+6 row(s)
+
+| dataset_id | spec_key | spec_value |
+|---|---|---|
+| survival | horizons_years | (1, 3, 5) |
+| price_daily | quantiles | (0.1, 0.5, 0.9) |
+| price_quarter_hour | quantiles | (0.1, 0.5, 0.9) |
+| honda_anomaly | injection | mask_specification |
+| honda_anomaly | flag_quantile | 0.99 |
+| weather_imputation | masks | mask_specification |
+
+### approval_spec
+
+_no rows for this run_
+
+### monitoring_spec
 
 _no rows for this run_
 
@@ -1793,3 +2215,80 @@ _no rows for this run_
 | honda_anomaly | flag_quantile | 0.99 |
 | weather_imputation | masks | mask_specification |
 | self_supervised_other | masks | mask_specification |
+
+<!-- section: energy__train__01_train -->
+## Model Training
+
+### candidate_results
+
+806 row(s), first 30 shown
+
+| task_id | model_name | family | stage | partition | metric | value | n_rows | status | detail |
+|---|---|---|---|---|---|---|---|---|---|
+| price_daily.price | seasonal_naive | baseline | baseline | validation | mae | 28.0429 | 364 | ok | seconds=48.6 |
+| price_daily.price | seasonal_naive | baseline | baseline | validation | rmse | 42.9023 | 364 | ok | seconds=48.6 |
+| price_daily.price | seasonal_naive | baseline | baseline | validation | mean_error | -1.5877 | 364 | ok | seconds=48.6 |
+| price_daily.price | seasonal_naive | baseline | baseline | validation | mean_error_relative | -0.0202 | 364 | ok | seconds=48.6 |
+| price_daily.price | seasonal_naive | baseline | baseline | validation | pred_std_ratio | 1.0185 | 364 | ok | seconds=48.6 |
+| price_daily.price | seasonal_naive | baseline | baseline | validation | pinball_q50 | 14.0215 | 364 | ok | seconds=48.6 |
+| price_daily.price | empirical_quantiles | baseline | baseline | validation | pinball_q10 | 5.8028 | 364 | ok | seconds=0.8 |
+| price_daily.price | empirical_quantiles | baseline | baseline | validation | pinball_q50 | 14.5833 | 364 | ok | seconds=0.8 |
+| price_daily.price | empirical_quantiles | baseline | baseline | validation | pinball_q90 | 16.8015 | 364 | ok | seconds=0.8 |
+| price_daily.price | empirical_quantiles | baseline | baseline | validation | interval_coverage_80 | 0.9313 | 364 | ok | seconds=0.8 |
+| price_daily.price | ridge | tabular | candidate | validation | mae | 14.3796 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | rmse | 22.0732 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | mean_error | -1.9049 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | mean_error_relative | -0.0242 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | pred_std_ratio | 0.8922 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | skill_mae | 0.4872 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | skill_rmse | 0.4855 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | pinball_q50 | 7.1898 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | train_mae | 20.195 | 364 | ok | seconds=2.0 |
+| price_daily.price | ridge | tabular | candidate | validation | train_rmse | 31.5309 | 364 | ok | seconds=2.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | mae | 13.343 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | rmse | 22.5071 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | mean_error | -5.1305 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | mean_error_relative | -0.0653 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | pred_std_ratio | 0.8947 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | skill_mae | 0.5242 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | skill_rmse | 0.4754 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | pinball_q50 | 6.6715 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | train_mae | 2.4168 | 364 | ok | seconds=10.0 |
+| price_daily.price | gbt_lightgbm | tabular | candidate | validation | train_rmse | 4.3027 | 364 | ok | seconds=10.0 |
+
+### task_run_context
+
+48 row(s), first 30 shown
+
+| task_id | status | smoke | frozen_delta_version | detail | recorded_at |
+|---|---|---|---|---|---|
+| price_daily.price | started | False | 14 |  | 2026-11-22 20:53:08.139791 |
+| price_daily.price | data_ready | False | 14 |  | 2026-11-22 20:53:17.061844 |
+| price_daily.price | finished | False | 14 | baseline_ok=True; fingerprint=b5482e29e07c | 2026-11-22 20:58:10.812386 |
+| price_quarter_hour.price | started | False | 4 |  | 2026-11-22 20:58:15.660658 |
+| price_quarter_hour.price | data_ready | False | 4 |  | 2026-11-22 20:58:23.511355 |
+| price_quarter_hour.price | finished | False | 4 | baseline_ok=True; fingerprint=b9adf809db0c | 2026-11-22 20:59:23.283059 |
+| price_quarter_hour.negative_price | started | False | 4 |  | 2026-11-22 20:59:27.790590 |
+| price_quarter_hour.negative_price | data_ready | False | 4 |  | 2026-11-22 20:59:35.566032 |
+| price_quarter_hour.negative_price | finished | False | 4 | baseline_ok=True; fingerprint=6ed9f827a252 | 2026-11-22 21:00:04.576019 |
+| load.load | started | False | 14 |  | 2026-11-22 21:00:10.477428 |
+| load.load | data_ready | False | 14 |  | 2026-11-22 21:00:24.393708 |
+| load.load | finished | False | 14 | baseline_ok=True; fingerprint=8ddbd325f085 | 2026-11-22 21:01:18.187733 |
+| bias.bias | started | False | 14 |  | 2026-11-22 21:01:23.668100 |
+| bias.bias | data_ready | False | 14 |  | 2026-11-22 21:01:31.372862 |
+| bias.bias | finished | False | 14 | baseline_ok=True; fingerprint=ca166504f47f | 2026-11-22 21:02:16.539739 |
+| zone_generation.generation | started | False | 34 |  | 2026-11-22 21:02:21.115599 |
+| zone_generation.generation | data_ready | False | 34 |  | 2026-11-22 21:02:28.511668 |
+| zone_generation.generation | finished | False | 34 | baseline_ok=True; fingerprint=cdc95319b023 | 2026-11-22 21:03:01.773755 |
+| honda_forecast.increment | started | False | 15 |  | 2026-11-22 21:03:06.672764 |
+| honda_forecast.increment | data_ready | False | 15 |  | 2026-11-22 21:03:16.743247 |
+| honda_forecast.increment | finished | False | 15 | baseline_ok=True; fingerprint=d5b5a29a75dd | 2026-11-22 21:04:33.606248 |
+| ccpp.output | started | False | 34 |  | 2026-11-22 21:04:38.659626 |
+| ccpp.output | data_ready | False | 34 |  | 2026-11-22 21:04:45.438702 |
+| ccpp.output | finished | False | 34 | baseline_ok=True; fingerprint=052609e48713 | 2026-11-22 21:05:22.798167 |
+| capacity_additions.additions | started | False | 34 |  | 2026-11-22 21:05:27.806261 |
+| capacity_additions.additions | data_ready | False | 34 |  | 2026-11-22 21:05:34.522911 |
+| capacity_additions.additions | finished | False | 34 | baseline_ok=True; fingerprint=abe477389572 | 2026-11-22 21:05:54.551559 |
+| redispatch.any_event | started | False | 8 |  | 2026-11-22 21:05:58.954884 |
+| redispatch.any_event | data_ready | False | 8 |  | 2026-11-22 21:06:04.947169 |
+| redispatch.any_event | finished | False | 8 | baseline_ok=True; fingerprint=f8cdb5812ffc | 2026-11-22 21:06:40.269814 |

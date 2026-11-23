@@ -1,6 +1,6 @@
 # Model card: rl_redispatch.policy
 
-_model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2, primary metric `action_agreement` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `reward_weighted_gbt_lightgbm`, dataset `rl_redispatch`, frozen version 8, primary metric `action_agreement` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -31,29 +31,29 @@ _model `reward_weighted_gbt_sklearn`, dataset `rl_redispatch`, frozen version 2,
 
 ## Data
 
-- frame: 6778 rows, columns 34, rows by partition {'test': 6778}
-- held-out read: partition test, frozen_delta_version 2, rows 6778, groups 1026
-- frame: 5207 rows, columns 34, rows by partition {'validation': 5207}
+- frame: 6778 rows, columns 39, rows by partition {'test': 6778}
+- held-out read: partition test, frozen_delta_version 8, rows 6778, groups 1026
+- frame: 5207 rows, columns 39, rows by partition {'validation': 5207}
 
 ## Training
 
-- model family: reward_weighted_gbt_sklearn; MLflow run `80a0ff0069054e87bebf4b1ec903de8c`
+- model family: reward_weighted_gbt_lightgbm; MLflow run `f3238c574ed144cea481152acdad576f`
 - parameters: {'row_fraction': 1.0}
-- library versions: sklearn 1.6.1
+- library versions: not recorded
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
-| metric | reward_weighted_gbt_sklearn held-out | reward_weighted_gbt_sklearn validation | majority_action held-out |
+| metric | reward_weighted_gbt_lightgbm held-out | reward_weighted_gbt_lightgbm validation | majority_action held-out |
 |---|---|---|---|
-| action_agreement | 0.6285 | 0.6962 | 0.5428 |
-| primary_change_relative | 0.09721 |  | -0.02999 |
-| reward_weighted_agreement | 0.5883 | 0.6929 | 0.6312 |
-| reward_when_agree | -1547 | -1678 | -1922 |
-| reward_when_disagree | -1831 | -1704 | -1333 |
-| skill_primary | 0.08572 |  |  |
-| skill_primary_ci_high | 0.105 |  |  |
-| skill_primary_ci_low | 0.06498 |  |  |
+| action_agreement | 0.6282 | 0.6941 | 0.5428 |
+| primary_change_relative | 0.09489 |  | -0.02999 |
+| reward_weighted_agreement | 0.5904 | 0.6938 | 0.6312 |
+| reward_when_agree | -1553 | -1685 | -1922 |
+| reward_when_disagree | -1821 | -1687 | -1333 |
+| skill_primary | 0.08542 |  |  |
+| skill_primary_ci_high | 0.1092 |  |  |
+| skill_primary_ci_low | 0.06467 |  |  |
 
 ## Flags
 

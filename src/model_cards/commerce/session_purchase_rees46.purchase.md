@@ -1,6 +1,6 @@
 # Model card: session_purchase_rees46.purchase
 
-_model `gbt_sklearn`, dataset `session_purchase_rees46`, frozen version 1, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `gbt_lightgbm`, dataset `session_purchase_rees46`, frozen version 15, primary metric `pr_auc` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -31,29 +31,29 @@ _model `gbt_sklearn`, dataset `session_purchase_rees46`, frozen version 1, prima
 ## Data
 
 - frame: 1313711 rows, columns 30, rows by partition {'test': 1313711}
-- held-out read: partition test, frozen_delta_version 1, rows 1313711, groups 406466
-- frame: 785035 rows, columns 30, rows by partition {'validation': 785035}
+- held-out read: partition test, frozen_delta_version 15, rows 1313711, groups 406466
+- frame: 1309405 rows, columns 30, rows by partition {'validation': 1309405}
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `08d766159e7147f9aa2be4018d79d835`
-- parameters: {'row_fraction': 0.6, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
-- library versions: sklearn 1.6.1
+- model family: gbt_lightgbm; MLflow run `3342180df4ac47e1b0fd0c8adf21a866`
+- parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}
+- library versions: lightgbm 4.7.0
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
-| metric | gbt_sklearn held-out | gbt_sklearn validation | base_rate held-out |
+| metric | gbt_lightgbm held-out | gbt_lightgbm validation | base_rate held-out |
 |---|---|---|---|
-| base_rate | 0.08171 | 0.08131 | 0.08171 |
-| calibration_error | 0.01476 | 0.01437 | 0.001452 |
-| log_loss | 0.2129 | 0.2125 | 0.2829 |
-| pr_auc | 0.4398 | 0.4378 | 0.08171 |
-| pr_auc_lift | 5.382 | 5.384 | 1 |
-| primary_change_relative | -0.004488 |  | -0.004879 |
-| skill_primary | 0.358 |  |  |
-| skill_primary_ci_high | 0.3776 |  |  |
-| skill_primary_ci_low | 0.3446 |  |  |
+| base_rate | 0.08171 | 0.08128 | 0.08171 |
+| calibration_error | 0.01379 | 0.01334 | 0.001506 |
+| log_loss | 0.2125 | 0.2117 | 0.2829 |
+| pr_auc | 0.4403 | 0.4399 | 0.08171 |
+| pr_auc_lift | 5.389 | 5.412 | 1 |
+| primary_change_relative | -0.0009798 |  | -0.005282 |
+| skill_primary | 0.3586 |  |  |
+| skill_primary_ci_high | 0.3765 |  |  |
+| skill_primary_ci_low | 0.3432 |  |  |
 
 ## Flags
 
@@ -65,7 +65,7 @@ _model `gbt_sklearn`, dataset `session_purchase_rees46`, frozen version 1, prima
 
 ## Disclosures
 
-- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 
@@ -73,4 +73,4 @@ _model `gbt_sklearn`, dataset `session_purchase_rees46`, frozen version 1, prima
 
 ## Baseline fallback
 
-- `base_rate`: validation 0.08131, held-out 0.08171 on `pr_auc`
+- `base_rate`: validation 0.08128, held-out 0.08171 on `pr_auc`

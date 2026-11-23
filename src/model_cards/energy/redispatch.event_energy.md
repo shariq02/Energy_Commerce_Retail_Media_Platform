@@ -1,6 +1,6 @@
 # Model card: redispatch.event_energy
 
-_model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `mae` (lower is better). Generated: 2026-10-26T17:52Z_
+_model `gbt_sklearn`, dataset `redispatch`, frozen version 8, primary metric `mae` (lower is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -30,15 +30,15 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 
 ## Data
 
-- frame: 1012 rows, columns 32, rows by partition {'test': 1012}
-- held-out read: partition test, frozen_delta_version 2, rows 1012, time_min 2020-01-01 00:00:00, time_max 2020-12-31 00:00:00, groups 362
-- frame: 970 rows, columns 32, rows by partition {'validation': 970}
+- frame: 1012 rows, columns 37, rows by partition {'test': 1012}
+- held-out read: partition test, frozen_delta_version 8, rows 1012, time_min 2020-01-01 00:00:00, time_max 2020-12-31 00:00:00, groups 362
+- frame: 970 rows, columns 37, rows by partition {'validation': 970}
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `9d323816f4a0439188e2031fb455dd6e`
+- model family: gbt_sklearn; MLflow run `debb87466fcc4569901343a5981cc77e`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
-- library versions: sklearn 1.6.1
+- library versions: sklearn 1.7.2
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -52,8 +52,8 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 | rmse | 1.392 | 1.334 | 1.612 |
 | skill_mae | 0.1926 | 0.126 |  |
 | skill_primary | 0.1926 |  |  |
-| skill_primary_ci_high | 0.2388 |  |  |
-| skill_primary_ci_low | 0.1544 |  |  |
+| skill_primary_ci_high | 0.2357 |  |  |
+| skill_primary_ci_low | 0.1489 |  |  |
 | skill_rmse | 0.1366 | 0.08881 |  |
 
 ## Flags
@@ -66,7 +66,7 @@ _model `gbt_sklearn`, dataset `redispatch`, frozen version 2, primary metric `ma
 
 ## Disclosures
 
-- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

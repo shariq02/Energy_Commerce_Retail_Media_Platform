@@ -1,6 +1,6 @@
 # Model card: redispatch.any_event
 
-_model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `logistic`, dataset `redispatch`, frozen version 8, primary metric `pr_auc` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -30,15 +30,15 @@ _model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_au
 
 ## Data
 
-- frame: 1464 rows, columns 32, rows by partition {'test': 1464}
-- held-out read: partition test, frozen_delta_version 2, rows 1464, time_min 2020-01-01 00:00:00, time_max 2020-12-31 00:00:00, groups 366
-- frame: 1452 rows, columns 32, rows by partition {'validation': 1452}
+- frame: 1464 rows, columns 37, rows by partition {'test': 1464}
+- held-out read: partition test, frozen_delta_version 8, rows 1464, time_min 2020-01-01 00:00:00, time_max 2020-12-31 00:00:00, groups 366
+- frame: 1452 rows, columns 37, rows by partition {'validation': 1452}
 
 ## Training
 
-- model family: logistic; MLflow run `5601cf4c687249099439aaf0c544c2bf`
+- model family: logistic; MLflow run `3f2d82e7cd714a93bb9caed28453d3d5`
 - parameters: {'row_fraction': 1.0, 'C': 1.0}
-- library versions: sklearn 1.6.1
+- library versions: sklearn 1.7.2
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
@@ -52,8 +52,8 @@ _model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_au
 | pr_auc_lift | 1.281 | 1.308 | 1 |
 | primary_change_relative | -0.01675 |  | -0.03836 |
 | skill_primary | 0.1968 |  |  |
-| skill_primary_ci_high | 0.2322 |  |  |
-| skill_primary_ci_low | 0.1526 |  |  |
+| skill_primary_ci_high | 0.2368 |  |  |
+| skill_primary_ci_low | 0.1514 |  |  |
 
 ## Flags
 
@@ -65,7 +65,7 @@ _model `logistic`, dataset `redispatch`, frozen version 2, primary metric `pr_au
 
 ## Disclosures
 
-- the held-out partition was read in at least 5 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

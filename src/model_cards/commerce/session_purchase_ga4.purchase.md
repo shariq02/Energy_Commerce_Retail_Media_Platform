@@ -1,6 +1,6 @@
 # Model card: session_purchase_ga4.purchase
 
-_model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary metric `pr_auc` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 15, primary metric `pr_auc` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -31,12 +31,12 @@ _model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary 
 ## Data
 
 - frame: 2724 rows, columns 21, rows by partition {'test': 2724}
-- held-out read: partition test, frozen_delta_version 0, rows 2724, groups 2180
+- held-out read: partition test, frozen_delta_version 15, rows 2724, groups 2180
 - frame: 2609 rows, columns 21, rows by partition {'validation': 2609}
 
 ## Training
 
-- model family: gbt_sklearn; MLflow run `7929859b36e8498da155cfae64d5ed12`
+- model family: gbt_sklearn; MLflow run `7bd160bd287f48429b95e51816080d80`
 - parameters: {'row_fraction': 1.0, 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 15, 'min_child_samples': 50}
 - library versions: sklearn 1.7.2
 - processor type: not recorded for the training and evaluation runs
@@ -46,14 +46,14 @@ _model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary 
 | metric | gbt_sklearn held-out | gbt_sklearn validation | base_rate held-out |
 |---|---|---|---|
 | base_rate | 0.2551 | 0.2376 | 0.2551 |
-| calibration_error | 0.01892 | 0.01851 | 0.01122 |
-| log_loss | 0.5054 | 0.5002 | 0.5682 |
-| pr_auc | 0.4584 | 0.3957 | 0.2551 |
-| pr_auc_lift | 1.797 | 1.665 | 1 |
-| primary_change_relative | -0.1585 |  | -0.07364 |
-| skill_primary | 0.2033 |  |  |
-| skill_primary_ci_high | 0.2341 |  |  |
-| skill_primary_ci_low | 0.1731 |  |  |
+| calibration_error | 0.02338 | 0.02134 | 0.01122 |
+| log_loss | 0.5052 | 0.5016 | 0.5682 |
+| pr_auc | 0.4607 | 0.3944 | 0.2551 |
+| pr_auc_lift | 1.806 | 1.66 | 1 |
+| primary_change_relative | -0.1681 |  | -0.07364 |
+| skill_primary | 0.2056 |  |  |
+| skill_primary_ci_high | 0.2364 |  |  |
+| skill_primary_ci_low | 0.1742 |  |  |
 
 ## Flags
 
@@ -65,7 +65,7 @@ _model `gbt_sklearn`, dataset `session_purchase_ga4`, frozen version 0, primary 
 
 ## Disclosures
 
-- the held-out partition was read in at least 3 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 

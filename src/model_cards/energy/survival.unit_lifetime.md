@@ -1,6 +1,6 @@
 # Model card: survival.unit_lifetime
 
-_model `survival_forest`, dataset `survival`, frozen version 0, primary metric `concordance` (higher is better). Generated: 2026-10-26T17:52Z_
+_model `boosted_cox_xgboost`, dataset `survival`, frozen version 34, primary metric `concordance` (higher is better). Generated: 2026-11-23T13:07Z_
 
 ## Decision
 
@@ -31,7 +31,7 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 ## Data
 
 - frame: 5244 rows, columns 21, rows by partition {'test': 5244}
-- held-out read: partition test, frozen_delta_version 0, rows 5244, groups 5244
+- held-out read: partition test, frozen_delta_version 34, rows 5244, groups 5244
 - frame: 5243 rows, columns 21, rows by partition {'validation': 5243}
 - events in the frozen data, train: 1895 of 24469 rows
 - events in the frozen data, validation: 406 of 5243 rows
@@ -39,26 +39,26 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 
 ## Training
 
-- model family: survival_forest; MLflow run `3332ab155b1d436f951615cfe5d892b1`
+- model family: boosted_cox_xgboost; MLflow run `97f69ea4bc35421fb7300a2c55034ec3`
 - parameters: {'entry': 'ignored', 'row_fraction': 1.0}
-- library versions: sksurv 0.25.0
+- library versions: not recorded
 - processor type: not recorded for the training and evaluation runs
 
 ## Metrics
 
-| metric | survival_forest held-out | survival_forest validation | kaplan_meier held-out |
+| metric | boosted_cox_xgboost held-out | boosted_cox_xgboost validation | kaplan_meier held-out |
 |---|---|---|---|
-| brier_1y | 0.000884 | 0.0007629 | 0.001169 |
-| brier_3y | 0.001205 | 0.001829 | 0.001779 |
-| brier_5y | 0.0009927 | 0.001733 | 0.001779 |
-| calibration_gap_1y | 0.0002344 | 0.0007641 | 3.065e-05 |
-| calibration_gap_3y | 0.002611 | 0.002075 | 0.0003227 |
-| calibration_gap_5y | 0.00354 | 0.002614 | 4.052e-05 |
-| concordance | 0.9626 | 0.9641 | 0.5031 |
-| primary_change_relative | 0.001587 |  | 0.001769 |
-| skill_primary | 0.4594 |  |  |
-| skill_primary_ci_high | 0.4672 |  |  |
-| skill_primary_ci_low | 0.4516 |  |  |
+| brier_1y | 0.0007142 | 0.0008154 | 0.001169 |
+| brier_3y | 0.0009005 | 0.001609 | 0.001779 |
+| brier_5y | 0.0007621 | 0.001511 | 0.001779 |
+| calibration_gap_1y | 0.000213 | 0.0008841 | 3.065e-05 |
+| calibration_gap_3y | 2.369e-06 | 0.0004565 | 0.0003227 |
+| calibration_gap_5y | 0.0009044 | 0.0001305 | 4.052e-05 |
+| concordance | 0.9669 | 0.9687 | 0.5031 |
+| primary_change_relative | 0.001793 |  | 0.001769 |
+| skill_primary | 0.4638 |  |  |
+| skill_primary_ci_high | 0.4695 |  |  |
+| skill_primary_ci_low | 0.4576 |  |  |
 
 ## Flags
 
@@ -66,13 +66,13 @@ _model `survival_forest`, dataset `survival`, frozen version 0, primary metric `
 
 ## Conditions and known limits
 
-- 5-year calibration gap 0.00354 against 4.05e-05 for the baseline; predicted risk is less well calibrated than the baseline
+- 5-year calibration gap 0.000904 against 4.05e-05 for the baseline; predicted risk is less well calibrated than the baseline
 - the number of events in the held-out partition was not recorded; the concordance and Brier scores rest on an unknown number of events
 - revalidate on a new frozen dataset version, with the held-out event count recorded, before relying on the risk values
 
 ## Disclosures
 
-- the held-out partition was read in at least 10 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
+- the held-out partition was read in at least 2 evaluation runs; the exact number of held-out reads is not recoverable; scores unchanged
 
 ## Revalidation trigger
 
