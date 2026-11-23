@@ -310,6 +310,31 @@ def test_spec_problems_names_a_missing_fit_key_and_a_missing_column(ml):
     assert "_probe: grain column local_date is not in the frame" in problems
 
 
+@pytest.mark.parametrize("cap", [0, -5, 1.5, "1000", True])
+def test_spec_problems_rejects_a_bad_max_rows(ml, cap):
+    datasets = ml["ML_SPEC"]["datasets"]
+    base = datasets["price_daily"]
+    columns = {*base["grain"], "local_date", "market_area_code"}
+    datasets["_probe"] = {**base, "max_rows": cap}
+    try:
+        problems = ml["spec_problems"]("_probe", columns)
+    finally:
+        del datasets["_probe"]
+    assert "_probe: max_rows must be a positive whole number" in problems
+
+
+def test_spec_problems_accepts_a_positive_max_rows(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    base = datasets["price_daily"]
+    columns = {*base["grain"], "local_date", "market_area_code"}
+    datasets["_probe"] = {**base, "max_rows": 1_000_000}
+    try:
+        problems = ml["spec_problems"]("_probe", columns)
+    finally:
+        del datasets["_probe"]
+    assert problems == []
+
+
 def test_spec_problems_reports_a_dataset_that_is_not_in_the_spec(ml):
     assert ml["spec_problems"]("_unknown", set()) == ["_unknown: not in the spec file"]
 

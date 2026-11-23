@@ -1181,6 +1181,10 @@ def spec_problems(dataset_id: str, columns) -> list[str]:
             if c and c not in have
         ]
 
+    cap = spec.get("max_rows")
+    bad_cap = isinstance(cap, bool) or not isinstance(cap, int) or cap < 1
+    if cap is not None and bad_cap:
+        found.append(f"{dataset_id}: max_rows must be a positive whole number")
     found += [f"{dataset_id}: no fit key {k}" for k in FIT_KEYS if k not in fit]
     found += [f"{dataset_id}: no split key {k}" for k in SPLIT_KEYS if k not in split]
     rule = split.get("rule")

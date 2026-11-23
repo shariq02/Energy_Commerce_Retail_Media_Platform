@@ -103,6 +103,9 @@ families:
 #   source_defined         the split the source gives (column split); with validation_percent
 #                          and group_cols, that share of its train rows (hash of group_cols)
 #                          is the validation partition, the source gives none
+#
+# Optional spec key max_rows: a dataset with more rows keeps about that many, chosen by a
+# stable hash of its grain (_ml_fit.cap_rows), before the partition is made.
 datasets:
   # ---------------------------------------------------------------- energy
   price_daily:
@@ -159,8 +162,13 @@ datasets:
     dependency_group: 1
     target_name: target_value_mwh
     provenance_tier: sourced
-    notes: ""
+    notes: the weather columns are the realised national daily means of the DWD stations, used as if they were a forecast (perfect prognosis); every zone row carries the national value
     contract:
+      perfect_prognosis:
+        - weather_temperature_mean_degc
+        - heating_degree_days
+        - cooling_degree_days
+        - weather_global_radiation_mean_w_per_m2
       overrides:
         load_kind: [key, null, null]
     split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date}
@@ -599,7 +607,7 @@ datasets:
     dependency_group: 1
     target_name: target_is_pathogenic
     # families of columns the label is read from (a part of the column name)
-    label_derived_like: [clinical_significance, clinvar, review_stars]
+    label_derived_like: [clinical_significance, clinvar, review_stars, cancer_variant_priority, polygenic_risk_contribution, splice_impact_severity]
     provenance_tier: sourced
     notes: rows with a pathogenic or benign class; the clinical significance text and class flags are the label
     contract:
@@ -649,7 +657,7 @@ datasets:
     dependency_group: 1
     target_name: target_is_high_impact
     # the label is a band of severity plus conservation; the raw conservation scores feed it
-    label_derived_like: [severity, conservation, phylop, cadd]
+    label_derived_like: [severity, conservation, phylop, cadd, disease_specific_priority, expression_impact_context, functional_impact_score]
     provenance_tier: rule_derived
     notes: the label is the impact rule of Silver (pathogenicity score at or above a band); its inputs are label-derived here
     contract:

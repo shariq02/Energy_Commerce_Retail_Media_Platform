@@ -123,6 +123,18 @@ def test_booleans_and_dates_are_numeric(lib):
     assert days["min_value"] == 18262.0
 
 
+def test_text_that_does_not_parse_as_dates_stays_numbers(lib):
+    mixed = pd.Series(["2", "3", "4", "5", "X"] * 20, dtype=object)
+    values = lib["numeric_array"](mixed)
+    assert np.isfinite(values).sum() == 80
+    assert np.nanmax(values) == 5.0
+
+
+def test_text_that_parses_as_dates_is_read_as_days(lib):
+    dates = pd.Series(["2020-01-01", "2020-01-02"], dtype=object)
+    assert lib["numeric_array"](dates).tolist() == [18262.0, 18263.0]
+
+
 def test_the_same_distribution_stays_ok(lib):
     ref = lib["profile_series"]("x", _normal(seed=1), SPEC)
     out = {

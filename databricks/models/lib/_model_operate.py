@@ -417,9 +417,12 @@ def numeric_array(series: pd.Series) -> np.ndarray:
     if series.dtype == bool:
         return series.to_numpy(dtype="float64")
     if pd.api.types.is_datetime64_any_dtype(series) or (
-        series.dtype == object and series.notna().any() and not _is_number(series)
+        series.dtype == object
+        and series.notna().any()
+        and not _is_number(series)
+        and _is_date(series)
     ):
-        t = pd.to_datetime(series, errors="coerce")
+        t = pd.to_datetime(series, errors="coerce", format="mixed")
         days = t.astype("datetime64[ns]").astype("int64") / 86_400_000_000_000
         return np.where(t.isna(), np.nan, days)
     return pd.to_numeric(series, errors="coerce").to_numpy(dtype="float64")
@@ -428,6 +431,15 @@ def numeric_array(series: pd.Series) -> np.ndarray:
 def _is_number(series: pd.Series) -> bool:
     non_null = series.dropna()
     return bool(pd.to_numeric(non_null, errors="coerce").notna().mean() >= 0.95)
+
+
+def _is_date(series: pd.Series) -> bool:
+    """Text is read as dates only when it parses as dates. A window that is mostly
+    text (a contig such as `X`) stays numbers and its text counts as missing; it is not
+    turned into dates, which made every value missing."""
+    non_null = series.dropna()
+    parsed = pd.to_datetime(non_null, errors="coerce", format="mixed")
+    return bool(parsed.notna().mean() >= 0.95)
 
 
 def level_values(series: pd.Series) -> tuple[np.ndarray, int]:

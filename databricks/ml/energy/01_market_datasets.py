@@ -79,6 +79,10 @@ QH_FROM = SPLIT_CALENDARS["quarter_hour"]["train"][0]
 REGIME_START = SPLIT_CALENDARS["redispatch"]["train"][0]
 REGIME_END = SPLIT_CALENDARS["redispatch"]["test"][1]
 TSOS = ["fifty_hertz", "amprion", "tennet_de", "transnetbw"]
+# national weather of the load dataset: a station-day needs 18 hourly values (radiation
+# 20), a day needs 10 stations; degree days against a heating and a cooling base
+WEATHER_MIN_HOURS, WEATHER_MIN_RADIATION_HOURS, WEATHER_MIN_STATIONS = 18, 20, 10
+HEATING_BASE_DEGC, COOLING_BASE_DEGC = 15.0, 22.0
 FRAMES, BLOCKS = {}, {}
 
 # COMMAND ----------
@@ -306,6 +310,67 @@ market_daily = _lagged.drop(
     "price_eur_per_mwh", *_gen_cols, "consumption_mwh", "residual_load_mwh"
 ).join(_forecast_daily, ["market_area_code", "local_date"], "left")
 _forecast_columns = [c for c in market_daily.columns if c.startswith("forecast_")]
+
+# COMMAND ----------
+
+# DBTITLE 1,National weather per day -- temperature, degree days and radiation (load)
+# The realised weather of the day is used as if it were a forecast (perfect prognosis,
+# named in the contract). The value is the mean of the DWD stations with enough hours.
+_weather = read_gold("weather_observation", source="dwd").filter(
+    F.col("source_system") == "dwd"
+)
+_station_temperature = (
+    _weather.filter(F.col("air_temperature_degc").isNotNull())
+    .groupBy("location_key", "local_date")
+    .agg(
+        F.count("*").alias("n_hours"),
+        F.avg("air_temperature_degc").alias("temperature"),
+    )
+    .filter(F.col("n_hours") >= WEATHER_MIN_HOURS)
+)
+_station_radiation = (
+    _weather.filter(F.col("global_radiation_w_per_m2").isNotNull())
+    .groupBy("location_key", "local_date")
+    .agg(
+        F.count("*").alias("n_hours"),
+        F.avg("global_radiation_w_per_m2").alias("radiation"),
+    )
+    .filter(F.col("n_hours") >= WEATHER_MIN_RADIATION_HOURS)
+)
+_national_radiation = _station_radiation.groupBy("local_date").agg(
+    F.count("*").alias("n_stations"),
+    F.avg("radiation").alias("weather_global_radiation_mean_w_per_m2"),
+)
+weather_national_daily = (
+    _station_temperature.groupBy("local_date")
+    .agg(
+        F.count("*").alias("n_stations"),
+        F.avg("temperature").alias("weather_temperature_mean_degc"),
+    )
+    .filter(F.col("n_stations") >= WEATHER_MIN_STATIONS)
+    .drop("n_stations")
+    .withColumn(
+        "heating_degree_days",
+        F.greatest(
+            F.lit(HEATING_BASE_DEGC) - F.col("weather_temperature_mean_degc"),
+            F.lit(0.0),
+        ),
+    )
+    .withColumn(
+        "cooling_degree_days",
+        F.greatest(
+            F.col("weather_temperature_mean_degc") - F.lit(COOLING_BASE_DEGC),
+            F.lit(0.0),
+        ),
+    )
+    .join(
+        _national_radiation.filter(F.col("n_stations") >= WEATHER_MIN_STATIONS).drop(
+            "n_stations"
+        ),
+        "local_date",
+        "left",
+    )
+)
 
 # COMMAND ----------
 
@@ -816,7 +881,9 @@ FRAMES["price_quarter_hour"] = assembled_frame(
     [(market_quarter_hour, ["market_area_code", "interval_start_utc"], ["local_date"])],
 )
 FRAMES["bias"] = assembled_frame(target_bias, [(market_daily, _day)])
-FRAMES["load"] = assembled_frame(target_load, [(market_daily, _day)])
+FRAMES["load"] = assembled_frame(
+    target_load, [(market_daily, _day), (weather_national_daily, ["local_date"])]
+)
 FRAMES["redispatch"] = assembled_frame(target_redispatch, [(redispatch_features, _day)])
 FRAMES["rl_redispatch"] = assembled_frame(
     target_rl_redispatch, [(redispatch_features, _day)]
