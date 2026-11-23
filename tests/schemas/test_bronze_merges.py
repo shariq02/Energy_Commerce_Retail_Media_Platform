@@ -92,8 +92,9 @@ def test_parts_are_loaded_or_staged_tables(merges, snapshot):
             if merge.get("at_load"):
                 assert part in staged, part
             else:
-                # a table of the snapshot, or one that the energy loader writes
-                assert (merge["schema"], part) in snapshot or part in loaded, part
+                # a table of the snapshot, or one that the loader of its schema writes
+                written = loaded if merge["schema"] == "bronze" else staged
+                assert (merge["schema"], part) in snapshot or part in written, part
 
 
 def test_an_appended_merge_lists_its_kept_values_as_parts(merges):

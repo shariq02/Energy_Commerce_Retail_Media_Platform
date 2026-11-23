@@ -146,7 +146,6 @@ merges:
   - schema: genomics_bronze
     table: reference_small
     discriminator: dataset
-    at_load: true
     parts:
       gnomad_constraint: gnomad_constraint_metrics
       tcga_site_code: tcga_site_codes
