@@ -1605,17 +1605,19 @@ class MulticlassEvaluator(Evaluator):
 
     needs_all_bundles = True
 
-    def load(self, df_eval, df_validation, validation_fraction: float = 1.0):
+    def _frame(self, df):
         spec = self.spec
-        feats = resolve_features(self.ctx, df_eval.columns)
+        feats = resolve_features(self.ctx, df.columns)
         wanted = [*feats, spec["target"], "partition", "group_key"]
-        cols = [c for c in dict.fromkeys(wanted) if c in set(df_eval.columns)]
-        pdf, _ = to_training_frame(df_eval, key_cols=spec["key_cols"], columns=cols)
+        cols = [c for c in dict.fromkeys(wanted) if c in set(df.columns)]
+        pdf, _ = to_training_frame(df, key_cols=spec["key_cols"], columns=cols)
         pdf[spec["target"]] = pdf[spec["target"]].astype(str)
-        mine = pdf["partition"] == self.ctx.partition
-        self.frames["eval"] = pdf[mine].reset_index(drop=True)
-        earlier = pdf["partition"] == "validation"
-        self.frames["validation"] = pdf[earlier].reset_index(drop=True)
+        return pdf.reset_index(drop=True)
+
+    def load(self, df_eval, df_validation, validation_fraction: float = 1.0):
+        self.frames["eval"] = self._frame(df_eval)
+        if df_validation is not None:
+            self.frames["validation"] = self._frame(df_validation)
         note_read(self.ctx, self.frames["eval"], None, "group_key")
 
     def attach(self, bundles, base_name):
