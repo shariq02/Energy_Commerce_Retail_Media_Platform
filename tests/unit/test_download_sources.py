@@ -388,6 +388,40 @@ def test_genome_chunks_keep_standard_contigs_with_a_flank_on_each_side(
     assert rows["sequence"].tolist() == ["NNACGTAC", "GTACGTNN", "NNTTTTNN"]
 
 
+@pytest.mark.parametrize("length", [1, 4, 5, 8, 10, 23])
+@pytest.mark.parametrize("width", [1, 3, 7, 50])
+def test_streamed_genome_chunks_equal_the_cut_of_the_whole_contig(
+    genomics, tmp_path, monkeypatch, length, width
+):
+    monkeypatch.setattr(genomics, "GENOME_CHUNK_BASES", 5)
+    monkeypatch.setattr(genomics, "GENOME_FLANK", 3)
+    monkeypatch.setattr(genomics, "GENOME_BATCH_CHUNKS", 2)
+    bases = ("acgtn" * 10)[:length]
+    lines = [bases[at : at + width] for at in range(0, length, width)]
+    path = tmp_path / "g.fa.gz"
+    with gzip.open(path, "wt", encoding="ascii") as handle:
+        handle.write(">chr2 x\n" + "\n".join(lines) + "\n")
+    frames = [batch["chunk"] for batch, _ in genomics.parse_genome_chunks(path, "")]
+    padded = "NNN" + bases.upper() + "NNN"
+    expected = [("2", at + 1, padded[at : at + 11]) for at in range(0, length, 5)]
+    assert list(genomics.pd.concat(frames).itertuples(index=False, name=None)) == (
+        expected
+    )
+
+
+def test_a_contig_chunker_holds_about_one_chunk_of_bases(genomics, monkeypatch):
+    monkeypatch.setattr(genomics, "GENOME_CHUNK_BASES", 100)
+    monkeypatch.setattr(genomics, "GENOME_FLANK", 10)
+    chunker = genomics.ContigChunker("1")
+    rows = []
+    for _ in range(1000):
+        rows += chunker.add("ACGTACGTAC\n")
+        assert len(chunker.buffer) + chunker.pending <= 100 + 2 * 10 + 10
+    rows += chunker.finish()
+    assert len(rows) == 100
+    assert all(len(sequence) == 120 for _, _, sequence in rows)
+
+
 def test_genome_and_blosum_stages_are_staged_and_read_by_bronze(config):
     stages = {(s["source"], tuple(s["datasets"])): s for s in config["stages"]}
     assert stages[("genome_sequence", ("chunk",))]["compress"] is True

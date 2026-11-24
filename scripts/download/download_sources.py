@@ -552,40 +552,91 @@ def parse_depmap_effect(path: Path, tag: str):
         yield {"gene_effect": long.rename(columns={model: "model_id"})}, len(frame)
 
 
-def genome_chunk_frames(contig: str, bases: str):
-    """Chunk rows of one contig: (contig, 1-based start of the chunk, its bases with a
-    GENOME_FLANK of N or neighbour bases on each side), in batches of rows."""
-    padded = "N" * GENOME_FLANK + bases + "N" * GENOME_FLANK
-    rows = []
-    for start in range(0, len(bases), GENOME_CHUNK_BASES):
-        sequence = padded[start : start + GENOME_CHUNK_BASES + 2 * GENOME_FLANK]
-        rows.append((contig, start + 1, sequence))
-        if len(rows) >= GENOME_BATCH_CHUNKS:
-            yield pd.DataFrame(rows, columns=GENOME_COLUMNS)
-            rows = []
-    if rows:
-        yield pd.DataFrame(rows, columns=GENOME_COLUMNS)
+class ContigChunker:
+    """Cuts one contig into chunk rows while its FASTA lines arrive and holds about one
+    chunk of bases (chr1 alone is 250 million). A row is (contig, 1-based start of the
+    chunk, its bases with GENOME_FLANK of N or neighbour bases on each side)."""
+
+    def __init__(self, contig: str):
+        self.contig = contig
+        self.buffer = ""  # the bases from `offset` on that are not dropped yet
+        self.offset = 0
+        self.pieces: list[str] = []  # lines that are not joined into the buffer yet
+        self.pending = 0
+        self.chunk = 0
+
+    def add(self, line: str) -> list[tuple]:
+        text = line.strip().upper()
+        self.pieces.append(text)
+        self.pending += len(text)
+        needed = (self.chunk + 1) * GENOME_CHUNK_BASES + GENOME_FLANK
+        if self.offset + len(self.buffer) + self.pending < needed:
+            return []
+        self.join()
+        rows = []
+        while self.offset + len(self.buffer) >= (
+            (self.chunk + 1) * GENOME_CHUNK_BASES + GENOME_FLANK
+        ):
+            rows.append(self.row())
+        return rows
+
+    def finish(self) -> list[tuple]:
+        """The chunks that the end of the contig completes (N after its last base)."""
+        self.join()
+        total = self.offset + len(self.buffer)
+        rows = []
+        while self.chunk * GENOME_CHUNK_BASES < total:
+            rows.append(self.row())
+        return rows
+
+    def join(self) -> None:
+        self.buffer += "".join(self.pieces)
+        self.pieces, self.pending = [], 0
+
+    def row(self) -> tuple:
+        start = self.chunk * GENOME_CHUNK_BASES
+        begin, end = start - GENOME_FLANK, start + GENOME_CHUNK_BASES + GENOME_FLANK
+        total = self.offset + len(self.buffer)
+        first = max(begin, self.offset) - self.offset
+        last = min(end, total) - self.offset
+        after = max(0, min(end, total + GENOME_FLANK) - total)
+        sequence = "N" * max(0, -begin) + self.buffer[first:last] + "N" * after
+        self.chunk += 1
+        drop = self.chunk * GENOME_CHUNK_BASES - GENOME_FLANK - self.offset
+        if drop > 0:
+            self.buffer, self.offset = self.buffer[drop:], self.offset + drop
+        return (self.contig, start + 1, sequence)
 
 
 def parse_genome_chunks(path: Path, tag: str):
-    """The standard contigs of a gzip FASTA as chunk rows (upper case)."""
-    contig, lines = None, []
+    """The standard contigs of a gzip FASTA as chunk rows (upper case), one contig at a
+    time without holding it, in frames of GENOME_BATCH_CHUNKS rows."""
+    chunker: ContigChunker | None = None
+    rows: list[tuple] = []
+    bases = 0
     with gzip.open(path, "rt", encoding="ascii") as handle:
         for line in handle:
             if line.startswith(">"):
-                if contig:
-                    bases = "".join(lines).upper()
-                    for frame in genome_chunk_frames(contig, bases):
-                        yield {"chunk": frame}, len(bases)
-                    logger.info(f"genome: contig {contig} done")
-                contig, lines = GENOME_CONTIGS.get(line[1:].split()[0]), []
-            elif contig:
-                lines.append(line.strip())
-    if contig:
-        bases = "".join(lines).upper()
-        for frame in genome_chunk_frames(contig, bases):
-            yield {"chunk": frame}, len(bases)
-        logger.info(f"genome: contig {contig} done")
+                if chunker:
+                    rows += chunker.finish()
+                    logger.info(f"genome: contig {chunker.contig} done")
+                name = GENOME_CONTIGS.get(line[1:].split()[0])
+                chunker = ContigChunker(name) if name else None
+            elif chunker:
+                bases += len(line.strip())
+                rows += chunker.add(line)
+            while len(rows) >= GENOME_BATCH_CHUNKS:
+                yield genome_frame(rows[:GENOME_BATCH_CHUNKS]), bases
+                rows, bases = rows[GENOME_BATCH_CHUNKS:], 0
+    if chunker:
+        rows += chunker.finish()
+        logger.info(f"genome: contig {chunker.contig} done")
+    if rows:
+        yield genome_frame(rows), bases
+
+
+def genome_frame(rows: list[tuple]) -> dict[str, pd.DataFrame]:
+    return {"chunk": pd.DataFrame(rows, columns=GENOME_COLUMNS)}
 
 
 def parse_blosum(path: Path, tag: str):
