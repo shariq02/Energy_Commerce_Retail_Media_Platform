@@ -1506,6 +1506,7 @@ def protein_claims(rules, xwalk):
                 fields=[
                     ("name", "protein_name"),
                     ("length", "sequence_length"),
+                    ("amino_acid_sequence", "sequence"),
                     ("gene_symbol", "gene_name"),
                     ("entry_name", "entry_name"),
                     ("tax_id", "tax_id"),

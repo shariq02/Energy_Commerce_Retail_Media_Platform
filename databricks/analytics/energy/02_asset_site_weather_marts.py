@@ -281,6 +281,78 @@ TABLES["capacity_utilisation_monthly"] = (
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- regional_fleet_monthly (units and capacity by state, type and month)
+# Units commissioned or decommissioned before FLEET_START count in its first month (set).
+FLEET_START = "2000-01-01"
+fleet_grain = ["federal_state", "unit_type", "month"]
+regional = units.filter(F.col("federal_state").isNotNull()).select(
+    "federal_state",
+    "unit_type",
+    "capacity_net_kw",
+    F.greatest(
+        F.trunc(F.to_date("commissioning_date"), "month"),
+        F.lit(FLEET_START).cast("date"),
+    ).alias("_start"),
+    F.greatest(
+        F.trunc(F.to_date("final_decommissioning_date"), "month"),
+        F.lit(FLEET_START).cast("date"),
+    ).alias("_end"),
+)
+
+
+def fleet_events(moment, units_name, capacity_name):
+    """Units and capacity (MW) that begin or end in each month."""
+    return (
+        regional.filter(F.col(moment).isNotNull())
+        .groupBy("federal_state", "unit_type", F.col(moment).alias("month"))
+        .agg(
+            F.count(F.lit(1)).alias(units_name),
+            (F.sum("capacity_net_kw") / 1000.0).alias(capacity_name),
+        )
+    )
+
+
+month_spine = spark.sql(
+    f"SELECT explode(sequence(DATE'{FLEET_START}', "
+    "trunc(current_date(), 'month'), interval 1 month)) AS month"
+)
+running = (
+    Window.partitionBy("federal_state", "unit_type")
+    .orderBy("month")
+    .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+)
+fleet_counts = ("units_added", "units_decommissioned")
+fleet_capacity = ("capacity_added_mw", "capacity_decommissioned_mw")
+fleet = (
+    regional.select("federal_state", "unit_type")
+    .distinct()
+    .crossJoin(month_spine)
+    .join(
+        fleet_events("_start", *("units_added", "capacity_added_mw")),
+        fleet_grain,
+        "left",
+    )
+    .join(
+        fleet_events("_end", *("units_decommissioned", "capacity_decommissioned_mw")),
+        fleet_grain,
+        "left",
+    )
+    .fillna(0, subset=[*fleet_counts, *fleet_capacity])
+    .withColumn(
+        "unit_count",
+        F.sum(F.col("units_added") - F.col("units_decommissioned")).over(running),
+    )
+    .withColumn(
+        "capacity_net_mw",
+        F.sum(F.col("capacity_added_mw") - F.col("capacity_decommissioned_mw")).over(
+            running
+        ),
+    )
+)
+TABLES["regional_fleet_monthly"] = (add_provenance(fleet, SOURCE, RID), fleet_grain)
+
+# COMMAND ----------
+
 # DBTITLE 1,Transform -- capacity_margin_yearly (capacity, plan and peak load per year)
 peak_load = consumption.groupBy(F.year("local_date").alias("year")).agg(
     F.max(F.col("energy_mwh") / (F.col("interval_seconds") / 3600.0)).alias(

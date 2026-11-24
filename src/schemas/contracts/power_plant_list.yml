@@ -33,7 +33,7 @@ acquisition:
   attribution: "Bundesnetzagentur, Kraftwerksliste"
   header_note: >
     the source CSV carries title / disclaimer rows above the real header and a
-    footnote block below the data. scripts/ingestion/stage_power_plant_list.py
+    footnote block below the data. scripts/ingestion/_energy_commerce_formats.py
     auto-detects and applies the header -- profiling confirms 0 unnamed / 0
     footnote-named columns in the current Bronze tables for power_plant_list.
     power_plant_capacity_additions still has footnote text in a data column

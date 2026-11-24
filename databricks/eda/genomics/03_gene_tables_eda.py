@@ -13,7 +13,7 @@
 # MAGIC **Date:** November 2026
 # MAGIC
 # MAGIC **Purpose:** Profile the gene tables of genomics Gold (`gene_profile`,
-# MAGIC `gene_disease_profile`): nulls, constant columns,
+# MAGIC `relation_record`): nulls, constant columns,
 # MAGIC key, rates per column kind, coverage by source, the genes each table covers,
 # MAGIC the diseases per gene, and which gene columns carry the pathogenic or benign
 # MAGIC class of the variants of the gene -- as evidence.
@@ -31,7 +31,7 @@ SOURCE = "genomics"
 NB_KEY = "03_gene_tables"
 SECTION_TITLE = "Gene tables and the variant class they carry"
 GENE = "gene_profile"
-LINKS = "gene_disease_profile"
+LINKS = "relation_record"
 TABLES = [GENE, LINKS]
 CLINICAL = "variant_profile"
 POSITIVE = "is_pathogenic"

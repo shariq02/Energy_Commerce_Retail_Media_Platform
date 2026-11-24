@@ -445,7 +445,7 @@ for name, v in trailer.items():
 if _trailer_hit:
     _struct.append(
         para(
-            f"-> INGESTION defect in {_trailer_hit}: fix `scripts/ingestion/stage_dwd.py`",
+            f"-> INGESTION defect in {_trailer_hit}: fix the DWD parser in `scripts/ingestion/_energy_commerce_formats.py`",
             "to strip the trailer, re-stage, re-upload to the Volume and re-run the DWD",
             "Bronze loader; until then, filter non-numeric STATIONS_ID before any join.",
         )
@@ -529,7 +529,7 @@ for name, x in meta.items():
 _silver = []
 if _trailer_hit:
     _silver.append(
-        f"- BLOCKED for {_trailer_hit}: strip the parser trailer in stage_dwd.py and re-run Bronze."
+        f"- BLOCKED for {_trailer_hit}: strip the parser trailer in the DWD parser and re-run Bronze."
     )
 if _relocations:
     _silver.append(

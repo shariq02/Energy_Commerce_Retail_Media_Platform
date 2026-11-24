@@ -106,7 +106,11 @@ TABLES = {}
 genes = from_gold(read_gold("gene_profile", **GOLD))
 clinical = read_gold("variant_profile", **GOLD)
 disease_profile = from_gold(read_gold("disease_profile", **GOLD))
-gene_disease = read_gold("gene_disease_profile", **GOLD)
+gene_disease = read_gold("relation_record", **GOLD).filter(
+    (F.col("relation_kind") == "gene_disease")
+    & (F.col("gene_key").isNotNull() | F.col("source_gene_id").isNotNull())
+    & (F.col("disease_key").isNotNull() | F.col("source_disease_id").isNotNull())
+)
 genetic_test = read_gold("genetic_test_profile", **GOLD)
 classification_change = read_gold("clinvar_classification_change", **GOLD)
 label = pick_column(clinical, *LABEL)

@@ -202,6 +202,7 @@ def read_uniprot(
     scanned = 0
     entry: dict = {}
     entry_features: list[dict] = []
+    sequence_lines: list[str] = []
     with open_text(path) as f:
         for line in f:
             code, body = line[:2], line[5:].rstrip("\n")
@@ -209,6 +210,9 @@ def read_uniprot(
                 parts = body.split()
                 entry = {"entry_name": parts[0], "sequence_length": parts[-2]}
                 entry_features = []
+                sequence_lines = []
+            elif code == "  ":
+                sequence_lines.append(body.replace(" ", ""))
             elif code == "AC" and "accession" not in entry:
                 entry["accession"] = body.split(";")[0].strip()
             elif code == "DE" and "protein_name" not in entry:
@@ -238,6 +242,7 @@ def read_uniprot(
             elif code == "//":
                 scanned += 1
                 if entry.get("tax_id") == tax_id:
+                    entry["sequence"] = "".join(sequence_lines)
                     entries.append(entry)
                     features.extend(
                         {"accession": entry["accession"], **feature}

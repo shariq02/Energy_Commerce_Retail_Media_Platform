@@ -442,6 +442,19 @@ _EVENT_TIME = [
     ("event_timestamp_project", "timestamp"),
     ("local_date", "date"),
 ]
+# GA4 event context besides the country (REES46 has none of it); a session or user
+# takes the first value of its events.
+GA4_CONTEXT = (
+    "geo_region",
+    "geo_city",
+    "platform",
+    "device_category",
+    "device_operating_system",
+    "device_browser",
+    "traffic_source",
+    "traffic_medium",
+    "traffic_campaign",
+)
 COMMERCE_EVENT_COLUMNS = [
     ("event_key", "string"),
     ("event_date_native", "string"),
@@ -462,7 +475,8 @@ COMMERCE_EVENT_COLUMNS = [
         "geo_country",
         "transaction_id",
     ),
-    *_doubles("purchase_revenue"),
+    *_texts(*GA4_CONTEXT),
+    *_doubles("purchase_revenue", "tax_value", "shipping_value", "refund_value"),
     ("unique_items", "bigint"),
     ("total_item_quantity", "bigint"),
     *_booleans(
@@ -523,10 +537,17 @@ COMMERCE_SESSION_COLUMNS = [
     *_EVENT_NAME_COUNTS,
     ("distinct_product_count", "bigint"),
     ("distinct_category_count", "bigint"),
+    ("distinct_price_count", "bigint"),
     ("transaction_count", "bigint"),
     ("revenue", "double"),
+    ("duration_seconds", "double"),
+    ("start_hour", "int"),
+    ("start_weekday", "int"),
+    ("seconds_to_first_cart", "double"),
+    ("mean_event_gap_seconds", "double"),
     *_booleans("currency_unknown", "bot_burst_suspected"),
     ("geo_country", "string"),
+    *_texts(*GA4_CONTEXT),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
@@ -541,8 +562,12 @@ COMMERCE_USER_COLUMNS = [
     ("distinct_product_count", "bigint"),
     ("transaction_count", "bigint"),
     ("revenue", "double"),
+    ("days_active", "bigint"),
+    ("mean_session_gap_hours", "double"),
+    ("days_before_data_end", "double"),
     *_booleans("currency_unknown"),
     ("geo_country", "string"),
+    *_texts(*GA4_CONTEXT),
     ("measurement_basis", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
@@ -560,8 +585,23 @@ COMMERCE_PRODUCT_COLUMNS = [
     *_doubles("minimum_price", "maximum_price", "mean_price"),
     ("total_quantity", "bigint"),
     ("revenue", "double"),
+    *_doubles(
+        "view_to_cart_rate",
+        "cart_to_purchase_rate",
+        "price_relative_to_category_median",
+    ),
     *_booleans("currency_unknown"),
     ("measurement_basis", "string"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
+# Eurostat retail trade volume index: one row per month and series.
+RETAIL_TRADE_INDEX_COLUMNS = [
+    ("observation_month", "date"),
+    *_texts("indicator_code", "activity_code", "adjustment_code", "unit_code"),
+    ("country_code", "string"),
+    ("index_value", "double"),
+    ("observation_flag", "string"),
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
@@ -766,6 +806,13 @@ ENERGY_CARRIER_MAP_COLUMNS = [
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
+# The nearest DWD weather station of a generation unit (one row per unit).
+UNIT_WEATHER_STATION_LINK_COLUMNS = [
+    *_texts("unit_type", "unit_id", "weather_station_key", "link_basis"),
+    ("distance_km", "double"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
 
 # COMMAND ----------
 
@@ -791,7 +838,9 @@ SEMANTIC_STRUCTURES = {
     "commerce_session": COMMERCE_SESSION_COLUMNS,
     "commerce_user": COMMERCE_USER_COLUMNS,
     "commerce_product": COMMERCE_PRODUCT_COLUMNS,
+    "retail_trade_index": RETAIL_TRADE_INDEX_COLUMNS,
     "energy_carrier_map": ENERGY_CARRIER_MAP_COLUMNS,
+    "unit_weather_station_link": UNIT_WEATHER_STATION_LINK_COLUMNS,
 }
 
 # Register structures whose wide column set comes from the MaStR / plant-list
@@ -904,6 +953,7 @@ COMMERCE_STRUCTURES = {
     "commerce_session",
     "commerce_user",
     "commerce_product",
+    "retail_trade_index",
 }
 
 

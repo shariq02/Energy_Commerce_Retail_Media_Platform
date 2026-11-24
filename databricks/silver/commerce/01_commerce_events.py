@@ -17,7 +17,8 @@
 # MAGIC (`ga4_event_item`, one row per item of an event). The REES46 category path is
 # MAGIC three columns. The GA4 event parameters and transaction fields are columns.
 # MAGIC The sessions, users and products (`commerce_session`, `commerce_user`,
-# MAGIC `commerce_product`) carry their counts, sums and first and last event.
+# MAGIC `commerce_product`) carry their counts, sums and first and last event. The
+# MAGIC German retail trade volume index is `retail_trade_index` (one row per month).
 
 # COMMAND ----------
 
@@ -121,9 +122,15 @@ def unset_to_null(col):
 
 
 ga4_bronze = read_bronze(GA4_BT)
+# The device, traffic and region columns exist after the re-export of GA4 only.
+GA4_CONTEXT_PRESENT = [c for c in GA4_CONTEXT if c in ga4_bronze.columns]
 _kept_ga4, _q_ga4 = resolve_conflicts(
-    ga4_bronze, GA4_KEY, GA4_CONTENT, bronze_table=GA4_BT
+    ga4_bronze,
+    GA4_KEY,
+    [*GA4_CONTENT, *GA4_CONTEXT_PRESENT],
+    bronze_table=GA4_BT,
 )
+_ecommerce_fields = {f.name for f in ga4_bronze.schema["ecommerce"].dataType.fields}
 write_quarantine(_q_ga4.withColumn("source_system", F.lit(GA4)), RID)
 ga4_reconciliation = reconciliation_stats(ga4_bronze, _kept_ga4, _q_ga4)
 
@@ -167,6 +174,9 @@ ga4_events = (
     .withColumn("measurement_basis", F.lit("web_analytics_event"))
     .withColumn("source_record_id", F.col("event_key"))
 )
+for _field in ("tax_value", "shipping_value", "refund_value"):
+    if _field in _ecommerce_fields:
+        ga4_events = ga4_events.withColumn(_field, F.col(f"ecommerce.{_field}"))
 ga4_events = add_semantic_provenance(ga4_events, GA4, GA4_BT, RID)
 
 # COMMAND ----------
@@ -298,6 +308,7 @@ SHARED_SUMS = [
         "currency_unknown"
     ),
     F.first("geo_country", ignorenulls=True).alias("geo_country"),
+    *[F.first(c, ignorenulls=True).alias(c) for c in GA4_CONTEXT],
     F.first("measurement_basis", ignorenulls=True).alias("measurement_basis"),
     F.first("source_dataset", ignorenulls=True).alias("source_dataset"),
 ]
@@ -306,13 +317,34 @@ sessions = (
     .agg(
         F.max("session_number").alias("session_number"),
         F.min("event_timestamp_project").alias("_first_project"),
+        F.min(
+            F.when(
+                F.col("_name").isin("cart", "add_to_cart"), F.col("event_timestamp_utc")
+            )
+        ).alias("_first_cart"),
         F.countDistinct("category_id").alias("distinct_category_count"),
+        F.countDistinct("price").alias("distinct_price_count"),
         F.max(F.coalesce(F.col("bot_burst_suspected"), F.lit(False))).alias(
             "bot_burst_suspected"
         ),
         *SHARED_SUMS,
     )
     .withColumn("local_date", F.to_date("_first_project"))
+    .withColumn(
+        "duration_seconds",
+        F.col("last_event_utc").cast("double")
+        - F.col("first_event_utc").cast("double"),
+    )
+    .withColumn("start_hour", F.hour("_first_project"))
+    .withColumn("start_weekday", F.dayofweek("_first_project"))
+    .withColumn(
+        "seconds_to_first_cart",
+        F.col("_first_cart").cast("double") - F.col("first_event_utc").cast("double"),
+    )
+    .withColumn(
+        "mean_event_gap_seconds",
+        F.col("duration_seconds") / F.nullif(F.col("event_count") - 1, F.lit(0)),
+    )
     .withColumn(
         "session_key", sha_key("source_system", "source_user_id", "source_session_id")
     )
@@ -341,10 +373,36 @@ write_inspect_export(
 # COMMAND ----------
 
 # DBTITLE 1,Transform -- commerce_user and commerce_product (REES46 events, GA4 items)
+# The mean gap between the starts of the sessions of a user is (last start - first
+# start) / (sessions - 1); the data end is the last event of the source.
+session_starts = sessions.groupBy("user_key").agg(
+    F.min("first_event_utc").alias("_first_start"),
+    F.max("first_event_utc").alias("_last_start"),
+)
+data_end = events.groupBy("source_system").agg(
+    F.max("event_timestamp_utc").alias("_data_end")
+)
 users = (
     events.groupBy("source_system", "source_user_id")
-    .agg(F.countDistinct("source_session_id").alias("session_count"), *SHARED_SUMS)
+    .agg(
+        F.countDistinct("source_session_id").alias("session_count"),
+        F.countDistinct("local_date").alias("days_active"),
+        *SHARED_SUMS,
+    )
     .withColumn("user_key", sha_key("source_system", "source_user_id"))
+    .join(session_starts, "user_key", "left")
+    .join(F.broadcast(data_end), "source_system", "left")
+    .withColumn(
+        "mean_session_gap_hours",
+        (F.col("_last_start").cast("double") - F.col("_first_start").cast("double"))
+        / 3600
+        / F.nullif(F.col("session_count") - 1, F.lit(0)),
+    )
+    .withColumn(
+        "days_before_data_end",
+        (F.col("_data_end").cast("double") - F.col("last_event_utc").cast("double"))
+        / 86400,
+    )
 )
 users = conform(
     with_row_provenance(users.withColumn("_srid", F.col("user_key")), "_srid"),
@@ -355,6 +413,29 @@ PRICE_STATS = [
     F.max("price").alias("maximum_price"),
     F.avg("price").alias("mean_price"),
 ]
+category_median = (
+    events.filter(
+        (F.col("source_system") == REES46)
+        & F.col("price").isNotNull()
+        & F.col("category_code").isNotNull()
+    )
+    .groupBy("category_code")
+    .agg(F.percentile_approx("price", 0.5).alias("_category_median"))
+)
+
+
+def with_stage_rates(df, view, cart):
+    """The share of the viewers that cart, and of the carts that purchase."""
+    return df.withColumn(
+        "view_to_cart_rate",
+        F.col(f"{cart}_event_count") / F.nullif(F.col(f"{view}_event_count"), F.lit(0)),
+    ).withColumn(
+        "cart_to_purchase_rate",
+        F.col("purchase_event_count")
+        / F.nullif(F.col(f"{cart}_event_count"), F.lit(0)),
+    )
+
+
 rees46_products = (
     events.filter((F.col("source_system") == REES46) & F.col("product_id").isNotNull())
     .groupBy("source_system", F.col("product_id").alias("source_product_id"))
@@ -402,6 +483,15 @@ ga4_products = (
     )
     .withColumn("measurement_basis", F.lit("web_analytics_event_item"))
 )
+rees46_products = with_stage_rates(
+    rees46_products.join(F.broadcast(category_median), "category_code", "left"),
+    "view",
+    "cart",
+).withColumn(
+    "price_relative_to_category_median",
+    F.col("mean_price") / F.nullif(F.col("_category_median"), F.lit(0)),
+)
+ga4_products = with_stage_rates(ga4_products, "view_item", "add_to_cart")
 products = (
     conform(rees46_products, COMMERCE_PRODUCT_COLUMNS)
     .unionByName(conform(ga4_products, COMMERCE_PRODUCT_COLUMNS))
@@ -431,3 +521,72 @@ for table, frame, key in (
         writer=write_semantic,
         extra_checks=structure_extra_checks,
     )
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- retail_trade_index (the German retail trade volume, per month)
+RETAIL = "eurostat"
+RETAIL_BT = "eurostat_retail_trade"
+MONTH = ("yyyy-MM",)
+retail_bronze = read_bronze(RETAIL_BT)
+_obs_text = F.trim(F.col("OBS_VALUE"))
+_obs_value = F.when(_obs_text.rlike(r"^[-+]?\d+(\.\d+)?$"), _obs_text.cast("double"))
+_obs_month = F.to_date(parse_ts("TIME_PERIOD", MONTH, "UTC"))
+register_lenient(
+    f"{RETAIL_BT}.OBS_VALUE", retail_bronze, _obs_text, _obs_value, "OBS_VALUE"
+)
+register_lenient(
+    f"{RETAIL_BT}.TIME_PERIOD",
+    retail_bronze,
+    F.col("TIME_PERIOD"),
+    _obs_month,
+    "TIME_PERIOD",
+)
+retail_trade_index = retail_bronze.select(
+    _obs_month.alias("observation_month"),
+    F.col("indic_bt").alias("indicator_code"),
+    F.col("nace_r2").alias("activity_code"),
+    F.col("s_adj").alias("adjustment_code"),
+    F.col("unit").alias("unit_code"),
+    F.col("geo").alias("country_code"),
+    _obs_value.alias("index_value"),
+    F.col("OBS_FLAG").alias("observation_flag"),
+).withColumn(
+    "source_record_id",
+    sha_key(
+        F.lit(RETAIL),
+        "observation_month",
+        "indicator_code",
+        "activity_code",
+        "adjustment_code",
+        "unit_code",
+        "country_code",
+    ),
+)
+retail_trade_index = conform(
+    add_semantic_provenance(retail_trade_index, RETAIL, RETAIL_BT, RID),
+    RETAIL_TRADE_INDEX_COLUMNS,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- retail_trade_index
+write_inspect_export(
+    retail_trade_index,
+    "retail_trade_index",
+    source=RETAIL,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["source_record_id"],
+    writer=write_semantic,
+    extra_checks=lambda t: {
+        "months": t.select("observation_month").distinct().count(),
+        "months_without_a_value": t.filter(F.col("index_value").isNull()).count(),
+    },
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Check and export -- rejected values of the lenient reads
+export_rejected_values(FINDINGS, COMPONENT)

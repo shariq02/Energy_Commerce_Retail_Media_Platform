@@ -1,9 +1,9 @@
-# Source download list: scripts run first, then one entry per stage() call, in run order
+# Source download list: one entry per stage() call, in run order
 # ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 # Author: Sharique Mohammad
 # Date: November 2026
 #
-# Read by download_sources.py. `before` names scripts whose main() runs first.
+# Read by download_sources.py (a menu of the ecosystems and their sources).
 # `vars` fill {name} in a url or file name. A file is {tag, url, file}; `each` repeats a file for
 # every item (a value, or a mapping whose keys fill the template); `range`
 # repeats it for n = 0 .. N-1; `from` takes the file list from a named listing.
@@ -12,11 +12,9 @@
 # stop the stage at the staging size cap. `ecosystem` is genomics unless named.
 # `refresh_when_files_added` stages a recorded stage again when a tag is new.
 # `pause_seconds` waits between the downloads of a stage; `timeout_seconds`
-# sets the request timeout (default 60).
-
-before:
-  - download_smard
-  - stage_smard
+# sets the request timeout (default 60). `compress` stages gzip CSV, `jsonl`
+# stages JSON lines (nested records); `fetch: bigquery` takes a `bigquery:<table>`
+# url from BigQuery instead of a download.
 
 vars:
   ncbi: https://ftp.ncbi.nlm.nih.gov
@@ -59,6 +57,130 @@ vars:
   gnomad_constraint: https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1/constraint
   tcga_codes: https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables
   eurostat: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data
+  smard: https://www.smard.de/app/chart_data
+  # SMARD series: one group per region and resolution; `chunks` keeps the last N weekly
+  # chunks (quarter-hour and hourly series stay a recent window). A filter id is
+  # listed under the name that its rows get in `metric`.
+  smard_series:
+    - region: DE-LU
+      resolution: day
+      filters:
+        <<: &market_filters
+          4169: day_ahead_prices
+          410: total_power_consumption
+          4359: residual_load
+          4387: pumped_storage_consumption
+          1223: generation_lignite
+          1224: generation_nuclear
+          1225: generation_offshore_wind
+          1226: generation_hydro
+          1227: generation_other_conventional
+          1228: generation_other_renewable
+          4066: generation_biomass
+          4067: generation_onshore_wind
+          4068: generation_photovoltaic
+          4069: generation_hard_coal
+          4070: generation_pumped_storage
+          4071: generation_natural_gas
+        122: forecast_generation_total
+        123: forecast_generation_onshore_wind
+        3791: forecast_generation_offshore_wind
+        126: forecast_generation_photovoltaic
+        715: forecast_generation_other
+        5097: forecast_generation_wind_and_photovoltaic
+    - region: 50Hertz
+      resolution: day
+      filters: &control_area_filters
+        410: total_power_consumption
+        4067: generation_onshore_wind
+        4068: generation_photovoltaic
+        1225: generation_offshore_wind
+    - {region: Amprion, resolution: day, filters: *control_area_filters}
+    - {region: TenneT, resolution: day, filters: *control_area_filters}
+    - {region: TransnetBW, resolution: day, filters: *control_area_filters}
+    - region: DE-LU
+      resolution: quarterhour
+      chunks: 104
+      filters:
+        <<: *market_filters
+        411: forecast_consumption_total
+        4362: forecast_residual_load
+    # Filter 258 is labelled "Polen" twice in the public filter list; its zone is
+    # confirmed at staging.
+    - region: DE-LU
+      resolution: hour
+      chunks: 104
+      filters:
+        5078: price_neighbours_average
+        4996: price_belgium
+        4997: price_norway_2
+        4170: price_austria
+        252: price_denmark_1
+        253: price_denmark_2
+        254: price_france
+        255: price_italy_north
+        256: price_netherlands
+        257: price_poland
+        258: price_zone_258
+        259: price_switzerland
+        260: price_slovenia
+        261: price_czechia
+        262: price_hungary
+  mastr_page: https://www.marktstammdatenregister.de/MaStR/Datendownload
+  dwd: https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly
+  dwd_solar_parameter: ST
+  # DWD category -> parameter abbreviation of its file names.
+  dwd_categories:
+    air_temperature: TU
+    precipitation: RR
+    moisture: TF
+    pressure: P0
+    wind: FF
+    sun: SD
+    cloudiness: N
+    dew_point: TD
+    soil_temperature: EB
+    visibility: VV
+    cloud_type: CS
+    wind_synop: F
+    extreme_wind: FX
+    weather_phenomena: WW
+  # Station key -> a part of the station name in the DWD description file, matched
+  # without umlauts; a trailing space or a compound name tells apart stations whose
+  # names collide ("Nurnberg " and "Nurnberg-Netzstall").
+  dwd_stations:
+    berlin: Berlin-Tempelhof
+    hamburg: Hamburg-Fuhlsbuttel
+    munich: Munchen-Flughafen
+    cologne_bonn: Koln/Bonn
+    frankfurt_am_main: Frankfurt/Main
+    stuttgart: Stuttgart
+    essen: Essen-Bredeney
+    leipzig: Leipzig-Holzhausen
+    dresden: Dresden-Klotzsche
+    nuremberg: "Nurnberg "
+    hannover: Hannover
+    bremen: Bremen
+    potsdam: Potsdam
+    magdeburg: Magdeburg
+    erfurt: Erfurt-Weimar
+    trier: Trier-Petrisberg
+    saarbruecken: Saarbrucken-Ensheim
+    kiel: Kiel-Holtenau
+    rostock_warnemuende: Rostock-Warnemunde
+    norderney: Norderney
+    sylt: List auf Sylt
+    garmisch_partenkirchen: Garmisch-Partenkirchen
+    zugspitze: Zugspitze
+    hohenpeissenberg: Hohenpeienberg
+    feldberg_schwarzwald: Feldberg/Schwarzwald
+    cottbus: Cottbus
+    goerlitz: Gorlitz
+    braunschweig: Braunschweig
+  bnetza_plants: https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/Versorgungssicherheit/Erzeugungskapazitaeten/Kraftwerksliste/_DL
+  netztransparenz: https://www.netztransparenz.de/xspproxy/api/staticfiles/ntp-relaunch/dokumente/systemdienstleistungen/betriebsf%C3%BChrung/redispatch/archiv
+  ga4_project: bigquery-public-data
+  ga4_dataset: ga4_obfuscated_sample_ecommerce
 
 stages:
   # --- NCBI (ClinVar first: gnomAD, CADD, conservation and AlphaMissense read its positions)
@@ -142,6 +264,21 @@ stages:
         url: https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz
         file: uniprot_sprot.dat.gz
     parser: uniprot
+  # The GRCh38 reference as 1 Mb chunk rows (50 base flank on each side): Silver cuts the
+  # window around each variant from the chunk. UCSC data files need no licence (also
+  # for commercial use); UCSC asks for a citation and credit to the data contributors.
+  - source: genome_sequence
+    datasets: [chunk]
+    files:
+      - {tag: GRCh38, url: "{ucsc}/bigZips/hg38.fa.gz", file: hg38.fa.gz}
+    parser: genome_chunks
+    compress: true
+  # BLOSUM62 substitution scores (NCBI); Silver builds the amino acid substitution table.
+  - source: blosum62
+    datasets: [scores]
+    files:
+      - {tag: "", url: "{ncbi}/blast/matrices/BLOSUM62", file: BLOSUM62}
+    parser: blosum
   - source: refseq
     datasets: [annotation]
     files:
@@ -773,3 +910,150 @@ stages:
       dataset: retail_trade
       read: {sep: ",", quoted: true}
       usecols_in: [indic_bt, nace_r2, s_adj, unit, geo, TIME_PERIOD, OBS_VALUE, OBS_FLAG]
+
+  # --- energy and commerce sources of the first Bronze load; the staged file names stay
+  # the same (the Bronze loader finds a file by its dataset name).
+  # SMARD chart API (public): one file per weekly chunk of each series in `smard_series`.
+  - source: smard
+    ecosystem: energy
+    datasets: [energy_timeseries]
+    files: {from: smard_series}
+    parser: smard_chart
+    pause_seconds: 0.5
+  # DWD open data: the recent, historical and solar zip of each station and category.
+  # An extracted folder in data/raw/dwd/<station>/<category>/<recent|historical> (solar:
+  # <station>/solar) is used as it is and kept (`keep_manual`); only the missing files are
+  # downloaded, and each downloaded zip is deleted after its parse.
+  - source: dwd
+    ecosystem: energy
+    datasets:
+      - air_temperature
+      - cloudiness
+      - moisture
+      - precipitation
+      - pressure
+      - sun
+      - wind
+      - dew_point
+      - soil_temperature
+      - visibility
+      - cloud_type
+      - wind_synop
+      - extreme_wind
+      - weather_phenomena
+      - solar
+      - station_geography
+      - station_name_history
+      - device_instrument
+      - parameter_unit
+      - missing_value_periods
+    files: {from: dwd_files}
+    parser: {name: dwd_zip}
+    keep_manual: true
+  # MaStR full export (Bundesnetzagentur): the solar, storage and gas object types. The
+  # other types are staged and loaded already. Not staged: electricity consumers.
+  - source: mastr
+    ecosystem: energy
+    datasets:
+      - einheiten_solar
+      - anlagen_eeg_solar
+      - einheiten_stromspeicher
+      - anlagen_eeg_speicher
+      - anlagen_stromspeicher
+      - einheiten_gaserzeuger
+      - einheiten_gasspeicher
+      - anlagen_gasspeicher
+      - einheiten_gasverbraucher
+    files: {from: mastr_export}
+    parser:
+      name: mastr_xml
+      prefixes:
+        EinheitenSolar: einheiten_solar
+        AnlagenEegSolar: anlagen_eeg_solar
+        EinheitenStromSpeicher: einheiten_stromspeicher
+        AnlagenEegSpeicher: anlagen_eeg_speicher
+        AnlagenStromSpeicher: anlagen_stromspeicher
+        EinheitenGasErzeuger: einheiten_gaserzeuger
+        EinheitenGasSpeicher: einheiten_gasspeicher
+        AnlagenGasSpeicher: anlagen_gasspeicher
+        EinheitenGasverbraucher: einheiten_gasverbraucher
+    compress: true
+  # BNetzA power plant list: the CSV list and the summary of planned capacity additions.
+  - source: power_plant_list
+    ecosystem: energy
+    datasets: [kraftwerksliste, zu_und_rueckbau]
+    files:
+      - tag: kraftwerksliste
+        url: "{bnetza_plants}/Kraftwerksliste_CSV.csv?__blob=publicationFile&v=9"
+        file: Kraftwerksliste_CSV.csv
+      - tag: zu_und_rueckbau
+        url: "{bnetza_plants}/ZuUndRueckbau.xlsx?__blob=publicationFile&v=12"
+        file: ZuUndRueckbau.xlsx
+    parser: power_plant_list
+  # Redispatch measures 2013 to 2020 (netztransparenz.de). No open-data licence:
+  # reproduction needs written TSO consent, so the data stays local and is never
+  # committed. The current publication (from about October 2023) has no direct endpoint
+  # and is not staged.
+  - source: redispatch
+    ecosystem: energy
+    datasets: [redispatch_measures]
+    files:
+      - tag: archive_2013_2020
+        url: "{netztransparenz}/2025-09-17%20redispatch%20export%202013-2020.zip"
+        file: redispatch_export_2013_2020.zip
+    parser: redispatch
+  # Honda IoT: files saved by hand, one per frequency and dataset.
+  - source: honda_iot
+    ecosystem: energy
+    datasets: [electricity_P, electricity_W, heating_P, heating_W, cooling_P, cooling_W, weather]
+    files:
+      - each: &honda_datasets [electricity_P, electricity_W, heating_P, heating_W, cooling_P, cooling_W, weather]
+        tag: "1min:{item}"
+        url: "manual:Honda IoT file 1min/{item}.csv.gz"
+        file: "1min/{item}.csv.gz"
+      - each: *honda_datasets
+        tag: "15min:{item}"
+        url: "manual:Honda IoT file 15min/{item}.csv.gz"
+        file: "15min/{item}.csv.gz"
+      - each: *honda_datasets
+        tag: "1h:{item}"
+        url: "manual:Honda IoT file 1h/{item}.csv.gz"
+        file: "1h/{item}.csv.gz"
+    parser:
+      name: honda_iot
+      columns:
+        electricity_P: [frequency, datetime_utc, total, PV, CHP]
+        electricity_W: [frequency, datetime_utc, total, PV, CHP]
+        heating_P: [frequency, datetime_utc, total, CHP_heat, CHP_elec]
+        heating_W: [frequency, datetime_utc, total, CHP_heat, CHP_elec]
+        cooling_P: [frequency, datetime_utc, total, cool_elec]
+        cooling_W: [frequency, datetime_utc, total, cool_elec]
+        weather: [frequency, datetime_utc, WeatherStation.Weather.Ta, WeatherStation.Weather.Igm]
+    keep_manual: true
+  # REES46 events: the two monthly files saved by hand.
+  - source: rees46
+    ecosystem: commerce
+    datasets: [events]
+    files:
+      - tag: "2019-Oct"
+        url: "manual:REES46 events file 2019-Oct.csv"
+        file: 2019-Oct.csv
+      - tag: "2019-Nov"
+        url: "manual:REES46 events file 2019-Nov.csv"
+        file: 2019-Nov.csv
+    parser:
+      name: events_csv
+      dataset: events
+      columns: [event_time, event_type, product_id, category_id, category_code, brand, price, user_id, user_session]
+    keep_manual: true
+  # GA4 sample ecommerce export (public BigQuery dataset): one query per daily table,
+  # staged as JSON lines because an event holds nested lists. A day file that is in
+  # data/raw/ga4 is used and not fetched again; when there are day files, BigQuery is
+  # not asked for the list either.
+  - source: ga4
+    ecosystem: commerce
+    datasets: [events]
+    files: {from: ga4_tables}
+    fetch: bigquery
+    jsonl: true
+    parser: ga4_events

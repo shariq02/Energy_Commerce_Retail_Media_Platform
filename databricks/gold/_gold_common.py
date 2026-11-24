@@ -318,6 +318,29 @@ def with_parent(
     return df.join(slim, F.col(on) == F.col("_parent_key"), "left").drop("_parent_key")
 
 
+SUBSTITUTION_COLUMNS = (
+    "blosum62_score",
+    "grantham_distance",
+    "polarity_change",
+    "hydropathy_change",
+    "residue_volume_change",
+    "charge_change",
+)
+
+
+def with_substitution(
+    df: DataFrame, substitution: DataFrame, reference: str, alternate: str
+) -> DataFrame:
+    """`df` with the BLOSUM62 score and the property changes of its amino acid pair
+    (a left join on the two one letter code columns `reference` and `alternate`)."""
+    pairs = substitution.select(
+        F.col("from_amino_acid").alias(reference),
+        F.col("to_amino_acid").alias(alternate),
+        *SUBSTITUTION_COLUMNS,
+    )
+    return df.join(F.broadcast(pairs), [reference, alternate], "left")
+
+
 def drop_empty_columns(df: DataFrame) -> DataFrame:
     """`df` without the columns that are null in every row (one aggregation)."""
     counts = df.agg(*[F.count(F.col(c)).alias(c) for c in df.columns]).first()

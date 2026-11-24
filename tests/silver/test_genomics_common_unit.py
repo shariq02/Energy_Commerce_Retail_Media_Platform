@@ -60,11 +60,11 @@ def _bronze_sources() -> dict:
 # --- declared structures ---------------------------------------------------
 
 
-def test_the_two_schemas_hold_eleven_and_twenty_seven_tables(genomics):
+def test_the_two_schemas_hold_twelve_and_twenty_eight_tables(genomics):
     reference = genomics["GENOMICS_REFERENCE_TABLES"]
     main = genomics["GENOMICS_MAIN_TABLES"]
-    assert len(reference) == 11
-    assert len(main) == 27
+    assert len(reference) == 12
+    assert len(main) == 28
     assert reference.isdisjoint(main)
 
 
@@ -98,6 +98,12 @@ def test_clinvar_tables_carry_the_snapshot_run(genomics):
 def test_cell_lines_carry_the_depmap_model_columns(genomics):
     columns = {name for name, _ in genomics["GENOMICS_STRUCTURES"]["cell_line"]}
     assert {"in_tahoe", "in_depmap", "oncotree_lineage", "cosmic_id"} <= columns
+
+
+def test_tumor_samples_carry_the_cohort_of_their_site(genomics):
+    columns = dict(genomics["GENOMICS_STRUCTURES"]["tumor_sample"])
+    assert columns["cohort"] == "string"
+    assert "tissue_source_site" in columns
 
 
 def test_every_table_has_a_grain_and_no_stray_table_has_one(genomics):
@@ -143,13 +149,80 @@ def test_every_genomics_table_is_classified_in_its_own_schema(genomics):
         assert {r["target_schema"] for r in mine} == {expected}, table
 
 
-def test_the_registry_places_eleven_and_twenty_seven_genomics_tables():
+def test_the_registry_places_twelve_and_twenty_eight_genomics_tables():
     rows = build_rows()
     per_schema: dict[str, set[str]] = {}
     for r in rows:
         per_schema.setdefault(r["target_schema"], set()).add(r["table_name"])
-    assert len(per_schema["genomics_silver_reference"]) == 11
-    assert len(per_schema["genomics_silver"]) == 27
+    assert len(per_schema["genomics_silver_reference"]) == 12
+    assert len(per_schema["genomics_silver"]) == 28
+
+
+# --- sequence window, substitution, claim attributes -----------------------
+
+
+def test_a_window_reads_the_bases_around_a_variant(genomics):
+    # the chunk starts at position 11 and the flank is 2: the sequence starts at 9
+    out = genomics["window_features"]("TTACGTAAC", 11, 2, 11, "A", "G")
+    assert out["sequence_window"] == "TTACG"
+    assert out["reference_base"] == "A"
+    assert out["reference_matches_genome"] is True
+    assert out["is_transition"] is True
+
+
+def test_a_window_flags_a_cpg_site_and_a_homopolymer(genomics):
+    out = genomics["window_features"]("AACGAA", 3, 1, 4, "C", "T")
+    assert out["is_cpg_site"] is True
+    run = genomics["window_features"]("AAAAAAA", 4, 3, 4, "A", "T")
+    assert run["homopolymer_length"] == 7
+    assert run["is_transition"] is False
+
+
+def test_a_window_beyond_the_chunk_is_none(genomics):
+    assert genomics["window_features"]("ACG", 3, 5, 3, "A", "G") is None
+
+
+def _substitutions(genomics, rules):
+    claim = rules["claim_attributes"]
+    acids = claim["amino_acids"]
+    blosum = {(a, b): 0 for a in acids for b in acids}
+    rows = genomics["substitution_rows"](acids, claim["grantham"], blosum)
+    return {(r["from_amino_acid"], r["to_amino_acid"]): r for r in rows}
+
+
+def test_the_substitution_table_has_every_ordered_pair(genomics, rules):
+    rows = _substitutions(genomics, rules)
+    assert len(rows) == 400
+    assert rows[("L", "L")]["grantham_distance"] == 0
+
+
+@pytest.mark.parametrize(
+    ("pair", "distance"),
+    [(("L", "I"), 5), (("C", "W"), 215), (("S", "R"), 110), (("A", "G"), 60)],
+)
+def test_grantham_distances_match_the_published_values(genomics, rules, pair, distance):
+    rows = _substitutions(genomics, rules)
+    assert abs(rows[pair]["grantham_distance"] - distance) <= 1
+    reverse = rows[pair[::-1]]["grantham_distance"]
+    assert reverse == pytest.approx(rows[pair]["grantham_distance"])
+
+
+def test_the_claim_attribute_rules_are_declared(rules):
+    claim = rules["claim_attributes"]
+    for key in (
+        "therapeutic_area_minimum_diseases",
+        "drug_stage_order",
+        "locus_block_bases",
+        "sequence_window_flank",
+        "allele_fraction_low_below",
+        "tumor_mutational_burden_high_from",
+    ):
+        assert key in claim, key
+    assert len(claim["amino_acids"]) == 20
+
+
+def test_the_protein_master_carries_the_amino_acid_sequence(genomics):
+    assert "amino_acid_sequence" in genomics["PROTEIN_FIELDS"]
 
 
 def test_the_registry_is_complete_with_the_genomics_tables():

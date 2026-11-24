@@ -70,6 +70,7 @@ silver = {
         "power_plant_capacity_plan",
         "market_actor_role",
         "grid_connection_point",
+        "unit_weather_station_link",
     )
 }
 
@@ -85,6 +86,16 @@ for name, (table, grain) in COPIES.items():
 units = silver["generation_unit"]
 for column, prefix in SUPPORT_IDS.items():
     units = with_parent(units, silver["support_registration"], on=column, prefix=prefix)
+units = units.join(
+    silver["unit_weather_station_link"].select(
+        "unit_type",
+        "unit_id",
+        F.col("weather_station_key").alias("nearest_station_key"),
+        F.col("distance_km").alias("nearest_station_distance_km"),
+    ),
+    ["unit_type", "unit_id"],
+    "left",
+)
 TABLES["generation_unit"] = (add_provenance(units, SOURCE, RID), UNIT_GRAIN)
 
 # COMMAND ----------

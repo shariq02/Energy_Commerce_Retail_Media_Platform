@@ -3,15 +3,14 @@
 # Author: Sharique Mohammad
 # Date: November 2026
 #
-# Purpose: run the scripts named under `before` in sources.yml, then every
-# stage in order: download the files, parse them with the named parser, stage
-# the rows in data/staging/<source>/ and delete each downloaded file after its
-# parse. A stage already in the release record is skipped; a failed stage is
-# logged and the run continues.
+# Purpose: a menu of the ecosystems (energy, commerce, genomics) and of their
+# sources. For each source chosen, run its stages of sources.yml in order:
+# download the files, parse them with the named parser, stage the rows in
+# data/staging/<source>/ and delete each downloaded file after its parse. A
+# source that is in the release record is staged again only after a yes; a failed
+# stage is logged and the menu comes back.
 
-import argparse
 import gzip
-import importlib
 import io
 import json
 import re
@@ -44,6 +43,21 @@ from _download_common import (
     table_parser,
     unpack,
     variant_codes,
+)
+from _energy_commerce_formats import (
+    dwd_files,
+    dwd_zip,
+    events_csv,
+    fetch_bigquery,
+    ga4_tables,
+    honda_iot,
+    mastr_export,
+    mastr_xml,
+    parse_ga4_events,
+    parse_power_plant_list,
+    parse_redispatch,
+    parse_smard_chart,
+    smard_series,
 )
 from _genomic_formats import (
     BATCH_ROWS,
@@ -87,6 +101,7 @@ UNIPROT_ENTRY_COLUMNS = [
     "protein_name",
     "tax_id",
     "sequence_length",
+    "sequence",
 ]
 UNIPROT_FEATURE_COLUMNS = ["accession", "feature_type", "location", "qualifiers"]
 GTF_FEATURES = {"gene", "transcript", "exon", "CDS", "UTR"}
@@ -110,6 +125,19 @@ CADD_QUERY_POSITIONS = 900
 # bigWig positions closer than WINDOW_GAP bases are read with one call.
 WINDOW_GAP = 1_000
 WINDOW_SPAN = 100_000
+# The reference genome is staged as 1 Mb chunks with a 50 base flank on each side, so
+# that Silver cuts a window of a variant from one chunk. Only the standard contigs.
+GENOME_CHUNK_BASES = 1_000_000
+GENOME_FLANK = 50
+GENOME_BATCH_CHUNKS = 40
+GENOME_COLUMNS = ["contig", "chunk_start", "sequence"]
+GENOME_CONTIGS = {
+    **{f"chr{number}": str(number) for number in range(1, 23)},
+    "chrX": "X",
+    "chrY": "Y",
+    "chrM": "MT",
+}
+BLOSUM_COLUMNS = ["from_amino_acid", "to_amino_acid", "score"]
 
 # Prediction files hold one 'score' column in the row order of test.parquet.
 gpn_scores: dict[str, pd.Series] = {}
@@ -524,6 +552,55 @@ def parse_depmap_effect(path: Path, tag: str):
         yield {"gene_effect": long.rename(columns={model: "model_id"})}, len(frame)
 
 
+def genome_chunk_frames(contig: str, bases: str):
+    """Chunk rows of one contig: (contig, 1-based start of the chunk, its bases with a
+    GENOME_FLANK of N or neighbour bases on each side), in batches of rows."""
+    padded = "N" * GENOME_FLANK + bases + "N" * GENOME_FLANK
+    rows = []
+    for start in range(0, len(bases), GENOME_CHUNK_BASES):
+        sequence = padded[start : start + GENOME_CHUNK_BASES + 2 * GENOME_FLANK]
+        rows.append((contig, start + 1, sequence))
+        if len(rows) >= GENOME_BATCH_CHUNKS:
+            yield pd.DataFrame(rows, columns=GENOME_COLUMNS)
+            rows = []
+    if rows:
+        yield pd.DataFrame(rows, columns=GENOME_COLUMNS)
+
+
+def parse_genome_chunks(path: Path, tag: str):
+    """The standard contigs of a gzip FASTA as chunk rows (upper case)."""
+    contig, lines = None, []
+    with gzip.open(path, "rt", encoding="ascii") as handle:
+        for line in handle:
+            if line.startswith(">"):
+                if contig:
+                    bases = "".join(lines).upper()
+                    for frame in genome_chunk_frames(contig, bases):
+                        yield {"chunk": frame}, len(bases)
+                    logger.info(f"genome: contig {contig} done")
+                contig, lines = GENOME_CONTIGS.get(line[1:].split()[0]), []
+            elif contig:
+                lines.append(line.strip())
+    if contig:
+        bases = "".join(lines).upper()
+        for frame in genome_chunk_frames(contig, bases):
+            yield {"chunk": frame}, len(bases)
+        logger.info(f"genome: contig {contig} done")
+
+
+def parse_blosum(path: Path, tag: str):
+    """A substitution matrix of the NCBI text format as rows (from, to, score)."""
+    lines = path.read_text(encoding="ascii").splitlines()
+    rows = [line.split() for line in lines if line.strip() and line[0] != "#"]
+    header, *body = rows
+    records = [
+        (row[0], column, score)
+        for row in body
+        for column, score in zip(header, row[1:], strict=True)
+    ]
+    yield {"scores": pd.DataFrame(records, columns=BLOSUM_COLUMNS)}, len(body)
+
+
 # --- parser factories: the arguments come from the `parser` mapping of a stage
 
 
@@ -782,8 +859,18 @@ PLAIN_PARSERS = {
     "acmg": parse_acmg,
     "tcga_site_codes": parse_tcga_site_codes,
     "depmap_effect": parse_depmap_effect,
+    "genome_chunks": parse_genome_chunks,
+    "blosum": parse_blosum,
+    "smard_chart": parse_smard_chart,
+    "power_plant_list": parse_power_plant_list,
+    "redispatch": parse_redispatch,
+    "ga4_events": parse_ga4_events,
 }
 PARSER_FACTORIES = {
+    "dwd_zip": dwd_zip,
+    "mastr_xml": mastr_xml,
+    "events_csv": events_csv,
+    "honda_iot": honda_iot,
     "zipped": zipped,
     "vcf": vcf,
     "homologies": homologies,
@@ -896,7 +983,13 @@ LISTINGS = {
     "opentargets_parts": open_targets_parts,
     "energy_charts_months": energy_charts_months,
     "encode_re2g": encode_re2g,
+    "smard_series": smard_series,
+    "dwd_files": dwd_files,
+    "mastr_export": mastr_export,
+    "ga4_tables": ga4_tables,
 }
+# `fetch` of a stage: how a url that is not a plain file is brought to disk.
+FETCHERS = {"bigquery": fetch_bigquery}
 
 
 def stage_files(entry: dict, variables: dict) -> list[tuple[str, str, str]]:
@@ -917,70 +1010,149 @@ def needs_staging(entry: dict, files: list[tuple[str, str, str]]) -> bool:
     return not {tag for tag, _, _ in files} <= recorded_tags(*key)
 
 
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Download and stage the sources.")
-    parser.add_argument(
-        "--skip-before", action="store_true", help="do not run the `before` scripts"
-    )
-    parser.add_argument(
-        "--only",
-        default="",
-        help=(
-            "comma-separated sources; only their stages run (in list order), "
-            "and the `before` scripts are skipped"
-        ),
-    )
-    return parser.parse_args()
+# --- the menu
+
+ECOSYSTEMS = ("energy", "commerce", "genomics")
 
 
-def main() -> None:
-    arguments = parse_arguments()
-    only = {s.strip() for s in arguments.only.split(",") if s.strip()}
-    config = load_sources()
+def ecosystem_of(entry: dict) -> str:
+    return entry.get("ecosystem", "genomics")
+
+
+def sources_of(config: dict, ecosystem: str) -> list[str]:
+    """The sources of one ecosystem, in the order of sources.yml."""
+    found: list[str] = []
+    for entry in config["stages"]:
+        if ecosystem_of(entry) == ecosystem and entry["source"] not in found:
+            found.append(entry["source"])
+    return found
+
+
+def is_staged(config: dict, source: str, done: set[tuple[str, str]]) -> bool:
+    """True when every stage of the source is in the release record."""
+    keys = {
+        (e["source"], "+".join(e["datasets"]))
+        for e in config["stages"]
+        if e["source"] == source
+    }
+    return keys <= done
+
+
+def parse_choice(text: str, count: int) -> list[int] | None:
+    """The numbers (1 to `count`) of a menu answer: `2`, `1,3` or `all`; None when the
+    answer is not valid."""
+    answer = text.strip().lower()
+    if answer == "all":
+        return list(range(1, count + 1))
+    try:
+        numbers = [int(part) for part in answer.split(",")]
+    except ValueError:
+        return None
+    if not all(1 <= number <= count for number in numbers):
+        return None
+    return sorted(set(numbers))
+
+
+def stage_entry(entry: dict, files: list[tuple[str, str, str]]) -> bool:
+    """Stage one stage of sources.yml; False when it was not staged."""
+    fetch = FETCHERS[entry["fetch"]] if "fetch" in entry else None
+    return stage(
+        entry["source"],
+        entry["datasets"],
+        files,
+        build_parser(entry["parser"]),
+        capped=tuple(entry.get("capped", ())),
+        keep_manual=entry.get("keep_manual", False),
+        pause_seconds=entry.get("pause_seconds", 0),
+        force=True,
+        timeout_seconds=entry.get("timeout_seconds", REQUEST_TIMEOUT),
+        compress=entry.get("compress", False),
+        jsonl=entry.get("jsonl", False),
+        fetch=fetch,
+    )
+
+
+def run_sources(
+    config: dict, chosen: list[str], ask=input
+) -> tuple[list[str], list[str]]:
+    """Stage the chosen sources, in the order of sources.yml. A stage that is not in
+    the release record (or has a new file tag) runs; a source whose stages are all
+    recorded runs again only after a yes. Returns (failed, not staged) stage labels."""
     failed: list[str] = []
     not_staged: list[str] = []
-    skip_before = arguments.skip_before or bool(only)
-    for name in [] if skip_before else config.get("before", []):
-        try:
-            importlib.import_module(name).main()
-        except Exception:
-            logger.exception(f"{name}: failed; continuing")
-            failed.append(name)
-    for entry in config["stages"]:
-        if only and entry["source"] not in only:
+    for source in dict.fromkeys(e["source"] for e in config["stages"]):
+        if source not in chosen:
             continue
-        label = f"{entry['source']}/{'+'.join(entry['datasets'])}"
-        try:
-            logger.info(f"{label}: listing the files")
-            files = stage_files(entry, config["vars"])
-            logger.info(f"{label}: {len(files)} file(s) listed")
-            if not needs_staging(entry, files):
-                logger.info(f"{label}: already staged, skipping")
+        listed = []
+        for entry in (e for e in config["stages"] if e["source"] == source):
+            label = f"{source}/{'+'.join(entry['datasets'])}"
+            try:
+                logger.info(f"{label}: listing the files")
+                files = stage_files(entry, config["vars"])
+                logger.info(f"{label}: {len(files)} file(s) listed")
+            except Exception:
+                logger.exception(f"{label}: listing failed; continuing")
+                failed.append(label)
                 continue
-            staged = stage(
-                entry["source"],
-                entry["datasets"],
-                files,
-                build_parser(entry["parser"]),
-                capped=tuple(entry.get("capped", ())),
-                keep_manual=entry.get("keep_manual", False),
-                pause_seconds=entry.get("pause_seconds", 0),
-                force=True,
-                timeout_seconds=entry.get("timeout_seconds", REQUEST_TIMEOUT),
-                compress=entry.get("compress", False),
-            )
-            if not staged:
-                not_staged.append(label)
-        except Exception:
-            logger.exception(f"{label}: failed; continuing with the next stage")
-            failed.append(label)
+            listed.append((entry, label, files))
+        due = [item for item in listed if needs_staging(item[0], item[2])]
+        if listed and not due:
+            again = ask(f"{source} is staged. Stage it again? [y/N] ")
+            if again.strip().lower() != "y":
+                continue
+            due = listed
+        for entry, label, files in due:
+            try:
+                if not stage_entry(entry, files):
+                    not_staged.append(label)
+            except Exception:
+                logger.exception(f"{label}: failed; continuing with the next stage")
+                failed.append(label)
+    return failed, not_staged
+
+
+def ecosystem_page(config: dict, ecosystem: str, ask=input) -> None:
+    sources = sources_of(config, ecosystem)
+    done = recorded()
+    print(f"\n{ecosystem}")
+    for number, source in enumerate(sources, 1):
+        state = "staged" if is_staged(config, source, done) else "not staged"
+        print(f"  {number}. {source} ({state})")
+    answer = ask("Numbers (for example 1,3), all, or Enter to go back: ")
+    if not answer.strip():
+        return
+    picked = parse_choice(answer, len(sources))
+    if picked is None:
+        print("Not valid: give numbers from the list.")
+        return
+    failed, not_staged = run_sources(config, [sources[n - 1] for n in picked], ask)
     if failed:
         logger.error(f"Failed: {', '.join(failed)}")
-        sys.exit(1)
     if not_staged:
         logger.warning(f"Not staged: {', '.join(not_staged)}")
-        return
-    logger.info("All sources staged.")
+    if not (failed or not_staged):
+        logger.info("Staged.")
+
+
+def main(ask=input) -> None:
+    config = load_sources()
+    leave = len(ECOSYSTEMS) + 1
+    while True:
+        print("\nEcosystems")
+        for number, name in enumerate(ECOSYSTEMS, 1):
+            print(f"  {number}. {name}")
+        print(f"  {leave}. exit")
+        try:
+            answer = ask("Choose a number: ").strip()
+        except EOFError:
+            return
+        if answer == str(leave):
+            return
+        picked = parse_choice(answer, len(ECOSYSTEMS))
+        if picked is None or len(picked) != 1:
+            print("Not valid: give one number from the list.")
+            continue
+        ecosystem_page(config, ECOSYSTEMS[picked[0] - 1], ask)
 
 
 if __name__ == "__main__":

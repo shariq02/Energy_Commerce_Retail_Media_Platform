@@ -601,7 +601,7 @@ if _broken:
     _struct.append(
         para(
             f"-> BLOCKED for {_broken}: this is an INGESTION defect, not a source finding.",
-            "Fix in `scripts/ingestion/stage_power_plant_list.py` (header auto-detection +",
+            "Fix in `scripts/ingestion/_energy_commerce_formats.py` (header auto-detection +",
             "footnote strip are now in place), re-download the BNetzA file, re-stage, re-upload",
             "to the Volume and re-run Bronze before trusting any column.",
         )

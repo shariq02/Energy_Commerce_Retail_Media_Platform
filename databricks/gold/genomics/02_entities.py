@@ -14,7 +14,7 @@
 # MAGIC
 # MAGIC **Purpose:** 18 `genomics_gold` tables: ten entity profiles (the entity rows
 # MAGIC with every attribute of their type; somatic mutations are keyed by their Silver
-# MAGIC record id), the gene-disease relations, structural
+# MAGIC record id), every relation row (`relation_record`), structural
 # MAGIC variants (variant rows and variant x gene rows), somatic sites, the ClinVar
 # MAGIC class changes in snapshot order and four typed tables that hold the many-side
 # MAGIC Silver rows (`record_kind` names the Silver table of a row).
@@ -104,6 +104,7 @@ MANY_SIDE = {
         "protein_feature": RECORD,
         "protein_gene_link": RECORD,
         "variant_hgvs": RECORD,
+        "variant_classification": RECORD,
         "variant_condition": RECORD,
         "variant_feature_overlap": RECORD,
     },
@@ -136,6 +137,7 @@ TABLES = {}
 attributes = read_silver("entity_derived_attribute")
 master = read_silver("entity_master")
 relation = read_silver("entity_relation")
+substitution = from_silver(read_silver("amino_acid_substitution"))
 classification = read_silver("variant_classification")
 variant_labels = read_silver("variant").select(
     "variant_key", "assembly", "contig", "position", "end_position", "variant_type"
@@ -151,18 +153,21 @@ bases = {
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- the ten entity profiles
+# DBTITLE 1,Transform -- the ten entity profiles (somatic mutations with the amino acid change)
 for table, (entity_type, key, _, grain) in PROFILES.items():
-    TABLES[table] = (
-        full_profile(bases[table], attributes, entity_type, key=key, **GATE),
-        grain,
-    )
+    profile = full_profile(bases[table], attributes, entity_type, key=key, **GATE)
+    if table == "somatic_mutation_profile":
+        profile = with_substitution(
+            profile,
+            substitution,
+            "protein_reference_amino_acid",
+            "protein_alternate_amino_acid",
+        )
+    TABLES[table] = (profile, grain)
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- gene_disease_profile (relation rows, gene symbol, disease name)
-has_gene = F.col("gene_key").isNotNull() | F.col("source_gene_id").isNotNull()
-has_disease = F.col("disease_key").isNotNull() | F.col("source_disease_id").isNotNull()
+# DBTITLE 1,Transform -- relation_record (every relation row, gene symbol, disease name)
 names = {
     entity_type: master.filter(F.col("entity_type") == entity_type).select(
         F.col("entity_key").alias(f"{entity_type}_key"), F.col(column).alias(alias)
@@ -172,16 +177,16 @@ names = {
         ("disease", "name", "disease_name"),
     )
 }
-TABLES["gene_disease_profile"] = (
+TABLES["relation_record"] = (
     add_provenance(
-        drop_empty_columns(from_silver(relation).filter(has_gene & has_disease))
+        drop_empty_columns(from_silver(relation))
         .join(names["gene"], "gene_key", "left")
         .join(names["disease"], "disease_key", "left"),
         SOURCE,
         RID,
         ecosystem="genomics",
     ),
-    ["source_record_id"],
+    ["relation_kind", "source_record_id"],
 )
 
 # COMMAND ----------
@@ -317,7 +322,20 @@ TABLES["clinvar_classification_change"] = (
 # DBTITLE 1,Transform -- the typed tables of the many-side Silver rows
 for table, members in MANY_SIDE.items():
     frame, grain = typed_table(
-        {name: (from_silver(read_silver(name)), keys) for name, keys in members.items()}
+        {
+            name: (
+                with_substitution(
+                    from_silver(read_silver(name)),
+                    substitution,
+                    "protein_reference_amino_acid",
+                    "protein_alternate_amino_acid",
+                )
+                if name == "variant_hgvs"
+                else from_silver(read_silver(name)),
+                keys,
+            )
+            for name, keys in members.items()
+        }
     )
     TABLES[table] = (add_provenance(frame, SOURCE, RID, ecosystem="genomics"), grain)
 

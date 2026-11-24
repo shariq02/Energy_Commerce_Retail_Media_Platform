@@ -1,6 +1,6 @@
 """Unit tests for scripts/download/download_sources.py and sources.yml -- the
-genomics stages must cover the genomics Bronze sources and every stage must
-expand without a network.
+genomics stages must cover the genomics Bronze sources, every stage must
+expand without a network, and the menu must stage the sources that are chosen.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
@@ -10,11 +10,10 @@ Date: November 2026
 from __future__ import annotations
 
 import ast
+import gzip
 import importlib.util
-import io
 import re
 import sys
-import types
 import zipfile
 from pathlib import Path
 
@@ -110,6 +109,17 @@ def test_every_stage_expands_to_files(genomics, config, monkeypatch):
         "encode_re2g",
         lambda dataset, variables: [("liver", "https://x/a.tsv.gz", "a.tsv.gz")],
     )
+    for name in ("smard_series", "dwd_files", "mastr_export"):
+        monkeypatch.setitem(
+            genomics.LISTINGS,
+            name,
+            lambda dataset, variables: [("t", "https://x/a.zip", "a.zip")],
+        )
+    monkeypatch.setitem(
+        genomics.LISTINGS,
+        "ga4_tables",
+        lambda dataset, variables: [("20210131", "bigquery:p.d.t", "t.jsonl")],
+    )
     for entry in config["stages"]:
         files = genomics.stage_files(entry, config["vars"])
         label = f"{entry['source']}/{entry['datasets']}"
@@ -118,7 +128,7 @@ def test_every_stage_expands_to_files(genomics, config, monkeypatch):
         assert len(names) == len(set(names)), label
         for _, url, name in files:
             assert not re.search(r"[{}]", url + name), label
-            assert url.startswith(("https://", "manual:https://")), label
+            assert url.startswith(("https://", "manual:", "bigquery:")), label
 
 
 @pytest.mark.parametrize(
@@ -363,6 +373,43 @@ def test_tcga_site_codes_read_the_code_table_not_the_page_navigation(
     assert read == 1
 
 
+def test_genome_chunks_keep_standard_contigs_with_a_flank_on_each_side(
+    genomics, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(genomics, "GENOME_CHUNK_BASES", 4)
+    monkeypatch.setattr(genomics, "GENOME_FLANK", 2)
+    path = tmp_path / "g.fa.gz"
+    with gzip.open(path, "wt", encoding="ascii") as handle:
+        handle.write(">chr1 a\nacgtac\ngt\n>chrUn_x\nAAAA\n>chrM\nTTTT\n")
+    frames = [batch["chunk"] for batch, _ in genomics.parse_genome_chunks(path, "")]
+    rows = genomics.pd.concat(frames)
+    assert rows["contig"].tolist() == ["1", "1", "MT"]
+    assert rows["chunk_start"].tolist() == [1, 5, 1]
+    assert rows["sequence"].tolist() == ["NNACGTAC", "GTACGTNN", "NNTTTTNN"]
+
+
+def test_genome_and_blosum_stages_are_staged_and_read_by_bronze(config):
+    stages = {(s["source"], tuple(s["datasets"])): s for s in config["stages"]}
+    assert stages[("genome_sequence", ("chunk",))]["compress"] is True
+    assert stages[("blosum62", ("scores",))]["parser"] == "blosum"
+    sources = _bronze_sources()
+    assert sources["genome_sequence"] == ["chunk"]
+    assert sources["blosum62"] == ["scores"]
+
+
+def test_blosum_text_becomes_rows_and_comments_are_dropped(genomics, tmp_path):
+    path = tmp_path / "BLOSUM62"
+    path.write_text("# comment\n   A  R\nA  4 -1\nR -1  5\n", encoding="ascii")
+    batches, read = next(genomics.parse_blosum(path, ""))
+    assert batches["scores"].values.tolist() == [
+        ["A", "A", "4"],
+        ["A", "R", "-1"],
+        ["R", "A", "-1"],
+        ["R", "R", "5"],
+    ]
+    assert read == 2
+
+
 def test_eurostat_stage_is_a_commerce_csv_with_named_columns(
     genomics, config, tmp_path
 ):
@@ -390,26 +437,157 @@ def test_eurostat_stage_is_a_commerce_csv_with_named_columns(
     assert batches["retail_trade"].iloc[0]["OBS_VALUE"] == "103.4"
 
 
+def _small_config():
+    def stage(source, ecosystem, dataset):
+        return {
+            "source": source,
+            "ecosystem": ecosystem,
+            "datasets": [dataset],
+            "files": [{"tag": "t", "url": "https://x/f", "file": "f"}],
+            "parser": "csv",
+        }
+
+    return {
+        "vars": {},
+        "stages": [
+            stage("a", "energy", "x"),
+            stage("b", "energy", "y"),
+            stage("c", "commerce", "z"),
+        ],
+    }
+
+
+def _run_menu(genomics, monkeypatch, answers, recorded=()):
+    config = _small_config()
+    staged = []
+    monkeypatch.setattr(genomics, "load_sources", lambda: config)
+    monkeypatch.setattr(genomics, "recorded", lambda: set(recorded))
+    monkeypatch.setattr(genomics, "recorded_tags", lambda source, datasets: {"t"})
+    monkeypatch.setattr(
+        genomics,
+        "stage_entry",
+        lambda entry, files: staged.append(entry["source"]) or True,
+    )
+    prompts = []
+    replies = iter(answers)
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return next(replies)
+
+    genomics.main(ask=ask)
+    return staged, prompts
+
+
+def test_menu_stages_the_chosen_sources_in_file_order_and_comes_back(
+    genomics, monkeypatch
+):
+    staged, prompts = _run_menu(genomics, monkeypatch, ["1", "2,1", "2", "all", "4"])
+    assert staged == ["a", "b", "c"]
+    assert len(prompts) == 5
+
+
+def test_menu_rejects_a_number_outside_the_list(genomics, monkeypatch):
+    staged, _ = _run_menu(genomics, monkeypatch, ["9", "1", "3", "", "4"])
+    assert staged == []
+
+
+def test_menu_asks_before_a_staged_source_runs_again(genomics, monkeypatch):
+    done = [("a", "x")]
+    staged, prompts = _run_menu(
+        genomics, monkeypatch, ["1", "1", "n", "1", "1", "y", "4"], recorded=done
+    )
+    assert staged == ["a"]
+    assert prompts.count("a is staged. Stage it again? [y/N] ") == 2
+
+
 @pytest.mark.parametrize(
-    ("arguments", "ran"),
+    ("text", "count", "expected"),
     [
-        ([], ["before_script"]),
-        (["--only", "faers"], []),
-        (["--skip-before"], []),
+        ("2", 3, [2]),
+        ("1,3", 3, [1, 3]),
+        ("3,1,3", 3, [1, 3]),
+        ("all", 3, [1, 2, 3]),
+        ("0", 3, None),
+        ("4", 3, None),
+        ("x", 3, None),
+        ("", 3, None),
+        ("1,", 3, None),
     ],
 )
-def test_only_and_skip_before_leave_out_the_before_scripts(
-    genomics, config, monkeypatch, arguments, ran
+def test_parse_choice(genomics, text, count, expected):
+    assert genomics.parse_choice(text, count) == expected
+
+
+def test_every_source_is_in_one_menu_page_and_agrees_with_the_governed_map(
+    genomics, config
 ):
-    calls = []
-    stub = types.SimpleNamespace(main=lambda: calls.append("before_script"))
-    monkeypatch.setattr(
-        genomics, "load_sources", lambda: {**config, "before": ["x"], "stages": []}
+    import yaml
+
+    mapped = {
+        m["source_system"]: m["ecosystem"]
+        for m in yaml.safe_load(
+            (ROOT / "src/schemas/reference/source_ecosystem_map.yml").read_text(
+                encoding="utf-8"
+            )
+        )["mappings"]
+    }
+    pages = {e: genomics.sources_of(config, e) for e in genomics.ECOSYSTEMS}
+    listed = [source for sources in pages.values() for source in sources]
+    assert len(listed) == len(set(listed))
+    assert set(listed) == {e["source"] for e in config["stages"]}
+    for ecosystem, sources in pages.items():
+        for source in sources:
+            assert mapped[source] == ecosystem, source
+    assert {"dwd", "mastr", "smard", "honda_iot"} <= set(pages["energy"])
+    assert {"ga4", "rees46", "eurostat"} <= set(pages["commerce"])
+
+
+def test_stage_entry_passes_the_writer_and_fetch_options(genomics, config, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(genomics, "stage", lambda *a, **k: seen.update(k) or True)
+    entry = _entry(config, "ga4", "events")
+    assert genomics.stage_entry(entry, [("t", "bigquery:p.d.t", "t.jsonl")])
+    assert seen["jsonl"] is True
+    assert seen["fetch"] is genomics.FETCHERS["bigquery"]
+    seen.clear()
+    genomics.stage_entry(
+        next(e for e in config["stages"] if e["source"] == "mastr"), []
     )
-    monkeypatch.setattr(genomics.importlib, "import_module", lambda name: stub)
-    monkeypatch.setattr(sys, "argv", ["download_sources.py", *arguments])
-    genomics.main()
-    assert calls == ran
+    assert seen["compress"] is True
+    assert seen["fetch"] is None
+
+
+def test_stage_writes_json_lines_through_a_fetch_and_deletes_the_raw_file(
+    genomics, monkeypatch, tmp_path
+):
+    common = sys.modules["_download_common"]
+    monkeypatch.setattr(common, "DATA_RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(common, "DATA_STAGING_DIR", tmp_path / "staging")
+    monkeypatch.setattr(common, "RELEASE_RECORD", tmp_path / "record.csv")
+
+    def fetch(url, dest, timeout):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text("x", encoding="utf-8")
+        return {"bytes": 1, "last_modified": ""}
+
+    def parse(path, tag):
+        yield {"events": [{"a": 1, "items": [{"b": 2}]}]}, 3
+
+    assert genomics.stage(
+        "src",
+        ["events"],
+        [("20210101", "bigquery:p.d.t", "t.jsonl")],
+        parse,
+        jsonl=True,
+        fetch=fetch,
+    )
+    chunk = tmp_path / "staging" / "src" / "src_events_chunk_00001.jsonl"
+    assert chunk.read_text(encoding="utf-8") == '{"a": 1, "items": [{"b": 2}]}\n'
+    assert not (tmp_path / "raw" / "src" / "t.jsonl").exists()
+    assert "src,events,20210101" in (tmp_path / "record.csv").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_html_table_rows_repeat_a_spanned_cell(genomics, tmp_path):
@@ -480,53 +658,3 @@ def test_a_zip_member_keeps_only_its_usecols_and_reads_quotes(genomics, tmp_path
 
     assert list(frame.columns) == ["nct_id", "name"]
     assert frame.loc[0, "name"] == "Heart | Disease"
-
-
-def _load_dwd():
-    spec = importlib.util.spec_from_file_location(
-        "download_dwd", DOWNLOAD_DIR / "download_dwd.py"
-    )
-    dwd = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(dwd)
-    return dwd
-
-
-def test_dwd_stage_option_runs_the_staging_after_the_download(monkeypatch, tmp_path):
-    dwd = _load_dwd()
-    calls = []
-    stub = types.ModuleType("stage_dwd")
-    stub.main = lambda: calls.append("stage")
-    monkeypatch.setitem(sys.modules, "stage_dwd", stub)
-    monkeypatch.setattr(dwd, "OUTPUT_DIR", tmp_path)
-    monkeypatch.setattr(dwd, "resolve_station_ids", dict)
-    dwd.main()
-    assert calls == []
-    dwd.main(stage=True)
-    assert calls == ["stage"]
-
-
-def test_dwd_refresh_replaces_the_old_recent_file_and_a_plain_run_keeps_it(
-    monkeypatch, tmp_path
-):
-    dwd = _load_dwd()
-    payload = io.BytesIO()
-    with zipfile.ZipFile(payload, "w") as archive:
-        archive.writestr("produkt_new.txt", "x")
-
-    class Reply:
-        status_code = 200
-        content = payload.getvalue()
-
-        def raise_for_status(self):
-            return None
-
-    monkeypatch.setattr(dwd, "OUTPUT_DIR", tmp_path)
-    monkeypatch.setattr(dwd.requests, "get", lambda url, timeout: Reply())
-    recent = tmp_path / "berlin" / "wind" / "recent"
-    recent.mkdir(parents=True)
-    (recent / "produkt_old.txt").write_text("x", encoding="utf-8")
-
-    dwd.download_recent("berlin", "00001", "wind", "FF")
-    assert [p.name for p in recent.iterdir()] == ["produkt_old.txt"]
-    dwd.download_recent("berlin", "00001", "wind", "FF", refresh=True)
-    assert [p.name for p in recent.iterdir()] == ["produkt_new.txt"]

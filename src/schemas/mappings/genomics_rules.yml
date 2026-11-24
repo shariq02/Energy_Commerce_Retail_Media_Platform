@@ -6,7 +6,7 @@
 # Read by databricks/silver/_genomics_common.py. Precedence entries are
 # "<source>.<dataset>.<column>"; the first wins, later ones only fill nulls.
 
-version: 6
+version: 7
 
 # entity_id_crosswalk keeps one row per entity, id and source column. When one id is
 # found by several methods, the first method of this list wins; a method that is not in
@@ -328,6 +328,8 @@ precedence:
     length:
       - uniprot.entries.sequence_length
       - string.protein_info.protein_size
+    amino_acid_sequence:
+      - uniprot.entries.sequence
     gene_symbol:
       - uniprot.entries.gene_name
       - string.protein_info.preferred_name
@@ -1018,3 +1020,71 @@ entity_counts:
   faers_outcomes: [DE, LT, HO, DS, CA, RI, OT]
   interaction_levels: [Major, Moderate, Minor, Unknown]
   positive_assay_prefix: Positive
+
+# Attributes read from claims, tumour samples, the reference genome and the amino acid
+# constants (genomics `10`). A number that is not from a source named here is the
+# owner's or the assistant's setting (marked "set").
+claim_attributes:
+  # Open Targets target claims: the Gene Ontology aspect -> the count attribute.
+  gene_ontology_counts:
+    go_biological_process: gene_ontology_biological_process_count
+    go_molecular_function: gene_ontology_molecular_function_count
+    go_cellular_component: gene_ontology_cellular_component_count
+  # A therapeutic area gets a flag when it covers at least this many diseases (set).
+  therapeutic_area_minimum_diseases: 1000
+  # Open Targets maximum clinical stage of a drug, in the order of development (set);
+  # the rank is the place in this list. UNKNOWN has no rank.
+  drug_stage_order:
+    - PRECLINICAL
+    - IND
+    - EARLY_PHASE_1
+    - PHASE_1
+    - PHASE_1_2
+    - PHASE_2
+    - PHASE_2_3
+    - PHASE_3
+    - PREAPPROVAL
+    - APPROVAL
+  # Genome block of the locus key (set): contig and position // block.
+  locus_block_bases: 1000000
+  # Bases on each side of a variant in its sequence window; it equals the flank of the
+  # staged genome chunks.
+  sequence_window_flank: 50
+  # Bases of a staged genome chunk (the chunk size of the download step).
+  genome_chunk_bases: 1000000
+  # A tumour allele fraction below this counts as low (set).
+  allele_fraction_low_below: 0.1
+  # Tumour mutational burden high: non-silent mutations per exome. 175 is the whole-exome
+  # counterpart of 10 mutations per megabase, the FDA threshold of the pembrolizumab
+  # approval for TMB-H solid tumours (an approximate calibration, not an exact conversion).
+  tumor_mutational_burden_high_from: 175
+  # Grantham (1974) distance = scale * sqrt(alpha dC^2 + beta dP^2 + gamma dV^2).
+  grantham:
+    alpha: 1.833
+    beta: 0.1018
+    gamma: 0.000399
+    scale: 50.723
+  # One letter code -> composition, polarity and volume (Grantham 1974), hydropathy
+  # (Kyte and Doolittle 1982), residue volume in cubic Angstrom (Zamyatnin 1972) and the
+  # charge at pH 7 (histidine is 0, set).
+  amino_acids:
+    A: {composition: 0.0, polarity: 8.1, volume: 31.0, hydropathy: 1.8, residue_volume: 88.6, charge: 0}
+    R: {composition: 0.65, polarity: 10.5, volume: 124.0, hydropathy: -4.5, residue_volume: 173.4, charge: 1}
+    N: {composition: 1.33, polarity: 11.6, volume: 56.0, hydropathy: -3.5, residue_volume: 114.1, charge: 0}
+    D: {composition: 1.38, polarity: 13.0, volume: 54.0, hydropathy: -3.5, residue_volume: 111.1, charge: -1}
+    C: {composition: 2.75, polarity: 5.5, volume: 55.0, hydropathy: 2.5, residue_volume: 108.5, charge: 0}
+    Q: {composition: 0.89, polarity: 10.5, volume: 85.0, hydropathy: -3.5, residue_volume: 143.8, charge: 0}
+    E: {composition: 0.92, polarity: 12.3, volume: 83.0, hydropathy: -3.5, residue_volume: 138.4, charge: -1}
+    G: {composition: 0.74, polarity: 9.0, volume: 3.0, hydropathy: -0.4, residue_volume: 60.1, charge: 0}
+    H: {composition: 0.58, polarity: 10.4, volume: 96.0, hydropathy: -3.2, residue_volume: 153.2, charge: 0}
+    I: {composition: 0.0, polarity: 5.2, volume: 111.0, hydropathy: 4.5, residue_volume: 166.7, charge: 0}
+    L: {composition: 0.0, polarity: 4.9, volume: 111.0, hydropathy: 3.8, residue_volume: 166.7, charge: 0}
+    K: {composition: 0.33, polarity: 11.3, volume: 119.0, hydropathy: -3.9, residue_volume: 168.6, charge: 1}
+    M: {composition: 0.0, polarity: 5.7, volume: 105.0, hydropathy: 1.9, residue_volume: 162.9, charge: 0}
+    F: {composition: 0.0, polarity: 5.2, volume: 132.0, hydropathy: 2.8, residue_volume: 189.9, charge: 0}
+    P: {composition: 0.39, polarity: 8.0, volume: 32.5, hydropathy: -1.6, residue_volume: 112.7, charge: 0}
+    S: {composition: 1.42, polarity: 9.2, volume: 32.0, hydropathy: -0.8, residue_volume: 89.0, charge: 0}
+    T: {composition: 0.71, polarity: 8.6, volume: 61.0, hydropathy: -0.7, residue_volume: 116.1, charge: 0}
+    W: {composition: 0.13, polarity: 5.4, volume: 170.0, hydropathy: -0.9, residue_volume: 227.8, charge: 0}
+    Y: {composition: 0.2, polarity: 6.2, volume: 136.0, hydropathy: -1.3, residue_volume: 193.6, charge: 0}
+    V: {composition: 0.0, polarity: 5.9, volume: 84.0, hydropathy: 4.2, residue_volume: 140.0, charge: 0}

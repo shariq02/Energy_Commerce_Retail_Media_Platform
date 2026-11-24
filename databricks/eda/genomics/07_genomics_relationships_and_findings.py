@@ -43,7 +43,7 @@ ALL_TABLES = [
     "embedding_split",
     "entity_identity_record",
     "epitope_profile",
-    "gene_disease_profile",
+    "relation_record",
     "gene_measurement",
     "gene_profile",
     "genetic_test_profile",

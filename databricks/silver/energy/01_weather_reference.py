@@ -114,8 +114,8 @@ for _c in ("von_datum", "bis_datum"):
 dwd_validity = geography.select(
     "source_location_id",
     F.col("Stationsname").alias("name"),
-    F.col("`Geogr.Breite`").cast("double").alias("latitude"),
-    F.col("`Geogr.Laenge`").cast("double").alias("longitude"),
+    F.col("Geogr_Breite").cast("double").alias("latitude"),
+    F.col("Geogr_Laenge").cast("double").alias("longitude"),
     F.col("Stationshoehe").cast("double").alias("elevation_m"),
     F.to_date(parse_ts("von_datum", DAY, "UTC")).alias("valid_from"),
     F.to_date(parse_ts("bis_datum", DAY, "UTC")).alias("valid_to"),

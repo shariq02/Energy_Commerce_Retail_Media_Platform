@@ -178,9 +178,9 @@ quality_rules:
     severity: block
     finding: >
       read-only diagnostic (code only, no Databricks query): the label comes from
-      scripts/download/download_smard.py FORECAST_FILTERS, which maps filter id
+      scripts/download/sources.yml smard_series, which maps filter id
       126 -> 'forecast_generation_photovoltaic' and 5097 ->
-      'forecast_generation_wind_and_photovoltaic'. stage_smard.py copies the
+      'forecast_generation_wind_and_photovoltaic'. The SMARD parser copies the
       value through unchanged (no arithmetic). Two independent SMARD series being
       an exact -1x mirror is not physical -- filter 126 is very likely the wrong
       SMARD chart id for the PV day-ahead forecast (or its sign is inverted at

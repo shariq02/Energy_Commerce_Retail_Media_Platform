@@ -7,7 +7,7 @@
 # measurement tables + 5 metadata / reference tables). Every *_observed value and
 # every quality-rule bound is traceable to src/schemas/profiling/dwd.md. The
 # 28-station stratified network and the per-parameter dataset list are defined by
-# scripts/download/download_dwd.py. Authored; the per-table JSON Schema under
+# the dwd stage of scripts/download/sources.yml. Authored; the per-table JSON Schema under
 # src/schemas/contracts/generated/dwd_*.schema.json is produced by
 # src/schemas/_generate_jsonschema.py -- do not edit those by hand.
 
@@ -76,7 +76,7 @@ conventions:
     window are warranted before pooling -- not applied here.
   station_set:
     count: 28
-    authoritative_source: "scripts/download/download_dwd.py STATIONS"
+    authoritative_source: "scripts/download/sources.yml dwd_stations"
     ids: ["433", "662", "691", "880", "1048", "1262", "1270", "1303", "1346",
           "1420", "1550", "1684", "1975", "2014", "2290", "2564", "2667",
           "2928", "3032", "3126", "3631", "3668", "3987", "4271", "4336",
@@ -407,8 +407,8 @@ tables:
     columns:
       - { name: Stations_id,     type: string, required: true,  nullable: false }
       - { name: Stationshoehe,   type: double, required: true,  nullable: true,  notes: "station elevation, metres above sea level" }
-      - { name: "Geogr.Breite",  type: double, required: true,  nullable: true,  notes: "latitude, decimal degrees (EPSG:4326)" }
-      - { name: "Geogr.Laenge",  type: double, required: true,  nullable: true,  notes: "longitude, decimal degrees (EPSG:4326)" }
+      - { name: Geogr_Breite,    type: double, required: true,  nullable: true,  notes: "latitude, decimal degrees (EPSG:4326)" }
+      - { name: Geogr_Laenge,    type: double, required: true,  nullable: true,  notes: "longitude, decimal degrees (EPSG:4326)" }
       - { name: von_datum,       type: string, required: true,  nullable: false, notes: "validity-period start, yyyyMMdd" }
       - { name: bis_datum,       type: string, required: false, nullable: true,  notes: "validity-period end, yyyyMMdd; 31 rows open-ended (blank)" }
       - { name: Stationsname,    type: string, required: true,  nullable: true }
@@ -504,20 +504,20 @@ quality_rules:
     expr: "per-station hourly coverage 38-100% -- gaps are real, no dense-grid / uniform-completeness assumption"
     severity: warn
   - id: station_set
-    expr: "STATIONS_ID in the 28 curated numeric ids (scripts/download/download_dwd.py STATIONS); a non-listed value is a parser artefact"
+    expr: "STATIONS_ID in the 28 curated numeric ids (scripts/download/sources.yml dwd_stations); a non-listed value is a parser artefact"
     severity: block
   - id: metadata_trailer_and_header_rows
     expr: >
       dwd_station_name_history, dwd_device_instrument and dwd_parameter_unit
       carry parser-trailer rows ('generiert: ... Deutscher Wetterdienst'), and
       station_name_history additionally carries a spurious 'Stations_ID' header
-      row and parameter_unit a 'Legende:' row. NB02 detects these; stage_dwd.py
-      does not yet strip them.
+      row and parameter_unit a 'Legende:' row. NB02 detects these; the DWD parser
+      (scripts/ingestion/_energy_commerce_formats.py) does not yet strip them.
     severity: block
     remediation: >
       Silver: filter every metadata row whose id column is not one of the
       28 numeric station ids, before any join. A permanent fix (strip in
-      stage_dwd.py, re-stage, re-upload, re-run Bronze) is parked for a
+      the DWD parser, re-stage, re-upload, re-run Bronze) is parked for a
       batched staging-fix pass, not this phase.
   - id: mess_datum_double_suffix
     expr: "MESS_DATUM may carry a trailing '.0' from a double-inferred column -- strip before parsing yyyyMMddHH"

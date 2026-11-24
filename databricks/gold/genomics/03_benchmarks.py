@@ -56,6 +56,7 @@ GOLD_FEEDS = {
         "entity_derived_attribute",
         "locus_score",
         "variant_population_frequency",
+        "variant_sequence_window",
     ),
     "multi_value_attribute": ("entity_derived_attribute",),
     "multi_value_score": ("locus_score",),
@@ -68,14 +69,18 @@ GOLD_FEEDS = {
     "clinical_trial_profile": ("clinical_trial", "entity_derived_attribute"),
     "epitope_profile": ("epitope", "entity_derived_attribute"),
     "tumor_sample_profile": ("tumor_sample", "entity_derived_attribute"),
-    "somatic_mutation_profile": ("somatic_mutation", "entity_derived_attribute"),
+    "somatic_mutation_profile": (
+        "somatic_mutation",
+        "entity_derived_attribute",
+        "amino_acid_substitution",
+    ),
     "somatic_site_profile": ("somatic_mutation", "entity_derived_attribute"),
-    "gene_disease_profile": ("entity_relation", "entity_master"),
+    "relation_record": ("entity_relation", "entity_master"),
     "structural_variant_profile": ("variant", "entity_derived_attribute"),
     "clinvar_classification_change": ("variant_classification",),
-    "benchmark_variant": ("benchmark_variant",),
+    "benchmark_variant": ("benchmark_variant", "amino_acid_substitution"),
     "dms_assay": ("dms_assay",),
-    "dms_assay_mutant": ("dms_assay_mutant",),
+    "dms_assay_mutant": ("dms_assay_mutant", "amino_acid_substitution"),
     "embedding_split": ("embedding_split",),
     "gene_measurement": (
         "gene_dependency",
@@ -90,8 +95,10 @@ GOLD_FEEDS = {
         "protein_feature",
         "protein_gene_link",
         "variant_hgvs",
+        "variant_classification",
         "variant_condition",
         "variant_feature_overlap",
+        "amino_acid_substitution",
     ),
     "case_assay_record": (
         "faers_case",
@@ -114,19 +121,29 @@ TABLES = {}
 # DBTITLE 1,Read Silver
 benchmark = from_silver(read_silver("benchmark_variant"))
 copies = {table: from_silver(read_silver(table)) for table in COPIES}
+substitution = from_silver(read_silver("amino_acid_substitution"))
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- benchmark_variant (the columns that a set fills)
+# DBTITLE 1,Transform -- benchmark_variant (the columns that a set fills, amino acid change)
 TABLES["benchmark_variant"] = (
-    add_provenance(drop_empty_columns(benchmark), SOURCE, RID, ecosystem="genomics"),
+    add_provenance(
+        with_substitution(
+            drop_empty_columns(benchmark), substitution, "wild_type_aa", "mutant_aa"
+        ),
+        SOURCE,
+        RID,
+        ecosystem="genomics",
+    ),
     ["source_record_id"],
 )
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- dms_assay, dms_assay_mutant, embedding_split
+# DBTITLE 1,Transform -- dms_assay, dms_assay_mutant (amino acid change), embedding_split
 for table, frame in copies.items():
+    if table == "dms_assay_mutant":
+        frame = with_substitution(frame, substitution, "wild_type_aa", "mutant_aa")
     TABLES[table] = (
         add_provenance(frame, SOURCE, RID, ecosystem="genomics"),
         ["source_record_id"],

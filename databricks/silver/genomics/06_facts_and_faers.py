@@ -59,6 +59,13 @@ sample = parsed.select(
     "mutation_records",
     F.lit(DATASET).alias("source_dataset"),
 ).withColumn("_srid", F.col("sample_barcode"))
+# The cohort is the study of the tissue source site (the GDC code table).
+SITES = "tcga.site_codes"
+cohorts = read_genomics_bronze("tcga_site_codes").select(
+    source_text("tss_code", SITES).alias("tissue_source_site"),
+    source_text("study_name", SITES).alias("cohort"),
+)
+sample = sample.join(F.broadcast(cohorts), "tissue_source_site", "left")
 sample = conform_genomics(add_genomics_provenance(sample, "_srid", RID), "tumor_sample")
 
 # COMMAND ----------
@@ -78,6 +85,9 @@ write_inspect_export(
         ).count(),
         "projects": lambda t: t.select("project").distinct().count(),
         "participants": lambda t: t.select("participant_barcode").distinct().count(),
+        "samples_without_a_cohort": lambda t: t.filter(
+            F.col("cohort").isNull()
+        ).count(),
     },
 )
 

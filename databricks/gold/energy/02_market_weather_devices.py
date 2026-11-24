@@ -158,7 +158,11 @@ GOLD_FEEDS = {
     "grid_location": ("grid_location",),
     "grid_network": ("grid_network",),
     "balancing_area": ("balancing_area",),
-    "generation_unit": ("generation_unit", "support_registration"),
+    "generation_unit": (
+        "generation_unit",
+        "support_registration",
+        "unit_weather_station_link",
+    ),
     "power_plant": ("power_plant_register", "generation_unit"),
     "unit_event": ("register_change_event", "unit_authorisation", "unit_repowering"),
     "capacity_plan": ("power_plant_capacity_plan",),

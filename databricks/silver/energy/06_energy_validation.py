@@ -528,6 +528,80 @@ report(
 
 # COMMAND ----------
 
+# DBTITLE 1,Build, write and check -- unit_weather_station_link (nearest DWD station)
+# A unit with its own coordinates takes the DWD station with the shortest great-circle
+# distance (haversine, Earth radius 6371.0088 km).
+EARTH_RADIUS_KM = 6371.0088
+stations = (
+    spark.table(semantic_table("weather_location"))
+    .filter(
+        (F.col("source_system") == "dwd")
+        & F.col("latitude").isNotNull()
+        & F.col("longitude").isNotNull()
+    )
+    .select(
+        F.col("location_key").alias("weather_station_key"),
+        F.col("latitude").cast("double").alias("station_latitude"),
+        F.col("longitude").cast("double").alias("station_longitude"),
+    )
+)
+coordinate_units = (
+    spark.table(semantic_table("generation_unit"))
+    .filter(F.col("latitude").isNotNull() & F.col("longitude").isNotNull())
+    .select(
+        "unit_type",
+        "unit_id",
+        F.col("latitude").cast("double").alias("unit_latitude"),
+        F.col("longitude").cast("double").alias("unit_longitude"),
+    )
+)
+half_sines = F.pow(
+    F.sin(F.radians(F.col("station_latitude") - F.col("unit_latitude")) / 2), 2
+) + F.cos(F.radians("unit_latitude")) * F.cos(F.radians("station_latitude")) * F.pow(
+    F.sin(F.radians(F.col("station_longitude") - F.col("unit_longitude")) / 2), 2
+)
+nearest = (
+    coordinate_units.crossJoin(F.broadcast(stations))
+    .groupBy("unit_type", "unit_id")
+    .agg(
+        F.min(
+            F.struct(
+                (2 * EARTH_RADIUS_KM * F.asin(F.sqrt(half_sines))).alias("distance"),
+                "weather_station_key",
+            )
+        ).alias("best")
+    )
+    .select(
+        "unit_type",
+        "unit_id",
+        F.col("best.weather_station_key").alias("weather_station_key"),
+        F.col("best.distance").alias("distance_km"),
+        F.lit("unit_coordinates").alias("link_basis"),
+        sha_key("unit_type", "unit_id").alias("_srid"),
+    )
+)
+nearest = add_semantic_provenance(
+    nearest, "mastr", "generation_unit+weather_location", RID, "_srid"
+)
+written_link = write_inspect_export(
+    conform(nearest, UNIT_WEATHER_STATION_LINK_COLUMNS),
+    "unit_weather_station_link",
+    source="mastr",
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["unit_type", "unit_id"],
+    writer=write_semantic,
+)
+_linked, _with_coordinates = written_link.count(), coordinate_units.count()
+report(
+    "every unit with coordinates has a nearest station",
+    _linked == _with_coordinates,
+    f"linked {_linked} of {_with_coordinates}",
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Export findings -- energy validation
 write_silver_findings(
     FINDINGS,

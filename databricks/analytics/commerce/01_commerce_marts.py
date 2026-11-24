@@ -12,10 +12,11 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 3 `commerce_analytics` tables from Gold `commerce_session` and
+# MAGIC **Purpose:** the 4 `commerce_analytics` tables from Gold `commerce_session` and
 # MAGIC `commerce_event`: GA4 demand per day, the session funnel per source and day, and
 # MAGIC demand per product category and day (REES46 event, session and distinct product
-# MAGIC counts).
+# MAGIC counts); and the German retail trade volume per month against the electricity
+# MAGIC price, temperature and consumption of the energy marts (runs after them).
 
 # COMMAND ----------
 
@@ -31,6 +32,7 @@ RID = analytics_run_id()
 RULES = load_yaml("src/schemas/mappings/analytics_rules.yml")
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": ANALYTICS_SCHEMAS["commerce"]}
+HOME = RULES["home_market_area"]
 EVENT_KINDS = ("view", "cart", "purchase")
 STEPS = sorted({step for steps in RULES["funnel_steps"].values() for step in steps})
 TABLES = {}
@@ -42,6 +44,10 @@ commerce_session = read_gold("commerce_session", source=SOURCE)
 shop_events = read_gold("commerce_event", source=SOURCE).filter(
     F.col("source_system") == SOURCE
 )
+retail_trade = read_gold("retail_trade_index", source=SOURCE)
+ENERGY = ANALYTICS_SCHEMAS["energy"]
+market_price = read_gold("market_price_daily", source=SOURCE, schema=ENERGY)
+national_weather = read_gold("weather_energy_daily", source=SOURCE, schema=ENERGY)
 
 # COMMAND ----------
 
@@ -158,6 +164,58 @@ TABLES["product_demand_daily"] = (
         RID,
     ),
     category_grain,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- retail_energy_monthly (retail trade volume against the energy marts)
+# The two sides meet on the calendar month of the home market area (Germany) only.
+# The monthly price is the mean of the daily means weighted by their interval counts.
+month = F.trunc("local_date", "month").alias("observation_month")
+daily_price = F.col("mean_price_eur_per_mwh")
+price_month = (
+    one_resolution(
+        market_price.filter(F.col("market_area_code") == HOME),
+        ["local_date"],
+        "interval_seconds",
+        largest=True,
+    )
+    .groupBy(month)
+    .agg(
+        ratio(
+            F.sum(daily_price * F.col("interval_count")),
+            F.sum(F.when(daily_price.isNotNull(), F.col("interval_count"))),
+        ).alias("mean_price_eur_per_mwh"),
+        F.countDistinct(F.when(daily_price.isNotNull(), F.col("local_date"))).alias(
+            "price_day_count"
+        ),
+    )
+)
+weather_month = (
+    national_weather.filter(F.col("market_area_code") == HOME)
+    .groupBy(month)
+    .agg(
+        F.avg("mean_air_temperature_degc").alias("mean_air_temperature_degc"),
+        F.count("mean_air_temperature_degc").alias("temperature_day_count"),
+        F.sum("consumption_mwh").alias("consumption_mwh"),
+        F.count("consumption_mwh").alias("consumption_day_count"),
+    )
+)
+TABLES["retail_energy_monthly"] = (
+    add_provenance(
+        retail_trade.select(
+            "observation_month",
+            "country_code",
+            F.col("index_value").alias("retail_trade_volume_index"),
+            F.col("unit_code").alias("retail_trade_unit_code"),
+            F.col("observation_flag").alias("retail_trade_observation_flag"),
+        )
+        .join(F.broadcast(price_month), "observation_month", "left")
+        .join(F.broadcast(weather_month), "observation_month", "left"),
+        "eurostat",
+        RID,
+    ),
+    ["observation_month", "country_code"],
 )
 
 # COMMAND ----------

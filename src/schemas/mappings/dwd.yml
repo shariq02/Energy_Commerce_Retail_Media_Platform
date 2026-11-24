@@ -75,7 +75,7 @@ targets:
     field_map:
       - { source: "Stations_id", canonical: "dim_weather_location.station_id" }
       - { source: "city",        canonical: "dim_weather_location.city" }
-      - { source: "Geogr.Breite / Geogr.Laenge / Stationshoehe (representative row)", canonical: "latitude / longitude (EPSG:4326) / elevation_m" }
+      - { source: "Geogr_Breite / Geogr_Laenge / Stationshoehe (representative row)", canonical: "latitude / longitude (EPSG:4326) / elevation_m" }
       - { source: "Stationsname", canonical: "dim_weather_location.station_name" }
     history_kept_as_reference: [dwd_station_geography, dwd_station_name_history]
     filter_first: >
@@ -164,8 +164,8 @@ business_names:
     Stations_id:            station_id
     Stations_ID:            station_id
     Stationshoehe:          station_elevation_m
-    "Geogr.Breite":         latitude
-    "Geogr.Laenge":         longitude
+    Geogr_Breite:           latitude
+    Geogr_Laenge:           longitude
     Stationsname:           station_name
     Stations_Name:          station_name
     von_datum:              valid_from

@@ -51,6 +51,7 @@ GENOMICS_REFERENCE_TABLES = {
     "protein_feature",
     "cell_line",
     "genetic_test",
+    "amino_acid_substitution",
 }
 
 # Variants, relations and facts.
@@ -60,6 +61,7 @@ GENOMICS_MAIN_TABLES = {
     "variant_condition",
     "variant_classification",
     "locus_score",
+    "variant_sequence_window",
     "variant_population_frequency",
     "variant_feature_overlap",
     "benchmark_variant",
@@ -97,6 +99,8 @@ GENOMICS_TABLE_GRAIN = {
     "protein_feature": "protein, feature record, reference",
     "cell_line": "cell line, driver",
     "genetic_test": "test, link",
+    "amino_acid_substitution": "from amino acid, to amino acid",
+    "variant_sequence_window": "variant",
     "variant": "variant",
     "variant_hgvs": "variant, transcript, snapshot run",
     "variant_condition": "variant, condition position, condition id, snapshot run",
@@ -230,6 +234,7 @@ TRANSCRIPT_FIELDS = (
 PROTEIN_FIELDS = (
     "name",
     "length",
+    "amino_acid_sequence",
     "description",
     "gene_symbol",
     "entry_name",
@@ -530,6 +535,34 @@ GENOMICS_STRUCTURES.update(
             ("score_value", "double"),
             *_text("score_label", "context", "source_dataset", "source_field"),
         ],
+        # The reference bases around a variant (the GRCh38 window) and the flags and
+        # shares that follow from them.
+        "variant_sequence_window": [
+            *_text("variant_key", "contig"),
+            ("position", "bigint"),
+            *_text("reference_base", "sequence_window"),
+            ("reference_matches_genome", "boolean"),
+            ("guanine_cytosine_share", "double"),
+            ("is_cpg_site", "boolean"),
+            ("homopolymer_length", "int"),
+            ("is_transition", "boolean"),
+            ("source_dataset", "string"),
+        ],
+        # One row per pair of amino acids (one letter codes): the BLOSUM62 score
+        # and the property changes from the first to the second amino acid.
+        "amino_acid_substitution": [
+            *_text("from_amino_acid", "to_amino_acid"),
+            ("blosum62_score", "int"),
+            *_number(
+                "double",
+                "grantham_distance",
+                "polarity_change",
+                "hydropathy_change",
+                "residue_volume_change",
+            ),
+            ("charge_change", "int"),
+            ("source_dataset", "string"),
+        ],
         "variant_population_frequency": [
             *_text("variant_key", "population", "measure"),
             ("allele_frequency", "double"),
@@ -719,6 +752,7 @@ GENOMICS_STRUCTURES.update(
                 "participant_barcode",
                 "project",
                 "tissue_source_site",
+                "cohort",
                 "sample_type_code",
                 "vial",
                 "portion",
@@ -4034,6 +4068,23 @@ def _master_key_source(entity_type: str):
     }[entity_type]
 
 
+CYTOBAND_PATTERNS = (
+    ("cytoband_arm", r"([pq])"),
+    ("cytoband_band", r"[pq](\d+)"),
+    ("cytoband_sub_band", r"[pq]\d+\.(\d+)"),
+)
+
+
+def cytoband_parts(location):
+    """(column name, Column) of the arm, band and sub-band of a cytoband text such as
+    `19q13.43`; null when the text has no such part."""
+    chromosome = r"^(?:[0-9]+|X|Y|MT)"
+    return [
+        (name, F.nullif(F.regexp_extract(location, chromosome + pattern, 1), F.lit("")))
+        for name, pattern in CYTOBAND_PATTERNS
+    ]
+
+
 def build_master(entity_type: str, claims, xwalk, coordinates=None):
     """(rows, conflicts): the master rows of one entity type, shaped for
     `conform_union(..., "entity_master")` after `add_genomics_provenance`.
@@ -4067,18 +4118,93 @@ def build_master(entity_type: str, claims, xwalk, coordinates=None):
         "key_source", _master_key_source(entity_type)
     )
     if entity_type == "gene":
-        location = F.col("map_location")
-        chromosome = r"^(?:[0-9]+|X|Y|MT)"
-        for name, pattern in (
-            ("cytoband_arm", r"([pq])"),
-            ("cytoband_band", r"[pq](\d+)"),
-            ("cytoband_sub_band", r"[pq]\d+\.(\d+)"),
-        ):
-            rows = rows.withColumn(
-                name,
-                F.nullif(
-                    F.regexp_extract(location, chromosome + pattern, 1), F.lit("")
-                ),
-            )
+        for name, part in cytoband_parts(F.col("map_location")):
+            rows = rows.withColumn(name, part)
     rows = rows.withColumn("_srid", sha_key("entity_type", "entity_key"))
     return rows, conflicts
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Sequence windows and amino acid substitution rows (plain Python)
+import math as _math
+
+DNA_BASES = "ACGT"
+PURINE_BASES = {"A", "G"}
+
+
+def _run_length(sequence: str, start: int, base: str, step: int) -> int:
+    """How many `base` follow `start` in a row, going by `step` (the start is not
+    counted)."""
+    count, at = 0, start + step
+    while 0 <= at < len(sequence) and sequence[at] == base:
+        count += 1
+        at += step
+    return count
+
+
+def window_features(sequence, chunk_start, flank, position, reference, alternate):
+    """The window of a variant in a staged genome chunk, and what follows from it.
+
+    `sequence` holds the bases of the chunk with `flank` bases on each side, so its
+    first base lies at position `chunk_start - flank`. Returns None when the window
+    is incomplete (the position lies beyond the contig)."""
+    centre = flank + position - chunk_start
+    window = sequence[centre - flank : centre + flank + 1] if centre >= flank else ""
+    if len(window) != 2 * flank + 1:
+        return None
+    base = window[flank]
+    ref = (reference or "").upper()
+    alt = (alternate or "").upper()
+    known = sum(window.count(b) for b in DNA_BASES)
+    snv = len(ref) == 1 and len(alt) == 1 and ref in DNA_BASES and alt in DNA_BASES
+    return {
+        "reference_base": base,
+        "sequence_window": window,
+        "reference_matches_genome": (
+            window[flank : flank + len(ref)] == ref if ref.isalpha() else None
+        ),
+        "guanine_cytosine_share": (
+            (window.count("G") + window.count("C")) / known if known else None
+        ),
+        "is_cpg_site": (base == "C" and window[flank + 1] == "G")
+        or (base == "G" and window[flank - 1] == "C"),
+        "homopolymer_length": (
+            1
+            + _run_length(window, flank, base, -1)
+            + _run_length(window, flank, base, 1)
+            if base in DNA_BASES
+            else None
+        ),
+        "is_transition": (
+            (ref in PURINE_BASES) == (alt in PURINE_BASES)
+            if snv and ref != alt
+            else None
+        ),
+    }
+
+
+def substitution_rows(acids: dict, grantham: dict, blosum: dict) -> list[dict]:
+    """One row per ordered pair of the amino acids: the BLOSUM62 score of the pair and
+    the Grantham distance and the property changes from the first to the second."""
+    rows = []
+    for first, a in acids.items():
+        for second, b in acids.items():
+            distance = grantham["scale"] * _math.sqrt(
+                grantham["alpha"] * (a["composition"] - b["composition"]) ** 2
+                + grantham["beta"] * (a["polarity"] - b["polarity"]) ** 2
+                + grantham["gamma"] * (a["volume"] - b["volume"]) ** 2
+            )
+            rows.append(
+                {
+                    "from_amino_acid": first,
+                    "to_amino_acid": second,
+                    "blosum62_score": blosum.get((first, second)),
+                    "grantham_distance": distance,
+                    "polarity_change": b["polarity"] - a["polarity"],
+                    "hydropathy_change": b["hydropathy"] - a["hydropathy"],
+                    "residue_volume_change": b["residue_volume"] - a["residue_volume"],
+                    "charge_change": b["charge"] - a["charge"],
+                }
+            )
+    return rows

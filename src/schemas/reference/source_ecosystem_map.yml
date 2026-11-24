@@ -69,6 +69,12 @@ mappings:
     ecosystem: commerce
     first_mapped: "2026-11-23"
   # genomics: one entry per source folder of genomics_bronze
+  - source_system: genome_sequence
+    ecosystem: genomics
+    first_mapped: "2026-11-24"
+  - source_system: blosum62
+    ecosystem: genomics
+    first_mapped: "2026-11-24"
   - source_system: aact
     ecosystem: genomics
     first_mapped: "2026-11-11"

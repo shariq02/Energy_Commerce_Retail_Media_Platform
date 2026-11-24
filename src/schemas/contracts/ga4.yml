@@ -54,7 +54,7 @@ acquisition:
   update_frequency: none  # Google's sample export is fixed/historical, not appended to
   sla: none
   source_location: US  # bigquery-public-data.ga4_obfuscated_sample_ecommerce, confirmed live via `bq show`
-  script: scripts/download/download_ga4.py
+  script: scripts/download/download_sources.py (stage ga4)
   status: COMPLETE -- all 92 daily tables downloaded locally to data/raw/ga4/*.jsonl (~15GB)
   scope: all tables present in the source dataset (discovered live, not hardcoded), all columns
   destination: >
@@ -120,7 +120,7 @@ tables:
     columns:
       # This is the Bronze reality (bronze.ga4_events, verified against
       # bronze_schema_v003.md), not the full raw GA4 export -- staging
-      # (scripts/ingestion/stage_ga4.py) filters/projects before Bronze. The
+      # (scripts/ingestion/_energy_commerce_formats.py) filters/projects before Bronze. The
       # full raw export schema is preserved for reference under
       # `source_schema_reference` below, not lost.
       - { name: event_date, type: string, required: true, nullable: false, distinct_observed: 91, notes: "YYYYMMDD string; 92 raw daily files exist but approx_count_distinct on Bronze reports 91 -- HLL estimation error at this cardinality, not confirmed as a real gap" }

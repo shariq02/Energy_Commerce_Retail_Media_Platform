@@ -12,12 +12,14 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the 4 `commerce_gold` tables: sessions (with the columns of their
+# MAGIC **Purpose:** the 5 `commerce_gold` tables: sessions (with the columns of their
 # MAGIC user), products, `commerce_event` (REES46 view, cart and purchase events
 # MAGIC and GA4 web events) and `commerce_event_item` (one row per item of a GA4
-# MAGIC event), all with the conformed session, user and product keys. The last cells
-# MAGIC check that every Silver event and item is in a Gold table and that every
-# MAGIC Silver commerce table feeds a Gold table.
+# MAGIC event), all with the conformed session, user and product keys, and
+# MAGIC `retail_trade_index` (the German retail trade volume, one row per month, with
+# MAGIC the date key and calendar attributes of its month).
+# MAGIC The last cells check that every Silver event, item and retail row is in a Gold
+# MAGIC table and that every Silver commerce table feeds a Gold table.
 
 # COMMAND ----------
 
@@ -41,6 +43,7 @@ GOLD_FEEDS = {
     "commerce_product": ("commerce_product",),
     "commerce_event": ("commerce_event",),
     "commerce_event_item": ("ga4_event_item",),
+    "retail_trade_index": ("retail_trade_index",),
 }
 TABLES = {}
 
@@ -53,6 +56,10 @@ entities = {
 }
 commerce_event = from_silver(read_silver("commerce_event"))
 event_item = from_silver(read_silver("ga4_event_item"))
+retail_trade = from_silver(read_silver("retail_trade_index"))
+dim_date = read_shared_conformed("dim_date").select(
+    "calendar_date", "date_key", "year", "quarter", "month", "month_name"
+)
 
 # COMMAND ----------
 
@@ -101,6 +108,24 @@ TABLES["commerce_event_item"] = (
 
 # COMMAND ----------
 
+# DBTITLE 1,Transform -- retail_trade_index (with the calendar attributes of its month)
+TABLES["retail_trade_index"] = (
+    add_provenance(
+        with_parent(
+            retail_trade,
+            dim_date,
+            on="observation_month",
+            parent_key="calendar_date",
+            prefix="",
+        ),
+        "eurostat",
+        RID,
+    ),
+    ["source_record_id"],
+)
+
+# COMMAND ----------
+
 # DBTITLE 1,Grain gate -- every table
 gate_tables(TABLES, **GATE)
 
@@ -116,11 +141,12 @@ inspect_tables(TABLES, findings="commerce", **COMMON)
 
 # COMMAND ----------
 
-# DBTITLE 1,Validation -- tables have rows and the Gold tables hold every Silver event and item
+# DBTITLE 1,Validation -- tables have rows and the Gold tables hold every Silver row
 validate_tables(TABLES, **COMMON)
 for gold_table, silver_frame, name in (
     ("commerce_event", commerce_event, "every_commerce_event_in_the_gold_table"),
     ("commerce_event_item", event_item, "every_ga4_event_item_in_the_gold_table"),
+    ("retail_trade_index", retail_trade, "every_retail_trade_row_in_the_gold_table"),
 ):
     gold_rows = read_gold(gold_table, source=SOURCE).count()
     silver_rows = silver_frame.count()

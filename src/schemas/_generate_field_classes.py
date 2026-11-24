@@ -537,6 +537,7 @@ SEMANTIC_DERIVED = {
     "linked_type",
     "event_timestamp_utc",
     "event_timestamp_project",
+    "observation_month",
     "item_ordinal",
     "item_context",
     "category_l1",
@@ -563,6 +564,18 @@ SEMANTIC_DERIVED = {
     "maximum_price",
     "mean_price",
     "total_quantity",
+    "distinct_price_count",
+    "duration_seconds",
+    "start_hour",
+    "start_weekday",
+    "seconds_to_first_cart",
+    "mean_event_gap_seconds",
+    "days_active",
+    "mean_session_gap_hours",
+    "days_before_data_end",
+    "view_to_cart_rate",
+    "cart_to_purchase_rate",
+    "price_relative_to_category_median",
 }
 
 

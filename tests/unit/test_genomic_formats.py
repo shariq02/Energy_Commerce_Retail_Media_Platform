@@ -162,6 +162,8 @@ def test_uniprot_keeps_human_entries_and_listed_features(tmp_path):
         "FT" + " " * 19 + '/note="DNA-binding"',
         f"FT   {'CHAIN':<16}1..393",
         "SQ   SEQUENCE   393 AA;",
+        "     MEEPQSDPSV EPPLSQETFS",
+        "     DLWKLLPENN",
         "//",
         "ID   P53_MOUSE               Reviewed;         390 AA.",
         "AC   P02340;",
@@ -181,6 +183,7 @@ def test_uniprot_keeps_human_entries_and_listed_features(tmp_path):
             "protein_name": "Cellular tumor antigen p53",
             "gene_name": "TP53",
             "tax_id": "9606",
+            "sequence": "MEEPQSDPSVEPPLSQETFSDLWKLLPENN",
         }
     ]
     assert features == [

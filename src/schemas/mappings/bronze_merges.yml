@@ -149,6 +149,7 @@ merges:
     parts:
       gnomad_constraint: gnomad_constraint_metrics
       tcga_site_code: tcga_site_codes
+      blosum62: blosum62_scores
   - schema: genomics_bronze
     table: variant_benchmark_sets
     discriminator: benchmark

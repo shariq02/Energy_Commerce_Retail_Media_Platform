@@ -49,6 +49,14 @@ genes = master_rows(read_silver("entity_master"), "gene", "gene_key")
 variant = from_silver(read_silver("variant"))
 locus_score = read_silver("locus_score")
 population_frequency = read_silver("variant_population_frequency")
+variant_window = from_silver(read_silver("variant_sequence_window")).drop(
+    "contig",
+    "position",
+    "source_dataset",
+    "source_system",
+    "source_record_id",
+    "ecosystem",
+)
 gene_columns = attribute_columns(attributes, "gene")
 variant_columns = attribute_columns(attributes, "variant")
 PROFILE = {"attributes": attributes, **GATE}
@@ -178,7 +186,11 @@ variant_profile = full_profile(
     columns=variant_columns,
     **PROFILE,
 )
-for part, suffix in ((by_score, "__score"), (by_population, "__frequency")):
+for part, suffix in (
+    (by_score, "__score"),
+    (by_population, "__frequency"),
+    (variant_window, "__sequence"),
+):
     variant_profile = join_profile(variant_profile, part, "variant_key", "left", suffix)
 TABLES["variant_profile"] = (variant_profile, ["variant_key"])
 

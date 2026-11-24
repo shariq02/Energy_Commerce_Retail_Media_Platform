@@ -27,7 +27,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ingestion"))
 
-from _chunk_writer import ChunkedCSVWriter
+from _chunk_writer import ChunkedCSVWriter, ChunkedJSONLWriter
 from _genomic_formats import read_table
 from _memory_guard import PeakRSSMonitor
 
@@ -67,6 +67,8 @@ MANUAL = "manual:"
 FileSpec = tuple[str, str, str]
 # parse(path, tag) yields ({dataset: batch}, rows read).
 Parser = Callable[[Path, str], Iterator[tuple[dict[str, pd.DataFrame], int]]]
+# fetch(url, destination, timeout) -> {"bytes", "last_modified"}, or None to skip.
+Fetch = Callable[[str, Path, float], dict | None]
 
 
 def _resumable(dest: Path, response: requests.Response) -> bool:
@@ -217,7 +219,7 @@ def record(rows: list[dict]) -> None:
             writer.writerow({**row, "recorded_at": stamp})
 
 
-def staged_bytes(writer: ChunkedCSVWriter) -> int:
+def staged_bytes(writer: ChunkedCSVWriter | ChunkedJSONLWriter) -> int:
     return sum(path.stat().st_size for path in writer.chunk_paths)
 
 
@@ -232,6 +234,8 @@ def stage(
     force: bool = False,
     timeout_seconds: float = REQUEST_TIMEOUT,
     compress: bool = False,
+    jsonl: bool = False,
+    fetch: Fetch | None = None,
 ) -> bool:
     """Download each file, stage its batches, delete it; record when all are done.
     Returns False when the stage was not staged (a manual file is missing, or a
@@ -243,7 +247,9 @@ def stage(
     by hand; `pause_seconds` waits between downloads (rate-limited APIs);
     `force` stages even when the stage is recorded (the caller decided);
     `timeout_seconds` is the request timeout (a server that builds its answer
-    first needs more); `compress` writes `.csv.gz` chunks."""
+    first needs more); `compress` writes `.csv.gz` chunks; `jsonl` writes JSON
+    lines (a parser then yields lists of mappings); `fetch` replaces `download`
+    for urls that are not plain files (BigQuery)."""
     key = "+".join(datasets)
     if not force and (source, key) in recorded():
         logger.info(f"{source}/{key}: already staged, skipping")
@@ -251,11 +257,17 @@ def stage(
 
     out_dir = DATA_STAGING_DIR / source
     for dataset in datasets:
-        for old in out_dir.glob(f"{source}_{dataset}_chunk_*.csv*"):
+        for old in out_dir.glob(f"{source}_{dataset}_chunk_*.*"):
             old.unlink()
     writers = {
-        d: ChunkedCSVWriter(out_dir, source, d, compress=compress) for d in datasets
+        d: (
+            ChunkedJSONLWriter(out_dir, source, d)
+            if jsonl
+            else ChunkedCSVWriter(out_dir, source, d, compress=compress)
+        )
+        for d in datasets
     }
+    get = fetch or download
     monitor = PeakRSSMonitor()
     rows = []
 
@@ -270,7 +282,7 @@ def stage(
                 return False
             facts = {"bytes": dest.stat().st_size, "last_modified": ""}
         else:
-            facts = download(url, dest, timeout_seconds)
+            facts = get(url, dest, timeout_seconds)
             time.sleep(pause_seconds)
         if facts is None:
             logger.error(f"{source}/{key}: not staged, {name} was skipped")

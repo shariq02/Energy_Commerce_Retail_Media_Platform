@@ -770,14 +770,33 @@ quality_rows = [
         "variant_classification.last_evaluated",
     ),
 ]
+# The flags read every ClinVar origin term of the variant (`origin_detail`: de novo,
+# maternal, paternal, ...) and not only the resolved `origin`.
+origin_terms = (
+    current_snapshot(
+        claims.filter(
+            (F.col("entity_type") == "variant") & (F.col("field") == "origin_detail")
+        ),
+        RULES,
+    )
+    .groupBy(F.col("entity_key").alias("variant_key"))
+    .agg(
+        F.concat_ws(";", F.sort_array(F.collect_set(F.lower("value_text")))).alias(
+            "origin_terms"
+        )
+    )
+)
 origin_flags = keyword_rows(
-    variant.filter(F.col("origin").isNotNull()),
+    variant.select("variant_key", "origin")
+    .join(origin_terms, "variant_key", "left")
+    .withColumn("origin_text", F.concat_ws(";", "origin", "origin_terms"))
+    .filter(F.col("origin_text") != ""),
     entity_type="variant",
     key="variant_key",
-    text="origin",
+    text="origin_text",
     group="origin_flags",
     patterns=RULES["origin_flags"],
-    text_source="variant.origin",
+    text_source="variant.origin+entity_claim.origin_detail",
     **COMMON,
 )
 type_flags = keyword_rows(
@@ -4744,7 +4763,7 @@ population_rows = attribute_rows(
 
 # COMMAND ----------
 
-# DBTITLE 1,Transform -- gene age, essentiality, structure confidence, ClinVar history, ACMG
+# DBTITLE 1,Transform -- gene age, essentiality, constraint, structure confidence, ClinVar history, ACMG
 # Gene age: the most distant species with an orthologue (Ensembl Compara) and the
 # consensus gene age (13 orthology algorithms); paralogue count; DepMap essentiality;
 # AlphaFold pLDDT per protein and per variant; first and last ClinVar snapshot.
@@ -4855,6 +4874,63 @@ age_rows = attribute_rows(
             ),
             "text",
         ),
+    ],
+)
+# gnomAD constraint: the NCBI-keyed rows, one transcript per gene (MANE Select, then
+# canonical); the Ensembl-keyed rows of the file repeat the same genes.
+CONSTRAINT = "gnomad_constraint.metrics"
+constraint_text = text_for(CONSTRAINT)
+constraint_number = number_for(CONSTRAINT)
+constraint = (
+    read_genomics_bronze("gnomad_constraint_metrics")
+    .withColumn("gene_key", constraint_text("gene_id"))
+    .filter(F.col("gene_key").rlike(r"^\d+$"))
+    .withColumn("is_mane_select", F.lower(constraint_text("mane_select")) == "true")
+    .withColumn("is_canonical", F.lower(constraint_text("canonical")) == "true")
+)
+preferred = Window.partitionBy("gene_key").orderBy(
+    F.col("is_mane_select").desc(), F.col("is_canonical").desc()
+)
+constraint = constraint.withColumn("_rank", F.rank().over(preferred)).filter(
+    F.col("_rank") == 1
+)
+tied_genes = constraint.groupBy("gene_key").count().filter(F.col("count") > 1).count()
+if tied_genes:
+    raise RuntimeError(f"gnomAD constraint: {tied_genes} genes keep two transcripts")
+constraint_rows = attribute_rows(
+    gene.select("gene_key").join(
+        F.broadcast(
+            constraint.select(
+                "gene_key",
+                constraint_number("lof_pLI").alias("lof_probability"),
+                constraint_number("lof_obs").alias("lof_observed"),
+                constraint_number("lof_exp").alias("lof_expected"),
+                constraint_number("lof_oe").alias("lof_ratio"),
+                constraint_number("lof_oe_ci_upper").alias("lof_ratio_upper"),
+                constraint_number("mis_z_score").alias("missense_z"),
+            )
+        ),
+        "gene_key",
+    ),
+    "gene",
+    "gene_key",
+    "gene_constraint",
+    CONSTRAINT,
+    [
+        ("gnomad_loss_of_function_probability", F.col("lof_probability"), "number"),
+        ("gnomad_loss_of_function_observed", F.col("lof_observed"), "number"),
+        ("gnomad_loss_of_function_expected", F.col("lof_expected"), "number"),
+        (
+            "gnomad_loss_of_function_observed_expected_ratio",
+            F.col("lof_ratio"),
+            "number",
+        ),
+        (
+            "gnomad_loss_of_function_ratio_upper_bound",
+            F.col("lof_ratio_upper"),
+            "number",
+        ),
+        ("gnomad_missense_z_score", F.col("missense_z"), "number"),
     ],
 )
 # AlphaFold confidence: per protein, and at the protein position of a variant
@@ -5036,6 +5112,7 @@ derived = _union(
         variant_confidence,
         history_rows,
         acmg_rows,
+        constraint_rows,
     ]
 )
 derived = derived.distinct().withColumn(
@@ -5074,6 +5151,9 @@ write_inspect_export(
         "entity_types": lambda t: t.select("entity_type").distinct().count(),
         "variants_with_an_impact_score": lambda t: t.filter(
             F.col("attribute") == "pathogenicity_score"
+        ).count(),
+        "genes_with_a_gnomad_constraint": lambda t: t.filter(
+            F.col("attribute") == "gnomad_loss_of_function_observed"
         ).count(),
     },
 )
