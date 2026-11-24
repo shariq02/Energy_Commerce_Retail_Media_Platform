@@ -82,6 +82,27 @@ def test_every_notebook_that_writes_gold_also_calls_the_hard_fail_gate(path):
     )
 
 
+def _first_call_line(tree: ast.AST, name: str) -> int | None:
+    lines = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == name
+    ]
+    return min(lines) if lines else None
+
+
+@pytest.mark.parametrize("path", _WRITERS, ids=_name)
+def test_the_grain_gate_runs_on_the_written_tables(path):
+    """`gate_tables` checks the written tables and restores a failing one, so
+    it must come after `write_tables` (the first gate call of the notebook)."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    gate = _first_call_line(tree, "gate_tables")
+    write = _first_call_line(tree, _WRITE_CALL)
+    assert gate is not None and write is not None and write < gate
+
+
 def test_no_gold_notebook_creates_a_view() -> None:
     """Every Gold object is a table."""
     creators = [

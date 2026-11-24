@@ -15,7 +15,7 @@
 # MAGIC **Purpose:** the plumbing of the Gold, analytics and ML notebooks, loaded with
 # MAGIC `%run` (it loads `_silver_common`, whose audit, watermark and inspection code
 # MAGIC it reuses). A notebook puts its tables in one dict, table -> (frame, grain);
-# MAGIC one cell each gates, writes, inspects and validates every table. Gold joins
+# MAGIC one cell each writes, gates, inspects and validates every table. Gold joins
 # MAGIC parent attributes, unions, pivots Silver attributes, builds typed tables
 # MAGIC (`typed_table`) and adds keys; scores, classes, counts and flags come from
 # MAGIC Silver. Definitions only.
@@ -134,6 +134,7 @@ def check(
         stage=stage_of(rid),
     )
     if not condition:
+        flush_logs()
         raise RuntimeError(
             f"{stage_of(rid).upper()} GATE FAILED: {component}.{metric_name} -- "
             f"{detail or 'no detail given'}"
@@ -174,28 +175,69 @@ def read_shared_conformed(table: str) -> DataFrame:
 # `tables` maps a table name to (frame, grain columns); `schema` is the target.
 
 
-def gate_tables(tables: dict, *, source: str, component: str, rid: str) -> None:
-    for frame, grain in tables.values():
-        assert_unique_grain(frame, grain, component=component, source=source, rid=rid)
+_PREVIOUS_VERSION = {}
 
 
 def write_tables(
     tables: dict, *, schema: str, source: str, component: str, rid: str
 ) -> None:
     """Full overwrite of each table; prints the rollback line, writes a
-    watermark row (Silver `watermark`, stage from the run id)."""
+    watermark row (Silver `watermark`, stage from the run id) and keeps the
+    version before the write for `gate_tables`."""
     for table, (frame, _) in tables.items():
         started = now_utc()
         full = f"{CATALOG}.{schema}.{table}"
-        if spark.catalog.tableExists(full):
-            v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
-            print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
         frame.write.format("delta").mode("overwrite").option(
             "overwriteSchema", "true"
         ).saveAsTable(full)
-        n = _delta_rows_written(full)
+        n, previous = delta_write_result(full)
+        _PREVIOUS_VERSION[full] = previous
+        print_rollback(full, previous)
         watermark(component, source, n, "COMPLETE", rid, started, stage=stage_of(rid))
         print(f"OK  {full}: {n if n is not None else '?'} rows")
+    flush_logs()
+
+
+def gate_tables(
+    tables: dict, *, schema: str, source: str, component: str, rid: str
+) -> None:
+    """Hard-fail grain gate on the written tables. A table with a duplicate key
+    goes back to its version before the write (a new table is dropped); the
+    notebook then stops once, after every table was checked."""
+    failed = []
+    for table, (_, grain) in tables.items():
+        full = f"{CATALOG}.{schema}.{table}"
+        dup_n = (
+            spark.table(full).groupBy(*grain).count().filter(F.col("count") > 1).count()
+        )
+        detail = f"{table} key_cols={grain} duplicate_groups={dup_n}"
+        audit(
+            component,
+            source,
+            "grain_duplicate_keys",
+            float(dup_n),
+            status="PASS" if dup_n == 0 else "FAIL",
+            error=detail,
+            rid=rid,
+            stage=stage_of(rid),
+        )
+        if dup_n:
+            previous = _PREVIOUS_VERSION.get(full, "unknown")
+            if previous == "unknown":
+                detail += " (no restore point: write_tables did not run here)"
+            elif previous is None:
+                spark.sql(f"DROP TABLE IF EXISTS {full}")
+                detail += " (new table dropped)"
+            else:
+                spark.sql(f"RESTORE TABLE {full} TO VERSION AS OF {previous}")
+                detail += " (restored to the version before the write)"
+            failed.append(detail)
+    flush_logs()
+    if failed:
+        raise RuntimeError(
+            f"{stage_of(rid).upper()} GATE FAILED: {component}.grain_duplicate_keys "
+            f"-- {'; '.join(failed)}"
+        )
 
 
 # Findings rows that would show a data value (a minimum, a maximum, the values
@@ -220,8 +262,9 @@ def inspect_tables(
     tables: dict, *, schema: str, findings: str, source: str, component: str, rid: str
 ) -> None:
     """Silver `inspect_table` on each written table, without data values; the
-    section goes to `src/findings/<stage>_findings/<findings>.md` (kept local)."""
-    for table, (_, grain) in tables.items():
+    section goes to `src/findings/<stage>_findings/<findings>.md` (kept local).
+    The grain was checked by `gate_tables` on the same written table."""
+    for table in tables:
         full = f"{CATALOG}.{schema}.{table}"
         blocks = inspect_table(
             spark.table(full),
@@ -229,7 +272,7 @@ def inspect_tables(
             source=findings,
             component=component,
             rid=rid,
-            key_cols=grain,
+            extra_checks={"duplicate_key_groups_at_gate": 0},
             full_name=full,
         )
         write_silver_findings(
@@ -258,6 +301,7 @@ def validate_tables(
             rid=rid,
         )
         print(f"OK  {full}: {rows} rows")
+    flush_logs()
 
 
 # COMMAND ----------
@@ -452,21 +496,18 @@ MULTI_VALUE_COLUMNS = (
 )
 
 
-def with_value_count(attributes: DataFrame) -> DataFrame:
-    """`attributes` with `_values`: the rows of the same VALUE_GROUP."""
-    return attributes.withColumn(
-        "_values", F.count(F.lit(1)).over(Window.partitionBy(*VALUE_GROUP))
-    )
-
-
 def multi_value_attributes(attributes: DataFrame) -> DataFrame:
     """The attribute rows of a cell with more than one value; the profiles
-    leave such a cell empty."""
-    return (
-        with_value_count(attributes)
-        .filter(F.col("_values") > 1)
-        .select(*MULTI_VALUE_COLUMNS)
+    leave such a cell empty. The cells are counted on the key columns only and
+    joined back, so no full row is shuffled."""
+    cells = (
+        attributes.groupBy(*VALUE_GROUP)
+        .count()
+        .filter(F.col("count") > 1)
+        .select(*[F.col(c).alias(f"_cell_{c}") for c in VALUE_GROUP])
     )
+    same_cell = [F.col(c).eqNullSafe(F.col(f"_cell_{c}")) for c in VALUE_GROUP]
+    return attributes.join(cells, same_cell, "left_semi").select(*MULTI_VALUE_COLUMNS)
 
 
 def attribute_columns(attributes: DataFrame, entity_type: str) -> dict:
@@ -512,36 +553,40 @@ def pivot_attributes(
     rules but `exclude` when `rules` is None); a keyword match adds
     `<column>__matched_text`. A cell with more than one value stays empty (its
     rows are in `multi_value_attribute`); raises when two attributes share a
-    column."""
+    column. A cell is counted once, by an aggregation on (entity, column)."""
     chosen = {
         k: name
         for k, name in columns.items()
         if (k[0] in rules if rules is not None else k[0] not in exclude)
     }
+    if len(set(chosen.values())) != len(chosen):
+        raise ValueError(f"{component}: two attributes share a {entity_type} column")
     names = spark.createDataFrame(
         [(*k, name) for k, name in chosen.items()],
         "rule_name string, attribute string, value_type string, _column string",
     )
-    rows = with_value_count(
-        attributes.filter(F.col("entity_type") == entity_type).join(
-            F.broadcast(names), ["rule_name", "attribute", "value_type"]
+    cells = (
+        attributes.filter(F.col("entity_type") == entity_type)
+        .join(F.broadcast(names), ["rule_name", "attribute", "value_type"])
+        .groupBy("entity_key", "_column", "value_type")
+        .agg(
+            F.count(F.lit(1)).alias("_values"),
+            *[F.first(column).alias(column) for column in VALUE_COLUMNS.values()],
+            F.first("matched_text").alias("matched_text"),
         )
     )
-    rows = rows.filter(F.col("_values") == 1).drop("_values")
-    assert_unique_grain(
-        rows, ["entity_key", "_column"], component=component, source=source, rid=rid
-    )
+    single = F.col("_values") == 1
     parts = []
     for kind, value in VALUE_COLUMNS.items():
         values = sorted({n for k, n in chosen.items() if k[2] == kind})
         if values:
             parts.append(
-                rows.filter(F.col("value_type") == kind)
+                cells.filter(F.col("value_type") == kind)
                 .groupBy("entity_key")
                 .pivot("_column", values)
-                .agg(F.first(value))
+                .agg(F.first(F.when(single, F.col(value))))
             )
-    matched = rows.filter(F.col("matched_text").isNotNull())
+    matched = cells.filter(single & F.col("matched_text").isNotNull())
     matched_names = [
         r["_column"] for r in matched.select("_column").distinct().collect()
     ]
@@ -553,7 +598,7 @@ def pivot_attributes(
             .agg(F.first("matched_text"))
         )
     if not parts:
-        return rows.select(F.col("entity_key").alias(key)).limit(0)
+        return cells.select(F.col("entity_key").alias(key)).limit(0)
     out = parts[0]
     for part in parts[1:]:
         out = out.join(part, "entity_key", "full")

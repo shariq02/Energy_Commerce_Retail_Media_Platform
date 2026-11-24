@@ -245,18 +245,21 @@ TABLES["variant_review_queue"] = (
 # DBTITLE 1,Transform -- population_risk (pathogenic variants x population group)
 suffix = "_allele_frequency"
 columns = set(clinical.columns)
-# A population group has all of its measure columns (variant_profile holds more
-# columns than the frequency ones).
+# A population group has an allele frequency and a filter status column
+# (variant_profile holds more columns than the frequency ones); its count
+# columns exist only where the source holds counts, and the others are null.
 groups = sorted(
     group
     for group in (c[: -len(suffix)] for c in columns if c.endswith(suffix))
-    if all(f"{group}_{name}" in columns for name in FREQUENCY_VALUES)
+    if f"{group}_filter_status" in columns
 )
 group_rows = [
     F.struct(
         F.lit(group).alias("population_group"),
         *[
-            F.col(f"{group}_{name}").cast(kind).alias(name)
+            (F.col(f"{group}_{name}") if f"{group}_{name}" in columns else F.lit(None))
+            .cast(kind)
+            .alias(name)
             for name, kind in FREQUENCY_VALUES.items()
         ],
     )
@@ -296,13 +299,13 @@ TABLES["classification_change_summary"] = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Grain gate -- every table
-gate_tables(TABLES, **GATE)
+# DBTITLE 1,Write -- every table
+write_tables(TABLES, **COMMON)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write -- every table
-write_tables(TABLES, **COMMON)
+# DBTITLE 1,Grain gate -- every written table
+gate_tables(TABLES, **COMMON)
 
 # COMMAND ----------
 

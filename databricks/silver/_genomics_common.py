@@ -2399,15 +2399,20 @@ def single_id_frame(
 
 
 def finish_crosswalk(frame):
-    """Distinct rows plus `entities_sharing_id` (entities holding the same id)."""
-    same = Window.partitionBy("entity_type", "id_type", "id_value")
-    return (
-        frame.filter(F.col("id_value").isNotNull() & (F.col("id_value") != ""))
-        .distinct()
-        .withColumn(
-            "entities_sharing_id", F.size(F.collect_set("entity_key").over(same))
-        )
+    """Distinct rows plus `entities_sharing_id` (entities holding the same id),
+    counted by an aggregation with a partial count per task and joined back."""
+    keys = ["entity_type", "id_type", "id_value"]
+    rows = frame.filter(
+        F.col("id_value").isNotNull() & (F.col("id_value") != "")
+    ).distinct()
+    sharing = rows.groupBy(*keys).agg(
+        F.countDistinct("entity_key").cast("int").alias("entities_sharing_id")
     )
+    sharing = sharing.select(
+        *[F.col(k).alias(f"_s_{k}") for k in keys], "entities_sharing_id"
+    )
+    same = [F.col(k).eqNullSafe(F.col(f"_s_{k}")) for k in keys]
+    return rows.join(sharing, same).drop(*[f"_s_{k}" for k in keys])
 
 
 def keep_best_match_method(frame, rules):

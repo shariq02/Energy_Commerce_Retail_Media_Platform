@@ -128,7 +128,10 @@ def family_frame(
 
 def _prep(table):
     """One DWD Bronze table: sentinels stripped, then identical rows collapsed and
-    conflicting rows quarantined on (STATIONS_ID, MESS_DATUM). Once per table."""
+    conflicting rows quarantined on (STATIONS_ID, MESS_DATUM). Once per table.
+    The collapsed rows go to a temporary table (dropped by the last cell), so the
+    window steps run for the write and the quarantine only; the statistics and
+    the weather table read the temporary table and the quarantine rows."""
     if table in _PREPPED:
         return _PREPPED[table]
     qn = DWD_TABLES[table]["qn"]
@@ -143,8 +146,22 @@ def _prep(table):
     kept, q = resolve_conflicts(
         df, ["STATIONS_ID", "MESS_DATUM"], data_cols, qn_col=qn, bronze_table=table
     )
+    started = now_utc()
+    temporary = f"{CATALOG}.{QUALITY_SCHEMA}.{table}_deduplicated"
+    kept.write.format("delta").mode("overwrite").option(
+        "overwriteSchema", "true"
+    ).saveAsTable(temporary)
+    kept = spark.table(temporary)
     write_quarantine(q.withColumn("source_system", F.lit("dwd")), RID)
-    RECONCILIATION[table] = reconciliation_stats(df, kept, q, raw_bronze_df=bronze_df)
+    since = F.lit(started) - F.expr("INTERVAL 30 SECONDS")
+    quarantined = spark.table(QUARANTINE_TABLE).filter(
+        (F.col("run_id") == RID)
+        & (F.col("bronze_table") == table)
+        & (F.col("quarantined_at") >= since)
+    )
+    RECONCILIATION[table] = reconciliation_stats(
+        df, kept, quarantined, raw_bronze_df=bronze_df
+    )
     _PREPPED[table] = (kept, qn)
     return _PREPPED[table]
 
@@ -963,3 +980,9 @@ write_inspect_export(
 
 # DBTITLE 1,Check and export -- rejected values of the lenient timestamp parser
 export_rejected_values(FINDINGS, COMPONENT)
+
+# COMMAND ----------
+
+# DBTITLE 1,Drop the temporary deduplicated DWD tables
+for _table in _PREPPED:
+    spark.sql(f"DROP TABLE IF EXISTS {CATALOG}.{QUALITY_SCHEMA}.{_table}_deduplicated")

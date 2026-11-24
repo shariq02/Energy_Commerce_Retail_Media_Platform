@@ -121,14 +121,26 @@ variant_names, position_names = [
     sorted(r[0] for r in frame.select("score_name").distinct().collect())
     for frame in (variant_scores, position_scores)
 ]
-by_variant = (
-    variant_scores.groupBy("variant_key")
-    .pivot("score_name", variant_names)
-    .agg(
-        F.first("score_value").alias("value"),
-        F.first("score_label").alias("label"),
-        F.first("context").alias("context"),
-    )
+# A score has a label and a context column only when the source gives them.
+score_fields = {
+    r["score_name"]: {"label": r["labels"] > 0, "context": r["contexts"] > 0}
+    for r in variant_scores.groupBy("score_name")
+    .agg(F.count("score_label").alias("labels"), F.count("context").alias("contexts"))
+    .collect()
+}
+by_variant = variant_scores.groupBy("variant_key").agg(
+    *[
+        F.first(F.when(F.col("score_name") == score, F.col(column)), True).alias(
+            f"{score}_{field}"
+        )
+        for score in variant_names
+        for field, column in (
+            ("value", "score_value"),
+            ("label", "score_label"),
+            ("context", "context"),
+        )
+        if field == "value" or score_fields[score][field]
+    ]
 )
 by_position = (
     position_scores.groupBy("contig", "position")
@@ -168,10 +180,22 @@ combo_text = F.concat_ws(
 )
 frequency_rows = population_frequency.withColumn("_combo", combo_map[combo_text])
 assert_unique_grain(frequency_rows, ["variant_key", "_combo"], **GATE)
-by_population = (
-    frequency_rows.groupBy("variant_key")
-    .pivot("_combo", sorted(set(combo_names.values())))
-    .agg(*[F.first(v).alias(v) for v in FREQUENCY_VALUES])
+# A population and measure has a count column only when the source holds counts.
+frequency_filled = {
+    row["_combo"]: row.asDict()
+    for row in frequency_rows.groupBy("_combo")
+    .agg(*[F.count(v).alias(v) for v in FREQUENCY_VALUES])
+    .collect()
+}
+by_population = frequency_rows.groupBy("variant_key").agg(
+    *[
+        F.first(F.when(F.col("_combo") == combo, F.col(value)), True).alias(
+            f"{combo}_{value}"
+        )
+        for combo in sorted(frequency_filled)
+        for value in FREQUENCY_VALUES
+        if frequency_filled[combo][value] > 0
+    ]
 )
 
 # COMMAND ----------
@@ -196,13 +220,13 @@ TABLES["variant_profile"] = (variant_profile, ["variant_key"])
 
 # COMMAND ----------
 
-# DBTITLE 1,Grain gate -- every table
-gate_tables(TABLES, **GATE)
+# DBTITLE 1,Write -- every table
+write_tables(TABLES, **COMMON)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write -- every table
-write_tables(TABLES, **COMMON)
+# DBTITLE 1,Grain gate -- every written table
+gate_tables(TABLES, **COMMON)
 
 # COMMAND ----------
 

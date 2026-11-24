@@ -1233,9 +1233,6 @@ def write_semantic(
     full = f"{CATALOG}.{target_schema_for(table, source=source)}.{table}"
     unclassified = validate_field_classes(df, full)
     exists = spark.catalog.tableExists(full)
-    if exists:
-        v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
-        print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
 
     if exists and replace_where:
         existing_schema = spark.table(full).schema
@@ -1258,7 +1255,8 @@ def write_semantic(
     else:
         writer = writer.option("overwriteSchema", "true")
     writer.saveAsTable(full)
-    n = _delta_rows_written(full)
+    n, previous = delta_write_result(full)
+    print_rollback(full, previous)
     watermark(component, source, n, "COMPLETE", rid, started)
     audit(component, source, "rows_written", n, status="PASS", rid=rid)
     if unclassified:
@@ -1271,6 +1269,7 @@ def write_semantic(
             error=",".join(unclassified),
             rid=rid,
         )
+    flush_logs()
     print(f"OK  {full}: {n if n is not None else '?'} rows written")
     return n
 

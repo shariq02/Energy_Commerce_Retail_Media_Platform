@@ -175,13 +175,13 @@ TABLES["metric_definition"] = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Grain gate -- every table
-gate_tables(TABLES, **GATE)
+# DBTITLE 1,Write -- every table
+write_tables(TABLES, **COMMON)
 
 # COMMAND ----------
 
-# DBTITLE 1,Write -- every table
-write_tables(TABLES, **COMMON)
+# DBTITLE 1,Grain gate -- every written table
+gate_tables(TABLES, **COMMON)
 
 # COMMAND ----------
 

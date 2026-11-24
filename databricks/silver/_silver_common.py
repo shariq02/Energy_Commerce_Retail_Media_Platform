@@ -855,41 +855,70 @@ def audit(
     rid: str,
     stage: str = STAGE,
 ) -> None:
-    """One quality_audit_log row; `stage` is `silver` unless a later layer
-    (Gold, analytics) passes its own."""
-    row = spark.createDataFrame(
-        [
-            (
-                rid,
-                _dt.datetime.now(_dt.UTC).date(),
-                source,
-                stage,
-                component,
-                metric_name,
-                None if metric_value is None else float(metric_value),
-                threshold,
-                status,
-                error,
-                _dt.datetime.now(_dt.UTC),
-            )
-        ],
-        "run_id string, run_date date, source string, stage string, component string, "
-        "metric_name string, metric_value double, threshold double, status string, "
-        "error_detail string, recorded_at timestamp",
-    )
-    row.write.format("delta").mode("append").saveAsTable(AUDIT_TABLE)
-
-
-def _delta_rows_written(table: str) -> int | None:
-    try:
-        m = (
-            spark.sql(f"DESCRIBE HISTORY {table} LIMIT 1")
-            .select("operationMetrics")
-            .first()[0]
+    """One quality_audit_log row, buffered until `flush_logs`; `stage` is
+    `silver` unless a later layer (Gold, analytics) passes its own."""
+    _AUDIT_ROWS.append(
+        (
+            rid,
+            _dt.datetime.now(_dt.UTC).date(),
+            source,
+            stage,
+            component,
+            metric_name,
+            None if metric_value is None else float(metric_value),
+            threshold,
+            status,
+            error,
+            _dt.datetime.now(_dt.UTC),
         )
-        return int(m.get("numOutputRows")) if m and "numOutputRows" in m else None
+    )
+
+
+_AUDIT_ROWS = []
+_WATERMARK_ROWS = []
+_AUDIT_DDL = (
+    "run_id string, run_date date, source string, stage string, component string, "
+    "metric_name string, metric_value double, threshold double, status string, "
+    "error_detail string, recorded_at timestamp"
+)
+_WATERMARK_DDL = (
+    "run_id string, source string, stage string, component string, "
+    "last_processed_ts timestamp, last_processed_row bigint, rows_written bigint, "
+    "status string, started_at timestamp, completed_at timestamp"
+)
+
+
+def flush_logs() -> None:
+    """Write the buffered audit and watermark rows: one insert per log table."""
+    for rows, ddl, table in (
+        (_AUDIT_ROWS, _AUDIT_DDL, AUDIT_TABLE),
+        (_WATERMARK_ROWS, _WATERMARK_DDL, WATERMARK_TABLE),
+    ):
+        if rows:
+            frame = spark.createDataFrame(rows, ddl)
+            frame.write.format("delta").mode("append").saveAsTable(table)
+            rows.clear()
+
+
+def delta_write_result(table: str) -> tuple[int | None, int | None]:
+    """(rows written by the last write, version before it) from one DESCRIBE
+    HISTORY; the version is None for a table the write created."""
+    try:
+        last, *earlier = (
+            spark.sql(f"DESCRIBE HISTORY {table} LIMIT 2")
+            .select("version", "operationMetrics")
+            .collect()
+        )
     except Exception:
-        return None
+        return None, None
+    metrics = last["operationMetrics"] or {}
+    rows = int(metrics["numOutputRows"]) if "numOutputRows" in metrics else None
+    return rows, (earlier[0]["version"] if earlier else None)
+
+
+def print_rollback(table: str, previous: int | None) -> None:
+    if previous is not None:
+        print(f"ROLLBACK IF NEEDED: RESTORE TABLE {table} TO VERSION AS OF {previous}")
 
 
 def watermark(
@@ -901,27 +930,22 @@ def watermark(
     started: _dt.datetime,
     stage: str = STAGE,
 ) -> None:
-    """One pipeline_watermarks row; `stage` as in `audit`."""
-    row = spark.createDataFrame(
-        [
-            (
-                rid,
-                source,
-                stage,
-                component,
-                None,
-                None,
-                None if rows is None else int(rows),
-                status,
-                started,
-                _dt.datetime.now(_dt.UTC),
-            )
-        ],
-        "run_id string, source string, stage string, component string, "
-        "last_processed_ts timestamp, last_processed_row bigint, rows_written bigint, "
-        "status string, started_at timestamp, completed_at timestamp",
+    """One pipeline_watermarks row, buffered until `flush_logs`; `stage` as in
+    `audit`."""
+    _WATERMARK_ROWS.append(
+        (
+            rid,
+            source,
+            stage,
+            component,
+            None,
+            None,
+            None if rows is None else int(rows),
+            status,
+            started,
+            _dt.datetime.now(_dt.UTC),
+        )
     )
-    row.write.format("delta").mode("append").saveAsTable(WATERMARK_TABLE)
 
 
 def write_silver(
@@ -937,23 +961,21 @@ def write_silver(
     the matching rows of an existing table. Detects unclassified columns
     (non-blocking -- see validate_field_classes), prints the Delta rollback
     line, records rows_written from Delta metrics (no pre-write count), writes
-    a watermark row. A brand-new table (no field_class_registry entry at all)
-    defaults to its ecosystem's schema via `source` rather than failing -- see
-    target_schema_for."""
+    a watermark row and flushes the log rows. A brand-new table (no
+    field_class_registry entry at all) defaults to its ecosystem's schema via
+    `source` rather than failing -- see target_schema_for."""
     started = now_utc()
     full = f"{CATALOG}.{target_schema_for(silver_table, source=source)}.{silver_table}"
     unclassified = validate_field_classes(df, full)
     exists = spark.catalog.tableExists(full)
-    if exists:
-        v = spark.sql(f"DESCRIBE HISTORY {full} LIMIT 1").first()["version"]
-        print(f"ROLLBACK IF NEEDED: RESTORE TABLE {full} TO VERSION AS OF {v}")
     writer = df.write.format("delta").mode("overwrite")
     if replace_where and exists:
         writer = writer.option("replaceWhere", replace_where)
     else:
         writer = writer.option("overwriteSchema", "true")
     writer.saveAsTable(full)
-    n = _delta_rows_written(full)
+    n, previous = delta_write_result(full)
+    print_rollback(full, previous)
     watermark(component, source, n, "COMPLETE", rid, started)
     audit(component, source, "rows_written", n, status="PASS", rid=rid)
     if unclassified:
@@ -966,6 +988,7 @@ def write_silver(
             error=",".join(unclassified),
             rid=rid,
         )
+    flush_logs()
     print(f"OK  {full}: {n if n is not None else '?'} rows")
     return n
 

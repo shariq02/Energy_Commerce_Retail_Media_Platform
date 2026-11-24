@@ -155,3 +155,91 @@ def test_a_not_available_flag_is_no_mastr_date(silver):
 
 def test_biomethane_first_use_is_a_mastr_date(silver):
     assert silver["_is_mastr_date"]("biomethane_first_use")
+
+
+class _Writer:
+    def __init__(self, spark_stub):
+        self.spark_stub = spark_stub
+
+    def format(self, _name):
+        return self
+
+    def mode(self, _name):
+        return self
+
+    def saveAsTable(self, table):
+        self.spark_stub.inserts.append((table, len(self.spark_stub.frame_rows)))
+
+
+class _SparkStub:
+    """Records one insert per `flush_logs` table; no Spark behaviour."""
+
+    def __init__(self):
+        self.inserts = []
+        self.frame_rows = []
+
+    def createDataFrame(self, rows, _ddl):
+        self.frame_rows = list(rows)
+        return type("Frame", (), {"write": _Writer(self)})()
+
+
+def test_log_rows_wait_for_one_insert_per_log_table(silver, monkeypatch):
+    stub = _SparkStub()
+    monkeypatch.setitem(silver, "spark", stub)
+    silver["_AUDIT_ROWS"].clear()
+    silver["_WATERMARK_ROWS"].clear()
+    started = silver["now_utc"]()
+    for name in ("a", "b", "c"):
+        silver["audit"]("comp", "src", name, 1.0, rid="run")
+    silver["watermark"]("comp", "src", 5, "COMPLETE", "run", started)
+    assert stub.inserts == []
+    silver["flush_logs"]()
+    tables = [table for table, _ in stub.inserts]
+    assert tables == [silver["AUDIT_TABLE"], silver["WATERMARK_TABLE"]]
+    assert silver["_AUDIT_ROWS"] == [] and silver["_WATERMARK_ROWS"] == []
+    silver["flush_logs"]()
+    assert len(stub.inserts) == 2
+
+
+def test_audit_row_matches_the_log_table_columns(silver):
+    silver["_AUDIT_ROWS"].clear()
+    silver["audit"]("comp", "src", "rows_written", 7, status="PASS", rid="run")
+    row = silver["_AUDIT_ROWS"].pop()
+    assert len(row) == len(silver["_AUDIT_DDL"].split(","))
+    assert (row[0], row[2], row[4], row[5], row[6], row[8]) == (
+        "run",
+        "src",
+        "comp",
+        "rows_written",
+        7.0,
+        "PASS",
+    )
+
+
+class _HistoryStub:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def sql(self, _statement):
+        return self
+
+    def select(self, *_columns):
+        return self
+
+    def collect(self):
+        return self.rows
+
+
+def test_delta_write_result_reads_rows_and_the_version_before(silver, monkeypatch):
+    history = [
+        {"version": 4, "operationMetrics": {"numOutputRows": "120"}},
+        {"version": 3, "operationMetrics": {}},
+    ]
+    monkeypatch.setitem(silver, "spark", _HistoryStub(history))
+    assert silver["delta_write_result"]("t") == (120, 3)
+
+
+def test_delta_write_result_of_a_new_table_has_no_version_before(silver, monkeypatch):
+    history = [{"version": 0, "operationMetrics": {"numOutputRows": "9"}}]
+    monkeypatch.setitem(silver, "spark", _HistoryStub(history))
+    assert silver["delta_write_result"]("t") == (9, None)
