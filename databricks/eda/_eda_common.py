@@ -2855,3 +2855,297 @@ def association_lines(label, flags, scores):
     lines.append("- numeric columns by gap between the missing rate of the classes:")
     lines.append(fmt_pairs(top_by(scores, "missing_gap"), LIST_LIMIT))
     return "\n".join(lines)
+
+
+def profile_standard(frames, tables, coverage=True):
+    """The standard profile of a table group: column kinds, profiles, keys, boolean
+    and numeric rates and, when asked, coverage by source. One line per table."""
+    kinds = {name: column_kinds(frame) for name, frame in frames.items()}
+    profiles = {}
+    for name, frame in frames.items():
+        profiles[name] = table_profile(frame)
+        p = profiles[name]
+        print(
+            f"{name}: rows={p['rows']:,} columns={p['columns']} "
+            f"empty={len(p['empty'])} constant={len(p['constant'])}"
+        )
+    keys = {name: table_key_report(frame) for name, frame in frames.items()}
+    for name, key in keys.items():
+        print(name, key)
+    booleans = {
+        name: boolean_rates(frame, kinds[name]["boolean"])
+        for name, frame in frames.items()
+    }
+    numerics = {
+        name: numeric_scan(frame, kinds[name]["numeric"])
+        for name, frame in frames.items()
+    }
+    for name in tables:
+        print(
+            name,
+            "boolean columns:",
+            len(booleans[name]),
+            "numeric:",
+            len(numerics[name]),
+        )
+    covered = {}
+    if coverage:
+        covered = {
+            name: coverage_by_source(frame, profiles[name])
+            for name, frame in frames.items()
+        }
+        for name, groups in covered.items():
+            print(
+                name,
+                "source groups:",
+                len(groups),
+                {g: v["rows"] for g, v in groups.items()},
+            )
+    return kinds, profiles, keys, booleans, numerics, covered
+
+
+def qn_col(df):
+    """The DWD quality byte column of a frame: any `QN*` column, never a measured
+    value. The numeric suffix varies by parameter (QN_9, QN_8, QN_7, QN_592, ...), so
+    it is found by prefix and not from a fixed list."""
+    return next((c for c in df.columns if c.upper().startswith("QN")), None)
+
+
+def standard_group_eda(
+    source,
+    nb_key,
+    section_title,
+    frames,
+    tables,
+    figure_file,
+    coverage=True,
+    links=True,
+):
+    """The standard EDA of a table group and its findings export: profile, keys and
+    rates, coverage by source and link columns when asked, date-like columns, rows per
+    table and the findings section. Returns the profiles of the group."""
+    kinds, profiles, keys, booleans, numerics, covered = profile_standard(
+        frames, tables, coverage=coverage
+    )
+    fills = link_fill(profiles) if links else {}
+    for name, fill in fills.items():
+        print(name, fill)
+    date_columns = {}
+    for name, p in profiles.items():
+        names = kinds[name]["timestamp"] + [
+            c for c in kinds[name]["text"] if "date" in c.lower()
+        ]
+        names = [c for c in names if c not in PROVENANCE_COLUMNS]
+        date_columns[name] = {c: p["null_rate"][c] for c in names}
+        print(name, len(names), "date-like columns")
+    drawn = barplot(
+        [(n, p["rows"]) for n, p in profiles.items()],
+        "Rows per table",
+        "table",
+        ylabel="rows",
+        rot=20,
+        logy=True,
+        filename=figure_file,
+    )
+    figures = [("Rows per table", figure_file)] if drawn else []
+    readiness = [
+        (
+            "Grain / grain drift",
+            "; ".join(
+                f"`{n}` key `{k['key']}` unique: {k.get('unique')}"
+                for n, k in keys.items()
+            ),
+        ),
+        (
+            "Duplicate-event leakage",
+            "; ".join(
+                para(
+                    f"{n} dup groups {(k.get('duplicates') or {}).get('dup_groups', 0)},",
+                    f"conflicting {(k.get('duplicates') or {}).get('conflicting', 0)}",
+                )
+                for n, k in keys.items()
+            ),
+        ),
+        (
+            "Survivorship / coverage bias",
+            "; ".join(
+                para(
+                    f"{n}: {sum((r or 0) >= HIGH_NULL_RATE for r in p['null_rate'].values())}",
+                    f"columns with a null rate of {pct(HIGH_NULL_RATE)} or more",
+                )
+                for n, p in profiles.items()
+            ),
+        ),
+        (
+            "Sample-vs-full divergence",
+            "every count and rate is read from the whole table; no sample is used.",
+        ),
+    ]
+    evidence = {
+        "Data quality": [
+            f"{n}: {len(p['empty'])} empty, {len(p['constant'])} constant columns"
+            for n, p in profiles.items()
+        ],
+        "Structure and engineering": [
+            f"{n}: {len(shape_lists(p, kinds[n])['near_unique'])} near-unique text columns"
+            for n, p in profiles.items()
+        ],
+        "Temporal": [
+            f"{n}: {len(c)} date-like columns" for n, c in date_columns.items()
+        ],
+    }
+    if links:
+        evidence["Relationships"] = [
+            f"{n}: {len(f)} link columns" for n, f in fills.items()
+        ]
+    blocks = [
+        ("Profile", profile_block(profiles)),
+        ("Data Quality", quality_block(profiles)),
+        ("Entities / Keys", key_block(keys)),
+    ]
+    if coverage:
+        blocks.append(("Coverage & Sampling Bias", coverage_block(covered)))
+    if links:
+        blocks.append(("Relationships", fill_lines(fills)))
+    blocks += [
+        ("Temporal Semantics", fill_lines(date_columns)),
+        ("Distributions", distribution_block(profiles, kinds, booleans, numerics)),
+        ("EDA Findings", table_findings_lines(profiles, keys)),
+        ("ML-Readiness Evidence", ml_readiness_block(readiness)),
+        ("Observations by Area", area_block(evidence)),
+    ]
+    write_profiling(source, nb_key, section_title, blocks, figures)
+    return profiles
+
+
+def print_support_files(kinds):
+    """Print the README and licence texts found next to the data files; return them."""
+    support = read_support_text(kinds)
+    for name, lines in support.items():
+        print("=" * 90, f"\n{name}")
+        for ln in lines[:40]:
+            print("  " + ln[:160])
+    if not support:
+        print("no README / licence file in the directory")
+    return support
+
+
+def profile_each_frame(frames):
+    """Single-pass profile of every frame, printed per column; name -> profile."""
+    prof = {}
+    for name, df in frames.items():
+        prof[name] = profile_frame(df)
+        cols, total = prof[name]["cols"], prof[name]["total"]
+        acd, miss = prof[name]["acd"], prof[name]["miss"]
+        print("=" * 90, f"\n{name}  rows={total}  cols={len(cols)}")
+        for c in cols:
+            rate = miss[c] / total if total else 0
+            print(
+                f"  {c:<40} missing={miss[c]:>10} rate={rate:.4f} approx_distinct={acd[c]}"
+            )
+    return prof
+
+
+def profile_frames_without_file(dfs):
+    """Single-pass profile of every frame without its `__file` column; name -> profile."""
+    prof = {}
+    for k, df in dfs.items():
+        prof[k] = profile_frame(df.drop("__file"))
+        p = prof[k]
+        print("=" * 90, f"\n{k}  rows={p['total']}  cols={len(p['cols'])}")
+        for c in p["cols"]:
+            print(
+                f"  {c[:40]:<40} missing={p['miss'][c]:>8} "
+                f"rate={p['miss'][c] / p['total'] if p['total'] else 0:.4f} "
+                f"approx_distinct={p['acd'][c]}"
+            )
+    return prof
+
+
+def categorical_distributions(frames, prof, max_distinct=50):
+    """Value counts (top 50) of every column with 2 to `max_distinct` distinct values."""
+    categorical_dist = {}
+    for name, df in frames.items():
+        cat_cols = [
+            c for c in prof[name]["cols"] if 1 < prof[name]["acd"][c] <= max_distinct
+        ]
+        dists = {}
+        for c in cat_cols:
+            vc = df.groupBy(c).count().orderBy(F.desc("count")).limit(50).collect()
+            dists[c] = [(x[c], x["count"]) for x in vc]
+        categorical_dist[name] = dists
+        print(f"{name} categorical columns: {cat_cols}")
+    return categorical_dist
+
+
+def full_row_duplicate_counts(frames, prof):
+    """Exact full-row duplicates of every frame; name -> count."""
+    dup_counts = {}
+    for name, df in frames.items():
+        dup_counts[name] = full_row_dup_count(df, prof[name]["total"])
+        print(f"{name}: exact full-row duplicates = {dup_counts[name]}")
+    return dup_counts
+
+
+def constant_and_duplicates(dfs, prof):
+    """Add the constant columns and the full-row duplicates (without `__file`) to the
+    profile of every frame."""
+    for k, df in dfs.items():
+        d = df.drop("__file")
+        prof[k]["constant"] = constant_column_names(d, prof[k])
+        prof[k]["dups"] = full_row_dup_count(d, prof[k]["total"])
+        print(
+            f"{k}: constant={prof[k]['constant']}  full-row duplicates={prof[k]['dups']}"
+        )
+
+
+def discover_files(root):
+    """List the files of a Samples directory and read them into frames."""
+    entries, kinds, frames = load_volume_frames(root)
+    require_frames(frames, root, kinds)
+    print(f"{root}: {len(entries)} files")
+    for e in entries:
+        print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
+    print({k: len(v) for k, v in kinds.items()})
+    print({k: (v["sep"], len(v["paths"])) for k, v in frames.items()})
+    return entries, kinds, frames
+
+
+def select_frame(frames, preferred):
+    """The preferred frame (or the first one), its data columns, and its schema."""
+    frame = preferred if preferred in frames else next(iter(frames))
+    df = frames[frame]["df"]
+    data_cols = [c for c in df.columns if c != "__file"]
+    print(f"frame={frame}  files={len(frames[frame]['paths'])}  columns={data_cols}")
+    df.printSchema()
+    return frame, df, data_cols
+
+
+def structural_check(df, data_cols):
+    """Nested columns and the corrupt-record column of a frame; (nested, summary)."""
+    nested = [
+        f.name
+        for f in df.schema.fields
+        if f.dataType.simpleString().startswith(("struct", "array", "map"))
+    ]
+    struct = {
+        "corrupt_record": "_corrupt_record" in data_cols,
+        "nested": nested,
+        "schema": df.schema.simpleString(),
+    }
+    print(struct)
+    return nested, struct
+
+
+def rows_per_table_figure(profiles, filename):
+    """The rows-per-table bar plot; the figure list for the findings export."""
+    drawn = barplot(
+        [(n, p["rows"]) for n, p in profiles.items()],
+        "Rows per table",
+        "table",
+        ylabel="rows",
+        rot=20,
+        logy=True,
+        filename=filename,
+    )
+    return [("Rows per table", filename)] if drawn else []

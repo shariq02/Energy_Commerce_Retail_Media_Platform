@@ -47,8 +47,8 @@ def test_file_parses_and_has_the_databricks_header(path):
     assert text.splitlines()[0] == "# Databricks notebook source"
 
 
-@pytest.mark.parametrize("path", _FILES, ids=_rel)
-def test_file_stays_within_the_cell_limit(path):
+@pytest.mark.parametrize("path", _NOTEBOOKS, ids=_rel)
+def test_notebook_stays_within_the_cell_limit(path):
     n = path.read_text(encoding="utf-8").count("# COMMAND ----------") + 1
     assert n <= _MAX_CELLS, f"{_rel(path)} has {n} cells"
 

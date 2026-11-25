@@ -29,7 +29,7 @@ description: >
   sample traffic came from, observed or not.
 
 profiling_evidence: >
-  src/schemas/profiling/ga4.md, from databricks/eda/commerce/01_ga4_eda.py against
+  src/schemas/profiling/ga4.md, from databricks/eda/01_commerce_eda.py against
   the staged/Bronze table (bronze.ga4_events, 779,485 rows -- the 11-event
   retained subset, not the full raw archive). The catalog facts in this
   section (pre-profiling) came from BigQuery metadata calls only; row-level

@@ -76,20 +76,19 @@ jobs:
           exit "$fail"
 
       # The cell-count split threshold applies to every notebook under databricks/,
-      # except the two EDA notebooks listed in EXCEPTIONS; the notebooks of
-      # databricks/models have a limit of their own. scripts/utilities/lint.py
-      # (not checked out in CI) holds the same limits and the same two exceptions.
+      # except the libraries (files named _*.py) and the EDA notebooks
+      # (databricks/eda/); the notebooks of databricks/models have a limit of their
+      # own. scripts/utilities/lint.py (not checked out in CI) holds the same limits
+      # and the same exemptions.
       - name: Verify notebooks stay under the cell split threshold
         env:
           MAX_CELLS: 35
           MAX_CELLS_MODELS: 45
-          EXCEPTIONS: >-
-            databricks/eda/weather/06_accuweather_eda.py
-            databricks/eda/energy/05_iot_devices_eda.py
         run: |
           fail=0
           while IFS= read -r -d '' f; do
-            case " $EXCEPTIONS " in *" $f "*) continue ;; esac
+            case "$f" in databricks/eda/*) continue ;; esac
+            case "$(basename "$f")" in _*) continue ;; esac
             limit=$MAX_CELLS
             case "$f" in databricks/models/*) limit=$MAX_CELLS_MODELS ;; esac
             n=$(grep -c "^# COMMAND ----------" "$f")
