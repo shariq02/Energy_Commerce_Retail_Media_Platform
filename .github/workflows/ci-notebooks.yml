@@ -47,7 +47,7 @@ jobs:
 
       - name: Verify no build-process wording in notebooks
         run: |
-          if grep -rniE --include='*.py' --exclude-dir=archive '\bwave[- ]?[0-9]+\b' databricks/; then
+          if grep -rniE --include='*.py' '\bwave[- ]?[0-9]+\b' databricks/; then
             echo "Describe what the code does, not the build history it came from."
             exit 1
           fi

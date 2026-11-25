@@ -23,9 +23,6 @@ uv.lock
 # public version is prepared near project completion
 docs/
 
-# Retired code (superseded implementations) - kept locally only
-archive/
-
 # Prompts given to Genie to build the Databricks jobs - kept locally only
 databricks/genie_prompts/
 

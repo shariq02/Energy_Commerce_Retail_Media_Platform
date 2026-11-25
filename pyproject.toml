@@ -48,7 +48,7 @@ where = ["."]
 include = ["src*", "fastapi*", "ai*"]
 
 [tool.ruff]
-exclude = ["data/", "docs/", "archive/", ".terraform/"]
+exclude = ["data/", "docs/", ".terraform/"]
 # Without this, `exclude` is skipped for explicitly-named paths -- which is
 # how pre-commit invokes ruff (it passes the changed files, not a directory).
 force-exclude = true

@@ -34,10 +34,10 @@ jobs:
         run: python -m pip install ruff==0.16.2
 
       - name: Run ruff check
-        run: ruff check . --exclude data/ --exclude docs/ --exclude archive/
+        run: ruff check . --exclude data/ --exclude docs/
 
       - name: Run ruff format --check
-        run: ruff format . --exclude data/ --exclude docs/ --exclude archive/ --check
+        run: ruff format . --exclude data/ --exclude docs/ --check
 
   workflow-lint:
     name: GitHub Actions workflow lint
@@ -82,7 +82,7 @@ jobs:
           DOC_REF_SCAN_SUFFIXES = {".py", ".sql", ".yml", ".yaml", ".tf", ".md"}
           DOC_REF_SKIP_DIRS = {
               ".git", ".venv", "venv", "node_modules", ".terraform",
-              "docs", "data", "archive",
+              "docs", "data",
           }
           MAX_PHASE = 40
           _SUBPHASE = re.compile(
