@@ -4252,7 +4252,7 @@ _Generated: 2026-11-25T00:08Z_
 <!-- BEGIN energy:06_energy_validation__energy_carrier_map -->
 ## energy_carrier_map
 
-_Generated: 2026-11-25T00:12Z_
+_Generated: 2026-11-25T12:54Z_
 
 ### cardinality
 
@@ -4314,17 +4314,17 @@ _Generated: 2026-11-25T00:12Z_
 <!-- BEGIN energy:06_energy_validation__unit_weather_station_link -->
 ## unit_weather_station_link
 
-_Generated: 2026-11-25T00:12Z_
+_Generated: 2026-11-25T12:56Z_
 
 ### cardinality
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
 | distinct:unit_type | approx_distinct | 11.0 |  | INFO | INFO |  |
-| distinct:unit_id | approx_distinct | 356488.0 |  | INFO | INFO |  |
+| distinct:unit_id | approx_distinct | 9673216.0 |  | INFO | INFO |  |
 | distinct:weather_station_key | approx_distinct | 28.0 |  | INFO | INFO |  |
-| distinct:link_basis | approx_distinct | 1.0 |  | INFO | INFO |  |
-| distinct:distance_km | approx_distinct | 298667.0 |  | INFO | INFO |  |
+| distinct:link_basis | approx_distinct | 2.0 |  | INFO | INFO |  |
+| distinct:distance_km | approx_distinct | 305484.0 |  | INFO | INFO |  |
 | distinct:source_system | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:source_dataset | approx_distinct | 1.0 |  | INFO | INFO |  |
 | distinct:_silver_loaded_at | approx_distinct | 1.0 |  | INFO | INFO |  |
@@ -4369,14 +4369,14 @@ _Generated: 2026-11-25T00:12Z_
 
 | check | metric | observed | expected | status | severity | details |
 |---|---|---|---|---|---|---|
-| row_count | rows | 367664.0 |  | INFO | INFO |  |
+| row_count | rows | 9401620.0 |  | INFO | INFO |  |
 
 <!-- END energy:06_energy_validation__unit_weather_station_link -->
 
 <!-- BEGIN energy:06_energy_validation__validation -->
 ## energy validation
 
-_Generated: 2026-11-25T00:12Z_
+_Generated: 2026-11-25T12:56Z_
 
 ### checks
 
@@ -4401,6 +4401,8 @@ _Generated: 2026-11-25T00:12Z_
 | power_plant_register -> generation_unit | INFO | 2052 of 2169 plant rows with a MaStR unit id match a unit |
 | every carrier value has a carrier key | PASS | without a key 0 |
 | every unit with coordinates has a nearest station | PASS | linked 367664 of 367664 |
+| every unit with a municipality point has a nearest station | PASS | linked 9033956 of 9033956 |
+| units with a municipality key but no point (count) | INFO | 5495 units; 0 municipality keys hold more than one point |
 
 ### weather_observation rows per source
 
@@ -4524,7 +4526,7 @@ _Generated: 2026-11-25T00:12Z_
 
 | electricity.PV | electricity.CHP | electricity.total | cooling.cool_elec | heating_total_w | heating_combined_heat_and_power_heat_w | cooling_total_w |
 |---|---|---|---|---|---|---|
-| 0.9995245717302501 | 0.9948578568755444 | 0.9914835454175787 | 0.9631350194883438 | 0.9317047776129623 | 0.9838492396571964 | 0.6747171969741529 |
+| 0.9995245717302491 | 0.9948578568755434 | 0.9914835454175781 | 0.9631350194883449 | 0.931704777612963 | 0.9838492396571958 | 0.674717196974153 |
 
 ### Honda W: share equal between 1 min and 1 h rows at the same instant
 
