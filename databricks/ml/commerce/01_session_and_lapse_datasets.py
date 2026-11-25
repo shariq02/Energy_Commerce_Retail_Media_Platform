@@ -470,7 +470,115 @@ target_lapse_ga4 = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Assemble the four datasets (the join is in memory, no view)
+# DBTITLE 1,Cart abandonment, GA4 session revenue and retail demand
+# cart abandonment: the prefix of a REES46 session ends at its first cart event
+_wc = Window.partitionBy("session_key").orderBy("event_timestamp_utc", "event_key")
+_ranked_cart = rees46_events.withColumn("rn", F.row_number().over(_wc))
+_first_cart = (
+    _ranked_cart.filter(F.col("event_type") == "cart")
+    .groupBy("session_key")
+    .agg(F.min("rn").alias("cart_rn"))
+)
+_cart_events = _ranked_cart.join(_first_cart, "session_key")
+_cart_prefix = (
+    _cart_events.filter(F.col("rn") <= F.col("cart_rn"))
+    .groupBy("session_key")
+    .agg(
+        F.first("user_id").alias("user_id"),
+        F.min("event_timestamp_utc").alias("session_start_utc"),
+        F.max("event_timestamp_utc").alias("as_of_ts"),
+        F.count("*").alias("prefix_event_count"),
+        F.sum((F.col("event_type") == "view").cast("int")).alias("prefix_view_count"),
+        F.countDistinct("product_id").alias("prefix_distinct_products"),
+        F.max_by("product_id", "rn").alias("cart_product_id"),
+        F.max_by("category_l1", "rn").alias("prefix_cart_category"),
+        F.max_by("brand", "rn").alias("prefix_cart_brand"),
+        F.max_by("price", "rn").alias("prefix_cart_price"),
+        (
+            F.max("event_timestamp_utc").cast("long")
+            - F.min("event_timestamp_utc").cast("long")
+        ).alias("prefix_span_seconds"),
+    )
+)
+_local_cart = F.from_utc_timestamp("session_start_utc", PROJECT_TIMEZONE)
+_cart_popularity = product_asof_rees46.select(
+    F.col("product_id").alias("cart_product_id"),
+    F.date_add("local_date", 1).alias("session_date"),
+    "product_pop_views",
+    "product_pop_carts",
+    "product_pop_purchases",
+    "product_pop_last_price",
+)
+cart_features = (
+    _cart_prefix.withColumn("session_date", F.to_date(_local_cart))
+    .withColumn("prefix_hour_of_day", F.hour(_local_cart))
+    .withColumn("prefix_day_of_week", F.dayofweek(_local_cart))
+    .join(_cart_popularity, ["cart_product_id", "session_date"], "left")
+    .drop("cart_product_id")
+)
+_after_cart = (
+    _cart_events.filter(F.col("rn") > F.col("cart_rn"))
+    .groupBy("session_key")
+    .agg(
+        F.max((F.col("event_type") == "purchase").cast("int")).alias(
+            "purchase_after_cart"
+        )
+    )
+)
+target_cart = (
+    cart_features.select("session_key", "user_id", "session_date")
+    .join(_after_cart, "session_key", "left")
+    .select(
+        "session_key",
+        "user_id",
+        "session_date",
+        (F.coalesce(F.col("purchase_after_cart"), F.lit(0)) == 1).alias(
+            "target_purchase_after_cart"
+        ),
+    )
+    .withColumn("provenance_tier", F.lit("constructed"))
+)
+# revenue: GA4 sessions with a purchase and a full prefix of ten events
+target_revenue = (
+    ga4_sessions.filter(
+        (F.col("transaction_count") > 0) & F.col("total_revenue").isNotNull()
+    )
+    .join(prefix_ga4.select("session_key"), "session_key", "left_semi")
+    .select(
+        "session_key",
+        "user_id",
+        F.to_date(F.from_utc_timestamp("session_start_utc", PROJECT_TIMEZONE)).alias(
+            "session_date"
+        ),
+        F.col("total_revenue").alias("target_session_revenue"),
+    )
+    .withColumn("provenance_tier", F.lit("constructed"))
+)
+# retail demand: the monthly change of the German retail volume, features of the
+# month before (31 days)
+_retail = spark.table(f"{CATALOG}.commerce_analytics.retail_energy_monthly").filter(
+    F.col("retail_trade_volume_index").isNotNull()
+)
+_months = Window.orderBy("observation_month")
+_volume = F.col("retail_trade_volume_index")
+target_retail = (
+    _retail.select(
+        "observation_month",
+        (_volume - F.lag(_volume).over(_months)).alias("target_retail_volume_change"),
+        (F.lag(_volume).over(_months) - F.lag(_volume, 2).over(_months)).alias(
+            "retail_change_lag31d"
+        ),
+        F.lag("mean_price_eur_per_mwh").over(_months).alias("price_lag31d"),
+        F.lag("mean_air_temperature_degc").over(_months).alias("temperature_lag31d"),
+        F.lag("consumption_mwh").over(_months).alias("consumption_lag31d"),
+    )
+    .filter(F.col("target_retail_volume_change").isNotNull())
+    .withColumn("provenance_tier", F.lit("constructed"))
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Assemble the datasets (the join is in memory, no view)
 FRAMES["session_purchase_rees46"] = assembled_frame(
     target_purchase_rees46,
     [
@@ -491,6 +599,21 @@ FRAMES["lapse_rees46"] = assembled_frame(
 FRAMES["lapse_ga4"] = target_lapse_ga4.join(
     lapse_features_ga4, ["user_id", "cutoff_date"], "inner"
 )
+FRAMES["cart_abandonment"] = assembled_frame(
+    target_cart,
+    [
+        (cart_features, ["session_key"], ["user_id", "session_date"]),
+        (user_asof_rees46, ["session_key"], ["user_id"]),
+    ],
+)
+FRAMES["session_revenue"] = assembled_frame(
+    target_revenue,
+    [
+        (prefix_ga4, ["session_key"], ["user_pseudo_id", "session_date"]),
+        (user_asof_ga4, ["session_key"], ["user_pseudo_id"]),
+    ],
+)
+FRAMES["retail_demand_monthly"] = assembled_frame(target_retail, [])
 BLOCKS["session_purchase_rees46"] = [_exclusion_rees46, _prefix_rees46_block]
 BLOCKS["session_purchase_ga4"] = [_exclusion_ga4, _prefix_ga4_block]
 

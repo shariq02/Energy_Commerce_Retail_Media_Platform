@@ -512,7 +512,153 @@ BLOCKS["weak_supervision"] = [
 
 # COMMAND ----------
 
-# DBTITLE 1,Assemble the seven datasets (the join is in memory, no view)
+# DBTITLE 1,Solar and storage buildout, and physical unit decommissioning
+BUILDOUT_TYPES = ["solar", "electricity_storage"]
+PHYSICAL_TYPES = ["wind", "verbrennung", "biomasse", "wasser", "geothermie_gsgk"]
+BUILDOUT_FROM, UNIT_YEARS = "2018-01-01", (2010, 2025)
+REGISTRATION_LAG_MONTHS = 3
+PLACEHOLDER_DATE, PLACEHOLDER_YEAR = "1900-01-01", 2100
+_commissioned = F.to_date("commissioning_date")
+_decommissioned = F.to_date("final_decommissioning_date")
+# a placeholder date (1899 or the year 9999) is null: its unit has no age
+_commissioning_year = F.year(
+    F.when(_commissioned > F.lit(PLACEHOLDER_DATE), _commissioned)
+)
+_decommissioning_year = F.year(
+    F.when(F.year(_decommissioned) < PLACEHOLDER_YEAR, _decommissioned)
+)
+# buildout: the months after the data end minus the registration lag are left out
+_register_end = (
+    units_all.filter(F.col("unit_type").isin(*BUILDOUT_TYPES))
+    .agg(F.max(F.to_date("registration_date")))
+    .first()[0]
+)
+_last_month = (
+    spark.range(1)
+    .select(
+        F.add_months(
+            F.trunc(F.lit(str(_register_end)).cast("date"), "month"),
+            -REGISTRATION_LAG_MONTHS,
+        )
+    )
+    .first()[0]
+)
+_months = spark.range(1).select(
+    F.explode(
+        F.sequence(
+            F.lit(BUILDOUT_FROM).cast("date"),
+            F.lit(str(_last_month)).cast("date"),
+            F.expr("interval 1 month"),
+        )
+    ).alias("month_start")
+)
+_buildout_units = units_all.filter(F.col("unit_type").isin(*BUILDOUT_TYPES))
+_cells = (
+    _buildout_units.filter(F.col("federal_state").isNotNull())
+    .select("federal_state", "unit_type")
+    .distinct()
+    .crossJoin(_months)
+)
+_added = (
+    _buildout_units.filter(_commissioned >= F.lit(BUILDOUT_FROM).cast("date"))
+    .groupBy(
+        "federal_state",
+        "unit_type",
+        F.trunc("commissioning_date", "month").alias("month_start"),
+    )
+    .agg(F.count("*").alias("target_units_added"))
+)
+_cell_window = Window.partitionBy("federal_state", "unit_type").orderBy("month_start")
+_filled = _cells.join(_added, ["federal_state", "unit_type", "month_start"], "left")
+_filled = _filled.withColumn(
+    "target_units_added", F.coalesce(F.col("target_units_added"), F.lit(0))
+)
+# lags of three, six and twelve months, named by their days; the registration lag is 31
+# days on average and 86 days at the 90th percentile
+target_buildout = _filled.select(
+    "federal_state",
+    "unit_type",
+    "month_start",
+    "target_units_added",
+    F.lag("target_units_added", 3).over(_cell_window).alias("units_added_lag90d"),
+    F.lag("target_units_added", 6).over(_cell_window).alias("units_added_lag180d"),
+    F.lag("target_units_added", 12).over(_cell_window).alias("units_added_lag365d"),
+    F.avg("target_units_added")
+    .over(_cell_window.rowsBetween(-14, -3))
+    .alias("units_added_mean_12m_lag90d"),
+    F.month("month_start").alias("month_of_year"),
+    F.year("month_start").alias("year"),
+    (F.year("month_start") >= 2023).alias("after_registration_wave"),
+).withColumn("provenance_tier", F.lit("constructed"))
+BLOCKS["solar_storage_buildout"] = [
+    ("last_complete_month", markdown_table(["month"], [(str(_last_month),)]))
+]
+# decommissioning: one row per unit and calendar year until the year it ends
+_spans = (
+    units_all.filter(F.col("unit_type").isin(*PHYSICAL_TYPES))
+    .select(
+        "unit_type",
+        "unit_id",
+        "capacity_net_kw",
+        "federal_state",
+        "generation_technology",
+        _commissioning_year.alias("commissioning_year"),
+        _decommissioning_year.alias("decommissioning_year"),
+    )
+    .filter(
+        F.col("commissioning_year").isNotNull()
+        & (
+            F.col("decommissioning_year").isNull()
+            | (F.col("decommissioning_year") >= F.col("commissioning_year"))
+        )
+    )
+    .withColumn(
+        "first_year", F.greatest(F.col("commissioning_year"), F.lit(UNIT_YEARS[0]))
+    )
+    .withColumn(
+        "last_year",
+        F.least(
+            F.coalesce(F.col("decommissioning_year"), F.lit(UNIT_YEARS[1])),
+            F.lit(UNIT_YEARS[1]),
+        ),
+    )
+    .filter(F.col("first_year") <= F.col("last_year"))
+)
+unit_years = (
+    _spans.select(
+        "unit_type",
+        "unit_id",
+        "capacity_net_kw",
+        "federal_state",
+        "generation_technology",
+        "commissioning_year",
+        "decommissioning_year",
+        F.explode(F.sequence("first_year", "last_year")).alias("calendar_year"),
+    )
+    .withColumn("year_start", F.make_date("calendar_year", F.lit(1), F.lit(1)))
+    .withColumn("age_years", F.col("calendar_year") - F.col("commissioning_year"))
+    .withColumn("target_ended", F.col("calendar_year") == F.col("decommissioning_year"))
+    .drop("decommissioning_year")
+)
+_physical = units_all.filter(F.col("unit_type").isin(*PHYSICAL_TYPES))
+BLOCKS["unit_decommissioning"] = [
+    (
+        "excluded_units",
+        markdown_table(
+            ["reason", "units"],
+            [
+                (
+                    "placeholder_or_missing_commissioning_date",
+                    _physical.filter(_commissioning_year.isNull()).count(),
+                ),
+            ],
+        ),
+    )
+]
+
+# COMMAND ----------
+
+# DBTITLE 1,Assemble the datasets (the join is in memory, no view)
 _honda_keys = ["location_key", "channel", "interval_seconds", "interval_start_utc"]
 FRAMES["honda_forecast"] = assembled_frame(
     target_honda, [(honda_site, _honda_keys, ["local_date"])]
@@ -537,6 +683,8 @@ FRAMES["redispatch_matching"] = assembled_frame(
 )
 FRAMES["ccpp"] = ccpp_frame
 FRAMES["weak_supervision"] = target_weak
+FRAMES["solar_storage_buildout"] = assembled_frame(target_buildout, [])
+FRAMES["unit_decommissioning"] = unit_years
 
 # COMMAND ----------
 

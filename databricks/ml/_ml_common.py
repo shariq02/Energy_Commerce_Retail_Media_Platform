@@ -1098,8 +1098,11 @@ def partition_frame(df: DataFrame, dataset_id: str) -> DataFrame:
         partition = F.when(source_train, "train").otherwise("test")
         share = split.get("validation_percent")
         if share:
-            # the source gives no validation rows: a hash share of its train rows
-            bucket = user_hash_bucket(split["group_cols"])
+            # the source gives no validation rows: a hash share of its train rows,
+            # chosen by whole groups (a gene or a protein) when the spec names them
+            bucket = user_hash_bucket(
+                split.get("validation_group_cols", split["group_cols"])
+            )
             partition = (
                 F.when(source_train & (bucket < share), "validation")
                 .when(source_train, "train")
@@ -1139,7 +1142,7 @@ SPLIT_RULE_FRAME_COLUMNS = {
     "hash_unit_stratified": ("group_col",),
     "hash_group": ("group_cols",),
     "all_train_grouped": ("group_col",),
-    "source_defined": ("split_column", "group_cols"),
+    "source_defined": ("split_column", "group_cols", "validation_group_cols"),
 }
 SPLIT_KEYS = ("rule", "rule_id")
 STRATIFIED_COLUMNS = ("target_event", "is_offshore", "entry_date", "stop_date")

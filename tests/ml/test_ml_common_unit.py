@@ -21,6 +21,22 @@ from tests._notebook_loader import load_ml_common
 pytestmark = [pytest.mark.unit]
 
 
+CALENDARS = [
+    "energy_daily",
+    "quarter_hour",
+    "redispatch",
+    "honda",
+    "clinvar_snapshot",
+    "trial_start",
+    "faers_quarter",
+    "cross_border",
+    "energy_daily_week",
+    "buildout_month",
+    "unit_year",
+    "retail_month",
+]
+
+
 @pytest.fixture(scope="module")
 def ml():
     return load_ml_common()
@@ -30,14 +46,14 @@ def _d(s):
     return dt.date.fromisoformat(s)
 
 
-@pytest.mark.parametrize("key", ["energy_daily", "quarter_hour", "redispatch", "honda"])
+@pytest.mark.parametrize("key", CALENDARS)
 def test_split_calendars_are_ordered_and_do_not_overlap(ml, key):
     cal = ml["SPLIT_CALENDARS"][key]
     assert _d(cal["train"][0]) < _d(cal["train"][1]) < _d(cal["validation"][0])
     assert _d(cal["validation"][1]) < _d(cal["test"][0])
 
 
-@pytest.mark.parametrize("key", ["energy_daily", "quarter_hour", "redispatch", "honda"])
+@pytest.mark.parametrize("key", CALENDARS)
 def test_every_calendar_has_an_embargo_and_rolling_blocks_inside_train(ml, key):
     cal = ml["SPLIT_CALENDARS"][key]
     assert ml["EMBARGO_DAYS"][key] >= 1
@@ -423,7 +439,7 @@ def test_a_source_split_with_train_rows_also_gives_a_validation_partition(ml):
 def test_spec_problems_names_a_validation_group_column_the_frame_lacks(ml):
     datasets = ml["ML_SPEC"]["datasets"]
     name = "benchmark_maps"
-    columns = {*datasets[name]["grain"], "split"}
+    columns = {*datasets[name]["grain"], "split", "protein_id"}
     assert ml["spec_problems"](name, columns) == []
     datasets["_probe"] = {
         **datasets[name],
@@ -434,3 +450,73 @@ def test_spec_problems_names_a_validation_group_column_the_frame_lacks(ml):
     finally:
         del datasets["_probe"]
     assert "_probe: split column missing_column is not in the frame" in problems
+
+
+def test_the_new_calendars_close_each_partition_on_their_own_dates(ml):
+    f = ml["partition_for_date_py"]
+    assert f("2022-01-01", "clinvar_snapshot") == "train"
+    assert f("2023-01-01", "clinvar_snapshot") == "validation"
+    assert f("2026-10-26", "clinvar_snapshot") == "test"
+    assert f("2021-12-31", "unit_year") == "embargo"
+    assert f("2022-01-01", "unit_year") == "validation"
+    assert f("2025-12-31", "unit_year") == "test"
+    assert f("2026-01-01", "unit_year") == "excluded"
+    assert f("2024-11-17", "cross_border") == "excluded"
+    assert f("2024-11-18", "cross_border") == "train"
+    assert f("2023-12-01", "buildout_month") == "embargo"
+    assert f("2024-01-01", "buildout_month") == "validation"
+
+
+def test_a_source_split_carves_its_validation_by_gene_or_protein_group(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    expected = {
+        "benchmark_causal_eqtl": ["split_group"],
+        "benchmark_maps": ["protein_id"],
+        "benchmark_pathogenic_coding": ["split_group"],
+    }
+    for name, columns in expected.items():
+        assert datasets[name]["split"]["validation_group_cols"] == columns, name
+
+
+def test_spec_problems_names_a_validation_group_column_by_its_name(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    name = "benchmark_maps"
+    problems = ml["spec_problems"](name, {*datasets[name]["grain"], "split"})
+    assert f"{name}: split column protein_id is not in the frame" in problems
+
+
+def test_reclassification_reads_the_label_derived_list_of_the_variant_label(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    assert (
+        datasets["variant_reclassification"]["label_derived"]
+        == datasets["variant_pathogenicity"]["label_derived"]
+    )
+
+
+def test_the_second_wave_datasets_are_declared_in_the_families_of_their_tables(ml):
+    spec = ml["ML_SPEC"]
+    second_wave = {
+        "variant_reclassification": "reclassification",
+        "trial_termination": "trial",
+        "faers_outcome": "faers",
+        "depmap_essentiality": "dependency",
+        "gtex_expression": "expression",
+        "gene_disease_progression": "association",
+        "clingen_validity": "association",
+        "dms_effect": "assay",
+        "mhc_binding": "assay",
+        "allele_frequency": "frequency",
+        "cancer_type": "tumor",
+        "haploinsufficiency": "gene",
+        "cross_border_spread": "cross_border",
+        "price_volatility": "market_daily",
+        "price_spike": "market_daily",
+        "solar_storage_buildout": "buildout",
+        "unit_decommissioning": "unit",
+        "cart_abandonment": "session_purchase",
+        "session_revenue": "session_purchase",
+        "retail_demand_monthly": "demand_monthly",
+    }
+    for name, family in second_wave.items():
+        assert spec["datasets"][name]["family"] == family, name
+        assert spec["datasets"][name]["target_name"].startswith("target_"), name

@@ -39,6 +39,82 @@ calendars:
       - ["2019-01-01", "2019-12-31"]
       - ["2020-01-01", "2020-12-31"]
       - ["2021-01-01", "2021-12-31"]
+  # one ClinVar snapshot a year; the date of a row is the snapshot it is uncertain at
+  clinvar_snapshot:
+    train: ["2019-01-01", "2022-12-31"]
+    validation: ["2023-01-01", "2023-12-31"]
+    test: ["2024-01-01", null]
+    embargo_days: 1
+    blocks:
+      - ["2020-01-01", "2020-12-31"]
+      - ["2021-01-01", "2021-12-31"]
+      - ["2022-01-01", "2022-12-31"]
+  trial_start:
+    train: ["2000-01-01", "2017-12-31"]
+    validation: ["2018-01-01", "2019-12-31"]
+    test: ["2020-01-01", "2021-12-31"]
+    embargo_days: 1
+    blocks:
+      - ["2010-01-01", "2012-12-31"]
+      - ["2013-01-01", "2015-12-31"]
+      - ["2016-01-01", "2017-12-31"]
+  # the date of a row is the first day of its quarter
+  faers_quarter:
+    train: ["2024-01-01", "2025-06-30"]
+    validation: ["2025-07-01", "2025-12-31"]
+    test: ["2026-01-01", null]
+    embargo_days: 1
+    blocks:
+      - ["2024-07-01", "2024-12-31"]
+      - ["2025-01-01", "2025-06-30"]
+  # neighbour prices start on 2024-11-18
+  cross_border:
+    train: ["2024-11-18", "2025-08-31"]
+    validation: ["2025-09-01", "2025-12-31"]
+    test: ["2026-01-01", null]
+    embargo_days: 2
+    blocks:
+      - ["2025-03-01", "2025-05-31"]
+      - ["2025-06-01", "2025-08-31"]
+  # the target looks seven days ahead
+  energy_daily_week:
+    train: ["2018-10-01", "2023-12-31"]
+    validation: ["2024-01-01", "2024-12-31"]
+    test: ["2025-01-01", null]
+    embargo_days: 7
+    blocks:
+      - ["2021-01-01", "2021-12-31"]
+      - ["2022-01-01", "2022-12-31"]
+      - ["2023-01-01", "2023-12-31"]
+  # the date of a row is the first day of its month; registrations come late
+  buildout_month:
+    train: ["2018-01-01", "2023-12-31"]
+    validation: ["2024-01-01", "2024-12-31"]
+    test: ["2025-01-01", null]
+    embargo_days: 31
+    blocks:
+      - ["2021-01-01", "2021-12-31"]
+      - ["2022-01-01", "2022-12-31"]
+      - ["2023-01-01", "2023-12-31"]
+  # the date of a row is the first day of its calendar year
+  unit_year:
+    train: ["2010-01-01", "2021-12-31"]
+    validation: ["2022-01-01", "2022-12-31"]
+    test: ["2023-01-01", "2025-12-31"]
+    embargo_days: 1
+    blocks:
+      - ["2019-01-01", "2019-12-31"]
+      - ["2020-01-01", "2020-12-31"]
+      - ["2021-01-01", "2021-12-31"]
+  retail_month:
+    train: ["2018-01-01", "2022-12-31"]
+    validation: ["2023-01-01", "2023-12-31"]
+    test: ["2024-01-01", null]
+    embargo_days: 31
+    blocks:
+      - ["2020-01-01", "2020-12-31"]
+      - ["2021-01-01", "2021-12-31"]
+      - ["2022-01-01", "2022-12-31"]
 
 cutoffs:
   user_split_percent: [70, 15, 15]
@@ -91,6 +167,18 @@ families:
   variant: {ecosystem: genomics}
   gene: {ecosystem: genomics}
   benchmark: {ecosystem: genomics}
+  cross_border: {ecosystem: energy}
+  buildout: {ecosystem: energy}
+  demand_monthly: {ecosystem: commerce}
+  reclassification: {ecosystem: genomics}
+  trial: {ecosystem: genomics}
+  faers: {ecosystem: genomics}
+  dependency: {ecosystem: genomics}
+  expression: {ecosystem: genomics}
+  association: {ecosystem: genomics}
+  assay: {ecosystem: genomics}
+  frequency: {ecosystem: genomics}
+  tumor: {ecosystem: genomics}
 
 # Split rules (functions in _ml_common.partition_frame):
 #   calendar               train/validation/test by date, rolling folds; optional group_col
@@ -101,7 +189,8 @@ families:
 #                          and an optional diagnostic split on a date
 #   all_train_grouped      one partition (train), grouped folds on group_col
 #   source_defined         the split the source gives (column split); with validation_percent
-#                          and group_cols, that share of its train rows (hash of group_cols)
+#                          and group_cols, that share of its train rows (hash of group_cols,
+#                          or of validation_group_cols when given: a gene or a protein)
 #                          is the validation partition, the source gives none
 #
 # Optional spec key max_rows: a dataset with more rows keeps about that many, chosen by a
@@ -615,7 +704,7 @@ datasets:
         key_source: [flag, null, null]
         gene_key: [group, null, null]
     group_col: gene_key
-    label_derived:
+    label_derived: &variant_label_derived
       - is_pathogenic
       - is_benign
       - is_vus
@@ -834,7 +923,7 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: the test partition is the source test split; validation is 15 percent of the source train rows by hash of source_record_id, so it shares genes with train; label and split columns come from the benchmark
+    notes: the test partition is the source test split; validation is 15 percent of the source train rows, chosen by whole genes (hash of split_group), so no gene sits in train and validation; the source test split shares genes with train; label and split columns come from the benchmark
     benchmark_set: causal_eqtl
     contract:
       overrides:
@@ -846,7 +935,7 @@ datasets:
         alternate_allele: [key, null, null]
         protein_id: [key, null, null]
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
-    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
+    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id], validation_group_cols: [split_group]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_maps:
     ecosystem: genomics
@@ -857,7 +946,7 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: 1,682 proteins occur in train and test in the source split; the leakage gate reports it; validation is 15 percent of the source train rows by hash of source_record_id, so it shares proteins with train
+    notes: 1,682 proteins occur in train and test in the source split; the leakage gate reports it; validation is 15 percent of the source train rows, chosen by whole proteins (hash of protein_id), so no protein sits in train and validation
     benchmark_set: maps
     contract:
       overrides:
@@ -869,7 +958,7 @@ datasets:
         alternate_allele: [key, null, null]
         protein_id: [key, null, null]
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
-    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
+    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id], validation_group_cols: [protein_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_pathogenic_coding:
     ecosystem: genomics
@@ -880,7 +969,7 @@ datasets:
     dependency_group: 1
     target_name: target_label_integer
     provenance_tier: sourced
-    notes: the test partition is the source test split; validation is 15 percent of the source train rows by hash of source_record_id, so it shares genes with train
+    notes: the test partition is the source test split; validation is 15 percent of the source train rows, chosen by whole genes (hash of split_group), so no gene sits in train and validation; the source test split shares genes with train
     benchmark_set: pathogenic_coding
     contract:
       overrides:
@@ -892,7 +981,7 @@ datasets:
         alternate_allele: [key, null, null]
         protein_id: [key, null, null]
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
-    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id]}
+    split: {rule: source_defined, rule_id: "source:split+hash_validation", split_column: split, validation_percent: 15, group_cols: [source_record_id], validation_group_cols: [split_group]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
   benchmark_pathogenic_non_coding:
     ecosystem: genomics
@@ -1011,3 +1100,361 @@ datasets:
     label_derived: [label, label_integer, source_label, split, split_file, review_status, stars, cluster, shuffle_rank, allele_count, allele_number, allele_frequency, minor_allele_frequency, minor_allele_count]
     split: {rule: hash_group, rule_id: "hash:protein_id", group_cols: [protein_id]}
     fit: {group_cols: [], fold_mode: none, calendar_key: null, date_col: null, impute: false}
+  # ------------------------------------------------ genomics, second wave
+  variant_reclassification:
+    ecosystem: genomics
+    family: reclassification
+    grain: [variant_key, snapshot_date]
+    time_col: snapshot_date
+    group_col: variant_key
+    capability: ClinVar uncertain variant is pathogenic at the next snapshot
+    dependency_group: 1
+    target_name: target_pathogenic_at_next_snapshot
+    max_rows: 1000000
+    label_derived_like: [clinical_significance, clinvar, review, condition]
+    provenance_tier: constructed
+    notes: one row per variant and snapshot at which its term is uncertain or conflicting; 1 if the next snapshot calls it pathogenic; the variant features are today's annotation, not as of the snapshot; few snapshots, disclosed
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        gene_key: [group, null, null]
+        snapshot_ordinal: [flag, null, null]
+    label_derived: *variant_label_derived
+    split: {rule: calendar, rule_id: "calendar:clinvar_snapshot", calendar: clinvar_snapshot, date_col: snapshot_date, group_col: variant_key}
+    fit: {group_cols: [], fold_mode: rolling, calendar_key: clinvar_snapshot, date_col: snapshot_date, impute: true}
+  trial_termination:
+    ecosystem: genomics
+    family: trial
+    grain: [nct_id]
+    time_col: start_date
+    capability: clinical trial ends terminated, not completed
+    dependency_group: 1
+    target_name: target_is_terminated
+    label_derived: [overall_status, enrollment_type, target_duration]
+    label_derived_like: [why_stopped, last_known, completion, results_first, disposition, last_update, registry_, verification, month_year, baseline, limitations]
+    provenance_tier: sourced
+    notes: trials that are completed or terminated and started in 2000 to 2021; the fields that are written when a trial ends are label-derived
+    contract:
+      overrides:
+        nct_id: [key, null, null]
+    split: {rule: calendar, rule_id: "calendar:trial_start", calendar: trial_start, date_col: start_date}
+    fit: {group_cols: [], fold_mode: rolling, calendar_key: trial_start, date_col: start_date, impute: true}
+  faers_outcome:
+    ecosystem: genomics
+    family: faers
+    grain: [quarter, primary_id]
+    time_col: quarter_start
+    capability: FAERS case ends in death or hospitalisation
+    dependency_group: 1
+    target_name: target_is_death_or_hospitalisation
+    max_rows: 1000000
+    label_derived_like: [outcome, reaction]
+    provenance_tier: sourced
+    notes: cases with at least one outcome; reaction terms are left out because the outcome and the reaction name the same event; the date of a row is the first day of its quarter
+    contract:
+      overrides:
+        quarter: [key, null, null]
+        primary_id: [key, null, null]
+    split: {rule: calendar, rule_id: "calendar:faers_quarter", calendar: faers_quarter, date_col: quarter_start}
+    fit: {group_cols: [], fold_mode: rolling, calendar_key: faers_quarter, date_col: quarter_start, impute: true}
+  depmap_essentiality:
+    ecosystem: genomics
+    family: dependency
+    grain: [cell_line_key, gene_key]
+    time_col: null
+    group_col: gene_key
+    capability: gene is essential in a cell line
+    dependency_group: 1
+    target_name: target_is_essential
+    max_rows: 1000000
+    label_derived: [gene_effect]
+    label_derived_like: [dependency, essential, gene_effect, crispr]
+    provenance_tier: sourced
+    notes: gene effect below -0.5; the gene columns that come from the same screen are label-derived
+    contract:
+      overrides:
+        cell_line_key: [key, null, null]
+        gene_key: [group, null, null]
+        entity_type: [flag, null, null]
+        key_source: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  gtex_expression:
+    ecosystem: genomics
+    family: expression
+    grain: [gene_key, tissue_key]
+    time_col: null
+    group_col: gene_key
+    capability: gene expression level in a tissue
+    dependency_group: 1
+    target_name: target_log_tpm
+    max_rows: 1000000
+    label_derived_like: [expression, tpm, tissue_specificity, tissue_count, tissue_breadth]
+    provenance_tier: sourced
+    notes: log of the median transcripts per million plus one; the gene columns that summarise expression are label-derived
+    contract:
+      overrides:
+        tissue_key: [key, null, null]
+        gene_key: [group, null, null]
+        entity_type: [flag, null, null]
+        key_source: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  gene_disease_progression:
+    ecosystem: genomics
+    family: association
+    grain: [source_gene_id, source_disease_id]
+    time_col: null
+    group_col: source_gene_id
+    capability: gene and disease pair strengthens from 2021 to 2025
+    dependency_group: 1
+    target_name: target_is_strengthened
+    max_rows: 1000000
+    label_derived_like: [score_2025]
+    provenance_tier: constructed
+    notes: pairs with an overall score below 0.5 in 2021; 1 if the overall score is 0.5 or more in 2025; only scores up to 2021 are features; the gene key is not set on these rows, the gene columns join by the Ensembl id
+    contract:
+      overrides:
+        source_gene_id: [group, null, null]
+        source_disease_id: [key, null, null]
+    split: {rule: hash_group, rule_id: "hash:source_gene_id", group_cols: [source_gene_id]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  clingen_validity:
+    ecosystem: genomics
+    family: association
+    grain: [source_record_id]
+    time_col: null
+    group_col: gene_key
+    capability: ClinGen gene and disease validity is definitive or strong
+    dependency_group: 1
+    target_name: target_is_definitive_or_strong
+    label_derived: [classification]
+    label_derived_like: [clingen, classification]
+    provenance_tier: sourced
+    notes: the curated gene and disease validity rows of ClinGen; the features count the other sources for the same gene
+    contract:
+      overrides:
+        gene_key: [group, null, null]
+        disease_key: [key, null, null]
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  dms_effect:
+    ecosystem: genomics
+    family: assay
+    grain: [source_record_id]
+    time_col: null
+    group_col: assay_id
+    capability: deep mutational scan mutant is damaging
+    dependency_group: 1
+    target_name: target_is_damaging
+    label_derived: [scan_score, scan_score_binarized]
+    label_derived_like: [scan_score]
+    provenance_tier: sourced
+    notes: the mutants of 2,621 assays; split by assay, because the protein is known for only a few assays
+    contract:
+      overrides:
+        assay_id: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:assay_id", group_cols: [assay_id]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  mhc_binding:
+    ecosystem: genomics
+    family: assay
+    grain: [source_record_id]
+    time_col: null
+    group_col: epitope_id
+    capability: linear peptide binds an MHC allele
+    dependency_group: 1
+    target_name: target_is_binder
+    max_rows: 1000000
+    label_derived_like: [qualitative, quantitative, measurement_inequality, assay_units]
+    provenance_tier: sourced
+    notes: linear peptides only; a binder is a qualitative measurement that starts with Positive; split by epitope
+    contract:
+      overrides:
+        epitope_id: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:epitope_id", group_cols: [epitope_id]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  allele_frequency:
+    ecosystem: genomics
+    family: frequency
+    grain: [variant_key]
+    time_col: null
+    group_col: split_group
+    capability: variant global allele frequency (log scale)
+    dependency_group: 1
+    target_name: target_log_allele_frequency
+    max_rows: 1000000
+    label_derived_like: [frequency, allele_count, allele_number, homozygote, rarity, carrier, population, common, rare, heteroplasmy, tier, gnomad_variants, max_ancestry]
+    provenance_tier: sourced
+    notes: variants with a global frequency; log10 of the frequency plus one millionth; the frequency columns and the tier flags are label-derived; split by gene, a variant without a gene is its own group
+    contract:
+      overrides:
+        variant_key: [key, null, null]
+        gene_key: [flag, null, null]
+        split_group: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:gene_key_else_variant_key", group_cols: [split_group]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  cancer_type:
+    ecosystem: genomics
+    family: tumor
+    grain: [sample_barcode]
+    time_col: null
+    group_col: participant_barcode
+    capability: tumor sample cohort (multiclass)
+    dependency_group: 1
+    target_name: target_cohort
+    label_derived: [cohort]
+    label_derived_like: [tissue_source, project, cohort]
+    provenance_tier: sourced
+    notes: the study cohort of the tissue source site; the site, the project and the barcode parts are left out because they name the cohort
+    contract:
+      overrides:
+        participant_barcode: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:participant_barcode", group_cols: [participant_barcode]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  haploinsufficiency:
+    ecosystem: genomics
+    family: gene
+    grain: [gene_key]
+    time_col: null
+    capability: gene is intolerant of loss of function (pLI at least 0.9)
+    dependency_group: 1
+    target_name: target_is_haploinsufficient
+    label_derived: [gnomad_loss_of_function_probability]
+    label_derived_like: [gnomad, constraint, loss_of_function]
+    provenance_tier: sourced
+    notes: genes with a gnomAD constraint value; every column from gnomAD or from the second constraint source is label-derived
+    contract:
+      overrides:
+        entity_type: [flag, null, null]
+        key_source: [flag, null, null]
+    split: {rule: hash_group, rule_id: "hash:gene_key", group_cols: [gene_key]}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  # ------------------------------------------------ energy, second wave
+  cross_border_spread:
+    ecosystem: energy
+    family: cross_border
+    grain: [market_area_code, local_date]
+    time_col: local_date
+    capability: day-ahead price spread between Germany and a neighbour
+    dependency_group: 1
+    target_name: target_spread_eur_per_mwh
+    provenance_tier: constructed
+    notes: German daily mean price minus the neighbour daily mean price; features are lags of two days and more and the calendar; neighbour prices start on 2024-11-18
+    split: {rule: calendar, rule_id: "calendar:cross_border", calendar: cross_border, date_col: local_date}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: cross_border, date_col: local_date, impute: true}
+  price_volatility:
+    ecosystem: energy
+    family: market_daily
+    grain: [market_area_code, local_date]
+    time_col: local_date
+    capability: day-ahead price volatility over the next seven days
+    dependency_group: 1
+    target_name: target_price_volatility_next_7d
+    provenance_tier: constructed
+    notes: standard deviation of the daily price changes of the seven days after the day; future prices are in the target only
+    contract:
+      overrides:
+        interval_seconds: [flag, null, null]
+        regime_year: [flag, null, null]
+    split: {rule: calendar, rule_id: "calendar:energy_daily_week", calendar: energy_daily_week, date_col: local_date}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: energy_daily_week, date_col: local_date, impute: true}
+  price_spike:
+    ecosystem: energy
+    family: market_daily
+    grain: [market_area_code, local_date]
+    time_col: local_date
+    capability: day-ahead price above the 95th percentile of the train days
+    dependency_group: 1
+    target_name: target_is_price_spike
+    provenance_tier: constructed
+    notes: the threshold is the 95th percentile of the train-partition days, fixed before the target is made
+    contract:
+      overrides:
+        interval_seconds: [flag, null, null]
+        regime_year: [flag, null, null]
+    split: {rule: calendar, rule_id: "calendar:energy_daily", calendar: energy_daily, date_col: local_date}
+    fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: energy_daily, date_col: local_date, impute: true}
+  solar_storage_buildout:
+    ecosystem: energy
+    family: buildout
+    grain: [federal_state, unit_type, month_start]
+    time_col: month_start
+    capability: monthly solar and storage units commissioned per state
+    dependency_group: 1
+    target_name: target_units_added
+    provenance_tier: constructed
+    notes: complete months only (the last three months before the data end are left out because of the registration lag); units removed from the register are absent
+    split: {rule: calendar, rule_id: "calendar:buildout_month", calendar: buildout_month, date_col: month_start}
+    fit: {group_cols: [unit_type], fold_mode: rolling, calendar_key: buildout_month, date_col: month_start, impute: true}
+  unit_decommissioning:
+    ecosystem: energy
+    family: unit
+    grain: [unit_type, unit_id, calendar_year]
+    time_col: year_start
+    capability: physical unit is decommissioned in a calendar year
+    dependency_group: 1
+    target_name: target_ended
+    max_rows: 1000000
+    label_derived_like: [status, decommission]
+    provenance_tier: rule_derived
+    notes: one row per unit and calendar year for wind, combustion, biomass, hydro and geothermal units; placeholder dates are null, so those units have no row; units removed from the register are absent
+    contract:
+      static:
+        - capacity_net_kw
+        - federal_state
+        - generation_technology
+        - commissioning_year
+      overrides:
+        unit_type: [key, null, null]
+        unit_id: [key, null, null]
+        calendar_year: [key, null, null]
+    split: {rule: calendar, rule_id: "calendar:unit_year", calendar: unit_year, date_col: year_start}
+    fit: {group_cols: [unit_type], fold_mode: rolling, calendar_key: unit_year, date_col: year_start, impute: true}
+  # ------------------------------------------------ commerce, second wave
+  cart_abandonment:
+    ecosystem: commerce
+    family: session_purchase
+    grain: [session_key]
+    time_col: session_date
+    group_col: user_id
+    capability: REES46 session buys after the first cart event
+    dependency_group: 1
+    target_name: target_purchase_after_cart
+    provenance_tier: constructed
+    notes: sessions with a cart event; the prefix ends at the first cart event; 1 if a purchase follows in the session
+    contract:
+      overrides:
+        session_start_utc: [flag, null, null]
+        user_id: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], temporal: {kind: user_cutoff, date_col: session_date, cutoff: rees46_evaluation_start}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  session_revenue:
+    ecosystem: commerce
+    family: session_purchase
+    grain: [session_key]
+    time_col: session_date
+    group_col: user_id
+    capability: GA4 revenue of a session with a purchase (thin)
+    dependency_group: 1
+    target_name: target_session_revenue
+    provenance_tier: constructed
+    notes: sessions with a purchase and at least ten events; few rows, disclosed
+    contract:
+      overrides:
+        session_start_utc: [flag, null, null]
+        user_id: [group, null, null]
+    split: {rule: hash_group, rule_id: "hash:user_id_with_temporal_ordering", group_cols: [user_id], diagnostic: {date_col: session_date, date: ga4_diagnostic_date}}
+    fit: {group_cols: [], fold_mode: grouped, calendar_key: null, date_col: null, impute: true}
+  retail_demand_monthly:
+    ecosystem: commerce
+    family: demand_monthly
+    grain: [observation_month]
+    time_col: observation_month
+    capability: German retail volume change against the previous month
+    dependency_group: 1
+    target_name: target_retail_volume_change
+    provenance_tier: constructed
+    notes: 105 months; features are lags of one month; no relationship is an accepted result
+    split: {rule: calendar, rule_id: "calendar:retail_month", calendar: retail_month, date_col: observation_month}
+    fit: {group_cols: [], fold_mode: rolling, calendar_key: retail_month, date_col: observation_month, impute: true}

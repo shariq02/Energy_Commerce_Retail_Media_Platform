@@ -874,7 +874,121 @@ BLOCKS["rl_pumped_storage"] = [
 
 # COMMAND ----------
 
-# DBTITLE 1,Assemble the seven datasets (the join is in memory, no view)
+# DBTITLE 1,Targets -- price volatility, price spike and the cross-border spread
+_series = Window.partitionBy("market_area_code").orderBy("local_date")
+_next_week = _series.rowsBetween(1, 7)
+_trailing_week = _series.rowsBetween(-8, -2)
+_changes = target_price_daily.select(
+    "market_area_code",
+    "local_date",
+    (
+        F.col("target_price_eur_per_mwh")
+        - F.lag("target_price_eur_per_mwh").over(_series)
+    ).alias("price_change"),
+)
+_volatility = _changes.select(
+    "market_area_code",
+    "local_date",
+    F.when(
+        F.count("price_change").over(_next_week) == 7,
+        F.stddev("price_change").over(_next_week),
+    ).alias("target_price_volatility_next_7d"),
+    F.when(
+        F.count("price_change").over(_trailing_week) == 7,
+        F.stddev("price_change").over(_trailing_week),
+    ).alias("price_volatility_trailing_7d_lag2"),
+)
+target_volatility = (
+    _volatility.filter(F.col("target_price_volatility_next_7d").isNotNull())
+    .select("market_area_code", "local_date", "target_price_volatility_next_7d")
+    .withColumn("provenance_tier", F.lit("constructed"))
+)
+volatility_features = _volatility.select(
+    "market_area_code", "local_date", "price_volatility_trailing_7d_lag2"
+)
+# the spike threshold is the 95th percentile of the train-partition days
+_train_from, _train_to = SPLIT_CALENDARS["energy_daily"]["train"]
+SPIKE_THRESHOLD = (
+    target_price_daily.filter(F.col("local_date").between(_train_from, _train_to))
+    .agg(F.percentile_approx("target_price_eur_per_mwh", 0.95).alias("p95"))
+    .first()["p95"]
+)
+target_spike = target_price_daily.select(
+    "market_area_code",
+    "local_date",
+    (F.col("target_price_eur_per_mwh") > F.lit(SPIKE_THRESHOLD)).alias(
+        "target_is_price_spike"
+    ),
+).withColumn("provenance_tier", F.lit("constructed"))
+BLOCKS["price_spike"] = [
+    (
+        "spike_threshold",
+        markdown_table(["percentile", "eur_per_mwh"], [("train p95", SPIKE_THRESHOLD)]),
+    )
+]
+# German daily mean price against the daily mean price of each neighbour area
+NEIGHBOURS = ["at", "be", "ch", "cz", "dk1", "dk2", "fr", "hu", "it_north", "nl"]
+NEIGHBOURS += ["no2", "pl", "si"]
+_clock_price = price.filter(
+    F.col("interval_seconds").isin(900, 3600) & F.col("price_eur_per_mwh").isNotNull()
+)
+_german = (
+    _clock_price.filter(F.col("market_area_code") == MARKET_AREA)
+    .groupBy("local_date")
+    .agg(
+        F.avg("price_eur_per_mwh").alias("german_price"),
+        F.count("*").alias("german_values"),
+    )
+    .filter(F.col("german_values") >= 92)
+)
+_neighbour = (
+    _clock_price.filter(F.col("market_area_code").isin(*NEIGHBOURS))
+    .groupBy("market_area_code", "local_date")
+    .agg(
+        F.avg("price_eur_per_mwh").alias("neighbour_price"),
+        F.count("*").alias("neighbour_values"),
+    )
+    .filter(F.col("neighbour_values") >= 23)
+)
+_spread = _neighbour.join(_german, "local_date").select(
+    "market_area_code",
+    "local_date",
+    "german_price",
+    "neighbour_price",
+    (F.col("german_price") - F.col("neighbour_price")).alias("spread_eur_per_mwh"),
+)
+target_cross_border = _spread.select(
+    "market_area_code",
+    "local_date",
+    F.col("spread_eur_per_mwh").alias("target_spread_eur_per_mwh"),
+).withColumn("provenance_tier", F.lit("constructed"))
+cross_border_features = (
+    add_date_lags(
+        _spread,
+        keys=["market_area_code"],
+        date_col="local_date",
+        cols=["german_price", "neighbour_price", "spread_eur_per_mwh"],
+        lags=[2, 7],
+    )
+    .drop("german_price", "neighbour_price", "spread_eur_per_mwh")
+    .join(
+        calendar.filter(F.col("market_area_code") == MARKET_AREA).select(
+            "local_date",
+            "day_of_week",
+            "is_weekend",
+            "month",
+            "is_holiday",
+            "is_bridge_day",
+            "as_of_ts",
+        ),
+        "local_date",
+        "left",
+    )
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Assemble the datasets (the join is in memory, no view)
 _day = ["market_area_code", "local_date"]
 FRAMES["price_daily"] = assembled_frame(target_price_daily, [(market_daily, _day)])
 FRAMES["price_quarter_hour"] = assembled_frame(
@@ -899,6 +1013,13 @@ FRAMES["rl_pumped_storage"] = assembled_frame(
         "day_of_week": F.dayofweek("local_date"),
         "month": F.month("local_date"),
     },
+)
+FRAMES["price_volatility"] = assembled_frame(
+    target_volatility, [(market_daily, _day), (volatility_features, _day)]
+)
+FRAMES["price_spike"] = assembled_frame(target_spike, [(market_daily, _day)])
+FRAMES["cross_border_spread"] = assembled_frame(
+    target_cross_border, [(cross_border_features, ["market_area_code", "local_date"])]
 )
 
 # COMMAND ----------
