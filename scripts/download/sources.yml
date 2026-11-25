@@ -57,6 +57,7 @@ vars:
   gnomad_constraint: https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1/constraint
   tcga_codes: https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables
   eurostat: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data
+  bkg_vg250: https://daten.gdz.bkg.bund.de/produkte/vg/vg250_ebenen_1231/aktuell
   smard: https://www.smard.de/app/chart_data
   # SMARD series: one group per region and resolution; `chunks` keeps the last N weekly
   # chunks (quarter-hour and hourly series stay a recent window). A filter id is
@@ -910,6 +911,18 @@ stages:
       dataset: retail_trade
       read: {sep: ",", quoted: true}
       usecols_in: [indic_bt, nace_r2, s_adj, unit, geo, TIME_PERIOD, OBS_VALUE, OBS_FLAG]
+  # BKG VG250 (edition 31.12): the point of every German municipality, the key `AGS` with
+  # `LON_DEZ` and `LAT_DEZ` (decimal degrees, ETRS89/WGS84). Licence dl-de/by-2-0,
+  # attribution "© BKG (year of the last data retrieval) dl-de/by-2-0". Silver reads
+  # these three columns only.
+  - source: vg250
+    ecosystem: energy
+    datasets: [municipality_point]
+    files:
+      - tag: "12-31"
+        url: "{bkg_vg250}/vg250_12-31.ee.excel.ebenen.zip"
+        file: vg250_excel.zip
+    parser: vg250_points
 
   # --- energy and commerce sources of the first Bronze load; the staged file names stay
   # the same (the Bronze loader finds a file by its dataset name).

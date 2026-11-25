@@ -75,6 +75,7 @@ def test_expected_current_scope_sources_present(doc):
         "rees46",
         "ga4",
         "eurostat",
+        "vg250",
     } | _genomics_sources()
     assert sources == expected
 
@@ -101,6 +102,7 @@ def test_current_scope_sources_map_to_the_expected_ecosystem(doc):
         "rees46": "commerce",
         "ga4": "commerce",
         "eurostat": "commerce",
+        "vg250": "energy",
         **dict.fromkeys(_genomics_sources(), "genomics"),
     }
     for entry in doc["mappings"]:

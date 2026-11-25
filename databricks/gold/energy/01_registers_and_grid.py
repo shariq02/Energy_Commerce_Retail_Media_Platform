@@ -92,6 +92,7 @@ units = units.join(
         "unit_id",
         F.col("weather_station_key").alias("nearest_station_key"),
         F.col("distance_km").alias("nearest_station_distance_km"),
+        F.col("link_basis").alias("nearest_station_basis"),
     ),
     ["unit_type", "unit_id"],
     "left",

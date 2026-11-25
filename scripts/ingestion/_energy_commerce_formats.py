@@ -5,7 +5,8 @@
 #
 # Purpose: the file listings, the parsers and the BigQuery fetch of the energy and
 # commerce stages of scripts/download/sources.yml (SMARD, DWD, MaStR, power plant
-# list, redispatch, GA4, REES46, Honda IoT), for download_sources.py.
+# list, redispatch, VG250 municipality points, GA4, REES46, Honda IoT), for
+# download_sources.py.
 
 import io
 import json
@@ -94,6 +95,12 @@ CAPACITY_ADDITION_COLUMNS = [
     "2029",
     "2026_2029_total",
 ]
+
+# The VG250 workbook sheet with the municipality points and the columns that Silver
+# reads; the header row is found by its content.
+VG250_SHEET = "VG250_PK"
+VG250_COLUMNS = ("AGS", "LON_DEZ", "LAT_DEZ")
+VG250_SCAN_ROWS = 10
 
 EVENTS_CHUNK_ROWS = 300_000
 HONDA_CHUNK_ROWS = 100_000
@@ -588,6 +595,40 @@ def parse_redispatch(path: Path, tag: str):
             frame = pd.read_csv(handle, sep=";", encoding="utf-8-sig")
     frame.insert(0, "coverage_regime", tag)
     yield {"redispatch_measures": frame}, len(frame)
+
+
+def parse_vg250_points(path: Path, tag: str):
+    """The municipality points of the VG250 workbook: key and coordinates. A header
+    row without the three columns, or a coordinate that is no number, stops the stage."""
+    with zipfile.ZipFile(path) as archive:
+        member = next(n for n in archive.namelist() if n.lower().endswith(".xlsx"))
+        raw = pd.read_excel(
+            io.BytesIO(archive.read(member)),
+            sheet_name=VG250_SHEET,
+            header=None,
+            dtype=str,
+            keep_default_na=False,
+        )
+    header = next(
+        (
+            at
+            for at in range(min(VG250_SCAN_ROWS, len(raw)))
+            if set(VG250_COLUMNS) <= {str(c).strip() for c in raw.iloc[at]}
+        ),
+        None,
+    )
+    if header is None:
+        raise RuntimeError(f"{path.name}: no header row with {VG250_COLUMNS}")
+    frame = raw.iloc[header + 1 :].copy()
+    frame.columns = [str(c).strip() for c in raw.iloc[header]]
+    frame = frame[list(VG250_COLUMNS)]
+    frame = frame[frame["AGS"].str.strip() != ""].copy()
+    frame["AGS"] = (
+        frame["AGS"].str.strip().str.replace(r"\.0$", "", regex=True).str.zfill(8)
+    )
+    for column in ("LON_DEZ", "LAT_DEZ"):
+        pd.to_numeric(frame[column])
+    yield {"municipality_point": frame}, len(frame)
 
 
 def project_ga4_event(row: dict) -> dict | None:

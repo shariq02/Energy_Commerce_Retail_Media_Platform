@@ -418,6 +418,45 @@ def test_redispatch_archive_gets_the_regime_column_first(formats, tmp_path):
     assert read == 1
 
 
+def _vg250_zip(tmp_path, rows):
+    openpyxl = pytest.importorskip("openpyxl")
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "VG250_PK"
+    sheet.append(["Municipality points"])
+    sheet.append(["LKZ", "AGS", "GEN", "LON_DEZ", "LAT_DEZ"])
+    for row in rows:
+        sheet.append(row)
+    workbook_path = tmp_path / "v.xlsx"
+    workbook.save(workbook_path)
+    return _write_zip(
+        tmp_path / "v.zip", {"verwaltungsgebiete.xlsx": workbook_path.read_bytes()}
+    )
+
+
+def test_vg250_points_keep_the_key_padded_and_the_coordinates(formats, tmp_path):
+    rows = [
+        ["DE", "01001000", "A", 9.43, 54.78],
+        ["DE", 2000000, "B", 10.0, 53.55],
+        [None] * 5,
+    ]
+    path = _vg250_zip(tmp_path, rows)
+    batches, read = _first(formats.parse_vg250_points, path, "12-31")[0]
+    frame = batches["municipality_point"]
+    assert list(frame.columns) == ["AGS", "LON_DEZ", "LAT_DEZ"]
+    assert frame["AGS"].tolist() == ["01001000", "02000000"]
+    assert frame["LON_DEZ"].tolist() == ["9.43", "10"]
+    assert read == 2
+
+
+def test_vg250_point_with_a_coordinate_that_is_no_number_stops_the_stage(
+    formats, tmp_path
+):
+    path = _vg250_zip(tmp_path, [["DE", "01001000", "A", "9,43", 54.78]])
+    with pytest.raises(ValueError):
+        _first(formats.parse_vg250_points, path, "12-31")
+
+
 def test_ga4_event_keeps_the_allowlists_and_flattens_the_scalars(formats):
     row = {
         "event_name": "purchase",

@@ -530,8 +530,11 @@ report(
 
 # DBTITLE 1,Build, write and check -- unit_weather_station_link (nearest DWD station)
 # A unit with its own coordinates takes the DWD station with the shortest great-circle
-# distance (haversine, Earth radius 6371.0088 km).
+# distance (haversine, Earth radius 6371.0088 km). A unit without coordinates uses the
+# VG250 point of its municipality (`source_municipality_key` is the 8-digit AGS).
 EARTH_RADIUS_KM = 6371.0088
+LINK_UNIT = "unit_coordinates"
+LINK_MUNICIPALITY = "municipality_point"
 stations = (
     spark.table(semantic_table("weather_location"))
     .filter(
@@ -545,24 +548,50 @@ stations = (
         F.col("longitude").cast("double").alias("station_longitude"),
     )
 )
-coordinate_units = (
-    spark.table(semantic_table("generation_unit"))
-    .filter(F.col("latitude").isNotNull() & F.col("longitude").isNotNull())
-    .select(
-        "unit_type",
-        "unit_id",
-        F.col("latitude").cast("double").alias("unit_latitude"),
-        F.col("longitude").cast("double").alias("unit_longitude"),
-    )
+units = spark.table(semantic_table("generation_unit"))
+has_coordinates = F.col("latitude").isNotNull() & F.col("longitude").isNotNull()
+coordinate_units = units.filter(has_coordinates).select(
+    "unit_type",
+    "unit_id",
+    F.col("latitude").cast("double").alias("unit_latitude"),
+    F.col("longitude").cast("double").alias("unit_longitude"),
+    F.lit(LINK_UNIT).alias("link_basis"),
 )
+# One point per municipality key; a key with several points takes the smallest
+# (longitude, latitude), and the count of such keys is reported.
+municipality_points = (
+    read_bronze("vg250_municipality_point")
+    .select(
+        F.trim("AGS").alias("source_municipality_key"),
+        F.struct(
+            F.col("LON_DEZ").cast("double").alias("longitude"),
+            F.col("LAT_DEZ").cast("double").alias("latitude"),
+        ).alias("point"),
+    )
+    .groupBy("source_municipality_key")
+    .agg(F.min("point").alias("point"), F.count("*").alias("points"))
+)
+units_with_key = units.filter(
+    ~has_coordinates & F.col("source_municipality_key").isNotNull()
+)
+municipality_units = units_with_key.join(
+    municipality_points, "source_municipality_key"
+).select(
+    "unit_type",
+    "unit_id",
+    F.col("point.latitude").alias("unit_latitude"),
+    F.col("point.longitude").alias("unit_longitude"),
+    F.lit(LINK_MUNICIPALITY).alias("link_basis"),
+)
+located_units = coordinate_units.unionByName(municipality_units)
 half_sines = F.pow(
     F.sin(F.radians(F.col("station_latitude") - F.col("unit_latitude")) / 2), 2
 ) + F.cos(F.radians("unit_latitude")) * F.cos(F.radians("station_latitude")) * F.pow(
     F.sin(F.radians(F.col("station_longitude") - F.col("unit_longitude")) / 2), 2
 )
 nearest = (
-    coordinate_units.crossJoin(F.broadcast(stations))
-    .groupBy("unit_type", "unit_id")
+    located_units.crossJoin(F.broadcast(stations))
+    .groupBy("unit_type", "unit_id", "link_basis")
     .agg(
         F.min(
             F.struct(
@@ -576,12 +605,16 @@ nearest = (
         "unit_id",
         F.col("best.weather_station_key").alias("weather_station_key"),
         F.col("best.distance").alias("distance_km"),
-        F.lit("unit_coordinates").alias("link_basis"),
+        "link_basis",
         sha_key("unit_type", "unit_id").alias("_srid"),
     )
 )
 nearest = add_semantic_provenance(
-    nearest, "mastr", "generation_unit+weather_location", RID, "_srid"
+    nearest,
+    "mastr",
+    "generation_unit+weather_location+vg250_municipality_point",
+    RID,
+    "_srid",
 )
 written_link = write_inspect_export(
     conform(nearest, UNIT_WEATHER_STATION_LINK_COLUMNS),
@@ -593,11 +626,27 @@ written_link = write_inspect_export(
     key_cols=["unit_type", "unit_id"],
     writer=write_semantic,
 )
-_linked, _with_coordinates = written_link.count(), coordinate_units.count()
+_linked = written_link.filter(F.col("link_basis") == LINK_UNIT).count()
+_with_coordinates = coordinate_units.count()
 report(
     "every unit with coordinates has a nearest station",
     _linked == _with_coordinates,
     f"linked {_linked} of {_with_coordinates}",
+)
+_linked_points = written_link.filter(F.col("link_basis") == LINK_MUNICIPALITY).count()
+_with_points = municipality_units.count()
+report(
+    "every unit with a municipality point has a nearest station",
+    _linked_points == _with_points,
+    f"linked {_linked_points} of {_with_points}",
+)
+_no_point = units_with_key.count() - _with_points
+_repeated = municipality_points.filter(F.col("points") > 1).count()
+report(
+    "units with a municipality key but no point (count)",
+    True,
+    f"{_no_point} units; {_repeated} municipality keys hold more than one point",
+    status="INFO",
 )
 
 # COMMAND ----------

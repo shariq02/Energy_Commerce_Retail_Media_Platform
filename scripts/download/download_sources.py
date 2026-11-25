@@ -57,6 +57,7 @@ from _energy_commerce_formats import (
     parse_power_plant_list,
     parse_redispatch,
     parse_smard_chart,
+    parse_vg250_points,
     smard_series,
 )
 from _genomic_formats import (
@@ -915,6 +916,7 @@ PLAIN_PARSERS = {
     "smard_chart": parse_smard_chart,
     "power_plant_list": parse_power_plant_list,
     "redispatch": parse_redispatch,
+    "vg250_points": parse_vg250_points,
     "ga4_events": parse_ga4_events,
 }
 PARSER_FACTORIES = {

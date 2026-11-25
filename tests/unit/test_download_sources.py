@@ -471,6 +471,15 @@ def test_eurostat_stage_is_a_commerce_csv_with_named_columns(
     assert batches["retail_trade"].iloc[0]["OBS_VALUE"] == "103.4"
 
 
+def test_vg250_stage_is_an_energy_zip_read_by_the_municipality_point_parser(
+    genomics, config
+):
+    entry = _entry(config, "vg250", "municipality_point")
+    assert entry["ecosystem"] == "energy"
+    assert entry["files"][0]["url"].startswith("{bkg_vg250}/")
+    assert genomics.build_parser(entry["parser"]) is genomics.parse_vg250_points
+
+
 def _small_config():
     def stage(source, ecosystem, dataset):
         return {

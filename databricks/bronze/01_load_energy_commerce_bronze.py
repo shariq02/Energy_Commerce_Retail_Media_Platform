@@ -147,6 +147,9 @@ SOURCES = {
     "eurostat": {
         "datasets": [("retail_trade", "eurostat_retail_trade", None)],
     },
+    "vg250": {
+        "datasets": [("municipality_point", "vg250_municipality_point", None)],
+    },
     "honda_iot": {
         "datasets": [
             (f"{kind}_{unit}", f"honda_iot_{kind}", unit.lower())

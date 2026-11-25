@@ -68,6 +68,9 @@ mappings:
   - source_system: eurostat
     ecosystem: commerce
     first_mapped: "2026-11-23"
+  - source_system: vg250
+    ecosystem: energy
+    first_mapped: "2026-11-25"
   # genomics: one entry per source folder of genomics_bronze
   - source_system: genome_sequence
     ecosystem: genomics
