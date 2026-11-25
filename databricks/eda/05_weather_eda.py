@@ -32,23 +32,19 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration
-CATALOG = "energy_commerce_retail_media"
-SCHEMA = "energy_gold"
-SOURCE = "weather"
-NB_KEY = "01_weather_tables"
-SECTION_TITLE = "Weather observation and daily tables"
-TABLES = ["weather_observation", "weather_daily"]
-
-# COMMAND ----------
-
-# DBTITLE 1,Read tables
-FRAMES = read_tables(CATALOG, SCHEMA, TABLES)
-
-# COMMAND ----------
-
-# DBTITLE 1,Standard EDA -- profile, keys, rates, coverage, links, dates and export
-standard_group_eda(SOURCE, NB_KEY, SECTION_TITLE, FRAMES, TABLES, "weather_01_rows.png")
+# DBTITLE 1,Standard EDA of the weather tables
+run_groups(
+    "energy_commerce_retail_media",
+    "weather",
+    [
+        {
+            "schema": "energy_gold",
+            "nb_key": "01_weather_tables",
+            "title": "Weather observation and daily tables",
+            "tables": ["weather_observation", "weather_daily"],
+        }
+    ],
+)
 
 # COMMAND ----------
 
@@ -61,39 +57,14 @@ standard_group_eda(SOURCE, NB_KEY, SECTION_TITLE, FRAMES, TABLES, "weather_01_ro
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration
+# DBTITLE 1,Continuity, link checks, rows per location and export
 CATALOG = "energy_commerce_retail_media"
-SCHEMA = "energy_gold"
-SOURCE = "weather"
-NB_KEY = "02_continuity_links_and_bias"
-SECTION_TITLE = "Weather continuity, links and coverage bias"
-LINKS = [
-    (
-        "energy_gold",
-        "weather_observation",
-        "location_key",
-        "shared_conformed",
-        "dim_place",
-        "location_key",
-    ),
-    (
-        "energy_gold",
-        "weather_daily",
-        "location_key",
-        "shared_conformed",
-        "dim_place",
-        "location_key",
-    ),
-]
-
-# COMMAND ----------
-
-# DBTITLE 1,Continuity against the expected grid
-OBSERVATION = spark.table(f"{CATALOG}.{SCHEMA}.weather_observation")
+GOLD = "energy_gold"
+OBSERVATION = spark.table(f"{CATALOG}.{GOLD}.weather_observation")
+DAILY = spark.table(f"{CATALOG}.{GOLD}.weather_daily")
 CONTINUITY = series_continuity(
     OBSERVATION, "weather_observation", "observation_timestamp_utc"
 )
-DAILY = spark.table(f"{CATALOG}.{SCHEMA}.weather_daily")
 for source in [
     r[0] for r in DAILY.select("source_system").distinct().collect() if r[0]
 ]:
@@ -104,30 +75,23 @@ for source in [
         entity_col="location_key",
     )
 print(continuity_block(CONTINUITY))
-
-# COMMAND ----------
-
-# DBTITLE 1,Link checks and rows per location
-LINK_RESULTS = link_checks(CATALOG, LINKS)
-print(links_block(LINK_RESULTS))
-BIAS = {
-    "weather_observation per location": coverage_bias(
-        rows_per_key(OBSERVATION, "location_key")
-    ),
-    "weather_daily per location": coverage_bias(rows_per_key(DAILY, "location_key")),
-}
-print(bias_block(BIAS))
-
-# COMMAND ----------
-
-# DBTITLE 1,Export findings
-write_profiling(
-    SOURCE,
-    NB_KEY,
-    SECTION_TITLE,
+PLACE = ("shared_conformed", "dim_place", "location_key")
+BLOCKS = link_bias_blocks(
+    CATALOG,
     [
-        ("Continuity against the expected grid", continuity_block(CONTINUITY)),
-        ("Links to the place table", links_block(LINK_RESULTS)),
-        ("Rows per location", bias_block(BIAS)),
+        (GOLD, table, "location_key", *PLACE)
+        for table in ("weather_observation", "weather_daily")
     ],
+    [
+        (f"{t} per location", GOLD, t, "location_key")
+        for t in ("weather_observation", "weather_daily")
+    ],
+    "Links to the place table",
+    "Rows per location",
+)
+write_profiling(
+    "weather",
+    "02_continuity_links_and_bias",
+    "Weather continuity, links and coverage bias",
+    [("Continuity against the expected grid", continuity_block(CONTINUITY)), *BLOCKS],
 )

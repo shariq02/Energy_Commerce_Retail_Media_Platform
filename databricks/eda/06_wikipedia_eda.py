@@ -34,12 +34,9 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Imports
+# DBTITLE 1,Configuration and frame intake
 from pyspark.sql import functions as F
 
-# COMMAND ----------
-
-# DBTITLE 1,Configuration
 SOURCE = "wikipedia"
 NB_KEY = "01_wikipedia_articles"
 SECTION_TITLE = "Wikipedia article text (Samples: wikipedia-datasets)"
@@ -74,136 +71,49 @@ DOMAIN_TERMS = {
     "aviation": ("airline", "airport", "aviation", "aircraft", "flight"),
     "mobility": ("electric vehicle", "charging station", "public transport", "railway"),
 }
+print(f"OK  repo root: {_repo_root()}")
+print(f"OK  profiling directory: {_profiling_dir()}")
+INFO = frame_intake(ROOT, NAME_HINTS, "parquet", cap=LIST_CAP, text_fallback=True)
+role, d0, prof, nested = INFO["role"], INFO["d0"], INFO["prof"], INFO["nested"]
+entries, kinds, FRAME, DATA_COLS = (
+    INFO["entries"],
+    INFO["kinds"],
+    INFO["frame"],
+    INFO["data_cols"],
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Validate profiling export path
-REPO_ROOT = _repo_root()
-PROFILING_DIR = _profiling_dir()
-print(f"OK  repo root: {REPO_ROOT}")
-print(f"OK  profiling directory: {PROFILING_DIR}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Discover files
-entries, kinds, frames = load_volume_frames(ROOT, cap=LIST_CAP)
-require_frames(frames, ROOT, kinds)
-print(f"{ROOT}: {len(entries)} files, {sum(e['size'] for e in entries)} bytes")
-if len(entries) >= LIST_CAP:
-    print(f"WARNING: the listing reached the cap of {LIST_CAP}; files may be missing")
-for e in entries[:12]:
-    print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
-print({k: len(v) for k, v in kinds.items()})
-
-# COMMAND ----------
-
-# DBTITLE 1,Support files (README) -- provenance evidence
-support = print_support_files(kinds)
-
-# COMMAND ----------
-
-# DBTITLE 1,Select the frame
-FRAME, df, DATA_COLS = select_frame(frames, "parquet")
-
-# COMMAND ----------
-
-# DBTITLE 1,Resolve column roles
-role = resolve_roles(DATA_COLS, NAME_HINTS)
-if role["text"] is None:
-    role["text"] = longest_text_col(df, DATA_COLS)
-    print("text column chosen by average length:", role["text"])
-print(role)
-
-# COMMAND ----------
-
-# DBTITLE 1,Structural check -- nesting and schema
-nested, struct = structural_check(df, DATA_COLS)
-
-# COMMAND ----------
-
-# DBTITLE 1,Profile -- rows, missingness, approx distinct
-d0 = df.drop("__file")
-prof = profile_frame(d0)
-print(f"rows={prof['total']}  cols={len(prof['cols'])}")
-for c in prof["cols"]:
-    print(
-        f"  {c[:40]:<40} missing={prof['miss'][c]:>9} "
-        f"rate={prof['miss'][c] / prof['total'] if prof['total'] else 0:.4f} "
-        f"approx_distinct={prof['acd'][c]}"
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Constant columns
-prof["constant"] = constant_column_names(d0, prof)
-print(f"constant={prof['constant']}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Key candidates -- exact uniqueness
+# DBTITLE 1,Keys, title forms and text measures
 key_cands = [role[r] for r in ("id", "title") if role[r]]
 uniq = exact_uniqueness(d0, key_cands)
 for c, u in uniq.items():
     print(c, u)
-
-# COMMAND ----------
-
-# DBTITLE 1,Title forms and case collisions
-forms = None
+forms = tstats = sstats = markup = chars = text_dups = None
 if role["title"]:
     forms = title_forms(d0, role["title"])
     print(forms)
 else:
     print("no title column located")
-
-# COMMAND ----------
-
-# DBTITLE 1,Text length -- characters and words
-tstats = None
 if role["text"]:
     tstats = text_stats(d0, role["text"])
     print(tstats)
+    sstats = section_stats(
+        d0, role["text"], fraction=TEXT_SAMPLE_FRACTION, seed=SAMPLE_SEED
+    )
+    print(sstats)
+    markup = markup_indicators(d0, role["text"])
+    print(markup)
+    chars = char_issues(d0, role["text"])
+    print(chars)
+    text_dups = text_duplicates(d0, role["text"])
+    print(text_dups)
 else:
     print("no text column located")
 
 # COMMAND ----------
 
-# DBTITLE 1,Section length against the chunk proxy (row sample)
-sstats = None
-if role["text"]:
-    sstats = section_stats(
-        d0, role["text"], fraction=TEXT_SAMPLE_FRACTION, seed=SAMPLE_SEED
-    )
-    print(sstats)
-
-# COMMAND ----------
-
-# DBTITLE 1,Markup indicators
-markup = None
-if role["text"]:
-    markup = markup_indicators(d0, role["text"])
-    print(markup)
-
-# COMMAND ----------
-
-# DBTITLE 1,Character issues
-chars = None
-if role["text"]:
-    chars = char_issues(d0, role["text"])
-    print(chars)
-
-# COMMAND ----------
-
-# DBTITLE 1,Duplicate texts (64-bit hash)
-text_dups = None
-if role["text"]:
-    text_dups = text_duplicates(d0, role["text"])
-    print(text_dups)
-
-# COMMAND ----------
-
-
-# DBTITLE 1,Duplicate-key helper
+# DBTITLE 1,Duplicate keys and date columns
 
 
 def vary_exprs(exclude):
@@ -214,25 +124,13 @@ def vary_exprs(exclude):
     return out
 
 
-# COMMAND ----------
-
-# DBTITLE 1,Duplicate keys -- id
-id_dups = None
+id_dups = title_dups = None
 if role["id"]:
     id_dups = key_duplicate_profile(d0, role["id"], vary_exprs("id"))
     print(id_dups)
-
-# COMMAND ----------
-
-# DBTITLE 1,Duplicate keys -- title
-title_dups = None
 if role["title"]:
     title_dups = key_duplicate_profile(d0, role["title"], vary_exprs("title"))
     print(title_dups)
-
-# COMMAND ----------
-
-# DBTITLE 1,Date columns
 ts_info, tprof = None, None
 if role["timestamp"]:
     tcol = role["timestamp"]
@@ -250,19 +148,14 @@ else:
 
 # COMMAND ----------
 
-# DBTITLE 1,Length after stripping markup (row sample)
-cstats = None
+# DBTITLE 1,Cleaned length, domain terms, length histograms and figure
+cstats = domain_text = domain_title = None
+len_hist = {}
 if role["text"]:
     cstats = cleaned_length_stats(
         d0, role["text"], fraction=TEXT_SAMPLE_FRACTION, seed=SAMPLE_SEED
     )
     print(cstats)
-
-# COMMAND ----------
-
-# DBTITLE 1,Domain-term coverage in text (row sample)
-domain_text = None
-if role["text"]:
     domain_text = domain_term_hits(
         d0,
         role["text"],
@@ -271,29 +164,14 @@ if role["text"]:
         seed=SAMPLE_SEED,
     )
     print(domain_text)
-
-# COMMAND ----------
-
-# DBTITLE 1,Domain-term coverage in titles
-domain_title = None
-if role["title"]:
-    domain_title = domain_term_hits(d0, role["title"], DOMAIN_TERMS)
-    print(domain_title)
-
-# COMMAND ----------
-
-# DBTITLE 1,Length histograms
-len_hist = {}
-if role["text"]:
     txt = as_str(role["text"])
     len_hist["words per article"] = log2_histogram(d0, word_count(txt))
     len_hist["characters per article"] = log2_histogram(d0, F.length(txt))
     for k, v in len_hist.items():
         print(k, v)
-
-# COMMAND ----------
-
-# DBTITLE 1,Figures
+if role["title"]:
+    domain_title = domain_term_hits(d0, role["title"], DOMAIN_TERMS)
+    print(domain_title)
 figs = []
 if len_hist and facet_bars(
     len_hist,
@@ -312,52 +190,9 @@ if len_hist and facet_bars(
 
 # COMMAND ----------
 
-# DBTITLE 1,Findings
-print(
-    f"rows={prof['total']}, cols={len(prof['cols'])}, constant={prof['constant']}, "
-    f"keys={ {c: u['unique'] for c, u in uniq.items()} }, text={tstats}, duplicates={text_dups}"
-)
-
-# COMMAND ----------
-
 # DBTITLE 1,Export profiling findings -> src/schemas/profiling/wikipedia.md
-_profile = [
-    "| frame | source files | rows | cols | constant columns | nested columns |",
-    "|---|---|---|---|---|---|",
-    para(
-        f"| {FRAME} | {len(frames[FRAME]['paths'])} | {prof['total']} | {len(prof['cols'])} |",
-        f"{', '.join(prof['constant']) or '-'} | {', '.join(nested) or '-'} |",
-    ),
-]
-
-_prov = [
-    para(
-        "The dataset is read in place from the Databricks Samples Volume;",
-        "there is no Bronze table and no ECRMAP acquisition step.",
-    ),
-    f"Files under `{ROOT}`: {len(entries)}, {sum(e['size'] for e in entries)} bytes ({ {k: len(v) for k, v in kinds.items()} }).",
-]
-for name, lines in support.items():
-    _prov.append(f"README-type file `{name}` (first lines):")
-    _prov += [f"  > {ln[:160]}" for ln in lines[:25] if ln.strip()]
-if not support:
-    _prov.append(
-        "- No README / licence file in the directory: provenance and licence are not documented here (LIMITATION)."
-    )
-
-_struct = [
-    f"- schema: `{struct['schema']}`",
-    f"- corrupt-record column present: {struct['corrupt_record']}; nested columns: {nested or 'none'}.",
-    f"- column roles resolved: { {k: v for k, v in role.items() if v} }.",
-]
-
-_dq = [
-    "Missingness (rate per column): "
-    + ", ".join(
-        f"{c}={prof['miss'][c] / prof['total'] if prof['total'] else 0:.4f}"
-        for c in prof["cols"]
-    ),
-]
+head_blocks, missing = intake_blocks(INFO, ROOT, "rows")
+_dq = [missing]
 if text_dups:
     _dq.append(
         f"Duplicate texts: {text_dups['dup_groups']} groups holding {text_dups['rows_in_dup_groups']} of {text_dups['rows']} rows."
@@ -504,9 +339,7 @@ write_profiling(
     NB_KEY,
     SECTION_TITLE,
     blocks=[
-        ("Profile", "\n".join(_profile)),
-        ("Provenance / Source Evidence", "\n".join(_prov)),
-        ("Structural Integrity", "\n".join(_struct)),
+        *head_blocks,
         ("Data Quality", "\n".join(_dq)),
         ("Entities / Keys", "\n".join(_entities)),
         ("Text Structure", "\n".join(_text)),
@@ -533,7 +366,7 @@ write_profiling(
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration
+# DBTITLE 1,Configuration and frame intake
 SOURCE = "wikipedia"
 NB_KEY = "02_wikipedia_clickstream"
 SECTION_TITLE = "Wikipedia clickstream (Samples: wikipedia-datasets)"
@@ -547,69 +380,18 @@ NAME_HINTS = {
     "type": ("type",),
 }
 LINK_TYPE = "link"
+INFO = frame_intake(ROOT, NAME_HINTS, "json", raw_lines=3)
+role, d0, prof, nested = INFO["role"], INFO["d0"], INFO["prof"], INFO["nested"]
+entries, kinds, FRAME, DATA_COLS = (
+    INFO["entries"],
+    INFO["kinds"],
+    INFO["frame"],
+    INFO["data_cols"],
+)
 
 # COMMAND ----------
 
-# DBTITLE 1,Discover files
-entries, kinds, frames = load_volume_frames(ROOT)
-require_frames(frames, ROOT, kinds)
-print(f"{ROOT}: {len(entries)} files, {sum(e['size'] for e in entries)} bytes")
-for e in entries:
-    print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
-print({k: len(v) for k, v in kinds.items()})
-
-# COMMAND ----------
-
-# DBTITLE 1,Support files (README) -- provenance evidence
-support = print_support_files(kinds)
-
-# COMMAND ----------
-
-# DBTITLE 1,First raw lines of the data file
-raw_lines = []
-if kinds.get("json"):
-    raw_lines = head_lines(kinds["json"][0]["path"], 3)
-for ln in raw_lines:
-    print(ln[:300])
-
-# COMMAND ----------
-
-# DBTITLE 1,Select the frame
-FRAME, df, DATA_COLS = select_frame(frames, "json")
-
-# COMMAND ----------
-
-# DBTITLE 1,Resolve column roles
-role = resolve_roles(DATA_COLS, NAME_HINTS)
-print(role)
-
-# COMMAND ----------
-
-# DBTITLE 1,Structural check -- nesting and schema
-nested, struct = structural_check(df, DATA_COLS)
-
-# COMMAND ----------
-
-# DBTITLE 1,Profile -- rows, missingness, approx distinct
-d0 = df.drop("__file")
-prof = profile_frame(d0)
-print(f"rows={prof['total']}  cols={len(prof['cols'])}")
-for c in prof["cols"]:
-    print(
-        f"  {c[:40]:<40} missing={prof['miss'][c]:>9} "
-        f"rate={prof['miss'][c] / prof['total'] if prof['total'] else 0:.4f} "
-        f"approx_distinct={prof['acd'][c]}"
-    )
-
-# COMMAND ----------
-
-# DBTITLE 1,Constant columns
-prof["constant"] = constant_column_names(d0, prof)
-print(f"constant={prof['constant']}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Edge duplicates on (previous title, current title, type)
+# DBTITLE 1,Edge duplicates, edge types, click count, self-loops and id checks
 edge_key = [role[r] for r in ("prev_title", "curr_title", "type") if role[r]]
 dup_edges = None
 if len(edge_key) == 3:
@@ -617,10 +399,6 @@ if len(edge_key) == 3:
     print(dup_edges)
 else:
     print("edge key columns not all located:", edge_key)
-
-# COMMAND ----------
-
-# DBTITLE 1,Edge types -- rows and clicks
 types = []
 if role["type"]:
     agg = [F.count(F.lit(1)).alias("edges")]
@@ -630,10 +408,6 @@ if role["type"]:
     types = [r.asDict() for r in rows.limit(40).collect()]
     for t in types:
         print(t)
-
-# COMMAND ----------
-
-# DBTITLE 1,Click count -- parse yield, moments and quantiles
 num = {}
 quant = {}
 if role["count"]:
@@ -642,10 +416,6 @@ if role["count"]:
     if num[role["count"]]["is_numeric"]:
         quant = quantiles(d0, role["count"])
         print(quant)
-
-# COMMAND ----------
-
-# DBTITLE 1,Self-loops
 self_loops = None
 pairs = [("prev_id", "curr_id"), ("prev_title", "curr_title")]
 for a, b in pairs:
@@ -654,10 +424,6 @@ for a, b in pairs:
         n = d0.agg(F.sum(same.cast("long")).alias("n")).first()["n"]
         self_loops = {**(self_loops or {}), f"{a}=={b}": n}
 print(self_loops)
-
-# COMMAND ----------
-
-# DBTITLE 1,Missing ids by edge type
 id_missing = []
 if role["type"] and (role["prev_id"] or role["curr_id"]):
     agg = [F.count(F.lit(1)).alias("edges")]
@@ -670,19 +436,11 @@ if role["type"] and (role["prev_id"] or role["curr_id"]):
     id_missing = [r.asDict() for r in rows.limit(40).collect()]
     for r in id_missing:
         print(r)
-
-# COMMAND ----------
-
-# DBTITLE 1,Id-to-title consistency
 spread = []
 for i, t in (("curr_id", "curr_title"), ("prev_id", "prev_title")):
     if role[i] and role[t]:
         spread.append(group_attribute_spread(d0, role[i], role[t]))
         print(spread[-1])
-
-# COMMAND ----------
-
-# DBTITLE 1,Title forms over distinct current titles
 forms = None
 if role["curr_title"]:
     nodes = d0.select(qcol(role["curr_title"])).distinct()
@@ -691,41 +449,24 @@ if role["curr_title"]:
 
 # COMMAND ----------
 
-# DBTITLE 1,Link edges
+# DBTITLE 1,Link edges, degrees, click-count histogram and figure
 links = d0.where(as_str(role["type"]) == LINK_TYPE) if role["type"] else d0
 print(
     f"link filter: type == {LINK_TYPE!r}"
     if role["type"]
     else "no type column; all edges used"
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,In-degree and click concentration (link edges, by current title)
-in_deg = None
+in_deg = out_deg = None
 if role["curr_title"] and role["count"]:
     in_deg = degree_summary(degree_table(links, role["curr_title"], role["count"]))
     print(in_deg)
-
-# COMMAND ----------
-
-# DBTITLE 1,Out-degree and click concentration (link edges, by previous title)
-out_deg = None
 if role["prev_title"] and role["count"]:
     out_deg = degree_summary(degree_table(links, role["prev_title"], role["count"]))
     print(out_deg)
-
-# COMMAND ----------
-
-# DBTITLE 1,Click-count histogram
 click_hist = []
 if role["count"] and num.get(role["count"], {}).get("is_numeric"):
     click_hist = log2_histogram(d0, to_double(role["count"]))
     print(click_hist)
-
-# COMMAND ----------
-
-# DBTITLE 1,Figures
 figs = []
 _panels = {}
 if types:
@@ -749,54 +490,9 @@ if _panels and facet_bars(
 
 # COMMAND ----------
 
-# DBTITLE 1,Findings
-print(
-    f"edges={prof['total']}, cols={len(prof['cols'])}, constant={prof['constant']}, "
-    f"types={[t['t'] for t in types[:8]]}, duplicates={dup_edges}, self_loops={self_loops}"
-)
-
-# COMMAND ----------
-
 # DBTITLE 1,Export profiling findings -> src/schemas/profiling/wikipedia.md
-_profile = [
-    "| frame | source files | edges | cols | constant columns | nested columns |",
-    "|---|---|---|---|---|---|",
-    para(
-        f"| {FRAME} | {len(frames[FRAME]['paths'])} | {prof['total']} | {len(prof['cols'])} |",
-        f"{', '.join(prof['constant']) or '-'} | {', '.join(nested) or '-'} |",
-    ),
-]
-
-_prov = [
-    para(
-        "The dataset is read in place from the Databricks Samples Volume;",
-        "there is no Bronze table and no ECRMAP acquisition step.",
-    ),
-    f"Files under `{ROOT}`: {len(entries)}, {sum(e['size'] for e in entries)} bytes ({ {k: len(v) for k, v in kinds.items()} }).",
-    "First raw lines:",
-    *[f"  > {ln[:200]}" for ln in raw_lines],
-]
-for name, lines in support.items():
-    _prov.append(f"README-type file `{name}` (first lines):")
-    _prov += [f"  > {ln[:160]}" for ln in lines[:25] if ln.strip()]
-if not support:
-    _prov.append(
-        "- No README / licence file in the directory: provenance and licence are not documented here (LIMITATION)."
-    )
-
-_struct = [
-    f"- schema: `{struct['schema']}`",
-    f"- corrupt-record column present: {struct['corrupt_record']}; nested columns: {nested or 'none'}.",
-    f"- column roles resolved: { {k: v for k, v in role.items() if v} }.",
-]
-
-_dq = [
-    "Missingness (rate per column): "
-    + ", ".join(
-        f"{c}={prof['miss'][c] / prof['total'] if prof['total'] else 0:.4f}"
-        for c in prof["cols"]
-    ),
-]
+head_blocks, missing = intake_blocks(INFO, ROOT, "edges")
+_dq = [missing]
 if dup_edges:
     _dq.append(
         f"Duplicates on {edge_key}: {dup_edges['dup_groups']} duplicated keys out of {dup_edges['distinct_keys']} ({dup_edges['identical']} identical, {dup_edges['conflicting']} conflicting)."
@@ -905,9 +601,7 @@ write_profiling(
     NB_KEY,
     SECTION_TITLE,
     blocks=[
-        ("Profile", "\n".join(_profile)),
-        ("Provenance / Source Evidence", "\n".join(_prov)),
-        ("Structural Integrity", "\n".join(_struct)),
+        *head_blocks,
         ("Data Quality", "\n".join(_dq)),
         ("Entities / Keys", "\n".join(_entities)),
         ("Edge Structure", "\n".join(_edges)),
@@ -932,7 +626,7 @@ write_profiling(
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration
+# DBTITLE 1,Configuration and both frames
 SOURCE = "wikipedia"
 NB_KEY = "03_wikipedia_relationships_and_findings"
 SECTION_TITLE = "Cross-table relationships (articles and clickstream)"
@@ -952,56 +646,12 @@ CLICK_HINTS = {
 LINK_TYPE = "link"
 TOP_N = 20
 LIST_CAP = 5000
-DOMAIN_TERMS = {
-    "energy": (
-        "electricity",
-        "power plant",
-        "wind power",
-        "solar power",
-        "renewable energy",
-        "electric grid",
-    ),
-    "weather": ("weather", "climate", "meteorology", "precipitation", "storm"),
-    "commerce": ("retail", "e-commerce", "online shopping", "advertising", "consumer"),
-    "aviation": ("airline", "airport", "aviation", "aircraft", "flight"),
-    "mobility": ("electric vehicle", "charging station", "public transport", "railway"),
-}
-
-# COMMAND ----------
-
-# DBTITLE 1,Load the article frame
-a_entries, a_kinds, a_frames = load_volume_frames(ROOT_ARTICLES, cap=LIST_CAP)
-require_frames(a_frames, ROOT_ARTICLES, a_kinds)
-if len(a_entries) >= LIST_CAP:
-    print(f"WARNING: the article listing reached the cap of {LIST_CAP}")
-a_name = "parquet" if "parquet" in a_frames else next(iter(a_frames))
-articles = a_frames[a_name]["df"].drop("__file")
-print(
-    f"articles: frame={a_name} files={len(a_frames[a_name]['paths'])} columns={articles.columns}"
+a_info = frame_intake(
+    ROOT_ARTICLES, ARTICLE_HINTS, "parquet", cap=LIST_CAP, profile=False
 )
-
-# COMMAND ----------
-
-# DBTITLE 1,Load the clickstream frame
-c_entries, c_kinds, c_frames = load_volume_frames(ROOT_CLICKS, cap=LIST_CAP)
-require_frames(c_frames, ROOT_CLICKS, c_kinds)
-c_name = "json" if "json" in c_frames else next(iter(c_frames))
-clicks = c_frames[c_name]["df"].drop("__file")
-print(
-    f"clickstream: frame={c_name} files={len(c_frames[c_name]['paths'])} columns={clicks.columns}"
-)
-
-# COMMAND ----------
-
-# DBTITLE 1,Resolve column roles
-a_role = resolve_roles(articles.columns, ARTICLE_HINTS)
-c_role = resolve_roles(clicks.columns, CLICK_HINTS)
-print(a_role)
-print(c_role)
-
-# COMMAND ----------
-
-# DBTITLE 1,Link edges
+c_info = frame_intake(ROOT_CLICKS, CLICK_HINTS, "json", cap=LIST_CAP, profile=False)
+articles, a_role = a_info["d0"], a_info["role"]
+clicks, c_role = c_info["d0"], c_info["role"]
 links = clicks.where(as_str(c_role["type"]) == LINK_TYPE) if c_role["type"] else clicks
 print(
     f"link filter: type == {LINK_TYPE!r}"
@@ -1011,53 +661,29 @@ print(
 
 # COMMAND ----------
 
-# DBTITLE 1,Title overlap -- articles against current titles
-ov_curr = None
+# DBTITLE 1,Overlaps, click coverage, most clicked destinations and domain-term clicks
+ov_curr = ov_prev = ov_id = cov_in = cov_out = mass = None
 if a_role["title"] and c_role["curr_title"]:
     ov_curr = key_overlap(articles, a_role["title"], links, c_role["curr_title"])
     print(ov_curr)
-
-# COMMAND ----------
-
-# DBTITLE 1,Title overlap -- articles against previous titles
-ov_prev = None
 if a_role["title"] and c_role["prev_title"]:
     ov_prev = key_overlap(articles, a_role["title"], links, c_role["prev_title"])
     print(ov_prev)
-
-# COMMAND ----------
-
-# DBTITLE 1,Id overlap -- article ids against current ids
-ov_id = None
 if a_role["id"] and c_role["curr_id"]:
     ov_id = key_overlap(
         articles, a_role["id"], links, c_role["curr_id"], normalise=False
     )
     print(ov_id)
-
-# COMMAND ----------
-
-# DBTITLE 1,Clicks landing on a known article
-cov_in = None
 if a_role["title"] and c_role["curr_title"] and c_role["count"]:
     cov_in = weighted_coverage(
         links, c_role["curr_title"], c_role["count"], articles, a_role["title"]
     )
     print(cov_in)
-
-# COMMAND ----------
-
-# DBTITLE 1,Clicks leaving from a known article
-cov_out = None
 if a_role["title"] and c_role["prev_title"] and c_role["count"]:
     cov_out = weighted_coverage(
         links, c_role["prev_title"], c_role["count"], articles, a_role["title"]
     )
     print(cov_out)
-
-# COMMAND ----------
-
-# DBTITLE 1,Most clicked destinations and whether an article exists
 top_dest = []
 if a_role["title"] and c_role["curr_title"] and c_role["count"]:
     top = (
@@ -1078,21 +704,9 @@ if a_role["title"] and c_role["curr_title"] and c_role["count"]:
     ]
     for row in top_dest:
         print(row)
-
-# COMMAND ----------
-
-# DBTITLE 1,Link clicks on domain-term titles
-mass = None
 if c_role["curr_title"] and c_role["count"]:
     mass = title_term_mass(links, c_role["curr_title"], c_role["count"], DOMAIN_TERMS)
     print(mass)
-
-# COMMAND ----------
-
-# DBTITLE 1,Findings
-print(f"title overlap (current): {ov_curr}")
-print(f"clicks landing on a known article: {cov_in}")
-print(f"clicks leaving from a known article: {cov_out}")
 
 # COMMAND ----------
 

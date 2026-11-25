@@ -2241,22 +2241,113 @@ def profile_standard(frames, tables, coverage=True):
     return kinds, profiles, keys, booleans, numerics, covered
 
 
-def standard_group_eda(
+def open_group(catalog, schema, tables, coverage=True):
+    """Read a table group and run the standard profile. Returns the frames and the six
+    profile results (kinds, profiles, keys, booleans, numerics, coverage)."""
+    frames = read_tables(catalog, schema, tables)
+    return (frames, *profile_standard(frames, tables, coverage=coverage))
+
+
+def leaking_columns(flags, scores):
+    """The flags, numeric columns and missing-rate gaps that reach the leak limits."""
+    return {
+        "flags": [c for c, v in top_by(flags, "separation") if v >= FLAG_SEPARATION],
+        "scores": [
+            c for c, v in top_by(scores, "correlation") if abs(v) >= LEAK_CORRELATION
+        ],
+        "gap": [c for c, v in top_by(scores, "missing_gap") if v >= MISSING_GAP],
+    }
+
+
+def class_association(frames, tables, kinds, key_col, label, skip=()):
+    """Flag and numeric association with a class slice (`label` holds `key_col` and
+    `__pos`) for every table whose unique key is `key_col`; the columns in `skip` are
+    left out. Returns the association and the leaking columns per table."""
+    assoc = {}
+    for name in tables:
+        check = exact_uniqueness(frames[name], [key_col]).get(key_col)
+        if not check or not check["unique"]:
+            print(f"{name}: {key_col} is not unique, no association")
+            continue
+        joined = frames[name].join(label, key_col)
+        flags = [c for c in kinds[name]["boolean"] if c not in skip]
+        scores = [c for c in kinds[name]["numeric"] if c not in skip]
+        flag_assoc = flag_vs_label(joined, flags)
+        score_assoc = score_vs_label(joined, scores)
+        ranked = [c for c, _ in top_by(score_assoc, "correlation", PAIR_COLUMNS)]
+        assoc[name] = {
+            "rows": joined.count(),
+            "flags": flag_assoc,
+            "scores": score_assoc,
+            "pairs": pair_correlations(joined, ranked),
+        }
+        print(name, "labelled rows:", assoc[name]["rows"])
+    leaking = {
+        name: leaking_columns(a["flags"], a["scores"]) for name, a in assoc.items()
+    }
+    for name, found in leaking.items():
+        print(name, {k: len(v) for k, v in found.items()})
+    return assoc, leaking
+
+
+def association_block(assoc, unit, list_pairs=False):
+    """The association text of every table; the pair list only when asked."""
+    parts = []
+    for name, a in assoc.items():
+        text = association_lines(
+            f"{name} ({a['rows']:,} labelled {unit})", a["flags"], a["scores"]
+        )
+        text += f"\n- numeric pairs at or above the limit: {len(a['pairs'])}"
+        if list_pairs:
+            pairs = fmt_pairs([(f"{x} / {y}", r) for x, y, r in a["pairs"]], LIST_LIMIT)
+            text += "\n" + pairs
+        parts.append(text)
+    return "\n".join(parts)
+
+
+def leak_entries(leaking, prefix="", noun=""):
+    """The target, proxy and missingness readiness entries of an association."""
+    target = "; ".join(
+        f"{n}: {len(v['flags'])} flags, {len(v['scores'])} numeric columns"
+        for n, v in leaking.items()
+    )
+    proxy = "; ".join(
+        f"{n}: " + ", ".join((v["flags"] + v["scores"])[:10])
+        for n, v in leaking.items()
+        if v["flags"] or v["scores"]
+    )
+    return [
+        ("Target contamination", para(prefix, target) if prefix else target),
+        (
+            "Proxy leakage",
+            proxy or f"no {noun}flag or numeric column reaches the limits.",
+        ),
+        (
+            "Missingness leakage",
+            "; ".join(f"{n}: {len(v['gap'])} columns" for n, v in leaking.items()),
+        ),
+    ]
+
+
+def export_group(
     source,
     nb_key,
     section_title,
-    frames,
-    tables,
-    figure_file,
-    coverage=True,
+    std,
+    extra_blocks=(),
+    readiness=(),
+    evidence=None,
+    quality_extra="",
+    coverage_extra="",
+    findings=None,
+    figures=None,
     links=True,
 ):
-    """The standard EDA of a table group and its findings export: profile, keys and
-    rates, coverage by source and link columns when asked, date-like columns, rows per
-    table and the findings section. Returns the profiles of the group."""
-    kinds, profiles, keys, booleans, numerics, covered = profile_standard(
-        frames, tables, coverage=coverage
-    )
+    """The findings export of a table group: the standard blocks, the readiness and
+    area evidence of the profile, and the extra blocks, readiness entries and evidence
+    a section adds (an extra entry of the same name replaces the standard one).
+    `std` is the profile result of `open_group`."""
+    kinds, profiles, keys, booleans, numerics, covered = std
     fills = link_fill(profiles) if links else {}
     for name, fill in fills.items():
         print(name, fill)
@@ -2268,50 +2359,32 @@ def standard_group_eda(
         names = [c for c in names if c not in PROVENANCE_COLUMNS]
         date_columns[name] = {c: p["null_rate"][c] for c in names}
         print(name, len(names), "date-like columns")
-    drawn = barplot(
-        [(n, p["rows"]) for n, p in profiles.items()],
-        "Rows per table",
-        "table",
-        ylabel="rows",
-        rot=20,
-        logy=True,
-        filename=figure_file,
+    if figures is None:
+        figures = rows_per_table_figure(profiles, f"{source}_{nb_key[:2]}_rows.png")
+    ready = {
+        "Grain / grain drift": "; ".join(
+            f"`{n}` key `{k['key']}` unique: {k.get('unique')}" for n, k in keys.items()
+        ),
+        "Duplicate-event leakage": "; ".join(
+            para(
+                f"{n} dup groups {(k.get('duplicates') or {}).get('dup_groups', 0)},",
+                f"conflicting {(k.get('duplicates') or {}).get('conflicting', 0)}",
+            )
+            for n, k in keys.items()
+        ),
+        "Survivorship / coverage bias": "; ".join(
+            para(
+                f"{n}: {sum((r or 0) >= HIGH_NULL_RATE for r in p['null_rate'].values())}",
+                f"columns with a null rate of {pct(HIGH_NULL_RATE)} or more",
+            )
+            for n, p in profiles.items()
+        ),
+    }
+    ready.update(dict(readiness))
+    ready["Sample-vs-full divergence"] = (
+        "every count and rate is read from the whole table; no sample is used."
     )
-    figures = [("Rows per table", figure_file)] if drawn else []
-    readiness = [
-        (
-            "Grain / grain drift",
-            "; ".join(
-                f"`{n}` key `{k['key']}` unique: {k.get('unique')}"
-                for n, k in keys.items()
-            ),
-        ),
-        (
-            "Duplicate-event leakage",
-            "; ".join(
-                para(
-                    f"{n} dup groups {(k.get('duplicates') or {}).get('dup_groups', 0)},",
-                    f"conflicting {(k.get('duplicates') or {}).get('conflicting', 0)}",
-                )
-                for n, k in keys.items()
-            ),
-        ),
-        (
-            "Survivorship / coverage bias",
-            "; ".join(
-                para(
-                    f"{n}: {sum((r or 0) >= HIGH_NULL_RATE for r in p['null_rate'].values())}",
-                    f"columns with a null rate of {pct(HIGH_NULL_RATE)} or more",
-                )
-                for n, p in profiles.items()
-            ),
-        ),
-        (
-            "Sample-vs-full divergence",
-            "every count and rate is read from the whole table; no sample is used.",
-        ),
-    ]
-    evidence = {
+    notes = {
         "Data quality": [
             f"{n}: {len(p['empty'])} empty, {len(p['constant'])} constant columns"
             for n, p in profiles.items()
@@ -2325,27 +2398,181 @@ def standard_group_eda(
         ],
     }
     if links:
-        evidence["Relationships"] = [
+        notes["Relationships"] = [
             f"{n}: {len(f)} link columns" for n, f in fills.items()
         ]
+    notes.update(evidence or {})
     blocks = [
         ("Profile", profile_block(profiles)),
-        ("Data Quality", quality_block(profiles)),
+        (
+            "Data Quality",
+            quality_block(profiles) + (f"\n\n{quality_extra}" if quality_extra else ""),
+        ),
         ("Entities / Keys", key_block(keys)),
     ]
-    if coverage:
-        blocks.append(("Coverage & Sampling Bias", coverage_block(covered)))
+    if covered:
+        blocks.append(
+            (
+                "Coverage & Sampling Bias",
+                coverage_block(covered)
+                + (f"\n{coverage_extra}" if coverage_extra else ""),
+            )
+        )
     if links:
         blocks.append(("Relationships", fill_lines(fills)))
+    blocks += list(extra_blocks)
     blocks += [
         ("Temporal Semantics", fill_lines(date_columns)),
         ("Distributions", distribution_block(profiles, kinds, booleans, numerics)),
-        ("EDA Findings", table_findings_lines(profiles, keys)),
-        ("ML-Readiness Evidence", ml_readiness_block(readiness)),
-        ("Observations by Area", area_block(evidence)),
+        ("EDA Findings", findings or table_findings_lines(profiles, keys)),
+        ("ML-Readiness Evidence", ml_readiness_block(list(ready.items()))),
+        ("Observations by Area", area_block(notes)),
     ]
     write_profiling(source, nb_key, section_title, blocks, figures)
     return profiles
+
+
+def run_groups(catalog, source, sections):
+    """The standard EDA of every plain table group of a notebook: read, profile and
+    export. A section is a dict with `schema`, `nb_key`, `title` and `tables`."""
+    for s in sections:
+        print("=" * 90, f"\n{s['nb_key']}: {s['title']}")
+        _, *std = open_group(catalog, s["schema"], s["tables"], s.get("coverage", True))
+        export_group(source, s["nb_key"], s["title"], std, links=s.get("links", True))
+
+
+def link_bias_blocks(catalog, links, bias, links_title, bias_title):
+    """Run the link checks and the spread of rows per key; return the two findings
+    blocks. `bias` is a list of (label, schema, table, key column)."""
+    link_results = link_checks(catalog, links)
+    print(links_block(link_results))
+    spread = {
+        label: coverage_bias(
+            rows_per_key(spark.table(f"{catalog}.{schema}.{table}"), column)
+        )
+        for label, schema, table, column in bias
+    }
+    print(bias_block(spread))
+    return [
+        (links_title, links_block(link_results)),
+        (bias_title, bias_block(spread)),
+    ]
+
+
+def frame_intake(
+    root, hints, preferred, cap=None, text_fallback=False, raw_lines=0, profile=True
+):
+    """Read a Samples Volume directory as one frame: file inventory, README texts,
+    the first raw lines, the preferred frame, its column roles and nesting and, when
+    asked, the missingness profile and the constant columns."""
+    entries, kinds, frames = (
+        load_volume_frames(root, cap=cap) if cap else load_volume_frames(root)
+    )
+    require_frames(frames, root, kinds)
+    print(f"{root}: {len(entries)} files, {sum(e['size'] for e in entries)} bytes")
+    if cap and len(entries) >= cap:
+        print(f"WARNING: the listing reached the cap of {cap}; files may be missing")
+    for e in entries[:12]:
+        print(f"  {file_kind(e['name']):<10} {e['size']:>12}  {e['path']}")
+    print({k: len(v) for k, v in kinds.items()})
+    support = print_support_files(kinds)
+    first_lines = []
+    if raw_lines and kinds.get(preferred):
+        first_lines = head_lines(kinds[preferred][0]["path"], raw_lines)
+    for ln in first_lines:
+        print(ln[:300])
+    frame, df, data_cols = select_frame(frames, preferred)
+    role = resolve_roles(data_cols, hints)
+    if text_fallback and role.get("text") is None:
+        role["text"] = longest_text_col(df, data_cols)
+        print("text column chosen by average length:", role["text"])
+    print(role)
+    nested, struct = structural_check(df, data_cols)
+    d0 = df.drop("__file")
+    info = {
+        "entries": entries,
+        "kinds": kinds,
+        "frames": frames,
+        "support": support,
+        "raw_lines": first_lines,
+        "frame": frame,
+        "data_cols": data_cols,
+        "role": role,
+        "nested": nested,
+        "struct": struct,
+        "d0": d0,
+    }
+    if profile:
+        prof = profile_frame(d0)
+        print(f"rows={prof['total']}  cols={len(prof['cols'])}")
+        for c in prof["cols"]:
+            rate = prof["miss"][c] / prof["total"] if prof["total"] else 0
+            print(
+                f"  {c[:40]:<40} missing={prof['miss'][c]:>9} rate={rate:.4f} "
+                f"approx_distinct={prof['acd'][c]}"
+            )
+        prof["constant"] = constant_column_names(d0, prof)
+        print(f"constant={prof['constant']}")
+        info["prof"] = prof
+    return info
+
+
+def intake_blocks(info, root, unit):
+    """The profile, provenance and structure blocks of a frame read by `frame_intake`,
+    and the missingness line of its data quality block."""
+    prof, nested, struct = info["prof"], info["nested"], info["struct"]
+    entries, kinds, support = info["entries"], info["kinds"], info["support"]
+    paths = len(info["frames"][info["frame"]]["paths"])
+    profile = [
+        f"| frame | source files | {unit} | cols | constant columns | nested columns |",
+        "|---|---|---|---|---|---|",
+        para(
+            f"| {info['frame']} | {paths} | {prof['total']} | {len(prof['cols'])} |",
+            f"{', '.join(prof['constant']) or '-'} | {', '.join(nested) or '-'} |",
+        ),
+    ]
+    provenance = [
+        para(
+            "The dataset is read in place from the Databricks Samples Volume;",
+            "there is no Bronze table and no ECRMAP acquisition step.",
+        ),
+        (
+            f"Files under `{root}`: {len(entries)}, "
+            f"{sum(e['size'] for e in entries)} bytes "
+            f"({ {k: len(v) for k, v in kinds.items()} })."
+        ),
+    ]
+    if info["raw_lines"]:
+        provenance += [
+            "First raw lines:",
+            *[f"  > {ln[:200]}" for ln in info["raw_lines"]],
+        ]
+    for name, lines in support.items():
+        provenance.append(f"README-type file `{name}` (first lines):")
+        provenance += [f"  > {ln[:160]}" for ln in lines[:25] if ln.strip()]
+    if not support:
+        provenance.append(
+            "- No README / licence file in the directory: provenance and licence are "
+            "not documented here (LIMITATION)."
+        )
+    structure = [
+        f"- schema: `{struct['schema']}`",
+        (
+            f"- corrupt-record column present: {struct['corrupt_record']}; "
+            f"nested columns: {nested or 'none'}."
+        ),
+        f"- column roles resolved: { {k: v for k, v in info['role'].items() if v} }.",
+    ]
+    missing = "Missingness (rate per column): " + ", ".join(
+        f"{c}={prof['miss'][c] / prof['total'] if prof['total'] else 0:.4f}"
+        for c in prof["cols"]
+    )
+    blocks = [
+        ("Profile", "\n".join(profile)),
+        ("Provenance / Source Evidence", "\n".join(provenance)),
+        ("Structural Integrity", "\n".join(structure)),
+    ]
+    return blocks, missing
 
 
 def print_support_files(kinds):

@@ -23,64 +23,34 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## EDA -- EVENT AND EVENT ITEM TABLES
+# MAGIC ## EDA -- EVENT, SESSION, PRODUCT AND RETAIL TRADE TABLES
 # MAGIC
-# MAGIC **Purpose:** Profile the event tables of commerce Gold (`commerce_event`,
-# MAGIC `commerce_event_item`): nulls, constant columns, key, rates per column kind,
-# MAGIC coverage by source (GA4 and REES46), the fill of the link columns and the
-# MAGIC date-like columns -- as evidence.
+# MAGIC **Purpose:** Profile the commerce Gold tables in two groups: the event tables
+# MAGIC (`commerce_event`, `commerce_event_item`) and `commerce_session`,
+# MAGIC `commerce_product` and `retail_trade_index`: nulls, constant columns, key, rates
+# MAGIC per column kind, coverage by source (GA4 and REES46), the fill of the link
+# MAGIC columns and the date-like columns -- as evidence.
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration
-CATALOG = "energy_commerce_retail_media"
-SCHEMA = "commerce_gold"
-SOURCE = "commerce"
-NB_KEY = "01_events"
-SECTION_TITLE = "Event and event item tables"
-TABLES = ["commerce_event", "commerce_event_item"]
-
-# COMMAND ----------
-
-# DBTITLE 1,Read tables
-FRAMES = read_tables(CATALOG, SCHEMA, TABLES)
-
-# COMMAND ----------
-
-# DBTITLE 1,Standard EDA -- profile, keys, rates, coverage, links, dates and export
-standard_group_eda(
-    SOURCE, NB_KEY, SECTION_TITLE, FRAMES, TABLES, "commerce_01_rows.png"
-)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## EDA -- SESSION, PRODUCT AND RETAIL TRADE TABLES
-# MAGIC
-# MAGIC **Purpose:** Profile `commerce_session`, `commerce_product` and `retail_trade_index`:
-# MAGIC nulls, constant columns, key, rates per column kind, coverage by source,
-# MAGIC the fill of the link columns and the date-like columns -- as evidence.
-
-# COMMAND ----------
-
-# DBTITLE 1,Configuration
-CATALOG = "energy_commerce_retail_media"
-SCHEMA = "commerce_gold"
-SOURCE = "commerce"
-NB_KEY = "02_sessions_products_and_trade"
-SECTION_TITLE = "Session, product and retail trade tables"
-TABLES = ["commerce_session", "commerce_product", "retail_trade_index"]
-
-# COMMAND ----------
-
-# DBTITLE 1,Read tables
-FRAMES = read_tables(CATALOG, SCHEMA, TABLES)
-
-# COMMAND ----------
-
-# DBTITLE 1,Standard EDA -- profile, keys, rates, coverage, links, dates and export
-standard_group_eda(
-    SOURCE, NB_KEY, SECTION_TITLE, FRAMES, TABLES, "commerce_02_rows.png"
+# DBTITLE 1,Standard EDA of the table groups
+run_groups(
+    "energy_commerce_retail_media",
+    "commerce",
+    [
+        {
+            "schema": "commerce_gold",
+            "nb_key": "01_events",
+            "title": "Event and event item tables",
+            "tables": ["commerce_event", "commerce_event_item"],
+        },
+        {
+            "schema": "commerce_gold",
+            "nb_key": "02_sessions_products_and_trade",
+            "title": "Session, product and retail trade tables",
+            "tables": ["commerce_session", "commerce_product", "retail_trade_index"],
+        },
+    ],
 )
 
 # COMMAND ----------
@@ -93,66 +63,29 @@ standard_group_eda(
 
 # COMMAND ----------
 
-# DBTITLE 1,Configuration
+# DBTITLE 1,Link checks, item rows per product and export
 CATALOG = "energy_commerce_retail_media"
-SOURCE = "commerce"
-NB_KEY = "03_links_and_bias"
-SECTION_TITLE = "Commerce links and coverage bias"
+GOLD = "commerce_gold"
 LINKS = [
+    (GOLD, "commerce_event", "session_key", GOLD, "commerce_session", "session_key"),
+    (GOLD, "commerce_event", "product_key", GOLD, "commerce_product", "product_key"),
+    (GOLD, "commerce_event_item", "event_key", GOLD, "commerce_event", "event_key"),
     (
-        "commerce_gold",
-        "commerce_event",
-        "session_key",
-        "commerce_gold",
-        "commerce_session",
-        "session_key",
-    ),
-    (
-        "commerce_gold",
-        "commerce_event",
-        "product_key",
-        "commerce_gold",
-        "commerce_product",
-        "product_key",
-    ),
-    (
-        "commerce_gold",
-        "commerce_event_item",
-        "event_key",
-        "commerce_gold",
-        "commerce_event",
-        "event_key",
-    ),
-    (
-        "commerce_gold",
+        GOLD,
         "commerce_event_item",
         "product_key",
-        "commerce_gold",
+        GOLD,
         "commerce_product",
         "product_key",
     ),
 ]
-
-# COMMAND ----------
-
-# DBTITLE 1,Link checks and item rows per product
-LINK_RESULTS = link_checks(CATALOG, LINKS)
-print(links_block(LINK_RESULTS))
-ITEMS = spark.table(f"{CATALOG}.commerce_gold.commerce_event_item")
-BIAS = {
-    "commerce_event_item per product": coverage_bias(rows_per_key(ITEMS, "product_key"))
-}
-print(bias_block(BIAS))
-
-# COMMAND ----------
-
-# DBTITLE 1,Export findings
+BLOCKS = link_bias_blocks(
+    CATALOG,
+    LINKS,
+    [("commerce_event_item per product", GOLD, "commerce_event_item", "product_key")],
+    "Links between commerce tables",
+    "Item rows per product",
+)
 write_profiling(
-    SOURCE,
-    NB_KEY,
-    SECTION_TITLE,
-    [
-        ("Links between commerce tables", links_block(LINK_RESULTS)),
-        ("Item rows per product", bias_block(BIAS)),
-    ],
+    "commerce", "03_links_and_bias", "Commerce links and coverage bias", BLOCKS
 )
