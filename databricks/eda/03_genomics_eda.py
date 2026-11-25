@@ -466,9 +466,9 @@ print(f"labelled variants: {LABEL_ROWS:,}")
 # DBTITLE 1,Association with the class -- every table with variant_key as its key
 ASSOC = {}
 for name, frame in FRAMES.items():
-    key = KEYS[name]
-    if key["key"] != "variant_key" or not key["unique"]:
-        print(f"{name}: variant_key is not its unique key, no association")
+    variant_key_check = exact_uniqueness(frame, ["variant_key"]).get("variant_key")
+    if not variant_key_check or not variant_key_check["unique"]:
+        print(f"{name}: variant_key is not unique, no association")
         continue
     joined = frame.join(LABEL, "variant_key")
     flags = KINDS[name]["boolean"]
