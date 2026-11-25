@@ -646,7 +646,7 @@ NB_KEY = "03_gene_tables"
 SECTION_TITLE = "Gene tables and the variant class they carry"
 GENE = "gene_profile"
 LINKS = "relation_record"
-TABLES = [GENE, LINKS]
+TABLES = [GENE, "gene_disease_profile", LINKS]
 CLINICAL = "variant_profile"
 POSITIVE = "is_pathogenic"
 NEGATIVE = "is_benign"
@@ -1354,6 +1354,7 @@ ALL_TABLES = [
     "entity_identity_record",
     "epitope_profile",
     "relation_record",
+    "gene_disease_profile",
     "gene_measurement",
     "gene_profile",
     "genetic_test_profile",
