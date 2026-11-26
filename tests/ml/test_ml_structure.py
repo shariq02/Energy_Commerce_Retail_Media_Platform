@@ -186,6 +186,12 @@ def test_build_datasets_reopens_the_families_before_the_first_write():
         assert "reopen_family(" not in path.read_text(encoding="utf-8")
 
 
+def test_the_label_coverage_check_reads_the_floor_of_the_dataset():
+    text = (_ML / "gate" / "01_ml_gates.py").read_text()
+    assert 'dataset_spec(ds).get("min_labelled_rows", MIN_LABELLED_ROWS)' in text
+    assert "< MIN_LABELLED_ROWS" not in text
+
+
 def test_the_partition_frame_returns_the_fold_as_an_int():
     """The family table and the manifest keep `fold_id` as int; a grouped fold is
     a bigint hash, and Delta refuses to merge the two types."""

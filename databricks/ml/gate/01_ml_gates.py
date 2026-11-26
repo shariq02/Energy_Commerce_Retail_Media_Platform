@@ -456,10 +456,11 @@ for eco in ECOSYSTEMS:
             f"{p}: rows={r['n']} labelled={r['labelled']} mean={r['mean']}"
             for p, r in sorted(stats.items())
         )
+        floor = dataset_spec(ds).get("min_labelled_rows", MIN_LABELLED_ROWS)
         thin = [
             p
             for p in ("train", "validation", "test")
-            if p in stats and stats[p]["labelled"] < MIN_LABELLED_ROWS
+            if p in stats and stats[p]["labelled"] < floor
         ]
         audit(
             LEAKAGE,

@@ -1188,6 +1188,10 @@ def spec_problems(dataset_id: str, columns) -> list[str]:
     bad_cap = isinstance(cap, bool) or not isinstance(cap, int) or cap < 1
     if cap is not None and bad_cap:
         found.append(f"{dataset_id}: max_rows must be a positive whole number")
+    floor = spec.get("min_labelled_rows")
+    bad_floor = isinstance(floor, bool) or not isinstance(floor, int) or floor < 1
+    if floor is not None and bad_floor:
+        found.append(f"{dataset_id}: min_labelled_rows must be a positive whole number")
     found += [f"{dataset_id}: no fit key {k}" for k in FIT_KEYS if k not in fit]
     found += [f"{dataset_id}: no split key {k}" for k in SPLIT_KEYS if k not in split]
     rule = split.get("rule")

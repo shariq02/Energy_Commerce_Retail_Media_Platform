@@ -1456,5 +1456,6 @@ datasets:
     target_name: target_retail_volume_change
     provenance_tier: constructed
     notes: 105 months; features are lags of one month; no relationship is an accepted result
+    min_labelled_rows: 10
     split: {rule: calendar, rule_id: "calendar:retail_month", calendar: retail_month, date_col: observation_month}
     fit: {group_cols: [], fold_mode: rolling, calendar_key: retail_month, date_col: observation_month, impute: true}

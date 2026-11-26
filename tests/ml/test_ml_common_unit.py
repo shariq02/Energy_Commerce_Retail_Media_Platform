@@ -339,6 +339,38 @@ def test_spec_problems_rejects_a_bad_max_rows(ml, cap):
     assert "_probe: max_rows must be a positive whole number" in problems
 
 
+@pytest.mark.parametrize("floor", [0, -5, 1.5, "10", True])
+def test_spec_problems_rejects_a_bad_min_labelled_rows(ml, floor):
+    datasets = ml["ML_SPEC"]["datasets"]
+    base = datasets["price_daily"]
+    columns = {*base["grain"], "local_date", "market_area_code"}
+    datasets["_probe"] = {**base, "min_labelled_rows": floor}
+    try:
+        problems = ml["spec_problems"]("_probe", columns)
+    finally:
+        del datasets["_probe"]
+    assert "_probe: min_labelled_rows must be a positive whole number" in problems
+
+
+def test_spec_problems_accepts_a_positive_min_labelled_rows(ml):
+    datasets = ml["ML_SPEC"]["datasets"]
+    base = datasets["price_daily"]
+    columns = {*base["grain"], "local_date", "market_area_code"}
+    datasets["_probe"] = {**base, "min_labelled_rows": 10}
+    try:
+        problems = ml["spec_problems"]("_probe", columns)
+    finally:
+        del datasets["_probe"]
+    assert problems == []
+
+
+def test_the_monthly_retail_dataset_declares_its_own_label_floor(ml):
+    spec = ml["ML_SPEC"]["datasets"]
+    assert spec["retail_demand_monthly"]["min_labelled_rows"] == 10
+    others = [k for k, v in spec.items() if "min_labelled_rows" in v]
+    assert others == ["retail_demand_monthly"]
+
+
 def test_spec_problems_accepts_a_positive_max_rows(ml):
     datasets = ml["ML_SPEC"]["datasets"]
     base = datasets["price_daily"]
