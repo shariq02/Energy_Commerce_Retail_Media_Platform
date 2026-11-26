@@ -1,10 +1,12 @@
-"""Unit tests for the approval libraries under `databricks/models/lib`.
+"""Unit tests for the registry and approval libraries under `databricks/models/lib`.
 
-The rule engine and the texts are plain Python; each test builds the recorded
-results of one task by hand and checks the recommendation."""
+The entry rules, the version planner, the reproducibility outcome, the approval rule
+engine and the findings and card texts are plain Python; each test builds the
+recorded rows by hand."""
 
 import datetime as dt
 import json
+import platform
 import re
 
 import pytest
@@ -12,6 +14,442 @@ import pytest
 from tests._notebook_loader import load_model_libs
 
 pytestmark = [pytest.mark.schema, pytest.mark.unit]
+
+NOW = dt.datetime(2026, 10, 5, 12, 0, tzinfo=dt.UTC)
+LATER = dt.datetime(2026, 10, 6, 12, 0, tzinfo=dt.UTC)
+
+
+@pytest.fixture(scope="module")
+def lib():
+    return load_model_libs()
+
+
+def _columns(ddl: str) -> list:
+    return [part.split()[0] for part in ddl.split(", ")]
+
+
+def _approval(task_id, model, role, decision="approved", run="run-1", by="owner"):
+    return {
+        "task_id": task_id,
+        "dataset_id": "dataset",
+        "model_name": model,
+        "role": role,
+        "decision": decision,
+        "restriction": None,
+        "conditions": "[]",
+        "primary_metric": "mae",
+        "validation_value": 1.5,
+        "frozen_delta_version": 3,
+        "mlflow_run_id": run,
+        "run_id": "model-approval-1",
+        "decided_at": NOW,
+        "decided_by": by,
+    }
+
+
+def _task(lib):
+    return lib["TASKS"][0]["task_id"]
+
+
+def _approvals(lib, **kw):
+    tid = _task(lib)
+    return [
+        _approval(tid, "cand", "selected", **kw),
+        _approval(tid, "base", "baseline_fallback", run="run-0"),
+        _approval(tid, "other", "runner_up", decision="not_approved", run="run-2"),
+    ]
+
+
+def test_only_the_approved_model_and_its_fallback_are_entries(lib):
+    entries = lib["registry_entries"](_approvals(lib), {})
+    assert [(e["model_name"], e["role"]) for e in entries] == [
+        ("cand", "selected"),
+        ("base", "baseline_fallback"),
+    ]
+
+
+@pytest.mark.parametrize("decision", ["not_approved", "deferred"])
+def test_a_task_that_is_not_approved_has_no_entry(lib, decision):
+    assert lib["registry_entries"](_approvals(lib, decision=decision), {}) == []
+
+
+def test_a_decision_not_made_by_the_owner_gives_no_entry(lib):
+    assert lib["registry_entries"](_approvals(lib, by="rule_engine"), {}) == []
+
+
+def test_an_entry_links_run_artifact_card_and_fit_environment(lib):
+    tid = _task(lib)
+    eco = lib["TASK_BY_ID"][tid]["ecosystem"]
+    entry = lib["registry_entries"](_approvals(lib), {tid: '{"torch": "2"}'})[0]
+    assert entry["artifact_uri"] == "runs:/run-1/candidate/candidate.pkl"
+    assert entry["card_path"] == f"src/model_cards/{eco}/{tid}.md"
+    assert entry["approval_run_id"] == "model-approval-1"
+    assert entry["fit_library_versions"] == '{"torch": "2"}'
+
+
+def test_a_first_registration_is_version_one(lib):
+    wanted = lib["registry_entries"](_approvals(lib), {})
+    new = lib["plan_versions"]([], wanted, {}, "rid-1", NOW)
+    assert [r["version"] for r in new] == [1, 1]
+    assert {r["lifecycle_status"] for r in new} == {"registered"}
+    assert {r["run_id"] for r in new} == {"rid-1"}
+
+
+def test_the_new_rows_have_exactly_the_registry_columns(lib):
+    wanted = lib["registry_entries"](_approvals(lib), {})
+    new = lib["plan_versions"]([], wanted, {}, "rid-1", NOW)
+    assert set(new[0]) == set(_columns(lib["MODEL_DDL"]["model_registry"]))
+
+
+def test_registering_twice_adds_nothing(lib):
+    wanted = lib["registry_entries"](_approvals(lib), {})
+    first = lib["plan_versions"]([], wanted, {}, "rid-1", NOW)
+    assert lib["plan_versions"](first, wanted, {}, "rid-2", LATER) == []
+
+
+def test_a_changed_link_creates_the_next_version_and_keeps_the_old_row(lib):
+    first = lib["plan_versions"](
+        [], lib["registry_entries"](_approvals(lib), {}), {}, "rid-1", NOW
+    )
+    moved = lib["registry_entries"](_approvals(lib, run="run-9"), {})
+    new = lib["plan_versions"](first, moved, {}, "rid-2", LATER)
+    assert [(r["model_name"], r["version"]) for r in new] == [("cand", 2)]
+    assert "mlflow_run_id" in new[0]["reason"]
+    assert first[0]["mlflow_run_id"] == "run-1"
+
+
+def _replaced(lib, selected="newcand", base="base", base_run="run-0"):
+    """The registry after one approval, and the approval that replaces models."""
+    tid = _task(lib)
+    first = lib["plan_versions"](
+        [], lib["registry_entries"](_approvals(lib), {}), {}, "rid-1", NOW
+    )
+    approvals = [
+        _approval(tid, selected, "selected", run="run-8"),
+        _approval(tid, base, "baseline_fallback", run=base_run),
+    ]
+    wanted = lib["registry_entries"](approvals, {})
+    return (
+        first,
+        approvals,
+        wanted,
+        lib["plan_versions"](first, wanted, {}, "rid-2", LATER),
+    )
+
+
+def test_a_new_selected_model_retires_the_entry_of_the_old_one(lib):
+    first, _decided, _wanted, new = _replaced(lib)
+    retired = [r for r in new if r["lifecycle_status"] == "retired"]
+    assert [(r["model_name"], r["role"], r["version"]) for r in retired] == [
+        ("cand", "selected", 2)
+    ]
+    assert retired[0]["reason"] == "replaced by newcand (approval run model-approval-1)"
+    assert [
+        (r["model_name"], r["version"]) for r in new if r["role"] == "selected"
+    ] == [
+        ("newcand", 1),
+        ("cand", 2),
+    ]
+    assert first[0]["lifecycle_status"] == "registered"
+
+
+def test_a_new_baseline_retires_the_entry_of_the_old_baseline(lib):
+    _first, _decided, _wanted, new = _replaced(lib, selected="cand", base="base2")
+    retired = [r for r in new if r["lifecycle_status"] == "retired"]
+    assert [(r["model_name"], r["role"]) for r in retired] == [
+        ("base", "baseline_fallback")
+    ]
+
+
+def test_the_replacement_is_planned_once(lib):
+    first, _decided, wanted, new = _replaced(lib)
+    assert lib["plan_versions"]([*first, *new], wanted, {}, "rid-3", LATER) == []
+
+
+def test_the_planned_registry_of_a_replacement_has_no_problem(lib):
+    first, approvals, _wanted, new = _replaced(lib)
+    assert lib["planned_registry_problems"](first, new, approvals) == []
+
+
+def test_the_registry_without_the_retire_rows_has_problems(lib):
+    first, approvals, wanted, _new = _replaced(lib)
+    only_new = [
+        r
+        for r in lib["plan_versions"](first, wanted, {}, "rid-2", LATER)
+        if r["lifecycle_status"] != "retired"
+    ]
+    problems = lib["planned_registry_problems"](first, only_new, approvals)
+    assert any("2 entries in role selected" in p[1] for p in problems)
+    assert any(p[1].startswith("differs from the approval") for p in problems)
+
+
+def test_a_registered_entry_of_an_unapproved_task_is_a_problem(lib):
+    first, _decided, _wanted, _new = _replaced(lib)
+    problems = lib["planned_registry_problems"](first, [], [])
+    assert {p[1] for p in problems} == {"registered but not approved"}
+
+
+def test_a_lifecycle_change_needs_a_reason_and_a_registered_entry(lib):
+    tid = _task(lib)
+    first = lib["plan_versions"](
+        [], lib["registry_entries"](_approvals(lib), {}), {}, "rid-1", NOW
+    )
+    key = (tid, "cand", "selected")
+    new = lib["plan_versions"](
+        first, [], {key: {"status": "deprecated", "reason": "replaced"}}, "r2", LATER
+    )
+    assert (new[0]["version"], new[0]["lifecycle_status"]) == (2, "deprecated")
+    assert new[0]["reason"] == "replaced"
+    with pytest.raises(ValueError, match="reason"):
+        lib["plan_versions"](
+            first, [], {key: {"status": "retired", "reason": " "}}, "r2", LATER
+        )
+    with pytest.raises(ValueError, match="not registered"):
+        lib["plan_versions"](
+            [], [], {key: {"status": "retired", "reason": "x"}}, "r2", LATER
+        )
+    with pytest.raises(ValueError, match="not valid"):
+        lib["plan_versions"](
+            first, [], {key: {"status": "gone", "reason": "x"}}, "r2", LATER
+        )
+
+
+def test_the_latest_version_of_each_entry_is_found(lib):
+    rows = [
+        {"task_id": "t", "model_name": "m", "role": "selected", "version": v}
+        for v in (1, 3, 2)
+    ]
+    assert lib["latest_versions"](rows)[("t", "m", "selected")]["version"] == 3
+
+
+@pytest.mark.parametrize(
+    ("recorded", "rescored", "comparable", "expected"),
+    [
+        (1.0, 1.0, True, "matched"),
+        (1.0, 1.0 + 1e-9, True, "matched"),
+        (1.0, 1.01, True, "not_matched"),
+        (None, 1.0, True, "no_recorded_value"),
+        (float("nan"), 1.0, True, "no_recorded_value"),
+        (1.0, None, True, "score_failed"),
+        (1.0, float("inf"), True, "score_failed"),
+        (1.0, 5.0, False, "not_comparable"),
+    ],
+)
+def test_reproduction_outcome(lib, recorded, rescored, comparable, expected):
+    status, _gap = lib["reproduction_outcome"](recorded, rescored, 1e-6, comparable)
+    assert status == expected
+
+
+def test_the_gap_is_relative_to_the_recorded_value(lib):
+    _status, gap = lib["reproduction_outcome"](200.0, 202.0, 1e-6)
+    assert gap == pytest.approx(0.01)
+
+
+@pytest.mark.parametrize(
+    ("reload", "rescore", "expected"),
+    [
+        ("ok", "matched", "passed"),
+        ("ok", "not_comparable", "passed"),
+        ("ok", "not_matched", "failed"),
+        ("ok", "no_recorded_value", "failed"),
+        ("failed", "matched", "failed"),
+    ],
+)
+def test_a_check_passes_only_when_the_model_reloads_and_reproduces(
+    lib, reload, rescore, expected
+):
+    assert lib["check_status"](reload, rescore) == expected
+
+
+def test_the_environment_record_names_the_processor_type(lib):
+    env = lib["environment_record"]()
+    assert env["processor_type"] == platform.machine()
+    assert env["python_version"] == platform.python_version()
+    assert set(json.loads(env["library_versions"])) == set(lib["LIBRARIES"])
+
+
+def test_a_check_row_has_exactly_the_check_columns(lib):
+    entry = {
+        "task_id": "t",
+        "model_name": "m",
+        "role": "selected",
+        "version": 1,
+        "validation_value": 1.0,
+    }
+    env = {"processor_type": "x86_64", "python_version": "3", "library_versions": "{}"}
+    row = lib["check_row"](entry, env, "rid", NOW, status="passed")
+    assert set(row) == set(_columns(lib["MODEL_DDL"]["registry_check"]))
+    assert row["status"] == "passed" and row["recorded_value"] == 1.0
+
+
+def test_the_latest_check_of_each_processor_type_is_kept(lib):
+    def row(proc, at, status):
+        return {
+            "task_id": "t",
+            "model_name": "m",
+            "role": "selected",
+            "processor_type": proc,
+            "checked_at": at,
+            "status": status,
+        }
+
+    rows = [
+        row("x86_64", NOW, "failed"),
+        row("x86_64", LATER, "passed"),
+        row("aarch64", NOW, "passed"),
+    ]
+    kept = lib["latest_checks"](rows)
+    assert len(kept) == 2
+    assert kept[("t", "m", "selected", "x86_64")]["status"] == "passed"
+
+
+def _findings(lib):
+    tid = _task(lib)
+    registry = lib["plan_versions"](
+        [], lib["registry_entries"](_approvals(lib), {}), {}, "rid-1", NOW
+    )
+    env = {
+        "processor_type": "aarch64",
+        "python_version": "3.12.3",
+        "library_versions": json.dumps({"lightgbm": "4.7.0", "torch": None}),
+    }
+    entry = {**registry[0], "version": 1}
+    checks = [
+        lib["check_row"](
+            entry,
+            env,
+            "rid-2",
+            NOW,
+            reload_status="ok",
+            rescore_status="matched",
+            rescored_value=1.5,
+            gap_relative=0.0,
+            tolerance=1e-6,
+            status="passed",
+            detail="/Users/someone@example.com/notebook failed",
+        )
+    ]
+    results = [
+        {
+            "component": "models/register/gate/01_registry_guards",
+            "metric_name": "every_entry_has_a_card",
+            "status": "PASS",
+            "error_detail": "",
+            "recorded_at": NOW,
+        }
+    ]
+    eco = lib["TASK_BY_ID"][tid]["ecosystem"]
+    return eco, lib["render_registry_findings"](eco, registry, checks, results, "stamp")
+
+
+def test_the_findings_carry_the_registry_the_checks_and_the_environment(lib):
+    _eco, text = _findings(lib)
+    for part in (
+        "## registry",
+        "## reproducibility checks",
+        "## environment of the checks",
+        "## check results",
+        "aarch64",
+        "lightgbm",
+        "not installed",
+        "every_entry_has_a_card",
+    ):
+        assert part in text
+
+
+def test_the_findings_hold_no_private_path_or_address(lib):
+    _eco, text = _findings(lib)
+    assert "someone@example.com" not in text and "/Users/someone" not in text
+
+
+# --- version fields of a registered model ------------------------------------------
+
+
+def test_the_registry_table_ends_with_the_version_columns(lib):
+    names = [
+        name for name, _type in lib["ddl_columns"](lib["MODEL_DDL"]["model_registry"])
+    ]
+    assert names[-5:] == [
+        "code_version",
+        "data_fingerprint",
+        "artifact_sha256",
+        "replaces",
+        "task_spec_hash",
+    ]
+    assert set(lib["VERSION_FIELDS"]) <= set(names) and "replaces" in names
+
+
+def test_an_entry_takes_the_version_fields_given_for_it_and_none_otherwise(lib):
+    tid = _task(lib)
+    given = {
+        (tid, "cand", "selected"): {
+            "code_version": "abc",
+            "data_fingerprint": "f" * 32,
+            "artifact_sha256": "a" * 64,
+            "task_spec_hash": "t" * 64,
+        }
+    }
+    entries = lib["registry_entries"](_approvals(lib), {}, given)
+    selected = next(e for e in entries if e["role"] == "selected")
+    fallback = next(e for e in entries if e["role"] == "baseline_fallback")
+    assert (
+        selected["data_fingerprint"] == "f" * 32 and selected["code_version"] == "abc"
+    )
+    assert all(fallback[f] is None for f in lib["VERSION_FIELDS"])
+    assert selected["replaces"] is None
+
+
+def test_the_task_definition_hash_is_stable_and_differs_between_tasks(lib):
+    first, second = (t["task_id"] for t in lib["TASKS"][:2])
+    assert lib["task_spec_hash"](first) == lib["task_spec_hash"](first)
+    assert lib["task_spec_hash"](first) != lib["task_spec_hash"](second)
+    assert len(lib["task_spec_hash"](first)) == 64
+
+
+def test_a_new_selected_model_records_which_version_it_replaces(lib):
+    tid = _task(lib)
+    old = lib["registry_entries"](
+        [
+            _approval(tid, "old", "selected"),
+            _approval(tid, "base", "baseline_fallback", run="run-0"),
+        ],
+        {},
+    )
+    existing = lib["plan_versions"]([], old, {}, "rid-1", NOW)
+    new_wanted = lib["registry_entries"](
+        [
+            _approval(tid, "new", "selected", run="run-9"),
+            _approval(tid, "base", "baseline_fallback", run="run-0"),
+        ],
+        {},
+    )
+    planned = lib["plan_versions"](existing, new_wanted, {}, "rid-2", LATER)
+    created = next(r for r in planned if r["model_name"] == "new")
+    retired = next(r for r in planned if r["model_name"] == "old")
+    assert created["replaces"] == "old@v1" and created["version"] == 1
+    assert retired["lifecycle_status"] == "retired" and retired["version"] == 2
+    assert created["lifecycle_status"] == "registered"
+
+
+def test_a_row_has_all_the_required_version_fields_or_none(lib):
+    base = {"task_id": "t", "model_name": "m", "role": "selected", "version": 1}
+    none = {**base}
+    full = {
+        **base,
+        "data_fingerprint": "f",
+        "artifact_sha256": "a",
+        "task_spec_hash": "h",
+    }
+    partial = {**base, "data_fingerprint": "f"}
+    assert lib["version_field_problems"]([none, full]) == []
+    problems = lib["version_field_problems"]([partial])
+    assert problems == [
+        ("t", "m", "selected", 1, ["artifact_sha256", "task_spec_hash"])
+    ]
+    assert lib["versions_not_recorded"]([none, full, partial]) == 1
+
+
+# --- the approval rule engine and the texts ----------------------------------------
 
 SPEC = {
     "degradation_relative": 0.2,
@@ -26,11 +464,6 @@ GOOD = {
     "primary_change_relative": 0.05,
     "bootstrap_blocks": 20.0,
 }
-
-
-@pytest.fixture(scope="module")
-def lib():
-    return load_model_libs()
 
 
 def _rows(task, model, stage="candidate", n_rows=1000, status="ok", **metrics):

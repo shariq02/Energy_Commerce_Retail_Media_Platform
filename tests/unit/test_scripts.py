@@ -1,40 +1,36 @@
-"""Unit tests for scripts/download/download_sources.py and sources.yml -- the
-genomics stages must cover the genomics Bronze sources, every stage must
-expand without a network, and the menu must stage the sources that are chosen.
+"""Unit tests for the scripts of the repository: the download stages, the memory
+guard and the check of the names in a `%run` chain.
 
 ECRMAP -- Ecosystem-Centric Real-World Multi-Domain Analytics Platform
 Author: Sharique Mohammad
 Date: November 2026
+
+`scripts/download/download_sources.py` with sources.yml (the genomics stages must cover
+the genomics Bronze sources, every stage must expand without a network, and the menu
+must stage the sources that are chosen), `scripts/ingestion/_memory_guard.py` (the
+peak-RSS tracker and the hard safety threshold every staging script calls after each
+chunk) and `scripts/utilities/check_run_chain_names.py`.
 """
 
 from __future__ import annotations
 
-import ast
 import gzip
 import importlib.util
 import re
+import shutil
 import sys
 import zipfile
 from pathlib import Path
 
 import pytest
 
+from scripts.ingestion._memory_guard import MemoryLimitExceeded, PeakRSSMonitor
+from tests._notebook_loader import REPO_ROOT, genomics_bronze_sources
+
 pytestmark = [pytest.mark.unit]
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
 DOWNLOAD_DIR = ROOT / "scripts" / "download"
-BRONZE_CONFIG = ROOT / "databricks" / "bronze" / "02_load_genomics_bronze.py"
-
-
-def _bronze_sources() -> dict[str, list[str]]:
-    tree = ast.parse(BRONZE_CONFIG.read_text(encoding="utf-8"))
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            getattr(t, "id", None) == "SOURCES" for t in node.targets
-        ):
-            return ast.literal_eval(node.value)
-    message = "SOURCES not found in the genomics Bronze config"
-    raise AssertionError(message)
 
 
 @pytest.fixture(scope="module")
@@ -71,7 +67,7 @@ def test_stages_cover_every_bronze_dataset(config):
         if entry.get("ecosystem", "genomics") != "genomics":
             continue
         staged.setdefault(entry["source"], set()).update(entry["datasets"])
-    expected = {s: set(d) for s, d in _bronze_sources().items()}
+    expected = {s: set(d) for s, d in genomics_bronze_sources().items()}
     assert staged == expected
 
 
@@ -426,7 +422,7 @@ def test_genome_and_blosum_stages_are_staged_and_read_by_bronze(config):
     stages = {(s["source"], tuple(s["datasets"])): s for s in config["stages"]}
     assert stages[("genome_sequence", ("chunk",))]["compress"] is True
     assert stages[("blosum62", ("scores",))]["parser"] == "blosum"
-    sources = _bronze_sources()
+    sources = genomics_bronze_sources()
     assert sources["genome_sequence"] == ["chunk"]
     assert sources["blosum62"] == ["scores"]
 
@@ -701,3 +697,103 @@ def test_a_zip_member_keeps_only_its_usecols_and_reads_quotes(genomics, tmp_path
 
     assert list(frame.columns) == ["nct_id", "name"]
     assert frame.loc[0, "name"] == "Heart | Disease"
+
+
+# --- the memory guard ---------------------------------------------------------
+
+
+def test_check_returns_current_rss_and_does_not_raise_under_threshold():
+    monitor = PeakRSSMonitor(safety_threshold_bytes=10**12)  # ~1 TB, never crossed
+    rss = monitor.check()
+    assert rss > 0
+    assert monitor.peak_rss_bytes >= rss
+
+
+def test_check_raises_once_rss_crosses_the_safety_threshold():
+    # threshold of 1 byte -- current process RSS is certain to exceed it
+    monitor = PeakRSSMonitor(safety_threshold_bytes=1)
+    with pytest.raises(MemoryLimitExceeded, match="exceeded safety threshold"):
+        monitor.check()
+
+
+def test_peak_rss_mb_tracks_the_observed_maximum_not_the_latest_sample():
+    monitor = PeakRSSMonitor(safety_threshold_bytes=10**12)
+    monitor.peak_rss_bytes = 500 * 1024 * 1024  # simulate an earlier, higher sample
+    monitor.check()  # a real (lower) sample must not overwrite a higher peak
+    assert monitor.peak_rss_mb >= 500
+
+
+def test_default_threshold_is_below_the_documented_1gb_hard_limit():
+    monitor = PeakRSSMonitor()
+    assert monitor.safety_threshold_bytes < 1024 * 1024 * 1024
+
+
+# --- the check of the names in a `%run` chain -----------------------------------
+
+CHAIN_SCRIPT = ROOT / "scripts" / "utilities" / "check_run_chain_names.py"
+NOTEBOOK_HEADER = "# Databricks notebook source\n"
+
+
+@pytest.fixture(scope="module")
+def checker():
+    spec = importlib.util.spec_from_file_location("check_run_chain_names", CHAIN_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def chain(tmp_path, checker, monkeypatch):
+    """A fake repo: databricks/silver/_base.py, _layer.py (runs _base) and a
+    notebook in databricks/silver/energy/ that runs _layer."""
+    silver = tmp_path / "databricks" / "silver"
+    (silver / "energy").mkdir(parents=True)
+    (silver / "_base.py").write_text(NOTEBOOK_HEADER + "def helper():\n    return 1\n")
+    (silver / "_layer.py").write_text(
+        NOTEBOOK_HEADER + "# MAGIC %run ./_base\n\ndef layer():\n    return SOURCE\n"
+    )
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(checker, "NOTEBOOK_ROOT", tmp_path / "databricks")
+    return silver
+
+
+def _chain_notebook(silver: Path, body: str) -> Path:
+    path = silver / "energy" / "01_notebook.py"
+    path.write_text(
+        NOTEBOOK_HEADER + "# MAGIC %run ../_layer\n\nSOURCE = 'dwd'\n" + body
+    )
+    return path
+
+
+def test_the_chain_is_depth_first_and_each_library_once(checker, chain):
+    notebook = _chain_notebook(chain, "")
+    names = [path.name for path in checker.run_chain(notebook.resolve())]
+    assert names == ["_base.py", "_layer.py"]
+
+
+def test_the_offset_counts_the_library_lines(checker, chain):
+    notebook = _chain_notebook(chain, "")
+    text, offset = checker.joined_source(notebook.resolve())
+    assert text.splitlines()[offset] == NOTEBOOK_HEADER.strip()
+
+
+def test_a_changed_library_selects_the_notebooks_that_run_it(checker, chain):
+    notebook = _chain_notebook(chain, "")
+    assert checker.notebooks(["databricks/silver/_base.py"]) == [notebook]
+    assert checker.notebooks(["databricks/gold/other.py"]) == []
+    assert checker.notebooks(None) == [notebook]
+
+
+@pytest.mark.skipif(shutil.which("ruff") is None, reason="ruff is not installed")
+def test_an_undefined_name_is_reported_at_the_notebook_line(checker, chain):
+    notebook = _chain_notebook(chain, "value = helper() + layer() + missing_name\n")
+    found = checker.undefined_names(notebook)
+    assert len(found) == 1
+    assert found[0].startswith("databricks/silver/energy/01_notebook.py:5:")
+    assert "missing_name" in found[0]
+
+
+@pytest.mark.skipif(shutil.which("ruff") is None, reason="ruff is not installed")
+def test_names_from_the_chain_and_late_bound_library_names_pass(checker, chain):
+    notebook = _chain_notebook(chain, "value = helper() + layer()\n")
+    assert checker.undefined_names(notebook) == []

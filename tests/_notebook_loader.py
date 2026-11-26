@@ -18,11 +18,24 @@ tests built on this loader and must not be exercised through it.
 
 from __future__ import annotations
 
+import ast
 import sys
 import types
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def genomics_bronze_sources() -> dict:
+    """The SOURCES dict of the genomics Bronze config: source -> datasets."""
+    path = REPO_ROOT / "databricks" / "bronze" / "02_load_genomics_bronze.py"
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "SOURCES" for t in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    message = "SOURCES not found in the genomics Bronze config"
+    raise AssertionError(message)
 
 
 def _stub_pyspark() -> None:

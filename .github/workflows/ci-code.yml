@@ -170,7 +170,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         # Marker-based selection across the whole tests/ tree (tests/schemas/,
-        # tests/silver/, tests/gold/, tests/unit/) -- a test collects here
+        # tests/layers/, tests/models/, tests/unit/) -- a test collects here
         # because it carries @pytest.mark.unit, not because of which
         # directory it lives in. No empty-suite tolerance: a real unit-test
         # suite exists now, so a zero-collected result is a real regression,
