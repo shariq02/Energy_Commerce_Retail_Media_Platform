@@ -25,6 +25,7 @@
 # DBTITLE 1,Imports
 import contextlib
 import datetime as _dt
+import itertools as _it
 import math
 import os as _os
 import re as _re
@@ -2829,3 +2830,476 @@ def links_block(results):
         for r in results
     ]
     return _table(header, rows)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,ML datasets -- limits and pure helpers
+ML_CATALOG = "energy_commerce_retail_media"
+ML_SHARED = "ml_datasets_shared"
+ML_FIT_STATES = ("fitted", "frozen")
+ML_COLUMN_BATCH = 100
+ML_NEAR_CONSTANT = 0.999
+ML_EDGE_PROBS = [0.01, 0.99]
+ML_SHOWN = 10
+ML_STEP_FACTOR = 1.5
+
+
+def batches(items, size=ML_COLUMN_BATCH):
+    # Lists of at most `size` items: one wide aggregation per list, so that no
+    # single query carries hundreds of expressions.
+    items = list(items)
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def is_number_type(dtype):
+    return dtype == "boolean" or dtype in NUMERIC_DTYPES or dtype.startswith("decimal")
+
+
+def ml_roles(rows):
+    """{role: [columns]} of (column name, role) rows, in the order given."""
+    roles = {}
+    for name, role in rows:
+        roles.setdefault(role, []).append(name)
+    return roles
+
+
+def ml_target_kind(dtype, low, high, distinct):
+    """binary, numeric, text or other: from the column type and, for a number, its
+    smallest and largest value and the number of distinct values."""
+    if dtype == "boolean":
+        return "binary"
+    if dtype == "string":
+        return "text"
+    if not is_number_type(dtype):
+        return "other"
+    flag = low is not None and low >= 0 and high <= 1 and distinct <= 2
+    return "binary" if flag else "numeric"
+
+
+def date_gaps(dates):
+    """For {partition: dates}: the number of dates, the usual step in days (the most
+    frequent one), the steps missing (every gap wider than ML_STEP_FACTOR steps) and
+    the longest gap in days."""
+    out = {}
+    for part, values in dates.items():
+        days = sorted(set(values))
+        diffs = [(b - a).days for a, b in _it.pairwise(days)]
+        if not diffs:
+            out[part] = {"dates": len(days), "step": None, "missing": 0, "longest": 0}
+            continue
+        counts = {}
+        for d in diffs:
+            counts[d] = counts.get(d, 0) + 1
+        step = min(d for d, n in counts.items() if n == max(counts.values()))
+        wide = [d for d in diffs if d > ML_STEP_FACTOR * step]
+        out[part] = {
+            "dates": len(days),
+            "step": step,
+            "missing": sum(round(d / step) - 1 for d in wide),
+            "longest": max(diffs),
+        }
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,ML datasets -- target, shift, constant columns, association, gaps, groups
+
+
+def ml_number(name):
+    # A column as a double; a text that is not a number becomes null.
+    return F.expr(f"try_cast(`{name}` AS DOUBLE)")
+
+
+def _finite(x):
+    return x is not None and not math.isnan(x)
+
+
+def ml_target_stats(frame, target, kind):
+    """Per partition: rows, labelled rows, mean (the positive rate of a flag),
+    standard deviation and share of zero; the number of levels of a text target."""
+    value = ml_number(target)
+    if kind == "text":
+        extra = [F.countDistinct(qcol(target)).alias("levels")]
+        labelled = F.count(qcol(target))
+    else:
+        extra = [
+            F.avg(value).alias("mean"),
+            F.stddev_samp(value).alias("std"),
+            F.avg((value == 0).cast("double")).alias("zero"),
+        ]
+        labelled = F.count(value)
+    rows = (
+        frame.groupBy("partition")
+        .agg(F.count(F.lit(1)).alias("rows"), labelled.alias("labelled"), *extra)
+        .collect()
+    )
+    return {r["partition"]: r.asDict() for r in rows}
+
+
+def ml_text_levels(frame, target):
+    """Text target: the share of the top level in train, and for validation and test
+    the share of labelled rows whose level train does not have."""
+    train = frame.where((F.col("partition") == "train") & qcol(target).isNotNull())
+    levels = train.groupBy(qcol(target).alias("__level")).count()
+    top = levels.agg(F.max("count"), F.sum("count")).first()
+    out = {"top_share": round(top[0] / top[1], 4) if top[1] else None}
+    for part in ("validation", "test"):
+        rows = frame.where((F.col("partition") == part) & qcol(target).isNotNull())
+        total = rows.count()
+        unseen = rows.join(levels, qcol(target) == F.col("__level"), "left_anti")
+        out[part] = round(unseen.count() / total, 4) if total else None
+    return out
+
+
+def ml_fold_balance(frame, target):
+    """{fold: (rows, mean of the target)} of the train rows that have a fold."""
+    rows = (
+        frame.where((F.col("partition") == "train") & F.col("fold_id").isNotNull())
+        .groupBy("fold_id")
+        .agg(F.count(F.lit(1)).alias("rows"), F.avg(ml_number(target)).alias("mean"))
+        .collect()
+    )
+    return {r["fold_id"]: (r["rows"], r["mean"]) for r in rows}
+
+
+def ml_value_shares(train, cols):
+    """{column: share of the most frequent value among the non-null train rows}."""
+    out = {}
+    for group in batches(cols):
+        modes = train.agg(*[F.mode(qcol(c)).alias(c) for c in group]).first().asDict()
+        known = {c: v for c, v in modes.items() if v is not None}
+        if not known:
+            continue
+        shares = (
+            train.agg(
+                *[
+                    F.avg((qcol(c) == F.lit(v)).cast("double")).alias(c)
+                    for c, v in known.items()
+                ]
+            )
+            .first()
+            .asDict()
+        )
+        out.update({c: s for c, s in shares.items() if s is not None})
+    return out
+
+
+def ml_train_edges(train, cols):
+    """{column: mean, standard deviation, 1st and 99th percentile} of the train rows."""
+    out = {}
+    for group in batches(cols):
+        exprs = []
+        for i, c in enumerate(group):
+            v = qcol(c).cast("double")
+            exprs += [
+                F.avg(v).alias(f"m{i}"),
+                F.stddev_samp(v).alias(f"s{i}"),
+                F.percentile_approx(v, ML_EDGE_PROBS).alias(f"p{i}"),
+            ]
+        r = train.agg(*exprs).first().asDict()
+        for i, c in enumerate(group):
+            p = r[f"p{i}"] or [None, None]
+            out[c] = {"mean": r[f"m{i}"], "std": r[f"s{i}"], "low": p[0], "high": p[1]}
+    return out
+
+
+def ml_feature_shift(frame, edges):
+    """{column: {partition: (mean difference to train in train standard deviations,
+    share of rows outside the train 1st to 99th percentile range)}} for validation
+    and test."""
+    later = frame.where(F.col("partition").isin("validation", "test"))
+    usable = [
+        c
+        for c, e in edges.items()
+        if _finite(e["std"]) and e["std"] > 0 and e["low"] is not None
+    ]
+    out = {c: {} for c in edges}
+    for group in batches(usable):
+        exprs = []
+        for i, c in enumerate(group):
+            v = qcol(c).cast("double")
+            outside = ((v < edges[c]["low"]) | (v > edges[c]["high"])).cast("double")
+            exprs += [
+                F.avg(v).alias(f"m{i}"),
+                F.avg(F.when(v.isNotNull(), outside)).alias(f"o{i}"),
+            ]
+        for r in later.groupBy("partition").agg(*exprs).collect():
+            for i, c in enumerate(group):
+                if r[f"m{i}"] is None or r[f"o{i}"] is None:
+                    continue
+                shift = (r[f"m{i}"] - edges[c]["mean"]) / edges[c]["std"]
+                out[c][r["partition"]] = (round(shift, 3), round(r[f"o{i}"], 4))
+    return out
+
+
+def ml_target_association(train, cols, target):
+    """{column: correlation with the target} of the train rows."""
+    out = {}
+    goal = ml_number(target)
+    for group in batches(cols):
+        exprs = [
+            F.corr(qcol(c).cast("double"), goal).alias(f"c{i}")
+            for i, c in enumerate(group)
+        ]
+        r = train.agg(*exprs).first().asDict()
+        for i, c in enumerate(group):
+            if _finite(r[f"c{i}"]):
+                out[c] = round(r[f"c{i}"], 4)
+    return out
+
+
+def ml_date_gaps(frame, time_col):
+    """date_gaps of the days that each partition holds."""
+    rows = (
+        frame.select("partition", F.to_date(qcol(time_col)).alias("d"))
+        .where(F.col("d").isNotNull())
+        .distinct()
+        .collect()
+    )
+    dates = {}
+    for r in rows:
+        dates.setdefault(r["partition"], []).append(r["d"])
+    return date_gaps(dates)
+
+
+def ml_group_sizes(frame):
+    """Per partition: groups, rows, rows per group (median, 99th percentile, largest)
+    and the share of the rows that the largest group holds."""
+    sizes = (
+        frame.where(F.col("group_key").isNotNull())
+        .groupBy("partition", "group_key")
+        .count()
+    )
+    rows = (
+        sizes.groupBy("partition")
+        .agg(
+            F.count(F.lit(1)).alias("groups"),
+            F.sum("count").alias("rows"),
+            F.max("count").alias("largest"),
+            F.percentile_approx("count", [0.5, 0.99]).alias("p"),
+        )
+        .collect()
+    )
+    return {
+        r["partition"]: {
+            "groups": r["groups"],
+            "rows": r["rows"],
+            "median": r["p"][0],
+            "p99": r["p"][1],
+            "largest": r["largest"],
+            "top_share": round(r["largest"] / r["rows"], 4),
+        }
+        for r in rows
+    }
+
+
+# COMMAND ----------
+
+# DBTITLE 1,ML datasets -- the profile of one dataset
+
+
+def ml_profile_dataset(frame, roles):
+    """The ML EDA results of one dataset frame: target by partition and fold, train
+    columns with one dominant value, shift of the numeric features, correlation with
+    the target, redundant feature pairs, gaps of the time axis and group sizes.
+    `roles` is {role: [columns]} of the feature contract."""
+    dtypes = dict(frame.dtypes)
+    targets = [c for c in roles.get("target", []) if c in dtypes]
+    target = targets[0] if targets else None
+    features = [c for c in roles.get("feature", []) if c in dtypes]
+    numbers = [c for c in features if is_number_type(dtypes[c])]
+    train = frame.where(F.col("partition") == "train")
+    out = {"target": target, "kind": None, "features": len(features)}
+    out["numbers"] = len(numbers)
+    if target:
+        low = high = distinct = None
+        if is_number_type(dtypes[target]) and dtypes[target] != "boolean":
+            value = ml_number(target)
+            low, high, distinct = train.agg(
+                F.min(value), F.max(value), F.approx_count_distinct(value)
+            ).first()
+        kind = ml_target_kind(dtypes[target], low, high, distinct)
+        out["kind"] = kind
+        if kind != "other":
+            out["partitions"] = ml_target_stats(frame, target, kind)
+        if kind == "text":
+            out["levels"] = ml_text_levels(frame, target)
+        if kind in ("binary", "numeric"):
+            out["folds"] = ml_fold_balance(frame, target)
+    if features:
+        shares = ml_value_shares(train, features)
+        out["dominant"] = {c: s for c, s in shares.items() if s >= ML_NEAR_CONSTANT}
+    if numbers:
+        edges = ml_train_edges(train, numbers)
+        out["shift"] = ml_feature_shift(frame, edges)
+    checked = numbers[:PAIR_COLUMNS]
+    if numbers and out["kind"] in ("binary", "numeric"):
+        found = ml_target_association(train, numbers, target)
+        ranked = sorted(found.items(), key=lambda kv: -abs(kv[1]))
+        out["association"] = ranked[:ML_SHOWN]
+        out["above_limit"] = sum(1 for _c, r in ranked if abs(r) >= LEAK_CORRELATION)
+        checked = [c for c, _r in ranked[:PAIR_COLUMNS]]
+    out["checked"] = len(checked)
+    out["pairs"] = pair_correlations(train, checked) if checked else []
+    times = sorted(c for c in roles.get("time", []) if c in dtypes)
+    time_type = dtypes[times[0]] if times else ""
+    if time_type in ("date", "string") or time_type.startswith("timestamp"):
+        out["gaps"] = ml_date_gaps(frame, times[0])
+    if "group_key" in dtypes:
+        out["groups"] = ml_group_sizes(frame)
+    return out
+
+
+# COMMAND ----------
+
+# DBTITLE 1,ML datasets -- findings blocks and the run of one ecosystem
+
+
+def _worst_shifts(shift):
+    # Per column the partition with the largest shift, then the columns with the
+    # largest shifts.
+    worst = {
+        c: max(parts.items(), key=lambda kv: abs(kv[1][0]))
+        for c, parts in shift.items()
+        if parts
+    }
+    ranked = sorted(worst.items(), key=lambda kv: -abs(kv[1][1][0]))
+    return [(c, part, s, o) for c, (part, (s, o)) in ranked[:ML_SHOWN]]
+
+
+def ml_eda_blocks(results):
+    """The findings blocks of {dataset: ml_profile_dataset result}: counts, rates
+    and column names only."""
+    rows = {k: [] for k in ("target", "text", "folds", "shift", "dominant")}
+    rows.update({k: [] for k in ("association", "pairs", "gaps", "groups")})
+    skipped = []
+    for ds, r in results.items():
+        if r["target"] is None or r["kind"] == "other":
+            skipped.append(ds)
+        for part, p in sorted(r.get("partitions", {}).items()):
+            rows["target"].append(
+                (ds, r["kind"], part, p["rows"], p["labelled"])
+                + tuple(fmt_num(p.get(k)) for k in ("mean", "std", "zero", "levels"))
+            )
+        if "levels" in r:
+            lv = r["levels"]
+            rows["text"].append((ds, lv["top_share"], lv["validation"], lv["test"]))
+        folds = r.get("folds", {})
+        if folds:
+            counts = [n for n, _m in folds.values()]
+            means = [m for _n, m in folds.values() if m is not None]
+            lowest = fmt_num(min(means)) if means else "-"
+            highest = fmt_num(max(means)) if means else "-"
+            rows["folds"].append(
+                (ds, len(folds), min(counts), max(counts), lowest, highest)
+            )
+        for c, part, s, o in _worst_shifts(r.get("shift", {})):
+            rows["shift"].append((ds, f"`{c}`", part, s, o))
+        dom = r.get("dominant", {})
+        names = ", ".join(f"`{c}`" for c in sorted(dom)[:ML_SHOWN])
+        rows["dominant"].append((ds, r["features"], len(dom), names))
+        if "association" in r:
+            top = ", ".join(f"`{c}` {x}" for c, x in r["association"])
+            rows["association"].append((ds, r["numbers"], r["above_limit"], top))
+        pairs = ", ".join(f"`{a}` / `{b}` {x}" for a, b, x in r["pairs"][:3])
+        rows["pairs"].append((ds, r["checked"], len(r["pairs"]), pairs))
+        for part, g in sorted(r.get("gaps", {}).items()):
+            rows["gaps"].append(
+                (ds, part, g["dates"], g["step"], g["missing"], g["longest"])
+            )
+        for part, g in sorted(r.get("groups", {}).items()):
+            rows["groups"].append(
+                (ds, part, g["groups"], g["rows"], g["median"], g["p99"])
+                + (g["largest"], g["top_share"])
+            )
+    headers = {
+        "target": ("dataset", "target kind", "partition", "rows", "labelled")
+        + ("mean or positive rate", "standard deviation", "share zero", "levels"),
+        "text": ("dataset", "top level share in train")
+        + ("validation rows with a new level", "test rows with a new level"),
+        "folds": ("dataset", "train folds", "rows per fold min", "rows per fold max")
+        + ("target mean min", "target mean max"),
+        "shift": ("dataset", "feature", "partition", "mean shift in train deviations")
+        + ("share outside the train 1 to 99 percent range",),
+        "dominant": ("dataset", "features", "with a value in 99.9 percent of rows")
+        + ("first columns",),
+        "association": (
+            "dataset",
+            "numeric features",
+            f"at or above {LEAK_CORRELATION}",
+        )
+        + ("ten highest correlations with the target",),
+        "pairs": ("dataset", "columns checked", f"pairs at or above {LEAK_CORRELATION}")
+        + ("first pairs",),
+        "gaps": ("dataset", "partition", "days", "usual step in days")
+        + ("steps missing", "longest gap in days"),
+        "groups": ("dataset", "partition", "groups", "rows", "rows per group median")
+        + ("rows per group 99th percentile", "largest group", "largest group share"),
+    }
+    titles = {
+        "target": "Target by partition",
+        "text": "Text targets: levels",
+        "folds": "Target by train fold",
+        "shift": "Feature shift from train (ten largest per dataset)",
+        "dominant": "Features with one dominant value in train",
+        "association": "Correlation of numeric features with the target (train)",
+        "pairs": "Redundant feature pairs (train)",
+        "gaps": "Gaps of the time axis inside each partition (day level)",
+        "groups": "Group sizes per partition",
+    }
+    blocks = [(titles[k], md_table(headers[k], rows[k])) for k in titles if rows[k]]
+    contaminated = [f"{r[0]}: {r[2]}" for r in rows["association"] if r[2]]
+    gapped = sorted({r[0] for r in rows["gaps"] if r[4]})
+    ready = [
+        (
+            "Target contamination",
+            f"numeric features at or above {LEAK_CORRELATION} with the target (train): "
+            + ("; ".join(contaminated) or "none"),
+        ),
+        (
+            "Temporal / post-event leakage",
+            f"datasets with missing steps inside a partition: {gapped or 'none'}",
+        ),
+        (
+            "Sample-vs-full divergence",
+            "every count and rate is read from the whole dataset; no sample is used.",
+        ),
+    ]
+    blocks.append(("ML-Readiness Evidence", ml_readiness_block(ready)))
+    if skipped:
+        blocks.append(("Datasets without a readable target", ", ".join(skipped)))
+    return blocks
+
+
+def run_ml_eda(eco):
+    """The ML EDA of every fitted dataset of one ecosystem, written to
+    `src/schemas/profiling/ml.md` under the key of the ecosystem."""
+    manifest = (
+        spark.table(f"{ML_CATALOG}.{ML_SHARED}.dataset_manifest")
+        .where((F.col("ecosystem") == eco) & F.col("status").isin(*ML_FIT_STATES))
+        .collect()
+    )
+    contract = {}
+    for r in (
+        spark.table(f"{ML_CATALOG}.{ML_SHARED}.feature_contract")
+        .where(F.col("ecosystem") == eco)
+        .select("dataset_id", "column_name", "role")
+        .collect()
+    ):
+        contract.setdefault(r["dataset_id"], []).append((r["column_name"], r["role"]))
+    results = {}
+    for row in sorted(manifest, key=lambda r: r["dataset_id"]):
+        ds = row["dataset_id"]
+        frame = spark.table(f"{ML_CATALOG}.{eco}_ml_datasets.dataset_{row['family']}")
+        frame = frame.where(F.col("dataset_id") == ds)
+        results[ds] = ml_profile_dataset(frame, ml_roles(sorted(contract.get(ds, []))))
+        r = results[ds]
+        print(
+            f"{eco}/{ds}: target={r['target']} kind={r['kind']} "
+            f"features={r['features']} dominant={len(r.get('dominant', {}))} "
+            f"pairs={len(r['pairs'])}"
+        )
+    write_profiling("ml", eco, f"ML datasets -- {eco}", ml_eda_blocks(results))
+    return results

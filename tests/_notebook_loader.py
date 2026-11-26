@@ -70,6 +70,28 @@ def load_wikipedia_chunks() -> dict:
     )
 
 
+def _stub_matplotlib() -> None:
+    try:
+        import matplotlib.pyplot
+    except ImportError:
+        matplotlib = types.ModuleType("matplotlib")
+        pyplot = types.ModuleType("matplotlib.pyplot")
+        matplotlib.pyplot = pyplot
+        sys.modules.setdefault("matplotlib", matplotlib)
+        sys.modules.setdefault("matplotlib.pyplot", pyplot)
+
+
+def load_eda_common() -> dict:
+    """`databricks/eda/_eda_common.py` alone: the pure functions only (Spark and
+    plotting imports are stubs)."""
+    _stub_pyspark()
+    _stub_matplotlib()
+    namespace: dict = {"__name__": "_eda_common_under_test"}
+    return _exec_notebook(
+        REPO_ROOT / "databricks" / "eda" / "_eda_common.py", namespace
+    )
+
+
 def load_silver_common() -> dict:
     """Executes `databricks/silver/_silver_common.py` into a fresh namespace
     and returns it -- the pure (non-Spark-API) functions defined there are
