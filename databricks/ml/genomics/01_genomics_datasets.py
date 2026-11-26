@@ -19,7 +19,7 @@
 # MAGIC the role `label_derived` and are never features. The identifier and coordinate
 # MAGIC columns of a benchmark keep the role `key`. Class flags of Gold are true or null, so a target is the flag
 # MAGIC with null read as false on the rows where its rule was evaluated. REBUILD names
-# MAGIC the datasets to build again after a change; their frozen families are reopened.
+# MAGIC the datasets to build again after a change; the build reopens frozen families.
 
 # COMMAND ----------
 
@@ -42,8 +42,8 @@
 ECO = "genomics"
 SOURCE = "genomics"
 COMPONENT = "ml/genomics"
-# Empty: build every genomics dataset (a frozen family stops the build). Dataset ids:
-# build only these and reopen their families first; the gate freezes them again.
+# Empty: build every genomics dataset. Dataset ids: build only these. The build
+# reopens a frozen family itself; the gate freezes it again.
 REBUILD = ()
 # columns that carry provenance or identify a row, never a feature
 TECHNICAL = {
@@ -664,8 +664,6 @@ if _unknown:
     raise RuntimeError(
         f"REBUILD names datasets this notebook does not build: {_unknown}"
     )
-for _dataset in REBUILD:
-    reopen_family(_dataset)
 build_datasets(
     {k: v for k, v in FRAMES.items() if not REBUILD or k in REBUILD},
     rid=rid,

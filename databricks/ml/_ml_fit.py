@@ -478,13 +478,20 @@ def build_datasets(frames: dict, *, rid: str, source: str, blocks: dict | None =
     """Build every dataset of `frames` (dataset id -> assembled frame) in order;
     `blocks` holds extra findings blocks per dataset (the dropped target rows). The
     spec is checked against every frame first; one problem stops the run before any
-    write."""
+    write. The family of each dataset is reopened once, so a rerun after a freeze
+    works; the gate freezes the family again at its next Delta version."""
     problems = [
         p for name, frame in frames.items() for p in spec_problems(name, frame.columns)
     ]
     if problems:
         detail = "; ".join(problems)
         raise RuntimeError(f"spec and frames disagree, nothing written: {detail}")
+    by_family = {}
+    for dataset_id in frames:
+        spec = dataset_spec(dataset_id)
+        by_family.setdefault((spec["ecosystem"], spec["family"]), dataset_id)
+    for dataset_id in by_family.values():
+        reopen_family(dataset_id)
     for dataset_id, frame in frames.items():
         print(f"=== {dataset_id}")
         build_dataset(

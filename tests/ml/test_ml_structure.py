@@ -176,6 +176,16 @@ def test_write_ml_refuses_a_frozen_dataset_before_any_write():
         assert body.index("_frozen_guard(") < body.index(".saveAsTable(")
 
 
+def test_build_datasets_reopens_the_families_before_the_first_write():
+    """A rerun after a freeze must work in every ML build notebook."""
+    text = (_ML / "_ml_fit.py").read_text()
+    body = text[text.index("def build_datasets(") :]
+    body = body[: body.index("\ndef ")]
+    assert body.index("reopen_family(") < body.index("build_dataset(")
+    for path in (_ML / "genomics").glob("01_*.py"):
+        assert "reopen_family(" not in path.read_text(encoding="utf-8")
+
+
 def test_the_partition_frame_returns_the_fold_as_an_int():
     """The family table and the manifest keep `fold_id` as int; a grouped fold is
     a bigint hash, and Delta refuses to merge the two types."""
