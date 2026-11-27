@@ -144,6 +144,12 @@ SOURCES = {
     "energy_charts": {
         "datasets": [("physical_flows", "energy_charts_physical_flows", None)],
     },
+    "era5": {
+        "datasets": [("wind_100m_daily", "era5_wind_100m_daily", None)],
+    },
+    "entsoe_observatory": {
+        "datasets": [("zone_daily", "entsoe_observatory_zone_daily", None)],
+    },
     "eurostat": {
         "datasets": [("retail_trade", "eurostat_retail_trade", None)],
     },

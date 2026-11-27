@@ -592,7 +592,7 @@ export_group(
 # MAGIC
 # MAGIC **Purpose:** Profile the entity tables of genomics Gold (`disease_profile`,
 # MAGIC `drug_profile`, `protein_profile`, `transcript_profile`, `epitope_profile`,
-# MAGIC `genetic_test_profile`, `clinical_trial_profile`): nulls, constant columns,
+# MAGIC `genetic_test_profile`, `clinical_trial_profile`, `entity_article_link`): nulls, constant columns,
 # MAGIC key, rates per column kind, coverage by source, the fill of the link columns,
 # MAGIC date-like columns and the shape of the text columns -- as evidence.
 
@@ -615,6 +615,7 @@ run_groups(
                 "epitope_profile",
                 "genetic_test_profile",
                 "clinical_trial_profile",
+                "entity_article_link",
             ],
         }
     ],

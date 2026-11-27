@@ -26,7 +26,8 @@
 # MAGIC `merged_parts` drops each Bronze table of `bronze_merges.yml` that a merge
 # MAGIC built from it, only when the merged table holds the same rows for its value.
 # MAGIC `stale_tables` drops, in the Gold and analytics schemas, only the tables that
-# MAGIC carry a provenance column and were last written before `CUTOFF`.
+# MAGIC carry a provenance column and were last written before `CUTOFF` (found from the
+# MAGIC latest write when `CUTOFF` is `None`).
 # MAGIC
 # MAGIC The default is a dry run: the notebook lists what it would drop and writes the
 # MAGIC findings file. The three drop switches stay off until you have read the plan.
@@ -36,7 +37,7 @@
 
 # DBTITLE 1,Imports
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import yaml
 from pyspark.sql import functions as F
@@ -56,9 +57,12 @@ FINDINGS_SUBDIR = "src/inventory"
 MODE = "stale_tables"  # "retire", "fresh", "fresh_gold", "merged_parts"
 MERGES_FILE = "src/schemas/mappings/bronze_merges.yml"
 
-# stale_tables: start of the run to keep (UTC). A table is old when its last write
-# is before it and it has a provenance column; other tables stay.
-CUTOFF = "2026-11-19T21:00:00Z"
+# stale_tables: a table is old when it has a provenance column and its last write is
+# before the cutoff; other tables stay. None finds the cutoff itself: the newest write
+# of any table with a provenance column, minus RUN_WINDOW_HOURS (one build writes all
+# its tables inside that window). A text such as "2026-11-19T21:00:00Z" sets it by hand.
+CUTOFF = None
+RUN_WINDOW_HOURS = 24
 PROVENANCE_COLUMNS = ("_gold_loaded_at", "_analytics_loaded_at")
 # Table history operations that write data (OPTIMIZE, COMPUTE STATS are not writes).
 WRITE_OPERATIONS = "^(CREATE|REPLACE|WRITE|MERGE|COPY INTO|UPDATE|DELETE)"
@@ -208,7 +212,9 @@ for name, spec in RETIREMENTS.items():
 
 # DBTITLE 1,Pick the old tables (MODE stale_tables)
 stale_rows = []  # (schema, table, last write, provenance column, decision)
+cutoff_text = CUTOFF
 if MODE == "stale_tables":
+    last_write = {}  # (schema, table) -> last write of a table with a provenance column
     for schema, held in inventory.items():
         with_column = {
             r["table_name"]
@@ -218,29 +224,40 @@ if MODE == "stale_tables":
                 f"AND column_name IN {PROVENANCE_COLUMNS}"
             ).collect()
         }
+        for table in held["tables"]:
+            if table in with_column:
+                last_write[schema, table] = (
+                    spark.sql(f"DESCRIBE HISTORY {CATALOG}.{schema}.{table}")
+                    .where(F.col("operation").rlike(WRITE_OPERATIONS))
+                    .agg(F.max("timestamp"))
+                    .first()[0]
+                )
+    written = [at for at in last_write.values() if at is not None]
+    if CUTOFF:
+        cutoff = spark.sql(f"SELECT CAST('{CUTOFF}' AS TIMESTAMP)").first()[0]
+    elif written:
+        cutoff = max(written) - timedelta(hours=RUN_WINDOW_HOURS)
+    else:
+        raise ValueError("No table with a provenance column was written; no cutoff")
+    cutoff_text = f"{cutoff:%Y-%m-%d %H:%M}" + (" (found)" if not CUTOFF else "")
+    print(f"Cutoff: {cutoff_text}")
+    for schema, held in inventory.items():
         old = []
         for table in held["tables"]:
-            if table not in with_column:
+            if (schema, table) not in last_write:
                 stale_rows.append((schema, table, None, "no", "keep (no column)"))
                 continue
-            last = (
-                spark.sql(f"DESCRIBE HISTORY {CATALOG}.{schema}.{table}")
-                .where(F.col("operation").rlike(WRITE_OPERATIONS))
-                .agg(
-                    F.date_format(F.max("timestamp"), "yyyy-MM-dd HH:mm").alias("at"),
-                    (F.max("timestamp") < F.lit(CUTOFF).cast("timestamp")).alias("old"),
-                )
-                .first()
-            )
-            if last["old"]:
+            at = last_write[schema, table]
+            if at is None or at < cutoff:
                 old.append(table)
                 decision = "old"
             else:
-                decision = "keep (written after the cutoff or never)"
-            stale_rows.append((schema, table, last["at"], "yes", decision))
-            print(f"{decision.upper()}  {schema}.{table}  last write {last['at']}")
+                decision = "keep (written after the cutoff)"
+            shown = f"{at:%Y-%m-%d %H:%M}" if at else None
+            stale_rows.append((schema, table, shown, "yes", decision))
+            print(f"{decision.upper()}  {schema}.{table}  last write {shown}")
         if held["tables"] and len(old) == len(held["tables"]):
-            raise ValueError(f"{schema}: CUTOFF {CUTOFF} would drop every table")
+            raise ValueError(f"{schema}: cutoff {cutoff_text} would drop every table")
         inventory[schema] = {"tables": old, "views": [], "volumes": []}
 
 # COMMAND ----------
@@ -332,7 +349,7 @@ if MODE == "stale_tables":
     columns = ["schema", "table", "last write", "provenance column", "decision"]
     with open(findings_path, "a", encoding="utf-8") as fh:
         fh.write(
-            f"\n## Tables by last write (cutoff {CUTOFF})\n\n"
+            f"\n## Tables by last write (cutoff {cutoff_text})\n\n"
             + markdown_table(columns, stale_rows)
             + "\n"
         )

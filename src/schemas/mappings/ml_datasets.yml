@@ -67,15 +67,16 @@ calendars:
     blocks:
       - ["2024-07-01", "2024-12-31"]
       - ["2025-01-01", "2025-06-30"]
-  # neighbour prices start on 2024-11-18
+  # ENTSO-E day-ahead prices of Germany (DE_LU) and the neighbours start on 2018-10-01
   cross_border:
-    train: ["2024-11-18", "2025-08-31"]
-    validation: ["2025-09-01", "2025-12-31"]
-    test: ["2026-01-01", null]
+    train: ["2018-10-01", "2023-12-31"]
+    validation: ["2024-01-01", "2024-12-31"]
+    test: ["2025-01-01", null]
     embargo_days: 2
     blocks:
-      - ["2025-03-01", "2025-05-31"]
-      - ["2025-06-01", "2025-08-31"]
+      - ["2021-01-01", "2021-12-31"]
+      - ["2022-01-01", "2022-12-31"]
+      - ["2023-01-01", "2023-12-31"]
   # the target looks seven days ahead
   energy_daily_week:
     train: ["2018-10-01", "2023-12-31"]
@@ -851,9 +852,9 @@ datasets:
     capability: gene is a pharmacogene
     dependency_group: 1
     target_name: target_is_pharmacogene
-    label_derived_like: [pharmgkb, pharmacogene]
+    label_derived_like: [pharmgkb, pharmacogene, wikipedia_lead]
     provenance_tier: sourced
-    notes: the label is the PharmGKB gene annotation; columns that count or score pharmacogene evidence are label-derived
+    notes: the label is the PharmGKB gene annotation; columns that count or score pharmacogene evidence are label-derived, and so is the text of the Wikipedia lead, which can state the label
     contract:
       overrides:
         entity_type: [flag, null, null]
@@ -876,8 +877,9 @@ datasets:
     capability: gene cancer role (multiclass)
     dependency_group: 1
     target_name: target_gene_cancer_role
+    label_derived_like: [wikipedia_lead]
     provenance_tier: sourced
-    notes: the old project found 97.95 percent in one class; the class balance is reported by the gates
+    notes: the old project found 97.95 percent in one class; the class balance is reported by the gates; the Wikipedia lead text can state the role, so its columns are label-derived
     contract:
       overrides:
         entity_type: [flag, null, null]
@@ -1284,9 +1286,9 @@ datasets:
     dependency_group: 1
     target_name: target_log_allele_frequency
     max_rows: 1000000
-    label_derived_like: [frequency, allele_count, allele_number, homozygote, rarity, carrier, population, common, rare, heteroplasmy, tier, gnomad_variants, max_ancestry]
+    label_derived_like: [frequency, allele_count, allele_number, homozygote, rarity, carrier, population, common, rare, heteroplasmy, tier, gnomad_variants, max_ancestry, likelihood, germline, screening]
     provenance_tier: sourced
-    notes: variants with a global frequency; log10 of the frequency plus one millionth; the frequency columns and the tier flags are label-derived; split by gene, a variant without a gene is its own group
+    notes: variants with a global frequency; log10 of the frequency plus one millionth; the frequency columns, the tier flags and every score or flag built from the tier (rarity, carrier, likelihood, germline predisposition, screening) are label-derived; split by gene, a variant without a gene is its own group
     contract:
       overrides:
         variant_key: [key, null, null]
@@ -1340,7 +1342,7 @@ datasets:
     dependency_group: 1
     target_name: target_spread_eur_per_mwh
     provenance_tier: constructed
-    notes: German daily mean price minus the neighbour daily mean price; features are lags of two days and more and the calendar; neighbour prices start on 2024-11-18
+    notes: German daily mean price minus the neighbour daily mean price; features are lags of two days and more and the calendar; both prices are the ENTSO-E daily means, from 2018-10-01
     split: {rule: calendar, rule_id: "calendar:cross_border", calendar: cross_border, date_col: local_date}
     fit: {group_cols: [market_area_code], fold_mode: rolling, calendar_key: cross_border, date_col: local_date, impute: true}
   price_volatility:

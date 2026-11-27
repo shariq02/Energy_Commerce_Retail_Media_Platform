@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # KNOWLEDGE -- WIKIPEDIA SHARED LIBRARY
@@ -42,6 +42,9 @@ CLICKSTREAM_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_clickstream"
 EDGES_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_edges"
 CHUNKS_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_chunks"
 CHUNKS_STAGING_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_chunks_staging"
+# the lead of each article that Gold links to a gene, drug or disease, with its vector
+ENTITY_LEAD_TABLE = f"{CATALOG}.{SCHEMA}.wikipedia_entity_lead"
+ENTITY_LINK_TABLE = f"{CATALOG}.genomics_gold.entity_article_link"
 MODEL_VOLUME = "models"
 # model.onnx, tokenizer.json and model_hashes.json of all-MiniLM-L6-v2, put there by
 # scripts/knowledge/wikipedia_model_upload.py from the local model folder.

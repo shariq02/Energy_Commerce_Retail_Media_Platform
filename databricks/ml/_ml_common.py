@@ -1875,6 +1875,16 @@ CALENDAR_COLUMNS = (
     "commissioning_month_number",
 )
 DERIVED_SUFFIXES_ML = ("_is_missing", "_filled", "_gap_hours", "_raw", "_imputed")
+# Gene profile columns that name a drug target class: biology, never a label.
+BIOLOGICAL_TARGET_PREFIXES = ("target_class",)
+
+
+def is_target_column(column: str) -> bool:
+    """A column that holds a label: its name starts with `target_`, and it is no
+    column of a biological target class."""
+    return column.startswith("target_") and not column.startswith(
+        BIOLOGICAL_TARGET_PREFIXES
+    )
 
 
 def assembled_frame(
@@ -1939,11 +1949,11 @@ def derive_contract(
             role, clock, lag = "time", None, None
         elif group_col and c == group_col:
             role, clock, lag = "group", None, None
-        elif not c.startswith("target_") and is_label_derived(
+        elif not is_target_column(c) and is_label_derived(
             c, label_derived, label_derived_like
         ):
             role, clock, lag = "label_derived", None, None
-        elif c.startswith("target_"):
+        elif is_target_column(c):
             role, clock, lag = "target", None, None
         elif (
             c == "provenance_tier" or c == "as_of_ts" or c.endswith(DERIVED_SUFFIXES_ML)

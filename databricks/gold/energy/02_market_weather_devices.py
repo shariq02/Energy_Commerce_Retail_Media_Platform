@@ -55,6 +55,7 @@ PRECIPITATION_FORM_LABELS = {
 # Silver table -> Gold table and grain, copied as they are
 COPIES = {
     "weather_daily": ("weather_daily", ["daily_key"]),
+    "market_zone_price_daily": ("market_zone_price_daily", ["zone_price_key"]),
     "device_telemetry_snapshot": ("iot_device", ["device_key"]),
     "plant_operating_sample": ("plant_sensor_observation", ["sample_key"]),
     "grid_intervention_event": ("grid_intervention_event", ["event_key"]),
@@ -175,6 +176,7 @@ GOLD_FEEDS = {
         "market_actor",
     ),
     "weather_daily": ("weather_daily",),
+    "market_zone_price_daily": ("market_zone_price_daily",),
     "iot_device": ("device_telemetry_snapshot",),
     "plant_sensor_observation": ("plant_operating_sample",),
     "grid_intervention_event": ("grid_intervention_event",),

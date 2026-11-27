@@ -47,6 +47,7 @@ run_groups(
                 "channel_reading",
                 "energy_component",
                 "market_price",
+                "market_zone_price_daily",
                 "forecast_actual",
             ],
         },
@@ -96,6 +97,13 @@ CONTINUITY = {}
 for table in SERIES:
     frame = spark.table(f"{CATALOG}.{SCHEMA}.{table}")
     CONTINUITY.update(series_continuity(frame, table, TS_COL))
+# the zone prices are daily rows of a market area, with no timestamp column
+CONTINUITY["market_zone_price_daily / 86400 s"] = continuity_grid(
+    spark.table(f"{CATALOG}.{SCHEMA}.market_zone_price_daily"),
+    "local_date",
+    86400,
+    entity_col="market_area_code",
+)
 print(continuity_block(CONTINUITY))
 SPANS = {}
 for table in [*SERIES, "weather_observation"]:

@@ -104,3 +104,23 @@ def test_embedding_skips_padding_and_keeps_the_text_order():
     expected = np.full(LIB["DIMENSION"], 1 / np.sqrt(LIB["DIMENSION"]))
     assert np.allclose(vectors, expected)
     assert np.allclose(np.linalg.norm(vectors, axis=1), 1.0)
+
+
+def test_reduce_components_keeps_the_strongest_directions():
+    rng = np.random.default_rng(3)
+    strong = rng.normal(size=(60, 1)) * 10.0
+    vectors = np.hstack([strong, strong * 0.5, rng.normal(size=(60, 4)) * 0.01])
+    scores, share = LIB["reduce_components"](vectors, 2)
+    assert scores.shape == (60, 2)
+    assert share > 0.99
+    assert np.allclose(scores.mean(axis=0), 0.0, atol=1e-9)
+
+
+def test_model_hash_check_reads_the_pinned_hashes(tmp_path):
+    (tmp_path / LIB["MODEL_FILE"]).write_bytes(b"model")
+    (tmp_path / LIB["TOKENIZER_FILE"]).write_bytes(b"tokenizer")
+    (tmp_path / "pins.json").write_text('{"model_onnx_sha256": "x"}', encoding="utf-8")
+    found, pinned = LIB["model_hash_check"](str(tmp_path), "pins.json")
+    assert pinned == {"model_onnx_sha256": "x"}
+    assert found["model_onnx_sha256"] == LIB["sha256_text"]("model")
+    assert found["tokenizer_sha256"] == LIB["sha256_text"]("tokenizer")

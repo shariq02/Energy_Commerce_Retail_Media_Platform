@@ -34,6 +34,8 @@ _REQUIRED_GOLD = (
     ("energy_gold", "grid_intervention_event"),
     ("energy_gold", "channel_reading"),
     ("energy_gold", "weather_observation"),
+    ("energy_gold", "weather_daily"),
+    ("energy_gold", "market_zone_price_daily"),
     ("energy_gold", "plant_sensor_observation"),
     ("shared_conformed", "series_coverage"),
     ("shared_conformed", "dim_place"),
@@ -43,6 +45,8 @@ _REQUIRED_GOLD = (
     ("commerce_gold", "commerce_product"),
     ("genomics_gold", "variant_profile"),
     ("genomics_gold", "gene_profile"),
+    ("genomics_gold", "entity_article_link"),
+    ("knowledge", "wikipedia_entity_lead"),
     ("genomics_gold", "structural_variant_profile"),
     ("genomics_gold", "benchmark_variant"),
 )

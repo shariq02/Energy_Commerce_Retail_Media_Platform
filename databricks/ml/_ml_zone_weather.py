@@ -10,13 +10,14 @@
 # MAGIC
 # MAGIC **Author:** Sharique Mohammad
 # MAGIC
-# MAGIC **Date:** September 2026
+# MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the station, unit-weight and zone-day computations shared by
+# MAGIC **Purpose:** the cell, unit-weight and zone-day computations shared by
 # MAGIC the zone-weather parameter fit, the zone-weather build and its acceptance
 # MAGIC test. Pulled in with `%run ../_ml_zone_weather` after `_ml_common`.
-# MAGIC Definitions only. Stations are `dim_place` rows; the sensor heights are the
-# MAGIC `instrument` station periods of `series_coverage`.
+# MAGIC Definitions only. The wind comes from the ERA5 grid cells (`dim_place` rows of
+# MAGIC the source `era5`, daily 100 m wind of `weather_daily`); the radiation comes
+# MAGIC from the DWD stations.
 
 # COMMAND ----------
 
@@ -28,14 +29,7 @@ from pyspark.sql.window import Window
 # COMMAND ----------
 
 # DBTITLE 1,Configuration constants
-MOUNTAIN_STATION_PATTERN = "(?i)zugspitze|feldberg|hohenpei"
-COASTAL_STATION_PATTERN = "(?i)list|norderney|kiel|warnem"
-WIND_CATEGORY_PATTERN = "(?i)windgeschwindigkeit|wind_?speed"
-WIND_SPEED_EXPR = (
-    "coalesce(wind_mean_speed_m_per_s, wind_instant_speed_m_per_s, "
-    "wind_unspecified_speed_m_per_s)"
-)
-MIN_STATION_HOURS = 18
+ERA5_HEIGHT_M = 100.0  # the height of the ERA5 wind speed
 EARTH_RADIUS_KM = 6371.0
 
 # COMMAND ----------
@@ -53,90 +47,44 @@ def haversine_km(lat1, lon1, lat2, lon2):
 
 # COMMAND ----------
 
-# DBTITLE 1,Stations and sensor heights
+# DBTITLE 1,ERA5 cells and the daily wind of a cell
 
 
-def station_table(dim_place: DataFrame, place_periods: DataFrame, *, names_like=None):
-    """One row per weather station with coordinates and name."""
-    st = (
-        dim_place.filter(F.col("latitude").isNotNull() & F.col("longitude").isNotNull())
-        .select(
-            F.col("location_key").alias("place_key"), "name", "latitude", "longitude"
-        )
-        .join(
-            place_periods.select(F.col("location_key").alias("place_key")).distinct(),
-            "place_key",
-            "inner",
-        )
-    )
-    if names_like:
-        st = st.filter(F.col("name").rlike(names_like))
-    return st
-
-
-def wind_height_periods(place_periods: DataFrame) -> DataFrame:
-    """Sensor height periods of the wind-speed category (one per station and day)."""
-    return place_periods.filter(
-        F.col("parameter_category").rlike(WIND_CATEGORY_PATTERN)
-        & F.col("sensor_height_m").isNotNull()
+def era5_cells(dim_place: DataFrame) -> DataFrame:
+    """One row per ERA5 grid cell with its coordinates and the 100 m height."""
+    return dim_place.filter(
+        (F.col("source_system") == "era5")
+        & F.col("latitude").isNotNull()
+        & F.col("longitude").isNotNull()
     ).select(
         F.col("location_key").alias("place_key"),
-        "valid_from",
-        F.coalesce(F.col("valid_to"), F.lit("9999-12-31").cast("date")).alias(
-            "valid_to"
-        ),
-        "sensor_height_m",
+        "name",
+        "latitude",
+        "longitude",
+        F.lit(ERA5_HEIGHT_M).alias("sensor_height_m"),
     )
 
 
-def station_day_wind(
-    weather: DataFrame, heights: DataFrame, date_from: str, date_to: str
-):
-    """Mean wind speed and mean speed cubed per station and local date, with the
-    sensor height valid on that date."""
-    hourly = weather.filter(
-        (F.col("source_system") == "dwd")
-        & (F.col("interval_seconds") == 3600)
-        & (F.col("interval_reference") == "clock")
-        & F.col("local_date").between(date_from, date_to)
-    ).select(
-        F.col("location_key").alias("place_key"),
-        "local_date",
-        F.expr(WIND_SPEED_EXPR).alias("speed"),
-    )
-    daily = (
-        hourly.filter(F.col("speed").isNotNull())
-        .groupBy("place_key", "local_date")
-        .agg(
-            F.count("*").alias("n_hours"),
-            F.avg("speed").alias("speed_mean"),
-            F.avg(F.pow("speed", 3)).alias("speed_cubed_mean"),
-        )
-        .filter(F.col("n_hours") >= MIN_STATION_HOURS)
-    )
-    j = daily.join(
-        heights,
-        (daily["place_key"] == heights["place_key"])
-        & (daily["local_date"] >= heights["valid_from"])
-        & (daily["local_date"] <= heights["valid_to"]),
-        "inner",
-    ).select(
-        daily["place_key"],
-        "local_date",
-        "speed_mean",
-        "speed_cubed_mean",
-        "sensor_height_m",
-        "valid_from",
-    )
-    w = F.row_number().over(
-        Window.partitionBy("place_key", "local_date").orderBy(
-            F.col("valid_from").desc()
-        )
-    )
+def cell_day_wind(daily: DataFrame, date_from: str, date_to: str) -> DataFrame:
+    """Mean wind speed and mean speed cubed per ERA5 cell and local date (the long
+    rows of `weather_daily` as two columns), with the height of the reanalysis."""
     return (
-        j.withColumn("_rn", w)
-        .filter(F.col("_rn") == 1)
-        .drop("_rn", "valid_from")
+        daily.filter(
+            (F.col("source_system") == "era5")
+            & (F.col("variable") == "wind_speed_100m")
+            & F.col("local_date").between(date_from, date_to)
+        )
+        .groupBy(F.col("location_key").alias("place_key"), "local_date")
+        .agg(
+            F.max(F.when(F.col("statistic") == "mean", F.col("value"))).alias(
+                "speed_mean"
+            ),
+            F.max(F.when(F.col("statistic") == "cubed_mean", F.col("value"))).alias(
+                "speed_cubed_mean"
+            ),
+        )
+        .filter(F.col("speed_mean").isNotNull() & F.col("speed_cubed_mean").isNotNull())
+        .withColumn("sensor_height_m", F.lit(ERA5_HEIGHT_M))
         .withColumn("month", F.trunc("local_date", "month"))
     )
 

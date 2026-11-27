@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import gzip
 import importlib.util
+import json
 import re
 import shutil
 import sys
 import zipfile
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from scripts.ingestion._memory_guard import MemoryLimitExceeded, PeakRSSMonitor
@@ -297,6 +299,61 @@ def test_energy_charts_months_cover_the_window(genomics, config):
     assert months[0][1].endswith("start=2024-11-01&end=2024-11-30")
     assert months[-1][1].endswith("start=2026-11-01&end=2026-11-12")
     assert len(months) == 25
+
+
+def test_era5_batches_cover_the_window_and_every_cell(genomics, config):
+    variables = config["vars"]
+    files = genomics.era5_batches("wind_100m_daily", variables)
+    per_year = -(-len(variables["era5_cells"]) // variables["era5_batch_size"])
+    assert len(files) == per_year * 9
+    assert "start_date=2018-10-01&end_date=2018-12-31" in files[0][1]
+    assert "start_date=2026-01-01&end_date=2026-11-12" in files[-1][1]
+    first_year = [url for tag, url, _ in files if tag.startswith("2018-")]
+    latitudes = [
+        value
+        for url in first_year
+        for value in url.split("latitude=")[1].split("&")[0].split(",")
+    ]
+    assert len(latitudes) == len(variables["era5_cells"])
+
+
+def test_era5_daily_rows_hold_the_mean_and_the_mean_cube(genomics, tmp_path):
+    hourly = {
+        "time": ["2024-01-01T00:00", "2024-01-01T01:00", "2024-01-02T00:00"],
+        "wind_speed_100m": [2.0, 4.0, 3.0],
+    }
+    path = tmp_path / "era5.json"
+    cell = {"latitude": 52.5, "longitude": 13.5, "hourly": hourly}
+    path.write_text(json.dumps([cell]), encoding="utf-8")
+    ((frames, read),) = genomics.parse_era5_daily(path, "2024-01")
+    first = frames["wind_100m_daily"].iloc[0]
+    assert read == 2
+    assert first["date"] == "2024-01-01" and first["hours"] == "2"
+    assert float(first["wind_speed_100m_mean"]) == 3.0
+    assert float(first["wind_speed_100m_cubed_mean"]) == 36.0
+
+
+def test_parquet_rows_keeps_the_columns_and_the_listed_zones(genomics, tmp_path):
+    path = tmp_path / "zone_daily.parquet"
+    pd.DataFrame(
+        {
+            "zone_key": ["DE_LU", "ES"],
+            "local_date": ["2024-01-01", "2024-01-01"],
+            "price_eur_mean": [1.5, 2.5],
+            "hours_in_day": [24, 24],
+        }
+    ).to_parquet(path)
+    parse = genomics.parquet_rows(
+        "zone_daily",
+        ["zone_key", "local_date", "price_eur_mean"],
+        key="zone_key",
+        values=["DE_LU"],
+    )
+    ((frames, read),) = parse(path, "zone_daily")
+    frame = frames["zone_daily"]
+    assert read == 1
+    assert list(frame.columns) == ["zone_key", "local_date", "price_eur_mean"]
+    assert frame.iloc[0].tolist() == ["DE_LU", "2024-01-01", "1.5"]
 
 
 def test_needs_staging_refreshes_only_marked_stages(genomics, monkeypatch):

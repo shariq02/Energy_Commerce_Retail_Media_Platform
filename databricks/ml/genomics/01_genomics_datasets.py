@@ -16,7 +16,9 @@
 # MAGIC `benchmark` from the Gold labels. The features are the Gold columns; no feature
 # MAGIC or target table is stored. The label-derived columns of each target are declared
 # MAGIC in the spec file, by name or by a part of the name; they stay in the dataset with
-# MAGIC the role `label_derived` and are never features. The identifier and coordinate
+# MAGIC the role `label_derived` and are never features. The gene-level datasets also carry
+# MAGIC three Open Targets literature columns (Europe PMC, score year 2021) and 16
+# MAGIC numeric columns of the Wikipedia lead of the gene. The identifier and coordinate
 # MAGIC columns of a benchmark keep the role `key`. Class flags of Gold are true or null, so a target is the flag
 # MAGIC with null read as false on the rows where its rule was evaluated. REBUILD names
 # MAGIC the datasets to build again after a change; the build reopens frozen families.
@@ -103,7 +105,60 @@ rid = ml_run_id()
 variants = table("variant_profile").filter(
     F.col("clinical_significance_label").isNotNull()
 )
-genes = table("gene_profile")
+measurements = table("gene_measurement")
+# Open Targets literature evidence (Europe PMC), score year 2021: one row per gene,
+# joined to the gene profile, so every gene-level dataset carries it as features
+_literature = (
+    measurements.filter(
+        (F.col("record_kind") == "gene_disease_score_year")
+        & (F.col("association_level") == "datasource")
+        & (F.col("datasource_id") == "europepmc")
+        & (F.col("year") == 2021)
+    )
+    .groupBy(F.col("source_gene_id").alias("ensembl_id"))
+    .agg(
+        F.max("association_score").alias("literature_europepmc_max_score_2021"),
+        F.countDistinct("source_disease_id").alias(
+            "literature_europepmc_disease_count_2021"
+        ),
+        F.sum("association_score").alias("literature_europepmc_score_sum_2021"),
+    )
+)
+# The Wikipedia lead of a gene as 16 numeric columns (the components of its lead
+# vector): the linked article whose type check passed, the symbol match first. A gene
+# without such an article keeps null columns.
+_WIKIPEDIA_COMPONENTS = [f"component_{i:02d}" for i in range(1, 17)]
+_gene_article = (
+    table("entity_article_link")
+    .filter((F.col("entity_type") == "gene") & F.col("type_check_passed"))
+    .withColumn(
+        "_rank",
+        F.row_number().over(
+            Window.partitionBy("entity_key").orderBy(
+                (F.col("match_method") != "symbol"), "article_id"
+            )
+        ),
+    )
+    .filter(F.col("_rank") == 1)
+    .join(
+        spark.table(f"{CATALOG}.knowledge.wikipedia_entity_lead").select(
+            "article_id", *_WIKIPEDIA_COMPONENTS
+        ),
+        "article_id",
+    )
+    .select(
+        F.col("entity_key").alias("gene_key"),
+        *[
+            F.col(name).alias(name.replace("component", "wikipedia_lead_component"))
+            for name in _WIKIPEDIA_COMPONENTS
+        ],
+    )
+)
+genes = (
+    table("gene_profile")
+    .join(_literature, "ensembl_id", "left")
+    .join(_gene_article, "gene_key", "left")
+)
 structural = table("structural_variant_profile").filter(
     F.col("record_kind") == "variant"
 )
@@ -343,7 +398,6 @@ FRAMES["haploinsufficiency"] = features_only(
 # COMMAND ----------
 
 # DBTITLE 1,Gene measurement datasets -- essentiality, expression, gene and disease progression, ClinGen
-measurements = table("gene_measurement")
 gene_features = features_only(genes)
 _gene_subset = genes.select(
     "gene_key",
@@ -351,6 +405,9 @@ _gene_subset = genes.select(
     "constraint_mis_observed_over_expected",
     "gnomad_loss_of_function_probability",
     "gnomad_missense_z_score",
+    "literature_europepmc_max_score_2021",
+    "literature_europepmc_disease_count_2021",
+    "literature_europepmc_score_sum_2021",
 )
 _cell_lines = (
     table("cell_line_profile")

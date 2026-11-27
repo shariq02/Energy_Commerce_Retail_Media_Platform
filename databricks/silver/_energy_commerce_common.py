@@ -813,6 +813,17 @@ UNIT_WEATHER_STATION_LINK_COLUMNS = [
     *_PROVENANCE_HEAD,
     *_PROVENANCE_TAIL,
 ]
+# The day-ahead price of one market zone and local day: the mean of the hourly
+# prices and the share of the day that the prices cover.
+MARKET_ZONE_PRICE_DAILY_COLUMNS = [
+    *_texts("zone_price_key", "market_area_code", "source_zone_key"),
+    ("local_date", "date"),
+    ("interval_reference", "string"),
+    ("price_eur_per_mwh", "double"),
+    ("price_coverage", "double"),
+    *_PROVENANCE_HEAD,
+    *_PROVENANCE_TAIL,
+]
 
 # COMMAND ----------
 
@@ -841,6 +852,7 @@ SEMANTIC_STRUCTURES = {
     "retail_trade_index": RETAIL_TRADE_INDEX_COLUMNS,
     "energy_carrier_map": ENERGY_CARRIER_MAP_COLUMNS,
     "unit_weather_station_link": UNIT_WEATHER_STATION_LINK_COLUMNS,
+    "market_zone_price_daily": MARKET_ZONE_PRICE_DAILY_COLUMNS,
 }
 
 # Register structures whose wide column set comes from the MaStR / plant-list
@@ -1040,6 +1052,16 @@ def local_time_to_utc(local_ts_col: str, offset_hours_col: str):
 def location_key(source_system: str, source_location_id):
     """Deterministic place key; `source_location_id` is a column name or Column."""
     return sha_key(F.lit(source_system), source_location_id)
+
+
+def era5_cell_id(latitude: str, longitude: str):
+    """Source location id of an ERA5 grid cell: its latitude and longitude as text
+    (the arguments are column names)."""
+    return F.concat_ws(
+        "_",
+        F.col(latitude).cast("double").cast("string"),
+        F.col(longitude).cast("double").cast("string"),
+    )
 
 
 def continent_of(country_code_col: str):

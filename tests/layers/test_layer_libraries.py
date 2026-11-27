@@ -252,6 +252,20 @@ def test_derive_contract_marks_the_columns_named_by_a_part_of_their_name(ml):
     assert by["target_is_rare"] == "target"
 
 
+def test_a_biological_target_class_column_is_no_target(ml):
+    contract, classes, _ = ml["derive_contract"](
+        ["gene_key", "target_class_count", "target_class_enzyme", "target_is_rare"],
+        keys=["gene_key"],
+        time_col=None,
+        default_clock="static_annotation",
+    )
+    by = {c[0]: c[1] for c in contract}
+    assert by["target_class_count"] == "feature"
+    assert by["target_class_enzyme"] == "feature"
+    assert by["target_is_rare"] == "target"
+    assert [c[0] for c in classes if c[1] == "F"] == ["target_is_rare"]
+
+
 def test_is_label_derived_reads_names_and_parts_of_names(ml):
     f = ml["is_label_derived"]
     assert f("a", ("a",), ())
@@ -497,8 +511,9 @@ def test_the_new_calendars_close_each_partition_on_their_own_dates(ml):
     assert f("2022-01-01", "unit_year") == "validation"
     assert f("2025-12-31", "unit_year") == "test"
     assert f("2026-01-01", "unit_year") == "excluded"
-    assert f("2024-11-17", "cross_border") == "excluded"
-    assert f("2024-11-18", "cross_border") == "train"
+    assert f("2018-09-30", "cross_border") == "excluded"
+    assert f("2018-10-01", "cross_border") == "train"
+    assert f("2024-06-01", "cross_border") == "validation"
     assert f("2023-12-01", "buildout_month") == "embargo"
     assert f("2024-01-01", "buildout_month") == "validation"
 
@@ -1710,10 +1725,10 @@ def test_no_declared_column_is_an_array_struct_or_map(layer, genomics) -> None:
     assert not nested, nested
 
 
-def test_the_energy_and_commerce_tables_number_35() -> None:
+def test_the_energy_and_commerce_tables_number_36() -> None:
     ns = _semantic_namespace()
     tables = set(ns["SEMANTIC_STRUCTURES"]) | set(ns["SEMANTIC_MEMBER_STRUCTURES"])
-    assert len(tables) == 35
+    assert len(tables) == 36
 
 
 def test_every_member_structure_carries_its_members_and_discriminators(

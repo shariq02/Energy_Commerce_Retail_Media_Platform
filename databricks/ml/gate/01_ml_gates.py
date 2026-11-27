@@ -195,6 +195,21 @@ for eco in ECOSYSTEMS:
             not used,
             f"columns={used}",
         )
+        biological_targets = [
+            r["column_name"]
+            for r in contract
+            if r["role"] == "target"
+            and r["column_name"] != dataset_spec(ds).get("target_name")
+            and r["column_name"].startswith(BIOLOGICAL_TARGET_PREFIXES)
+        ]
+        audit(
+            LEAKAGE,
+            eco,
+            ds,
+            "no_biological_column_has_the_target_role",
+            not biological_targets,
+            f"columns={biological_targets}",
+        )
         forbidden = [c for c in cols if c in CLASS_E_COLUMNS]
         audit(
             LEAKAGE, eco, ds, "no_class_e_column", not forbidden, f"columns={forbidden}"

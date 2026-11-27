@@ -17,7 +17,7 @@
 # MAGIC weather family. Same-instant products of one family are columns (alternate
 # MAGIC readings, wind statistics, cloud layers 1 to 4), never an array. The daily
 # MAGIC temperature rows (Seattle files and the DWD day minimum, maximum and mean) go in
-# MAGIC `weather_daily`.
+# MAGIC `weather_daily`, with the ERA5 daily 100 m wind (mean and mean cube) per grid cell.
 
 # COMMAND ----------
 
@@ -953,7 +953,72 @@ derived_daily = conform(
     add_semantic_provenance(derived_daily, "dwd", "weather_observation", RID),
     WEATHER_DAILY_COLUMNS,
 )
-daily = seattle_daily.unionByName(derived_daily)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ERA5 daily 100 m wind per grid cell (mean and mean cube)
+# The staged rows are daily already: the mean and the mean cube of the hourly speed
+# over the Europe/Berlin local day. One long row per cell, day and statistic.
+ERA5_TABLE = "era5_wind_100m_daily"
+ERA5_STATISTICS = {
+    "mean": ("wind_speed_100m_mean", "m/s"),
+    "cubed_mean": ("wind_speed_100m_cubed_mean", "m3/s3"),
+}
+era5_src = read_bronze(ERA5_TABLE).withColumn(
+    "source_location_id", era5_cell_id("latitude", "longitude")
+)
+era5_kept, era5_q = resolve_conflicts(
+    era5_src,
+    ["source_location_id", "date"],
+    [column for column, _ in ERA5_STATISTICS.values()],
+    bronze_table=ERA5_TABLE,
+)
+write_quarantine(era5_q.withColumn("source_system", F.lit("era5")), RID)
+era5_stats = reconciliation_stats(era5_src, era5_kept, era5_q)
+era5_stack = ", ".join(
+    f"'{name}', cast({column} as double)"
+    for name, (column, _) in ERA5_STATISTICS.items()
+)
+era5_unit = lit_map({name: unit for name, (_, unit) in ERA5_STATISTICS.items()})
+era5_column = lit_map({name: column for name, (column, _) in ERA5_STATISTICS.items()})
+era5_daily = (
+    era5_kept.select(
+        "source_location_id",
+        "date",
+        "hours",
+        F.expr(f"stack({len(ERA5_STATISTICS)}, {era5_stack}) as (statistic, value)"),
+    )
+    .withColumn("location_key", location_key("era5", "source_location_id"))
+    .withColumn("local_date", F.to_date(F.col("date"), "yyyy-MM-dd"))
+    .withColumn("date_native", F.col("date"))
+    .withColumn("variable", F.lit("wind_speed_100m"))
+    .withColumn("level", F.lit("100m"))
+    .withColumn("is_primary", F.lit(True))
+    .withColumn("value_native", F.col("value"))
+    .withColumn("unit_native", era5_unit[F.col("statistic")])
+    .withColumn("unit", era5_unit[F.col("statistic")])
+    .withColumn("value_origin", F.lit("derived"))
+    .withColumn(
+        "derivation_rule",
+        F.lit("mean and mean cube of the hourly wind speed over the local day"),
+    )
+    .withColumn("observation_count", F.col("hours").cast("int"))
+    .withColumn("time_basis", F.lit("local_day_europe_berlin"))
+    .withColumn("measurement_basis", F.lit("reanalysis_grid_cell"))
+    .withColumn("source_column", era5_column[F.col("statistic")])
+    .withColumn(
+        "source_record_id",
+        sha_key("location_key", "local_date", "variable", "statistic"),
+    )
+    .withColumn(
+        "daily_key", sha_key("location_key", "local_date", "variable", "statistic")
+    )
+)
+era5_daily = conform(
+    add_semantic_provenance(era5_daily, "era5", ERA5_TABLE, RID),
+    WEATHER_DAILY_COLUMNS,
+)
+daily = seattle_daily.unionByName(derived_daily).unionByName(era5_daily)
 
 # COMMAND ----------
 
@@ -972,7 +1037,11 @@ write_inspect_export(
         (
             f"dedup/conflict reconciliation -- {SEATTLE}",
             dict_to_markdown_row(seattle_stats),
-        )
+        ),
+        (
+            f"dedup/conflict reconciliation -- {ERA5_TABLE}",
+            dict_to_markdown_row(era5_stats),
+        ),
     ],
 )
 

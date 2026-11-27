@@ -54,6 +54,15 @@ vars:
   energy_charts: https://api.energy-charts.info/v2
   energy_charts_start: "2024-11-01"
   energy_charts_end: "2026-11-12"
+  era5: https://archive-api.open-meteo.com/v1/archive
+  era5_start: "2018-10-01"
+  era5_end: "2026-11-12"
+  era5_batch_size: 25
+  # ERA5 cells (latitude,longitude at 0.25 degree) that hold the wind capacity of the
+  # four control zones: the 30 onshore cells of most capacity per zone, the 8 offshore
+  # cells of most capacity per zone, and the capacity centroid of each zone (MaStR
+  # units of the Gold generation unit table).
+  era5_cells: ["47.75,8", "48,8", "48,8.75", "48,9.5", "48,9.75", "48.25,8", "48.25,8.25", "48.25,9.25", "48.5,8.5", "48.5,9.5", "48.5,9.75", "48.5,10", "48.75,8.5", "48.75,9.5", "48.75,9.75", "48.75,10", "48.75,10.25", "49,9.75", "49,10", "49,10.25", "49.25,9.5", "49.25,9.75", "49.25,10", "49.5,7", "49.5,7.25", "49.5,9.25", "49.5,9.5", "49.5,9.75", "49.5,10", "49.75,7", "49.75,7.75", "49.75,8", "49.75,8.25", "49.75,9.25", "49.75,9.5", "49.75,9.75", "50,7.5", "50,7.75", "50.25,6.5", "50.25,7.25", "50.75,6.25", "50.75,6.5", "50.75,6.75", "51,6.25", "51,6.5", "51,7.5", "51.25,12", "51.5,6.25", "51.5,8.25", "51.5,8.5", "51.5,8.75", "51.5,11.75", "51.5,13.25", "51.75,7", "51.75,8", "51.75,8.75", "51.75,9", "51.75,11.5", "51.75,11.75", "52,7", "52,7.25", "52,7.5", "52,8", "52,11.5", "52,12.75", "52,13.25", "52,13.5", "52,13.75", "52.25,7.25", "52.25,7.5", "52.25,10.25", "52.25,11.25", "52.5,7.5", "52.5,7.75", "52.5,8", "52.5,10.25", "52.5,11.75", "52.5,12.75", "52.75,8.75", "52.75,11.5", "52.75,11.75", "52.75,12", "52.75,13.75", "53,7.25", "53,7.5", "53,7.75", "53,9", "53,9.25", "53,12", "53,12.25", "53,14", "53.25,7.25", "53.25,8.5", "53.25,11.75", "53.25,12", "53.25,12.25", "53.25,14", "53.25,14.25", "53.5,7.25", "53.5,7.5", "53.5,8", "53.5,9", "53.5,12", "53.5,13.75", "53.5,14", "53.75,8.75", "53.75,9.25", "53.75,9.5", "53.75,13.25", "54,6.5", "54,6.75", "54,7", "54,9", "54,9.25", "54,9.5", "54,12", "54,13.25", "54.25,5.75", "54.25,6", "54.25,9", "54.25,11", "54.25,14.25", "54.5,6.25", "54.5,7.75", "54.5,9", "54.5,9.25", "54.5,9.5", "54.5,12.75", "54.75,8.75", "54.75,9", "54.75,9.25", "54.75,13.5", "54.75,13.75", "54.75,14", "54.75,14.25", "55,7.75", "55,13", "55,13.25"]
   gnomad_constraint: https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1/constraint
   tcga_codes: https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables
   eurostat: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data
@@ -896,6 +905,33 @@ stages:
     parser: energy_charts
     # The public API answered 429 after 6 calls with a 2 s pause.
     pause_seconds: 10
+  - source: era5
+    ecosystem: energy
+    datasets: [wind_100m_daily]
+    # ERA5 reanalysis (Copernicus Climate Change Service, CC BY 4.0, attribution
+    # "Generated using Copernicus Climate Change Service information") through the
+    # Open-Meteo archive API: wind speed at 100 m, one call per year and batch of cells.
+    # Silver reads the daily mean and the daily mean of the cubed speed only.
+    files: {from: era5_batches}
+    parser: era5_daily
+    pause_seconds: 10
+  - source: entsoe_observatory
+    ecosystem: energy
+    datasets: [zone_daily]
+    # Day-ahead prices of the ENTSO-E Transparency Platform (re-use with attribution
+    # "ENTSO-E Transparency Platform"), daily per bidding zone, as published by the
+    # hsilvosa/entsoe-observatory dataset. Silver reads the price mean and its coverage
+    # of Germany (DE_LU) and of the 13 neighbour zones of the price spread only.
+    files:
+      - tag: zone_daily
+        url: "{hf}/hsilvosa/entsoe-observatory/resolve/main/data/zone_daily/part-0.parquet"
+        file: zone_daily.parquet
+    parser:
+      name: parquet_rows
+      dataset: zone_daily
+      columns: [zone_key, local_date, price_eur_mean, price_coverage]
+      key: zone_key
+      values: [DE_LU, AT, BE, CH, CZ, DK_1, DK_2, FR, HU, IT_NORD, NL, NO_2, PL, SI]
   # Eurostat sts_trtu_m (free re-use with source named): German retail trade except motor
   # vehicles (G47), volume of sales (VOL_SLS), calendar adjusted, index 2021 = 100,
   # monthly from 2018-01 (105 values at 2026-11-23). Silver reads these columns only.

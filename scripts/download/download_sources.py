@@ -482,6 +482,38 @@ def parse_energy_charts(path: Path, tag: str):
     yield {"physical_flows": frame}, len(records)
 
 
+def parse_era5_daily(path: Path, tag: str):
+    """One row per cell and local day: the mean and the mean cube of the hourly 100 m
+    wind speed (the cube is the wind power term); `hours` counts the values."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    frames = []
+    for cell in payload if isinstance(payload, list) else [payload]:
+        hourly = cell["hourly"]
+        speed = pd.Series(
+            hourly["wind_speed_100m"],
+            index=pd.to_datetime(hourly["time"]),
+            dtype="float64",
+        )
+        day = speed.index.normalize()
+        daily = pd.DataFrame(
+            {
+                "wind_speed_100m_mean": speed.groupby(day).mean(),
+                "wind_speed_100m_cubed_mean": (speed**3).groupby(day).mean(),
+                "hours": speed.groupby(day).count(),
+            }
+        ).rename_axis("date")
+        daily.insert(0, "longitude", cell["longitude"])
+        daily.insert(0, "latitude", cell["latitude"])
+        frames.append(daily.reset_index())
+    frame = pd.concat(frames, ignore_index=True)
+    frame["date"] = frame["date"].dt.strftime("%Y-%m-%d")
+    frame = frame.astype("string")
+    frame["license"] = (
+        "CC BY 4.0, Copernicus Climate Change Service (ERA5) via Open-Meteo"
+    )
+    yield {"wind_100m_daily": frame}, len(frame)
+
+
 def html_table_rows(path: Path, first_header: str | None = None) -> list[list[str]]:
     """Rows of the first HTML table, or of the first table whose first cell reads
     `first_header`; a cell spanning rows is repeated below."""
@@ -854,6 +886,19 @@ def parquet(dataset):
     return parse
 
 
+def parquet_rows(dataset, columns, key=None, values=()):
+    """A Parquet file as text, reduced to `columns` and, with `key`, to the rows
+    whose `key` value is in `values`."""
+
+    def parse(path: Path, tag: str):
+        for frame in read_parquet(path):
+            if key:
+                frame = frame[frame[key].isin(values)]
+            yield {dataset: frame[columns].astype("string")}, len(frame)
+
+    return parse
+
+
 def csv(dataset, rename=None):
     """A comma-separated file; `rename` maps column names (pandas names an empty
     header `Unnamed: 0`)."""
@@ -908,6 +953,7 @@ PLAIN_PARSERS = {
     "bigwig": parse_bigwig,
     "alphafold": parse_alphafold,
     "energy_charts": parse_energy_charts,
+    "era5_daily": parse_era5_daily,
     "acmg": parse_acmg,
     "tcga_site_codes": parse_tcga_site_codes,
     "depmap_effect": parse_depmap_effect,
@@ -932,6 +978,7 @@ PARSER_FACTORIES = {
     "reference": reference,
     "substitutions": substitutions,
     "parquet": parquet,
+    "parquet_rows": parquet_rows,
     "csv": csv,
     "open_targets": open_targets,
     "metadata": metadata,
@@ -996,6 +1043,28 @@ def energy_charts_months(dataset: str, variables: dict) -> list[tuple[str, str, 
     return files
 
 
+def era5_batches(dataset: str, variables: dict) -> list[tuple[str, str, str]]:
+    """One API call per year and batch of cells; a file answers for all its cells."""
+    cells, size = variables["era5_cells"], int(variables["era5_batch_size"])
+    start = date.fromisoformat(variables["era5_start"])
+    end = date.fromisoformat(variables["era5_end"])
+    files = []
+    for year in range(start.year, end.year + 1):
+        first, last = max(date(year, 1, 1), start), min(date(year, 12, 31), end)
+        for number, offset in enumerate(range(0, len(cells), size), start=1):
+            points = [cell.split(",") for cell in cells[offset : offset + size]]
+            url = (
+                f"{variables['era5']}?latitude={','.join(p[0] for p in points)}"
+                f"&longitude={','.join(p[1] for p in points)}"
+                f"&start_date={first}&end_date={last}&hourly=wind_speed_100m"
+                "&models=era5&wind_speed_unit=ms&timezone=Europe%2FBerlin"
+            )
+            files.append(
+                (f"{year}-{number:02d}", url, f"era5_{year}_{number:02d}.json")
+            )
+    return files
+
+
 def encode_re2g(dataset: str, variables: dict) -> list[tuple[str, str, str]]:
     """Released ENCODE-rE2G prediction files of the biosamples whose name holds
     a keyword of `encode_tissue_keywords` (tissues as in GTEx)."""
@@ -1035,6 +1104,7 @@ def encode_re2g(dataset: str, variables: dict) -> list[tuple[str, str, str]]:
 LISTINGS = {
     "opentargets_parts": open_targets_parts,
     "energy_charts_months": energy_charts_months,
+    "era5_batches": era5_batches,
     "encode_re2g": encode_re2g,
     "smard_series": smard_series,
     "dwd_files": dwd_files,

@@ -12,8 +12,9 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** the zone weather method (station-day tables, the parameter fit
-# MAGIC stored as imputer rows, the zone wind and radiation, the acceptance test),
+# MAGIC **Purpose:** the zone weather method (the ERA5 cell-day wind and the DWD
+# MAGIC station-day radiation tables, the parameter fit stored as imputer rows, the
+# MAGIC zone wind and radiation, the acceptance test),
 # MAGIC the zone generation dataset (family `unit`), the weather imputation and
 # MAGIC series datasets (family `self_supervised_rl`) and their mask specification.
 # MAGIC Run after the market notebook and the unit notebook (the calendar, the load
@@ -51,10 +52,12 @@ CARRIERS = ["onshore_wind", "offshore_wind", "photovoltaic"]
 DATE_FROM = SPLIT_CALENDARS["energy_daily"]["train"][0]
 TRAIN_FROM, TRAIN_TO = SPLIT_CALENDARS["energy_daily"]["train"]
 VALID_FROM, VALID_TO = SPLIT_CALENDARS["energy_daily"]["validation"]
-GRID_K, GRID_CAP_KM, GRID_ALPHA = (2, 3, 5), (150.0, 300.0), (0.11, 0.143, 0.2)
+# ERA5 cells: a unit takes its k nearest cells within the cap (the cell spacing is
+# about 28 km); alpha is the shear exponent from 100 m to the hub height (0 = none)
+GRID_K, GRID_CAP_KM, GRID_ALPHA = (1, 2, 3), (40.0, 80.0), (0.0, 0.11, 0.143, 0.2)
 MIN_COVERED = 0.5
 RADIATION_K, RADIATION_CAP_KM = 5, 500.0
-OFFSHORE_K, OFFSHORE_CAP_KM, OFFSHORE_DECAY_KM = 2, 500.0, 100.0
+OFFSHORE_K, OFFSHORE_CAP_KM, OFFSHORE_DECAY_KM = 2, 100.0, 25.0
 # Declared before scoring: minimum validation correlation and minimum MAE
 # improvement over the better of the two baselines.
 ACCEPT = {
@@ -74,15 +77,14 @@ set_utc_session()
 
 # COMMAND ----------
 
-# DBTITLE 1,Read Gold -- weather, station periods, places, units, generation
+# DBTITLE 1,Read Gold -- weather, ERA5 daily wind, places, units, generation
 weather = read_gold("weather_observation", source="dwd")
+daily = read_gold("weather_daily", source="era5")
 coverage = read_shared_conformed("series_coverage")
-# the sensor heights are the instrument periods of the station periods
-periods = coverage.filter(
-    (F.col("record_kind") == "station_period") & (F.col("period_kind") == "instrument")
-)
 dim_place = read_shared_conformed("dim_place")
-heights = wind_height_periods(periods)
+cells = era5_cells(dim_place)
+# the reanalysis wind has one height for every cell
+heights = cells.select("place_key", "sensor_height_m")
 _date_to = read_gold("market_price", source="smard").agg(F.max("local_date")).first()[0]
 generation = (
     read_gold("energy_component", source="smard")
@@ -103,14 +105,14 @@ calendar = read_ml("features_calendar_market_area", ecosystem=ECO)
 
 # COMMAND ----------
 
-# DBTITLE 1,Station-day wind and radiation -- two kept tables
+# DBTITLE 1,Cell-day wind and station-day radiation -- two kept tables
 write_stored_table(
-    station_day_wind(weather, heights, DATE_FROM, str(_date_to)),
-    "features_station_day_wind",
+    cell_day_wind(daily, DATE_FROM, str(_date_to)),
+    "features_cell_day_wind",
     ECO,
     key_cols=["place_key", "local_date"],
-    source="dwd",
-    component=f"{COMPONENT}/station_day_wind",
+    source="era5",
+    component=f"{COMPONENT}/cell_day_wind",
     rid=rid,
     section="features",
 )
@@ -124,7 +126,7 @@ write_stored_table(
     rid=rid,
     section="features",
 )
-sday = read_ml("features_station_day_wind", ecosystem=ECO)
+sday = read_ml("features_cell_day_wind", ecosystem=ECO)
 rday = read_ml("features_station_day_radiation", ecosystem=ECO)
 
 # COMMAND ----------
@@ -233,10 +235,6 @@ units_zoned = (
 )
 onshore_units = units_zoned.filter(~F.col("is_offshore"))
 offshore_units = units_zoned.filter(F.col("is_offshore"))
-_wind_periods = periods.filter(F.col("parameter_category").rlike(WIND_CATEGORY_PATTERN))
-stations = station_table(dim_place, _wind_periods).filter(
-    ~F.col("name").rlike(MOUNTAIN_STATION_PATTERN)
-)
 _gen_onshore = (
     generation.filter(F.col("carrier_code") == "onshore_wind")
     .join(
@@ -253,7 +251,7 @@ _sday_fit = sday.filter(F.col("local_date") <= VALID_TO)
 
 
 def score_parameters(k, cap_km, alpha):
-    weights = unit_station_weights(onshore_units, stations, k=k, cap_km=cap_km)
+    weights = unit_station_weights(onshore_units, cells, k=k, cap_km=cap_km)
     umonths = unit_months(onshore_units, TRAIN_FROM, VALID_TO)
     zw = zone_station_weights(umonths, weights, heights, alpha)
     zdaily = zone_wind_daily(_sday_fit, zw, min_covered=MIN_COVERED).join(
@@ -292,7 +290,7 @@ for _k in GRID_K:
             print(f"k={_k} cap={_cap} alpha={_alpha}: train={_train} valid={_valid}")
 _scored = [r for r in _results if r[3] is not None]
 if not _scored:
-    raise RuntimeError("no parameter set scored; check the stations and the units")
+    raise RuntimeError("no parameter set scored; check the ERA5 cells and the units")
 _best = max(_scored, key=lambda r: r[3])
 K, CAP_KM, ALPHA = _best[0], _best[1], _best[2]
 record_imputer(
@@ -304,7 +302,7 @@ record_imputer(
             f"k{k}_cap{int(c)}_alpha{a}",
             "grid_search",
             {
-                "station_count": k,
+                "cell_count": k,
                 "distance_cap_km": c,
                 "shear_exponent": a,
                 "min_covered_weight": MIN_COVERED,
@@ -322,16 +320,15 @@ print(f"selected: k={K} cap_km={CAP_KM} alpha={ALPHA} train corr={_best[3]}")
 
 # DBTITLE 1,Zone wind (onshore and offshore) and zone radiation per day
 _umonths_on = unit_months(onshore_units, DATE_FROM, str(_date_to))
-_weights_on = unit_station_weights(onshore_units, stations, k=K, cap_km=CAP_KM)
+_weights_on = unit_station_weights(onshore_units, cells, k=K, cap_km=CAP_KM)
 onshore = zone_wind_daily(
     sday,
     zone_station_weights(_umonths_on, _weights_on, heights, ALPHA),
     min_covered=MIN_COVERED,
 )
-_coastal = station_table(dim_place, _wind_periods, names_like=COASTAL_STATION_PATTERN)
 _weights_off = unit_station_weights(
     offshore_units,
-    _coastal,
+    cells,
     k=OFFSHORE_K,
     cap_km=OFFSHORE_CAP_KM,
     decay_km=OFFSHORE_DECAY_KM,
@@ -505,48 +502,7 @@ for r in _rows:
 
 # COMMAND ----------
 
-# DBTITLE 1,Acceptance -- the mountain stations included, and the findings
-_stations_all = station_table(dim_place, _wind_periods)
-_weights_all = unit_station_weights(onshore_units, _stations_all, k=K, cap_km=CAP_KM)
-with_mountain = (
-    zone_wind_daily(
-        sday,
-        zone_station_weights(
-            unit_months(onshore_units, TRAIN_FROM, str(_date_to)),
-            _weights_all,
-            heights,
-            ALPHA,
-        ),
-    )
-    .select(
-        "market_area_code",
-        "local_date",
-        F.col("wind_speed_cubed_adjusted_mean").alias("proxy_mountain"),
-    )
-    .toPandas()
-)
-_base_frame = frames["onshore_wind"]
-_cmp = []
-for zone in sorted(_base_frame["market_area_code"].unique()):
-    z = _base_frame[_base_frame["market_area_code"] == zone].merge(
-        with_mountain[with_mountain["market_area_code"] == zone][
-            ["local_date", "proxy_mountain"]
-        ],
-        on="local_date",
-        how="left",
-    )
-    excluded = fit_and_score(z, ["proxy"])
-    included = fit_and_score(z.assign(proxy=z["proxy_mountain"]), ["proxy"])
-    if excluded and included:
-        _cmp.append(
-            (
-                zone,
-                round(excluded["corr"], 3),
-                round(included["corr"], 3),
-                round(excluded["mae"], 4),
-                round(included["mae"], 4),
-            )
-        )
+# DBTITLE 1,Acceptance -- the verdict per carrier, and the findings
 _verdict = {
     c: "PASS" if all(r[5] == "PASS" for r in _rows if r[0] == c) else "FAIL"
     for c in _VARIABLE
@@ -576,19 +532,6 @@ write_ml_findings(
                     "status",
                 ],
                 _rows,
-            ),
-        ),
-        (
-            "mountain_stations",
-            markdown_table(
-                [
-                    "zone",
-                    "corr_excluded",
-                    "corr_included",
-                    "mae_excluded",
-                    "mae_included",
-                ],
-                _cmp,
             ),
         ),
     ],

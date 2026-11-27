@@ -926,29 +926,23 @@ BLOCKS["price_spike"] = [
         markdown_table(["percentile", "eur_per_mwh"], [("train p95", SPIKE_THRESHOLD)]),
     )
 ]
-# German daily mean price against the daily mean price of each neighbour area
+# German daily mean price against the daily mean price of each neighbour area; both
+# are the ENTSO-E zone prices, so a spread has one basis. A day counts when its prices
+# cover 23 of 24 hours (the share is 0.958).
 NEIGHBOURS = ["at", "be", "ch", "cz", "dk1", "dk2", "fr", "hu", "it_north", "nl"]
 NEIGHBOURS += ["no2", "pl", "si"]
-_clock_price = price.filter(
-    F.col("interval_seconds").isin(900, 3600) & F.col("price_eur_per_mwh").isNotNull()
+ZONE_PRICE_MIN_COVERAGE = 0.95
+_zone_price = read_gold("market_zone_price_daily", source=SOURCE).filter(
+    F.col("price_eur_per_mwh").isNotNull()
+    & (F.col("price_coverage") >= ZONE_PRICE_MIN_COVERAGE)
 )
-_german = (
-    _clock_price.filter(F.col("market_area_code") == MARKET_AREA)
-    .groupBy("local_date")
-    .agg(
-        F.avg("price_eur_per_mwh").alias("german_price"),
-        F.count("*").alias("german_values"),
-    )
-    .filter(F.col("german_values") >= 92)
+_german = _zone_price.filter(F.col("market_area_code") == MARKET_AREA).select(
+    "local_date", F.col("price_eur_per_mwh").alias("german_price")
 )
-_neighbour = (
-    _clock_price.filter(F.col("market_area_code").isin(*NEIGHBOURS))
-    .groupBy("market_area_code", "local_date")
-    .agg(
-        F.avg("price_eur_per_mwh").alias("neighbour_price"),
-        F.count("*").alias("neighbour_values"),
-    )
-    .filter(F.col("neighbour_values") >= 23)
+_neighbour = _zone_price.filter(F.col("market_area_code").isin(*NEIGHBOURS)).select(
+    "market_area_code",
+    "local_date",
+    F.col("price_eur_per_mwh").alias("neighbour_price"),
 )
 _spread = _neighbour.join(_german, "local_date").select(
     "market_area_code",

@@ -78,6 +78,7 @@ CITY_REGION = {
     "goerlitz": "Sachsen",
     "braunschweig": "Niedersachsen",
 }
+ERA5_TABLE = "era5_wind_100m_daily"
 MEASUREMENT_TABLES = (
     "dwd_air_temperature",
     "dwd_cloudiness",
@@ -226,12 +227,31 @@ site_locations = (
     .withColumn("_silver_loaded_at", F.current_timestamp())
     .withColumn("_silver_run_id", F.lit(RID))
 )
+# ERA5 grid cells: the latitude and longitude of the staged cell is its identity
+era5_locations = (
+    read_bronze(ERA5_TABLE)
+    .select(
+        F.col("latitude").cast("double").alias("latitude"),
+        F.col("longitude").cast("double").alias("longitude"),
+    )
+    .distinct()
+    .withColumn("source_location_id", era5_cell_id("latitude", "longitude"))
+    .withColumn("location_key", location_key("era5", "source_location_id"))
+    .withColumn("name", F.concat(F.lit("ERA5 cell "), F.col("source_location_id")))
+    .withColumn("continent", F.lit("EU"))
+    .withColumn("location_role", F.lit("grid_cell"))
+    .withColumn("geography_basis", F.lit("source_field"))
+)
 locations = (
     add_semantic_provenance(dwd_locations, "dwd", "dwd_station_geography", RID)
     .unionByName(
         add_semantic_provenance(
             aw_locations, "accuweather", "historical_hourly_metric", RID
         ),
+        allowMissingColumns=True,
+    )
+    .unionByName(
+        add_semantic_provenance(era5_locations, "era5", ERA5_TABLE, RID),
         allowMissingColumns=True,
     )
     .unionByName(site_locations, allowMissingColumns=True)

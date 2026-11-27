@@ -1,7 +1,7 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
-# environment_version = "5"
+# environment_version = "6"
 # ///
 # MAGIC %md
 # MAGIC # KNOWLEDGE -- WIKIPEDIA CHUNK AND EMBEDDING LIBRARY
@@ -61,6 +61,18 @@ def sha256_text(text):
 def file_sha256(path):
     with open(path, "rb") as handle:
         return hashlib.file_digest(handle, "sha256").hexdigest()
+
+
+def model_hash_check(model_dir, hashes_file):
+    """(found, pinned) hashes of the model and tokenizer files; `pinned` is read from
+    `hashes_file` in the model folder."""
+    with open(f"{model_dir}/{hashes_file}", encoding="utf-8") as handle:
+        pinned = json.load(handle)
+    found = {
+        "model_onnx_sha256": file_sha256(f"{model_dir}/{MODEL_FILE}"),
+        "tokenizer_sha256": file_sha256(f"{model_dir}/{TOKENIZER_FILE}"),
+    }
+    return found, pinned
 
 
 def normalize_sections(raw):
@@ -172,6 +184,16 @@ def load_session(model_dir):
         providers=[("CUDAExecutionProvider", {"use_tf32": 0}), "CPUExecutionProvider"],
     )
     return session, session.get_providers()[0]
+
+
+def reduce_components(vectors, count):
+    """The first `count` principal components of `vectors` (rows), the part of the
+    variance they hold, and the scores of every row. The fit uses the vectors only,
+    never a label."""
+    centred = vectors - vectors.mean(axis=0)
+    _, singular, rotation = np.linalg.svd(centred, full_matrices=False)
+    share = float((singular[:count] ** 2).sum() / (singular**2).sum())
+    return centred @ rotation[:count].T, share
 
 
 def embed_texts(session, tokenizer, texts, batch_size):

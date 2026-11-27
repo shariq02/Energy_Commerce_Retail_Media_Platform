@@ -12,12 +12,16 @@
 # MAGIC
 # MAGIC **Date:** November 2026
 # MAGIC
-# MAGIC **Purpose:** 18 `genomics_gold` tables: ten entity profiles (the entity rows
+# MAGIC **Purpose:** 19 `genomics_gold` tables: ten entity profiles (the entity rows
 # MAGIC with every attribute of their type; somatic mutations are keyed by their Silver
 # MAGIC record id), every relation row (`relation_record`), structural
 # MAGIC variants (variant rows and variant x gene rows), somatic sites, the ClinVar
 # MAGIC class changes in snapshot order and four typed tables that hold the many-side
-# MAGIC Silver rows (`record_kind` names the Silver table of a row).
+# MAGIC Silver rows (`record_kind` names the Silver table of a row). The 19th table,
+# MAGIC `entity_article_link`, holds the part of the Wikipedia corpus that ML needs: the
+# MAGIC kept article whose title equals a gene, drug or disease name, its lead text and a
+# MAGIC type check of the lead (a homonym fails it). It is read in place from
+# MAGIC `knowledge.wikipedia_article`; its vectors stay in the `knowledge` schema.
 
 # COMMAND ----------
 
@@ -32,6 +36,30 @@ COMPONENT = "gold/genomics/02_entities"
 RID = gold_run_id()
 GATE = {"source": SOURCE, "component": COMPONENT, "rid": RID}
 COMMON = {**GATE, "schema": GENOMICS_GOLD_SCHEMA}
+# the Wikipedia link: a name of a gene, drug or disease that equals the title of a kept
+# article is a link; the first 500 characters of the lead must hold a word of the type
+ARTICLE_TABLE = f"{CATALOG}.knowledge.wikipedia_article"
+LEAD_SECTION = "Lead"
+TYPE_CHECK_CHARACTERS = 500
+# entity type -> words of the lead of an article of that type (my choice)
+TYPE_WORDS = {
+    "gene": r"gene|protein|enzyme|receptor|transcription factor|encodes",
+    "drug": (
+        r"drug|medication|medicine|pharmaceutical|compound|antibiotic|inhibitor|"
+        r"agonist|antagonist|vaccine|therapy"
+    ),
+    "disease": (
+        r"disease|disorder|syndrome|condition|cancer|infection|illness|neoplasm|"
+        r"tumou?r|deficiency"
+    ),
+}
+# (entity type, profile table, key column, name column, match method)
+LINK_NAMES = (
+    ("gene", "gene_profile", "gene_key", "symbol", "symbol"),
+    ("gene", "gene_profile", "gene_key", "full_name", "full_name"),
+    ("drug", "drug_profile", "drug_key", "name", "name"),
+    ("disease", "disease_profile", "disease_key", "name", "name"),
+)
 MASTER_TYPES = ("transcript", "protein", "disease", "drug")
 # profile table -> (entity type, key, Silver table or None for entity_master, grain)
 PROFILES = {
@@ -338,6 +366,86 @@ for table, members in MANY_SIDE.items():
         }
     )
     TABLES[table] = (add_provenance(frame, SOURCE, RID, ecosystem="genomics"), grain)
+
+# COMMAND ----------
+
+# DBTITLE 1,Read the names of the genes, drugs and diseases (the Wikipedia link)
+link_names = None
+for _type, _table, _key, _column, _method in LINK_NAMES:
+    # the drug and disease profiles are built above; the gene profile is read from Gold
+    _profile = (
+        TABLES[_table][0] if _table in TABLES else read_gold(_table, source=SOURCE)
+    )
+    _part = (
+        _profile.select(
+            F.lit(_type).alias("entity_type"),
+            F.col(_key).alias("entity_key"),
+            F.col(_column).alias("matched_name"),
+            F.lit(_method).alias("match_method"),
+        )
+        .withColumn("match_name", F.lower(F.trim("matched_name")))
+        .filter(F.length("match_name") > 1)
+    )
+    link_names = _part if link_names is None else link_names.unionByName(_part)
+
+# COMMAND ----------
+
+# DBTITLE 1,Match the names with the titles of the kept Wikipedia articles
+articles = spark.table(ARTICLE_TABLE).filter(F.col("status") == "kept")
+titles = articles.select(
+    "article_id",
+    F.col("title").alias("article_title"),
+    F.lower(F.trim("title")).alias("match_name"),
+)
+pairs = link_names.join(titles, "match_name")
+
+# COMMAND ----------
+
+# DBTITLE 1,Read the lead text of the matched articles only
+# the ids are joined back, so the section column is read for the matched rows
+lead = F.expr("try_element_at(sections, 1)")
+leads = (
+    pairs.select("article_id")
+    .distinct()
+    .join(articles.select("article_id", "sections"), "article_id")
+    .select(
+        "article_id",
+        F.when(lead["section"] == LEAD_SECTION, lead["text"]).alias("lead_text"),
+    )
+    .filter(F.col("lead_text").isNotNull() & (F.length(F.trim("lead_text")) > 0))
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- entity_article_link (a link, its lead and the type check)
+opening = F.lower(F.substring("lead_text", 1, TYPE_CHECK_CHARACTERS))
+type_check = F.lit(False)
+for _type, _words in TYPE_WORDS.items():
+    type_check = F.when(
+        F.col("entity_type") == _type, opening.rlike(rf"\b({_words})\b")
+    ).otherwise(type_check)
+TABLES["entity_article_link"] = (
+    add_provenance(
+        pairs.join(leads, "article_id")
+        .withColumn("type_check_passed", type_check)
+        .withColumn("lead_word_count", F.size(F.split(F.trim("lead_text"), r"\s+")))
+        .select(
+            "entity_type",
+            "entity_key",
+            "match_method",
+            "matched_name",
+            "article_id",
+            "article_title",
+            "lead_text",
+            "lead_word_count",
+            "type_check_passed",
+        ),
+        SOURCE,
+        RID,
+        ecosystem="genomics",
+    ),
+    ["entity_type", "entity_key", "match_method", "article_id"],
+)
 
 # COMMAND ----------
 

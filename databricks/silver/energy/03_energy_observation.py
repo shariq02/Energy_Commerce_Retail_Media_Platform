@@ -19,6 +19,8 @@
 # MAGIC `energy_component` has one row per component of an energy balance, forecast or
 # MAGIC exchange (generation by carrier, consumption, residual load, forecast scope,
 # MAGIC commercial exchange and physical flow per neighbour). Sign is always native.
+# MAGIC `market_zone_price_daily` holds the ENTSO-E day-ahead price of Germany and each
+# MAGIC neighbour zone per local day, from one source, for the price spread.
 
 # COMMAND ----------
 
@@ -109,6 +111,25 @@ EXCHANGES_TABLE = "smard_commercial_exchanges"
 EXCHANGE_COLUMN = r"^(.+)_(export|import)_MWh_Original_resolutions$"
 FLOWS = "energy_charts"
 FLOWS_TABLE = "energy_charts_physical_flows"
+ENTSOE = "entsoe_observatory"
+ENTSOE_TABLE = "entsoe_observatory_zone_daily"
+# ENTSO-E bidding zone -> market area of this project (Germany and its neighbours)
+ENTSOE_AREAS = {
+    "DE_LU": "de_lu",
+    "AT": "at",
+    "BE": "be",
+    "CH": "ch",
+    "CZ": "cz",
+    "DK_1": "dk1",
+    "DK_2": "dk2",
+    "FR": "fr",
+    "HU": "hu",
+    "IT_NORD": "it_north",
+    "NL": "nl",
+    "NO_2": "no2",
+    "PL": "pl",
+    "SI": "si",
+}
 QUARTER_HOUR_SECONDS = 900
 GW_QUARTER_HOUR_TO_MWH = 250.0  # 1 GW for 15 minutes = 250 MWh
 NO_TEXT = F.lit(None).cast("string")
@@ -688,4 +709,57 @@ write_inspect_export(
     key_cols=["source_record_id"],
     writer=write_semantic,
     extra_checks=structure_extra_checks,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Transform -- ENTSO-E day-ahead price per market zone and local day
+# The staged rows are daily already (the mean of the hourly prices of the local day).
+# Germany and each neighbour come from one source, so a spread has one basis.
+bronze_zone_price = read_bronze(ENTSOE_TABLE)
+_zone_kept, _q = resolve_conflicts(
+    bronze_zone_price,
+    ["zone_key", "local_date"],
+    ["price_eur_mean", "price_coverage"],
+    bronze_table=ENTSOE_TABLE,
+)
+write_quarantine(_q.withColumn("source_system", F.lit(ENTSOE)), RID)
+zone_price_stats = reconciliation_stats(bronze_zone_price, _zone_kept, _q)
+zone_price_daily = (
+    _zone_kept.select(
+        F.col("zone_key").alias("source_zone_key"),
+        F.to_date(F.col("local_date"), "yyyy-MM-dd").alias("local_date"),
+        F.col("price_eur_mean").cast("double").alias("price_eur_per_mwh"),
+        F.col("price_coverage").cast("double").alias("price_coverage"),
+    )
+    .filter(F.col("price_eur_per_mwh").isNotNull())
+    .withColumn("market_area_code", lit_map(ENTSOE_AREAS)[F.col("source_zone_key")])
+    .withColumn("interval_reference", F.lit("local_day_europe_berlin"))
+    .withColumn("zone_price_key", sha_key("source_zone_key", "local_date"))
+    .withColumn("source_record_id", F.col("zone_price_key"))
+)
+zone_price_daily = conform(
+    add_semantic_provenance(zone_price_daily, ENTSOE, ENTSOE_TABLE, RID),
+    MARKET_ZONE_PRICE_DAILY_COLUMNS,
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Write, inspect and export -- market_zone_price_daily
+write_inspect_export(
+    zone_price_daily,
+    "market_zone_price_daily",
+    source=SOURCE,
+    component=COMPONENT,
+    rid=RID,
+    findings=FINDINGS,
+    key_cols=["zone_price_key"],
+    writer=write_semantic,
+    extra_checks=structure_extra_checks,
+    extra_blocks=[
+        (
+            f"dedup/conflict reconciliation -- {ENTSOE_TABLE}",
+            dict_to_markdown_row(zone_price_stats),
+        )
+    ],
 )
